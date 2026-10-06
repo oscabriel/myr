@@ -39,6 +39,19 @@
         "vitest": "catalog:",
       },
     },
+    "packages/protocol": {
+      "name": "@repo/protocol",
+      "dependencies": {
+        "@repo/brand": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
   },
   "catalog": {
     "@effect/platform-bun": "4.0.1",
@@ -271,6 +284,8 @@
     "@repo/brand": ["@repo/brand@workspace:packages/brand"],
 
     "@repo/config": ["@repo/config@workspace:packages/config"],
+
+    "@repo/protocol": ["@repo/protocol@workspace:packages/protocol"],
 
     "@rolldown/binding-android-arm-eabi": ["@rolldown/binding-android-arm-eabi@1.2.12", "", { "os": "android", "cpu": "arm" }, "sha512-dB/a1214qKfHMXCpgqR4OZT+jS4kTyEXbQGJPqzobt5EwH5rX080pxE37alt3RzvR1bf1Yz/yGqRfrYAxuPw0A=="],
 
