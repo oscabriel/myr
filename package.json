@@ -24,6 +24,8 @@
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "test": "turbo run test",
     "brand:check": "bun scripts/brand.ts",
+    "env:check": "varlock load --agent --path infra/",
+    "ops": "varlock run --path infra/ -- cf",
     "verify": "bun run lockfile:check && bun run check && bun run typecheck && bun run test && bun run brand:check"
   },
   "devDependencies": {
@@ -31,13 +33,15 @@
     "@effect/tsgo": "0.48.1",
     "@oxlint/plugins": "1.87.0",
     "@repo/brand": "workspace:*",
+    "cf": "1.0.0-beta.12",
     "effect": "catalog:",
     "oxfmt": "0.72.0",
     "oxlint": "1.87.0",
     "oxlint-tsgolint": "7.0.2003",
     "turbo": "2.11.7",
     "typescript": "catalog:",
-    "ultracite": "7.12.4"
+    "ultracite": "7.12.4",
+    "varlock": "1.21.1"
   },
   "packageManager": "bun@1.4.2"
 }
