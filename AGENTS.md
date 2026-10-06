@@ -63,7 +63,7 @@ Each code noun has one home:
 - **Stage:** `gate/src/stages/*.ts`.
 - **Cartridge:** a cut line removable by deletion.
 
-Contributors meet four domain nouns: ask, answer, check and refusal. They are vocabulary, not the brand. GLOSSARY.md defines them; until it lands, synthesis §8.1 does.
+Contributors meet four domain nouns: ask, answer, check and refusal. They are vocabulary, not the brand. `GLOSSARY.md` defines them.
 
 ## Boundaries
 
