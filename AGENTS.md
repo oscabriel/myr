@@ -17,25 +17,26 @@ The plan is the synthesis: `~/Developer/projects/wanted-explainer/notes/git-plat
 Fence wins over prose: if this file and an enforced check disagree, the check wins; fix this file. A rule held by "No fence yet" is debt: give it a fence.
 
 | # | Principle | Held by |
-|---|---|---|
+| --- | --- | --- |
 | 1 | **Encode lessons in structure; prose is the last rung.** When a mistake repeats, make it unrepresentable, then a lint or test, then a skill. | `packages/config/test/agents-table.test.ts`: every enforcer named here exists |
 | 2 | **Parse at the boundary, trust inside.** Decode every external input (HTTP, git, DO RPC, WebSocket, rule facts, env) with Effect Schema; inside, use branded types (`AskId`, `LandedSha`, `PatchId`). Decode the Worker `env` once, in one Layer. | Effect diagnostics map at `error`; anti-slop Effect rules; `env` typed by the generated `worker-configuration.d.ts`, with no `as` on `env` |
 | 3 | **Refusals are a closed `Schema.TaggedError` union and a public contract.** Handle them with `Match.exhaustive` or `catchTags`. Each carries a static `retryable`, a `next` command and an optional `at`, and no `message` field. A `_tag` is renamed only with an alias. `protocol/render` is the one renderer for git `remote:`, CLI and MCP text. Stage-1 refusals accumulate. | Union test; `gen:check` on `docs/reference/refusals.md`; an MCP `tools/call` test |
 | 4 | **One schema, many surfaces.** Change `packages/protocol`, then run `bun run gen`. `skills/`, `plugins/` and `docs/reference/` are generated. Projections live only in `apps/*/src/surfaces.ts`. | `gen:check` (`git diff --exit-code` after gen); per-package `allowedUnstableApis` |
 | 5 | **The name lives only in `packages/brand`.** Internal packages use `@repo/*`. DO classes, Workflows, queues and databases carry job names. | `brand:check` in `verify`; `scripts/acceptance.ts` renames the brand at random |
-| 6 | **Pure core, thin hosts.** Only `@repo/artifacts` calls Artifacts. Each beta dependency sits behind one job-named port with a `/memory` adapter in the owning package. Apps import packages only. Worker code stays free of `node:child_process`, `@effect/platform-bun` and OpenTUI. `rules` and `gate` run in both Workers and Bun. `alchemy/*` stays in `infra/`. | dependency-cruiser in `packages/config`; scoped `allowedUnstableApis`; `no-module-level-mutable-state` |
+| 6 | **Pure core, thin hosts.** Only `@repo/artifacts` calls Artifacts. Each beta dependency sits behind one job-named port with a `/memory` adapter in the owning package. Apps import packages only. Worker code stays free of `node:child_process`, `@effect/platform-bun` and OpenTUI. `rules` and `gate` run in both Workers and Bun. `alchemy/*` stays in `infra/`. | Scoped `allowedUnstableApis`; `no-module-level-mutable-state`. No fence yet: import direction (apps never import apps, Worker code stays host-free, `alchemy/*` only in `infra/`) |
 | 7 | **Deny by default for visibility.** Land the answer's tree, never the composed tree. Nothing from a layer enters a public tree. Snapshot before held-back files are written. Public-serving Workers have no private-namespace binding. Public commits, trailers, notes and errors name public paths only. | `PrivatePathInPublicTree` and snapshot-order tests; a type test that `apps/web/worker-configuration.d.ts` has no `ARTIFACTS_PRIVATE` |
 | 8 | **Deterministic and idempotent.** Rule evaluation sees frozen time and randomness and only injected facts. Re-running an operation converges. Check results are keyed by (tree SHA, check version), push events deduped by (repo, sha), and land requests carry a `requestId`. | `globalDate`, `globalRandom`, `globalTimers` and `cryptoRandomUUID` at `error`; replay-twice and dedupe tests; lifecycle model tests |
 | 9 | **Effect v4 only.** Read `node_modules/effect/src` as API truth. Off limits: `effect/unstable/*`, v3 `@effect/platform` and `@effect/cli`, and `effect/workflow` or `effect/cluster` on Workers. | `outdatedApi`; oxlint `no-restricted-imports`; `no-manual-effect-runtime-in-tests` |
-| 10 | **Escapes need a reason and only shrink.** Every `oxlint-disable`, `@effect-diagnostics` or `@ts-expect-error` carries a reason after ` -- ` and is counted. The count rises only with sign-off. | `scripts/debt.ts` against `debt.baseline.json` in `verify`; unused directives at `error` |
-| 11 | **Hooks are early feedback; `bun run verify` and CI are the authority.** Deploy only to an explicit stage, after `verify`, with smoke after. A red gate is fixed, never deployed around. | lefthook, plus `scripts/hooks/vcs-policy.ts` and its bypass-variant tests; `infra/deploy.ts` refuses without a stage and runs `scripts/smoke.ts`. No fence yet: CI on a cold install |
+| 10 | **Escapes need a reason and only shrink.** Every `oxlint-disable`, `@effect-diagnostics` or `@ts-expect-error` carries a reason after `--` and is counted. The count rises only with sign-off. | `scripts/debt.ts` against `debt.baseline.json` in `verify`; unused directives at `error` |
+| 11 | **Hooks are early feedback; `bun run verify` and CI are the authority.** Deploy only to an explicit stage, after `verify`, with smoke after. A red gate is fixed, never deployed around. | `scripts/hooks/vcs-policy.ts` and its bypass-variant tests; `infra/deploy.ts` refuses without a stage and runs `scripts/smoke.ts`. No fence yet: git hooks; CI on a cold install |
 | 12 | **Lifecycles are pure transitions.** `transition(state, command, now)`. Per DO call: hydrate, transition, persist, settle. Deadlines run on DO alarms. Call them lifecycles. | Model tests over `effect/Arbitrary` histories with one planted bug. No fence yet: a lint banning `Effect.sleep` and `setTimeout` in `packages/project` |
 
 ## Fence
 
-`bun run verify` is the gate: check, typecheck, test, `gen:check`, `brand:check` and deps. Run it before you stop. When a hook or check fails, fix the cause. Loosening, skipping or disabling a check needs the user's sign-off.
+`bun run verify` is the gate: the lockfile check, lint and format (`check`), typecheck, test, `gen:check` and `brand:check`. Run it before you stop. When a hook or check fails, fix the cause. Loosening, skipping or disabling a check needs the user's sign-off.
 
 **Safe by default:**
+
 - new or tightened tests;
 - tightening a rule;
 - a reasoned escape that keeps the count at or below the baseline;
@@ -43,9 +44,10 @@ Fence wins over prose: if this file and an enforced check disagree, the check wi
 - a cut that follows the README's "Keep or cut".
 
 **Needs the user's sign-off:**
+
 - a dependency outside the synthesis §4.4 adopt list;
 - any version change to effect, wrangler or pi;
-- loosening `oxlint.config.ts`, `tsconfig.base.json` (map, overrides, allow-lists), `.dependency-cruiser.cjs`, `lefthook.yml`, `scripts/hooks/*`, `turbo.json` or `package.json` scripts;
+- loosening `oxlint.config.ts`, `tsconfig.base.json` (map, overrides, allow-lists), `bunfig.toml`, `scripts/hooks/*`, `turbo.json` or `package.json` scripts;
 - raising `debt.baseline.json`;
 - renaming or removing a DO class;
 - deleting any Cloudflare resource;
@@ -55,6 +57,7 @@ Fence wins over prose: if this file and an enforced check disagree, the check wi
 ## Nouns
 
 Each code noun has one home:
+
 - **Contract:** one Rpc in `protocol/src/contracts.ts`.
 - **Projection:** `protocol/{cli,mcp}` and `apps/*/src/surfaces.ts`.
 - **Port:** the owning package's `src/<port>.ts`.
@@ -79,6 +82,7 @@ Wire schemas in `protocol` use `Schema.Int` or `Schema.Finite` in place of bare 
 ## Rejected dependencies
 
 Each was weighed and turned down; re-adding one needs sign-off.
+
 - `agents`: McpAgent is deprecated, it brings 17 peer dependencies, and it pins the MCP SDK at 2.0.0.
 - `alchemy`, until after Oct 14: released Alchemy can't declare DO-managed containers (PR #1905), so it would be a two-tool hybrid, with beta churn.
 - cf's project commands, `cloudflare.config.ts` and `@cloudflare/config`: the config can't declare `triggers.events`, the deploy refuses the sandbox's container self-binding, and it would be a second deploy tool in recording week.
@@ -107,3 +111,14 @@ The five default roles, each label equal to its name: `needs-triage`, `needs-inf
 ### Domain docs
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+<!-- BEGIN:turborepo-agent-rules -->
+
+# This is NOT the Turborepo you know
+
+Turborepo configuration, task behavior, and CLI commands can vary between installed versions and may differ from your training data. Resolve the `turbo` package from this file's directory or relevant workspace; in monorepos, it may not be visible from the repository root. For example, run `node -p "require.resolve('turbo/package.json')"` from a workspace that depends on `turbo`.
+
+Read `docs/README.md` inside that installed package first, then read the relevant pages from its `docs/` directory before changing Turborepo configuration or commands. Heed deprecation notices. These bundled docs match the installed package version and are available without network access.
+
+This block is written and re-added by `turbo` before repository-scoped commands when an AI agent is detected. In the Turborepo source repository, its template is defined in `crates/turborepo-cli/src/cli/agent_guidance.rs`. Removing the managed block while updates are enabled means a later qualifying invocation will add it again. Set `"agentGuidance": false` in the root `turbo.json` or `turbo.jsonc` to opt out; this does not remove an existing block. Keep the block committed with your work to avoid an uncommitted change on the next agent invocation.
+<!-- END:turborepo-agent-rules -->

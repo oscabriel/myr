@@ -1,0 +1,14 @@
+import { defineConfig } from "oxfmt";
+import ultracite from "ultracite/oxfmt";
+
+export default defineConfig({
+  ...ultracite,
+  ignorePatterns: [
+    ...(ultracite.ignorePatterns ?? []),
+    ".agent_sources/**",
+    // Prose is hand-shaped: the glossary keeps term, definition and _Avoid_ on
+    // separate lines, and code spans keep their inner spaces.
+    "**/*.md",
+    "tools/oxlint/anti-slop/**",
+  ],
+});

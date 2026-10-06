@@ -1,0 +1,16 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "tasks": {
+    "types": {
+      "outputs": ["worker-configuration.d.ts"]
+    },
+    "typecheck": {
+      "dependsOn": ["types", "^types"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["types", "^types"],
+      "outputs": []
+    }
+  }
+}

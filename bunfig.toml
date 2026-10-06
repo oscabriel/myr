@@ -1,0 +1,9 @@
+[install]
+exact = true
+linker = "isolated"
+# One day, in seconds (pnpm's default). Excludes take package names, not
+# name@version, and lift the gate for every version of that package. Bun drops
+# an optional dependency the gate blocks without an error, so a too-fresh native
+# binding shows up as a tool that will not start, not as an install failure.
+minimumReleaseAge = 86400
+minimumReleaseAgeExcludes = []

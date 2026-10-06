@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+.wrangler/
+*.log
+.DS_Store
+
+# Pinned source mirrors for agents (scripts/vendor-agent-sources.sh)
+.agent_sources/
+
+# varlock: keep .env.schema; local values stay out of git
+.env
+.env.local
+.env.*.local
+.dev.vars*
+env.d.ts
