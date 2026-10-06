@@ -12,7 +12,7 @@ class BrandLeaks extends Data.TaggedError("BrandLeaks")<{
   readonly count: number;
 }> {}
 
-const listCommittable = Effect.gen(function* listCommittable() {
+const listCommittable = Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
   const lines = yield* spawner.lines(
@@ -28,7 +28,7 @@ const listCommittable = Effect.gen(function* listCommittable() {
   return lines.filter((line) => line.length > 0);
 });
 
-const check = Effect.gen(function* check() {
+const check = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* listCommittable;
 

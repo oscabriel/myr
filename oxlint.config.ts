@@ -27,6 +27,40 @@ export default defineConfig({
   options: {
     typeAware: true,
   },
+  overrides: [
+    {
+      // Ultracite sets the vitest rules in an override for these files, which
+      // beats top-level rules. Without `plugins` here, oxlint 1.87 keeps
+      // Ultracite's options for the rule and drops ours.
+      files: [
+        "**/*.{test,spec,test-d,spec-d}.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
+        "**/__tests__/**/*.{ts,tsx,js,jsx,mts,cts,mjs,cjs}",
+      ],
+      plugins: ["vitest"],
+      rules: {
+        // `@effect/vitest` test blocks: `it.effect(…, () => Effect.gen(…))`.
+        "vitest/no-standalone-expect": [
+          "error",
+          {
+            additionalTestBlockFunctions: [
+              "it.effect",
+              "it.effect.each",
+              "it.effect.only",
+              "it.effect.skip",
+              "it.flakyTest",
+              "it.layer",
+              "it.live",
+              "it.live.each",
+              "it.prop",
+              "layer",
+            ],
+          },
+        ],
+      },
+    },
+  ],
+  // Lint fits Effect, not the other way around: where a rule fights an idiom
+  // Effect's own docs use, the rule changes, with its reason beside it.
   rules: {
     "anti-slop-effect/no-manual-effect-error-tag": "error",
     "anti-slop-effect/no-manual-tag-comparison": "error",
@@ -51,6 +85,13 @@ export default defineConfig({
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/require-readable-spacing": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
+    // Effect: `Effect.gen(function* () {…})`; `Effect.fn("name")` names spans.
+    "func-names": ["error", "always", { generators: "never" }],
+    // Effect: Schema classes, tagged errors and services are all classes.
+    "max-classes-per-file": "off",
+    // Effect: `const X = Schema…` beside `type X = typeof X.Type`. tsc still
+    // catches a real redeclaration.
+    "no-redeclare": "off",
     "no-restricted-imports": [
       "error",
       {
@@ -75,5 +116,9 @@ export default defineConfig({
       },
     ],
     "oxc/no-accumulating-spread": "error",
+    // Effect: `Effect.forEach(xs, f, { concurrency })` is not a `thisArg`.
+    "unicorn/no-array-method-this-argument": "off",
+    // Effect: `Schema.TaggedError<X>()(…)` returns a class, not an error.
+    "unicorn/throw-new-error": "off",
   },
 });

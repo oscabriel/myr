@@ -39,6 +39,7 @@ Fence wins over prose: if this file and an enforced check disagree, the check wi
 
 - new or tightened tests;
 - tightening a rule;
+- changing a lint rule that fights an idiom Effect's own docs use, with the reason beside it in `oxlint.config.ts` (lint fits Effect, not the other way around);
 - a reasoned escape that keeps the count at or below the baseline;
 - docs;
 - a cut that follows the README's "Keep or cut".
