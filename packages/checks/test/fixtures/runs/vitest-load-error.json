@@ -1,0 +1,44 @@
+{
+  "code": 1,
+  "report": {
+    "numTotalTestSuites": 1,
+    "numPassedTestSuites": 0,
+    "numFailedTestSuites": 1,
+    "numPendingTestSuites": 0,
+    "numTotalTests": 0,
+    "numPassedTests": 0,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "snapshot": {
+      "added": 0,
+      "failure": false,
+      "filesAdded": 0,
+      "filesRemoved": 0,
+      "filesRemovedList": [],
+      "filesUnmatched": 0,
+      "filesUpdated": 0,
+      "matched": 0,
+      "total": 0,
+      "unchecked": 0,
+      "uncheckedKeysByFile": [],
+      "unmatched": 0,
+      "updated": 0,
+      "didUpdate": false
+    },
+    "startTime": 1791367638742,
+    "success": false,
+    "testResults": [
+      {
+        "assertionResults": [],
+        "startTime": 1791367638742,
+        "endTime": 1791367638742,
+        "status": "failed",
+        "message": "Cannot find module '../src/weeks.js' imported from /work/datekit/test/week.test.js",
+        "name": "/work/datekit/test/week.test.js"
+      }
+    ]
+  },
+  "stderr": "\n⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  test/week.test.js [ test/week.test.js ]\nError: Cannot find module '../src/weeks.js' imported from /work/datekit/test/week.test.js\n ❯ test/week.test.js:1:1\n      1| import { parseWeek } from \"../src/weeks.js\";\n       | ^\n      2|\n      3| describe(\"parseWeek\", () => {\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
+  "stdout": "\n RUN  v5.0.3 /work/datekit\n\n ❯ test/week.test.js (0 test)\n\n Test Files  1 failed (1)\n      Tests  no tests\n   Start at  03:07:18\n   Duration  85ms (worker 98%, environment 2%)\n\nJSON report written to /work/datekit/report.json\n"
+}
