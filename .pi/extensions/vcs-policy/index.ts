@@ -6,6 +6,8 @@
  * the slice of pi's extension API this file uses, checked against pi 1.0.4's
  * `dist/core/extensions/types.d.ts`; pi itself is not a dependency here.
  */
+import { Option, Schema } from "effect";
+
 import { Decision, decide } from "../../../scripts/hooks/lib/policy.ts";
 
 /** pi's `ToolCallEvent`, as far as this extension reads it. */
@@ -28,33 +30,35 @@ export interface PiApi {
   ): unknown;
 }
 
+/** pi's `BashToolInput`, as far as the policy reads it. */
+const BashInput = Schema.Struct({ command: Schema.String });
+
 const UNREADABLE: Block = {
   block: true,
   reason:
     "vcs-policy could not read a shell command from this bash call, so it refuses it.",
 };
 
+const blockFor = (command: string): Block | undefined => {
+  const decision = decide(command);
+
+  return Decision.$is("Deny")(decision)
+    ? {
+        block: true,
+        reason: `vcs-policy refused this command (${decision.rule}): ${decision.reason}`,
+      }
+    : undefined;
+};
+
 const vcsPolicy = (pi: PiApi) => {
-  pi.on("tool_call", (event) => {
-    if (event.toolName !== "bash") {
-      return undefined;
-    }
-
-    const { command } = event.input;
-
-    if (typeof command !== "string") {
-      return UNREADABLE;
-    }
-
-    const decision = decide(command);
-
-    return Decision.$is("Deny")(decision)
-      ? {
-          block: true,
-          reason: `vcs-policy refused this command (${decision.rule}): ${decision.reason}`,
-        }
-      : undefined;
-  });
+  pi.on("tool_call", (event) =>
+    event.toolName === "bash"
+      ? Option.match(Schema.decodeUnknownOption(BashInput)(event.input), {
+          onNone: () => UNREADABLE,
+          onSome: ({ command }) => blockFor(command),
+        })
+      : undefined
+  );
 };
 
 export default vcsPolicy;

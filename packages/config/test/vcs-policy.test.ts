@@ -210,9 +210,26 @@ describe(decide, () => {
     ["bun run ops -- workers list", "Allow"],
     ["bun run ops -- zones purge-cache x", "delete"],
     ["bun run ops -- workers delete x --dry-run=false", "delete"],
+    // cf parses with yargs, which reads `false` after a boolean flag as its
+    // value, and the last of `--dry-run` and `--no-dry-run` wins.
+    ["bun run ops -- workers delete x --dry-run false", "delete"],
+    ["bun run ops -- workers delete x --dry-run --no-dry-run", "delete"],
+    ["bun run ops -- workers delete x --no-dry-run --dry-run", "Allow"],
+    // AGENTS.md's discovery steps only read: `cli search`, `schema <command>`
+    // and `<command> --help` (the help cf itself points to) delete nothing.
+    ['bun run ops -- cli search "delete"', "Allow"],
+    ["bun run ops -- schema artifacts namespaces repos delete", "Allow"],
+    ["bun run ops -- artifacts namespaces repos delete --help", "Allow"],
+    // cf's package installs its bin under a second name, `cloudflare`.
+    ["./node_modules/.bin/cloudflare deploy", "cf-project-command"],
+    ["bunx cloudflare workers delete x", "delete"],
     // cf's project commands are refused even as dry runs, and through varlock.
     ["cf deploy --dry-run", "cf-project-command"],
     ["cf --profile dev deploy", "cf-project-command"],
+    // An option cf doesn't declare may take the next word as its value, so
+    // any word it could have taken may be the command.
+    ["cf --account-id x --env y deploy", "cf-project-command"],
+    ["cf --account-id x workers list --name deploy", "Allow"],
     ["bunx varlock run --path infra/ -- cf deploy", "cf-project-command"],
     ["bun run verify", "Allow"],
     ["bun infra/deploy.ts --stage demo", "Allow"],
@@ -235,6 +252,26 @@ describe(decide, () => {
     ["grep -f .env other.txt", "closed-env-read"],
     ["cp .env /tmp/x", "closed-env-read"],
     ["set -a; . ./.env; set +a", "closed-env-read"],
+    // A recursive grep reads every file under its paths, the closed ones too,
+    // unless --include or --exclude keeps them out. A pattern is not a file.
+    ["grep -rn TOKEN .", "closed-env-read"],
+    ["grep -R TOKEN apps/platform", "closed-env-read"],
+    ["grep --recursive TOKEN", "closed-env-read"],
+    ["grep -d recurse TOKEN .", "closed-env-read"],
+    ["grep -rn TOKEN . --include='*'", "closed-env-read"],
+    ["grep -rn TOKEN . --exclude='*.local'", "closed-env-read"],
+    ["grep -rn TOKEN . --include='*.ts'", "Allow"],
+    ["grep -rn TOKEN . --exclude='.env*'", "Allow"],
+    ["grep -rn TOKEN . --exclude=.env --exclude='*.local'", "Allow"],
+    ["grep -rn TOKEN . --exclude={.env,.env.local,.env.*.local}", "Allow"],
+    ["grep -n -e .env .gitignore", "Allow"],
+    // rg skips hidden and git-ignored files; the closed files are both, so it
+    // reaches them only when told to search both.
+    ["rg TOKEN", "Allow"],
+    ["rg --hidden TOKEN", "Allow"],
+    ["rg -uu TOKEN", "closed-env-read"],
+    ["rg --hidden --no-ignore-vcs TOKEN", "closed-env-read"],
+    ["rg -. -u TOKEN", "closed-env-read"],
     ["bun run env:check", "Allow"],
   ])("%s → %s", (command, verdict) => {
     expect(verdictOf(command)).toBe(verdict);
@@ -252,7 +289,7 @@ describe(decide, () => {
       "cf-project-command":
         "cf's project commands are not our deploy tool; use infra/deploy.ts.",
       "closed-env-read":
-        "Never read .env, .env.local or .env.*.local; run bun run env:check.",
+        "Never read .env, .env.local or .env.*.local, even in a recursive search (rg and git grep skip them); run bun run env:check.",
       delete: "Deleting Cloudflare resources needs the user's OK.",
       "hook-bypass":
         "Hooks are early feedback; fix the failure instead of skipping it (AGENTS.md principle 11).",

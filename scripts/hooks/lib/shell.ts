@@ -16,6 +16,13 @@
  * `<`, and the heredoc or here-string text on its stdin.
  */
 export interface Simple {
+  readonly words: readonly string[];
+  readonly reads: readonly string[];
+  readonly stdin: readonly string[];
+}
+
+/** A simple command while the scan is still reading it. */
+interface Building {
   readonly words: string[];
   readonly reads: string[];
   readonly stdin: string[];
@@ -130,7 +137,7 @@ const ansiC = (body: string): string => {
 const scan = (src: string, start: number, nested: boolean): Scanned => {
   const commands: Simple[] = [];
   const heredocs: Heredoc[] = [];
-  let simple: Simple = { reads: [], stdin: [], words: [] };
+  let simple: Building = { reads: [], stdin: [], words: [] };
   let word = "";
   let inWord = false;
   let quoted = false;

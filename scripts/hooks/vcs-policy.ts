@@ -10,8 +10,9 @@
  *   on stderr; an allowed command exits 0 and prints nothing.
  * - Cursor: prints `{"permission": "allow" | "deny", …}` and exits 0.
  *
- * Input it cannot read, or any failure of its own, is a refusal: it fails
- * closed, so a broken hook never lets a command through.
+ * Input it cannot read, or a failure while it judges, is a refusal: it fails
+ * closed. A hook that cannot start at all (no `bun install` yet) exits 1,
+ * which Cursor's `failClosed` blocks and Claude Code reports without blocking.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {

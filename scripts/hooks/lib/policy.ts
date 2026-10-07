@@ -40,7 +40,7 @@ export const reasons = {
   "cf-project-command":
     "cf's project commands are not our deploy tool; use infra/deploy.ts.",
   "closed-env-read":
-    "Never read .env, .env.local or .env.*.local; run bun run env:check.",
+    "Never read .env, .env.local or .env.*.local, even in a recursive search (rg and git grep skip them); run bun run env:check.",
   delete: "Deleting Cloudflare resources needs the user's OK.",
   "hook-bypass":
     "Hooks are early feedback; fix the failure instead of skipping it (AGENTS.md principle 11).",
@@ -212,7 +212,7 @@ const DESTRUCTIVE = /(?:^|-)(?:delete|destroy|purge|remove|revoke)(?:-|$)/u;
 
 // cf-project-command ----------------------------------------------------------
 
-// cf's global options that take a value.
+// cf's global options that take a value (`cf --help`, cf 1.0.0-beta.12).
 const CF = grammar("-m -z --mode --persist-to --profile --zone");
 
 const CF_PROJECT = names("build deploy dev init migrate previews");
@@ -222,36 +222,101 @@ const CF_PROJECT_SEQUENCES: readonly (readonly string[])[] = [
   ["workers", "versions", "create"],
 ];
 
+/** cf's commands that only read: AGENTS.md's `cli search` and `schema`. */
+const CF_DISCOVERY = names("cli schema");
+
+/**
+ * The words that may be cf's command. cf parses with yargs, which gives an
+ * option it doesn't declare the next word as its value, so each such word may
+ * be the command too: `cf --account-id x deploy`. The last word is the first
+ * one no option can have taken.
+ */
+const cfCommandWords = (args: readonly string[]): readonly string[] => {
+  const [word, next, ...rest] = args;
+
+  if (word === undefined) {
+    return [];
+  }
+
+  if (word === "--") {
+    return next === undefined ? [] : [next];
+  }
+
+  if (!word.startsWith("-") || word === "-") {
+    return [word];
+  }
+
+  if (word.includes("=") || next === undefined || next.startsWith("-")) {
+    return cfCommandWords(args.slice(1));
+  }
+
+  const after = cfCommandWords(rest);
+
+  return CF.values.has(word) ? after : [next, ...after];
+};
+
+/** Values yargs reads as false for a boolean flag. */
+const OFF = names("0 false");
+
+const DRY_RUN = "--dry-run";
+
+const setsDryRun = (word: string) =>
+  word === DRY_RUN || word === "--no-dry-run" || word.startsWith(`${DRY_RUN}=`);
+
+/** Whether the last `--dry-run`, `--dry-run=…` or `--no-dry-run` turns it on. */
+const dryRun = (args: readonly string[]): boolean => {
+  const end = args.indexOf("--");
+  const flags = end === -1 ? args : args.slice(0, end);
+  const last = flags.findLastIndex(setsDryRun);
+  const word = flags[last] ?? "--no-dry-run";
+
+  if (word === "--no-dry-run") {
+    return false;
+  }
+
+  return !OFF.has(
+    word === DRY_RUN ? (flags[last + 1] ?? "") : word.slice(DRY_RUN.length + 1)
+  );
+};
+
 const judgeCf = (args: readonly string[]): Verdict => {
   const parsed = parse(args, CF, true);
-  const [first = "", second = ""] = parsed.operands;
-  // An option cf doesn't declare may take the next word as its value.
-  const optionFirst = args[0]?.startsWith("-") === true;
+  const commands = cfCommandWords(args);
+  const [command = ""] = commands;
+
+  if (commands.length === 1 && CF_DISCOVERY.has(command)) {
+    return Option.none();
+  }
 
   if (
-    CF_PROJECT.has(first) ||
-    (optionFirst && CF_PROJECT.has(second)) ||
+    commands.some((word) => CF_PROJECT.has(word)) ||
     CF_PROJECT_SEQUENCES.some((sequence) => contains(parsed.operands, sequence))
   ) {
     return Option.some("cf-project-command");
   }
 
-  const dryRun =
-    parsed.options.includes("--dry-run") &&
-    parsed.values.every(
-      ([option, value]) => option !== "--dry-run" || value !== "false"
-    );
+  // `<command> --help` prints the command's help, as cf's own help suggests.
+  const executes = !parsed.options.includes("--help") && !dryRun(args);
 
   return breaks(
     "delete",
-    !dryRun && parsed.operands.some((word) => DESTRUCTIVE.test(word))
+    executes && parsed.operands.some((word) => DESTRUCTIVE.test(word))
   );
 };
 
 // closed-env-read -------------------------------------------------------------
 
-/** One name for each closed shape, for testing globs against. */
-const CLOSED_SAMPLES = [".env", ".env.local", ".env.development.local"];
+/**
+ * Closed names to test globs against: one of each fixed name and a few of the
+ * `.env.*.local` shape, so a glob covers the shape only if it matches them all.
+ */
+const CLOSED_SAMPLES = [
+  ".env",
+  ".env.local",
+  ".env.development.local",
+  ".env.production.local",
+  ".env.test.local",
+];
 
 const isClosedName = (name: string) =>
   name === ".env" || name === ".env.local" || /^\.env\..+\.local$/u.test(name);
@@ -273,16 +338,21 @@ const globPart = (part: string) => {
 };
 
 /**
- * Whether a shell glob could match `name`. A bracket matches any one
- * character, which only widens the match; a leading `*` never matches a
- * dotfile, as in a shell without `dotglob`.
+ * Whether a glob could match `name`, as fnmatch does without `FNM_PERIOD`. A
+ * bracket matches any one character, which only widens the match.
  */
-const globMatches = (pattern: string, name: string) =>
-  pattern.startsWith(".") &&
+const fnmatch = (pattern: string, name: string) =>
   new RegExp(
     `^${pattern.replaceAll(/\[[^\]]*\]|[\s\S]/gu, globPart)}$`,
     "u"
   ).test(name);
+
+/**
+ * Whether a shell glob could match the dotfile `name`: a leading `*` never
+ * matches one, as in a shell without `dotglob`.
+ */
+const globMatches = (pattern: string, name: string) =>
+  pattern.startsWith(".") && fnmatch(pattern, name);
 
 /** `a{b,c}d` → `abd`, `acd`, as a shell expands braces. */
 const braces = (word: string): readonly string[] => {
@@ -312,6 +382,63 @@ const namesClosedEnv = (word: string) =>
     })
   );
 
+/** The globs one option names, braces expanded: `--include={a,b}`. */
+const globsOf = (parsed: Parsed, option: string) =>
+  parsed.values.flatMap(([name, value]) =>
+    name === option ? braces(value) : []
+  );
+
+const GREP_RECURSIVE = names("-R -r --dereference-recursive --recursive");
+
+/**
+ * `grep -r` reads every file under its paths, the closed ones too, unless
+ * `--include` leaves them out or `--exclude` covers them (grep matches both
+ * against the file's name with fnmatch, so `*` matches a leading dot).
+ */
+const grepReachesClosed = (parsed: Parsed) => {
+  const recursive =
+    parsed.options.some((option) => GREP_RECURSIVE.has(option)) ||
+    parsed.values.some(
+      ([option, value]) =>
+        (option === "-d" || option === "--directories") && value === "recurse"
+    );
+
+  const includes = globsOf(parsed, "--include");
+  const excludes = globsOf(parsed, "--exclude");
+
+  return (
+    recursive &&
+    CLOSED_SAMPLES.some(
+      (sample) =>
+        (includes.length === 0 ||
+          includes.some((glob) => fnmatch(glob, sample))) &&
+        !excludes.some((glob) => fnmatch(glob, sample))
+    )
+  );
+};
+
+const RG_HIDDEN = names("-. --hidden");
+
+const RG_IGNORED = names("--no-ignore --no-ignore-parent --no-ignore-vcs");
+
+/**
+ * rg skips hidden files and the files .gitignore names, and the closed files
+ * are both, so it reaches them only when told to search both: `-uu`, or
+ * `--hidden` with `--no-ignore`.
+ */
+const rgReachesClosed = (parsed: Parsed) => {
+  const unrestricted = parsed.options.filter(
+    (option) => option === "-u" || option === "--unrestricted"
+  ).length;
+
+  return (
+    (unrestricted >= 2 ||
+      parsed.options.some((option) => RG_HIDDEN.has(option))) &&
+    (unrestricted >= 1 ||
+      parsed.options.some((option) => RG_IGNORED.has(option)))
+  );
+};
+
 /**
  * A reader whose first operand is a pattern or a script, not a file, unless
  * one of `instead` supplies it.
@@ -319,6 +446,10 @@ const namesClosedEnv = (word: string) =>
 interface PatternFirst {
   readonly grammar: Grammar;
   readonly instead: ReadonlySet<string>;
+  /** Options whose value is a pattern or a glob, never a file it reads. */
+  readonly patterns: ReadonlySet<string>;
+  /** Whether a search of whole directories can reach a closed file. */
+  readonly reachesClosed: (parsed: Parsed) => boolean;
 }
 
 const GREP: PatternFirst = {
@@ -326,6 +457,8 @@ const GREP: PatternFirst = {
     "-A -B -C -D -d -e -f -m --after-context --before-context --binary-files --context --devices --directories --exclude --exclude-dir --exclude-from --file --include --label --max-count --regexp"
   ),
   instead: names("-e -f --file --regexp"),
+  patterns: names("-e --exclude --exclude-dir --include --regexp"),
+  reachesClosed: grepReachesClosed,
 };
 
 const AWK: PatternFirst = {
@@ -333,6 +466,8 @@ const AWK: PatternFirst = {
     "-E -F -W -f -i -l -v --assign --exec --field-separator --file --include --load"
   ),
   instead: names("-E -f --exec --file"),
+  patterns: names(""),
+  reachesClosed: () => false,
 };
 
 const RG: PatternFirst = {
@@ -340,11 +475,15 @@ const RG: PatternFirst = {
     "-A -B -C -E -M -T -d -e -f -g -j -m -r -t --after-context --before-context --color --colors --context --context-separator --encoding --engine --file --glob --iglob --ignore-file --max-columns --max-count --max-depth --max-filesize --path-separator --pre --pre-glob --regexp --replace --sort --sortr --threads --type --type-add --type-not"
   ),
   instead: names("-e -f --file --files --regexp --type-list"),
+  patterns: names("-e --regexp"),
+  reachesClosed: rgReachesClosed,
 };
 
 const SED: PatternFirst = {
   grammar: grammar("-e -f -l --expression --file --line-length", "-i"),
   instead: names("-e -f --expression --file"),
+  patterns: names(""),
+  reachesClosed: () => false,
 };
 
 const PATTERN_FIRST: ReadonlyMap<string, PatternFirst> = new Map([
@@ -372,16 +511,30 @@ const judgeRead = (program: string, args: readonly string[]): Verdict => {
   const patternFirst = PATTERN_FIRST.get(program);
   const parsed = parse(args, patternFirst?.grammar ?? NO_OPTIONS, true);
 
-  const skipsFirst =
-    patternFirst !== undefined &&
-    !parsed.options.some((option) => patternFirst.instead.has(option));
+  if (patternFirst === undefined) {
+    return breaks(
+      "closed-env-read",
+      [...parsed.values.map(([, value]) => value), ...parsed.operands].some(
+        namesClosedEnv
+      )
+    );
+  }
+
+  const skipsFirst = !parsed.options.some((option) =>
+    patternFirst.instead.has(option)
+  );
 
   const files = [
-    ...parsed.values.map(([, value]) => value),
+    ...parsed.values.flatMap(([option, value]) =>
+      patternFirst.patterns.has(option) ? [] : [value]
+    ),
     ...(skipsFirst ? parsed.operands.slice(1) : parsed.operands),
   ];
 
-  return breaks("closed-env-read", files.some(namesClosedEnv));
+  return breaks(
+    "closed-env-read",
+    files.some(namesClosedEnv) || patternFirst.reachesClosed(parsed)
+  );
 };
 
 // ---------------------------------------------------------------------------
@@ -547,6 +700,8 @@ const PACKAGE_RUNNERS = names("bun bunx npm npx pnpm pnpx varlock yarn");
 const PROGRAMS: ReadonlyMap<string, (args: readonly string[]) => Verdict> =
   new Map([
     ["cf", judgeCf],
+    // cf's package installs the same bin as `cloudflare`.
+    ["cloudflare", judgeCf],
     ["git", judgeGit],
     ["jj", judgeJj],
     ["lefthook", judgeLefthook],
