@@ -2,7 +2,7 @@
 
 Myr is a whole Git platform on Cloudflare. Everything a project ships is public, the contribution process is typed code, and a push lands only by passing a typed gate. It is our entry to Cloudflare's "Build the next GitHub" competition, which closes Wed Oct 14, 11:59 PM PDT.
 
-**Day 0.** Every script, package and check named below is planned, not built. Until a rule's fence exists, review holds it: build the fence, then rely on it.
+**W1's fences exist, and `bun run verify` runs them.** The principles table says which rules still wait for theirs; until a rule's fence lands, review holds it.
 
 The plan is the synthesis: `~/Developer/projects/wanted-explainer/notes/git-platform-research/zoom-out/synthesis.md`, published at https://plans.gneiss.run/wanted-explainer/zoom-out/synthesis.html. Read the section your task touches:
 
@@ -16,24 +16,26 @@ The plan is the synthesis: `~/Developer/projects/wanted-explainer/notes/git-plat
 
 Fence wins over prose: if this file and an enforced check disagree, the check wins; fix this file. A rule held by "No fence yet" is debt: give it a fence.
 
+In "Held by", each code-formatted name before "No fence yet:" is an enforcer: a file, a root script, a lint rule, an Effect diagnostic, a tsconfig key, a refusal tag or a branded id. Principle 1's test fails on any the repo lacks, so write everything else in the cell as plain text. After "No fence yet:", name what will hold the rule and the wave that builds it.
+
 | # | Principle | Held by |
 | --- | --- | --- |
-| 1 | **Encode lessons in structure; prose is the last rung.** When a mistake repeats, make it unrepresentable, then a lint or test, then a skill. | `packages/config/test/agents-table.test.ts`: every enforcer named here exists |
-| 2 | **Parse at the boundary, trust inside.** Decode every external input (HTTP, git, DO RPC, WebSocket, rule facts, env) with Effect Schema; inside, use branded types (`AskId`, `LandedSha`, `PatchId`). Decode the Worker `env` once, in one Layer. | Effect diagnostics map at `error`; anti-slop Effect rules; `env` typed by the generated `worker-configuration.d.ts`, with no `as` on `env` |
-| 3 | **Refusals are a closed `Schema.TaggedError` union and a public contract.** Handle them with `Match.exhaustive` or `catchTags`. Each carries a static `retryable`, a `next` command and an optional `at`, and no `message` field. A `_tag` is renamed only with an alias. `protocol/render` is the one renderer for git `remote:`, CLI and MCP text. Stage-1 refusals accumulate. | Union test; `gen:check` on `docs/reference/refusals.md`; an MCP `tools/call` test |
-| 4 | **One schema, many surfaces.** Change `packages/protocol`, then run `bun run gen`. `skills/`, `plugins/` and `docs/reference/` are generated. Projections live only in `apps/*/src/surfaces.ts`. | `gen:check` (`git diff --exit-code` after gen); per-package `allowedUnstableApis` |
-| 5 | **The name lives only in `packages/brand`.** Internal packages use `@repo/*`. DO classes, Workflows, queues and databases carry job names. | `brand:check` in `verify`; `scripts/acceptance.ts` renames the brand at random |
-| 6 | **Pure core, thin hosts.** Only `@repo/artifacts` calls Artifacts. Each beta dependency sits behind one job-named port with a `/memory` adapter in the owning package. Apps import packages only. Worker code stays free of `node:child_process`, `@effect/platform-bun` and OpenTUI. `rules` and `gate` run in both Workers and Bun. `alchemy/*` stays in `infra/`. | Scoped `allowedUnstableApis`; `no-module-level-mutable-state`. No fence yet: import direction (apps never import apps, Worker code stays host-free, `alchemy/*` only in `infra/`) |
-| 7 | **Deny by default for visibility.** Land the answer's tree, never the composed tree. Nothing from a layer enters a public tree. Snapshot before held-back files are written. Public-serving Workers have no private-namespace binding. Public commits, trailers, notes and errors name public paths only. | `PrivatePathInPublicTree` and snapshot-order tests; a type test that `apps/web/worker-configuration.d.ts` has no `ARTIFACTS_PRIVATE` |
-| 8 | **Deterministic and idempotent.** Rule evaluation sees frozen time and randomness and only injected facts. Re-running an operation converges. Check results are keyed by (tree SHA, check version), push events deduped by (repo, sha), and land requests carry a `requestId`. | `globalDate`, `globalRandom`, `globalTimers` and `cryptoRandomUUID` at `error`; replay-twice and dedupe tests; lifecycle model tests |
-| 9 | **Effect v4 only.** Read `node_modules/effect/src` as API truth. Off limits: `effect/unstable/*`, v3 `@effect/platform` and `@effect/cli`, and `effect/workflow` or `effect/cluster` on Workers. | `outdatedApi`; oxlint `no-restricted-imports`; `no-manual-effect-runtime-in-tests` |
-| 10 | **Escapes need a reason and only shrink.** Every `oxlint-disable`, `@effect-diagnostics` or `@ts-expect-error` carries a reason after `--` and is counted. The count rises only with sign-off. | `scripts/debt.ts` against `debt.baseline.json` in `verify`; unused directives at `error` |
-| 11 | **Hooks are early feedback; `bun run verify` and CI are the authority.** Deploy only to an explicit stage, after `verify`, with smoke after. A red gate is fixed, never deployed around. | `scripts/hooks/vcs-policy.ts` and its bypass-variant tests; `infra/deploy.ts` refuses without a stage and runs `scripts/smoke.ts`. No fence yet: git hooks; CI on a cold install |
-| 12 | **Lifecycles are pure transitions.** `transition(state, command, now)`. Per DO call: hydrate, transition, persist, settle. Deadlines run on DO alarms. Call them lifecycles. | Model tests over `effect/Arbitrary` histories with one planted bug. No fence yet: a lint banning `Effect.sleep` and `setTimeout` in `packages/project` |
+| 1 | **Encode lessons in structure; prose is the last rung.** When a mistake repeats, make it unrepresentable, then a lint or test, then a skill. | `packages/config/test/agents-table.test.ts`: every enforcer this column names exists and is on |
+| 2 | **Parse at the boundary, trust inside.** Decode every external input (HTTP, git, DO RPC, WebSocket, rule facts, env) with Effect Schema; inside, use branded types (`AskId`, `LandedSha`, `PatchId`). Decode the Worker `env` once, in one Layer. | The Effect diagnostics at error in `tsconfig.base.json`; `anti-slop/no-unknown-parameters`, `anti-slop/no-widen-then-assert` and `anti-slop/require-safety-comment-for-type-assertion`; the generated `apps/platform/worker-configuration.d.ts` types the env, and `apps/platform/test/platform.test.ts` proves a bad env fails at start. No fence yet: the decoded bindings equal `wrangler.jsonc`'s, with no `as` on `env` (`apps/platform/test/bindings.test.ts`, W3 317) |
+| 3 | **Refusals are a closed `Schema.TaggedError` union and a public contract.** Handle them with `Match.exhaustive` or `catchTags`. Each carries a static `retryable`, a `next` command and an optional `at`, and no `message` field. A `_tag` is renamed only with an alias. `protocol/render` is the one renderer for git `remote:`, CLI and MCP text. Stage-1 refusals accumulate. | `packages/protocol/test/refusal.test.ts` (the tag list is closed; each refusal reaches MCP as JSON with retryable and next); `packages/protocol/test/render.test.ts`; `packages/protocol/test/mcp.test.ts` (a refusal from tools/call keeps its tag); `gen:check` on `docs/reference/refusals.md`; `anti-slop-effect/prefer-effect-match` and `anti-slop-effect/no-manual-tag-comparison`. No fence yet: the gate's stage-1 test that every refusal accumulates (W2 206); a `tools/call` test per refusing contract (W4 408) |
+| 4 | **One schema, many surfaces.** Change `packages/protocol`, then run `bun run gen`. `skills/`, `plugins/` and `docs/reference/` are generated. Projections live only in `apps/*/src/surfaces.ts`. | `gen:check` (`scripts/gen.ts`, tested by `packages/config/test/gen.test.ts`) fails on a stale, missing or hand-written generated file; per-package `allowedUnstableApis` with `unstableApiUsage` at error keep Rpc and Tool construction in protocol and the apps |
+| 5 | **The name lives only in `packages/brand`.** Internal packages use `@repo/*`. DO classes, Workflows, queues and databases carry job names. | `brand:check` (`scripts/brand.ts`, tested by `packages/brand/test/leaks.test.ts`) in `verify`. No fence yet: `scripts/acceptance.ts` renames the brand at random on a cold clone and runs `verify` (W7 714) |
+| 6 | **Pure core, thin hosts.** Only `@repo/artifacts` calls Artifacts. Each beta dependency sits behind one job-named port with a `/memory` adapter in the owning package. Apps import packages only. Worker code stays free of `node:child_process`, `@effect/platform-bun` and OpenTUI. `rules` and `gate` run in both Workers and Bun. `alchemy/*` stays in `infra/`. | `imports:check` (`scripts/imports.ts`, tested by `packages/config/test/imports.test.ts`): the package matrix, apps never importing apps, host-free Worker code, adapters only through their subpaths, alchemy only in infra; scoped `allowedUnstableApis`; `fence/no-module-level-mutable-state`. No fence yet: Artifacts and each other beta dependency behind one port with a `/memory` adapter, composed from the decoded env (W2 202; W3 317 `apps/platform/src/ports.ts`) |
+| 7 | **Deny by default for visibility.** Land the answer's tree, never the composed tree. Nothing from a layer enters a public tree. Snapshot before held-back files are written. Public-serving Workers have no private-namespace binding. Public commits, trailers, notes and errors name public paths only. | `PrivatePathInPublicTree` in the closed refusal union. No fence yet: the stage-1 path checks that raise it (W2 206 gate, W6 606 gateway); the web `Env` type test, no `ARTIFACTS_PRIVATE` (W5 501 `apps/web/test/env.test-d.ts`); the snapshot-order test (W3 315, W6 605) |
+| 8 | **Deterministic and idempotent.** Rule evaluation sees frozen time and randomness and only injected facts. Re-running an operation converges. Check results are keyed by (tree SHA, check version), push events deduped by (repo, sha), and land requests carry a `requestId`. | `globalDate`, `globalRandom`, `globalTimers` and `cryptoRandomUUID` at error, with their in-Effect twins. No fence yet: the rules replay-twice test (W2 204); dedupe by `requestId` and event id (W2 210, W3 313); the Answer Workflow's replay test (W3 304); lifecycle model tests (W2 209, 219) |
+| 9 | **Effect v4 only.** Read `node_modules/effect/src` as API truth. Off limits: `effect/unstable/*`, v3 `@effect/platform` and `@effect/cli`, and `effect/workflow` or `effect/cluster` on Workers. | `outdatedApi`; `no-restricted-imports`; `fence/no-manual-effect-runtime-in-tests` |
+| 10 | **Escapes need a reason and only shrink.** Every `oxlint-disable`, `@effect-diagnostics` or `@ts-expect-error` carries a reason after `--` and is counted. The count rises only with sign-off. | `debt` (`scripts/debt.ts` over `oxlint.debt.config.ts`, tested by `packages/config/test/debt.test.ts`) against `debt.baseline.json` in `verify`; `check` fails on an unused directive |
+| 11 | **Hooks are early feedback; `bun run verify` and CI are the authority.** Deploy only to an explicit stage, after `verify`, with smoke after. A red gate is fixed, never deployed around. | `scripts/hooks/vcs-policy.ts`, wired into Claude Code (`.claude/settings.json`), Cursor (`.cursor/hooks.json`) and pi (`.pi/extensions/vcs-policy/`), refusing every bypass variant in `packages/config/test/vcs-policy.test.ts`; `verify`. No fence yet: `infra/deploy.ts` refuses without a stage and runs `scripts/smoke.ts` (W3 308); `scripts/acceptance.ts` runs `verify` on a cold install in place of CI (W7 714) |
+| 12 | **Lifecycles are pure transitions.** `transition(state, command, now)`. Per DO call: hydrate, transition, persist, settle. Deadlines run on DO alarms. Call them lifecycles. | `globalTimers` and `globalTimersInEffect` refuse JavaScript timers outside and inside Effect. No fence yet: lifecycle model tests over `effect/Arbitrary` histories with one planted bug (W2 209, 219); a lint banning `Effect.sleep` in `packages/project` (no wave yet) |
 
 ## Fence
 
-`bun run verify` is the gate: the lockfile check, lint and format (`check`), typecheck, test, `gen:check` and `brand:check`. Run it before you stop. When a hook or check fails, fix the cause. Loosening, skipping or disabling a check needs the user's sign-off.
+`bun run verify` is the gate (see Commands). Run it before you stop. When a hook or check fails, fix the cause. Loosening, skipping or disabling a check needs the user's sign-off.
 
 **Safe by default:**
 
@@ -55,6 +57,27 @@ Fence wins over prose: if this file and an enforced check disagree, the check wi
 - any deploy during a recording;
 - removing a credit from `PROVENANCE.md`.
 
+## Commands
+
+Run each as `bun run <name>` from the repo root.
+
+- `verify`: the gate. It runs `lockfile:check`, `check`, `typecheck`, `test`, `gen:check`, `imports:check`, `debt`, `brand:check` and `bytes:check`, and stops at the first failure.
+- `check`: lints and checks formatting; an unused escape directive fails it.
+- `fix`: applies lint fixes and formatting. Run it before `verify`.
+- `typecheck`: type-checks every workspace and the root's scripts, Effect diagnostics included.
+- `test`: runs every workspace's tests.
+- `gen`: rewrites `docs/reference/`, `skills/` and `plugins/` from `packages/protocol`.
+- `gen:check`: fails when a generated file is stale, missing or written by hand.
+- `imports:check`: fails on an import that crosses a line principle 6 draws.
+- `debt`: fails when an escape has no reason, or a kind's count rises above `debt.baseline.json`. `debt -- --lower` lowers the baseline to the count, never raises it.
+- `brand:check`: fails when the name appears outside `packages/brand` and prose.
+- `bytes:check`: fails when a Worker's bundle grows past its byte budget.
+- `lockfile:check`: fails when `bun.lock` is out of date with the manifests.
+- `env:check`: shows the env with its values redacted.
+- `ops -- <command>`: runs cf with the ops credentials (see Boundaries).
+
+`bash scripts/vendor-agent-sources.sh` clones the source of the pinned Effect and Wrangler into `.agent_sources/`, the API truth to read.
+
 ## Nouns
 
 Each code noun has one home:
@@ -73,12 +96,16 @@ Contributors meet four domain nouns: ask, answer, check and refusal. They are vo
 
 - **Competition rules apply to repo text.** Describe rival projects by mechanism, neutrally. All of this repo's code is public; no part of the submission lives in a private layer.
 - **Env.** To see the env, run `bun run env:check` (`varlock load --agent`, values redacted). That is the only way to read it: `.env`, `.env.local` and `.env.*.local` stay closed. To add a variable, edit the `.env.schema` that owns it (`infra/` for tool credentials, an app's for its Worker) and ask the user to set the value. Product code reads a project's `.env.schema` only through `@repo/visibility`'s parser, and never resolves it.
-- **Deploy and ops.** Deploy with Wrangler, through `infra/deploy.ts`. `cf` handles read-mostly API operations, run as `bun run ops -- <command>`. Find a command with `bun run ops -- cli search "…"` and `bun run ops -- schema <command>`, and try it with `--dry-run` before a real call. Leave cf's project commands (`dev`, `build`, `deploy`, `init`, `migrate`, `previews`) and the global `cf` alone. Ask the user before any cf `delete` or `revoke`, and keep `apps/platform` undeployed while a recording runs.
+- **Deploy and ops.** Deploy with Wrangler, through `infra/deploy.ts`. `cf` handles read-mostly API operations, run as `bun run ops -- <command>`. Find a command with `bun run ops -- cli search "…"` and `bun run ops -- schema <command>`, and try it with `--dry-run` before a real call. Leave cf's project commands (`dev`, `build`, `deploy`, `init`, `migrate`, `previews`) and the global `cf` alone. Ask the user before any cf `delete` or `revoke`, and keep `apps/platform` undeployed while a recording runs. `wrangler delete` auto-confirms in a non-interactive shell, so never run it without the user's OK (the hook policy refuses it); cf deletes need `--force` when non-interactive.
 - **Ported code is ours.** Change ported files freely and record each change in `PROVENANCE.md`. Upstream `main` is never synced in. Borrowed code stays under 15% of the codebase (aim for about 5%).
 
 ## Effect traps
 
-Wire schemas in `protocol` use `Schema.Int` or `Schema.Finite` in place of bare `Schema.Number`, and `Schema.optionalKey` in place of `Schema.optional`. The bare forms put `"Infinity"` strings and `null` into JSON Schema and MCP tool schemas.
+- Wire schemas in `protocol` use `Schema.Int` or `Schema.Finite` in place of bare `Schema.Number`, and `Schema.optionalKey` in place of `Schema.optional`. The bare forms put `"Infinity"` strings and `null` into JSON Schema and MCP tool schemas.
+- Promises and web streams enter Effect through `Effect.tryPromise` and `Stream.fromReadableStream`/`toReadableStream`; the `asyncFunction` diagnostic bans `async`.
+- Tests that spawn processes or open sockets use `it.live`; `it.effect` runs on the TestClock.
+- `McpServer.layerStdio` interrupts the fiber that started it when stdin ends; in tests, fork the server and await it.
+- The RPC HTTP client carries Rpc headers inside the body, so send a credential as a plain HTTP header.
 
 ## Rejected dependencies
 

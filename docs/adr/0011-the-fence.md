@@ -8,12 +8,13 @@ Each rule this repo keeps is held by the strongest enforcer available. First, ma
 
 ## Considered Options
 
-- **The full test suite in pre-commit.** Too slow for an agent sprint. Hooks run lint, format check and typecheck; tests run in `verify` and CI.
+- **The full test suite in pre-commit.** Too slow for an agent sprint. Git hooks, when they come, run lint, format check and typecheck; tests run in `verify` and CI.
 - **A `no-comments` lint rule.** Rejected: agents need room for workaround notes.
 
 ## Consequences
 
 - Every escape (`oxlint-disable`, `@effect-diagnostics`, `@ts-expect-error`) carries a reason after ` -- `. `scripts/debt.ts` counts escapes against `debt.baseline.json` in `verify`, and the count rises only with the maintainer's sign-off.
-- One hook policy refuses the usual ways around hooks: `--no-verify`, `commit -n`, `core.hooksPath` overrides, `LEFTHOOK=0` and `lefthook uninstall`. It is wired into each agent harness the repo uses.
+- One hook policy (`scripts/hooks/vcs-policy.ts`), wired into Claude Code, Cursor and pi, refuses the usual ways around hooks (`--no-verify`, `commit -n`, `core.hooksPath` overrides, `LEFTHOOK=0` and `lefthook uninstall`), `git push`, `wrangler delete`, cf `delete` and `revoke`, cf's project commands and reads of the closed `.env` files.
+- Until the deadline there is no lefthook and no CI workflow: the harness hooks give the early feedback, `bun run verify` is the authority, and `scripts/acceptance.ts` stands in for CI by running `verify` on a cold install.
 - A deploy is never a way around a red gate: `infra/deploy.ts` refuses without an explicit stage and runs smoke tests after.
 - `AGENTS.md` lists each principle with the check that holds it. Where the check and the prose disagree, the check wins.
