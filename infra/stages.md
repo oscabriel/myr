@@ -56,7 +56,8 @@ It never deletes anything and never prints or reads a secret's value.
 | --- | --- |
 | `OPERATOR_TOKEN` | Always. The operator's bearer token, at least 32 characters. |
 | `SESSION_TOKENS` | Optional. A JSON object from token to handle, for the demo's named people (spec §8 D9). |
-| `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `COOKIE_KEY` | Optional, but all three or none. GitHub sign-in (H4). |
+| `COOKIE_KEY` | Always. Seals a sign-in in progress into its form (HMAC-SHA-256), at least 32 characters. |
+| `PASSWORD_PEPPER` | Always. Every password is HMAC'd with it before PBKDF2, at least 32 characters. Changing it makes every stored password fail to verify. |
 
 To set them for a stage, do one of these:
 
@@ -64,7 +65,7 @@ To set them for a stage, do one of these:
 - **A secrets file (dev stages only, spec §8.3 O1).** Keep a dotenv file outside the repo with mode 600, and deploy with `STAGE_SECRETS_FILE=<that file> bun run deploy -- --stage dev-<user>`. The platform's deploy step gets only the names `.env.schema` declares, as its environment, and that environment overrides any `.env` value. Nothing prints them. A deploy to `demo` refuses the file before it runs anything.
 - **By hand**, one at a time: `apps/platform/node_modules/.bin/wrangler secret put <NAME> --env <s>` in `apps/platform`, with the value on stdin.
 
-To make the GitHub OAuth app (H4), use homepage `https://platform-<s>.<subdomain>.workers.dev` and callback `https://platform-<s>.<subdomain>.workers.dev/oauth/callback`. The subdomain is in `infra/workers-dev.json` once bootstrap has run.
+Sign-in uses the platform's own accounts (handle and password), so no stage needs a third-party OAuth app. A stage's platform lives at `https://platform-<s>.<subdomain>.workers.dev`; the subdomain is in `infra/workers-dev.json` once bootstrap has run.
 
 ## Deploy a stage
 

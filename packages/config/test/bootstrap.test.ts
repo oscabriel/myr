@@ -436,9 +436,8 @@ describe("secrets, by name only", () => {
       expect(schemaItems(schema)).toStrictEqual([
         { name: "OPERATOR_TOKEN", required: true },
         { name: "SESSION_TOKENS", required: false },
-        { name: "GITHUB_CLIENT_ID", required: false },
-        { name: "GITHUB_CLIENT_SECRET", required: false },
-        { name: "COOKIE_KEY", required: false },
+        { name: "COOKIE_KEY", required: true },
+        { name: "PASSWORD_PEPPER", required: true },
       ]);
     })
   );

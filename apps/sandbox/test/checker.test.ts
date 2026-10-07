@@ -20,6 +20,7 @@ import {
   Effect,
   Exit,
   Fiber,
+  Latch,
   Match,
   Option,
   Redacted,
@@ -451,8 +452,15 @@ describe("the Checker", () => {
     "destroys the container when a lane runs out of time, and reports that lane as blocked",
     () =>
       Effect.gen(function* () {
+        // The lane says when it has started, so the clock moves only once its
+        // time limit is running: the checkout hashes with a real promise
+        // first, and a busy machine can let an early `adjust` pass it by.
+        const started = yield* Latch.make();
+
         const fake = fakeChecker({
-          commands: new Map([["bun test", Effect.never]]),
+          commands: new Map([
+            ["bun test", started.open.pipe(Effect.andThen(Effect.never))],
+          ]),
         });
 
         const wire = wireFor();
@@ -472,6 +480,7 @@ describe("the Checker", () => {
           },
         }).pipe(Effect.provide(fake.layer), Effect.forkChild);
 
+        yield* started.await;
         yield* TestClock.adjust(Duration.seconds(1));
 
         const ran = yield* Fiber.join(fiber);
