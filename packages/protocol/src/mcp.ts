@@ -1,7 +1,7 @@
 // Ported from joelhooks/rat-stack@fba26d8 `packages/capability/src/to-toolkit.ts`
 // (MIT, LICENSES/rat-stack.MIT.txt). Changes are listed in PROVENANCE.md.
 import type { JsonSchema, Layer } from "effect";
-import { Context, Effect, Predicate, Schema } from "effect";
+import { Context, Effect, JsonPointer, Predicate, Schema } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import type { Rpc, RpcClient, RpcClientError, RpcGroup } from "effect/rpc";
 
@@ -56,8 +56,15 @@ export interface ToolListing {
   readonly outputSchema: JsonSchema.JsonSchema;
 }
 
-/** How a document points at one of its own definitions. */
-const DEFINITION = "#/$defs/";
+/**
+ * The definition a `$ref` names, read as Effect reads it: a URI fragment
+ * (percent-encoded, then `~1` and `~0` escaped) of the form `#/$defs/<key>`.
+ */
+const definitionKey = ($ref: string) => {
+  const tokens = JsonPointer.parseUriFragment($ref);
+
+  return tokens?.length === 2 && tokens[0] === "$defs" ? tokens[1] : undefined;
+};
 
 /**
  * A schema as MCP lists it, derived the way `McpServer` derives a tool's:
@@ -67,14 +74,9 @@ const DEFINITION = "#/$defs/";
 export const toJsonSchema = (schema: Schema.Top): JsonSchema.JsonSchema => {
   const { definitions, schema: root } = Schema.toJsonSchemaDocument(schema);
 
-  // A JSON Pointer escapes `/` as `~1` and `~` as `~0`.
-  const key =
-    Predicate.isString(root.$ref) && root.$ref.startsWith(DEFINITION)
-      ? root.$ref
-          .slice(DEFINITION.length)
-          .replaceAll("~1", "/")
-          .replaceAll("~0", "~")
-      : undefined;
+  const key = Predicate.isString(root.$ref)
+    ? definitionKey(root.$ref)
+    : undefined;
 
   const inlined = (key === undefined ? undefined : definitions[key]) ?? root;
 

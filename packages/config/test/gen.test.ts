@@ -1,7 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Predicate, Schema } from "effect";
+import { Predicate, Schema, SchemaAST } from "effect";
 
-import { CommandCatalog, generate, Refusal } from "../../../scripts/lib/gen.ts";
+import {
+  CommandCatalog,
+  Contracts,
+  generate,
+  Refusal,
+} from "../../../scripts/lib/gen.ts";
 
 const NON_FINITE = new Set(["Infinity", "-Infinity", "NaN"]);
 
@@ -83,15 +88,51 @@ const ref = (tag: string) => ({ $ref: `#/$defs/${tag}Encoded` });
 const content = (path: string) =>
   generate().find((file) => file.path === path)?.content ?? "";
 
-const decodeCatalog = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(CommandCatalog)
-);
-
 /** The JSON blocks in a Markdown page: here, each tool's schemas. */
 const jsonBlocks = (markdown: string): readonly Schema.Json[] =>
   [...markdown.matchAll(/```json\n(?<body>[\s\S]*?)\n```/gu)].map((match) =>
     parseJson(match.groups?.body ?? "null")
   );
+
+/** A Markdown page's `## ` sections, keyed by their heading. */
+const sections = (markdown: string): ReadonlyMap<string, string> =>
+  new Map(
+    [
+      ...markdown.matchAll(
+        /^## (?<heading>.+)\n(?<body>[\s\S]*?)(?=^## |(?![\s\S]))/gmu
+      ),
+    ].map((match) => [match.groups?.heading ?? "", match.groups?.body ?? ""])
+  );
+
+/** The definitions in protocol.schema.json, by name. */
+const definitions = () =>
+  Schema.decodeSync(
+    Schema.fromJsonString(
+      Schema.Struct({ $defs: Schema.Record(Schema.String, Schema.Json) })
+    )
+  )(content("docs/reference/protocol.schema.json")).$defs;
+
+const catalog = () =>
+  Schema.decodeSync(Schema.fromJsonString(CommandCatalog))(
+    content("docs/reference/commands.json")
+  );
+
+/** The fields a command's payload schema names. */
+const payloadFields = Schema.decodeUnknownSync(
+  Schema.Struct({ properties: Schema.Record(Schema.String, Schema.Json) })
+);
+
+/** A union of pointers, as a contract's error is written. */
+const decodeUnion = Schema.decodeUnknownSync(
+  Schema.Struct({ anyOf: Schema.Array(Schema.Struct({ $ref: Schema.String })) })
+);
+
+/** An object schema's required keys. */
+const decodeObject = Schema.decodeUnknownSync(
+  Schema.Struct({ required: Schema.Array(Schema.String) })
+);
+
+const contracts = [...Contracts.requests.values()];
 
 describe("generation", () => {
   it("writes exactly the five reference files, sorted by path", () => {
@@ -137,28 +178,62 @@ describe("the leak finder", () => {
 });
 
 describe("the generated JSON Schema", () => {
-  it("has a definition for each contract's payload, success and error, and the refusal union", () => {
+  it("defines each contract's payload, success and error", () => {
+    const defined = new Set(Object.keys(definitions()));
+
+    const missing = contracts
+      .flatMap((rpc) =>
+        ["payload", "success", "error"].map((part) => `${rpc._tag}.${part}`)
+      )
+      .filter((name) => !defined.has(name));
+
+    expect(contracts).not.toHaveLength(0);
+    expect(missing).toStrictEqual([]);
+  });
+
+  it("defines each refusal once, and points the union and a contract's errors at it", () => {
     const document = parseJson(content("docs/reference/protocol.schema.json"));
+    const $defs = definitions();
+    const { anyOf } = decodeUnion($defs["submitAnswer.error"]);
+    const { required } = decodeObject($defs["submitAnswer.payload"]);
+
+    const pointedAt = new Set(anyOf.map((member) => member.$ref));
+    const fields = new Set(required);
 
     expect(document).toMatchObject({
       $defs: {
         Refusal: {
           anyOf: Refusal.members.map((member) => ref(member.identifier)),
         },
-        // A contract with no refusals of its own can't fail that way.
-        "listAsks.error": { not: {} },
         "listAsks.payload": { required: ["project"] },
         "listAsks.success": { required: ["asks"] },
-        "submitAnswer.error": {
-          anyOf: ["NotClaimed", "ClaimLapsed", "StaleBase", "RepoBusy"].map(
-            ref
-          ),
-        },
-        "submitAnswer.payload": { required: ["ask", "base", "head"] },
-        "submitAnswer.success": { required: ["main"] },
       },
       $schema: "https://json-schema.org/draft/2020-12/schema",
     });
+    // Later contracts may widen submitAnswer; what it has now must stay.
+    expect(
+      ["NotClaimed", "ClaimLapsed", "StaleBase", "RepoBusy"].flatMap((tag) =>
+        pointedAt.has(ref(tag).$ref) ? [] : [tag]
+      )
+    ).toStrictEqual([]);
+    expect(
+      ["ask", "base", "head"].flatMap((field) =>
+        fields.has(field) ? [] : [field]
+      )
+    ).toStrictEqual([]);
+  });
+
+  it("says a contract with no refusals of its own can't fail that way", () => {
+    const $defs = definitions();
+
+    const infallible = contracts.flatMap((rpc) =>
+      SchemaAST.isNever(rpc.errorSchema.ast) ? [rpc._tag] : []
+    );
+
+    expect(infallible).not.toHaveLength(0);
+    expect(infallible.map((tag) => $defs[`${tag}.error`])).toStrictEqual(
+      infallible.map(() => ({ not: {} }))
+    );
   });
 
   it("admits no non-finite number string and no null under an optional key", () => {
@@ -168,68 +243,82 @@ describe("the generated JSON Schema", () => {
   });
 
   it("gives every MCP tool's input and output schema, with no leak in either", () => {
-    const schemas = jsonBlocks(content("docs/reference/mcp-tools.md"));
+    const reference = content("docs/reference/mcp-tools.md");
+    const schemas = jsonBlocks(reference);
 
-    // Two tools, an input and an output each.
-    expect(schemas).toHaveLength(4);
+    // An input and an output for each tool.
+    expect(sections(reference).size).toBeGreaterThan(0);
+    expect(schemas).toHaveLength(2 * sections(reference).size);
     expect(schemas.flatMap(leaks)).toStrictEqual([]);
   });
 });
 
 describe("the command catalog", () => {
-  it.effect(
-    "decodes with its own schema and lists the projected commands",
-    () =>
-      Effect.gen(function* () {
-        const catalog = yield* decodeCatalog(
-          content("docs/reference/commands.json")
-        );
+  it("decodes with its own schema and lists asks and submit", () => {
+    const { commands, version } = catalog();
 
-        expect(catalog.version).toBe(1);
-        expect(catalog.commands).toMatchObject([
-          {
-            contract: "listAsks",
-            destructive: false,
-            idempotent: true,
-            name: "asks",
-            needsApproval: false,
-            path: ["asks"],
-            positional: [],
-            readOnly: true,
-            source: "projected",
-            surfaces: ["rpc", "mcp", "cli", "web"],
-          },
-          {
-            contract: "submitAnswer",
-            destructive: false,
-            idempotent: true,
-            name: "submit",
-            needsApproval: false,
-            path: ["submit"],
-            positional: [],
-            readOnly: false,
-            source: "projected",
-            surfaces: ["rpc", "mcp", "cli", "web"],
-          },
-        ]);
-        expect(
-          catalog.commands.flatMap((command) => leaks(command.payloadSchema))
-        ).toStrictEqual([]);
-      })
-  );
+    const byName = new Map(commands.map((command) => [command.name, command]));
 
-  it("is what the CLI reference is rendered from: each command with its flags", () => {
-    const reference = content("docs/reference/cli.md");
-    const submit = reference.slice(reference.indexOf("submit`"));
+    expect(version).toBe(1);
+    expect(byName.get("asks")).toMatchObject({
+      contract: "listAsks",
+      destructive: false,
+      idempotent: true,
+      needsApproval: false,
+      path: ["asks"],
+      positional: [],
+      readOnly: true,
+      source: "projected",
+      surfaces: ["rpc", "mcp", "cli", "web"],
+    });
+    expect(byName.get("submit")).toMatchObject({
+      contract: "submitAnswer",
+      destructive: false,
+      idempotent: true,
+      needsApproval: false,
+      path: ["submit"],
+      readOnly: false,
+      source: "projected",
+    });
+    expect(
+      commands.flatMap((command) => leaks(command.payloadSchema))
+    ).toStrictEqual([]);
+  });
 
-    expect(reference).toContain("asks`");
-    expect(reference.slice(reference.indexOf("asks`"))).toContain(
-      "`--project`"
+  it("is what the CLI reference is rendered from: every command, with its arguments", () => {
+    const { commands } = catalog();
+
+    // A heading is the command line in backticks: the CLI's name, then the path.
+    const byPath = new Map(
+      [...sections(content("docs/reference/cli.md"))].map(([heading, body]) => [
+        heading.replace(/^`\S+ (?<path>.+)`$/u, "$<path>"),
+        body,
+      ])
     );
 
-    for (const flag of ["`--ask`", "`--base`", "`--head`"]) {
-      expect(submit).toContain(flag);
-    }
+    const unrendered = commands.flatMap((command) => {
+      const path = command.path.join(" ");
+      const body = byPath.get(path) ?? "";
+      const positional = new Set(command.positional);
+      const { properties } = payloadFields(command.payloadSchema);
+
+      return [
+        ...command.positional.map((field) => `<${field}>`),
+        ...Object.keys(properties).flatMap((field) =>
+          positional.has(field) ? [] : [`--${field}`]
+        ),
+      ].flatMap((argument) =>
+        body.includes(`| \`${argument}\` |`) ? [] : [`${path} ${argument}`]
+      );
+    });
+
+    expect([...byPath.keys()]).toStrictEqual(
+      commands.map((command) => command.path.join(" "))
+    );
+    expect(unrendered).toStrictEqual([]);
+    // Known rows, so an empty catalog can't pass.
+    expect(byPath.get("asks")).toContain("| `--project` | text | yes |");
+    expect(byPath.get("submit")).toContain("| `--head` | text | yes |");
   });
 });
 

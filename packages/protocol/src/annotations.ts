@@ -26,7 +26,7 @@ export const Visibility = Context.Reference<"public" | "maintainers">(
   { defaultValue: () => "public" }
 );
 
-/** It reads and changes nothing. */
+/** It only reads: it changes nothing. */
 export const ReadOnly = Context.Reference<boolean>("protocol/ReadOnly", {
   defaultValue: () => false,
 });
@@ -38,7 +38,8 @@ export const Idempotent = Context.Reference<boolean>("protocol/Idempotent", {
 
 /**
  * It can destroy something a person cannot get back. Set it on every
- * contract: MCP reads a tool that says nothing as destructive.
+ * contract: every tool carries this value, so a destructive contract that
+ * forgot it would tell an agent it is safe (`annotations.test.ts` holds this).
  */
 export const Destructive = Context.Reference<boolean>("protocol/Destructive", {
   defaultValue: () => false,

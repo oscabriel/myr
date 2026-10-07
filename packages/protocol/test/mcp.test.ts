@@ -68,6 +68,14 @@ const ListedTools = Schema.Struct({
   ),
 });
 
+/** A struct of one commit, as JSON Schema writes it. */
+const receipt = {
+  additionalProperties: true,
+  properties: { main: { pattern: "^[0-9a-f]{40}$", type: "string" } },
+  required: ["main"],
+  type: "object",
+};
+
 describe("the contracts as MCP tools", () => {
   it.effect("lists each contract as a tool, its payload as the input", () =>
     Effect.gen(function* () {
@@ -141,18 +149,22 @@ describe("the contracts as MCP tools", () => {
   );
 
   it("inlines a named root schema, since MCP wants an object at the root", () => {
-    const receipt = {
-      additionalProperties: true,
-      properties: { main: { pattern: "^[0-9a-f]{40}$", type: "string" } },
-      required: ["main"],
-      type: "object",
-    };
-
     expect(
       toJsonSchema(
         Schema.Struct({ main: CommitSha }).annotate({ identifier: "Receipt" })
       )
     ).toStrictEqual({ ...receipt, $defs: { Receipt: receipt } });
+  });
+
+  // The pointer to "Answer receipt" is `#/$defs/Answer%20receipt`.
+  it("inlines a named root whose pointer is percent-encoded", () => {
+    expect(
+      toJsonSchema(
+        Schema.Struct({ main: CommitSha }).annotate({
+          identifier: "Answer receipt",
+        })
+      )
+    ).toStrictEqual({ ...receipt, $defs: { "Answer receipt": receipt } });
   });
 
   it("tells the agent a person approves a contract that needs approval", () => {

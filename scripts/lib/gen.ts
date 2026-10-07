@@ -62,11 +62,14 @@ import {
 } from "effect";
 
 /**
- * The union `refusals.md` is rendered from. Tests in `packages/config` read it
- * here: that package takes no `@repo/*` dependency, since every package
- * dev-depends on it and the edge would be a cycle.
+ * The union and the group the reference is rendered from. Tests in
+ * `packages/config` read them here: that package takes no `@repo/*`
+ * dependency, since every package dev-depends on it and the edge would be a
+ * cycle.
  */
 export { Refusal } from "@repo/protocol/refusal";
+
+export { Contracts } from "@repo/protocol/contracts";
 
 /**
  * `docs/reference/commands.json`: every command the CLI has. `projected`
