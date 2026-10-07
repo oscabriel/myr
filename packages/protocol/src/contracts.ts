@@ -1,5 +1,5 @@
 import { Context, Schema, Struct } from "effect";
-import { Rpc, RpcGroup } from "effect/rpc";
+import { Rpc, RpcGroup, RpcSchema } from "effect/rpc";
 import type { RpcClient, RpcClientError } from "effect/rpc";
 
 import {
@@ -800,6 +800,24 @@ export const surfaced = <S extends SurfaceName>(
   RpcGroup.make(
     ...[...Contracts.requests.values()].filter(isServedOn(surface))
   );
+
+/**
+ * A contract's payload, success and error as a client meets them. A stream's
+ * success is one of its elements, and its error is the stream's: the call
+ * itself never fails outside the stream.
+ */
+export const partsOf = (rpc: Contract) =>
+  RpcSchema.isStreamSchema(rpc.successSchema)
+    ? {
+        error: rpc.successSchema.error,
+        payload: rpc.payloadSchema,
+        success: rpc.successSchema.success,
+      }
+    : {
+        error: rpc.errorSchema,
+        payload: rpc.payloadSchema,
+        success: rpc.successSchema,
+      };
 
 /** A way to call the contracts, in process or over the wire. */
 export class Client extends Context.Service<

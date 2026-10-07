@@ -12,7 +12,7 @@ import {
   Unauthenticated,
 } from "../src/principal.ts";
 import type { Principal } from "../src/principal.ts";
-import { unanswered } from "./handlers.ts";
+import { unanswered } from "../src/testing.ts";
 
 const project = ProjectName.make("datekit");
 
@@ -75,6 +75,18 @@ describe("the server side of Authenticated", () => {
         new Unauthenticated()
       );
       expect(yield* callers).toStrictEqual([]);
+    })
+  );
+
+  // `today` is for deciders: the handler checks who decides, but nobody
+  // reaches it without a credential.
+  it.effect("refuses a decider's contract without a credential", () =>
+    Effect.gen(function* () {
+      const { client } = yield* served;
+
+      expect(yield* Effect.flip(client.today({ project }))).toStrictEqual(
+        new Unauthenticated()
+      );
     })
   );
 

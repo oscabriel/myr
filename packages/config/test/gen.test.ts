@@ -359,6 +359,22 @@ describe("the command catalog", () => {
       "| `--acknowledgeShort` | nothing (a switch) | no |"
     );
   });
+
+  // A table cell ends at any pipe Markdown doesn't see escaped, so a choice
+  // written `"a" | "b"` would push its row past the table's three columns.
+  it("keeps every argument row to its three columns, a choice's values included", () => {
+    const rows = content("docs/reference/cli.md")
+      .split("\n")
+      .filter((line) => line.startsWith("| `"));
+
+    const split = rows.flatMap((row) =>
+      row.split(/(?<!\\)\|/u).length === 5 ? [] : [row]
+    );
+
+    expect(rows).not.toHaveLength(0);
+    expect(split).toStrictEqual([]);
+    expect(rows).toContain('| `--verdict` | "vouch" \\| "denounce" | yes |');
+  });
 });
 
 describe("the refusals reference", () => {

@@ -1,12 +1,11 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, Exit, Layer } from "effect";
 import { RpcTest } from "effect/rpc";
 
 import { Contracts } from "../src/contracts.ts";
 import { AskId, Handle, KindName, ProjectName } from "../src/ids.ts";
 import { CurrentPrincipal, Principal } from "../src/principal.ts";
-import { asPerson, asTester } from "../src/testing.ts";
-import { unanswered } from "./handlers.ts";
+import { asPerson, asTester, unanswered } from "../src/testing.ts";
 
 /** Contracts whose one listed ask wants whoever called: their handle, or `anyone`. */
 const echoCaller = Layer.mergeAll(
@@ -58,5 +57,26 @@ describe("the test principals", () => {
     Effect.gen(function* () {
       expect(yield* caller).toStrictEqual(["tester"]);
     }).pipe(Effect.provide(Layer.mergeAll(echoCaller, asTester)))
+  );
+});
+
+describe("the unanswered handlers", () => {
+  it.effect(
+    "answer only the contracts a test sets up over them; any other call dies",
+    () =>
+      Effect.gen(function* () {
+        const client = yield* RpcTest.makeClient(Contracts);
+
+        const listed = yield* client.listAsks({
+          project: ProjectName.make("datekit"),
+        });
+
+        const other = yield* Effect.exit(
+          client.credits({ handle: Handle.make("alice") })
+        );
+
+        expect(listed.asks.map(({ want }) => want)).toStrictEqual(["tester"]);
+        expect(Exit.hasDies(other)).toBeTruthy();
+      }).pipe(Effect.provide(Layer.mergeAll(echoCaller, asTester)))
   );
 });

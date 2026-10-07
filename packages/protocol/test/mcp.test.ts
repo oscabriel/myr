@@ -14,8 +14,8 @@ import {
 import { AskId, CommitSha, KindName, ProjectName } from "../src/ids.ts";
 import { listTools, toJsonSchema, toToolkit } from "../src/mcp.ts";
 import { StaleBase } from "../src/refusal.ts";
+import { unanswered } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
-import { unanswered } from "./handlers.ts";
 import { serve } from "./mcp.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");

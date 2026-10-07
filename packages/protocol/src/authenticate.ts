@@ -9,10 +9,14 @@ import {
 } from "./principal.ts";
 import type { Person, Principal } from "./principal.ts";
 
-/** The credential in an `authorization: Bearer <token>` header. */
-const bearer = (authorization: string) =>
+/**
+ * The credential in an `authorization: Bearer <token>` header, if it holds
+ * one. A host's HTTP gate reads it with this too, so the gate and the server
+ * side agree on what a credential is.
+ */
+export const bearerToken = (authorization: string | undefined) =>
   Option.fromNullishOr(
-    /^Bearer (?<token>\S+)$/u.exec(authorization)?.groups?.token
+    /^Bearer (?<token>\S+)$/u.exec(authorization ?? "")?.groups?.token
   );
 
 /**
@@ -43,7 +47,7 @@ export const authenticated = <E, R>(
             : Effect.succeedNone;
         }
 
-        return Option.match(bearer(authorization), {
+        return Option.match(bearerToken(authorization), {
           onNone: () => Effect.succeedNone,
           onSome: verified,
         });

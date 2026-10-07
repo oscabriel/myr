@@ -39,7 +39,7 @@ myr front [--kind <kind>] [--reserved <reserved>]
 | Argument | Takes | Required |
 | --- | --- | --- |
 | `--kind` | text | no |
-| `--reserved` | "newcomers" | "people" | no |
+| `--reserved` | "newcomers" \| "people" | no |
 
 ## `myr asks`
 
@@ -318,7 +318,7 @@ myr decide --choice <choice> --decision <decision> [--note <note>] --project <pr
 
 | Argument | Takes | Required |
 | --- | --- | --- |
-| `--choice` | "accept" | "decline" | "adopt" | "revert" | yes |
+| `--choice` | "accept" \| "decline" \| "adopt" \| "revert" | yes |
 | `--decision` | text | yes |
 | `--note` | text | no |
 | `--project` | text | yes |
@@ -471,7 +471,7 @@ myr vouch --handle <handle> [--note <note>] --project <project> --verdict <verdi
 | `--handle` | text | yes |
 | `--note` | text | no |
 | `--project` | text | yes |
-| `--verdict` | "vouch" | "denounce" | yes |
+| `--verdict` | "vouch" \| "denounce" | yes |
 
 ## `myr env set`
 

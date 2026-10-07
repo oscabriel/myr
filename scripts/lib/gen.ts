@@ -12,6 +12,7 @@ import {
   Destructive,
   Idempotent,
   NeedsApproval,
+  partsOf,
   ReadOnly,
   surfaced,
   SurfaceName,
@@ -85,8 +86,6 @@ import {
   SchemaAST,
   SchemaRepresentation,
 } from "effect";
-import { RpcSchema } from "effect/rpc";
-import type { Rpc } from "effect/rpc";
 
 /**
  * The union and the group the reference is rendered from. Tests in
@@ -96,7 +95,7 @@ import type { Rpc } from "effect/rpc";
  */
 export { Refusal } from "@repo/protocol/refusal";
 
-export { Contracts } from "@repo/protocol/contracts";
+export { Contracts, partsOf } from "@repo/protocol/contracts";
 
 /**
  * `docs/reference/commands.json`: every command the CLI has. `projected`
@@ -149,24 +148,6 @@ export const ownedRoots: readonly string[] = [
 ];
 
 const contracts = [...Contracts.requests.values()];
-
-/**
- * A contract's payload, success and error as a client meets them. A stream's
- * success is one of its elements, and its error is the stream's: the call
- * itself never fails outside the stream.
- */
-export const partsOf = (rpc: Rpc.AnyWithProps) =>
-  RpcSchema.isStreamSchema(rpc.successSchema)
-    ? {
-        error: rpc.successSchema.error,
-        payload: rpc.payloadSchema,
-        success: rpc.successSchema.success,
-      }
-    : {
-        error: rpc.errorSchema,
-        payload: rpc.payloadSchema,
-        success: rpc.successSchema,
-      };
 
 const byPath = Order.mapInput(Order.String, (file: GeneratedFile) => file.path);
 
@@ -488,14 +469,18 @@ const kinds = new Map([
 const isSwitch = (field: Schema.Json) =>
   isFieldSchema(field) && field.type === "boolean";
 
-/** What a field takes on the command line, in the words `--help` uses. */
+/**
+ * What a field takes on the command line, in the words `--help` uses, as a
+ * table cell: a choice's values are split by an escaped pipe, which Markdown
+ * shows as a pipe and doesn't read as the cell's end.
+ */
 const takes = (field: Schema.Json) => {
   if (!isFieldSchema(field)) {
     return "JSON";
   }
 
   if (field.enum !== undefined) {
-    return field.enum.map((value) => JSON.stringify(value)).join(" | ");
+    return field.enum.map((value) => JSON.stringify(value)).join(" \\| ");
   }
 
   return (

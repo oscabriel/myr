@@ -118,7 +118,7 @@ describe("the platform before any project exists", () => {
           client.setEnv({
             key: EnvKey.make("PAYMENTS_KEY"),
             project,
-            value: Redacted.make("sk_live_0123456789abcdef0123456789"),
+            value: Redacted.make("not-a-real-value-0123456789abcdef"),
           })
         ),
       ]);

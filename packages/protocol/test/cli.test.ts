@@ -10,9 +10,8 @@ import { toCommand } from "../src/cli.ts";
 import { Client, Contracts, ListAsks, SubmitAnswer } from "../src/contracts.ts";
 import { CommitSha, KindName, ProjectName, RequestId } from "../src/ids.ts";
 import { StaleBase } from "../src/refusal.ts";
-import { asTester } from "../src/testing.ts";
+import { asTester, unanswered } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
-import { unanswered } from "./handlers.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
 

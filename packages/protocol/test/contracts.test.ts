@@ -5,6 +5,7 @@ import { expectTypeOf } from "vitest";
 
 import {
   Audience,
+  Cli,
   Description,
   Destructive,
   Idempotent,
@@ -12,8 +13,15 @@ import {
   ReadOnly,
   SurfaceName,
   Surfaces,
+  Visibility,
 } from "../src/annotations.ts";
-import { Contracts, SetEnv, surfaced, Watch } from "../src/contracts.ts";
+import {
+  Contracts,
+  partsOf,
+  SetEnv,
+  surfaced,
+  Watch,
+} from "../src/contracts.ts";
 import type { Contract, TagOn } from "../src/contracts.ts";
 import { ProjectEvent } from "../src/domain/event.ts";
 import { toJsonSchema } from "../src/mcp.ts";
@@ -21,21 +29,31 @@ import { examples } from "./contract-examples.ts";
 import type { Example } from "./contract-examples.ts";
 
 /**
- * Spec §3.2, row by row and in its order. Flags: R reads only, I idempotent,
- * D destructive, A needs a person's approval. Surfaces: R rpc, M mcp, C cli,
- * W web.
+ * Spec §3.2, row by row and in its order. CLI: the command's name, then the
+ * fields it takes in order; `none` for a contract with no command. Flags: R
+ * reads only, I idempotent, D destructive, A needs a person's approval.
+ * Surfaces: R rpc, M mcp, C cli, W web.
  */
 const table = [
   {
     audience: "public",
+    cli: "projects",
     errors: [],
     flags: "RI",
     on: "RMCW",
     tag: "listProjects",
   },
-  { audience: "public", errors: [], flags: "RI", on: "RMCW", tag: "frontPage" },
   {
     audience: "public",
+    cli: "front",
+    errors: [],
+    flags: "RI",
+    on: "RMCW",
+    tag: "frontPage",
+  },
+  {
+    audience: "public",
+    cli: "asks",
     errors: ["UnknownProject"],
     flags: "RI",
     on: "RMCW",
@@ -43,6 +61,7 @@ const table = [
   },
   {
     audience: "public",
+    cli: "ask <ask>",
     errors: ["UnknownProject", "UnknownAsk"],
     flags: "RI",
     on: "RMCW",
@@ -50,6 +69,7 @@ const table = [
   },
   {
     audience: "signedIn",
+    cli: "status",
     errors: ["UnknownProject"],
     flags: "RI",
     on: "RMCW",
@@ -57,6 +77,7 @@ const table = [
   },
   {
     audience: "public",
+    cli: "verdict",
     errors: ["UnknownProject", "UnknownAsk"],
     flags: "RI",
     on: "RMCW",
@@ -64,14 +85,23 @@ const table = [
   },
   {
     audience: "public",
+    cli: "landing",
     errors: ["UnknownProject", "UnknownCommit"],
     flags: "RI",
     on: "RMCW",
     tag: "landing",
   },
-  { audience: "public", errors: [], flags: "RI", on: "RMCW", tag: "credits" },
+  {
+    audience: "public",
+    cli: "credits",
+    errors: [],
+    flags: "RI",
+    on: "RMCW",
+    tag: "credits",
+  },
   {
     audience: "decider",
+    cli: "today",
     errors: ["NotDecider", "UnknownProject"],
     flags: "RI",
     on: "RMCW",
@@ -79,6 +109,7 @@ const table = [
   },
   {
     audience: "public",
+    cli: "ledger",
     errors: ["UnknownProject"],
     flags: "RI",
     on: "RMCW",
@@ -86,6 +117,7 @@ const table = [
   },
   {
     audience: "public",
+    cli: "env shape",
     errors: ["UnknownProject"],
     flags: "RI",
     on: "RMCW",
@@ -93,6 +125,7 @@ const table = [
   },
   {
     audience: "public",
+    cli: "none",
     errors: ["UnknownProject"],
     flags: "R",
     on: "RW",
@@ -100,6 +133,7 @@ const table = [
   },
   {
     audience: "signedIn",
+    cli: "init",
     errors: ["ProjectExists", "ImportFailed"],
     flags: "A",
     on: "RMC",
@@ -107,6 +141,7 @@ const table = [
   },
   {
     audience: "decider",
+    cli: "ask open",
     errors: [
       "UnknownProject",
       "NotDecider",
@@ -123,6 +158,7 @@ const table = [
   },
   {
     audience: "signedIn",
+    cli: "propose",
     errors: ["UnknownProject", "Denounced", "CapReached"],
     flags: "",
     on: "RMCW",
@@ -130,6 +166,7 @@ const table = [
   },
   {
     audience: "signedIn",
+    cli: "ask flag",
     errors: ["UnknownProject", "UnknownAsk", "Denounced", "CapReached"],
     flags: "",
     on: "RMC",
@@ -137,6 +174,7 @@ const table = [
   },
   {
     audience: "decider",
+    cli: "decide",
     errors: [
       "UnknownProject",
       "UnknownDecision",
@@ -149,6 +187,7 @@ const table = [
   },
   {
     audience: "signedIn",
+    cli: "claim <ask>",
     errors: [
       "UnknownProject",
       "UnknownAsk",
@@ -164,6 +203,7 @@ const table = [
   },
   {
     audience: "signedIn",
+    cli: "release",
     errors: ["UnknownProject", "NotClaimed"],
     flags: "I",
     on: "RMC",
@@ -171,6 +211,7 @@ const table = [
   },
   {
     audience: "signedIn",
+    cli: "submit",
     errors: [
       "UnknownProject",
       "NotClaimed",
@@ -189,6 +230,7 @@ const table = [
   },
   {
     audience: "decider",
+    cli: "finish",
     errors: [
       "UnknownProject",
       "NotDecider",
@@ -202,6 +244,7 @@ const table = [
   },
   {
     audience: "decider",
+    cli: "land",
     errors: ["UnknownProject", "NotDecider", "StaleBase", "RepoBusy"],
     flags: "IA",
     on: "RMC",
@@ -209,6 +252,7 @@ const table = [
   },
   {
     audience: "signedIn",
+    cli: "fork",
     errors: ["UnknownProject", "NotVouched", "Denounced"],
     flags: "I",
     on: "RMC",
@@ -216,6 +260,7 @@ const table = [
   },
   {
     audience: "decider",
+    cli: "vouch",
     errors: ["UnknownProject", "NotDecider", "StaleBase"],
     flags: "A",
     on: "RMC",
@@ -223,6 +268,7 @@ const table = [
   },
   {
     audience: "decider",
+    cli: "env set",
     errors: [
       "UnknownProject",
       "NotDecider",
@@ -250,11 +296,19 @@ const surfacesOf = (letters: string): readonly SurfaceName[] =>
 
 const contracts = [...Contracts.requests.values()];
 
-/** A contract's success and error: a stream's are its element's and its stream error's. */
-const schemasOf = (rpc: Contract) =>
-  RpcSchema.isStreamSchema(rpc.successSchema)
-    ? { error: rpc.successSchema.error, success: rpc.successSchema.success }
-    : { error: rpc.errorSchema, success: rpc.successSchema };
+/** A contract's command as the table's CLI column writes it. */
+const commandOf = (rpc: Contract) => {
+  const cli = Context.getOrUndefined(rpc.annotations, Cli);
+
+  if (cli?.name === undefined) {
+    return "none";
+  }
+
+  return [
+    cli.name,
+    ...(cli.positional ?? []).map((field) => `<${field}>`),
+  ].join(" ");
+};
 
 /** The refusals an error schema admits, by name: one, a union of several, or none. */
 const refusalsOf = (error: Schema.Top) => {
@@ -271,7 +325,7 @@ const refusalsOf = (error: Schema.Top) => {
 
 /** A contract's example, decoded with the contract's schemas and encoded back. */
 const roundTrip = (rpc: Contract, example: Example) => {
-  const { success } = schemasOf(rpc);
+  const { success } = partsOf(rpc);
 
   return {
     payload: Schema.encodeSync(rpc.payloadSchema)(
@@ -336,10 +390,30 @@ describe("the contracts group", () => {
     );
   });
 
+  it("names each contract's command, and the fields it takes in order", () => {
+    expect(
+      contracts.map((rpc) => ({ cli: commandOf(rpc), tag: rpc._tag }))
+    ).toStrictEqual(table.map(({ cli, tag }) => ({ cli, tag })));
+  });
+
+  // Web caching reads it: no cache may keep a response for maintainers.
+  it("sets each contract's visibility explicitly, keeping only a decider's Today and decisions to maintainers", () => {
+    expect(
+      contracts.flatMap((rpc) => {
+        const visibility = Context.getOrUndefined(rpc.annotations, Visibility);
+
+        return visibility === "public" ? [] : [{ tag: rpc._tag, visibility }];
+      })
+    ).toStrictEqual([
+      { tag: "today", visibility: "maintainers" },
+      { tag: "decide", visibility: "maintainers" },
+    ]);
+  });
+
   it("lets each contract refuse only with its own subset of refusals", () => {
     expect(
       contracts.map((rpc) => ({
-        errors: refusalsOf(schemasOf(rpc).error),
+        errors: refusalsOf(partsOf(rpc).error),
         tag: rpc._tag,
       }))
     ).toStrictEqual(table.map(({ errors, tag }) => ({ errors, tag })));
@@ -361,7 +435,7 @@ describe("the contracts group", () => {
   // `Schema.optional` admits null; MCP tool schemas would carry both.
   it("gives every payload and success a JSON Schema with no non-finite number and no null", () => {
     const leaky = contracts.flatMap((rpc) => {
-      const { success } = schemasOf(rpc);
+      const { success } = partsOf(rpc);
 
       return [
         [`${rpc._tag}.payload`, rpc.payloadSchema] as const,
@@ -387,7 +461,7 @@ describe("the contracts group", () => {
 
     expect(Redacted.isRedacted(decoded.value)).toBeTruthy();
     expect(encoded).toStrictEqual(sent);
-    expect(encoded.value).toBe("sk_live_0123456789abcdef0123456789");
+    expect(encoded.value).toBe("not-a-real-value-0123456789abcdef");
     expect(JSON.stringify(decoded)).toContain('"value":"<redacted>"');
     expect(JSON.stringify(decoded)).not.toContain(encoded.value);
   });

@@ -8,9 +8,9 @@ import {
   RequestId,
 } from "@repo/protocol/ids";
 import { StaleBase } from "@repo/protocol/refusal";
+import { unanswered } from "@repo/protocol/testing";
 import { Effect, Layer, Schema } from "effect";
 
-import { unanswered } from "./handlers.ts";
 import { session } from "./stdio.ts";
 
 const ask = AskId.make("fix-parser");

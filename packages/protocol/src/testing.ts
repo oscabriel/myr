@@ -5,6 +5,7 @@
  */
 import { Effect, Layer } from "effect";
 
+import { Contracts, EnvSchemaOf } from "./contracts.ts";
 import { Handle } from "./ids.ts";
 import { Authenticated, CurrentPrincipal, Person } from "./principal.ts";
 
@@ -18,3 +19,41 @@ export const asPerson = (handle: Handle): Layer.Layer<Authenticated> =>
 export const asTester: Layer.Layer<Authenticated> = asPerson(
   Handle.make("tester")
 );
+
+/** What a contract does when a test reaches one it did not set up. */
+const uncalled = () =>
+  Effect.die("This test calls only the contracts it sets up.");
+
+/**
+ * A handler for every contract, none of which a test should reach. A test
+ * merges the ones it is about over these, each with
+ * `Contracts.toLayerHandler`: a later layer's handler wins.
+ */
+export const unanswered = Contracts.toLayer({
+  claim: uncalled,
+  credits: uncalled,
+  decide: uncalled,
+  // Keyed by the class: lint keeps "shape" out of code names.
+  [EnvSchemaOf._tag]: uncalled,
+  finish: uncalled,
+  flagAsk: uncalled,
+  fork: uncalled,
+  frontPage: uncalled,
+  initProject: uncalled,
+  land: uncalled,
+  landing: uncalled,
+  ledger: uncalled,
+  listAsks: uncalled,
+  listProjects: uncalled,
+  openAsk: uncalled,
+  proposeAsk: uncalled,
+  release: uncalled,
+  setEnv: uncalled,
+  showAsk: uncalled,
+  status: uncalled,
+  submitAnswer: uncalled,
+  today: uncalled,
+  verdict: uncalled,
+  vouch: uncalled,
+  watch: uncalled,
+});

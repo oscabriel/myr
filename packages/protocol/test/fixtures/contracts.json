@@ -423,7 +423,7 @@
         "acknowledgeShort": false,
         "key": "PAYMENTS_KEY",
         "project": "datekit",
-        "value": "sk_live_0123456789abcdef0123456789"
+        "value": "not-a-real-value-0123456789abcdef"
       },
       "success": {
         "key": "PAYMENTS_KEY",

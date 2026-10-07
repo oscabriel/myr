@@ -1,5 +1,5 @@
 import { Brand } from "@repo/brand";
-import { authenticated } from "@repo/protocol/authenticate";
+import { authenticated, bearerToken } from "@repo/protocol/authenticate";
 import { Client, Contracts, surfaced } from "@repo/protocol/contracts";
 import { toToolkit } from "@repo/protocol/mcp";
 import { Authenticated } from "@repo/protocol/principal";
@@ -26,16 +26,12 @@ export type Services =
   | Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>
   | Sessions;
 
-/** The token in an `Authorization: Bearer <token>` header. */
-const bearer = (authorization: string | undefined) =>
-  /^Bearer (?<token>\S+)$/u.exec(authorization ?? "")?.groups?.token;
-
 /** The person an `Authorization` header names, if any. */
-const principalOf = (sessions: Sessions["Service"], authorization?: string) => {
-  const token = bearer(authorization);
-
-  return token === undefined ? Effect.succeedNone : sessions.verify(token);
-};
+const principalOf = (sessions: Sessions["Service"], authorization?: string) =>
+  Option.match(bearerToken(authorization), {
+    onNone: () => Effect.succeedNone,
+    onSome: (token) => sessions.verify(token),
+  });
 
 /**
  * Every request needs a credential the platform knows; anything else gets a
