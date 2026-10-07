@@ -10,6 +10,8 @@ import { LaneName } from "@repo/protocol/ids";
 import { Array as Arr, Option, Result, Schema } from "effect";
 import { parse } from "yaml";
 
+import { PATH_PLACEHOLDER } from "./kinds.ts";
+
 /** The run block as it travels before decoding. */
 export type RunBlockEncoded = typeof RunBlock.Encoded;
 
@@ -29,9 +31,6 @@ export interface FoundRunBlock {
   readonly run: Partial<RunBlockEncoded>;
   readonly sources: readonly string[];
 }
-
-/** The placeholder a `test` command holds for the one check file it runs. */
-const PATH = "{path}";
 
 /** The lane names the finder prefers; any other lane takes its script's name. */
 type Canonical = "build" | "format" | "lint" | "types" | "unit";
@@ -385,6 +384,13 @@ const insertBefore = (
     : [...tokens.slice(0, at), ...added, ...tokens.slice(at)];
 };
 
+/** A `go test` package pattern: `.`, `./pkg`, `./...`, `example.com/m/...`. */
+const isGoPackages = (arg: string) =>
+  arg === "." ||
+  arg.startsWith("./") ||
+  arg.startsWith("../") ||
+  arg.includes("...");
+
 /**
  * The command that runs one test file, for runners that can: `vitest run`
  * → `vitest run {path}`. Go runs a package and Cargo a test target, so theirs
@@ -402,7 +408,7 @@ const oneFile = (command: string): Option.Option<string> => {
   if (startsWith(rest, ["vitest"])) {
     const args = rest[1] === "run" ? rest.slice(2) : rest.slice(1);
 
-    return write("vitest", "run", ...args, PATH);
+    return write("vitest", "run", ...args, PATH_PLACEHOLDER);
   }
 
   if (
@@ -413,18 +419,22 @@ const oneFile = (command: string): Option.Option<string> => {
       ["deno", "test"],
     ].some((tool) => startsWith(rest, tool))
   ) {
-    return write(...rest, PATH);
+    return write(...rest, PATH_PLACEHOLDER);
   }
 
   if (startsWith(rest, ["go", "test"])) {
-    const flags = rest.slice(2).filter((arg) => arg.startsWith("-"));
+    // Keep every flag and its value (`-run TestX`); drop the packages.
+    const flags = rest.slice(2).filter((arg) => !isGoPackages(arg));
 
-    return write("go", "test", ...flags, `"./$(dirname ${PATH})"`);
+    return write("go", "test", ...flags, `"./$(dirname ${PATH_PLACEHOLDER})"`);
   }
 
   if (startsWith(rest, ["cargo", "test"])) {
     return write(
-      ...insertBefore(rest, "--", ["--test", `"$(basename ${PATH} .rs)"`])
+      ...insertBefore(rest, "--", [
+        "--test",
+        `"$(basename ${PATH_PLACEHOLDER} .rs)"`,
+      ])
     );
   }
 
@@ -584,7 +594,10 @@ const PreCommit = Schema.Struct({
   ),
 });
 
-const PRE_COMMIT_STAGES = new Set(["commit", "pre-commit"]);
+const PRE_COMMIT_STAGES: ReadonlySet<string> = new Set([
+  "commit",
+  "pre-commit",
+]);
 
 /** pre-commit's hook ids that name a canonical lane. */
 const HOOKS: ReadonlyMap<string, Canonical> = new Map([
@@ -611,7 +624,13 @@ const isWorkflow = (file: RepoFile) => workflowFile.test(file.path);
 
 const huskyFile = /^\.husky\/pre-(?:commit|push)$/u;
 
-const LEFTHOOK = new Set(["lefthook.yml", "lefthook.yaml", ".lefthook.yml"]);
+// Every name lefthook reads its config from, as the judge closure lists them.
+const LEFTHOOK: ReadonlySet<string> = new Set([
+  "lefthook.yml",
+  "lefthook.yaml",
+  ".lefthook.yml",
+  ".lefthook.yaml",
+]);
 
 const PRE_COMMIT = ".pre-commit-config.yaml";
 
@@ -660,7 +679,12 @@ const offerFromStep = (
 
   const fallback = Option.flatMap(ownName, scriptLane);
 
-  return fixes(runner.body)
+  // A dev server, deploy or release is no check, whatever tool its body runs.
+  const neverALane = [step.name, task].some((name) =>
+    Option.exists(name, (text) => NEVER_A_LANE.test(text))
+  );
+
+  return neverALane || fixes(runner.body)
     ? Option.none()
     : Option.map(
         Option.orElse(lane, () => fallback),
@@ -873,12 +897,14 @@ const testOf = (lanes: Lanes) =>
  * then lefthook, husky and pre-commit hooks, then root `package.json`
  * scripts; a lower source only adds lanes the higher ones lack. Lanes are
  * named `lint`, `types`, `unit`, `build` and `format` when the finder knows
- * the tool or the name, else by their script's name. `test` runs one file
- * (`{path}`) for runners it knows (vitest, jest, bun test, pytest, go test,
- * cargo test, and a few more); otherwise it is the unit lane's command as
- * found. Setup is the install commands the top source runs, or else the
- * package manager's install. A file that doesn't parse is skipped with its
- * reason in `sources`; nothing found leaves `run` and `sources` empty.
+ * the tool or the name, else by their script's name; a dev server, deploy,
+ * release or fixer is never a lane. `test` runs one file (`{path}`) for
+ * runners it knows (vitest, jest, bun test, pytest, go test, cargo test, and
+ * a few more); otherwise it is the unit lane's command as found. Setup is the
+ * install commands the top source runs, or else the package manager's
+ * install, frozen only when a lockfile is committed. A file that doesn't
+ * parse is skipped with its reason in `sources`; nothing found leaves `run`
+ * and `sources` empty.
  */
 export const findRunBlock = (files: readonly RepoFile[]): FoundRunBlock => {
   const sorted = files.toSorted(byPath);
@@ -941,12 +967,14 @@ export const findRunBlock = (files: readonly RepoFile[]): FoundRunBlock => {
     ([name, owner]) => owner === manager && sorted.some(fileNamed(name))
   );
 
+  // A frozen install refuses to run without a lockfile, so none means a plain one.
   const inferred =
     setup.length === 0 && Option.isSome(rootPackage)
-      ? Option.some({
-          command: INSTALL[manager],
-          from: lockfile?.[0] ?? PACKAGE_JSON,
-        })
+      ? Option.some(
+          lockfile === undefined
+            ? { command: `${manager} install`, from: PACKAGE_JSON }
+            : { command: INSTALL[manager], from: lockfile[0] }
+        )
       : Option.none();
 
   const commands = [

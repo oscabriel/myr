@@ -118,6 +118,28 @@ describe(findRunBlock, () => {
     });
   });
 
+  it("infers a plain install when the repo commits no lockfile, since a frozen one would refuse", () => {
+    expect(
+      findRunBlock([
+        {
+          content: JSON.stringify({ scripts: { test: "vitest run" } }),
+          path: "package.json",
+        },
+      ])
+    ).toStrictEqual({
+      run: {
+        checks: { unit: "npm test" },
+        setup: "npm install",
+        test: "vitest run {path}",
+      },
+      sources: [
+        "setup inferred from package.json",
+        "test from package.json",
+        "checks.unit from package.json",
+      ],
+    });
+  });
+
   it("names a lane by its script when the tool is unknown, and never takes a fixer or a deploy", () => {
     expect(findRunBlock(mixedWorkflow)).toStrictEqual({
       run: {
@@ -134,6 +156,24 @@ describe(findRunBlock, () => {
       ],
     });
   });
+
+  it.each(["lefthook.yml", "lefthook.yaml", ".lefthook.yml", ".lefthook.yaml"])(
+    "reads lefthook's commands from %s, a name the judge closure holds",
+    (path) => {
+      expect(
+        findRunBlock([
+          {
+            content:
+              "pre-commit:\n  commands:\n    lint:\n      run: npx eslint {staged_files}\n",
+            path,
+          },
+        ])
+      ).toStrictEqual({
+        run: { checks: { lint: "npx eslint ." } },
+        sources: [`checks.lint from ${path}`],
+      });
+    }
+  );
 
   it("finds nothing in a repo with no scripts, CI or hooks", () => {
     expect(findRunBlock(nothing)).toStrictEqual({ run: {}, sources: [] });
@@ -167,6 +207,10 @@ describe(findRunBlock, () => {
     ["uv run pytest -q", "uv run pytest -q {path}"],
     ["python -m pytest", "python -m pytest {path}"],
     ["go test -race ./...", 'go test -race "./$(dirname {path})"'],
+    [
+      "go test -tags integration -run TestWeek ./pkg/...",
+      'go test -tags integration -run TestWeek "./$(dirname {path})"',
+    ],
     [
       "cargo test --all-features",
       'cargo test --all-features --test "$(basename {path} .rs)"',

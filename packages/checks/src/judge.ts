@@ -17,11 +17,11 @@ import type { RepoFile } from "./finder.ts";
 const EXCLUDE = "!";
 
 /**
- * What every project's judge holds before its run block adds to it (spec
- * §4.2 `packages/gate`): the config folder, the env schema and committed env
- * files (never `*.local` ones), CI, test and lint config, the tsconfig files,
- * git and harness hook config, and generated contribute skills. W4 issue 411
- * adds lint plugin sources, rule fixtures and more harnesses.
+ * What every project's judge holds before its run block adds to it: the
+ * config folder, the env schema and committed env files (never `*.local`
+ * ones), CI, test and lint config, the tsconfig files, git and harness hook
+ * config, and generated contribute skills. Lint plugin sources and rule
+ * fixtures are not in it yet.
  */
 export const defaultJudgeGlobs: readonly Glob[] = [
   `${Brand.configDir}/**`,
@@ -194,7 +194,7 @@ const resolveExtends = (
 /**
  * The files a tsconfig extends, followed until the chain ends or leaves the
  * repo. A package specifier (`@tsconfig/node24`) is a dependency, not a path.
- * A file that doesn't parse as JSON ends its branch (411 reads JSONC).
+ * A file that doesn't parse as plain JSON (JSONC, say) ends its branch.
  */
 const extendsChain = (
   start: string,

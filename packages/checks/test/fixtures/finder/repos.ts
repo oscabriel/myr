@@ -195,13 +195,17 @@ export const turboMonorepo: readonly RepoFile[] = [
   ),
 ];
 
-/** A workflow that runs a fixer, a deploy, an unknown script and both kinds of `ruff format`. */
+/**
+ * A workflow that runs a fixer, a deploy that builds first, a dev server, an
+ * unknown script and both kinds of `ruff format`.
+ */
 export const mixedWorkflow: readonly RepoFile[] = [
   file(
     "package.json",
     JSON.stringify({
       scripts: {
-        deploy: "wrangler deploy",
+        deploy: "vite build && wrangler deploy",
+        dev: "vitest",
         "gen:check": "node scripts/gen.js --check",
       },
     })
@@ -215,6 +219,7 @@ export const mixedWorkflow: readonly RepoFile[] = [
     "      - run: npx prettier --write .",
     "      - run: npm run gen:check",
     "      - run: npm run deploy",
+    "      - run: npm run dev",
     "      - run: ruff format .",
     "      - run: ruff format --check .",
     "      - run: echo done"
