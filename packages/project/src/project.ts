@@ -33,15 +33,27 @@ import { patchId } from "@repo/git/patch-id";
 import { formatLanding } from "@repo/git/trailers";
 import {
   Claim as ClaimContract,
+  Credits,
+  Decide,
+  EnvSchemaOf,
+  Finish,
+  FlagAsk,
+  Fork,
   InitProject,
+  Land,
   LandingOf,
+  LedgerOf,
   ListAsks,
   OpenAsk,
+  ProposeAsk,
   Release,
+  SetEnv,
   ShowAsk,
   Status,
   SubmitAnswer,
+  TodayOf,
   VerdictOf,
+  Vouch,
 } from "@repo/protocol/contracts";
 import { AnswerReceipt, Verdict } from "@repo/protocol/domain/answer";
 import type {
@@ -54,20 +66,28 @@ import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { RefNameText } from "@repo/protocol/domain/common";
 import type { Credit } from "@repo/protocol/domain/credit";
+import type { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { Outcome, StageName } from "@repo/protocol/domain/outcome";
 import { Policy } from "@repo/protocol/domain/policy";
+import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   CommitSha,
+  Handle,
   LandedSha,
   RepoName,
   RepoPath,
   RequestId,
 } from "@repo/protocol/ids";
-import type { Handle, LaneName, ProjectName } from "@repo/protocol/ids";
+import type {
+  DecisionId,
+  LaneName,
+  ProjectName,
+  ProposalId,
+} from "@repo/protocol/ids";
 import { Person, Principal } from "@repo/protocol/principal";
 import {
   AskFull,
@@ -77,6 +97,7 @@ import {
   NotClaimed,
   NotDecider,
   NotRedFirst,
+  NotVouched,
   ProjectExists,
   Refusal,
   StaleBase,
@@ -91,7 +112,6 @@ import type {
   CapReached,
   ClaimLapsed,
   Denounced,
-  NotVouched,
   OutOfScope,
   PrivatePathInPublicTree,
   ReachedInternals,
@@ -113,6 +133,7 @@ import {
   Result,
   Schema,
   Semaphore,
+  Struct,
 } from "effect";
 import { init } from "isomorphic-git";
 
@@ -137,6 +158,8 @@ import {
   transition as claimTransition,
 } from "./claim.ts";
 import type { ClaimStep, Live } from "./claim.ts";
+import { deciderDeadlines, deciders, envSchemaMethod } from "./deciders.ts";
+import type { DeciderApi, Opening } from "./deciders.ts";
 import { askClosed, askOpened, judged, listingOf, numbered } from "./events.ts";
 import { evaluationFacts, pushFacts, targetOf } from "./facts.ts";
 import type { MissingCommit } from "./facts.ts";
@@ -162,6 +185,7 @@ import { ProjectStore } from "./project-store.ts";
 import type { ProjectWrites } from "./project-store.ts";
 import type {
   AnswerRow,
+  BudgetDayRow,
   ClaimRow,
   OutboxRow,
   ProjectEventInput,
@@ -241,9 +265,12 @@ export type SubmitRefusal =
 
 /**
  * Every contract's server logic for one project. Each method takes its
- * caller explicitly: one project's service serves many callers.
+ * caller explicitly: one project's service serves many callers. The
+ * decider-facing methods (Today, proposals, decisions, finishes, a
+ * decider's own landings, vouches, credits, the ledger and the env shape)
+ * are `DeciderApi`'s, with their bodies in `deciders.ts`.
  */
-export interface ProjectApi extends AnswerQueue {
+export interface ProjectApi extends AnswerQueue, DeciderApi {
   // reads
   readonly listAsks: (
     caller: Principal
@@ -337,12 +364,12 @@ export interface ProjectApi extends AnswerQueue {
       readonly requestId: RequestId;
     }
   ) => Effect.Effect<AnswerReceipt, SubmitRefusal>;
-  /** The project's alarm fired: deadlines that passed move, and outbox rows due run again. */
+  /**
+   * The project's alarm fired: deadlines that passed move (claims warned
+   * and lapsed, proposals expired, decisions defaulted), and outbox rows
+   * due run again.
+   */
   readonly onAlarm: () => Effect.Effect<void>;
-  // ---------------------------------------------------------------------
-  // 221 adds the decider-facing methods here: today, proposeAsk, flagAsk,
-  // decide, finish, land, fork, vouch, credits, ledger, envShape, setEnv.
-  // ---------------------------------------------------------------------
 }
 
 /** The schemas one method's arguments (in order), success and failure cross a boundary with. */
@@ -359,6 +386,11 @@ export interface MethodSchema {
  * (302) encodes and decodes with the same ones.
  */
 export const MethodSchemas = {
+  [envSchemaMethod]: {
+    args: [Principal],
+    error: EnvSchemaOf.errorSchema,
+    success: EnvSchemaOf.successSchema,
+  },
   advanceAnswer: {
     args: [RequestId, ReportedCommand, Schema.UndefinedOr(AnswerReport)],
     error: Schema.Never,
@@ -374,12 +406,37 @@ export const MethodSchemas = {
     error: ClaimContract.errorSchema,
     success: ClaimContract.successSchema,
   },
+  credits: {
+    args: [Principal, Handle],
+    error: Schema.Never,
+    success: Credits.successSchema,
+  },
+  decide: {
+    args: [Person, Decide.payloadSchema.mapFields(Struct.omit(["project"]))],
+    error: Decide.errorSchema,
+    success: Decide.successSchema,
+  },
   events: {
     args: [Schema.Int, Schema.Int],
     error: Schema.Never,
     success: Schema.Array(
       Schema.Struct({ event: ProjectEvent, seq: Schema.Int })
     ),
+  },
+  finish: {
+    args: [Person, Finish.payloadSchema.mapFields(Struct.omit(["project"]))],
+    error: Finish.errorSchema,
+    success: Finish.successSchema,
+  },
+  flagAsk: {
+    args: [Person, FlagAsk.payloadSchema.mapFields(Struct.omit(["project"]))],
+    error: FlagAsk.errorSchema,
+    success: FlagAsk.successSchema,
+  },
+  fork: {
+    args: [Person],
+    error: Fork.errorSchema,
+    success: Fork.successSchema,
   },
   initProject: {
     args: [
@@ -389,10 +446,20 @@ export const MethodSchemas = {
     error: InitProject.errorSchema,
     success: InitProject.successSchema,
   },
+  land: {
+    args: [Person, Land.payloadSchema.mapFields(Struct.omit(["project"]))],
+    error: Land.errorSchema,
+    success: Land.successSchema,
+  },
   landing: {
     args: [Principal, CommitSha],
     error: LandingOf.errorSchema,
     success: LandingOf.successSchema,
+  },
+  ledger: {
+    args: [Principal],
+    error: LedgerOf.errorSchema,
+    success: LedgerOf.successSchema,
   },
   listAsks: {
     args: [Principal],
@@ -408,6 +475,16 @@ export const MethodSchemas = {
     error: OpenAsk.errorSchema,
     success: OpenAsk.successSchema,
   },
+  // The contract leaves `NotVouched` out; a project whose vouch mode is
+  // `all` gives it (213's `propose`). 221's Comments ask 299 to add it.
+  proposeAsk: {
+    args: [
+      Person,
+      ProposeAsk.payloadSchema.mapFields(Struct.omit(["project"])),
+    ],
+    error: Schema.Union([ProposeAsk.errorSchema, NotVouched]),
+    success: ProposeAsk.successSchema,
+  },
   recordFirstPush: {
     args: [Person, CommitSha],
     error: DirectPush,
@@ -422,6 +499,11 @@ export const MethodSchemas = {
     args: [Person, AskId],
     error: Release.errorSchema,
     success: Release.successSchema,
+  },
+  setEnv: {
+    args: [Person, SetEnv.payloadSchema.mapFields(Struct.omit(["project"]))],
+    error: SetEnv.errorSchema,
+    success: SetEnv.successSchema,
   },
   showAsk: {
     args: [Principal, AskId],
@@ -446,6 +528,11 @@ export const MethodSchemas = {
     error: SubmitAnswer.errorSchema,
     success: SubmitAnswer.successSchema,
   },
+  today: {
+    args: [Person],
+    error: TodayOf.errorSchema,
+    success: TodayOf.successSchema,
+  },
   verdict: {
     args: [
       Principal,
@@ -453,6 +540,11 @@ export const MethodSchemas = {
     ],
     error: VerdictOf.errorSchema,
     success: VerdictOf.successSchema,
+  },
+  vouch: {
+    args: [Person, Vouch.payloadSchema.mapFields(Struct.omit(["project"]))],
+    error: Vouch.errorSchema,
+    success: Vouch.successSchema,
   },
 } as const satisfies { readonly [M in keyof ProjectApi]: MethodSchema };
 
@@ -536,28 +628,34 @@ interface Answered {
 interface Hydrated {
   readonly answers: readonly Answered[];
   readonly asks: ReadonlyMap<AskId, Ask>;
+  readonly budgetDays: readonly BudgetDayRow[];
   readonly claims: readonly Claimed[];
+  readonly decisions: readonly Decision[];
   readonly landings: readonly LandingView[];
   readonly lastSeq: number;
   readonly outbox: readonly OutboxRow[];
   readonly policy: Option.Option<Policy>;
   readonly project: Option.Option<ProjectRow>;
+  readonly proposals: readonly Proposal[];
   readonly queue: LandingQueue;
 }
 
 /**
  * What one call writes, gathered as it goes and committed at its end. The
  * project row and the queue are kept in one-entry maps, so the record itself
- * never changes.
+ * never changes. Budget days are keyed by day and decider.
  */
 interface Writes {
   readonly answers: Map<RequestId, AnswerRow>;
   readonly asks: Map<AskId, Ask>;
+  readonly budgetDays: Map<string, BudgetDayRow>;
   readonly claims: Map<string, ClaimRow>;
+  readonly decisions: Map<DecisionId, Decision>;
   readonly events: ProjectEventInput[];
   readonly landings: LandingView[];
   readonly outbox: OutboxRow[];
   readonly project: Map<"row", ProjectRow>;
+  readonly proposals: Map<ProposalId, Proposal>;
   readonly pushEvents: PushEventRow[];
   readonly queue: Map<"queue", LandingQueue>;
 }
@@ -565,11 +663,14 @@ interface Writes {
 const writesOf = (): Writes => ({
   answers: new Map(),
   asks: new Map(),
+  budgetDays: new Map(),
   claims: new Map(),
+  decisions: new Map(),
   events: [],
   landings: [],
   outbox: [],
   project: new Map(),
+  proposals: new Map(),
   pushEvents: [],
   queue: new Map(),
 });
@@ -578,11 +679,14 @@ const isEmpty = (writes: Writes) =>
   [
     writes.answers.size,
     writes.asks.size,
+    writes.budgetDays.size,
     writes.claims.size,
+    writes.decisions.size,
     writes.events.length,
     writes.landings.length,
     writes.outbox.length,
     writes.project.size,
+    writes.proposals.size,
     writes.pushEvents.length,
     writes.queue.size,
   ].every((count) => count === 0);
@@ -952,12 +1056,15 @@ export const projectService = (
       return {
         answers,
         asks: new Map(snapshot.asks.map((ask) => [ask.id, ask])),
+        budgetDays: snapshot.budgetDays,
         claims,
+        decisions: snapshot.decisions,
         landings: snapshot.landings,
         lastSeq: snapshot.lastSeq,
         outbox: snapshot.outbox,
         policy,
         project: snapshot.project,
+        proposals: snapshot.proposals,
         queue: yield* queueOf(snapshot.queue),
       };
     });
@@ -1052,10 +1159,13 @@ export const projectService = (
         const all: ProjectWrites = {
           answers: [...writes.answers.values()],
           asks: [...writes.asks.values()],
+          budgetDays: [...writes.budgetDays.values()],
           claims: [...writes.claims.values()],
+          decisions: [...writes.decisions.values()],
           events: writes.events,
           landings: writes.landings,
           outbox,
+          proposals: [...writes.proposals.values()],
           pushEvents: writes.pushEvents,
           ...field(
             "project",
@@ -1092,6 +1202,7 @@ export const projectService = (
 
       const deadlines = [
         ...h.claims.flatMap(({ state }) => Option.toArray(deadlineOf(state))),
+        ...deciderDeadlines(h),
         ...h.outbox.map(({ notBefore }) => notBefore),
       ];
 
@@ -2012,23 +2123,20 @@ export const projectService = (
         );
       });
 
-    /** The landing that opens an ask: its files on main, asked by the decider. */
+    /** The landing that opens an ask: its files on main, authored by its asker. */
     const landAsk = (input: {
       readonly ask: Ask;
-      readonly caller: Person;
+      readonly credits: readonly Credit[];
       readonly files: Array.NonEmptyReadonlyArray<ComposedFile>;
       readonly main: LandedSha;
       readonly tree: Checking["tree"];
     }) => {
       const requestId = RequestId.make(`open-${input.tree}`);
-
-      const credits: readonly Credit[] = [
-        { handle: input.caller.handle, role: "Asked-by" },
-      ];
+      const { credits } = input;
 
       const landing = lander
         .land({
-          author: input.caller.handle,
+          author: input.ask.askedBy,
           main: input.main,
           message: formatLanding({
             ask: { ask: input.ask.id, project: name },
@@ -2053,6 +2161,129 @@ export const projectService = (
       return Effect.map(landing, ({ sha }) => ({ credits, requestId, sha }));
     };
 
+    /**
+     * An ask opened from its files, red first, and landed as a platform
+     * commit: what `openAsk` does for a decider, and what an accepted
+     * proposal does for its proposer (221). `opening.decider` must decide
+     * for the ask's territory; `opening.asker` asks it and authors the
+     * landing, which carries `opening.credits`.
+     */
+    const openFrom = (
+      h: Hydrated,
+      writes: Writes,
+      now: DateTime.Utc,
+      opening: Opening
+    ) =>
+      Effect.gen(function* () {
+        const live = liveRow(h);
+        const { decider } = opening;
+
+        if (Option.isNone(live) || Option.isNone(h.policy)) {
+          return yield* new VerifierBlocked({});
+        }
+
+        const policy = h.policy.value;
+
+        if (!isDecider(policy, decider.handle)) {
+          return yield* new NotDecider({});
+        }
+
+        // An ask still open (or claimed) is not opened twice: the same
+        // call again finds it as it stands, and nothing lands.
+        const stillOpen = Option.filter(
+          askNow(h, writes, opening.ask),
+          ({ state }) => state !== "closed"
+        );
+
+        if (Option.isSome(stillOpen)) {
+          return decidesOn(policy, stillOpen.value, decider.handle)
+            ? { ask: stillOpen.value, landed: stillOpen.value.openedIn }
+            : yield* new NotDecider({});
+        }
+
+        const unplain = opening.files.flatMap(({ path }) =>
+          isPlainPath(path) ? [] : [path]
+        );
+
+        if (Array.isReadonlyArrayNonEmpty(unplain)) {
+          return yield* new TouchedJudge({ paths: unplain });
+        }
+
+        const { landed: main, row } = live.value;
+        const { files } = opening;
+        const composed = yield* lander.compose({ files, main, repo });
+
+        const stated = yield* statedAsk({
+          composed: composed.commit,
+          id: opening.ask,
+          now,
+          policy,
+          row,
+        });
+
+        if (!decidesOn(policy, stated, decider.handle)) {
+          return yield* new NotDecider({});
+        }
+
+        const ask: Ask = {
+          ...stated,
+          askedBy: opening.asker,
+          openedAt: now,
+          project: name,
+          state: "open",
+        };
+
+        const touched = yield* touchedJudge({
+          ask,
+          caller: decider,
+          files,
+          head: composed.commit,
+          main,
+          policy,
+        });
+
+        if (Option.isSome(touched)) {
+          return yield* touched.value;
+        }
+
+        const weak = weakness(ask, files);
+
+        if (Option.isSome(weak)) {
+          return yield* new WeakCheck({ weakness: weak.value });
+        }
+
+        yield* redTwice(policy, ask, composed.commit);
+
+        const landed = yield* landAsk({
+          ask,
+          credits: opening.credits,
+          files,
+          main,
+          tree: composed.tree,
+        });
+
+        const opened: Ask = { ...ask, openedIn: landed.sha };
+
+        writes.asks.set(opened.id, opened);
+        writes.events.push(askOpened(opened, now));
+        writes.landings.push({
+          assisted: [],
+          author: opening.asker,
+          credits: landed.credits,
+          landedAt: now,
+          parent: main,
+          project: name,
+          requestId: landed.requestId,
+          sha: landed.sha,
+        });
+        writes.project.set(
+          "row",
+          yield* withPolicyAt({ ...row, landed: landed.sha }, landed.sha, now)
+        );
+
+        return { ask: opened, landed: landed.sha };
+      });
+
     const openBody =
       (
         caller: Person,
@@ -2062,113 +2293,12 @@ export const projectService = (
         }
       ) =>
       (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
-        Effect.gen(function* () {
-          const live = liveRow(h);
-
-          if (Option.isNone(live) || Option.isNone(h.policy)) {
-            return yield* new VerifierBlocked({});
-          }
-
-          const policy = h.policy.value;
-
-          if (!isDecider(policy, caller.handle)) {
-            return yield* new NotDecider({});
-          }
-
-          // An ask still open (or claimed) is not opened twice: the same
-          // call again finds it as it stands, and nothing lands.
-          const stillOpen = Option.filter(
-            askNow(h, writes, input.ask),
-            ({ state }) => state !== "closed"
-          );
-
-          if (Option.isSome(stillOpen)) {
-            return decidesOn(policy, stillOpen.value, caller.handle)
-              ? { ask: stillOpen.value, landed: stillOpen.value.openedIn }
-              : yield* new NotDecider({});
-          }
-
-          const unplain = input.files.flatMap(({ path }) =>
-            isPlainPath(path) ? [] : [path]
-          );
-
-          if (Array.isReadonlyArrayNonEmpty(unplain)) {
-            return yield* new TouchedJudge({ paths: unplain });
-          }
-
-          const { landed: main, row } = live.value;
-          const { files } = input;
-          const composed = yield* lander.compose({ files, main, repo });
-
-          const stated = yield* statedAsk({
-            composed: composed.commit,
-            id: input.ask,
-            now,
-            policy,
-            row,
-          });
-
-          if (!decidesOn(policy, stated, caller.handle)) {
-            return yield* new NotDecider({});
-          }
-
-          const ask: Ask = {
-            ...stated,
-            askedBy: caller.handle,
-            openedAt: now,
-            project: name,
-            state: "open",
-          };
-
-          const touched = yield* touchedJudge({
-            ask,
-            caller,
-            files,
-            head: composed.commit,
-            main,
-            policy,
-          });
-
-          if (Option.isSome(touched)) {
-            return yield* touched.value;
-          }
-
-          const weak = weakness(ask, files);
-
-          if (Option.isSome(weak)) {
-            return yield* new WeakCheck({ weakness: weak.value });
-          }
-
-          yield* redTwice(policy, ask, composed.commit);
-
-          const landed = yield* landAsk({
-            ask,
-            caller,
-            files,
-            main,
-            tree: composed.tree,
-          });
-
-          const opened: Ask = { ...ask, openedIn: landed.sha };
-
-          writes.asks.set(opened.id, opened);
-          writes.events.push(askOpened(opened, now));
-          writes.landings.push({
-            assisted: [],
-            author: caller.handle,
-            credits: landed.credits,
-            landedAt: now,
-            parent: main,
-            project: name,
-            requestId: landed.requestId,
-            sha: landed.sha,
-          });
-          writes.project.set(
-            "row",
-            yield* withPolicyAt({ ...row, landed: landed.sha }, landed.sha, now)
-          );
-
-          return { ask: opened, landed: landed.sha };
+        openFrom(h, writes, now, {
+          ask: input.ask,
+          asker: caller.handle,
+          credits: [{ handle: caller.handle, role: "Asked-by" }],
+          decider: caller,
+          files: input.files,
         });
 
     /** Whether a person may claim an ask, by the trust rules (220), and the ask's race. */
@@ -2691,6 +2821,26 @@ export const projectService = (
         return Effect.succeed(field("verdict", verdict));
       });
 
+    // ---------------------------------------------------------- deciders
+
+    /** The decider-facing methods (221), over the same hydrate, write and helpers. */
+    const decided = deciders<Hydrated, Writes>({
+      advance: (h, writes, now, requestId, command) =>
+        advanceBody(requestId, command)(h, writes, now),
+      enqueue: queueAnswer,
+      name,
+      open: openFrom,
+      policyAt: withPolicyAt,
+      read: hydrate,
+      remote: (fork) =>
+        Effect.gen(function* () {
+          return `${yield* GatewayUrl}/${fork}.git`;
+        }),
+      repo,
+      withPorts,
+      write,
+    });
+
     const alarmed = (queue: AnswerQueue) =>
       Effect.gen(function* () {
         const rows = yield* lock.withPermits(1)(
@@ -2700,6 +2850,7 @@ export const projectService = (
             const writes = writesOf();
 
             yield* tickAll(h, writes, now);
+            yield* decided.expire(h, writes, now);
 
             return [...(yield* commit(h, writes, now)), ...h.outbox];
           })
@@ -2711,6 +2862,12 @@ export const projectService = (
     // ------------------------------------------------------------ the api
 
     const api: ProjectApi = {
+      [envSchemaMethod]: (caller) =>
+        checked(
+          MethodSchemas[envSchemaMethod],
+          [caller],
+          decided.envSchema(caller)
+        ),
       advanceAnswer: (requestId, command, report) =>
         checked(
           MethodSchemas.advanceAnswer,
@@ -2731,6 +2888,18 @@ export const projectService = (
           [caller, id],
           write(api, claimBody(caller, id))
         ),
+      credits: (caller, handle) =>
+        checked(
+          MethodSchemas.credits,
+          [caller, handle],
+          decided.credits(handle)
+        ),
+      decide: (caller, input) =>
+        checked(
+          MethodSchemas.decide,
+          [caller, input],
+          decided.decide(api, caller, input)
+        ),
       events: (since, limit) =>
         checked(
           MethodSchemas.events,
@@ -2739,11 +2908,31 @@ export const projectService = (
             rows.map(({ event, seq }) => ({ event, seq }))
           )
         ),
+      finish: (caller, input) =>
+        checked(
+          MethodSchemas.finish,
+          [caller, input],
+          decided.finish(api, caller, input)
+        ),
+      flagAsk: (caller, input) =>
+        checked(
+          MethodSchemas.flagAsk,
+          [caller, input],
+          decided.flagAsk(api, caller, input)
+        ),
+      fork: (caller) =>
+        checked(MethodSchemas.fork, [caller], decided.fork(api, caller)),
       initProject: (caller, input) =>
         checked(
           MethodSchemas.initProject,
           [caller, input],
           write(api, initBody(caller, input))
+        ),
+      land: (caller, input) =>
+        checked(
+          MethodSchemas.land,
+          [caller, input],
+          decided.land(api, caller, input)
         ),
       landing: (caller, sha) =>
         checked(
@@ -2756,6 +2945,8 @@ export const projectService = (
             })
           )
         ),
+      ledger: (caller) =>
+        checked(MethodSchemas.ledger, [caller], decided.ledger),
       listAsks: (caller) =>
         checked(
           MethodSchemas.listAsks,
@@ -2773,6 +2964,12 @@ export const projectService = (
           [caller, input],
           write(api, openBody(caller, input))
         ),
+      proposeAsk: (caller, input) =>
+        checked(
+          MethodSchemas.proposeAsk,
+          [caller, input],
+          decided.proposeAsk(api, caller, input)
+        ),
       recordFirstPush: (caller, head) =>
         checked(
           MethodSchemas.recordFirstPush,
@@ -2786,6 +2983,12 @@ export const projectService = (
           MethodSchemas.release,
           [caller, id],
           write(api, releaseBody(caller, id))
+        ),
+      setEnv: (caller, input) =>
+        checked(
+          MethodSchemas.setEnv,
+          [caller, input],
+          decided.setEnv(caller, input)
         ),
       showAsk: (caller, id) =>
         checked(
@@ -2806,8 +3009,16 @@ export const projectService = (
           [caller, input],
           write(api, submitBody(caller, input))
         ),
+      today: (caller) =>
+        checked(MethodSchemas.today, [caller], decided.today(caller)),
       verdict: (caller, input) =>
         checked(MethodSchemas.verdict, [caller, input], verdictOn(input)),
+      vouch: (caller, input) =>
+        checked(
+          MethodSchemas.vouch,
+          [caller, input],
+          decided.vouch(api, caller, input)
+        ),
     };
 
     return api;
