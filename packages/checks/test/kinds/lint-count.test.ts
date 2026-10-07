@@ -1,8 +1,7 @@
-import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Glob } from "@repo/protocol/domain/common";
 import { RepoPath } from "@repo/protocol/ids";
-import { Effect, FileSystem, Option, Result } from "effect";
+import { Effect, Option, Result } from "effect";
 
 import { countLint } from "../../src/kinds/lint-count.ts";
 import type {
@@ -10,6 +9,7 @@ import type {
   LintCount,
   LintFormat,
 } from "../../src/kinds/lint-count.ts";
+import { recorded } from "./recorded.ts";
 
 // Recorded stdout, byte for byte, from one fixture repo of four files:
 //
@@ -27,14 +27,6 @@ import type {
 // `no-debugger` at error), `eslint --format json packages`; ESLint prints
 // absolute paths, and the scratch folder it ran in is rewritten to
 // `/srv/fixture`.
-const recorded = (name: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-
-    return yield* fs.readFileString(
-      `${import.meta.dirname}/../fixtures/lint/${name}.stdout`
-    );
-  }).pipe(Effect.orDie, Effect.provide(NodeServices.layer));
 
 const ESLINT_ROOT = "/srv/fixture";
 

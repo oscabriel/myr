@@ -129,16 +129,25 @@ export const afterLanding = (
   measured: readonly RatchetCount[],
   landed: LandedSha
 ): BaselinesAfterLanding => {
-  const lowerTo = (held: RatchetBaseline) =>
-    Array.findFirst(
-      measured,
-      (count) => sameRatchet(held)(count) && count.count < held.count
-    );
+  // Each baseline reads the landing's first count for its key, as `first`
+  // does for a ratchet with none yet.
+  const lowered = baselines.flatMap((held) =>
+    Array.findFirst(measured, sameRatchet(held)).pipe(
+      Option.filter(({ count }) => count < held.count),
+      Option.map(({ count }): Lowered => ({
+        after: count,
+        before: held.count,
+        ratchet: held.ratchet,
+        territory: held.territory,
+      })),
+      Option.toArray
+    )
+  );
 
   const kept = baselines.map((held) =>
-    Option.match(lowerTo(held), {
+    Option.match(Array.findFirst(lowered, sameRatchet(held)), {
       onNone: () => held,
-      onSome: ({ count }) => ({ ...held, count, setAt: landed }),
+      onSome: ({ after }) => ({ ...held, count: after, setAt: landed }),
     })
   );
 
@@ -152,22 +161,7 @@ export const afterLanding = (
     territory,
   }));
 
-  return {
-    baselines: [...kept, ...first],
-    lowered: baselines.flatMap((held) =>
-      Option.match(lowerTo(held), {
-        onNone: () => [],
-        onSome: ({ count }) => [
-          {
-            after: count,
-            before: held.count,
-            ratchet: held.ratchet,
-            territory: held.territory,
-          },
-        ],
-      })
-    ),
-  };
+  return { baselines: [...kept, ...first], lowered };
 };
 
 /** Whether a choice gives a raise its way: `accept` (or `adopt`) does, `decline` and `revert` don't. */
@@ -180,8 +174,11 @@ const raisesOn = {
 
 /**
  * The baselines after a decider answered a `RaiseRatchet`: accepted, the
- * ratchet's baseline in that territory becomes the raised count, set at
- * `landed`; declined, nothing moves. The one way a baseline rises.
+ * ratchet's baseline in that territory rises to the raised count, set at
+ * `landed`; declined, nothing moves. The one way a baseline rises. An
+ * accepted raise never lowers one: when another accepted raise already took
+ * the baseline past this one's count, main may count that much, and a lower
+ * baseline would refuse every later answer for a count it did not raise.
  */
 export const decideRaise = (
   baselines: readonly RatchetBaseline[],
@@ -200,7 +197,11 @@ export const decideRaise = (
     territory: subject.territory,
   };
 
-  return Option.isSome(baselineOf(baselines, subject))
-    ? baselines.map((held) => (sameRatchet(subject)(held) ? raised : held))
-    : [...baselines, raised];
+  return Option.match(baselineOf(baselines, subject), {
+    onNone: () => [...baselines, raised],
+    onSome: (held) =>
+      held.count >= subject.after
+        ? baselines
+        : baselines.map((row) => (sameRatchet(subject)(row) ? raised : row)),
+  });
 };

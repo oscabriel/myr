@@ -59,7 +59,7 @@ describe(readMetric, () => {
     ["a negative index", "$.parts[-1].kb"],
     ["a trailing dot", "$.total."],
   ])("reads no path beyond `$`, `.key` and `[index]`: %s", (_label, path) => {
-    expect(Result.isFailure(read(report, path))).toBeTruthy();
+    expect(unreadHead(read(report, path))).toStrictEqual(Option.some(report));
   });
 
   it("keeps the first 200 characters of output that isn't JSON", () => {

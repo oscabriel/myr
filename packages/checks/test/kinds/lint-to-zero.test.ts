@@ -1,24 +1,16 @@
-import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Glob } from "@repo/protocol/domain/common";
-import { Effect, FileSystem, Result } from "effect";
+import { Effect, Result } from "effect";
 
 import { countLint } from "../../src/kinds/lint-count.ts";
 import {
   lintToZeroGreen,
   lintToZeroRed,
 } from "../../src/kinds/lint-to-zero.ts";
+import { recorded } from "./recorded.ts";
 
 // The recordings `lint-count.test.ts` describes: oxlint over a fixture with
 // `any` in `packages/parser` and `packages/lexer`, none in `packages/printer`.
-const recorded = (name: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-
-    return yield* fs.readFileString(
-      `${import.meta.dirname}/../fixtures/lint/${name}.stdout`
-    );
-  }).pipe(Effect.orDie, Effect.provide(NodeServices.layer));
 
 const anysIn = (output: string, territory: string) =>
   Result.getOrThrow(

@@ -198,6 +198,21 @@ describe(decideRaise, () => {
     }
   );
 
+  // Two answers asked to raise from 14; the raise to 18 was accepted first,
+  // so main may already count 18. Accepting the stale raise to 15 must not
+  // sink the baseline under main's count, or every later answer is refused.
+  it("never lowers a baseline a later accepted raise overtook", () => {
+    expect(
+      decideRaise([baseline(18, shaAt(2))], raiseTo(15), "accept", shaAt(3))
+    ).toStrictEqual([baseline(18, shaAt(2))]);
+  });
+
+  it("sets a baseline for a ratchet that has none yet", () => {
+    expect(decideRaise([], raiseTo(15), "accept", shaAt(2))).toStrictEqual([
+      baseline(15, shaAt(2)),
+    ]);
+  });
+
   it("touches no other ratchet or territory", () => {
     const lexer = { ...baseline(2), territory: "packages/lexer" };
 
@@ -371,15 +386,35 @@ const step = (model: Model, move: Move, at: number): Stepped => {
       model,
       refused: 0,
     }),
-    onSome: (subject) => ({
-      broken: Option.none(),
-      decided: Option.some({ choice: move.choice, subject }),
-      model: {
-        baselines: decideRaise(model.baselines, subject, move.choice, landed),
-        waiting: model.waiting.filter((waiting) => waiting !== subject),
-      },
-      refused: 0,
-    }),
+    onSome: (subject) => {
+      const baselines = decideRaise(
+        model.baselines,
+        subject,
+        move.choice,
+        landed
+      );
+
+      // An accepted raise another accepted raise overtook must not lower the
+      // baseline: main may already count the higher one.
+      const sank = Option.exists(baselineOf(model.baselines, subject), (held) =>
+        Option.exists(
+          baselineOf(baselines, subject),
+          (now) => now.count < held.count
+        )
+      );
+
+      return {
+        broken: sank
+          ? Option.some("a decision on a raise lowered a baseline")
+          : Option.none(),
+        decided: Option.some({ choice: move.choice, subject }),
+        model: {
+          baselines,
+          waiting: model.waiting.filter((waiting) => waiting !== subject),
+        },
+        refused: 0,
+      };
+    },
   });
 };
 

@@ -1,25 +1,17 @@
-import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { RatchetMeasure, RatchetSpec } from "@repo/protocol/domain/check";
 import { Command, Glob, JsonPath } from "@repo/protocol/domain/common";
 import type { Territory } from "@repo/protocol/domain/territory";
 import { RatchetName } from "@repo/protocol/ids";
-import { Effect, Exit, FileSystem, Ref } from "effect";
+import { Effect, Exit, Ref } from "effect";
 
 import { CountUnreadable } from "../../src/kinds/lint-count.ts";
 import { measure } from "../../src/kinds/ratchet.ts";
+import { recorded } from "./recorded.ts";
 
 // The recordings `lint-count.test.ts` describes: `any` three times in
 // parse.ts and once in date.ts (packages/parser), once in lex.ts
 // (packages/lexer), never in packages/printer.
-const recorded = (name: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-
-    return yield* fs.readFileString(
-      `${import.meta.dirname}/../fixtures/lint/${name}.stdout`
-    );
-  }).pipe(Effect.orDie, Effect.provide(NodeServices.layer));
 
 const module = (name: string, folder: string): Territory => ({
   module: name,
