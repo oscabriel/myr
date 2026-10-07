@@ -1,0 +1,212 @@
+import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { envSchemaMethod } from "@repo/project/deciders";
+import { LandingCommand } from "@repo/project/landing";
+import type { ProjectApi } from "@repo/project/project";
+import { Projects } from "@repo/project/projects";
+import { ProjectsMemory } from "@repo/project/projects/memory";
+import {
+  CommitSha,
+  DecisionId,
+  EnvKey,
+  LandedSha,
+  ProjectName,
+  RequestId,
+} from "@repo/protocol/ids";
+import { ProjectExists, UnknownProject } from "@repo/protocol/refusal";
+import { advanceTo } from "@repo/testkit/clock";
+import { Effect, Layer, Option, Redacted, Schema } from "effect";
+
+import { DoProjects } from "../src/adapters/do-projects.ts";
+import type { ProjectNamespace } from "../src/adapters/do-projects.ts";
+import {
+  decodeReply,
+  ProjectCalls,
+  projectMethods,
+} from "../src/project-calls.ts";
+import type { ProjectMethod } from "../src/project-calls.ts";
+import {
+  alice,
+  anyone,
+  askFiles,
+  bob,
+  carol,
+  forkOf,
+  namespaceOf,
+  outcomeOf,
+  parseIso,
+  project,
+  world,
+} from "./project-do.fixtures.ts";
+
+const other = ProjectName.make("other");
+
+const sha = CommitSha.make("a".repeat(40));
+
+const requestId = RequestId.make("req-none0001");
+
+/** A call's `Exit` as JSON, by its method's own schemas: equal when the outcomes are. */
+const settled = <A, E>(method: ProjectMethod, effect: Effect.Effect<A, E>) =>
+  Effect.exit(effect).pipe(
+    Effect.flatMap((exit) =>
+      Schema.encodeUnknownEffect(ProjectCalls[method].exit)(exit)
+    ),
+    Effect.orDie
+  );
+
+/** Every `ProjectApi` method once, on a project made and not yet pushed to. */
+const everyMethod = (api: ProjectApi) =>
+  Effect.all({
+    advanceAnswer: settled(
+      "advanceAnswer",
+      api.advanceAnswer(
+        requestId,
+        LandingCommand.Start({ main: LandedSha.make(sha) })
+      )
+    ),
+    answer: settled("answer", api.answer(requestId)),
+    claim: settled("claim", api.claim(bob, parseIso)),
+    credits: settled("credits", api.credits(anyone, bob.handle)),
+    decide: settled(
+      "decide",
+      api.decide(alice, {
+        choice: "accept",
+        decision: DecisionId.make("dec-none0001"),
+      })
+    ),
+    [envSchemaMethod]: settled(envSchemaMethod, api[envSchemaMethod](anyone)),
+    events: settled("events", api.events(0, 100)),
+    finish: settled(
+      "finish",
+      api.finish(bob, { ask: parseIso, base: sha, head: sha, requestId })
+    ),
+    flagAsk: settled(
+      "flagAsk",
+      api.flagAsk(bob, { ask: parseIso, reason: "It names no format." })
+    ),
+    fork: settled("fork", api.fork(carol)),
+    initProject: settled("initProject", api.initProject(alice, {})),
+    land: settled(
+      "land",
+      api.land(bob, { base: sha, head: sha, message: "Tidy", requestId })
+    ),
+    landing: settled("landing", api.landing(anyone, sha)),
+    ledger: settled("ledger", api.ledger(anyone)),
+    listAsks: settled("listAsks", api.listAsks(anyone)),
+    onAlarm: settled("onAlarm", api.onAlarm()),
+    openAsk: settled(
+      "openAsk",
+      api.openAsk(bob, { ask: parseIso, files: askFiles() })
+    ),
+    proposeAsk: settled(
+      "proposeAsk",
+      api.proposeAsk(carol, { want: "Parse ISO week dates." })
+    ),
+    recordFirstPush: settled("recordFirstPush", api.recordFirstPush(bob, sha)),
+    recordPush: settled(
+      "recordPush",
+      api.recordPush({
+        after: sha,
+        before: Option.none(),
+        eventId: "push-none",
+        pusher: bob,
+        ref: "refs/heads/main",
+        repo: forkOf(bob),
+      })
+    ),
+    release: settled("release", api.release(bob, parseIso)),
+    setEnv: settled(
+      "setEnv",
+      api.setEnv(bob, {
+        key: EnvKey.make("API_KEY"),
+        value: Redacted.make("a-value-long-enough-0123"),
+      })
+    ),
+    showAsk: settled("showAsk", api.showAsk(anyone, parseIso)),
+    status: settled("status", api.status(bob)),
+    submitAnswer: settled(
+      "submitAnswer",
+      api.submitAnswer(bob, { ask: parseIso, base: sha, head: sha, requestId })
+    ),
+    today: settled("today", api.today(alice)),
+    verdict: settled("verdict", api.verdict(anyone, { ask: parseIso })),
+    vouch: settled(
+      "vouch",
+      api.vouch(bob, { handle: carol.handle, verdict: "vouch" })
+    ),
+  });
+
+/**
+ * What `Projects` answers: for a name never made, for the project once made
+ * (made again, and every method on it), and for another name.
+ */
+const script = Effect.gen(function* () {
+  const projects = yield* Projects;
+  const before = yield* outcomeOf(projects.get(project));
+  const made = yield* projects.create(project);
+
+  yield* made.initProject(alice, {});
+
+  return {
+    again: yield* outcomeOf(projects.create(project)),
+    before,
+    each: yield* Effect.flatMap(projects.get(project), everyMethod),
+    other: yield* outcomeOf(projects.get(other)),
+  };
+});
+
+describe("Projects over the Project DO namespace", () => {
+  it("takes the Worker's PROJECT binding", () => {
+    expectTypeOf<Env["PROJECT"]>().toExtend<ProjectNamespace>();
+  });
+
+  it.effect("routes each project name to a DO of its own", () =>
+    Effect.gen(function* () {
+      const { names, namespace } = yield* namespaceOf;
+
+      const outcome = yield* script.pipe(Effect.provide(DoProjects(namespace)));
+
+      expect(outcome.before).toStrictEqual({
+        refused: new UnknownProject({ project }),
+      });
+      expect(outcome.again).toStrictEqual({
+        refused: new ProjectExists({ project }),
+      });
+      expect(outcome.other).toStrictEqual({
+        refused: new UnknownProject({ project: other }),
+      });
+      expect(yield* names).toStrictEqual([project, other]);
+    }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "answers every ProjectApi method as the project's service does in process",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-07T12:00:00Z");
+
+        const inProcess = yield* script.pipe(
+          Effect.provide(Layer.provideMerge(ProjectsMemory, world))
+        );
+
+        const throughDo = yield* Effect.gen(function* () {
+          const { namespace } = yield* namespaceOf;
+
+          return yield* script.pipe(Effect.provide(DoProjects(namespace)));
+        }).pipe(Effect.provide(world));
+
+        const died = yield* Effect.filter(projectMethods, (method) =>
+          Effect.map(
+            outcomeOf(decodeReply(method, throughDo.each[method])),
+            (outcome) => outcome === "died"
+          )
+        );
+
+        expect(Object.keys(throughDo.each).toSorted()).toStrictEqual(
+          projectMethods.toSorted()
+        );
+        expect(throughDo).toStrictEqual(inProcess);
+        // Only a step reported for an answer request that never was dies.
+        expect(died).toStrictEqual(["advanceAnswer"]);
+      })
+  );
+});
