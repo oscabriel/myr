@@ -48,18 +48,21 @@ const noteBytes = (verdict: Verdict) =>
     encoder.encode(`${json}\n`)
   );
 
+/** A blob holding `bytes` as git frames it: its header, then its content. */
+const framed = (bytes: Uint8Array) => {
+  const header = encoder.encode(`blob ${bytes.byteLength}\0`);
+  const raw = new Uint8Array(header.byteLength + bytes.byteLength);
+
+  raw.set(header);
+  raw.set(bytes, header.byteLength);
+
+  return raw;
+};
+
 /** The id git gives a blob holding `bytes`. */
 const blobId = (bytes: Uint8Array) =>
   Effect.map(
-    Effect.promise(() =>
-      crypto.subtle.digest(
-        "SHA-1",
-        Uint8Array.from([
-          ...encoder.encode(`blob ${bytes.byteLength}\0`),
-          ...bytes,
-        ])
-      )
-    ),
+    Effect.promise(() => crypto.subtle.digest("SHA-1", framed(bytes))),
     (digest) =>
       [...new Uint8Array(digest)]
         .map((byte) => byte.toString(16).padStart(2, "0"))
@@ -100,12 +103,7 @@ const keepEarlierNote = (
 
     const dir = `${source.gitdir}/objects/${blob.slice(0, 2)}`;
 
-    const loose = yield* deflate(
-      Uint8Array.from([
-        ...encoder.encode(`blob ${bytes.byteLength}\0`),
-        ...bytes,
-      ])
-    );
+    const loose = yield* deflate(framed(bytes));
 
     // Another note's blob may have made the folder already.
     yield* Effect.ignore(

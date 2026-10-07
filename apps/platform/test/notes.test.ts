@@ -8,6 +8,7 @@ import {
   RepoName,
   RepoNotFound,
 } from "@repo/artifacts/repo-host";
+import type { RefUpdate } from "@repo/artifacts/repo-host";
 import { RepoHostLocal } from "@repo/artifacts/repo-host/local";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { pushRefs } from "@repo/artifacts/repo-host/smart-http";
@@ -43,6 +44,7 @@ import {
 } from "effect";
 import type { Scope } from "effect";
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { TestClock } from "effect/testing";
 
 import { WorkerFetch } from "../src/adapters/fetch.ts";
 import { runAnswer } from "../src/workflows/answer/program.ts";
@@ -275,6 +277,20 @@ const overSmartHttp = (disk: DiskWorld) =>
       ),
   });
 
+/** The disk's store, keeping the updates of every push it takes, in order. */
+const recordingPushes = (disk: DiskWorld) =>
+  Effect.map(Ref.make<readonly (readonly RefUpdate[])[]>([]), (pushed) => ({
+    host: RepoHost.of({
+      ...disk.host,
+      push: (name, source, updates) =>
+        Effect.andThen(
+          Ref.update(pushed, (all) => [...all, updates]),
+          disk.host.push(name, source, updates)
+        ),
+    }),
+    pushed: Ref.get(pushed),
+  }));
+
 /** Where the fork's notes ref stands, through the port. */
 const notesTip = (host: RepoHost["Service"]) =>
   Effect.map(host.refs(fork).pipe(Effect.orDie), (refs) =>
@@ -385,6 +401,38 @@ describe(writeVerdictNote, () => {
         expect(
           yield* asVerdict(yield* noteInClone(disk, "answerer", second))
         ).toStrictEqual(Option.some(yield* encoded(refusedOn(second))));
+      }).pipe(Effect.provide(NodeServices.layer)),
+    30_000
+  );
+
+  it.live(
+    "pushes the notes ref alone, never forced: a compare-and-swap from the tip it listed",
+    () =>
+      Effect.gen(function* () {
+        const disk = yield* diskWorld;
+
+        const { first, second } = yield* forkWithTwoHeads(disk.host);
+
+        const recording = yield* recordingPushes(disk);
+
+        const noted = (head: CommitSha) =>
+          writeVerdictNote({ fork, head, verdict: refusedOn(head) }).pipe(
+            Effect.provideService(RepoHost, recording.host)
+          );
+
+        const one = yield* noted(first);
+        const two = yield* noted(second);
+
+        expect(yield* recording.pushed).toStrictEqual([
+          [{ from: Option.none(), ref: notesRef, to: one.notesTip }],
+          [
+            {
+              from: Option.some(one.notesTip),
+              ref: notesRef,
+              to: two.notesTip,
+            },
+          ],
+        ]);
       }).pipe(Effect.provide(NodeServices.layer)),
     30_000
   );
@@ -525,9 +573,12 @@ const noteOnBobsFork = (head: CommitSha) =>
 
 /**
  * The world's store, each push to the fork's notes ref counted; with
- * `refuse`, every such push fails as a store that lost the fork would.
+ * `refuse`, every such push fails as a store that lost the fork would; with
+ * `busy`, that many first ones find the fork busy with another push.
  */
-const countingNotes = (options: { readonly refuse?: boolean } = {}) =>
+const countingNotes = (
+  options: { readonly busy?: number; readonly refuse?: boolean } = {}
+) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
     const pushes = yield* Ref.make(0);
@@ -536,11 +587,17 @@ const countingNotes = (options: { readonly refuse?: boolean } = {}) =>
       ...host,
       push: (name, source, updates) =>
         name === bobFork && updates.some(({ ref }) => ref === notesRef)
-          ? Effect.andThen(
-              Ref.update(pushes, (n) => n + 1),
-              options.refuse === true
-                ? Effect.fail(new RepoNotFound({ name }))
-                : host.push(name, source, updates)
+          ? Effect.flatMap(
+              Ref.getAndUpdate(pushes, (n) => n + 1),
+              (before): ReturnType<typeof host.push> => {
+                if (options.refuse === true) {
+                  return Effect.fail(new RepoNotFound({ name }));
+                }
+
+                return before < (options.busy ?? 0)
+                  ? Effect.fail(new HostBusy({ name }))
+                  : host.push(name, source, updates);
+              }
             )
           : host.push(name, source, updates),
     });
@@ -680,6 +737,35 @@ describe(runAnswer, () => {
         Option.map(yield* verdictOf(answer.api), (verdict) => verdict.outcome)
       ).toStrictEqual(Option.some(outcome));
     }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "a fork busy with another push is asked again, and the note is written",
+    () =>
+      Effect.gen(function* () {
+        const answer = yield* admitted();
+
+        yield* unitFails(answer);
+
+        const { counted, pushes } = yield* countingNotes({ busy: 1 });
+
+        // The step waits out its backoff on the TestClock: move the clock
+        // on for as long as the run goes.
+        const outcome = yield* Effect.race(
+          runOver(answer, yield* freshSteps, counted),
+          Effect.forever(TestClock.adjust("250 millis"))
+        );
+
+        const noted = yield* noteOnBobsFork(answer.head);
+
+        expect(Outcome.guards.Refused(outcome)).toBeTruthy();
+        expect(yield* pushes).toBe(2);
+        expect(yield* noteIn(noted)).toStrictEqual(
+          Option.some(
+            yield* encoded(Option.getOrThrow(yield* verdictOf(answer.api)))
+          )
+        );
+      }).pipe(Effect.provide(world))
   );
 
   it.effect(
