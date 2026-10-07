@@ -71,6 +71,12 @@
             "options": {
               "allowedUnstableApis": ["effect/process"]
             }
+          },
+          {
+            "include": ["packages/git/test/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": ["effect/http", "effect/process"]
+            }
           }
         ]
       }

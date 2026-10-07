@@ -1,0 +1,27 @@
+{
+  "name": "@repo/git",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./custody": "./src/custody.ts",
+    "./gateway": "./src/gateway.ts",
+    "./upstream": "./src/upstream.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/artifacts": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261006.1",
+    "@effect/platform-node": "4.0.1",
+    "@effect/vitest": "catalog:",
+    "@repo/config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
