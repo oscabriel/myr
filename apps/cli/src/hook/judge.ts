@@ -1,11 +1,11 @@
-import { findRunBlock } from "@repo/checks/finder";
-import type { RepoFile } from "@repo/checks/finder";
 /**
  * The judge closure a hook session decides by: the closure `@repo/checks`
  * computes over the repo's files at the claim's base (the files the
  * platform reads: those at the root and in the CI folders), plus the ask's
  * own files, which the gate's shape stage judges for every answer.
  */
+import { findRunBlock } from "@repo/checks/finder";
+import type { RepoFile } from "@repo/checks/finder";
 import { judgeClosure } from "@repo/checks/judge";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -45,20 +45,6 @@ const MAX_FACT_BYTES = 256 * 1024;
 
 const decoder = new TextDecoder();
 
-const bytesOf = <E>(stream: Stream.Stream<Uint8Array, E>) =>
-  Stream.runFold(
-    stream,
-    () => new Uint8Array(0),
-    (all, chunk) => {
-      const joined = new Uint8Array(all.length + chunk.length);
-
-      joined.set(all);
-      joined.set(chunk, all.length);
-
-      return joined;
-    }
-  );
-
 /** Runs git in `root` to the end: stdout as bytes, or none if it failed. */
 const git = (root: string, args: readonly string[], stdin?: string) =>
   Effect.scoped(
@@ -77,7 +63,7 @@ const git = (root: string, args: readonly string[], stdin?: string) =>
       );
 
       const [stdout, exitCode] = yield* Effect.all(
-        [bytesOf(child.stdout), child.exitCode],
+        [Stream.mkUint8Array(child.stdout), child.exitCode],
         { concurrency: "unbounded" }
       );
 

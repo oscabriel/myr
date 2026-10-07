@@ -7,7 +7,7 @@
 import { Brand } from "@repo/brand";
 import { Client } from "@repo/protocol/contracts";
 import type { ClaimView } from "@repo/protocol/domain/claim";
-import { Cause, Effect, Option, Result } from "effect";
+import { Cause, Duration, Effect, Option, Result, Schema } from "effect";
 import type { ChildProcessSpawner } from "effect/process";
 
 import { repoContext } from "../repo-context.ts";
@@ -25,6 +25,33 @@ const without = (root: string, why: string): SessionState => ({
   root,
   why,
 });
+
+/**
+ * How long the platform has to answer one call. A hook the harness kills
+ * for its time also lets the agent go on, but only after the harness's own
+ * limit (a minute in Claude Code), on every turn.
+ */
+const PLATFORM_LIMIT = Duration.seconds(10);
+
+/** The platform did not answer in time; the session goes on without a claim. */
+class PlatformSilent extends Schema.TaggedError<PlatformSilent>()(
+  "PlatformSilent",
+  { limit: Schema.String }
+) {
+  override get message() {
+    return `the platform did not answer within ${this.limit}`;
+  }
+}
+
+/** A platform call, given at most `PLATFORM_LIMIT` to answer. */
+const inTime = <A, E, R>(call: Effect.Effect<A, E, R>) =>
+  Effect.timeoutOrElse(call, {
+    duration: PLATFORM_LIMIT,
+    orElse: () =>
+      Effect.fail(
+        new PlatformSilent({ limit: Duration.format(PLATFORM_LIMIT) })
+      ),
+  });
 
 /** A failure's first line, for a reason on stderr. */
 const firstLine = (cause: Cause.Cause<unknown>) =>
@@ -101,7 +128,8 @@ export const gatherFacts = (
     const client = yield* Client;
 
     return yield* Effect.gen(function* () {
-      const { claims } = yield* client.status({ project: ref.project });
+      const { claims } = yield* inTime(client.status({ project: ref.project }));
+
       const picked = claimFor(ref, claims);
 
       if (Result.isFailure(picked)) {
@@ -110,10 +138,9 @@ export const gatherFacts = (
 
       const live = picked.success;
 
-      const shown = yield* client.showAsk({
-        ask: live.ask,
-        project: live.project,
-      });
+      const shown = yield* inTime(
+        client.showAsk({ ask: live.ask, project: live.project })
+      );
 
       const judge = askJudge(
         yield* judgeAt({ base: live.base, root, test: live.checkCommand }),

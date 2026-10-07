@@ -12,6 +12,7 @@
  * usage error (exit 2).
  */
 import { HookEvent } from "@repo/agent-kit/hook-events";
+import { Brand } from "@repo/brand";
 import {
   Cause,
   Console,
@@ -115,15 +116,26 @@ const answer = (event: HookEvent, input: HookInput) =>
       root: state.root,
     });
 
-    if (decision.holds !== state.holds) {
-      yield* saveSession(input.session_id, {
-        ...state,
-        holds: decision.holds,
-      }).pipe(
-        Effect.catchTag("SessionUnsaved", (unsaved) =>
-          output.note(unsaved.message)
-        )
+    const counted =
+      decision.holds === state.holds
+        ? true
+        : yield* saveSession(input.session_id, {
+            ...state,
+            holds: decision.holds,
+          }).pipe(
+            Effect.as(true),
+            Effect.catchTag("SessionUnsaved", (unsaved) =>
+              Effect.as(output.note(unsaved.message), false)
+            )
+          );
+
+    // A hold the session cannot count could never reach the cap: allow.
+    if (!counted && decision.holds > state.holds) {
+      yield* output.note(
+        `${event}: this hold could not be counted, so the agent may stop; ${Brand.cli} check still refuses its work`
       );
+
+      return {};
     }
 
     // Why the session has no claim says more than the policy's "no claim".

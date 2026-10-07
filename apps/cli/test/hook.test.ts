@@ -29,12 +29,15 @@ import {
   Array,
   Cause,
   ConfigProvider,
+  Deferred,
   Effect,
   Exit,
+  Fiber,
   FileSystem,
   Layer,
   Option,
   Path,
+  Predicate,
   Ref,
   Result,
   Runtime,
@@ -44,7 +47,7 @@ import {
 } from "effect";
 import { CliOutput } from "effect/cli";
 import { RpcTest } from "effect/rpc";
-import { TestConsole } from "effect/testing";
+import { TestClock, TestConsole } from "effect/testing";
 
 import { decideHook } from "../src/hook/decide.ts";
 import type { HookClaim, HookFacts } from "../src/hook/decide.ts";
@@ -52,6 +55,7 @@ import type { HookInput } from "../src/hook/input.ts";
 import { askJudge } from "../src/hook/judge.ts";
 import {
   PushCheck,
+  PushCheckFailed,
   selfCommand,
   pushCheckWith,
 } from "../src/hook/push-check.ts";
@@ -574,15 +578,21 @@ interface Ran {
   readonly err: readonly string[];
 }
 
+/** The env a run reads: where the session's state is kept. */
+interface StateEnv {
+  readonly HOME?: string;
+  readonly XDG_STATE_HOME?: string;
+}
+
 /**
- * Runs `argv` as a harness would: `stdin` on stdin, the state kept under
- * `stateHome`, with `services` (the platform, a shape check) beside the
- * CLI's own.
+ * Runs `argv` as a harness would: `stdin` on stdin, the state kept where
+ * `env` says (a folder alone is `XDG_STATE_HOME`), with `services` (the
+ * platform, a push check) beside the CLI's own.
  */
 const runHook = (
   argv: readonly string[],
   stdin: string,
-  stateHome: string,
+  env: string | StateEnv,
   services: Layer.Layer<Client> | Layer.Layer<Client | PushCheck>
 ) =>
   Effect.gen(function* () {
@@ -605,7 +615,9 @@ const runHook = (
         OutputPlain,
         services,
         ConfigProvider.layer(
-          ConfigProvider.fromEnv({ env: { XDG_STATE_HOME: stateHome } })
+          ConfigProvider.fromEnv({
+            env: Predicate.isString(env) ? { XDG_STATE_HOME: env } : { ...env },
+          })
         ),
         // Last, so it stands in for the process's own stdio.
         Stdio.layerTest({
@@ -732,6 +744,177 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
         expect(fourth.code).toBe(0);
         expect(fourth.err.join("\n")).toContain("Weakened");
         expect((yield* stopRun).out).toStrictEqual([held]);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "lets a stop go when the hold could not be counted, so the cap of three still binds",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const { base, dir } = yield* aClone(fork);
+        const { platform } = yield* platformFor(base);
+
+        // The state home is a file: no session's state can be kept under it.
+        const blocked = path.join(yield* tempDir, "state");
+
+        yield* fs.writeFileString(blocked, "");
+
+        const refusing = Layer.mergeAll(
+          platform,
+          Layer.succeed(PushCheck)({ run: () => Effect.succeed([weakened]) })
+        );
+
+        const stops = yield* Effect.forEach(
+          [false, true, true, true],
+          (again) =>
+            runHook(
+              ["hook", "stop", "--json"],
+              JSON.stringify({
+                cwd: dir,
+                hook_event_name: "Stop",
+                session_id: "s-6",
+                stop_hook_active: again,
+              }),
+              blocked,
+              refusing
+            )
+        );
+
+        expect(stops.map(({ code, out }) => ({ code, out }))).toStrictEqual(
+          globalThis.Array.from({ length: 4 }, () => ({ code: 0, out: ["{}"] }))
+        );
+        expect(stops[0]?.err.join("\n")).toContain(blocked);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.effect(
+    "allows a session whose platform never answers once its time is up, and says why",
+    () =>
+      Effect.gen(function* () {
+        const { dir } = yield* aClone(fork);
+        // The project the hook asks the platform about, once it asks.
+        const asked = yield* Deferred.make<string | undefined>();
+
+        const hung = Layer.mock(Client)({
+          status: ({ project }) =>
+            Effect.andThen(Deferred.succeed(asked, project), Effect.never),
+        });
+
+        const running = yield* runHook(
+          ["hook", "session-start", "--json"],
+          JSON.stringify({
+            cwd: dir,
+            hook_event_name: "SessionStart",
+            session_id: "s-7",
+          }),
+          yield* tempDir,
+          hung
+        ).pipe(Effect.forkChild);
+
+        expect(yield* Deferred.await(asked)).toBe("datekit");
+
+        yield* TestClock.adjust("10 seconds");
+
+        // A hook still waiting a real second later never answers.
+        const ran = yield* Fiber.join(running).pipe(
+          Effect.timeoutOption("1 second"),
+          TestClock.withLive
+        );
+
+        expect(
+          Option.map(ran, ({ code, out }) => ({ code, out }))
+        ).toStrictEqual(Option.some({ code: 0, out: ["{}"] }));
+        expect(
+          Option.getOrElse(
+            Option.map(ran, ({ err }) => err.join("\n")),
+            () => ""
+          )
+        ).toContain("did not answer");
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "keeps a session's facts under XDG_STATE_HOME, else under HOME's .local/state, readable by its owner alone",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const { base, dir } = yield* aClone(fork);
+        const { platform } = yield* platformFor(base);
+        const state = yield* tempDir;
+        const home = yield* tempDir;
+
+        const start = (session: string, env: StateEnv) =>
+          runHook(
+            ["hook", "session-start", "--json"],
+            JSON.stringify({
+              cwd: dir,
+              hook_event_name: "SessionStart",
+              session_id: session,
+            }),
+            env,
+            platform
+          );
+
+        yield* start("s-8", { HOME: home, XDG_STATE_HOME: state });
+        yield* start("s-9", { HOME: home });
+
+        const kept = [
+          path.join(state, Brand.slug, "hooks", "s-8.json"),
+          path.join(home, ".local", "state", Brand.slug, "hooks", "s-9.json"),
+        ];
+
+        // Each file's permission bits, if it is there.
+        expect(
+          yield* Effect.forEach(kept, (file) =>
+            Effect.map(
+              Effect.option(fs.stat(file)),
+              Option.map(({ mode }) => mode % 0o1000)
+            )
+          )
+        ).toStrictEqual([Option.some(0o600), Option.some(0o600)]);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live.each([
+    {
+      check: Effect.fail(new PushCheckFailed({ reason: "it printed nothing" })),
+      name: "fails",
+      why: "it printed nothing",
+    },
+    {
+      check: Effect.die("the check's process vanished"),
+      name: "dies",
+      why: "the check's process vanished",
+    },
+  ])(
+    "lets a stop go when the local check $name, and says why",
+    ({ check, why }) =>
+      Effect.gen(function* () {
+        const { base, dir } = yield* aClone(fork);
+        const { platform } = yield* platformFor(base);
+
+        const ran = yield* runHook(
+          ["hook", "stop", "--json"],
+          JSON.stringify({
+            cwd: dir,
+            hook_event_name: "Stop",
+            session_id: "s-10",
+          }),
+          yield* tempDir,
+          Layer.mergeAll(
+            platform,
+            Layer.succeed(PushCheck)({ run: () => check })
+          )
+        );
+
+        expect({ code: ran.code, out: ran.out }).toStrictEqual({
+          code: 0,
+          out: ["{}"],
+        });
+        expect(ran.err.join("\n")).toContain(why);
       }).pipe(Effect.provide(NodeServices.layer))
   );
 

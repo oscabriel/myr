@@ -7,7 +7,8 @@
  * skipped, so the hook still answers.
  */
 import { Brand } from "@repo/brand";
-import { Glob, NoneOrMore } from "@repo/protocol/domain/common";
+import { NoneOrMore } from "@repo/protocol/domain/common";
+import { Policy } from "@repo/protocol/domain/policy";
 import { Config, Effect, FileSystem, Hash, Option, Path, Schema } from "effect";
 
 import { HookClaim } from "./decide.ts";
@@ -16,10 +17,7 @@ import { HookClaim } from "./decide.ts";
 export const SessionState = Schema.Struct({
   claim: Schema.optionalKey(HookClaim),
   holds: NoneOrMore,
-  judge: Schema.Struct({
-    paths: Schema.Array(Glob),
-    pointers: Schema.Array(Schema.NonEmptyString),
-  }),
+  judge: Policy.fields.judge,
   /** The repo's top folder, or the harness's cwd outside a repo. */
   root: Schema.String,
   /** Why the session has no claim, said again on each event's stderr. */
