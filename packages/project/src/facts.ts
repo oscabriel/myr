@@ -336,7 +336,7 @@ const workspaceAt = (repo: RepoName, root: ObjectId, dir: string) =>
   Effect.map(filesIn(repo, root, dir), (files) =>
     Option.flatMap(
       Option.fromNullishOr(
-        files.find(({ path }) => path.endsWith("package.json"))
+        files.find(({ path }) => path === `${dir}/package.json`)
       ),
       ({ content }) => decodeManifest(content)
     ).pipe(
@@ -374,17 +374,17 @@ export const evaluationFacts = (
   repo: RepoName,
   at: CommitSha,
   input: FactsInput
-): Effect.Effect<EvaluationFacts, never, RepoHost> =>
-  Effect.gen(function* () {
-    const empty: EvaluationFacts = {
-      ci: [],
-      initializer: input.initializer,
-      now: input.now,
-      project: input.project,
-      seed: Number.parseInt(at.slice(0, 8), 16),
-      workspaces: [],
-    };
+): Effect.Effect<EvaluationFacts, never, RepoHost> => {
+  const empty: EvaluationFacts = {
+    ci: [],
+    initializer: input.initializer,
+    now: input.now,
+    project: input.project,
+    seed: Number.parseInt(at.slice(0, 8), 16),
+    workspaces: [],
+  };
 
+  return Effect.gen(function* () {
     const commit = yield* RepoHost.use((host) => host.readCommit(repo, at));
 
     if (Option.isNone(commit)) {
@@ -434,15 +434,5 @@ export const evaluationFacts = (
       onNone: () => facts,
       onSome: (bytes) => ({ ...facts, vouchFile: textOf(bytes) }),
     });
-  }).pipe(
-    Effect.catchTag("RepoNotFound", () =>
-      Effect.succeed({
-        ci: [],
-        initializer: input.initializer,
-        now: input.now,
-        project: input.project,
-        seed: Number.parseInt(at.slice(0, 8), 16),
-        workspaces: [],
-      })
-    )
-  );
+  }).pipe(Effect.catchTag("RepoNotFound", () => Effect.succeed(empty)));
+};

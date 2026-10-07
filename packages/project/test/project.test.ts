@@ -6,6 +6,7 @@ import { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { ClaimView } from "@repo/protocol/domain/claim";
+import { Glob } from "@repo/protocol/domain/common";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   AskId,
@@ -21,7 +22,9 @@ import { Anonymous, Person } from "@repo/protocol/principal";
 import {
   AskFull,
   ClaimLapsed,
+  DirectPush,
   ImportFailed,
+  NotClaimed,
   NotDecider,
   NotRedFirst,
   OutOfScope,
@@ -33,7 +36,16 @@ import {
 import { advanceTo, at as instant } from "@repo/testkit/clock";
 import type { Files } from "@repo/testkit/git-client";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
-import { Array, DateTime, Effect, Exit, Layer, Option, Schema } from "effect";
+import {
+  Array,
+  DateTime,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Result,
+  Schema,
+} from "effect";
 
 import { ScheduledAlarm } from "../src/alarms/memory.ts";
 import { ProjectStore } from "../src/project-store.ts";
@@ -51,7 +63,7 @@ import {
   Pusher,
   worldOf,
 } from "./world.ts";
-import type { StoreKind } from "./world.ts";
+import type { StoreKind, WorldScenario } from "./world.ts";
 
 const people = ["bob", "carol", "dave", "eve", "frank"];
 
@@ -191,8 +203,8 @@ const scriptAll = (
     })
   );
 
-/** Opens an ask whose check the Checker fails twice the same way on the composed tree. */
-const openRed = (api: ProjectApi, id: string) =>
+/** `decider` opens an ask whose check the Checker fails twice the same way on the composed tree. */
+const openRed = (api: ProjectApi, id: string, decider: Person = alice) =>
   Effect.gen(function* () {
     const files = askFiles(id);
     const composed = yield* composedAt(repo, yield* mainTip, files);
@@ -201,7 +213,7 @@ const openRed = (api: ProjectApi, id: string) =>
       checker.script(composed, redThenGreen, ["failed", "failed"])
     );
 
-    return yield* api.openAsk(alice, { ask: AskId.make(id), files });
+    return yield* api.openAsk(decider, { ask: AskId.make(id), files });
   });
 
 /** What each event is, in the order the project numbered them. */
@@ -211,6 +223,11 @@ const eventTags = (api: ProjectApi) =>
   );
 
 const scheduled = ScheduledAlarm.use(({ at }) => at);
+
+/** The project's state as its store keeps it, once it is made. */
+const projectState = ProjectStore.use((store) => store.load()).pipe(
+  Effect.map(({ project: row }) => Option.map(row, ({ state }) => state))
+);
 
 const states = (api: ProjectApi, who: Person) =>
   Effect.map(api.status(who), ({ claims }) => claims.map(({ state }) => state));
@@ -226,11 +243,13 @@ const parseIso = AskId.make("parse-iso");
 const opening = (api: ProjectApi) =>
   Effect.gen(function* () {
     const made = yield* Effect.exit(api.initProject(alice, {}));
+    const awaiting = yield* projectState;
 
     const first = yield* Pusher.use((pusher) =>
       pusher.push(repo, Option.none(), start, "Start")
     );
 
+    const notHers = yield* api.recordFirstPush(bob, first).pipe(Effect.flip);
     const recorded = yield* api.recordFirstPush(alice, first);
     const evaluated = yield* Evaluated.use(({ shas }) => shas);
     const opened = yield* openRed(api, "parse-iso");
@@ -247,6 +266,7 @@ const opening = (api: ProjectApi) =>
 
     return {
       asked: yield* commitOf(opened.landed),
+      awaiting,
       bobRefused,
       evaluated,
       first,
@@ -254,6 +274,7 @@ const opening = (api: ProjectApi) =>
       listed: yield* api.listAsks(anyone),
       made,
       mainAfterRefusals: yield* mainTip,
+      notHers,
       opened,
       recorded,
       shown: yield* api.showAsk(anyone, parseIso),
@@ -384,6 +405,7 @@ const landing = (api: ProjectApi, opened: LandedSha, wide: CommitSha) =>
       ),
       receipt,
       replay: yield* api.submitAnswer(bob, submission),
+      replayByCarol: yield* Effect.result(api.submitAnswer(carol, submission)),
       requestId,
       roundTrip,
       status: yield* api.status(bob),
@@ -609,6 +631,12 @@ describe.each(["memory", "sqlite"] as const)(
           expect(opened.made).toStrictEqual(
             Exit.succeed({ project, remote: remoteOf(project) })
           );
+          expect(opened.awaiting).toStrictEqual(
+            Option.some("awaitingFirstPush")
+          );
+          expect(opened.notHers).toStrictEqual(
+            new DirectPush({ ref: mainRef })
+          );
           expect(opened.recorded).toStrictEqual({ landed: opened.first });
           expect(opened.evaluated).toStrictEqual([opened.first]);
         })
@@ -819,11 +847,14 @@ describe.each(["memory", "sqlite"] as const)(
     );
 
     it.effect(
-      "6. the same request again gets the same receipt, and nothing lands twice",
+      "6. the same request again gets the same receipt, and nothing lands twice; nobody else's request is theirs",
       () =>
         Effect.map(seen, ({ answered }) => {
           expect(answered.replay).toStrictEqual(answered.receipt);
           expect(answered.tipAfterReplay).toBe(answered.landed);
+          expect(answered.replayByCarol).toStrictEqual(
+            Result.fail(NotClaimed.of(parseIso))
+          );
         })
     );
 
@@ -1013,6 +1044,97 @@ const replaying = Effect.gen(function* () {
     events: [before, yield* eventTags(api)],
     first: claimed.wideRefusals,
   };
+});
+
+/** An ask bob claimed, opened again by alice with the same files. */
+const reopening = Effect.gen(function* () {
+  yield* advanceTo("2026-10-07T12:00:00Z");
+
+  const api = yield* projectService(project);
+  const { opened } = yield* opening(api);
+
+  yield* api.claim(bob, parseIso);
+
+  const before = yield* eventTags(api);
+  const again = yield* openRed(api, "parse-iso");
+
+  return {
+    again,
+    events: [before, yield* eventTags(api)],
+    listed: yield* api.listAsks(anyone),
+    main: yield* mainTip,
+    opened,
+  };
+});
+
+/** dave decides for `packages/format/**` only. */
+const narrowDecider: WorldScenario = {
+  policy: {
+    ...scenario.policy,
+    deciders: [
+      ...scenario.policy.deciders,
+      {
+        handles: Array.make(dave.handle),
+        paths: Glob.make("packages/format/**"),
+      },
+    ],
+  },
+};
+
+/** dave opens an ask in the format package, and one in the parser. */
+const decidingNarrowly = Effect.gen(function* () {
+  yield* advanceTo("2026-10-07T12:00:00Z");
+
+  const api = yield* projectService(project);
+
+  yield* api.initProject(alice, {});
+
+  const first = yield* Pusher.use((pusher) =>
+    pusher.push(repo, Option.none(), start, "Start")
+  );
+
+  yield* api.recordFirstPush(alice, first);
+
+  const outside = yield* Effect.result(openRed(api, "parse-iso", dave));
+  const inside = yield* Effect.result(openRed(api, "format-date", dave));
+
+  return {
+    inside: Result.map(inside, ({ ask }) => [ask.id, ask.askedBy]),
+    outside,
+  };
+});
+
+describe("opening an ask", () => {
+  it.effect(
+    "again, once it is claimed, answers with the ask as it stands and lands nothing",
+    () =>
+      Effect.map(
+        reopening.pipe(Effect.provide(worldOf(scenario, "memory"))),
+        ({ again, events, listed, main, opened }) => {
+          expect(again).toStrictEqual({
+            ask: { ...opened.ask, state: "claimed" },
+            landed: opened.landed,
+          });
+          expect(main).toBe(opened.landed);
+          expect(events[1]).toStrictEqual(events[0]);
+          expect(listed.asks.map(({ claimed }) => claimed)).toStrictEqual([
+            true,
+          ]);
+        }
+      )
+  );
+
+  it.effect("is for a decider whose paths hold the ask's territory", () =>
+    Effect.map(
+      decidingNarrowly.pipe(Effect.provide(worldOf(narrowDecider, "memory"))),
+      ({ inside, outside }) => {
+        expect(outside).toStrictEqual(Result.fail(new NotDecider({})));
+        expect(inside).toStrictEqual(
+          Result.succeed([AskId.make("format-date"), dave.handle])
+        );
+      }
+    )
+  );
 });
 
 describe("the project's outbox", () => {

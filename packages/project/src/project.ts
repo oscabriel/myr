@@ -125,6 +125,7 @@ import {
 } from "./answer-runs.ts";
 import type { AnswerQueue, AnswerRuns } from "./answer-runs.ts";
 import { isStep } from "./answer-runs/steps.ts";
+import { decidersFor } from "./attention/decisions.ts";
 import { recordOf, sameHandle } from "./attention/record.ts";
 import { mayClaim, standing } from "./attention/vouch.ts";
 import {
@@ -149,7 +150,14 @@ import {
   transition as landingTransition,
 } from "./landing.ts";
 import type { LandingQueue, Request } from "./landing.ts";
-import { isDue, outboxRow, OutboxBody, runOutbox, startRow } from "./outbox.ts";
+import {
+  isDue,
+  outboxRow,
+  OutboxBody,
+  projectedRows,
+  runOutbox,
+  startRow,
+} from "./outbox.ts";
 import { ProjectStore } from "./project-store.ts";
 import type { ProjectWrites } from "./project-store.ts";
 import type {
@@ -611,6 +619,17 @@ const isDecider = (policy: Policy, handle: Handle) =>
     handles.some((each) => sameHandle(each, handle))
   );
 
+/**
+ * Whether `handle` decides for the ask's territory: a deciders entry whose
+ * glob holds one of the territory's globs, each read as the path it spells
+ * (`packages/**` holds `packages/parser/**`; `**` holds every territory).
+ */
+const decidesOn = (policy: Policy, ask: Ask, handle: Handle) =>
+  decidersFor(
+    policy,
+    ask.territory.paths.map((glob) => RepoPath.make(glob))
+  ).some((each) => sameHandle(each, handle));
+
 /** A path a composed commit can hold: plain folder names and a file name. */
 const isPlainPath = (path: string) =>
   path
@@ -1022,14 +1041,7 @@ export const projectService = (
         }
 
         const events = yield* numbered(h.lastSeq, writes.events);
-
-        const projected = yield* Effect.forEach(events, (event) =>
-          outboxRow(
-            `projected:${event.seq}`,
-            OutboxBody.cases.Projected.make({ event, project: name }),
-            now
-          )
-        );
+        const projected = yield* projectedRows(name, events, now);
 
         const outbox = [...writes.outbox, ...projected];
 
@@ -1893,24 +1905,34 @@ export const projectService = (
           return { landed };
         });
 
-    /** The ask a decider's files state, read from the config folder at the commit they compose. */
-    const statedAsk = (
-      row: ProjectRow,
-      composed: CommitSha,
-      id: AskId,
-      now: DateTime.Utc
-    ) =>
+    /**
+     * The ask a decider's files state, read from the config folder at the
+     * commit they compose; its kind, as every rule but the ask itself, is
+     * main's (ADR 0005).
+     */
+    const statedAsk = (input: {
+      readonly composed: CommitSha;
+      readonly id: AskId;
+      readonly now: DateTime.Utc;
+      readonly policy: Policy;
+      readonly row: ProjectRow;
+    }) =>
       Effect.gen(function* () {
+        const { id, policy } = input;
+
         // The composed commit is never main; the evaluator reads it as it
         // would a landing, which is all the port knows how to name.
-        const evaluated = yield* evaluateAt(row, LandedSha.make(composed), now);
+        const evaluated = yield* evaluateAt(
+          input.row,
+          LandedSha.make(input.composed),
+          input.now
+        );
 
         if (Option.isNone(evaluated)) {
           return yield* new VerifierBlocked({});
         }
 
-        const policy = evaluated.value;
-        const stated = policy.asks.find((ask) => ask.id === id);
+        const stated = evaluated.value.asks.find((ask) => ask.id === id);
 
         if (stated === undefined) {
           return yield* new IncompleteBrief({ missing: ["want"] });
@@ -1927,7 +1949,7 @@ export const projectService = (
           return yield* new IncompleteBrief({ missing });
         }
 
-        return { policy, stated };
+        return stated;
       });
 
     /** The judge an ask's files touch beyond their own (stage 1, as an ask opens). */
@@ -2047,8 +2069,23 @@ export const projectService = (
             return yield* new VerifierBlocked({});
           }
 
-          if (!isDecider(h.policy.value, caller.handle)) {
+          const policy = h.policy.value;
+
+          if (!isDecider(policy, caller.handle)) {
             return yield* new NotDecider({});
+          }
+
+          // An ask still open (or claimed) is not opened twice: the same
+          // call again finds it as it stands, and nothing lands.
+          const stillOpen = Option.filter(
+            askNow(h, writes, input.ask),
+            ({ state }) => state !== "closed"
+          );
+
+          if (Option.isSome(stillOpen)) {
+            return decidesOn(policy, stillOpen.value, caller.handle)
+              ? { ask: stillOpen.value, landed: stillOpen.value.openedIn }
+              : yield* new NotDecider({});
           }
 
           const unplain = input.files.flatMap(({ path }) =>
@@ -2063,12 +2100,17 @@ export const projectService = (
           const { files } = input;
           const composed = yield* lander.compose({ files, main, repo });
 
-          const { policy, stated } = yield* statedAsk(
+          const stated = yield* statedAsk({
+            composed: composed.commit,
+            id: input.ask,
+            now,
+            policy,
             row,
-            composed.commit,
-            input.ask,
-            now
-          );
+          });
+
+          if (!decidesOn(policy, stated, caller.handle)) {
+            return yield* new NotDecider({});
+          }
 
           const ask: Ask = {
             ...stated,
@@ -2389,7 +2431,12 @@ export const projectService = (
           return refusals;
         });
 
-    /** An answer given before for the same request, or for the same head while it stands. */
+    /**
+     * The receipt of an answer given before: the caller's own request
+     * again, or the same head from them while that answer stands. A
+     * request id another person's answer holds is not the caller's to
+     * replay, nor to take: `NotClaimed`.
+     */
     const earlier = (
       h: Hydrated,
       caller: Person,
@@ -2398,27 +2445,38 @@ export const projectService = (
         readonly head: CommitSha;
         readonly requestId: RequestId;
       }
-    ) =>
-      Option.map(
-        Option.orElse(findAnswer(h, input.requestId), () =>
-          Option.fromUndefinedOr(
-            h.answers.find(
-              ({ record, row }) =>
-                row.ask === input.ask &&
-                row.head === input.head &&
-                sameHandle(row.answerer, caller.handle) &&
-                !LandingState.guards.Refused(record.landing)
-            )
+    ): Effect.Effect<Option.Option<AnswerReceipt>, NotClaimed> => {
+      const own = (row: AnswerRow) => sameHandle(row.answerer, caller.handle);
+      const same = findAnswer(h, input.requestId);
+
+      if (Option.isSome(same) && !own(same.value.row)) {
+        return Effect.fail(NotClaimed.of(input.ask));
+      }
+
+      const given = Option.orElse(same, () =>
+        Option.fromUndefinedOr(
+          h.answers.find(
+            ({ record, row }) =>
+              row.ask === input.ask &&
+              row.head === input.head &&
+              own(row) &&
+              !LandingState.guards.Refused(record.landing)
           )
-        ),
-        ({ record }) => record.receipt
+        )
       );
+
+      return Effect.succeed(Option.map(given, ({ record }) => record.receipt));
+    };
 
     /** A new answer request, queued and started on main as it stands, with its receipt. */
     const queueAnswer = (
       writes: Writes,
       request: Request,
-      input: { readonly main: LandedSha; readonly now: DateTime.Utc }
+      input: {
+        readonly ask: AskId;
+        readonly main: LandedSha;
+        readonly now: DateTime.Utc;
+      }
     ) =>
       Effect.gen(function* () {
         const started = landingTransition(
@@ -2428,7 +2486,7 @@ export const projectService = (
         );
 
         const receipt: AnswerReceipt = {
-          ask: Option.getOrThrow(request.ask),
+          ask: input.ask,
           base: request.base,
           head: request.head,
           outcome: outcomeOf(started.state),
@@ -2463,7 +2521,7 @@ export const projectService = (
       ) =>
       (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
         Effect.gen(function* () {
-          const given = earlier(h, caller, input);
+          const given = yield* earlier(h, caller, input);
 
           if (Option.isSome(given)) {
             return given.value;
@@ -2546,7 +2604,7 @@ export const projectService = (
               project: name,
               requestId: input.requestId,
             },
-            { main: live.value.landed, now }
+            { ask: input.ask, main: live.value.landed, now }
           );
         });
 

@@ -49,6 +49,9 @@ const mainRef = RefName.make("refs/heads/main");
 /** Where the project's store keeps its rows. */
 export type StoreKind = "memory" | "sqlite";
 
+/** What a world reads from a scenario: the policy its rules evaluator returns. */
+export type WorldScenario = Pick<Scenario, "policy">;
+
 /**
  * What the Checker answers, by `(tree or commit, lane)`: the test adds to
  * it as it learns the trees an answer will be checked on.
@@ -102,7 +105,7 @@ const storeOf = (kind: StoreKind): Layer.Layer<ProjectStore> =>
  * scenario's policy at that commit, holding the scenario's asks whose files
  * the commit's config folder has, and the judge closure `checks` derives.
  */
-const rulesOf = (scenario: Scenario) =>
+const rulesOf = (scenario: WorldScenario) =>
   Layer.effectContext(
     Effect.gen(function* () {
       const finishers = yield* Finishers;
@@ -253,7 +256,7 @@ const flakyProjection = Layer.effectContext(
 );
 
 /** Every service the scenario test reads besides the project's ports. */
-const fixtures = (scenario: Scenario) =>
+const fixtures = (scenario: WorldScenario) =>
   Layer.mergeAll(scriptOf, rulesOf(scenario), pusher).pipe(
     Layer.provideMerge(FinishersFromChecks)
   );
@@ -264,7 +267,7 @@ const fixtures = (scenario: Scenario) =>
  * fresh for each test.
  */
 export const worldOf = (
-  scenario: Scenario,
+  scenario: WorldScenario,
   store: StoreKind,
   faults: Faults = {}
 ) =>
