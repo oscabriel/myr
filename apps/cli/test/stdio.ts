@@ -1,7 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { Client, Contracts } from "@repo/protocol/contracts";
-import { Handle } from "@repo/protocol/ids";
-import { Authenticated, CurrentPrincipal } from "@repo/protocol/principal";
+import { asTester } from "@repo/protocol/testing";
 import {
   Effect,
   Fiber,
@@ -19,13 +18,6 @@ import type { Rpc, RpcGroup } from "effect/rpc";
 import { RpcTest } from "effect/rpc";
 
 import { mcp } from "../src/surfaces.ts";
-
-/** A server side that takes every call as one person. */
-const asTester = Layer.succeed(Authenticated, (effect) =>
-  Effect.provideService(effect, CurrentPrincipal, {
-    handle: Handle.make("tester"),
-  })
-);
 
 const Message = Schema.fromJsonString(
   Schema.Struct({

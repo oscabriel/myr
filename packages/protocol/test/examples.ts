@@ -1,7 +1,6 @@
-import { DateTime, Effect, Layer } from "effect";
+import { DateTime } from "effect";
 
-import { AskId, CommitSha, Handle, RepoPath } from "../src/ids.ts";
-import { Authenticated, CurrentPrincipal } from "../src/principal.ts";
+import { AskId, CommitSha, RepoPath } from "../src/ids.ts";
 import {
   AskFull,
   AttemptsExhausted,
@@ -36,13 +35,6 @@ export const base = CommitSha.make("1111111111111111111111111111111111111111");
 export const main = CommitSha.make("2222222222222222222222222222222222222222");
 
 export const path = RepoPath.make("src/a.ts");
-
-/** A server side that takes every call as one person, for tests about other things. */
-export const asTester = Layer.succeed(Authenticated, (effect) =>
-  Effect.provideService(effect, CurrentPrincipal, {
-    handle: Handle.make("tester"),
-  })
-);
 
 // One of each member, in the union's order.
 export const examples: readonly Refusal[] = [
