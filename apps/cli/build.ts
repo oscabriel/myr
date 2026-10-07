@@ -139,8 +139,17 @@ const make = (targets: readonly string[]) =>
       cwd: root,
     });
 
-    // 2. The library entries' types.
-    const scratch = yield* fs.makeTempDirectoryScoped({ prefix: "cli-types-" });
+    // 2. The library entries' types. tsgo declares them in a folder at a
+    // fixed path, removed once the build ends: the bundled `.d.ts` files keep
+    // each source's path in a comment, so a temp folder's random name would
+    // make every build's types differ (and publish this machine's paths).
+    const scratch = path.join(dist, ".types");
+
+    yield* Effect.acquireRelease(
+      fs.makeDirectory(scratch, { recursive: true }),
+      () => Effect.orDie(fs.remove(scratch, { recursive: true }))
+    );
+
     const declared = path.join(scratch, "declared");
 
     /** Where tsgo declares `file` (a source under the repo). */

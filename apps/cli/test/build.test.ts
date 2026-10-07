@@ -1,12 +1,22 @@
 /**
  * The CLI as it ships: `bun run build` makes one standalone binary, its git
  * credential helper link and the npm `dist/`, and each runs as a process
- * here. The build runs once for the file; every case reads what it wrote.
+ * here. The build runs twice for the file (the second run shows the npm
+ * files come out the same); every case reads what the second run wrote.
  */
 import { NodeServices } from "@effect/platform-node";
 import { expect, layer } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { Context, Effect, FileSystem, Layer, Path, Stream } from "effect";
+import {
+  Config,
+  Context,
+  Effect,
+  FileSystem,
+  Hash,
+  Layer,
+  Path,
+  Stream,
+} from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 /** How a process ended, and what it printed. */
@@ -64,11 +74,38 @@ const run = (
     })
   ).pipe(Effect.orDie);
 
+/**
+ * The npm build's files in `dist/` (not the binaries), each by its name and
+ * a hash of its text, so two builds compare in a short diff.
+ */
+const npmFiles = (dist: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const files: Record<string, number> = {};
+
+    if (yield* fs.exists(dist)) {
+      for (const file of yield* fs.readDirectory(dist)) {
+        if (/\.(?:js|d\.ts)$/u.test(file)) {
+          files[file] = Hash.string(
+            yield* fs.readFileString(path.join(dist, file))
+          );
+        }
+      }
+    }
+
+    return files;
+  });
+
 /** What `bun run build` did, where it wrote, and a bare env to run it in. */
 class Built extends Context.Service<
   Built,
   {
     readonly build: Ran;
+    /** The build run a second time, and the npm files each run wrote. */
+    readonly rebuild: Ran;
+    readonly firstFiles: Readonly<Record<string, number>>;
+    readonly secondFiles: Readonly<Record<string, number>>;
     /** The CLI package's folder, and its `dist/`. */
     readonly root: string;
     readonly dist: string;
@@ -76,6 +113,8 @@ class Built extends Context.Service<
     readonly bare: Bare;
     /** `bare`, with the built binaries' folder as the whole `PATH`. */
     readonly onPath: Bare;
+    /** `bare`, with this machine's `PATH`, where `node` is. */
+    readonly withNode: Bare;
   }
 >()("cli/test/Built") {}
 
@@ -94,14 +133,21 @@ const BuiltOnce = Layer.effect(
     yield* fs.makeDirectory(config);
 
     const build = yield* run("bun", ["run", "build"], { cwd: root });
+    const firstFiles = yield* npmFiles(dist);
+    const rebuild = yield* run("bun", ["run", "build"], { cwd: root });
+    const secondFiles = yield* npmFiles(dist);
     const bare = { HOME: home, PATH: empty, XDG_CONFIG_HOME: config };
 
     return Built.of({
       bare,
       build,
       dist,
+      firstFiles,
       onPath: { ...bare, PATH: path.join(dist, "bin") },
+      rebuild,
       root,
+      secondFiles,
+      withNode: { ...bare, PATH: yield* Config.String("PATH") },
     });
   })
 ).pipe(Layer.provideMerge(NodeServices.layer));
@@ -139,6 +185,39 @@ const bannerIn = (stdout: string) => {
   const start = lines.indexOf("Start here:");
 
   return start === -1 ? [] : lines.slice(start, start + banner.length);
+};
+
+/**
+ * The names a module's source exports, types included: each `export {…}`
+ * list by its exported names, and each exported declaration. An `export *`
+ * shows as `*`, since its names can't be read off the page.
+ */
+const exportedNames = (source: string) => {
+  const listed = [
+    ...source.matchAll(/\bexport\s+(?:type\s+)?\{(?<list>[^}]*)\}/gu),
+  ]
+    .flatMap((match) => (match.groups?.list ?? "").split(","))
+    .map((entry) =>
+      (
+        entry
+          .trim()
+          .replace(/^type\s+/u, "")
+          .split(/\s+as\s+/u)
+          .at(-1) ?? ""
+      ).trim()
+    );
+
+  const declared = [
+    ...source.matchAll(
+      /\bexport\s+(?:declare\s+)?(?:const|let|function|class|type|interface|enum)\s+(?<name>[\w$]+)/gu
+    ),
+  ].map((match) => match.groups?.name ?? "");
+
+  const starred = /\bexport\s*\*/u.test(source) ? ["*"] : [];
+
+  return [...new Set([...listed, ...declared, ...starred])]
+    .filter((name) => name.length > 0)
+    .toSorted();
 };
 
 /** What git hands a credential helper: the host, then a blank line. */
@@ -242,8 +321,16 @@ layer(BuiltOnce, { excludeTestServices: true, timeout: "180 seconds" })(
       "node runs the npm entry, so the npm build is not Bun-only",
       () =>
         Effect.gen(function* () {
-          // vitest runs under Node, so `node` is on this PATH.
-          const help = yield* run("node", [yield* written("bin.js"), "--help"]);
+          const { withNode } = yield* Built;
+
+          // vitest runs under Node, so `node` is on this machine's PATH.
+          const help = yield* run(
+            "node",
+            [yield* written("bin.js"), "--help"],
+            {
+              only: withNode,
+            }
+          );
 
           expect(help).toMatchObject({ exitCode: 0 });
           expect(bannerIn(help.stdout)).toStrictEqual(banner);
@@ -255,20 +342,24 @@ layer(BuiltOnce, { excludeTestServices: true, timeout: "180 seconds" })(
       `under node, an npm bin link named ${Brand.gitCredentialHelper} is the credential command too`,
       () =>
         Effect.gen(function* () {
-          const { bare } = yield* Built;
+          const { withNode } = yield* Built;
           const fs = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const entry = yield* written("bin.js");
 
           // npm links each `bin` name to the entry; node then sees the
           // link's path as `argv[1]`.
-          const link = path.join(bare.HOME, Brand.gitCredentialHelper);
+          const link = path.join(withNode.HOME, Brand.gitCredentialHelper);
 
           yield* fs.symlink(entry, link);
 
-          const helper = yield* run("node", [link, "get"], { stdin: request });
+          const helper = yield* run("node", [link, "get"], {
+            only: withNode,
+            stdin: request,
+          });
 
           const direct = yield* run("node", [entry, "credential", "get"], {
+            only: withNode,
             stdin: request,
           });
 
@@ -330,6 +421,37 @@ console.log(JSON.stringify({
           expect(importing).toStrictEqual([]);
         }),
       spawning
+    );
+
+    it.effect(
+      "rules.d.ts declares every name the sdk exports, its types included",
+      () =>
+        Effect.gen(function* () {
+          const { root } = yield* Built;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+
+          const sdk = yield* fs.readFileString(
+            path.join(root, "..", "..", "packages", "sdk", "src", "index.ts")
+          );
+
+          const declared = yield* fs.readFileString(
+            yield* written("rules.d.ts")
+          );
+
+          expect(exportedNames(sdk)).toContain("project");
+          expect(exportedNames(declared)).toStrictEqual(exportedNames(sdk));
+        })
+    );
+
+    it.effect("a second build writes the same npm files", () =>
+      Effect.gen(function* () {
+        const { firstFiles, rebuild, secondFiles } = yield* Built;
+
+        expect(rebuild).toMatchObject({ exitCode: 0 });
+        expect(Object.keys(firstFiles)).toContain("rules.d.ts");
+        expect(secondFiles).toStrictEqual(firstFiles);
+      })
     );
   }
 );
