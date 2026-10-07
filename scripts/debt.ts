@@ -1,63 +1,95 @@
 /**
  * debt: counts every escape directive the product's own code carries, by kind,
- * and fails when a count rises above `debt.baseline.json` (AGENTS.md principle
- * 10). The count comes from `fence/debt-ledger`, run alone through
- * `oxlint.debt.config.ts`.
+ * and fails when a count rises above `debt.baseline.json` or an escape has no
+ * reason after ` -- ` (AGENTS.md principle 10). The count comes from
+ * `fence/debt-ledger`, run alone through `oxlint.debt.config.ts`.
+ *
+ * `debt --lower` rewrites the baseline to the count, only ever downward.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import { Console, Data, Effect, FileSystem, Path, Schema } from "effect";
+import { Console, Data, Effect, FileSystem, Path, Schema, Stdio } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
+import type { Change } from "./lib/debt.ts";
 import {
-  Kind,
+  Baseline,
+  judge,
   ledgerArgs,
   ledgerFromOxlintJson,
-  rises,
+  lowered,
+  renderBaseline,
+  renderLowered,
+  renderTable,
+  renderVerdict,
   tally,
-  Tally,
+  Verdict,
 } from "./lib/debt.ts";
 
+const baselineFile = "debt.baseline.json";
+
 class DebtRose extends Data.TaggedError("DebtRose")<{
-  readonly kinds: readonly Kind[];
+  readonly rises: readonly Change[];
+  readonly unreasoned: number;
 }> {}
 
-const check = Effect.gen(function* () {
+const main = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const args = yield* (yield* Stdio.Stdio).args;
+  const lowering = args.includes("--lower");
 
   // oxlint exits 1 whenever it reports an escape, so only its report counts.
-  const report = yield* spawner.string(
-    ChildProcess.make(path.resolve("node_modules/.bin/oxlint"), ledgerArgs)
-  );
-
-  const counted = tally(yield* ledgerFromOxlintJson(report));
+  const ledger = yield* spawner
+    .string(
+      ChildProcess.make(path.resolve("node_modules/.bin/oxlint"), ledgerArgs)
+    )
+    .pipe(Effect.flatMap(ledgerFromOxlintJson));
 
   const baseline = yield* fs
-    .readFileString("debt.baseline.json")
-    .pipe(Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(Tally))));
+    .readFileString(baselineFile)
+    .pipe(Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(Baseline))));
 
-  const risen = rises(counted, baseline);
+  const verdict = judge(ledger, baseline);
 
-  for (const kind of Kind.literals) {
-    yield* Console.log(`debt: ${kind}: ${counted[kind]} of ${baseline[kind]}`);
-  }
+  yield* Console.log(renderTable(tally(ledger), baseline));
 
-  if (risen.length === 0) {
-    return yield* Console.log("debt: no kind rose above its baseline");
-  }
+  return yield* Verdict.$match(verdict, {
+    Held: (held) =>
+      Effect.gen(function* () {
+        if (!lowering) {
+          return yield* Console.log(renderVerdict(held));
+        }
 
-  for (const rise of risen) {
-    yield* Console.error(
-      `debt: ${rise.kind} rose to ${rise.count}, above its baseline of ${rise.baseline}.`
-    );
-  }
+        if (held.falls.length === 0) {
+          return yield* Console.log(
+            "debt: every kind is at its baseline; nothing to lower."
+          );
+        }
 
-  yield* Console.error(
-    "debt: remove the new escape, or fix what it hides. Raising debt.baseline.json takes the user's sign-off."
-  );
+        yield* fs.writeFileString(
+          baselineFile,
+          renderBaseline(lowered(held.tally, baseline))
+        );
 
-  return yield* new DebtRose({ kinds: risen.map((rise) => rise.kind) });
+        return yield* Console.log(renderLowered(held.falls));
+      }),
+    Rose: (rose) =>
+      Effect.gen(function* () {
+        yield* Console.error(renderVerdict(rose));
+
+        if (lowering) {
+          yield* Console.error(
+            `debt: not writing ${baselineFile}: --lower only lowers, and raising the baseline needs the user's sign-off (AGENTS.md principle 10).`
+          );
+        }
+
+        return yield* new DebtRose({
+          rises: rose.rises,
+          unreasoned: rose.unreasoned.length,
+        });
+      }),
+  });
 });
 
-BunRuntime.runMain(check.pipe(Effect.provide(BunServices.layer)));
+BunRuntime.runMain(main.pipe(Effect.provide(BunServices.layer)));
