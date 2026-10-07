@@ -278,6 +278,24 @@ describe("deciding", () => {
     );
   });
 
+  it("refuses a person who does not decide for it before saying it is closed", () => {
+    const decided = Result.getOrThrow(choose(proposalDecision, "accept"));
+
+    expect([
+      choose(decided.decision, "decline", bob),
+      decide([proposalDecision], {
+        by: bob,
+        choice: "accept",
+        id: proposalDecision.id,
+        note: Option.none(),
+        now: proposalDecision.expiresAt,
+      }),
+    ]).toStrictEqual([
+      Result.fail(new NotDecider({})),
+      Result.fail(new NotDecider({})),
+    ]);
+  });
+
   it("refuses to decide twice", () => {
     const decided = Result.getOrThrow(choose(proposalDecision, "accept"));
 

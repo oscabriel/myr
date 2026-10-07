@@ -160,8 +160,9 @@ export const openDecision = (input: {
 /**
  * One decider's choice on one open decision, recorded with who chose what
  * and when. `adopt` and `accept` both say yes, `revert` and `decline` both
- * say no, and the decision records the word its subject uses. A person who
- * does not decide for it is refused before anything else; a decision taken,
+ * say no, and the decision records the word its subject uses. After an
+ * unknown id, a person who does not decide for it is refused before the
+ * decision's state is read, so they learn nothing of it; a decision taken,
  * or past its expiry, is closed.
  */
 export const decide = (
@@ -194,7 +195,7 @@ export const decide = (
 };
 
 /** A project's decisions after an alarm, and what follows from the ones that expired. */
-export interface Expired {
+export interface ExpiredDecisions {
   readonly decisions: readonly Decision[];
   readonly effects: readonly AttentionEffect[];
 }
@@ -206,7 +207,7 @@ export interface Expired {
 export const expireDecisions = (
   decisions: readonly Decision[],
   now: DateTime.Utc
-): Expired => {
+): ExpiredDecisions => {
   const steps = decisions.map((decision) =>
     isClosed(decision, now) && decision.decided === undefined
       ? take(decision, platformHandle, decision.default, now, Option.none())

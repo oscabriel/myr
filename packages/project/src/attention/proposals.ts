@@ -26,9 +26,10 @@ import { Data, DateTime, Option, Result } from "effect";
 import { AttentionEffect, AttentionEvent } from "./effects.ts";
 
 /**
- * What the service knows about the person proposing that a proposal does
- * not: how many of their proposals are open (`openCount`, against the cap)
- * and whether the vouch file denounces them.
+ * What every proposal command carries: the id the service minted, the
+ * project, the person proposing, and what the service knows about them that
+ * a proposal does not: how many of their proposals are open (`openCount`,
+ * against the cap) and whether the vouch file denounces them.
  */
 interface Proposer {
   readonly denounced: boolean;
@@ -199,7 +200,7 @@ export const propose = (
   });
 
 /** A project's proposals after an alarm, and what follows from the ones that expired. */
-export interface Expired {
+export interface ExpiredProposals {
   readonly effects: readonly AttentionEffect[];
   readonly proposals: readonly Proposal[];
 }
@@ -216,7 +217,7 @@ export interface Expired {
 export const expire = (
   proposals: readonly Proposal[],
   now: DateTime.Utc
-): Expired => ({
+): ExpiredProposals => ({
   effects: [],
   proposals: proposals.map((proposal) =>
     proposal.state === "open" &&

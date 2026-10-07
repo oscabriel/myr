@@ -4,21 +4,18 @@
  * row per decider and day; a finish costs more than a decision, so it is
  * counted apart, and a project can see where its deciders' time goes.
  */
+import type { Today } from "@repo/protocol/domain/decision";
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { Handle } from "@repo/protocol/ids";
 import { DateTime } from "effect";
 
 import type { BudgetDayRow } from "../project-store/rows.ts";
 
-/** One decider's budget for one day, as Today shows it. */
-export interface Budget {
-  /** Finishes made today, counted apart from decisions. */
-  readonly finishes: number;
-  /** The policy's decisions per day. */
-  readonly total: number;
-  /** Decisions taken today. */
-  readonly used: number;
-}
+/**
+ * One decider's budget for one day, as Today shows it: decisions `used` of
+ * the policy's `total` per day, and `finishes`, counted apart.
+ */
+export type Budget = Today["budget"];
 
 /** The day a moment falls on, as `BudgetDayRow.day` keys it: `2026-10-07`, in UTC. */
 const dayOf = (now: DateTime.Utc) => DateTime.formatIsoDateUtc(now);

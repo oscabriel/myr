@@ -136,6 +136,21 @@ describe("proposing an ask", () => {
     );
   });
 
+  it("refuses a denouncement first, then a missing vouch, and the cap last", () => {
+    const everything = mode("all");
+
+    expect([
+      proposalOf(
+        byCarol({ denounced: true, openCount: 2, vouched: false }),
+        everything
+      ),
+      proposalOf(byCarol({ openCount: 2, vouched: false }), everything),
+    ]).toStrictEqual([
+      Result.fail(new Denounced({})),
+      Result.fail(new NotVouched({})),
+    ]);
+  });
+
   it("lets an unvouched person propose when the vouch gates only code", () => {
     expect(
       Result.map(

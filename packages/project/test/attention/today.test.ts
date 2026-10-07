@@ -7,7 +7,7 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import { AskId, Handle, LandedSha, RepoPath } from "@repo/protocol/ids";
 import { at } from "@repo/testkit/clock";
 import { aProject, ids, sha, withAsk } from "@repo/testkit/scenarios";
-import { DateTime, Option, Result } from "effect";
+import { Array as Arr, DateTime, Option, Result } from "effect";
 
 import { budgetFor, spend } from "../../src/attention/budget.ts";
 import {
@@ -46,22 +46,25 @@ const vouchFor = (name: string, expiresIn: number): Decision =>
     subject: DecisionSubject.cases.Vouch.make({ handle: handle(name) }),
   });
 
-/** Eight open decisions, given out of order, expiring 3 h to 200 h from now. */
-const eight = [
-  vouchFor("p5", 100),
-  vouchFor("p1", 3),
-  vouchFor("p8", 200),
-  vouchFor("p3", 30),
-  vouchFor("p2", 20),
-  vouchFor("p7", 150),
-  vouchFor("p4", 50),
-  vouchFor("p6", 120),
-];
+// Eight open decisions, numbered in the order they expire: 3 h to 200 h from now.
+const p1 = vouchFor("p1", 3);
 
-const byExpiry = (decisions: readonly Decision[]) =>
-  decisions.toSorted((one, other) =>
-    DateTime.Order(one.expiresAt, other.expiresAt)
-  );
+const p2 = vouchFor("p2", 20);
+
+const p3 = vouchFor("p3", 30);
+
+const p4 = vouchFor("p4", 50);
+
+const p5 = vouchFor("p5", 100);
+
+const p6 = vouchFor("p6", 120);
+
+const p7 = vouchFor("p7", 150);
+
+const p8 = vouchFor("p8", 200);
+
+/** The eight, given out of order. */
+const eight = [p5, p1, p8, p3, p2, p7, p4, p6];
 
 const fresh = { finishes: 0, total: 5, used: 0 };
 
@@ -83,7 +86,7 @@ describe("a decider's Today", () => {
   it("holds the decisions that expire first to the budget, and counts the overflow", () => {
     const page = todayFor({ decisions: eight });
 
-    expect(page.decisions).toStrictEqual(byExpiry(eight).slice(0, 5));
+    expect(page.decisions).toStrictEqual([p1, p2, p3, p4, p5]);
     expect(page.overflow).toBe(3);
     expect(page.budget).toStrictEqual(fresh);
     expect(page.decider).toBe(alice);
@@ -95,8 +98,19 @@ describe("a decider's Today", () => {
       decisions: eight,
     });
 
-    expect(page.decisions).toStrictEqual(byExpiry(eight).slice(0, 3));
+    expect(page.decisions).toStrictEqual([p1, p2, p3]);
     expect(page.overflow).toBe(5);
+  });
+
+  it("shows none when more was used than the day's budget now allows", () => {
+    // The policy lowered decisionsPerDay after the decider had spent more.
+    const page = todayFor({
+      budget: { finishes: 0, total: 3, used: 5 },
+      decisions: eight,
+    });
+
+    expect(page.decisions).toStrictEqual([]);
+    expect(page.overflow).toBe(8);
   });
 
   it("calls out every decision expiring within 24 hours, over the budget too", () => {
@@ -107,22 +121,16 @@ describe("a decider's Today", () => {
 
     expect(spent.decisions).toStrictEqual([]);
     expect(spent.overflow).toBe(8);
-    expect(spent.expiringSoon).toStrictEqual(
-      byExpiry(eight)
-        .slice(0, 2)
-        .map(({ id }) => id)
-    );
+    expect(spent.expiringSoon).toStrictEqual([p1.id, p2.id]);
   });
 
   it("leaves out decisions already taken, and those past their expiry", () => {
-    // The first to expire was taken; the second reaches its expiry at +20 h.
-    const [first, , ...rest] = byExpiry(eight);
-
+    // p1 was taken; p2 reaches its expiry at +20 h.
     const taken = Result.getOrThrow(
       decide(eight, {
         by: dana,
         choice: "accept",
-        id: first?.id ?? minted.decision(),
+        id: p1.id,
         note: Option.none(),
         now,
       })
@@ -135,7 +143,7 @@ describe("a decider's Today", () => {
       now: DateTime.add(now, { hours: 20 }),
     });
 
-    expect(page.decisions).toStrictEqual(rest.slice(0, 5));
+    expect(page.decisions).toStrictEqual([p3, p4, p5, p6, p7]);
     expect(page.overflow).toBe(1);
   });
 
@@ -148,11 +156,14 @@ describe("a decider's Today", () => {
       ],
     };
 
+    // A path no glob matches would go to nobody either of them is.
+    const nobody = handle("nobody");
+
     const forPaths = (path: string, ask: string) => {
-      const [first, ...more] = decidersFor(policy, [RepoPath.make(path)]);
+      const owners = decidersFor(policy, [RepoPath.make(path)]);
 
       return openDecision({
-        deciders: first === undefined ? [dana] : [first, ...more],
+        deciders: Arr.isReadonlyArrayNonEmpty(owners) ? owners : [nobody],
         evidence: [],
         expireDays: 14,
         id: minted.decision(),
