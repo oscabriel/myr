@@ -9,7 +9,7 @@ Every way the platform says no is one refusal from one closed union. The same re
 - `next`: the command to run next.
 - `at` (optional): the `path` and `line` it points at.
 
-No refusal has a message. Shape refusals accumulate, so one push hears about every one at once. Field types are given as they travel on the wire.
+No refusal has a message. Shape refusals accumulate, so one push hears about every one at once. Field types are given as they travel on the wire. Each reason is what the renderer says for one example of that refusal.
 
 ## Push and claim
 
@@ -19,6 +19,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: set when it is raised
 - Fields:
   - `ask`: `string`
+- Reason, for example: you hold no claim on fix-parser
 
 ### ClaimLapsed
 
@@ -26,12 +27,14 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: set when it is raised
 - Fields:
   - `ask`: `string`
+- Reason, for example: your claim on fix-parser lapsed
 
 ### NotVouched
 
 - Retryable: no
 - Next: `myr status`
 - Fields: none
+- Reason, for example: no member of this project has vouched for you
 
 ### CapReached
 
@@ -39,6 +42,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr status`
 - Fields:
   - `cap`: `number`
+- Reason, for example: you already hold 3 claims, the most this project allows
 
 ### AskFull
 
@@ -46,18 +50,21 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr asks`
 - Fields:
   - `ask`: `string`
+- Reason, for example: someone else holds the claim on fix-parser
 
 ### NoAsk
 
 - Retryable: no
 - Next: `myr asks`
 - Fields: none
+- Reason, for example: this push names no open ask
 
 ### RepoBusy
 
 - Retryable: yes
 - Next: `git push`
 - Fields: none
+- Reason, for example: the repo was busy with another push
 
 ## Shape
 
@@ -67,6 +74,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `paths`: `readonly [string, ...Array<string>]`
+- Reason, for example: changes paths outside the ask's territory: src/a.ts
 
 ### TouchedJudge
 
@@ -74,6 +82,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `paths`: `readonly [string, ...Array<string>]`
+- Reason, for example: changes files that decide what the checks do: src/a.ts
 
 ### Weakened
 
@@ -81,6 +90,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `weakening`: `{ readonly "marker": string, readonly "reason"?: string } | { readonly "after": number, readonly "before": number, readonly "ratchet": string, readonly "territory": string }`
+- Reason, for example: adds it.skip, with the reason "flaky on CI"
 
 ### PrivatePathInPublicTree
 
@@ -88,6 +98,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `paths`: `readonly [string, ...Array<string>]`
+- Reason, for example: would put held-back paths in a public tree: src/a.ts
 
 ## Merge
 
@@ -99,6 +110,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
   - `base`: `string`
   - `conflicts`: `ReadonlyArray<string>`
   - `main`: `string`
+- Reason, for example: main moved to 2222222, past your base 1111111; conflicts in src/a.ts
 
 ## Checks
 
@@ -109,6 +121,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Fields:
   - `lane`: `string`
   - `logRef`: `string`
+- Reason, for example: the test checks failed; the log is at logs/7
 
 ### HeldBackFailed
 
@@ -117,6 +130,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Fields:
   - `area`: `string`
   - `suite`: `string`
+- Reason, for example: a held-back check failed in parser, suite edge-cases
 
 ### AttemptsExhausted
 
@@ -125,6 +139,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Fields:
   - `area`: `string`
   - `resetsAt`: `string`
+- Reason, for example: no attempts left on parser until 2026-10-07T00:00:00.000Z
 
 ## Never counted against the answerer
 
@@ -134,12 +149,14 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr status`
 - Fields:
   - `lane`: `string`
+- Reason, for example: the test checks failed, then passed on the same tree; the platform will run them again
 
 ### VerifierBlocked
 
 - Retryable: yes
 - Next: `myr status`
 - Fields: none
+- Reason, for example: the platform could not run the checks; it will run them again
 
 ## At ask open
 
@@ -148,6 +165,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Retryable: no
 - Next: `myr check`
 - Fields: none
+- Reason, for example: the ask's check must fail on main twice in the same way, by an assertion
 
 ### WeakCheck
 
@@ -155,6 +173,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `weakness`: `string`
+- Reason, for example: the ask's check is weak: no assertion
 
 ### IncompleteBrief
 
@@ -162,6 +181,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `missing`: `readonly [string, ...Array<string>]`
+- Reason, for example: the brief is missing territory
 
 ## Maintainers only
 
@@ -171,6 +191,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `paths`: `readonly [string, ...Array<string>]`
+- Reason, for example: a layer's files would enter a public tree: src/a.ts
 
 ### SecretInOutput
 
@@ -179,6 +200,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Fields:
   - `item`: `string`
   - `where`: `"output" | "tree"`
+- Reason, for example: the write-only value PAYMENTS_KEY appeared in the output
 
 ## Decision
 
@@ -189,3 +211,4 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Fields:
   - `from`: `"open" | "openWithSealedEvidence" | "openOnSchedule" | "openCore" | "sourceAvailable"`
   - `to`: `"open" | "openWithSealedEvidence" | "openOnSchedule" | "openCore" | "sourceAvailable"`
+- Reason, for example: landing would change the posture from open to openCore, which takes a decider

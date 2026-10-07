@@ -1,0 +1,81 @@
+{
+  "commands": [
+    {
+      "contract": "listAsks",
+      "description": "List a project's open asks.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "asks",
+      "needsApproval": false,
+      "path": [
+        "asks"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "project": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "submitAnswer",
+      "description": "Offer the commit `head`, built on `base`, as an answer to an ask; once it lands, `main` is the new tip.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "submit",
+      "needsApproval": false,
+      "path": [
+        "submit"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "base": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "head": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "base",
+          "head"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    }
+  ],
+  "version": 1
+}
