@@ -30,6 +30,7 @@ import {
   AskId,
   CommitSha,
   Handle,
+  LandedSha,
   ProjectName,
   RepoName,
 } from "@repo/protocol/ids";
@@ -67,10 +68,22 @@ import {
   ConfigBundlerBun,
   localPolicy,
 } from "./local-policy.ts";
+import { staleGenerated } from "./stale.ts";
+import type { StaleCopy } from "./stale.ts";
 
 const COMMAND = "check";
 
-/** What `check --json` prints on success: the ask, the diff it judged, and each lane. */
+/** A generated file in the working copy that main's config no longer gives (`stale.ts`). */
+const Stale = Schema.Struct({
+  /** The landing the copy says it came from, when it names one. */
+  landed: Schema.optionalKey(LandedSha),
+  path: Schema.String,
+});
+
+/**
+ * What `check --json` prints on success: the ask, the diff it judged, each
+ * lane, and the generated files that are out of date, when any are.
+ */
 const Checked = Schema.Struct({
   ask: AskId,
   base: CommitSha,
@@ -78,6 +91,7 @@ const Checked = Schema.Struct({
   lanes: Schema.Array(LaneResult),
   /** The last stage that ran: `shape` with `--shape-only`, else `checks`. */
   stage: Schema.Literals(["shape", "checks"]),
+  stale: Schema.optionalKey(Schema.NonEmptyArray(Stale)),
 });
 
 type Checked = typeof Checked.Type;
@@ -112,6 +126,28 @@ const refuse = (
       Effect.fail(new Reported())
     )
   );
+
+/** What a stale copy is told: which file, the landing it names, and how to get a current one. */
+const staleNote = ({ landed, path }: StaleCopy) =>
+  `${path} is out of date: ${Option.match(landed, {
+    onNone: () => "it is not what main's config gives",
+    onSome: (sha) =>
+      `it was generated at ${sha}, and main's config now gives other text`,
+  })}. The platform regenerates it whenever the config changes; pull main for the current copy instead of editing it.`;
+
+/** The stale copies as `--json` lists them: absent when there are none. */
+const staleField = (stale: readonly StaleCopy[]) =>
+  Array.match(stale, {
+    onEmpty: () => ({}),
+    onNonEmpty: (copies) => ({
+      stale: Array.map(copies, ({ landed, path }) =>
+        Option.match(landed, {
+          onNone: () => ({ path }),
+          onSome: (sha) => ({ landed: sha, path }),
+        })
+      ),
+    }),
+  });
 
 /** The signed-in profile's handle, when `login` learned one. */
 const signedInHandle = Effect.flatMap(
@@ -466,6 +502,18 @@ export const check = Command.make(
         )
       );
 
+      // Copies of the generated agent files main's config no longer gives.
+      const stale = yield* staleGenerated({
+        landed: policy.at,
+        policy,
+        project,
+        root: context.root,
+      });
+
+      yield* Effect.forEach(stale, (copy) => output.note(staleNote(copy)), {
+        discard: true,
+      });
+
       const ask = Array.findFirst(policy.asks, ({ id }) => id === askId);
 
       if (Option.isNone(ask)) {
@@ -524,7 +572,12 @@ export const check = Command.make(
       const judged = { ask: askId, base: facts.base, head: facts.head };
 
       if (flags.noLanes) {
-        const checked: Checked = { ...judged, lanes: [], stage: "shape" };
+        const checked: Checked = {
+          ...judged,
+          lanes: [],
+          stage: "shape",
+          ...staleField(stale),
+        };
 
         return yield* output.success({
           command: COMMAND,
@@ -601,7 +654,12 @@ export const check = Command.make(
         return yield* refuse(json, failed);
       }
 
-      const checked: Checked = { ...judged, lanes: run.lanes, stage: "checks" };
+      const checked: Checked = {
+        ...judged,
+        lanes: run.lanes,
+        stage: "checks",
+        ...staleField(stale),
+      };
 
       return yield* output.success({
         command: COMMAND,
