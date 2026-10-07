@@ -1,11 +1,17 @@
 // Ported from joelhooks/rat-stack@fba26d8 `packages/capability/src/to-toolkit.ts`
 // (MIT, LICENSES/rat-stack.MIT.txt). Changes are listed in PROVENANCE.md.
-import type { Layer } from "effect";
-import { Context, Effect } from "effect";
+import type { JsonSchema, Layer } from "effect";
+import { Context, Effect, Predicate, Schema } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import type { Rpc, RpcClient, RpcClientError, RpcGroup } from "effect/rpc";
 
-import { Description } from "./annotations.ts";
+import {
+  Description,
+  Destructive,
+  Idempotent,
+  NeedsApproval,
+  ReadOnly,
+} from "./annotations.ts";
 import type { Unauthenticated } from "./principal.ts";
 
 /** How a call can fail before its handler runs: in transit, or unauthenticated. */
@@ -36,19 +42,98 @@ export type ToolsOf<Rpcs extends Rpc.Any> = {
   readonly [R in Rpcs as R["_tag"]]: ToolOf<R>;
 };
 
+/** A tool as MCP's `tools/list` shows it to a client. */
+export interface ToolListing {
+  readonly name: string;
+  readonly description: string;
+  readonly annotations: {
+    readonly readOnlyHint: boolean;
+    readonly idempotentHint: boolean;
+    readonly destructiveHint: boolean;
+    readonly openWorldHint: boolean;
+  };
+  readonly inputSchema: JsonSchema.JsonSchema;
+  readonly outputSchema: JsonSchema.JsonSchema;
+}
+
+/** How a document points at one of its own definitions. */
+const DEFINITION = "#/$defs/";
+
+/**
+ * A schema as MCP lists it, derived the way `McpServer` derives a tool's:
+ * JSON Schema with an object root (a top-level `$ref` is inlined) and its
+ * definitions under `$defs`.
+ */
+export const toJsonSchema = (schema: Schema.Top): JsonSchema.JsonSchema => {
+  const { definitions, schema: root } = Schema.toJsonSchemaDocument(schema);
+
+  // A JSON Pointer escapes `/` as `~1` and `~` as `~0`.
+  const key =
+    Predicate.isString(root.$ref) && root.$ref.startsWith(DEFINITION)
+      ? root.$ref
+          .slice(DEFINITION.length)
+          .replaceAll("~1", "/")
+          .replaceAll("~0", "~")
+      : undefined;
+
+  const inlined = (key === undefined ? undefined : definitions[key]) ?? root;
+
+  return Object.keys(definitions).length === 0
+    ? inlined
+    : { ...inlined, $defs: definitions };
+};
+
+/**
+ * The tools a toolkit lists, in its order, as a client reads them from
+ * `tools/list`. The generated MCP reference is written from this.
+ */
+export const listTools = <Tools extends Readonly<Record<string, Tool.Any>>>(
+  toolkit: Toolkit.Toolkit<Tools>
+): readonly ToolListing[] =>
+  // A toolkit keys each tool by its name.
+  Object.entries(toolkit.tools).map(([name, tool]) => ({
+    annotations: {
+      destructiveHint: Context.get(tool.annotations, Tool.Destructive),
+      idempotentHint: Context.get(tool.annotations, Tool.Idempotent),
+      openWorldHint: Context.get(tool.annotations, Tool.OpenWorld),
+      readOnlyHint: Context.get(tool.annotations, Tool.Readonly),
+    },
+    description: Tool.getDescription(tool) ?? "",
+    inputSchema: toJsonSchema(tool.parametersSchema),
+    name,
+    outputSchema: toJsonSchema(tool.successSchema),
+  }));
+
 export interface ToolkitProjection<Rpcs extends Rpc.AnyWithProps, R> {
   readonly toolkit: Toolkit.Toolkit<ToolsOf<Rpcs>>;
   /** Handlers that answer each tool by calling its Rpc through the client. */
   readonly layer: Layer.Layer<Tool.HandlersFor<ToolsOf<Rpcs>>, never, R>;
 }
 
-const toTool = (rpc: Rpc.AnyWithProps) =>
-  Tool.make(rpc._tag, {
-    description: Context.get(rpc.annotations, Description),
+/** What a tool says before a person-approved contract runs. */
+const ASKS_FIRST = " Asks a person first.";
+
+/**
+ * One contract as a tool. Its hints come from the contract's own annotations,
+ * and every tool says it reaches nothing outside the platform: MCP's defaults
+ * would read an unannotated tool as destructive and open-world.
+ */
+const toTool = (rpc: Rpc.AnyWithProps) => {
+  const description = Context.get(rpc.annotations, Description);
+
+  return Tool.make(rpc._tag, {
+    description: Context.get(rpc.annotations, NeedsApproval)
+      ? `${description}${ASKS_FIRST}`
+      : description,
     failure: rpc.errorSchema,
     parameters: rpc.payloadSchema,
     success: rpc.successSchema,
-  });
+  })
+    .annotate(Tool.Readonly, Context.get(rpc.annotations, ReadOnly))
+    .annotate(Tool.Idempotent, Context.get(rpc.annotations, Idempotent))
+    .annotate(Tool.Destructive, Context.get(rpc.annotations, Destructive))
+    .annotate(Tool.OpenWorld, false);
+};
 
 /**
  * Projects a group of contracts onto MCP tools. A tool call runs as a call to
