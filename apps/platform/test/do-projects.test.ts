@@ -79,6 +79,7 @@ const everyMethod = (api: ProjectApi) =>
       "finish",
       api.finish(bob, { ask: parseIso, base: sha, head: sha, requestId })
     ),
+    firstPusher: settled("firstPusher", api.firstPusher()),
     flagAsk: settled(
       "flagAsk",
       api.flagAsk(bob, { ask: parseIso, reason: "It names no format." })

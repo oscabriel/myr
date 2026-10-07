@@ -92,6 +92,7 @@ const apiOf = (
     decide: (caller, input) => assumingMade(on("decide", [caller, input])),
     events: (since, limit) => on("events", [since, limit]),
     finish: (caller, input) => assumingMade(on("finish", [caller, input])),
+    firstPusher: () => on("firstPusher", []),
     flagAsk: (caller, input) => assumingMade(on("flagAsk", [caller, input])),
     fork: (caller) => assumingMade(on("fork", [caller])),
     initProject: (caller, input) => on("initProject", [caller, input]),

@@ -104,6 +104,7 @@ export const ProjectCalls = byMethod({
   decide: callOf(MethodSchemas.decide),
   events: callOf(MethodSchemas.events),
   finish: callOf(MethodSchemas.finish),
+  firstPusher: callOf(MethodSchemas.firstPusher),
   flagAsk: callOf(MethodSchemas.flagAsk),
   fork: callOf(MethodSchemas.fork),
   initProject: callOf(MethodSchemas.initProject),

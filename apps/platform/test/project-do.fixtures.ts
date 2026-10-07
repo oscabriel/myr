@@ -27,18 +27,16 @@ import {
   AskId,
   LandedSha,
   LaneName,
-  ProjectName,
   RepoName,
   RepoPath,
 } from "@repo/protocol/ids";
-import type { CommitSha } from "@repo/protocol/ids";
+import type { CommitSha, ProjectName } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
 import { Finishers } from "@repo/rules/finish";
 import { RulesEvaluator } from "@repo/rules/rules-evaluator";
 import { gitClient } from "@repo/testkit/git-client";
 import type { Files } from "@repo/testkit/git-client";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
-import { untouchable } from "@repo/testkit/untouchable";
 import {
   Array,
   Cause,
@@ -49,15 +47,12 @@ import {
   Layer,
   Option,
   Predicate,
-  SynchronizedRef,
 } from "effect";
-import type { Scope } from "effect";
 
 import { DoAlarms } from "../src/adapters/alarms.ts";
 import type { AlarmStorage } from "../src/adapters/alarms.ts";
 import { AnswerRunsWorkflow } from "../src/adapters/answer-runs-workflow.ts";
 import type { AnswerWorkflow } from "../src/adapters/answer-runs-workflow.ts";
-import type { ProjectNamespace } from "../src/adapters/do-projects.ts";
 import type { AnswerParams } from "../src/answer-runs.ts";
 import { decodeReply, encodeCall } from "../src/project-calls.ts";
 import type {
@@ -68,6 +63,7 @@ import type {
 } from "../src/project-calls.ts";
 import { projectShell } from "../src/project-shell.ts";
 import type { ProjectShell } from "../src/project-shell.ts";
+import { inProcessNamespace } from "./project-namespace.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -442,44 +438,6 @@ export const outcomeOf = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
  * shell of its own, over a SQLite of its own, on the world's ports and the
  * test's clock. `names` lists the DOs made, in order.
  */
-export const namespaceOf = Effect.gen(function* () {
-  const context = yield* Effect.context<World | Scope.Scope>();
-
-  const shells = yield* SynchronizedRef.make<ReadonlyMap<string, ProjectShell>>(
-    new Map()
-  );
-
-  const shellFor = (name: string) =>
-    SynchronizedRef.modifyEffect(shells, (all) =>
-      Option.match(Option.fromUndefinedOr(all.get(name)), {
-        onNone: () =>
-          Effect.map(
-            shellOver(":memory:", Option.some(ProjectName.make(name))),
-            (shell) => [shell, new Map(all).set(name, shell)] as const
-          ),
-        onSome: (shell) => Effect.succeed([shell, all] as const),
-      })
-    );
-
-  const namespace: ProjectNamespace = {
-    get: (id) => ({
-      call: (request) =>
-        Effect.runPromiseWith(context)(
-          Effect.flatMap(shellFor(id.toString()), (shell) =>
-            shell.call(request)
-          )
-        ),
-    }),
-    idFromName: (name) =>
-      untouchable<DurableObjectId>("DurableObjectId", {
-        equals: (other) => other.toString() === name,
-        name,
-        toString: () => name,
-      }),
-  };
-
-  return {
-    names: Effect.map(SynchronizedRef.get(shells), (all) => [...all.keys()]),
-    namespace,
-  };
-});
+export const namespaceOf = inProcessNamespace((name) =>
+  shellOver(":memory:", Option.some(name))
+);
