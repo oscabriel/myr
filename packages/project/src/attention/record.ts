@@ -29,7 +29,12 @@ export interface RecordEntry {
 
 /** What a record is built from. */
 export interface RecordInput {
-  /** The project's asks by id, closed ones included, to find each landing's area. */
+  /**
+   * The project's asks by id, closed ones included, to find each landing's
+   * area. Ask ids are unique only within a project, so give one project's
+   * asks and landings, and build one record per project for several: a
+   * landing whose id finds another project's ask counts for no area.
+   */
   readonly asks: ReadonlyMap<AskId, Ask>;
   readonly landings: readonly LandingView[];
   readonly now: DateTime.Utc;
@@ -134,7 +139,11 @@ export const recordOf = (
   return (handle) => byPerson.get(personOf(handle)) ?? [];
 };
 
-/** Whether a record holds at least `atLeast` counted landings in `area`: yes or no, never how many. */
+/**
+ * Whether a record holds at least `atLeast` counted landings in `area`: yes
+ * or no, never how many. It counts every entry it is given, so a caller
+ * holding several projects' entries passes one project's (`mayClaim` does).
+ */
 export const meets = (
   entries: readonly RecordEntry[],
   rule: RecordRule

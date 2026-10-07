@@ -18,7 +18,13 @@ import { areaOf, sameHandle } from "./record.ts";
 
 /** What a person's credits are counted from. */
 export interface CreditsInput {
-  /** The asks the landings answered, by id, closed ones included, to find each landing's area. */
+  /**
+   * The asks the landings answered, by id, closed ones included, to find
+   * each landing's area. Ask ids are unique only within a project, so for a
+   * person's credits across projects call once per project and join the
+   * rows (they sort by project first): a landing whose id finds another
+   * project's ask credits no area.
+   */
   readonly asks: ReadonlyMap<AskId, Ask>;
   readonly handle: Handle;
   readonly landings: readonly LandingView[];

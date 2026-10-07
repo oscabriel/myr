@@ -3,7 +3,7 @@ import type { Ask } from "@repo/protocol/domain/ask";
 import { Glob } from "@repo/protocol/domain/common";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import type { Policy } from "@repo/protocol/domain/policy";
-import { Handle, LandedSha } from "@repo/protocol/ids";
+import { Handle, LandedSha, ProjectName } from "@repo/protocol/ids";
 import { Denounced, NotVouched } from "@repo/protocol/refusal";
 import { at } from "@repo/testkit/clock";
 import {
@@ -37,8 +37,8 @@ const fix: AskKindEncoded = {
  * `datekit`: its file vouches for `bob` and `Erin` and denounces `mallory`;
  * kinds `fix` (vouched), `open` (anyone), `parser` (two held landings in
  * `parser`) and `starter` (newcomers, mentored by alice); an ask of each;
- * asks reserved for newcomers of `fix` and `open`; and a `fix` ask reserved
- * for people. The deciders are `alice` alone.
+ * asks reserved for newcomers of `fix`, `open` and `parser`; and a `fix` ask
+ * reserved for people. The deciders are `alice` alone.
  */
 const scenario = aProject({ now }).pipe(
   withVouches(["bob", "Erin"], ["mallory"]),
@@ -70,6 +70,12 @@ const scenario = aProject({ now }).pipe(
   withAsk({
     id: "first-open",
     kind: "open",
+    reserve: "newcomers",
+    territory: "packages/parser",
+  }),
+  withAsk({
+    id: "first-parser",
+    kind: "parser",
     reserve: "newcomers",
     territory: "packages/parser",
   })
@@ -111,13 +117,17 @@ const carol = Handle.make("carol");
 
 const mallory = Handle.make("mallory");
 
-/** One held landing on carol's record, in `area`. */
-const held = (area: string, seed: string): RecordEntry => ({
+/** One held landing on carol's record, in `area` of `project` (datekit's by default). */
+const held = (
+  area: string,
+  seed: string,
+  project: ProjectName = scenario.project
+): RecordEntry => ({
   area,
   at: now,
   handle: carol,
   landing: LandedSha.make(sha(seed)),
-  project: scenario.project,
+  project,
 });
 
 const allowed = Result.void;
@@ -126,17 +136,24 @@ const notVouched = Result.fail(new NotVouched({}));
 
 const denounced = Result.fail(new Denounced({}));
 
-/** May a person of this standing, record and landings claim `ask` under `rules`? */
+/**
+ * May a person of this standing, record and landings claim ask `id` under
+ * `rules`, with `mentor` named on the ask?
+ */
 const claim = (
   id: string,
   who: Standing,
   options: {
     readonly landingsInProject?: number;
+    readonly mentor?: Handle;
     readonly record?: readonly RecordEntry[];
     readonly rules?: Policy;
   } = {}
 ) => {
-  const ask = askOf(id);
+  const ask =
+    options.mentor === undefined
+      ? askOf(id)
+      : { ...askOf(id), mentor: options.mentor };
 
   return mayClaim({
     ask,
@@ -275,6 +292,21 @@ describe("who may claim an ask of a record kind", () => {
     );
   });
 
+  it("counts only landings in the ask's project, not an area of the same name elsewhere", () => {
+    const burrow = ProjectName.make("burrow");
+
+    expect(
+      claim("parser-iso", "unknown", {
+        record: [held("parser", "a", burrow), held("parser", "b", burrow)],
+      })
+    ).toStrictEqual(notVouched);
+    expect(
+      claim("parser-iso", "unknown", {
+        record: [held("parser", "a"), held("parser", "b", burrow)],
+      })
+    ).toStrictEqual(notVouched);
+  });
+
   it("does not take a vouch in place of the record", () => {
     expect(claim("parser-iso", "vouched")).toStrictEqual(notVouched);
   });
@@ -315,9 +347,33 @@ describe("an ask's reserve", () => {
     ).toStrictEqual(notVouched);
   });
 
-  it("narrows who the kind admits and widens nothing: a newcomer still needs the kind's vouch", () => {
+  it("narrows who the kind admits: with no mentor named, a newcomer still needs the kind's vouch", () => {
     expect(claim("first-iso", "unknown")).toStrictEqual(notVouched);
     expect(claim("first-open", "unknown")).toStrictEqual(allowed);
+  });
+
+  it("lets the mentor a newcomers ask names stand in for the vouch, as the newcomer rule's does", () => {
+    expect(claim("first-iso", "unknown", { mentor: alice })).toStrictEqual(
+      allowed
+    );
+    expect(
+      claim("first-iso", "unknown", { landingsInProject: 1, mentor: alice })
+    ).toStrictEqual(notVouched);
+    expect(claim("first-iso", "denounced", { mentor: alice })).toStrictEqual(
+      denounced
+    );
+  });
+
+  it("lets a mentor stand in for a vouch only, not for a kind's record rule", () => {
+    expect(claim("first-parser", "unknown", { mentor: alice })).toStrictEqual(
+      notVouched
+    );
+    expect(
+      claim("first-parser", "unknown", {
+        mentor: alice,
+        record: [held("parser", "a"), held("parser", "b")],
+      })
+    ).toStrictEqual(allowed);
   });
 
   it("refuses nobody for a people ask: it is a hint for agents' harnesses only", () => {

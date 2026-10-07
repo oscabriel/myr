@@ -40,7 +40,7 @@ export interface ClaimQuestion {
   /** How many landings the person is accountable for in this project, held or not. */
   readonly landingsInProject: number;
   readonly policy: Policy;
-  /** The person's record (`recordOf`), for a kind's record rule. */
+  /** The person's record (`recordOf`), for a kind's record rule; entries in other projects never count. */
   readonly record: readonly RecordEntry[];
   readonly standing: Standing;
 }
@@ -115,10 +115,20 @@ export const standing = (
 };
 
 /**
+ * Whether a newcomer claims an ask held for newcomers that names their
+ * mentor: the mentor stands in for the vouch, as the `newcomer` rule's does.
+ */
+const mentored = ({ ask, landingsInProject }: ClaimQuestion) =>
+  ask.reserve === "newcomers" &&
+  ask.mentor !== undefined &&
+  landingsInProject === 0;
+
+/**
  * Whether a kind's `claimers` rule admits the person: `anyone`; `vouched`,
- * which the `bansOnly` mode lifts; a record of `atLeast` held landings in an
- * area, which no vouch stands in for; or a newcomer, with no landing in the
- * project, whose mentor the rule names and who needs no vouch for it.
+ * which the `bansOnly` mode lifts and a newcomers ask's mentor stands in
+ * for; a record of `atLeast` held landings in an area of the ask's project,
+ * which no vouch or mentor stands in for; or a newcomer, with no landing in
+ * the project, whose mentor the rule names and who needs no vouch for it.
  */
 const admits = (rule: ClaimRule, question: ClaimQuestion): boolean =>
   Match.value(rule).pipe(
@@ -127,10 +137,16 @@ const admits = (rule: ClaimRule, question: ClaimQuestion): boolean =>
       "vouched",
       () =>
         question.standing === "vouched" ||
-        question.policy.vouch.mode === "bansOnly"
+        question.policy.vouch.mode === "bansOnly" ||
+        mentored(question)
     ),
     Match.when({ record: Match.defined }, ({ record }) =>
-      meets(question.record, record)
+      meets(
+        question.record.filter(
+          ({ project }) => project === question.ask.project
+        ),
+        record
+      )
     ),
     Match.when(
       { newcomer: Match.defined },
@@ -143,11 +159,12 @@ const admits = (rule: ClaimRule, question: ClaimQuestion): boolean =>
  * May this person claim this ask? A denounced person never may, in any
  * mode. An ask reserved for `newcomers` takes only people with no landing in
  * the project, and otherwise follows its kind: the reserve narrows who the
- * kind admits and widens nothing. An ask reserved for `people` refuses
- * nobody: it tells agents' harnesses to leave it to a person, and the
- * platform can't tell who typed a claim, so it is a hint only. Then the
- * kind's `claimers` rule decides. Every refusal but a denouncement is
- * `NotVouched`: the person is not admitted to this ask.
+ * kind admits, and widens it only by its mentor, who stands in for a vouch
+ * (never for a record). An ask reserved for `people` refuses nobody: it
+ * tells agents' harnesses to leave it to a person, and the platform can't
+ * tell who typed a claim, so it is a hint only. Then the kind's `claimers`
+ * rule decides. Every refusal but a denouncement is `NotVouched`: the person
+ * is not admitted to this ask.
  */
 export const mayClaim = (question: ClaimQuestion): TrustAnswer => {
   if (question.standing === "denounced") {
