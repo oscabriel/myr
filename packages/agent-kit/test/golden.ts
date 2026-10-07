@@ -2,7 +2,10 @@
  * Golden files for the generators: each generator's files in one
  * `test/golden/<name>.txt`, with the product's name as placeholders so no
  * golden file spells it (`brand:check`) and a renamed brand still matches.
- * `UPDATE_GOLDEN=1` rewrites them; read the diff before committing it.
+ * A `content-hash` covers text that spells the name, so it changes with the
+ * brand: the golden file holds `__HASH__` there, and the generator tests
+ * hold each recorded hash to its body instead. `UPDATE_GOLDEN=1` rewrites
+ * them; read the diff before committing it.
  */
 import { expect } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -31,9 +34,16 @@ export const branded = (golden: string) =>
     .replaceAll("__CLI__", Brand.cli)
     .replaceAll("__SLUG__", Brand.slug);
 
-/** Generated text as a golden file holds it: the brand as placeholders. */
+// The hex of a frontmatter's `content-hash: "sha256:…"` or an AGENTS.md
+// marker's `content-hash: sha256:…`.
+const HASH = /(?<=content-hash: "?sha256:)[0-9a-f]{64}/gu;
+
+/** Generated text with each content hash as `__HASH__`. */
+const unhashed = (text: string) => text.replaceAll(HASH, "__HASH__");
+
+/** Generated text as a golden file holds it: the brand and hashes as placeholders. */
 const unbranded = (text: string) =>
-  text
+  unhashed(text)
     .replaceAll(NAME, "__NAME__")
     .replaceAll(CLI, "__CLI__")
     .replaceAll(SLUG, "__SLUG__");
@@ -43,8 +53,9 @@ export const transcript = (files: readonly GeneratedFile[]) =>
   files.map(({ content, path }) => `==> ${path} <==\n${content}`).join("\n");
 
 /**
- * Asserts that `actual` is `test/golden/<name>.txt` with its placeholders
- * filled in, byte for byte. Under `UPDATE_GOLDEN=1` it writes the file.
+ * Asserts that `actual`, with its content hashes as `__HASH__`, is
+ * `test/golden/<name>.txt` with its brand placeholders filled in, byte for
+ * byte. Under `UPDATE_GOLDEN=1` it writes the file.
  */
 export const expectGolden = (name: string, actual: string) =>
   Effect.gen(function* () {
@@ -71,5 +82,5 @@ export const expectGolden = (name: string, actual: string) =>
 
     const golden = yield* fs.readFileString(file);
 
-    expect(actual).toBe(branded(golden));
+    expect(unhashed(actual)).toBe(branded(golden));
   }).pipe(Effect.orDie);

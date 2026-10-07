@@ -149,8 +149,10 @@ export const readManaged = (file: string): Option.Option<Managed> => {
  * or what it records is not the current body's hash (generated from other
  * text). The landing alone never makes a copy stale: a landing that left
  * the text alone leaves the copy current. Some names the copy's own landing
- * and recorded hash; a copy without the frontmatter has no landing, and its
- * hash is the whole file's.
+ * and recorded hash. A copy without the frontmatter has no landing, and its
+ * hash is the whole file's: it is current only when the current file has no
+ * frontmatter either and the two are the same text, so a copy whose
+ * frontmatter was taken off is stale.
  */
 export const isStale = (
   onDisk: string,
@@ -162,20 +164,21 @@ export const isStale = (
   }>
 > =>
   Effect.gen(function* () {
+    const copy = readManaged(onDisk);
+
+    if (Option.isNone(copy)) {
+      return onDisk === current.content
+        ? Option.none()
+        : Option.some({
+            hash: yield* contentHash(onDisk),
+            landed: Option.none(),
+          });
+    }
+
     const wanted = yield* Option.match(readManaged(current.content), {
       onNone: () => contentHash(current.content),
       onSome: ({ hash }) => Effect.succeed(hash),
     });
-
-    const copy = readManaged(onDisk);
-
-    if (Option.isNone(copy)) {
-      const hash = yield* contentHash(onDisk);
-
-      return hash === wanted
-        ? Option.none()
-        : Option.some({ hash, landed: Option.none() });
-    }
 
     const { body, hash, landed } = copy.value;
     const actual = yield* contentHash(body);

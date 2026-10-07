@@ -3,6 +3,7 @@ import { Brand } from "@repo/brand";
 import { Effect } from "effect";
 
 import { agentsBlock, upsertAgentsBlock } from "../src/agents-block.ts";
+import { contentHash } from "../src/generated-file.ts";
 import {
   landed,
   later,
@@ -87,12 +88,11 @@ describe(agentsBlock, () => {
     () =>
       Effect.gen(function* () {
         const generated = yield* agentsBlock({ landed, policy, project });
+        const hash = yield* contentHash(generated.body);
 
-        expect(generated.begin).toMatch(
-          new RegExp(
-            `^<!-- BEGIN ${Brand.slug} contribute \\(generated; content-hash: sha256:[0-9a-f]{64}\\) -->$`,
-            "u"
-          )
+        expect(hash).toMatch(/^sha256:[0-9a-f]{64}$/u);
+        expect(generated.begin).toBe(
+          `<!-- BEGIN ${Brand.slug} contribute (generated; content-hash: ${hash}) -->`
         );
         expect(generated.end).toBe(end);
         expect(generated.body).toContain(`${Brand.cli} check`);

@@ -4,6 +4,7 @@ import { Brand } from "@repo/brand";
 import { Effect, Schema } from "effect";
 
 import { agentsBlock, upsertAgentsBlock } from "../src/agents-block.ts";
+import { contentHash } from "../src/generated-file.ts";
 import type { GeneratedFile } from "../src/generated-file.ts";
 import type { HookEvent } from "../src/hook-events.ts";
 import { claudeEventOf } from "../src/hook-events.ts";
@@ -150,6 +151,18 @@ const frontmatterKeys = (content: string) => {
   };
 };
 
+/** A Markdown file's body: everything after its frontmatter's closing line. */
+const bodyOf = (content: string) => {
+  const close = content.indexOf("\n---\n", 3);
+
+  return close === -1 ? content : content.slice(close + "\n---\n".length);
+};
+
+/** The hash a file's frontmatter records, read with a pattern of its own. */
+const recordedHash = (content: string) =>
+  /^ {2}content-hash: "(?<hash>sha256:[0-9a-f]{64})"$/mu.exec(content)?.groups
+    ?.hash ?? "";
+
 /** The hook entry that runs `<cli> hook <event> --json`. */
 const hookCommand = (event: HookEvent) => [
   { command: `${Brand.cli} hook ${event} --json`, type: "command" },
@@ -234,6 +247,27 @@ describe("every SKILL.md", () => {
           }))
         );
       })
+  );
+
+  it.effect("records the SHA-256 of its own body", () =>
+    Effect.gen(function* () {
+      const files = yield* skills;
+
+      expect(files.length).toBeGreaterThan(0);
+
+      const computed = yield* Effect.forEach(files, ({ content, path }) =>
+        contentHash(bodyOf(content)).pipe(
+          Effect.map((hash) => ({ hash, path }))
+        )
+      );
+
+      expect(
+        files.map(({ content, path }) => ({
+          hash: recordedHash(content),
+          path,
+        }))
+      ).toStrictEqual(computed);
+    })
   );
 
   it.effect("names the landing it came from when it came from one", () =>

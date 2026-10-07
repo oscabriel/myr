@@ -52,7 +52,7 @@ const bodyOf = (project: ProjectName, policy: Policy) => {
   return page([
     `## Contributing to ${project}`,
     "",
-    `This project takes changes through ${Brand.name}: an answer to one of its asks lands only by passing the gate. This block is generated from the config folder, and the gate decides what lands. The full guide is the ${code(contributeSkillName(project))} skill (${code(agentsPath ?? "")}).`,
+    `This project takes changes through ${Brand.name}: an answer to one of its asks lands only by passing the gate. This block is generated from the config folder, and the gate decides what lands. The full guide is the ${code(contributeSkillName(project))} skill (${code(agentsPath)}).`,
     "",
     ...loopSteps(),
     "",

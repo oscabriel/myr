@@ -192,4 +192,43 @@ describe(isStale, () => {
         );
       })
   );
+
+  it.effect(
+    "is Some for a copy whose frontmatter was taken off, though its body is current",
+    () =>
+      Effect.gen(function* () {
+        const current = yield* contributeSkill({ landed, policy });
+
+        const body = Option.map(
+          readManaged(current.content),
+          (managed) => managed.body
+        );
+
+        expect(Option.isSome(body)).toBeTruthy();
+
+        const bare = Option.getOrElse(body, () => "");
+
+        expect(yield* isStale(bare, current)).toStrictEqual(
+          Option.some({
+            hash: recordedHash(current.content),
+            landed: Option.none(),
+          })
+        );
+      })
+  );
+
+  it.effect(
+    "compares a file the generators give without frontmatter as it stands",
+    () =>
+      Effect.gen(function* () {
+        const current = { content: "# Ours\n", path: "AGENTS.md" };
+
+        expect(yield* isStale("# Ours\n", current)).toStrictEqual(
+          Option.none()
+        );
+        expect(yield* isStale("hello\n", current)).toStrictEqual(
+          Option.some({ hash: helloDigest, landed: Option.none() })
+        );
+      })
+  );
 });

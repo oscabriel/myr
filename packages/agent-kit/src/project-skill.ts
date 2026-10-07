@@ -26,11 +26,12 @@ import { code, page } from "./text.ts";
 export const contributeSkillName = (project: ProjectName) =>
   `${project}-contribute`;
 
-/** Where the skill goes: the folders harnesses read project skills from. */
-export const contributeSkillPaths = (project: ProjectName) =>
-  [".agents", ".claude"].map(
-    (root) => `${root}/skills/${contributeSkillName(project)}/SKILL.md`
-  );
+/** Where the skill goes: the folders harnesses read project skills from, `.agents` first. */
+export const contributeSkillPaths = (project: ProjectName) => {
+  const skill = `skills/${contributeSkillName(project)}/SKILL.md`;
+
+  return [`.agents/${skill}`, `.claude/${skill}`] as const;
+};
 
 /** What the skill's frontmatter says it is for. */
 export const contributeDescription = (project: ProjectName) =>

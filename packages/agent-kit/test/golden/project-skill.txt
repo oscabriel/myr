@@ -5,7 +5,7 @@ description: "Answer one of datekit's asks on __NAME__: claim it, change only it
 metadata:
   managed-by: "__SLUG__"
   landed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-  content-hash: "sha256:46fa2ac0a9b213b2e9a5f9a1c3e54246809e6c2326fc80c97a0881034932e369"
+  content-hash: "sha256:__HASH__"
 ---
 # Contribute to datekit
 
@@ -116,7 +116,7 @@ description: "Answer one of datekit's asks on __NAME__: claim it, change only it
 metadata:
   managed-by: "__SLUG__"
   landed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-  content-hash: "sha256:46fa2ac0a9b213b2e9a5f9a1c3e54246809e6c2326fc80c97a0881034932e369"
+  content-hash: "sha256:__HASH__"
 ---
 # Contribute to datekit
 

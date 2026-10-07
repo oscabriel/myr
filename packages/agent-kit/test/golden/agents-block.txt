@@ -1,5 +1,5 @@
 ==> AGENTS.md <==
-<!-- BEGIN __SLUG__ contribute (generated; content-hash: sha256:8bc87e18feaa6e1f6a121ec99a78a92f3edaa1fdc2eead4181dee67ee60b7b71) -->
+<!-- BEGIN __SLUG__ contribute (generated; content-hash: sha256:__HASH__) -->
 ## Contributing to datekit
 
 This project takes changes through __NAME__: an answer to one of its asks lands only by passing the gate. This block is generated from the config folder, and the gate decides what lands. The full guide is the `datekit-contribute` skill (`.agents/skills/datekit-contribute/SKILL.md`).

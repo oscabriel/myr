@@ -11,7 +11,7 @@ name: __SLUG__
 description: "Contribute to projects on __NAME__ with the `__SLUG__` CLI: find an ask, claim it, check your answer locally, push it to your fork, and read the verdict. Use when a repo's remote is on __NAME__, or when a push was refused with a refusal such as OutOfScope or StaleBase."
 metadata:
   managed-by: "__SLUG__"
-  content-hash: "sha256:8a8ea9eed71ff4e3bf0de80fce9b559d693e027826022b91151ba8aae2a375c1"
+  content-hash: "sha256:__HASH__"
 ---
 # __NAME__
 

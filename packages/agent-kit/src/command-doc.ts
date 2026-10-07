@@ -163,10 +163,13 @@ export const localCommandDocs: readonly CommandDoc[] = [
   },
 ];
 
-/** The contracts a local command calls in their place, by the command's name. */
-const standIns = new Map(
+/**
+ * The names of the local commands that call a contract: a contract whose
+ * CLI name is one of them is that command, so it gets no row of its own.
+ */
+const standIns = new Set(
   localCommandDocs.flatMap(({ contract, path }) =>
-    contract === undefined ? [] : [[path.join(" "), contract] as const]
+    contract === undefined ? [] : [path.join(" ")]
   )
 );
 
