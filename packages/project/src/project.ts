@@ -1532,6 +1532,10 @@ export const projectService = (
         state: landing,
         ...field("ask", ask),
         ...field("askLane", askLane),
+        ...field(
+          "run",
+          Option.map(h.policy, ({ run }) => run)
+        ),
         ...Option.getOrElse(judgedRun, () => ({})),
       };
     };
@@ -2106,6 +2110,7 @@ export const projectService = (
           project: name,
           proxies: [],
           repo,
+          run: policy.run,
         };
 
         const first = yield* runner.run(job);

@@ -40,3 +40,9 @@ COPY --from=sdk /usr/local/bin/bun /usr/local/bin/bun
 COPY --from=sdk /opt/sdk /opt/sdk
 
 WORKDIR /workspace
+
+# The Lander runs every command through the Container API's `exec`, so the
+# container only has to stay up until its Durable Object destroys it.
+# debian's own `bash` exits at once with no stdin, and takes every `exec`
+# with it (exit 137; found live on dev-oscabriel, 311).
+CMD ["sleep", "infinity"]

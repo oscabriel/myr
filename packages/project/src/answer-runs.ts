@@ -20,6 +20,7 @@ import { Ask } from "@repo/protocol/domain/ask";
 import { Choice } from "@repo/protocol/domain/decision";
 import { AskKind } from "@repo/protocol/domain/kind";
 import { Outcome } from "@repo/protocol/domain/outcome";
+import { RunBlock } from "@repo/protocol/domain/run";
 import {
   AskId,
   CommitSha,
@@ -32,9 +33,8 @@ import {
   TreeSha,
 } from "@repo/protocol/ids";
 import type { RequestId } from "@repo/protocol/ids";
-import { Refusal } from "@repo/protocol/refusal";
-import { Context, Schema } from "effect";
-import type { Effect, Option } from "effect";
+import { Refusal, VerifierBlocked } from "@repo/protocol/refusal";
+import { Context, Effect, Option, Schema } from "effect";
 
 import { Change, LandingState, PendingDecision } from "./landing.ts";
 import type { LandingCommand, LandingEffect } from "./landing.ts";
@@ -103,12 +103,29 @@ export const AnswerRun = Schema.Struct({
   message: Schema.optionalKey(Schema.String),
   /** The canonical repo the answer lands on. */
   repo: RepoName,
+  /**
+   * The project's run block, which every check job carries: absent while
+   * the project has no policy (the gate is broken, and nothing is checked).
+   */
+  run: Schema.optionalKey(RunBlock),
   state: LandingState,
   /** The verdict on the merged tree, once the checks judged it. */
   verdict: Schema.optionalKey(Verdict),
 });
 
 export type AnswerRun = typeof AnswerRun.Type;
+
+/**
+ * The run block every check job of an answer's run carries: `VerifierBlocked`
+ * while the project has none, since the Checker never guesses a project's
+ * setup (live on dev-oscabriel, 311: a job without one was blocked).
+ */
+export const runBlockOf = (from: {
+  readonly run?: RunBlock;
+}): Effect.Effect<RunBlock, VerifierBlocked> =>
+  Effect.fromOption(Option.fromUndefinedOr(from.run)).pipe(
+    Effect.mapError(() => new VerifierBlocked({}))
+  );
 
 /**
  * What a step saw beside the command it reports: the lanes and held-back

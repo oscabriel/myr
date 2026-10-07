@@ -10,10 +10,16 @@ import { Duration, Effect, Layer } from "effect";
 import { Box, BoxFailed } from "../box.ts";
 import type { ExecOptions } from "../box.ts";
 
-/** Which image the container runs, and whether it may reach the internet. */
+/**
+ * Which image the container runs, whether it may reach the internet, and
+ * its instance size (the runtime's default, `lite`, when absent: a
+ * Durable Object's container takes its size when it starts, not from
+ * `wrangler.jsonc`).
+ */
 export interface ContainerStart {
   readonly image: string;
   readonly enableInternet: boolean;
+  readonly instance?: ContainerStartupOptions["instance"];
 }
 
 const text = new TextDecoder();
@@ -22,10 +28,15 @@ const text = new TextDecoder();
 const started = (container: Container, start: ContainerStart) =>
   Effect.sync(() => {
     if (!container.running) {
-      container.start({
-        enableInternet: start.enableInternet,
-        image: start.image,
-      });
+      container.start(
+        start.instance === undefined
+          ? { enableInternet: start.enableInternet, image: start.image }
+          : {
+              enableInternet: start.enableInternet,
+              image: start.image,
+              instance: start.instance,
+            }
+      );
     }
 
     return container;

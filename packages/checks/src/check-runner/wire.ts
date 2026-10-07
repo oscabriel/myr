@@ -26,6 +26,8 @@ export type Remote = typeof Remote.Type;
 /** A check job as the platform sends it: the job and a read token for its repo. */
 export const CheckWire = Schema.Struct({ clone: Remote, job: CheckJob });
 
+export type CheckWire = typeof CheckWire.Type;
+
 /**
  * A check's outcome as it comes back: the run, `VerifierBlocked`, or a
  * defect, as JSON.

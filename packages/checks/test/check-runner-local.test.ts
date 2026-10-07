@@ -1,5 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it, vi } from "@effect/vitest";
+import { Command } from "@repo/protocol/domain/common";
 import {
   AreaName,
   CommitSha,
@@ -56,6 +57,7 @@ const world = Effect.gen(function* () {
     project: ProjectName.make("datekit"),
     proxies: [],
     repo: RepoName.make("datekit"),
+    run: { checks: {}, test: Command.make("bun test {path}") },
   });
 
   return { checkout, job, repo };

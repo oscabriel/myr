@@ -22,6 +22,7 @@ import {
   MergeWire,
 } from "@repo/project/lander/wire";
 import type { LaneResult } from "@repo/protocol/domain/answer";
+import { Command } from "@repo/protocol/domain/common";
 import {
   CommitSha,
   Handle,
@@ -89,6 +90,7 @@ const checkJob: CheckJob = {
   project,
   proxies: [],
   repo: fork,
+  run: { checks: {}, test: Command.make("bun test {path}") },
 };
 
 const mergeJob = { base, fork, head, main, repo: canonical };

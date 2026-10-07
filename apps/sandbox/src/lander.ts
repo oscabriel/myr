@@ -56,9 +56,16 @@ export const landerJobs = (
 };
 
 /**
+ * The Lander's container size: a whole vCPU. On the runtime's default
+ * (`lite`, 1/16 vCPU) one landing took 32 s and a config bundle 20 s on
+ * dev-oscabriel (311, against S6's 5 s).
+ */
+export const landInstance = "standard-2";
+
+/**
  * The Lander's Durable Object, which owns its container: started on its
- * first job from the `land` image, with internet on, since git reaches
- * Artifacts over HTTPS with the tokens each job carries.
+ * first job from the `land` image on `landInstance`, with internet on,
+ * since git reaches Artifacts over HTTPS with the tokens each job carries.
  */
 export class Lander extends DurableObject<Env> {
   readonly #jobs: ReturnType<typeof landerJobs>;
@@ -76,6 +83,7 @@ export class Lander extends DurableObject<Env> {
       SdkBox.layer(container, {
         enableInternet: true,
         image: container.images[landImage] ?? landImage,
+        instance: landInstance,
       }),
       Semaphore.makeUnsafe(1)
     );

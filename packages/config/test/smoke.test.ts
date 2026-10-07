@@ -160,10 +160,54 @@ describe("smoke against a live stage", () => {
     }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
+  // Live on dev-oscabriel (311): the first smoke after the first deploy got
+  // a 500 from /health and a defect from the first Project DO call, and a
+  // second run seconds later passed every probe.
+  it.live(
+    "asks again while a fresh deploy answers with a server error or a defect, and passes once it settles",
+    () =>
+      Effect.gen(function* () {
+        const asked = { health: 0, rpc: 0 };
+
+        const origin = yield* fakePlatform((seen) => {
+          if (seen.path === "/health") {
+            asked.health += 1;
+
+            if (asked.health <= 2) {
+              return { body: "internal error", status: 500 };
+            }
+          }
+
+          if (seen.path === "/rpc") {
+            asked.rpc += 1;
+
+            if (asked.rpc === 1) {
+              return {
+                body: '[{"_tag":"Defect","defect":{"name":"UnknownError","message":"An error occurred in Effect.tryPromise"}}]',
+                status: 200,
+              };
+            }
+          }
+
+          return healthy(seen);
+        });
+
+        const report = yield* smoke(origin, { settling: "10 seconds" });
+
+        expect({
+          asked,
+          probes: report.probes.map(({ probe }) => probe),
+        }).toStrictEqual({ asked: { health: 3, rpc: 2 }, probes: [...probes] });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
   it.live("names each probe that fails, and why", () =>
     Effect.gen(function* () {
       const origin = yield* fakePlatform(broken);
-      const result = yield* Effect.result(smoke(origin));
+
+      const result = yield* Effect.result(
+        smoke(origin, { settling: "1 second" })
+      );
 
       expect(Result.isFailure(result)).toBeTruthy();
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { LaneResult } from "@repo/protocol/domain/answer";
+import { Command } from "@repo/protocol/domain/common";
 import {
   CommitSha,
   LaneName,
@@ -34,6 +35,7 @@ const job = (at: CheckAt, ...lanes: readonly LaneName[]): CheckJob => ({
   project: ProjectName.make("datekit"),
   proxies: [],
   repo: RepoName.make("datekit"),
+  run: { checks: {}, test: Command.make("bun test {path}") },
 });
 
 const ran = (

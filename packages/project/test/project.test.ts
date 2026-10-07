@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
+import { CheckAt } from "@repo/checks/check-runner";
 import { authorLine, committerLine, parseTrailers } from "@repo/git/trailers";
 import { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -256,6 +257,7 @@ const opening = (api: ProjectApi) =>
     const firstPushers = [unmade, awaitedFrom, yield* api.firstPusher()];
     const evaluated = yield* Evaluated.use(({ shas }) => shas);
     const opened = yield* openRed(api, "parse-iso");
+    const redFirstJobs = yield* CheckScript.use(({ jobs }) => jobs);
     const greenFiles = askFiles("parse-green");
 
     yield* scriptAll(
@@ -281,6 +283,7 @@ const opening = (api: ProjectApi) =>
       notHers,
       opened,
       recorded,
+      redFirstJobs,
       shown: yield* api.showAsk(anyone, parseIso),
     };
   });
@@ -702,6 +705,28 @@ describe.each(["memory", "sqlite"] as const)(
             ask: opened.shown.ask,
             readsWant: opened.shown.brief.includes(open.ask.brief.want),
           }).toStrictEqual({ ask: open.ask, readsWant: true });
+        })
+    );
+
+    // Live on dev-oscabriel (311): the Checker blocked every red-first run
+    // with "the job carries no run block", since a job did not carry one.
+    it.effect(
+      "2. red first runs the ask's check twice on the composed commit, each run in the project's own setup",
+      () =>
+        Effect.map(seen, ({ opened }) => {
+          expect(
+            opened.redFirstJobs.map(({ at, lanes: ran, run }) => ({
+              at: CheckAt.guards.Commit(at),
+              lanes: ran.map(({ lane }) => lane),
+              run,
+            }))
+          ).toStrictEqual(
+            [1, 2].map(() => ({
+              at: true,
+              lanes: [redThenGreen],
+              run: scenario.policy.run,
+            }))
+          );
         })
     );
 

@@ -14,6 +14,10 @@
  * 5. `missing-repo-404`: git's `info/refs` for a repo that doesn't exist
  *    answers 404.
  *
+ * A probe the platform answers with its own failure (a server error, or an
+ * RPC defect) asks again for up to `settling`, as a fresh deploy gives
+ * those for its first seconds; any other wrong answer fails it at once.
+ *
  * `scripts/smoke.ts` is the command; this module holds the probes, since
  * `infra/` may use `effect/http` (tsconfig.base.json's overrides).
  */
@@ -26,6 +30,7 @@ import {
   Option,
   Path,
   Result,
+  Schedule,
   Schema,
 } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
@@ -59,6 +64,17 @@ const MISSING = "no-such-project";
 /** How long one probe waits for an answer: a cold Worker included. */
 const PATIENCE = Duration.seconds(30);
 
+/**
+ * How long a probe keeps asking a platform that answers with a server error
+ * or a defect, as a fresh deploy does for its first seconds (311: the first
+ * smoke after the first deploy got a 500 from `/health` and a defect from
+ * the first Project DO call; a run seconds later passed).
+ */
+const SETTLING = Duration.seconds(30);
+
+/** How long a probe waits between two asks while the platform settles. */
+const ASK_AGAIN = Duration.seconds(1);
+
 /** One or more probes failed: each, and why. */
 export class SmokeFailed extends Schema.TaggedError<SmokeFailed>()(
   "SmokeFailed",
@@ -86,9 +102,15 @@ export interface SmokeReport {
   }[];
 }
 
-/** Why one probe failed, in a line a person reads. */
+/**
+ * Why one probe failed, in a line a person reads. A transient miss is the
+ * platform's own failure (a server error, a defect), which a fresh deploy
+ * may give for its first seconds, so the probe asks again; any other answer
+ * is the platform's word, and fails the probe at once.
+ */
 class Missed extends Schema.TaggedError<Missed>()("Missed", {
   reason: Schema.String,
+  transient: Schema.optionalKey(Schema.Boolean),
 }) {}
 
 /** The parts of a response a probe judges. */
@@ -125,13 +147,14 @@ const send = (
     })
   );
 
-/** `answer`, when its status is `expected`. */
+/** `answer`, when its status is `expected`; a server error is transient. */
 const statusIs = (label: string, expected: number) => (answer: Answer) =>
   answer.status === expected
     ? Effect.succeed(answer)
     : Effect.fail(
         new Missed({
           reason: `${label} answered ${answer.status}, not ${expected}`,
+          transient: answer.status >= 500,
         })
       );
 
@@ -232,6 +255,13 @@ const decodeRefused = Schema.decodeUnknownEffect(
   )
 );
 
+/** A reply whose call died in the platform: its own failure, not an answer. */
+const decodeDefect = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Tuple([Schema.TaggedStruct("Defect", { defect: Schema.Unknown })])
+  )
+);
+
 /** A read anyone may make, refused for a project that doesn't exist. */
 const anonymousUnknownProject = (origin: string) =>
   Effect.gen(function* () {
@@ -253,8 +283,15 @@ const anonymousUnknownProject = (origin: string) =>
     ).pipe(Effect.flatMap(statusIs(label, 200)));
 
     const [reply] = yield* decodeRefused(text).pipe(
-      missing(
-        `${label} for ${MISSING} answered 200 without an UnknownProject refusal`
+      Effect.mapError(() =>
+        Option.isSome(decodeDefect(text))
+          ? new Missed({
+              reason: `${label} for ${MISSING} died in the platform (a defect)`,
+              transient: true,
+            })
+          : new Missed({
+              reason: `${label} for ${MISSING} answered 200 without an UnknownProject refusal`,
+            })
       )
     );
 
@@ -280,12 +317,26 @@ const missingRepo = (origin: string) => {
   ).pipe(Effect.flatMap(statusIs(label, 404)), Effect.asVoid);
 };
 
-/** One probe's run: how long it took, and whether it held. */
+/**
+ * One probe's run: how long it took, and whether it held. A transient miss
+ * is asked again, every `ASK_AGAIN`, for `settling` at most; the probe fails
+ * with its last miss.
+ */
 const timed = <A>(
   probe: Probe,
-  run: Effect.Effect<A, Missed, HttpClient.HttpClient>
+  run: Effect.Effect<A, Missed, HttpClient.HttpClient>,
+  settling: Duration.Input
 ) =>
-  Effect.timed(Effect.result(run)).pipe(
+  Effect.timed(
+    Effect.result(
+      Effect.retry(run, {
+        schedule: Schedule.spaced(ASK_AGAIN).pipe(
+          Schedule.upTo({ duration: settling })
+        ),
+        while: ({ transient }) => transient === true,
+      })
+    )
+  ).pipe(
     Effect.map(([elapsed, outcome]) => ({
       elapsedMs: Math.round(Duration.toMillis(elapsed)),
       outcome,
@@ -295,16 +346,20 @@ const timed = <A>(
 
 /**
  * Runs every probe against the platform at `origin`; with `stage`, `/health`
- * must name it.
+ * must name it. `settling` bounds how long a probe asks again while the
+ * platform answers with its own failure (30 s unless given).
  */
 export const smoke = (
   origin: string,
-  options: { readonly stage?: Stage } = {}
+  options: { readonly stage?: Stage; readonly settling?: Duration.Input } = {}
 ): Effect.Effect<SmokeReport, SmokeFailed, HttpClient.HttpClient> =>
   Effect.gen(function* () {
+    const settling = options.settling ?? SETTLING;
+
     const first = yield* timed(
       "health",
-      health(origin, Option.fromUndefinedOr(options.stage))
+      health(origin, Option.fromUndefinedOr(options.stage)),
+      settling
     );
 
     const rest = yield* Effect.forEach(
@@ -314,7 +369,7 @@ export const smoke = (
         ["anonymous-unknown-project", anonymousUnknownProject(origin)],
         ["missing-repo-404", missingRepo(origin)],
       ] as const,
-      ([probe, run]) => timed(probe, run)
+      ([probe, run]) => timed(probe, run, settling)
     );
 
     const runs: readonly {

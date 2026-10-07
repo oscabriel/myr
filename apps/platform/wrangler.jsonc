@@ -123,13 +123,13 @@
         {
           "binding": "FRONT_PAGE",
           "database_name": "front-page-dev-oscabriel",
-          "database_id": "00000000-0000-0000-0000-000000000000",
+          "database_id": "49c4ccfe-c491-49f1-9985-8296db748c4b",
           "migrations_dir": "migrations",
         },
       ],
       // KV namespace `oauth-dev-oscabriel`.
       "kv_namespaces": [
-        { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
+        { "binding": "OAUTH_KV", "id": "ddf5c48366af4ed7b93f183e7ceb3e9a" },
       ],
       "r2_buckets": [
         { "binding": "EVIDENCE", "bucket_name": "evidence-dev-oscabriel" },

@@ -17,6 +17,7 @@ import type { LaneName, RepoPath, RequestId } from "@repo/protocol/ids";
 import type { Refusal, VerifierBlocked } from "@repo/protocol/refusal";
 import { Array, Effect, Option } from "effect";
 
+import { runBlockOf } from "../answer-runs.ts";
 import type { AnswerQueue, AnswerReport, AnswerRun } from "../answer-runs.ts";
 import { Lander, Rebuild } from "../lander.ts";
 import {
@@ -117,6 +118,8 @@ const checks = (
     const runner = yield* CheckRunner;
     const { request } = checking;
 
+    const block = yield* runBlockOf(run);
+
     const job = (at: CheckAt, lanes: readonly CheckLane[]) =>
       runner.run({
         at,
@@ -125,6 +128,7 @@ const checks = (
         project: request.project,
         proxies: [],
         repo: run.repo,
+        run: block,
       });
 
     const lanesNamed = (names: ReadonlySet<LaneName>) =>

@@ -1,12 +1,17 @@
 import { describe, expect, it } from "@effect/vitest";
 import { CheckAt } from "@repo/checks/check-runner";
 import { CheckExit, CheckWire } from "@repo/checks/check-runner/wire";
+import { Command } from "@repo/protocol/domain/common";
 import { ProjectName, RepoName, TreeSha } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Effect, Exit, Option, Redacted, Schema } from "effect";
 
-import Sandbox from "../src/worker.ts";
+import { CloneGateway, EgressGateway } from "../src/outbound.ts";
+import Sandbox, {
+  CloneGateway as ExportedClone,
+  EgressGateway as ExportedEgress,
+} from "../src/worker.ts";
 import { fakeEnv } from "./fake-env.ts";
 
 const repo = RepoName.make("datekit");
@@ -24,6 +29,18 @@ const sandbox = new Sandbox(untouchable("ctx"), fakeEnv());
 /** A stub's outcome: a typed failure, not a defect. */
 const failureOf = Exit.findErrorOption;
 
+describe("the sandbox Worker's main module", () => {
+  // Live on dev-oscabriel (311): `ctx.exports` holds a loopback only for an
+  // export of the main module, and every check was blocked with "worker.ts
+  // does not export the outbound gateways" (315 #1).
+  it("exports the Checker's outbound gateways, so ctx.exports holds them", () => {
+    expect({
+      CloneGateway: ExportedClone,
+      EgressGateway: ExportedEgress,
+    }).toStrictEqual({ CloneGateway, EgressGateway });
+  });
+});
+
 describe("the sandbox Worker's entrypoint", () => {
   it.effect(
     "blocks a check with a typed refusal until the Checker is built",
@@ -38,6 +55,7 @@ describe("the sandbox Worker's entrypoint", () => {
             project: ProjectName.make("datekit"),
             proxies: [],
             repo,
+            run: { checks: {}, test: Command.make("bun test {path}") },
           },
         });
 

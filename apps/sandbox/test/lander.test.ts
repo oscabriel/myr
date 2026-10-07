@@ -951,6 +951,27 @@ describe("the land image", () => {
         ).toBe(manifest.workspaces.catalog.effect);
       }).pipe(Effect.provide(TestServices))
   );
+
+  // Live on dev-oscabriel (311): the land image ended on debian's own
+  // `bash`, which exits at once with no stdin, so the container stopped and
+  // the first `exec` of every job was killed (exit 137).
+  it.effect.each(["check", "land"])(
+    "keeps the %s container up until its Durable Object destroys it, since every command runs through exec",
+    (image) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+
+        const dockerfile = yield* fs.readFileString(
+          inRepo(`apps/sandbox/images/${image}.Dockerfile`)
+        );
+
+        const finalStage = dockerfile.split(/^FROM /mu).at(-1) ?? "";
+
+        expect(/^CMD (?<command>.+)$/mu.exec(finalStage)?.groups?.command).toBe(
+          '["sleep", "infinity"]'
+        );
+      }).pipe(Effect.provide(TestServices))
+  );
 });
 
 describe("the Lander's script, as data", () => {
@@ -1191,8 +1212,10 @@ describe("the Lander's Durable Objects", () => {
         );
 
         expect(merged).toStrictEqual(Exit.fail(new VerifierBlocked({})));
+        // A whole vCPU (live on dev-oscabriel, 311: on the default `lite`,
+        // 1/16 vCPU, one landing took 32 s and a config bundle 20 s).
         expect(started).toStrictEqual([
-          { enableInternet: true, image: "land-image" },
+          { enableInternet: true, image: "land-image", instance: "standard-2" },
         ]);
       })
   );

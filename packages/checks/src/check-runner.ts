@@ -7,6 +7,7 @@
  */
 import { HeldBackResult, LaneResult } from "@repo/protocol/domain/answer";
 import { EnvItem } from "@repo/protocol/domain/env";
+import { RunBlock } from "@repo/protocol/domain/run";
 import {
   AreaName,
   CommitSha,
@@ -72,6 +73,12 @@ export const CheckJob = Schema.Struct({
   /** Env items whose outbound hosts go through the platform's gateway. */
   proxies: Schema.Array(EnvItem),
   repo: RepoName,
+  /**
+   * The project's run block at the policy the job was made under: how the
+   * Checker sets up (`setup`, `setupEgress`, `image`). The Checker never
+   * guesses a project's setup.
+   */
+  run: RunBlock,
 });
 
 export type CheckJob = typeof CheckJob.Type;

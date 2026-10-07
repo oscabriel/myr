@@ -93,7 +93,7 @@ bun run smoke -- --stage dev-oscabriel --url http://localhost:8787
 
 The second form points smoke at another origin, such as `wrangler dev --env dev-oscabriel` in `apps/platform`. Plain `wrangler dev` serves stage `local`, which no `--stage` names, so its `health` probe fails.
 
-Smoke only reads. Every probe runs even when others fail, and the output names each probe that failed and why. It also prints how long each probe took.
+Smoke only reads. Every probe runs even when others fail, and the output names each probe that failed and why. It also prints how long each probe took. A probe the platform answers with its own failure (a 5xx, or an RPC defect) asks again every second for up to 30 s, since a fresh deploy gives those for its first seconds (seen on `dev-oscabriel`'s first deploy); any other wrong answer fails the probe at once.
 
 | Probe | Passes when |
 | --- | --- |

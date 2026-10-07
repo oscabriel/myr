@@ -11,12 +11,13 @@
  *
  * The container is destroyed however the job ends, and its logs are handed
  * to `CheckLogs` before that; the result carries none. A job the Checker
- * cannot run to the end (no run block, a clone or a setup that fails, a
- * sealed suite before W6) is `VerifierBlocked`: the gate's trouble, never the
+ * cannot run to the end (a clone or a setup that fails, a sealed suite
+ * before W6) is `VerifierBlocked`: the gate's trouble, never the
  * answer's. A lane that fails or runs out of time is that lane's result.
  */
 import { CheckAt, evidenceFrom } from "@repo/checks/check-runner";
 import type { CheckRun, LaneEvidence } from "@repo/checks/check-runner";
+import type { CheckWire } from "@repo/checks/check-runner/wire";
 import { classifyRun } from "@repo/checks/classify";
 import type { RunExit } from "@repo/checks/classify";
 import { Phase, phasePlan } from "@repo/checks/phases";
@@ -39,7 +40,6 @@ import {
   REGISTRIES,
 } from "./network.ts";
 import { Snapshots } from "./snapshots.ts";
-import type { CheckerWire } from "./wire.ts";
 
 /** Where the job's tree is checked out, and every command runs. */
 export const REPO = "/workspace/repo";
@@ -290,7 +290,7 @@ const checkout = (kept: Kept, url: string, at: CheckAt) =>
 
 /** What the phases share for one job. */
 interface Job {
-  readonly wire: CheckerWire;
+  readonly wire: CheckWire;
   readonly kept: Kept;
   /** The URL the container clones from: the clone host, no token. */
   readonly url: string;
@@ -463,7 +463,7 @@ const runLane = (job: Job, { command, lane }: PlannedLane) => {
 };
 
 /** The phases, from the clone to the last lane, with the logs kept as they go. */
-const phases = (wire: CheckerWire, run: RunBlock, kept: Kept) =>
+const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
   Effect.gen(function* () {
     const network = yield* Network;
     const { clone } = wire;
@@ -537,7 +537,7 @@ const phases = (wire: CheckerWire, run: RunBlock, kept: Kept) =>
  * result carries each lane's result and evidence, never a log.
  */
 export const check = (
-  wire: CheckerWire
+  wire: CheckWire
 ): Effect.Effect<
   CheckRun,
   VerifierBlocked,
@@ -548,12 +548,8 @@ export const check = (
     const logs = yield* CheckLogs;
     const kept = yield* Ref.make<readonly PhaseLog[]>([]);
 
-    const { run } = wire.job;
-
     const [elapsed, ran] = yield* Effect.timed(
-      run === undefined
-        ? blocked("the job carries no run block", { phase: "plan" })
-        : phases(wire, run, kept)
+      phases(wire, wire.job.run, kept)
     ).pipe(
       Effect.onExit(() => Effect.flatMap(Ref.get(kept), logs.report)),
       Effect.ensuring(box.destroy())

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { CheckAt } from "@repo/checks/check-runner";
-import { CheckExit } from "@repo/checks/check-runner/wire";
+import { CheckExit, CheckWire } from "@repo/checks/check-runner/wire";
 import { phasePlan } from "@repo/checks/phases";
 import { Command, Hostname } from "@repo/protocol/domain/common";
 import { RunBlock } from "@repo/protocol/domain/run";
@@ -33,7 +33,6 @@ import { Checker, runCheck } from "../src/checker.ts";
 import type { Checkers } from "../src/checker.ts";
 import { CLONE_HOST, REGISTRIES } from "../src/checker/network.ts";
 import { check } from "../src/checker/run.ts";
-import { CheckerWire } from "../src/checker/wire.ts";
 import { CloneGateway, EgressGateway } from "../src/outbound.ts";
 import type { CloneProps, EgressProps } from "../src/outbound.ts";
 import { exited, fakeChecker, fakeContainer } from "./fake-box.ts";
@@ -59,7 +58,7 @@ const lanes = [
   { command: "bun test", lane: LaneName.make("unit") },
 ];
 
-const wireFor = (project = "datekit"): CheckerWire => ({
+const wireFor = (project = "datekit"): CheckWire => ({
   clone: {
     token: Redacted.make(TOKEN),
     url: `https://0123abcd.artifacts.cloudflare.net/git/public/${project}.git`,
@@ -418,7 +417,7 @@ describe("the Checker", () => {
         const snapshots = new Set<string>();
         const wire = wireFor();
 
-        const answer: CheckerWire = {
+        const answer: CheckWire = {
           ...wire,
           job: {
             ...wire.job,
@@ -759,7 +758,7 @@ const checkerWorld = (options: { readonly withGateways: boolean }) => {
 };
 
 const encodedWire = () =>
-  Schema.encodeEffect(CheckerWire)(wireFor()).pipe(Effect.orDie);
+  Schema.encodeEffect(CheckWire)(wireFor()).pipe(Effect.orDie);
 
 /** Two jobs of one project through `runCheck`, one after the other. */
 const twoJobs = Effect.gen(function* () {

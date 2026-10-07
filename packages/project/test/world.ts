@@ -14,7 +14,8 @@ import { SqliteClient } from "@effect/sql-sqlite-node";
 import { ForkInProgress, RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
-import { CheckAt } from "@repo/checks/check-runner";
+import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
+import type { CheckJob } from "@repo/checks/check-runner";
 import { CheckRunnerMemory, scriptKey } from "@repo/checks/check-runner/memory";
 import type { LaneOutcome, LaneResult } from "@repo/protocol/domain/answer";
 import type { Policy } from "@repo/protocol/domain/policy";
@@ -64,6 +65,8 @@ export class CheckScript extends Context.Service<
       lane: LaneName,
       results: readonly LaneOutcome[]
     ) => Effect.Effect<void>;
+    /** Every job the Checker was given, in order. */
+    readonly jobs: Effect.Effect<readonly CheckJob[]>;
   }
 >()("test/CheckScript") {}
 
@@ -138,11 +141,23 @@ const scriptOf = Layer.effectContext(
   Effect.gen(function* () {
     // The Checker reads its script when it runs, so the test may add to it later.
     const script = new Map<string, readonly LaneResult[]>();
+    const jobs = yield* Ref.make<readonly CheckJob[]>([]);
 
-    const runner = yield* Layer.build(CheckRunnerMemory.layer(script));
+    const memory = Context.get(
+      yield* Layer.build(CheckRunnerMemory.layer(script)),
+      CheckRunner
+    );
 
-    return runner.pipe(
+    const runner = CheckRunner.of({
+      run: (job) =>
+        Ref.update(jobs, (given) => [...given, job]).pipe(
+          Effect.andThen(memory.run(job))
+        ),
+    });
+
+    return Context.make(CheckRunner, runner).pipe(
       Context.add(CheckScript, {
+        jobs: Ref.get(jobs),
         script: (at, lane, results) =>
           Effect.sync(() => {
             script.set(

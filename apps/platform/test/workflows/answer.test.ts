@@ -58,6 +58,7 @@ import {
   openedFiles,
   parseIso,
   parsePath,
+  policy,
   project,
   repo,
   scriptProjectLanes,
@@ -243,17 +244,30 @@ describe(runAnswer, () => {
 
         const jobs = yield* Checker.use((script) => script.jobs);
 
+        // Each in the project's own setup, its run block (live on
+        // dev-oscabriel, 311: a job without one is blocked).
         expect(
           jobs
             .filter(({ at }) => CheckAt.guards.Tree(at))
-            .map(({ at, lanes, repo: on }) => ({
+            .map(({ at, lanes, repo: on, run: block }) => ({
               at,
               lanes: lanes.map(({ lane }) => lane),
               on,
+              run: block,
             }))
         ).toStrictEqual([
-          { at: answer.merged, lanes: ["lint", "types"], on: bobFork },
-          { at: answer.merged, lanes: [askLane, "unit"], on: bobFork },
+          {
+            at: answer.merged,
+            lanes: ["lint", "types"],
+            on: bobFork,
+            run: policy.run,
+          },
+          {
+            at: answer.merged,
+            lanes: [askLane, "unit"],
+            on: bobFork,
+            run: policy.run,
+          },
         ]);
       }).pipe(Effect.provide(world))
   );

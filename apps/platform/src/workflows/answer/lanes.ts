@@ -15,6 +15,7 @@ import { CheckAt, CheckLane, CheckRunner } from "@repo/checks/check-runner";
 import type { CheckRun, LaneEvidence } from "@repo/checks/check-runner";
 import { EvidenceStore } from "@repo/checks/evidence-store";
 import { classifyFailure } from "@repo/gate/classify";
+import { runBlockOf } from "@repo/project/answer-runs";
 import type { AnswerRun } from "@repo/project/answer-runs";
 import { LandingState } from "@repo/project/landing";
 import {
@@ -23,6 +24,7 @@ import {
   LaneResult,
 } from "@repo/protocol/domain/answer";
 import { AskKind } from "@repo/protocol/domain/kind";
+import { RunBlock } from "@repo/protocol/domain/run";
 import {
   CommitSha,
   LandedSha,
@@ -80,6 +82,8 @@ export const Checked = Schema.Struct({
   /** The canonical repo, which holds main. */
   repo: RepoName,
   requestId: RequestId,
+  /** The project's run block, which every check job carries; absent without a policy. */
+  run: Schema.optionalKey(RunBlock),
   tree: TreeSha,
 });
 
@@ -271,8 +275,11 @@ const checkedOf = (run: AnswerRun, tree: TreeSha): Option.Option<Checked> => {
     tree: state.tree,
   };
 
+  const asked =
+    run.askLane === undefined ? checked : { ...checked, askLane: run.askLane };
+
   return Option.some(
-    run.askLane === undefined ? checked : { ...checked, askLane: run.askLane }
+    run.run === undefined ? asked : { ...asked, run: run.run }
   );
 };
 
@@ -299,6 +306,12 @@ export const runStage = (
           ? run.state.remerges
           : 0;
 
+        if (!Array.isReadonlyArrayNonEmpty(lanes)) {
+          return StageRun.cases.Ran.make({ checked, heldBack: [], lanes: [] });
+        }
+
+        const block = yield* runBlockOf(checked);
+
         const job = (each: readonly CheckLane[]) =>
           runner.run({
             at: CheckAt.cases.Tree.make({ tree }),
@@ -307,11 +320,8 @@ export const runStage = (
             project: checked.project,
             proxies: [],
             repo: checked.fork,
+            run: block,
           });
-
-        if (!Array.isReadonlyArrayNonEmpty(lanes)) {
-          return StageRun.cases.Ran.make({ checked, heldBack: [], lanes: [] });
-        }
 
         const firstRun = yield* job(lanes);
         const first = byLane(firstRun);
@@ -409,15 +419,18 @@ export const laneOnMain = (
   checked: Checked,
   lane: CheckLane
 ): Effect.Effect<LaneOutcome, never, CheckRunner> =>
-  CheckRunner.use((runner) =>
-    runner.run({
-      at: CheckAt.cases.Commit.make({ commit: checked.main }),
-      lanes: [lane],
-      placeholders: [],
-      project: checked.project,
-      proxies: [],
-      repo: checked.repo,
-    })
+  Effect.flatMap(runBlockOf(checked), (block) =>
+    CheckRunner.use((runner) =>
+      runner.run({
+        at: CheckAt.cases.Commit.make({ commit: checked.main }),
+        lanes: [lane],
+        placeholders: [],
+        project: checked.project,
+        proxies: [],
+        repo: checked.repo,
+        run: block,
+      })
+    )
   ).pipe(
     Effect.map(
       ({ lanes }): LaneOutcome =>

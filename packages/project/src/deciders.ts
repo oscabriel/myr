@@ -36,6 +36,7 @@ import { Outcome } from "@repo/protocol/domain/outcome";
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import type { CreditSummary } from "@repo/protocol/domain/record";
+import type { RunBlock } from "@repo/protocol/domain/run";
 import type { Ledger } from "@repo/protocol/domain/visibility";
 import {
   AskId,
@@ -1760,6 +1761,8 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       readonly lanes: readonly CheckLane[];
       readonly message: string;
       readonly now: DateTime.Utc;
+      /** The project's run block, which every check job carries. */
+      readonly run: RunBlock;
     },
     step: Step,
     turns: number
@@ -1777,6 +1780,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         lanes: input.lanes,
         message: input.message,
         repo,
+        run: input.run,
         state: step.state,
       };
 
@@ -1909,6 +1913,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
                 ...messageParts(input.message),
               }),
               now,
+              run: policy.run,
             },
             transition(
               LandingState.cases.Queued.make({ request }),

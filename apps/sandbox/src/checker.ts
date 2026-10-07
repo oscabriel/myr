@@ -9,8 +9,7 @@
  * check of the project shares.
  */
 import type { CheckRun } from "@repo/checks/check-runner";
-import { CheckExit } from "@repo/checks/check-runner/wire";
-import type { CheckWire } from "@repo/checks/check-runner/wire";
+import { CheckExit, CheckWire } from "@repo/checks/check-runner/wire";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { DurableObject } from "cloudflare:workers";
 import { Effect, Exit, Layer, Schema } from "effect";
@@ -19,7 +18,6 @@ import { SdkBox } from "./box/sdk.ts";
 import { WorkerCheckLogs } from "./checker/logs/worker.ts";
 import { blocked, check } from "./checker/run.ts";
 import { hasGateways, SdkChecker } from "./checker/sdk.ts";
-import { CheckerWire } from "./checker/wire.ts";
 import { answerJob } from "./job.ts";
 
 /** The run block's image a check runs in when it names none. */
@@ -31,8 +29,8 @@ const CHECK_IMAGE = "check";
 /** The Checker's Durable Object, which owns its container. */
 export class Checker extends DurableObject<Env> {
   /** Runs one check job in this object's container, its outcome encoded. */
-  check(wire: typeof CheckerWire.Encoded): Promise<typeof CheckExit.Encoded> {
-    return answerJob(CheckerWire, CheckExit, (job) => this.#checked(job))(wire);
+  check(wire: typeof CheckWire.Encoded): Promise<typeof CheckExit.Encoded> {
+    return answerJob(CheckWire, CheckExit, (job) => this.#checked(job))(wire);
   }
 
   /** The snapshot id kept under `key`, on a project's snapshot index. */
@@ -48,7 +46,7 @@ export class Checker extends DurableObject<Env> {
     this.ctx.storage.kv.delete(key);
   }
 
-  #checked(wire: CheckerWire): Effect.Effect<CheckRun, VerifierBlocked> {
+  #checked(wire: CheckWire): Effect.Effect<CheckRun, VerifierBlocked> {
     const { container, exports } = this.ctx;
 
     if (container === undefined) {
@@ -62,7 +60,7 @@ export class Checker extends DurableObject<Env> {
     }
 
     const image = container.images[CHECK_IMAGE];
-    const wanted = wire.job.run?.image ?? DEFAULT_IMAGE;
+    const wanted = wire.job.run.image ?? DEFAULT_IMAGE;
 
     if (image === undefined || wanted !== DEFAULT_IMAGE) {
       return blocked("no image for this run block", {
@@ -102,7 +100,7 @@ export interface Checkers {
     readonly newUniqueId: () => DurableObjectId;
     readonly get: (id: DurableObjectId) => {
       readonly check: (
-        wire: typeof CheckerWire.Encoded
+        wire: typeof CheckWire.Encoded
       ) => Promise<typeof CheckExit.Encoded>;
     };
     readonly getByName: (name: string) => {
