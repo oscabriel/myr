@@ -13,8 +13,8 @@ import { NotClaimed } from "@repo/protocol/refusal";
 import { Effect, Layer, Ref } from "effect";
 
 import { MemorySessions } from "../src/sessions/memory.ts";
-import { Vacant } from "../src/vacant.ts";
 import {
+  noProjects,
   origin,
   rpcClient,
   served,
@@ -51,7 +51,7 @@ const sessions = MemorySessions.layer({
 /** The platform where only `holder` holds the ask's claim. */
 const claimHeldBy = (holder: string) =>
   Layer.mergeAll(
-    Vacant,
+    noProjects,
     Contracts.toLayerHandler("submitAnswer", (payload) =>
       Effect.gen(function* () {
         const holds = Principal.match(yield* CurrentPrincipal, {
@@ -93,7 +93,7 @@ describe("the platform's MCP surface", () => {
   // through an agent's transcript.
   it.effect("lists the MCP-surfaced contracts only: no watch, no setEnv", () =>
     Effect.gen(function* () {
-      const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+      const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
       const names = yield* toolNames(yield* fetch(toolList("alice-token")));
 
@@ -117,7 +117,7 @@ describe("the platform's MCP surface", () => {
 
         const { fetch } = yield* served(
           Layer.mergeAll(
-            Vacant,
+            noProjects,
             Contracts.toLayerHandler("listAsks", () => counted),
             Contracts.toLayerHandler("submitAnswer", () => counted),
             sessions

@@ -954,7 +954,7 @@ describe(Answer, () => {
         const engine = fakeEngine();
         const workflow = new Answer(untouchable("ctx"), fakeEnv());
 
-        // Until W3 317 wires the ports, the first port call dies `NotWired`.
+        // The fake env's Project DOs hold no project: the first step finds none.
         const exit = yield* Effect.exit(
           Effect.tryPromise(() =>
             workflow.run(

@@ -15,8 +15,14 @@ import { Sessions } from "../src/sessions.ts";
 import { firstOf } from "../src/sessions/first-of.ts";
 import { MemorySessions } from "../src/sessions/memory.ts";
 import { sessionTable, TableSessions } from "../src/sessions/table.ts";
-import { Vacant } from "../src/vacant.ts";
-import { origin, rpcClient, served, toolCall, toolResult } from "./harness.ts";
+import {
+  noProjects,
+  origin,
+  rpcClient,
+  served,
+  toolCall,
+  toolResult,
+} from "./harness.ts";
 
 const project = ProjectName.make("datekit");
 
@@ -42,7 +48,7 @@ const noting = (seen: Ref.Ref<readonly Principal[]>) => {
   );
 
   return Layer.mergeAll(
-    Vacant,
+    noProjects,
     Contracts.toLayerHandler("listAsks", () => Effect.as(note, { asks: [] })),
     Contracts.toLayerHandler("status", () =>
       Effect.as(note, { answers: [], claims: [] })
@@ -81,7 +87,7 @@ describe("discovering how to sign in", () => {
     "names the platform as its own protected resource and authorization server, without a credential",
     () =>
       Effect.gen(function* () {
-        const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
         const response = yield* fetch(new Request(metadataUrl));
 
@@ -98,7 +104,7 @@ describe("discovering how to sign in", () => {
     "answers the authorization server's document from a placeholder until sign-in mounts its own",
     () =>
       Effect.gen(function* () {
-        const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
         const response = yield* fetch(
           new Request(`${origin}/.well-known/oauth-authorization-server`)
@@ -118,7 +124,7 @@ describe("discovering how to sign in", () => {
     "never turns away /health or the sign-in paths, whatever credential they carry",
     () =>
       Effect.gen(function* () {
-        const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
         const stale = { authorization: "Bearer a-token-nobody-knows" };
 
@@ -152,7 +158,7 @@ describe("discovering how to sign in", () => {
     "leaves git's paths to the gateway, whatever credential they carry",
     () =>
       Effect.gen(function* () {
-        const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
         const response = yield* fetch(
           new Request(
@@ -188,7 +194,7 @@ describe("reading without signing in", () => {
     "reads the front page, an ask and a verdict as anyone: each reaches its contract",
     () =>
       Effect.gen(function* () {
-        const { handler } = yield* served(Layer.mergeAll(Vacant, sessions));
+        const { handler } = yield* served(Layer.mergeAll(noProjects, sessions));
 
         const anyone = yield* rpcClient(handler);
 
@@ -237,7 +243,7 @@ describe("the 401", () => {
     "turns away an RPC call whose bearer the platform does not know",
     () =>
       Effect.gen(function* () {
-        const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
         const response = yield* fetch(
           new Request(`${origin}/rpc`, {
@@ -261,7 +267,7 @@ describe("the 401", () => {
     "asks MCP for a credential, naming where to learn how to get one",
     () =>
       Effect.gen(function* () {
-        const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
         const response = yield* fetch(toolCall("listAsks", { project }));
 
@@ -278,7 +284,7 @@ describe("the 401", () => {
     "turns away an RPC call whose credential is not a bearer token, with no error code",
     () =>
       Effect.gen(function* () {
-        const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
         const response = yield* fetch(
           new Request(`${origin}/rpc`, {
@@ -302,7 +308,7 @@ describe("the 401", () => {
   // hold wherever the router sends a request to MCP.
   it.effect("asks for a credential however MCP's path is spelled", () =>
     Effect.gen(function* () {
-      const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+      const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
 
       const call = toolCall("listProjects", {});
 
