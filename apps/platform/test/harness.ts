@@ -1,11 +1,14 @@
-import type { Upstream } from "@repo/git/upstream";
-import type { Projects } from "@repo/project/projects";
+import { Upstream } from "@repo/git/upstream";
+import { FrontPageMemory } from "@repo/project/front-page/memory";
+import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
+import { UnknownProject } from "@repo/protocol/refusal";
 import { Effect, Layer, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 
-import { Unwired } from "../src/ports.ts";
+import { MemoryRateLimits, WorkerCaps } from "../src/adapters/rate-limits.ts";
+import { Handlers } from "../src/handlers.ts";
 import { serve, Stage } from "../src/surfaces.ts";
 import type { Services } from "../src/surfaces.ts";
 
@@ -119,14 +122,40 @@ export const toolResult = (response: Response) =>
     }))
   );
 
+/** A port method a surfaces test never calls: a call is the test's defect. */
+const unused = (port: string) => () =>
+  Effect.die(`a surfaces test called ${port}, which it never sets up`);
+
 /**
- * What a surfaces test may leave out: git's ports, unwired (no test here
+ * What a surfaces test may leave out: git's ports, unused (no test here
  * pushes), and the stage, `local`.
  */
 const defaults = Layer.mergeAll(
-  Unwired.Projects,
-  Unwired.Upstream,
+  Layer.succeed(
+    Projects,
+    Projects.of({ create: unused("Projects"), get: unused("Projects") })
+  ),
+  Layer.succeed(Upstream, Upstream.of({ exchange: unused("Upstream") })),
   Layer.succeed(Stage, Stage.of({ name: "local" }))
+);
+
+/**
+ * The contracts before any project exists, served by the platform's own
+ * handlers: a call that names a project finds none (`UnknownProject`), the
+ * front page lists nothing, and nobody is near a rate limit.
+ */
+export const noProjects = Handlers.pipe(
+  Layer.provide([
+    Layer.succeed(
+      Projects,
+      Projects.of({
+        create: unused("Projects.create"),
+        get: (project) => Effect.fail(new UnknownProject({ project })),
+      })
+    ),
+    FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
+    MemoryRateLimits(WorkerCaps),
+  ])
 );
 
 /**
