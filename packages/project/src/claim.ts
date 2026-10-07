@@ -141,14 +141,17 @@ export interface ClaimStep {
 export const forkName = (project: ProjectName, ask: AskId, handle: Handle) =>
   RepoName.make(`${project}--${ask}--${handle.toLowerCase()}`);
 
-type Outcome = Result.Result<ClaimStep, ClaimRefusal>;
+/** What `transition` returns: a step, or the refusal that changes nothing. */
+export type ClaimResult = Result.Result<ClaimStep, ClaimRefusal>;
 
 /** The state as it is, with nothing to settle: how a repeated command converges. */
-const stay = (state: ClaimState): Outcome =>
+const stay = (state: ClaimState): ClaimResult =>
   Result.succeed({ effects: [], state });
 
-const move = (state: ClaimState, ...effects: readonly ClaimEffect[]): Outcome =>
-  Result.succeed({ effects, state });
+const move = (
+  state: ClaimState,
+  ...effects: readonly ClaimEffect[]
+): ClaimResult => Result.succeed({ effects, state });
 
 /** A claim's own fields, whatever state holds them. */
 const claimOf = ({
@@ -189,7 +192,7 @@ const grant = (
   made: Claim,
   now: DateTime.Utc,
   policy: Policy["claims"]
-): Outcome => {
+): ClaimResult => {
   if (made.liveCount >= made.race) {
     return Result.fail(new AskFull({ ask }));
   }
@@ -240,7 +243,7 @@ const claim = (
   made: Claim,
   now: DateTime.Utc,
   policy: Policy["claims"]
-): Outcome => {
+): ClaimResult => {
   // A live claim is its holder's to keep, and nobody else's to take.
   const holder = (live: Live) =>
     live.claimant === made.who.handle
@@ -266,7 +269,7 @@ const push = (
   { head, who }: typeof ClaimCommand.cases.Push.Type,
   now: DateTime.Utc,
   policy: Policy["claims"]
-): Outcome => {
+): ClaimResult => {
   // The holder's push starts both deadlines again from now.
   const kept = (live: Live) => {
     if (live.claimant !== who) {
@@ -301,7 +304,7 @@ const push = (
   });
 };
 
-const tick = (state: ClaimState, now: DateTime.Utc): Outcome => {
+const tick = (state: ClaimState, now: DateTime.Utc): ClaimResult => {
   const reached = (deadline: DateTime.Utc) =>
     DateTime.isGreaterThanOrEqualTo(now, deadline);
 
@@ -345,7 +348,7 @@ const release = (
   state: ClaimState,
   who: Handle,
   now: DateTime.Utc
-): Outcome => {
+): ClaimResult => {
   const end = (live: Live) =>
     live.claimant === who
       ? move(
@@ -378,7 +381,7 @@ const release = (
  * claim's already has. A released claim stays released, and an ask that holds
  * no claim (a decider's own landing) is left as it is.
  */
-const land = (state: ClaimState, landing: LandedSha): Outcome => {
+const land = (state: ClaimState, landing: LandedSha): ClaimResult => {
   const answer = (live: Live, ...effects: readonly ClaimEffect[]) =>
     move(
       ClaimState.cases.Answered.make({ ...claimOf(live), landing }),
@@ -409,7 +412,7 @@ export const transition = (
   command: ClaimCommand,
   now: DateTime.Utc,
   policy: Policy["claims"]
-): Outcome =>
+): ClaimResult =>
   ClaimCommand.match(command, {
     Claim: (made) => claim(state, made, now, policy),
     Land: ({ landing }) => land(state, landing),

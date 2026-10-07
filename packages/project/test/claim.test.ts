@@ -183,6 +183,27 @@ describe("claiming an ask", () => {
     ).toStrictEqual(Result.fail(new Denounced({})));
   });
 
+  it("names only the first refusal a claim meets: blockers, then the cap, then standing", () => {
+    const troubled = {
+      blockedBy: [blocker],
+      denounced: true,
+      heldByWho: 3,
+      vouched: false,
+    };
+
+    expect(
+      transition(open, claimBy(bob, troubled), start, policy)
+    ).toStrictEqual(Result.fail(AskBlocked.of(ask, [blocker])));
+    expect(
+      transition(
+        open,
+        claimBy(bob, { ...troubled, blockedBy: [] }),
+        start,
+        policy
+      )
+    ).toStrictEqual(Result.fail(new CapReached({ cap: 3 })));
+  });
+
   it("says AskFull before anything else, so a full ask never forks", () => {
     expect(
       transition(

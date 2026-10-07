@@ -8,8 +8,15 @@ import {
   RepoName,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
-import { AskFull } from "@repo/protocol/refusal";
-import { Arbitrary, DateTime, Option, Result, Schema } from "effect";
+import {
+  Arbitrary,
+  Array as Arr,
+  DateTime,
+  Option,
+  Predicate,
+  Result,
+  Schema,
+} from "effect";
 
 import {
   ClaimCommand,
@@ -18,7 +25,7 @@ import {
   forkName,
   transition,
 } from "../src/claim.ts";
-import type { ClaimRefusal, ClaimStep, Live } from "../src/claim.ts";
+import type { ClaimResult, ClaimStep, Live } from "../src/claim.ts";
 
 // A model test (ADR 0012): generated histories of claims, pushes, alarms,
 // releases and landings run through `transition` the way the project service
@@ -51,18 +58,16 @@ const start = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 const People = Schema.Literals(["alice", "Bob", "carol", "dave"]);
 
 /**
- * How the person making a claim stands: free to claim, or meeting exactly one
- * refusal (denounced, not vouched, the ask blocked, or at their cap).
+ * How the person making a claim stands: each flag is one refusal the claim
+ * would meet (the ask blocked, the person at their cap, denounced, or not
+ * vouched). A claim may meet several, so their order is checked too.
  */
-const Standing = Schema.Literals([
-  "clear",
-  "denounced",
-  "unvouched",
-  "blocked",
-  "atCap",
-]);
-
-type Standing = typeof Standing.Type;
+const Standing = Schema.Struct({
+  atCap: Schema.Boolean,
+  blocked: Schema.Boolean,
+  denounced: Schema.Boolean,
+  unvouched: Schema.Boolean,
+});
 
 /** One thing that happens to the ask, as a history step names it. */
 const Move = Schema.TaggedUnion({
@@ -95,12 +100,16 @@ const roll = (maximum: number) =>
 
 const person = Arbitrary.schema(People);
 
-/** Most claims are clear; a roll below 4 picks one refusal. */
-const troubles = ["denounced", "unvouched", "blocked", "atCap"] as const;
+/** True one time in six; it shrinks to false, so a shrunk claim meets nothing. */
+const rare = roll(5).pipe(Arbitrary.map((n) => n === 5));
 
-const standing = roll(9).pipe(
-  Arbitrary.map((n): Standing => troubles[n] ?? "clear")
-);
+/** About half of all claims meet no refusal. */
+const standing = Arbitrary.all({
+  atCap: rare,
+  blocked: rare,
+  denounced: rare,
+  unvouched: rare,
+});
 
 const claims = Arbitrary.all({ standing, who: person }).pipe(
   Arbitrary.map((made) => Move.cases.Claim.make(made))
@@ -173,15 +182,6 @@ const held = (state: ClaimState): Option.Option<Live> =>
 
 const isLive = (state: ClaimState) => Option.isSome(live(state));
 
-const tagOf = ClaimState.match({
-  Answered: () => "Answered",
-  Lapsed: () => "Lapsed",
-  Live: () => "Live",
-  Open: () => "Open",
-  Released: () => "Released",
-  Warned: () => "Warned",
-});
-
 const ms = (time: DateTime.Utc) => DateTime.toEpochMillis(time);
 
 /** The time a claim's deadlines count from: its last push, or its making. */
@@ -200,63 +200,142 @@ interface Call {
   readonly now: DateTime.Utc;
 }
 
-/** Whether a claim command meets none of the refusals it could meet. */
-const clear = ({ before, command }: Call) =>
-  ClaimCommand.guards.Claim(command) &&
-  !isLive(before) &&
-  tagOf(before) !== "Answered" &&
-  command.liveCount < command.race &&
-  command.blockedBy.length === 0 &&
-  command.heldByWho < command.cap &&
-  !command.denounced &&
-  command.vouched;
+type Claim = typeof ClaimCommand.cases.Claim.Type;
 
-/** Whether a claim command finds every claim the ask allows taken. */
-const full = ({ before, command }: Call) =>
-  ClaimCommand.guards.Claim(command) &&
-  (tagOf(before) === "Answered" ||
-    command.liveCount >= command.race ||
-    Option.exists(
-      live(before),
-      (holder) => holder.claimant !== command.who.handle
-    ));
+/** Whether the person making a claim holds the ask's live claim already. */
+const holds = (before: ClaimState, made: Claim) =>
+  Option.exists(live(before), (holder) => holder.claimant === made.who.handle);
+
+/**
+ * The refusal a claim by someone who does not hold it meets first, in the
+ * lifecycle's order: a full ask before anything else (ADR 0008), then the
+ * ask's blockers, the person's cap, a denouncement and a missing vouch. None
+ * when it should go live.
+ */
+const owed = (before: ClaimState, made: Claim) =>
+  Option.map(
+    Arr.findFirst(
+      [
+        [
+          "AskFull",
+          ClaimState.guards.Answered(before) ||
+            isLive(before) ||
+            made.liveCount >= made.race,
+        ],
+        ["AskBlocked", made.blockedBy.length > 0],
+        ["CapReached", made.heldByWho >= made.cap],
+        ["Denounced", made.denounced],
+        ["NotVouched", !made.vouched],
+      ] as const,
+      ([, meets]) => meets
+    ),
+    ([refusal]) => refusal
+  );
+
+/**
+ * A claim is refused with the first refusal it meets, and goes live, held by
+ * its maker, when it meets none; the holder claiming again changes nothing.
+ */
+const claimsAsOwed = (
+  { before, command }: Call,
+  result: ClaimResult
+): readonly string[] => {
+  if (!ClaimCommand.guards.Claim(command)) {
+    return [];
+  }
+
+  if (holds(before, command)) {
+    return Result.match(result, {
+      onFailure: (refusal) => [
+        `the holder claiming again is refused with ${refusal._tag}`,
+      ],
+      onSuccess: ({ effects, state }) =>
+        effects.length === 0 && same(before, state)
+          ? []
+          : ["the holder claiming again changes the claim"],
+    });
+  }
+
+  const first = owed(before, command);
+
+  return Result.match(result, {
+    onFailure: (refusal) =>
+      Option.match(first, {
+        onNone: () => [
+          `a claim that meets no refusal is refused with ${refusal._tag}`,
+        ],
+        onSome: (expected) =>
+          Predicate.isTagged(refusal, expected)
+            ? []
+            : [
+                `a claim that meets ${expected} first is refused with ${refusal._tag}`,
+              ],
+      }),
+    onSuccess: ({ state }) =>
+      Option.match(first, {
+        onNone: () =>
+          Option.exists(
+            live(state),
+            (holder) => holder.claimant === command.who.handle
+          )
+            ? []
+            : ["a claim that meets no refusal goes live, held by its maker"],
+        onSome: (expected) => [`a claim that meets ${expected} goes through`],
+      }),
+  });
+};
+
+/** Who pushed or released; none for any other command. */
+const pushedOrReleasedBy = ClaimCommand.match({
+  Claim: () => Option.none<Handle>(),
+  Land: () => Option.none<Handle>(),
+  Push: ({ who }) => Option.some(who),
+  Release: ({ who }) => Option.some(who),
+  Tick: () => Option.none<Handle>(),
+});
+
+/**
+ * Only a live claim's holder moves it by a push or a release, and the
+ * holder's push or release always goes through.
+ */
+const holderOnly = (
+  { before, command }: Call,
+  result: ClaimResult
+): readonly string[] =>
+  Option.match(pushedOrReleasedBy(command), {
+    onNone: () => [],
+    onSome: (who) => {
+      const holder = Option.exists(
+        live(before),
+        (claim) => claim.claimant === who
+      );
+
+      return Result.match(result, {
+        onFailure: (refusal) =>
+          holder
+            ? [`the holder's ${command._tag} is refused with ${refusal._tag}`]
+            : [],
+        onSuccess: ({ state }) =>
+          holder || same(before, state)
+            ? []
+            : [`a ${command._tag} by someone without the live claim moves it`],
+      });
+    },
+  });
 
 /** Whether a push comes from the holder of a live claim. */
 const holderPushes = ({ before, command }: Call) =>
   ClaimCommand.guards.Push(command) &&
   Option.exists(live(before), (holder) => holder.claimant === command.who);
 
-/** Whether a claim command goes live, held by the person who made it. */
-const madeLive = ({ command }: Call, state: ClaimState) =>
-  ClaimCommand.guards.Claim(command) &&
-  Option.exists(
-    live(state),
-    (holder) => holder.claimant === command.who.handle
-  );
-
-/** What a refusal keeps: AskFull comes first, and nothing allowed is refused. */
-const brokenByRefusal = (call: Call, refusal: ClaimRefusal) => [
-  ...(full(call) && !Schema.is(AskFull)(refusal)
-    ? [`a full ask is refused with AskFull, not ${refusal._tag}`]
-    : []),
-  ...(clear(call) ? [`a clear claim is refused with ${refusal._tag}`] : []),
-  ...(holderPushes(call) ? ["the holder's push is refused"] : []),
-];
-
 /** An invariant over one successful call, naming what it found broken. */
 type Invariant = (call: Call, done: ClaimStep) => readonly string[];
-
-/** A claim that meets no refusal goes live, held by its maker; a full ask takes none. */
-const progresses: Invariant = (call, { state }) => [
-  ...(clear(call) && !madeLive(call, state) ? ["a clear claim goes live"] : []),
-  ...(full(call) ? ["a full ask takes a claim"] : []),
-];
 
 /** The holder's push keeps the claim live and counts from now. */
 const pushesRenew: Invariant = (call, { state }) =>
   holderPushes(call) &&
   !(
-    tagOf(state) === "Live" &&
+    ClaimState.guards.Live(state) &&
     Option.exists(live(state), (holder) =>
       Option.exists(holder.lastPushAt, (pushed) => ms(pushed) === ms(call.now))
     )
@@ -272,11 +351,11 @@ const forksOnlyNewClaims: Invariant = ({ before }, { effects, state }) => {
   const forks = effects.filter(ClaimEffect.$is("MakeFork"));
 
   const opens =
-    ["Open", "Released", "Lapsed"].includes(tagOf(before)) &&
-    tagOf(state) === "Live";
+    ClaimState.isAnyOf(["Open", "Released", "Lapsed"])(before) &&
+    ClaimState.guards.Live(state);
 
   if (!opens) {
-    return forks.length > 0 ? [`a fork made from ${tagOf(before)}`] : [];
+    return forks.length > 0 ? [`a fork made from ${before._tag}`] : [];
   }
 
   const named = Option.map(live(state), (claim) =>
@@ -334,55 +413,83 @@ const noTimeTravel: Invariant = ({ now }, { effects }) => [
 ];
 
 /** A claim is warned no earlier than warnsAt, and lapses no earlier than lapsesAt. */
-const deadlinesKept: Invariant = ({ before, now }, { state }) => {
-  const entered = tagOf(state) !== tagOf(before);
-
-  return Option.match(held(state), {
+const deadlinesKept: Invariant = ({ before, now }, { state }) =>
+  Option.match(held(state), {
     onNone: () => [],
     onSome: (claim) => [
-      ...(entered && tagOf(state) === "Warned" && ms(now) < ms(claim.warnsAt)
+      ...(ClaimState.guards.Warned(state) &&
+      !ClaimState.guards.Warned(before) &&
+      ms(now) < ms(claim.warnsAt)
         ? ["warned before warnsAt"]
         : []),
-      ...(entered && tagOf(state) === "Lapsed" && ms(now) < ms(claim.lapsesAt)
+      ...(ClaimState.guards.Lapsed(state) &&
+      !ClaimState.guards.Lapsed(before) &&
+      ms(now) < ms(claim.lapsesAt)
         ? ["lapsed before lapsesAt"]
         : []),
     ],
   });
-};
+
+/**
+ * A claim that moves into or within live sets the alarm for its next
+ * deadline (warnsAt while live, lapsesAt once warned): deadlines run on
+ * alarms, so a claim with none would never lapse.
+ */
+const alarmsNextDeadline: Invariant = ({ before }, { effects, state }) =>
+  Option.match(live(state), {
+    onNone: () => [],
+    onSome: (claim) => {
+      const next = ClaimState.guards.Warned(state)
+        ? claim.lapsesAt
+        : claim.warnsAt;
+
+      return same(before, state) ||
+        effects
+          .filter(ClaimEffect.$is("SetAlarm"))
+          .some((alarm) => ms(alarm.at) === ms(next))
+        ? []
+        : [
+            `a claim moved to ${state._tag} sets no alarm for its next deadline`,
+          ];
+    },
+  });
 
 /** Answered never changes; Released changes only by a fresh claim. */
 const endsAreFinal: Invariant = ({ before, command }, { state }) => [
-  ...(tagOf(before) === "Answered" && !same(before, state)
+  ...(ClaimState.guards.Answered(before) && !same(before, state)
     ? ["Answered is terminal"]
     : []),
-  ...(tagOf(before) === "Released" &&
+  ...(ClaimState.guards.Released(before) &&
   !same(before, state) &&
-  !(ClaimCommand.guards.Claim(command) && tagOf(state) === "Live")
+  !(ClaimCommand.guards.Claim(command) && ClaimState.guards.Live(state))
     ? ["Released changes only by a fresh claim"]
     : []),
 ];
 
 const invariants: readonly Invariant[] = [
-  progresses,
   pushesRenew,
   forksOnlyNewClaims,
   revokesWhenLiveEnds,
   deadlinesCount,
   noTimeTravel,
   deadlinesKept,
+  alarmsNextDeadline,
   endsAreFinal,
 ];
 
-/** Names every invariant one call broke. */
-const brokenBy = (
-  call: Call,
-  result: Result.Result<ClaimStep, ClaimRefusal>
-): readonly string[] =>
-  Result.match(result, {
-    onFailure: (refusal) => brokenByRefusal(call, refusal),
+/**
+ * Names everything one call broke: who may claim, push and release, then,
+ * when it went through, every invariant of the step it took.
+ */
+const brokenBy = (call: Call, result: ClaimResult): readonly string[] => [
+  ...claimsAsOwed(call, result),
+  ...holderOnly(call, result),
+  ...Result.match(result, {
+    onFailure: () => [],
     onSuccess: (done) =>
       invariants.flatMap((invariant) => invariant(call, done)),
-  });
+  }),
+];
 
 /** The ask's claim states, by slot: the claimant's handle, or `ask` when shared. */
 type Slots = ReadonlyMap<string, ClaimState>;
@@ -425,14 +532,14 @@ const commandsFor = (
         slotOf(layout, who),
         ClaimCommand.cases.Claim.make({
           base,
-          blockedBy: made === "blocked" ? [blocker] : [],
+          blockedBy: made.blocked ? [blocker] : [],
           cap,
-          denounced: made === "denounced",
-          heldByWho: made === "atCap" ? cap : 0,
+          denounced: made.denounced,
+          heldByWho: made.atCap ? cap : 0,
           liveCount: liveOutside(slots, slotOf(layout, who)),
           project,
           race: raceOf(layout),
-          vouched: made !== "unvouched",
+          vouched: !made.unvouched,
           who: Person.make({ handle: Handle.make(who) }),
         })
       ),
@@ -466,7 +573,7 @@ const overdue = (now: DateTime.Utc, state: ClaimState) =>
       return Option.some("an alarm left a claim past lapsesAt");
     }
 
-    return tagOf(state) === "Live" && ms(now) >= ms(claim.warnsAt)
+    return ClaimState.guards.Live(state) && ms(now) >= ms(claim.warnsAt)
       ? Option.some("an alarm left a claim unwarned past warnsAt")
       : Option.none();
   });
