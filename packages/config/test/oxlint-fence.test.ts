@@ -3,11 +3,10 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Path, Random, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
+import { noEffectSleepInProject } from "../../../tools/oxlint/fence/rules/no-effect-sleep-in-project.ts";
 import { noManualEffectRuntimeInTests } from "../../../tools/oxlint/fence/rules/no-manual-effect-runtime-in-tests.ts";
 import { noModuleLevelMutableState } from "../../../tools/oxlint/fence/rules/no-module-level-mutable-state.ts";
-
-// Vitest runs in the package's folder, two below the repo root.
-const repoRoot = Effect.map(Path.Path, (path) => path.resolve("..", ".."));
+import { repoRoot } from "./root.ts";
 
 const fixtures = "tools/oxlint/fence/fixtures";
 
@@ -32,7 +31,11 @@ const ruleId = (code: string) =>
 
 /** Each message text the fence rules can report, mapped back to its id. */
 const messageIds = new Map(
-  [noManualEffectRuntimeInTests, noModuleLevelMutableState].flatMap((rule) =>
+  [
+    noEffectSleepInProject,
+    noManualEffectRuntimeInTests,
+    noModuleLevelMutableState,
+  ].flatMap((rule) =>
     Object.entries(rule.meta?.messages ?? {}).map(([id, text]) => [text, id])
   )
 );
@@ -146,13 +149,52 @@ describe("fence/no-manual-effect-runtime-in-tests", () => {
   );
 });
 
+const sleepAt = (file: string, line: number) => ({
+  file,
+  line,
+  messageId: "sleeps",
+  ruleId: "fence/no-effect-sleep-in-project",
+  severity: "error",
+});
+
+describe("fence/no-effect-sleep-in-project", () => {
+  it.live(
+    "flags Effect.sleep and Effect.delay in packages/project/src, and nothing in its tests, other packages or other objects",
+    () =>
+      Effect.gen(function* () {
+        const { files, findings } = yield* lint(
+          `${fixtures}/oxlint.json`,
+          fixtures,
+          [
+            "packages/project/src/bad-sleep.ts",
+            "packages/project/src/good-sleep.ts",
+            "packages/project/test/sleep.test.ts",
+            "packages/demo/src/sleeps.ts",
+          ]
+        );
+
+        expect(files).toBe(4);
+        expect(findings).toStrictEqual([
+          sleepAt("packages/project/src/bad-sleep.ts", 2),
+          sleepAt("packages/project/src/bad-sleep.ts", 2),
+          sleepAt("packages/project/src/bad-sleep.ts", 4),
+          sleepAt("packages/project/src/bad-sleep.ts", 5),
+          sleepAt("packages/project/src/bad-sleep.ts", 6),
+        ]);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+});
+
 describe("the fence messages", () => {
-  it("say why module state is refused, and what a test runs Effects with", () => {
+  it("say why module state is refused, what a test runs Effects with, and where a deadline goes", () => {
     expect(noModuleLevelMutableState.meta?.messages?.moduleState).toContain(
       "Worker isolate"
     );
     expect(noManualEffectRuntimeInTests.meta?.messages?.manualRunner).toMatch(
       /it\.effect\(.*it\.layer\(/u
+    );
+    expect(noEffectSleepInProject.meta?.messages?.sleeps).toContain(
+      "Durable Object alarm"
     );
   });
 });
@@ -180,9 +222,15 @@ describe("the root lint config", () => {
           Effect.orDie(fs.remove(directory, { recursive: true }))
         );
 
+        // The sleep rule guards one package by name, so its copy keeps the
+        // `packages/project/src/` shape inside the temporary package.
         const copies = [
           ["packages/demo/src/bad-state.ts", "src/state.ts"],
           ["packages/demo/test/bad-runtime.test.ts", "test/runtime.test.ts"],
+          [
+            "packages/project/src/bad-sleep.ts",
+            "packages/project/src/sleep.ts",
+          ],
         ] as const;
 
         for (const [fixture, copy] of copies) {
@@ -198,8 +246,13 @@ describe("the root lint config", () => {
           copies.map(([, copy]) => copy)
         );
 
-        expect(files).toBe(2);
+        expect(files).toBe(3);
         expect(findings).toStrictEqual([
+          sleepAt("packages/project/src/sleep.ts", 2),
+          sleepAt("packages/project/src/sleep.ts", 2),
+          sleepAt("packages/project/src/sleep.ts", 4),
+          sleepAt("packages/project/src/sleep.ts", 5),
+          sleepAt("packages/project/src/sleep.ts", 6),
           moduleStateAt("src/state.ts", 3),
           moduleStateAt("src/state.ts", 6),
           manualRunnerAt("test/runtime.test.ts", 5),

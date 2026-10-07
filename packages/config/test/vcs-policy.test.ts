@@ -1,14 +1,17 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Path, Schema, Stream } from "effect";
+import { Effect, FileSystem, Path, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
+import vcsPolicy from "../../../.pi/extensions/vcs-policy/index.ts";
+import type { PiApi } from "../../../.pi/extensions/vcs-policy/index.ts";
 import {
   Decision,
   decide,
   reasons,
 } from "../../../scripts/hooks/lib/policy.ts";
 import type { Rule } from "../../../scripts/hooks/lib/policy.ts";
+import { repoRoot } from "./root.ts";
 
 /** What a row expects: the command runs, or the rule that refuses it. */
 type Verdict = "Allow" | Rule;
@@ -299,9 +302,6 @@ describe(decide, () => {
   });
 });
 
-// Vitest runs in the package's folder, two below the repo root.
-const repoRoot = Effect.map(Path.Path, (path) => path.resolve("..", ".."));
-
 interface Ran {
   readonly exitCode: number;
   readonly stdout: string;
@@ -431,5 +431,88 @@ describe("the hook adapter", () => {
         expect(ran.stderr).toContain("could not read");
       }
     })
+  );
+});
+
+/**
+ * Calls the pi extension's `tool_call` handler as pi would, through a
+ * stand-in for pi's API, and returns what the handler answers.
+ */
+const piToolCall = (
+  toolName: string,
+  input: Readonly<Record<string, string>>
+) => {
+  const handlers: Parameters<PiApi["on"]>[1][] = [];
+
+  vcsPolicy({ on: (_event, handler) => handlers.push(handler) });
+
+  return handlers.map((handler) => handler({ input, toolName }));
+};
+
+const CLOSED_READ =
+  "vcs-policy refused this read (closed-env-read): Never read .env, .env.local or .env.*.local, even in a recursive search (rg and git grep skip them); run bun run env:check.";
+
+describe("pi's own file tools", () => {
+  it("block a read, an edit or a grep of a closed env file", () => {
+    for (const [tool, input] of [
+      ["read", { path: ".env" }],
+      ["read", { path: "infra/.env.local" }],
+      ["read", { path: "/repo/apps/platform/.env.production.local" }],
+      ["edit", { path: "infra/.env.local" }],
+      ["grep", { path: ".env", pattern: "TOKEN" }],
+    ] as const) {
+      expect(piToolCall(tool, input)).toStrictEqual([
+        { block: true, reason: CLOSED_READ },
+      ]);
+    }
+  });
+
+  it("pass the schema, other files, and tools that name no closed file", () => {
+    for (const [tool, input] of [
+      ["read", { path: ".env.schema" }],
+      ["read", { path: "apps/platform/.env.schema" }],
+      ["read", { path: "AGENTS.md" }],
+      ["grep", { pattern: "TOKEN" }],
+      ["ls", { path: "infra" }],
+    ] as const) {
+      expect(piToolCall(tool, input)).toStrictEqual([undefined]);
+    }
+  });
+
+  it("still judge pi's bash tool by the policy", () => {
+    expect(piToolCall("bash", { command: "git push" })).toStrictEqual([
+      {
+        block: true,
+        reason: `vcs-policy refused this command (push): ${PUSH}`,
+      },
+    ]);
+  });
+});
+
+const ClaudeSettings = Schema.fromJsonString(
+  Schema.Struct({
+    permissions: Schema.optionalKey(
+      Schema.Struct({ deny: Schema.Array(Schema.String) })
+    ),
+  })
+);
+
+describe("Claude Code's own file tools", () => {
+  it.live("are denied the closed env files by the project settings", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* repoRoot;
+
+      const settings = yield* fs
+        .readFileString(path.join(root, ".claude/settings.json"))
+        .pipe(Effect.flatMap(Schema.decodeEffect(ClaudeSettings)));
+
+      expect(settings.permissions?.deny).toStrictEqual([
+        "Read(**/.env)",
+        "Read(**/.env.local)",
+        "Read(**/.env.*.local)",
+      ]);
+    }).pipe(Effect.provide(NodeServices.layer))
   );
 });

@@ -17,9 +17,7 @@ import {
   tally,
   Verdict,
 } from "../../../scripts/lib/debt.ts";
-
-// Vitest runs in the package's folder, two below the repo root.
-const repoRoot = Effect.map(Path.Path, (path) => path.resolve("..", ".."));
+import { repoRoot } from "./root.ts";
 
 const baseline: Baseline = {
   "@effect-diagnostics": 0,
@@ -248,7 +246,7 @@ describe("the debt ledger rule", () => {
   // The fixture sits where the debt config ignores it, so the real count
   // never sees it. A copy outside the repo is linted with that same config.
   it.live(
-    "reads every kind, and a reason only after ` -- ` on the directive's line",
+    "reads every kind, a reason only after ` -- ` on the directive's line, and an escape no disable comment can hide",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -280,8 +278,9 @@ describe("the debt ledger rule", () => {
           at(4, "@ts-nocheck", "@ts-nocheck"),
           at(9, "oxlint-disable", "oxlint-disable-next-line no-console"),
           at(14, "@effect-diagnostics", effectDirective),
-          at(19, "@ts-expect-error", "@ts-expect-error --"),
+          at(19, "@ts-expect-error", "@ts-expect-error"),
           at(24, "@ts-ignore", "@ts-ignore"),
+          at(36, "@ts-ignore", "@ts-ignore"),
         ];
 
         expect(ledger).toStrictEqual([
@@ -310,15 +309,35 @@ describe("the debt ledger rule", () => {
           without[3],
           at(22, "@ts-ignore", "@ts-ignore", "the fixture ignores it"),
           without[4],
+          at(
+            27,
+            "oxlint-disable",
+            "eslint-disable-next-line no-console",
+            "oxlint honours eslint's name too"
+          ),
+          at(
+            32,
+            "@ts-ignore",
+            "@ts-ignore",
+            "a directive at a doc line's start still counts"
+          ),
+          at(34, "oxlint-disable", "oxlint-disable-line", "hides its own line"),
+          at(
+            35,
+            "oxlint-disable",
+            "oxlint-disable",
+            "a file-wide disable hides nothing from the ledger"
+          ),
+          without[5],
         ]);
 
         expect(
           judge(ledger, {
             "@effect-diagnostics": 2,
             "@ts-expect-error": 2,
-            "@ts-ignore": 2,
+            "@ts-ignore": 4,
             "@ts-nocheck": 2,
-            "oxlint-disable": 2,
+            "oxlint-disable": 5,
           })
         ).toStrictEqual(Verdict.Rose({ rises: [], unreasoned: without }));
       }).pipe(Effect.provide(NodeServices.layer))

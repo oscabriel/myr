@@ -1,6 +1,6 @@
 # The fence plugin's upstreams
 
-The `fence` plugin holds the repo's own lint rules. Three are ports; each file keeps a header naming its source. They are ours to change, and upstream is never synced in. Licence texts are in `LICENSES/`.
+The `fence` plugin holds the repo's own lint rules. Three are ports; each file keeps a header naming its source. The fourth, `no-effect-sleep-in-project` (AGENTS.md principle 12), is ours and has no upstream. They are ours to change, and upstream is never synced in. Licence texts are in `LICENSES/`.
 
 | Rule | Upstream | Commit | Licence |
 | --- | --- | --- | --- |
@@ -15,6 +15,7 @@ The `fence` plugin holds the repo's own lint rules. Three are ports; each file k
 - Only this rule is ported from `oxlint-plugin-patterns.ts`. Its other rules (`acquire-release-constructs-in-acquire-body`, `contract-binding-matches-name`, `watch-effect-actors`) are not, by the AGENTS.md rejections.
 - A named export registered in the `fence` plugin, not upstream's `rat-stack-patterns` plugin.
 - `workspacePath` reads the path string alone. Upstream made the path relative to a repo root it found from its own location (`import.meta.dirname` and `node:path`, under a `nodeBuiltinImport` escape). Ours strips oxlint's working directory (`context.cwd`) by string, then finds the whole `(apps|packages)/<name>/src/` shape anywhere in what is left. A copy of that layout anywhere (the fixtures under `fixtures/packages/`, a temporary tree) counts as runtime source, and a folder named `apps` or `packages` above the checkout does not. No `node:path` import, so no escape.
+- `workspacePath` is exported, so `no-effect-sleep-in-project` finds a file's workspace the same way.
 - `isRuntimeSource` drops upstream's `.svelte` exclusion: this repo has no Svelte.
 - A `declare let` or `declare var` is skipped: it is ambient and holds no state.
 - Kept as upstream wrote them: the `let` check by scope (`module` or `global`), `isModuleScopedVar` for a hoisted `var`, the `moduleState` message id and its text, and the rule's description.
@@ -32,4 +33,4 @@ See its row in `PROVENANCE.md` (issue 101).
 
 ## Tests
 
-`packages/config/test/oxlint-fence.test.ts` runs the real oxlint binary over `fixtures/` with `fixtures/oxlint.json` (the fence plugin, both rules at error, every category off) and checks each rule's `{ruleId, line, messageId}` on a bad fixture and silence on a good one: an ambient `declare let`, a `var` that hoists only to its function, and an Effect run by hand in `src/`. It also lints a temporary copy of the bad fixtures with the root `oxlint.config.ts`, laid out as a package of its own (`packages/oxlint-fence-<id>.log/{src,test}`, gitignored), so a config change that switches a rule off for the files it guards fails the test, through an anchored glob such as `packages/*/src/**` too. Root lint, format and typecheck ignore `fixtures/`, so each fixture keeps the faults its test points at.
+`packages/config/test/oxlint-fence.test.ts` runs the real oxlint binary over `fixtures/` with `fixtures/oxlint.json` (the fence plugin, its three lint rules at error, every category off) and checks each rule's `{ruleId, line, messageId}` on a bad fixture and silence on a good one: an ambient `declare let`, a `var` that hoists only to its function, an Effect run by hand in `src/`, and `Effect.sleep` in a test or in another package. It also lints a temporary copy of the bad fixtures with the root `oxlint.config.ts`, laid out as a package of its own (`packages/oxlint-fence-<id>.log/{src,test}`, gitignored, with the sleep fixture under `packages/project/src/` inside it), so a config change that switches a rule off for the files it guards fails the test, through an anchored glob such as `packages/*/src/**` too. Root lint, format and typecheck ignore `fixtures/`, so each fixture keeps the faults its test points at.

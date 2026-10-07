@@ -1,2 +1,2 @@
-Blocks a bash tool call the hook policy refuses (hook bypasses, `git push`, deletes, cf's project commands, reads of the closed `.env` files), with the policy's reason; the policy is `scripts/hooks/lib/policy.ts`, shared with the Claude Code and Cursor hooks.
+Blocks a bash tool call the hook policy refuses (hook bypasses, `git push`, deletes, cf's project commands, reads of the closed `.env` files), and a `read`, `edit` or `grep` of a closed `.env` file, with the policy's reason; the policy is `scripts/hooks/lib/policy.ts`, shared with the Claude Code and Cursor hooks.
 pi loads it from `.pi/extensions/vcs-policy/index.ts` when it starts in this repo and the project is trusted; it needs `bun install` first, since the policy imports `effect`.

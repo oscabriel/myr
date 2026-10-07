@@ -98,6 +98,8 @@ export default defineConfig({
     "anti-slop/no-widen-then-assert": "error",
     "anti-slop/require-readable-spacing": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
+    // The rule guards packages/project/src only (AGENTS.md principle 12).
+    "fence/no-effect-sleep-in-project": "error",
     "fence/no-manual-effect-runtime-in-tests": "error",
     "fence/no-module-level-mutable-state": "error",
     // Effect: `Effect.gen(function* () {…})`; `Effect.fn("name")` names spans.

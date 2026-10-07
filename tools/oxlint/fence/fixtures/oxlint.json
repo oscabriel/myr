@@ -10,6 +10,7 @@
   },
   "jsPlugins": [{ "name": "fence", "specifier": "../index.ts" }],
   "rules": {
+    "fence/no-effect-sleep-in-project": "error",
     "fence/no-manual-effect-runtime-in-tests": "error",
     "fence/no-module-level-mutable-state": "error"
   }

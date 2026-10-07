@@ -63,10 +63,13 @@ export const ledgerArgs: readonly string[] = [
   "json",
 ];
 
-// The rule's message is itself JSON: `{directive, kind, reason?}`.
+// The rule's message is itself JSON: `{directive, kind, line, reason?}`. The
+// rule reports every escape at the file's first offset, where no disable
+// comment can hide it, so the escape's own line travels in the message.
 const Directive = Schema.Struct({
   directive: Schema.String,
   kind: Kind,
+  line: Schema.Int,
   reason: Schema.optionalKey(Schema.String),
 });
 
@@ -74,9 +77,6 @@ const OxlintReport = Schema.Struct({
   diagnostics: Schema.Array(
     Schema.Struct({
       filename: Schema.String,
-      labels: Schema.NonEmptyArray(
-        Schema.Struct({ span: Schema.Struct({ line: Schema.Int }) })
-      ),
       message: Schema.fromJsonString(Directive),
     })
   ),
@@ -95,11 +95,11 @@ export const ledgerFromOxlintJson = (
   Schema.decodeEffect(Schema.fromJsonString(OxlintReport))(json).pipe(
     Effect.map(({ diagnostics }) =>
       diagnostics
-        .map(({ filename, labels, message }) => {
+        .map(({ filename, message }) => {
           const entry = {
             directive: message.directive,
             kind: message.kind,
-            line: labels[0].span.line,
+            line: message.line,
             path: filename,
           };
 

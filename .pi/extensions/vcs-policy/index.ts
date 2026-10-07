@@ -2,13 +2,20 @@
 // (MIT, LICENSES/rat-stack.MIT.txt). Changes are listed in PROVENANCE.md.
 /**
  * pi's side of the hook policy: before pi's bash tool runs a command, ask
- * `decide`, and block a refused command with its reason. The types below are
+ * `decide`, and block a refused command with its reason. pi's own `read`,
+ * `edit` and `grep` tools are blocked from the closed env files the policy
+ * keeps shell reads away from. The types below are
  * the slice of pi's extension API this file uses, checked against pi 1.0.4's
  * `dist/core/extensions/types.d.ts`; pi itself is not a dependency here.
  */
 import { Option, Schema } from "effect";
 
-import { Decision, decide } from "../../../scripts/hooks/lib/policy.ts";
+import {
+  Decision,
+  decide,
+  isClosedEnvPath,
+  reasons,
+} from "../../../scripts/hooks/lib/policy.ts";
 
 /** pi's `ToolCallEvent`, as far as this extension reads it. */
 interface ToolCall {
@@ -33,6 +40,17 @@ export interface PiApi {
 /** pi's `BashToolInput`, as far as the policy reads it. */
 const BashInput = Schema.Struct({ command: Schema.String });
 
+/** pi's `read`, `edit` and `grep` inputs, as far as the policy reads them. */
+const PathInput = Schema.Struct({ path: Schema.optionalKey(Schema.String) });
+
+/** pi's tools that open a file's contents at their `path`. */
+const READERS: ReadonlySet<string> = new Set(["edit", "grep", "read"]);
+
+const CLOSED_READ: Block = {
+  block: true,
+  reason: `vcs-policy refused this read (closed-env-read): ${reasons["closed-env-read"]}`,
+};
+
 const UNREADABLE: Block = {
   block: true,
   reason:
@@ -50,15 +68,25 @@ const blockFor = (command: string): Block | undefined => {
     : undefined;
 };
 
+const readBlockFor = (input: Readonly<Record<string, unknown>>) =>
+  Option.match(Schema.decodeOption(PathInput)(input), {
+    // pi decodes its own tool input; a path this can't read is pi's to refuse.
+    onNone: () => undefined,
+    onSome: ({ path }) =>
+      path !== undefined && isClosedEnvPath(path) ? CLOSED_READ : undefined,
+  });
+
 const vcsPolicy = (pi: PiApi) => {
-  pi.on("tool_call", (event) =>
-    event.toolName === "bash"
-      ? Option.match(Schema.decodeUnknownOption(BashInput)(event.input), {
-          onNone: () => UNREADABLE,
-          onSome: ({ command }) => blockFor(command),
-        })
-      : undefined
-  );
+  pi.on("tool_call", (event) => {
+    if (event.toolName === "bash") {
+      return Option.match(Schema.decodeUnknownOption(BashInput)(event.input), {
+        onNone: () => UNREADABLE,
+        onSome: ({ command }) => blockFor(command),
+      });
+    }
+
+    return READERS.has(event.toolName) ? readBlockFor(event.input) : undefined;
+  });
 };
 
 export default vcsPolicy;

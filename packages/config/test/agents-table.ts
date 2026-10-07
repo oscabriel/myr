@@ -26,6 +26,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import type { DummyRule, OxlintConfig } from "oxlint";
 
 import oxlintConfig from "../../../oxlint.config.ts";
+import { repoRoot } from "./root.ts";
 
 /** What the repo holds that a "Held by" cell may name. */
 export interface Repo {
@@ -428,8 +429,7 @@ export const readAgentsTable = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  // Vitest runs in the package's folder, two below the repo root.
-  const root = path.resolve("..", "..");
+  const root = yield* repoRoot;
   const read = (file: string) => fs.readFileString(path.join(root, file));
 
   const lsFiles = (...args: readonly string[]) =>

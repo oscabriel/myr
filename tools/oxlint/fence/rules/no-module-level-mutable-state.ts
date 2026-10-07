@@ -11,7 +11,7 @@ import type { ESTree } from "@oxlint/plugins";
  * is made relative to oxlint's working directory first, so the folders above
  * the one oxlint runs from never match.
  */
-const workspacePath = (filename: string, cwd: string) => {
+export const workspacePath = (filename: string, cwd: string) => {
   const slashed = filename.replaceAll("\\", "/");
   const root = `${cwd.replaceAll("\\", "/")}/`;
 

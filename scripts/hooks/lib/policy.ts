@@ -321,6 +321,13 @@ const CLOSED_SAMPLES = [
 const isClosedName = (name: string) =>
   name === ".env" || name === ".env.local" || /^\.env\..+\.local$/u.test(name);
 
+/**
+ * Whether a harness's own file tool (pi's `read`, say) would open a closed env
+ * file at `path`. The shell rule above judges commands; this one judges a path.
+ */
+export const isClosedEnvPath = (path: string) =>
+  isClosedName(basename(path.replace(/\/+$/u, "")));
+
 const GLOB = /[*?[]/u;
 
 const REGEXP_SPECIAL = /[$()*+.?[\\\]^{|}]/u;

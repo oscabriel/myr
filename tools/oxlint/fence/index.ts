@@ -6,6 +6,7 @@
 import { definePlugin } from "@oxlint/plugins";
 
 import { debtLedger } from "./rules/debt-ledger.ts";
+import { noEffectSleepInProject } from "./rules/no-effect-sleep-in-project.ts";
 import { noManualEffectRuntimeInTests } from "./rules/no-manual-effect-runtime-in-tests.ts";
 import { noModuleLevelMutableState } from "./rules/no-module-level-mutable-state.ts";
 
@@ -13,6 +14,7 @@ export default definePlugin({
   meta: { name: "fence" },
   rules: {
     "debt-ledger": debtLedger,
+    "no-effect-sleep-in-project": noEffectSleepInProject,
     "no-manual-effect-runtime-in-tests": noManualEffectRuntimeInTests,
     "no-module-level-mutable-state": noModuleLevelMutableState,
   },

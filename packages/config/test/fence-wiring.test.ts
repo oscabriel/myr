@@ -14,9 +14,7 @@ import {
 } from "../../../scripts/lib/debt.ts";
 import { drift, generate, Refusal } from "../../../scripts/lib/gen.ts";
 import { findViolations } from "../../../scripts/lib/imports.ts";
-
-// Vitest runs in the package's folder, two below the repo root.
-const repoRoot = Effect.map(Path.Path, (path) => path.resolve("..", ".."));
+import { repoRoot } from "./root.ts";
 
 const readRootJson = <S extends Schema.Top>(file: string, schema: S) =>
   Effect.gen(function* () {
@@ -32,9 +30,16 @@ const RootPackage = Schema.Struct({
   scripts: Schema.Struct({ verify: Schema.String }),
 });
 
-/** What `fence/debt-ledger` reports as one diagnostic's message. */
-const message = (directive: string, kind: string, reason?: string) =>
-  JSON.stringify({ directive, kind, reason });
+/**
+ * What `fence/debt-ledger` reports as one diagnostic's message. The rule
+ * reports at the file's first offset, so the escape's line is in the message.
+ */
+const message = (
+  directive: string,
+  kind: string,
+  line: number,
+  reason?: string
+) => JSON.stringify({ column: 3, directive, kind, line, reason });
 
 const entry = (kind: Kind, line: number) => ({
   directive: kind,
@@ -90,51 +95,54 @@ describe("the debt count", () => {
     }).pipe(Effect.provide(NodeServices.layer))
   );
 
-  it.effect("reads each directive from oxlint's JSON report", () =>
-    Effect.gen(function* () {
-      const report = JSON.stringify({
-        diagnostics: [
+  it.effect(
+    "reads each directive, and its line, from oxlint's JSON report",
+    () =>
+      Effect.gen(function* () {
+        const report = JSON.stringify({
+          diagnostics: [
+            {
+              code: "fence(debt-ledger)",
+              filename: "packages/x/src/a.ts",
+              labels: [{ span: { column: 1, length: 0, line: 1, offset: 0 } }],
+              message: message(
+                "oxlint-disable-next-line no-console",
+                "oxlint-disable",
+                12,
+                "the CLI prints"
+              ),
+              severity: "error",
+            },
+            {
+              code: "fence(debt-ledger)",
+              filename: "packages/x/test/b.test.ts",
+              labels: [{ span: { column: 1, length: 0, line: 1, offset: 0 } }],
+              message: message("@ts-nocheck", "@ts-nocheck", 1),
+              severity: "error",
+            },
+          ],
+          number_of_files: 2,
+          number_of_rules: 1,
+        });
+
+        const ledger = yield* ledgerFromOxlintJson(report);
+
+        expect(ledger).toStrictEqual([
           {
-            code: "fence(debt-ledger)",
-            filename: "packages/x/src/a.ts",
-            labels: [{ span: { column: 3, length: 0, line: 12, offset: 99 } }],
-            message: message(
-              "oxlint-disable-next-line no-console",
-              "oxlint-disable",
-              "the CLI prints"
-            ),
-            severity: "error",
+            directive: "oxlint-disable-next-line no-console",
+            kind: "oxlint-disable",
+            line: 12,
+            path: "packages/x/src/a.ts",
+            reason: "the CLI prints",
           },
           {
-            code: "fence(debt-ledger)",
-            filename: "packages/x/test/b.test.ts",
-            labels: [{ span: { column: 1, length: 0, line: 1, offset: 0 } }],
-            message: message("@ts-nocheck", "@ts-nocheck"),
-            severity: "error",
+            directive: "@ts-nocheck",
+            kind: "@ts-nocheck",
+            line: 1,
+            path: "packages/x/test/b.test.ts",
           },
-        ],
-        number_of_files: 2,
-        number_of_rules: 1,
-      });
-
-      const ledger = yield* ledgerFromOxlintJson(report);
-
-      expect(ledger).toStrictEqual([
-        {
-          directive: "oxlint-disable-next-line no-console",
-          kind: "oxlint-disable",
-          line: 12,
-          path: "packages/x/src/a.ts",
-          reason: "the CLI prints",
-        },
-        {
-          directive: "@ts-nocheck",
-          kind: "@ts-nocheck",
-          line: 1,
-          path: "packages/x/test/b.test.ts",
-        },
-      ]);
-    })
+        ]);
+      })
   );
 
   it.effect("refuses a report that is not oxlint's JSON", () =>
@@ -190,6 +198,7 @@ describe("the lint config", () => {
 
     expect(oxlintConfig.jsPlugins).toContainEqual(fence);
     expect(oxlintConfig.rules).toMatchObject({
+      "fence/no-effect-sleep-in-project": "error",
       "fence/no-manual-effect-runtime-in-tests": "error",
       "fence/no-module-level-mutable-state": "error",
     });
