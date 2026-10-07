@@ -6,9 +6,10 @@ import { Tool, Toolkit } from "effect/ai";
 import type { Rpc, RpcClient, RpcClientError, RpcGroup } from "effect/rpc";
 
 import { Description } from "./annotations.ts";
+import type { Unauthenticated } from "./principal.ts";
 
-/** How a call can fail on its way to the handler and back. */
-type TransportError = RpcClientError.RpcClientError;
+/** How a call can fail before its handler runs: in transit, or unauthenticated. */
+type CallError = RpcClientError.RpcClientError | Unauthenticated;
 
 /** The tool an Rpc becomes: its payload as parameters, its errors as failures. */
 export type ToolOf<R extends Rpc.Any> =
@@ -56,7 +57,7 @@ const toTool = (rpc: Rpc.AnyWithProps) =>
  */
 export const toToolkit = <Rpcs extends Rpc.AnyWithProps, R>(
   group: RpcGroup.RpcGroup<Rpcs>,
-  client: Effect.Effect<RpcClient.RpcClient<Rpcs, TransportError>, never, R>
+  client: Effect.Effect<RpcClient.RpcClient<Rpcs, CallError>, never, R>
 ): ToolkitProjection<Rpcs, R> => {
   const rpcs = [...group.requests.values()];
 
@@ -74,10 +75,7 @@ export const toToolkit = <Rpcs extends Rpc.AnyWithProps, R>(
           string,
           (
             payload: Rpc.Payload<Rpcs>
-          ) => Effect.Effect<
-            Rpc.Success<Rpcs>,
-            Rpc.Error<Rpcs> | TransportError
-          >
+          ) => Effect.Effect<Rpc.Success<Rpcs>, Rpc.Error<Rpcs> | CallError>
         >
       >;
 

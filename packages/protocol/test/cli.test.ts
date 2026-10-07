@@ -10,7 +10,7 @@ import { toCommand } from "../src/cli.ts";
 import { Client, Contracts, ListAsks, SubmitAnswer } from "../src/contracts.ts";
 import { CommitSha } from "../src/ids.ts";
 import { StaleBase } from "../src/refusal.ts";
-import { ask, base, main, path } from "./examples.ts";
+import { asTester, ask, base, main, path } from "./examples.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
 
@@ -56,7 +56,7 @@ const run = <Name extends string, Input, E, R, ContextInput>(
         TestConsole.layer,
         CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
         Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
-          Layer.provide(handlers)
+          Layer.provide([handlers, asTester])
         )
       ).pipe(Layer.provideMerge(NodeServices.layer))
     )

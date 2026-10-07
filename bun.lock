@@ -20,6 +20,36 @@
         "varlock": "1.21.1",
       },
     },
+    "apps/cli": {
+      "name": "@repo/cli",
+      "dependencies": {
+        "@repo/brand": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "4.0.1",
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "apps/platform": {
+      "name": "@repo/platform",
+      "dependencies": {
+        "@repo/brand": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "5.20261006.1",
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/artifacts": {
       "name": "@repo/artifacts",
       "dependencies": {
@@ -331,9 +361,13 @@
 
     "@repo/brand": ["@repo/brand@workspace:packages/brand"],
 
+    "@repo/cli": ["@repo/cli@workspace:apps/cli"],
+
     "@repo/config": ["@repo/config@workspace:packages/config"],
 
     "@repo/git": ["@repo/git@workspace:packages/git"],
+
+    "@repo/platform": ["@repo/platform@workspace:apps/platform"],
 
     "@repo/protocol": ["@repo/protocol@workspace:packages/protocol"],
 

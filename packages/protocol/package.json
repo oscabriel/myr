@@ -8,6 +8,7 @@
     "./ids": "./src/ids.ts",
     "./mcp": "./src/mcp.ts",
     "./posture": "./src/posture.ts",
+    "./principal": "./src/principal.ts",
     "./refusal": "./src/refusal.ts",
     "./render": "./src/render.ts"
   },

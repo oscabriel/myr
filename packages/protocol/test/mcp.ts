@@ -6,6 +6,7 @@ import { RpcTest } from "effect/rpc";
 
 import { Client, Contracts } from "../src/contracts.ts";
 import { toToolkit } from "../src/mcp.ts";
+import { asTester } from "./examples.ts";
 
 const endpoint = "http://localhost/mcp";
 
@@ -53,7 +54,7 @@ export const serve = Effect.fnUntraced(function* (
   const app = McpServer.toolkit(projection.toolkit).pipe(
     Layer.provideMerge(projection.layer),
     Layer.provide(Layer.effect(Client)(RpcTest.makeClient(Contracts))),
-    Layer.provide(handlers),
+    Layer.provide([handlers, asTester]),
     Layer.provide(
       McpServer.layerHttp({
         name: "test",

@@ -13,11 +13,12 @@ import { Argument, Command, Flag } from "effect/cli";
 import type { Rpc, RpcClient, RpcClientError } from "effect/rpc";
 
 import { Description } from "./annotations.ts";
+import type { Unauthenticated } from "./principal.ts";
 import { Refusal } from "./refusal.ts";
 import { explain } from "./render.ts";
 
-/** How a call can fail on its way to the handler and back. */
-type TransportError = RpcClientError.RpcClientError;
+/** How a call can fail before its handler runs: in transit, or unauthenticated. */
+type CallError = RpcClientError.RpcClientError | Unauthenticated;
 
 /** A schema that needs no services to decode or encode, as every wire schema is. */
 type Plain = Schema.Top & {
@@ -199,11 +200,7 @@ const report = (refusal: Refusal, json: boolean) =>
  */
 export const toCommand = <R extends CommandRpc, Requirements>(
   rpc: R,
-  client: Effect.Effect<
-    RpcClient.RpcClient<R, TransportError>,
-    never,
-    Requirements
-  >,
+  client: Effect.Effect<RpcClient.RpcClient<R, CallError>, never, Requirements>,
   options?: ToCommandOptions<Rpc.Success<R>>
 ) => {
   const positional = new Set(options?.positional);
@@ -235,7 +232,7 @@ export const toCommand = <R extends CommandRpc, Requirements>(
       parsed
     ): Effect.Effect<
       void,
-      Schema.SchemaError | Rpc.Error<R> | TransportError,
+      Schema.SchemaError | Rpc.Error<R> | CallError,
       Requirements
     > =>
       Effect.gen(function* () {
@@ -255,7 +252,7 @@ export const toCommand = <R extends CommandRpc, Requirements>(
             string,
             (
               decoded: typeof payload
-            ) => Effect.Effect<Rpc.Success<R>, Rpc.Error<R> | TransportError>
+            ) => Effect.Effect<Rpc.Success<R>, Rpc.Error<R> | CallError>
           >
         >;
 

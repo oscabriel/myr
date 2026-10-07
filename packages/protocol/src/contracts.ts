@@ -4,6 +4,7 @@ import type { RpcClient, RpcClientError } from "effect/rpc";
 
 import { Description } from "./annotations.ts";
 import { AskId, CommitSha, ProjectName } from "./ids.ts";
+import { Authenticated } from "./principal.ts";
 import { ClaimLapsed, NotClaimed, RepoBusy, StaleBase } from "./refusal.ts";
 
 /** One open ask, as a list of asks shows it. */
@@ -29,7 +30,9 @@ export class SubmitAnswer extends Rpc.make("submitAnswer", {
 ) {}
 
 /** The one schema: every surface is a projection of this group. */
-export class Contracts extends RpcGroup.make(ListAsks, SubmitAnswer) {}
+export class Contracts extends RpcGroup.make(ListAsks, SubmitAnswer).middleware(
+  Authenticated
+) {}
 
 /** A way to call the contracts, in process or over the wire. */
 export class Client extends Context.Service<

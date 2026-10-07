@@ -34,3 +34,11 @@ export const ProjectName = Schema.String.pipe(
 );
 
 export type ProjectName = typeof ProjectName.Type;
+
+/** A person's handle on the platform, as their sign-in provider spells it. */
+export const Handle = Schema.String.pipe(
+  Schema.check(Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9-]*$/u)),
+  Schema.brand("Handle")
+);
+
+export type Handle = typeof Handle.Type;
