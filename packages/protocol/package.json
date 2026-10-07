@@ -10,7 +10,8 @@
     "./posture": "./src/posture.ts",
     "./principal": "./src/principal.ts",
     "./refusal": "./src/refusal.ts",
-    "./render": "./src/render.ts"
+    "./render": "./src/render.ts",
+    "./testing": "./src/testing.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
