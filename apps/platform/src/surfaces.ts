@@ -52,7 +52,10 @@ const GIT_PATH =
 const DISCOVERY_PATH =
   /^\/\.well-known\/oauth-(?:protected-resource|authorization-server)(?:\/.*)?$/u;
 
-/** Sign-in's own endpoints (W3 316 mounts them): `/authorize`, `/signup`, `/token` and `/oauth/*`. */
+/**
+ * Sign-in's own endpoints (W3 316 mounts them): `/authorize`, `/signup`,
+ * `/token` and `/oauth/*`.
+ */
 const SIGN_IN_PATH = /^\/(?:authorize|signup|token|oauth(?:\/.*)?)$/u;
 
 /**
@@ -67,6 +70,9 @@ const isExempt = (path: string) =>
   GIT_PATH.test(path) ||
   DISCOVERY_PATH.test(path) ||
   SIGN_IN_PATH.test(path);
+
+/** Where the platform describes itself as an OAuth protected resource. */
+const PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource";
 
 /** The platform's origin, as the request reached it. */
 const originOf = (request: HttpServerRequest.HttpServerRequest) =>
@@ -103,14 +109,19 @@ const authorizationServerMetadata = (origin: string) => ({
 });
 
 /**
- * A 401's challenge: a bearer token, and where to learn how to get one
- * (RFC 9728 §5.1, which MCP's authorization requires); `invalid_token` when
- * the request carried one the platform does not know (RFC 6750 §3.1).
+ * A 401 for `request`: it asks for a bearer token and names where to learn
+ * how to get one (RFC 9728 §5.1, which MCP's authorization requires). Its
+ * `error` is `invalid_token` only for a bearer token the platform does not
+ * know; a request with no credential, or one of another scheme, gets no
+ * error code (RFC 6750 §3.1).
  */
-const unauthorized = (origin: string, invalid: boolean) => {
+const unauthorized = (
+  request: HttpServerRequest.HttpServerRequest,
+  error?: "invalid_token"
+) => {
   const params = [
-    ...(invalid ? ['error="invalid_token"'] : []),
-    `resource_metadata="${origin}/.well-known/oauth-protected-resource"`,
+    ...(error === undefined ? [] : [`error="${error}"`]),
+    `resource_metadata="${originOf(request)}${PROTECTED_RESOURCE_PATH}"`,
   ];
 
   return HttpServerResponse.empty({
@@ -121,9 +132,9 @@ const unauthorized = (origin: string, invalid: boolean) => {
 
 /**
  * The bearer credential the request was let in with, and the person it
- * names; none when it carried none, and on an exempt path. Set once per request, before
- * any surface sees it, and read by the contracts' server side, so a token is
- * verified once per request.
+ * names; none when it carried none, and on an exempt path. Set once per
+ * request, before any surface sees it, and read by the contracts' server
+ * side, so a token is verified once per request.
  */
 const Caller = Context.Reference<
   Option.Option<{ readonly person: Person; readonly token: string }>
@@ -152,18 +163,23 @@ const identifyCaller = HttpRouter.middleware(
           return yield* httpEffect;
         }
 
-        const caller = yield* Option.match(bearerToken(authorization), {
-          onNone: () => Effect.succeedNone,
-          onSome: (token) =>
-            Effect.map(
-              sessions.verify(token),
-              Option.map((person) => ({ person, token }))
-            ),
-        });
+        const token = bearerToken(authorization);
 
-        return Option.isNone(caller)
-          ? unauthorized(originOf(request), true)
-          : yield* Effect.provideService(httpEffect, Caller, caller);
+        if (Option.isNone(token)) {
+          return unauthorized(request);
+        }
+
+        const person = yield* sessions.verify(token.value);
+
+        if (Option.isNone(person)) {
+          return unauthorized(request, "invalid_token");
+        }
+
+        return yield* Effect.provideService(
+          httpEffect,
+          Caller,
+          Option.some({ person: person.value, token: token.value })
+        );
       });
   }),
   { global: true }
@@ -180,9 +196,7 @@ const signedInOnly = HttpRouter.middleware((httpEffect) =>
       return yield* httpEffect;
     }
 
-    const request = yield* HttpServerRequest.HttpServerRequest;
-
-    return unauthorized(originOf(request), false);
+    return unauthorized(yield* HttpServerRequest.HttpServerRequest);
   })
 ).layer;
 
@@ -274,33 +288,25 @@ const health = HttpRouter.use((router) =>
   })
 );
 
+/** The two OAuth discovery documents, each by its path. */
+const DISCOVERY_DOCUMENTS = [
+  [PROTECTED_RESOURCE_PATH, protectedResourceMetadata],
+  ["/.well-known/oauth-authorization-server", authorizationServerMetadata],
+] as const;
+
 /**
  * The two OAuth discovery documents, answered to anyone: where a client
  * learns that the platform is its own authorization server.
  */
 const discovery = HttpRouter.use((router) =>
   Effect.gen(function* () {
-    yield* router.add(
-      "GET",
-      "/.well-known/oauth-protected-resource",
-      (request) =>
+    for (const [path, document] of DISCOVERY_DOCUMENTS) {
+      yield* router.add("GET", path, (request) =>
         Effect.succeed(
-          HttpServerResponse.jsonUnsafe(
-            protectedResourceMetadata(originOf(request))
-          )
+          HttpServerResponse.jsonUnsafe(document(originOf(request)))
         )
-    );
-
-    yield* router.add(
-      "GET",
-      "/.well-known/oauth-authorization-server",
-      (request) =>
-        Effect.succeed(
-          HttpServerResponse.jsonUnsafe(
-            authorizationServerMetadata(originOf(request))
-          )
-        )
-    );
+      );
+    }
   })
 );
 

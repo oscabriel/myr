@@ -16,7 +16,7 @@ import { firstOf } from "../src/sessions/first-of.ts";
 import { MemorySessions } from "../src/sessions/memory.ts";
 import { sessionTable, TableSessions } from "../src/sessions/table.ts";
 import { Vacant } from "../src/vacant.ts";
-import { origin, rpcClient, served, toolCall } from "./harness.ts";
+import { origin, rpcClient, served, toolCall, toolResult } from "./harness.ts";
 
 const project = ProjectName.make("datekit");
 
@@ -272,6 +272,32 @@ describe("the 401", () => {
       })
   );
 
+  // RFC 6750 §3.1: a credential of another scheme is not an invalid bearer
+  // token, so the challenge carries no error code.
+  it.effect(
+    "turns away an RPC call whose credential is not a bearer token, with no error code",
+    () =>
+      Effect.gen(function* () {
+        const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+
+        const response = yield* fetch(
+          new Request(`${origin}/rpc`, {
+            body: "[]",
+            headers: {
+              authorization: `Basic ${btoa(`alice:${aliceToken}`)}`,
+              "content-type": "application/json",
+            },
+            method: "POST",
+          })
+        );
+
+        expect(challengeOf(response)).toStrictEqual({
+          challenge: `Bearer resource_metadata="${metadataUrl}"`,
+          status: 401,
+        });
+      })
+  );
+
   // The router matches `/mcp` however its path is spelled, so the 401 must
   // hold wherever the router sends a request to MCP.
   it.effect("asks for a credential however MCP's path is spelled", () =>
@@ -298,36 +324,6 @@ describe("the 401", () => {
       );
 
       expect(statuses).toStrictEqual([401, 401, 401, 401, 401]);
-    })
-  );
-
-  it.effect("verifies an MCP request's token once", () =>
-    Effect.gen(function* () {
-      const { layer, verified } = yield* counting;
-
-      const { fetch } = yield* served(Layer.mergeAll(Vacant, layer));
-
-      const response = yield* fetch(
-        toolCall("listAsks", { project }, aliceToken)
-      );
-
-      expect(response.status).toBe(200);
-      expect(yield* Ref.get(verified)).toBe(1);
-    })
-  );
-
-  it.effect("verifies an RPC call's token once", () =>
-    Effect.gen(function* () {
-      const { layer, verified } = yield* counting;
-
-      const { handler } = yield* served(Layer.mergeAll(Vacant, layer));
-
-      const asAlice = yield* rpcClient(handler, aliceToken);
-
-      expect(yield* Effect.exit(asAlice.status({}))).toStrictEqual(
-        Exit.succeed({ answers: [], claims: [] })
-      );
-      expect(yield* Ref.get(verified)).toBe(1);
     })
   );
 
@@ -369,6 +365,53 @@ describe("the 401", () => {
         ).toContain('"_tag":"Unauthenticated"');
         expect(yield* Ref.get(seen)).toStrictEqual([]);
       })
+  );
+});
+
+describe("verifying a token", () => {
+  it.effect(
+    "verifies an MCP request's token once, and calls as its person",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* Ref.make<readonly Principal[]>([]);
+
+        const { layer, verified } = yield* counting;
+
+        const { fetch } = yield* served(Layer.mergeAll(noting(seen), layer));
+
+        const result = yield* toolResult(
+          yield* fetch(toolCall("status", {}, aliceToken))
+        );
+
+        expect(result).toStrictEqual({
+          isError: false,
+          json: { answers: [], claims: [] },
+        });
+        expect(yield* Ref.get(seen)).toStrictEqual([
+          Person.make({ handle: alice }),
+        ]);
+        expect(yield* Ref.get(verified)).toBe(1);
+      })
+  );
+
+  it.effect("verifies an RPC call's token once, and calls as its person", () =>
+    Effect.gen(function* () {
+      const seen = yield* Ref.make<readonly Principal[]>([]);
+
+      const { layer, verified } = yield* counting;
+
+      const { handler } = yield* served(Layer.mergeAll(noting(seen), layer));
+
+      const asAlice = yield* rpcClient(handler, aliceToken);
+
+      expect(yield* Effect.exit(asAlice.status({}))).toStrictEqual(
+        Exit.succeed({ answers: [], claims: [] })
+      );
+      expect(yield* Ref.get(seen)).toStrictEqual([
+        Person.make({ handle: alice }),
+      ]);
+      expect(yield* Ref.get(verified)).toBe(1);
+    })
   );
 });
 
