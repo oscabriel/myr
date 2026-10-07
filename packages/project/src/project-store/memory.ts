@@ -11,8 +11,14 @@ import type {
   ProjectWrites,
 } from "../project-store.ts";
 import type { EventRow } from "./rows.ts";
-import { EventTable, ProjectTable, QueueTable, Tables } from "./tables.ts";
-import type { Column, Table } from "./tables.ts";
+import {
+  EventTable,
+  ProjectTable,
+  QueueTable,
+  Tables,
+  writeAll,
+} from "./tables.ts";
+import type { Column, Table, Upsert } from "./tables.ts";
 
 /** A row as a table keeps it: its columns and its encoded body. */
 interface Stored {
@@ -24,10 +30,8 @@ interface Stored {
 type Rows = ReadonlyMap<string, Stored>;
 
 interface State {
-  /** The kept events, oldest first, each body with its `seq`. */
-  readonly events: readonly Stored[];
   readonly lastSeq: number;
-  /** Each table's rows, by table name. */
+  /** Each table's rows by table name; the kept events too, oldest first. */
   readonly tables: ReadonlyMap<string, Rows>;
 }
 
@@ -98,62 +102,41 @@ const seenIn = (state: State, writes: ProjectWrites) => {
   );
 };
 
+/** Writes rows into copies of `tables`' maps, never into the maps themselves. */
+const upsertInto =
+  (tables: Map<string, Rows>): Upsert<never, never> =>
+  (table, rows) =>
+    Effect.gen(function* () {
+      const kept = new Map(tables.get(table.name));
+
+      for (const row of rows) {
+        const columns = table.columns(row);
+
+        kept.set(keyOf(table, columns), {
+          body: yield* table.encode(row),
+          columns,
+        });
+      }
+
+      tables.set(table.name, kept);
+    });
+
 /**
- * The state after `writes`, built from copies in the order `/sqlite` writes
- * its tables. A row that won't encode dies before anything is swapped in.
+ * The state after `writes`, built from copies through the write plan both
+ * adapters share. A row that won't encode dies before anything is swapped in.
  */
 const written = (state: State, writes: ProjectWrites) =>
   Effect.gen(function* () {
     const tables = new Map(state.tables);
+    const seqs = yield* writeAll(writes, state.lastSeq, upsertInto(tables));
+    const events = [...(tables.get(EventTable.name) ?? [])];
 
-    const upsert = <A>(table: Table<A>, rows: readonly A[] | undefined) =>
-      Effect.gen(function* () {
-        const kept = new Map(rowsIn(state, table));
+    tables.set(EventTable.name, new Map(events.slice(-keptEvents)));
 
-        for (const row of rows ?? []) {
-          const columns = table.columns(row);
-
-          kept.set(keyOf(table, columns), {
-            body: yield* table.encode(row),
-            columns,
-          });
-        }
-
-        tables.set(table.name, kept);
-      });
-
-    yield* upsert(
-      ProjectTable,
-      Option.toArray(Option.fromUndefinedOr(writes.project))
-    );
-    yield* upsert(Tables.asks, writes.asks);
-    yield* upsert(Tables.claims, writes.claims);
-    yield* upsert(Tables.answers, writes.answers);
-    yield* upsert(QueueTable, writes.queue === undefined ? [] : [writes.queue]);
-    yield* upsert(Tables.landings, writes.landings);
-    yield* upsert(Tables.proposals, writes.proposals);
-    yield* upsert(Tables.decisions, writes.decisions);
-    yield* upsert(Tables.budgetDays, writes.budgetDays);
-    yield* upsert(Tables.ratchets, writes.ratchets);
-    yield* upsert(Tables.pushEvents, writes.pushEvents);
-
-    const events = yield* Effect.forEach(writes.events ?? [], (event, index) =>
-      Effect.map(
-        EventTable.encode({ ...event, seq: state.lastSeq + index + 1 }),
-        (body): Stored => ({ body, columns: {} })
-      )
-    );
-
-    yield* upsert(Tables.outbox, writes.outbox);
-
-    const committed: Committed = {
-      duplicatePushEvents: [],
-      seqs: Array.map(events, (_, index) => state.lastSeq + index + 1),
-    };
+    const committed: Committed = { duplicatePushEvents: [], seqs };
 
     const next: State = {
-      events: [...state.events, ...events].slice(-keptEvents),
-      lastSeq: state.lastSeq + events.length,
+      lastSeq: state.lastSeq + seqs.length,
       tables,
     };
 
@@ -170,7 +153,6 @@ export const ProjectStoreMemory = Layer.effect(
   ProjectStore,
   Effect.gen(function* () {
     const ref = yield* SynchronizedRef.make<State>({
-      events: [],
       lastSeq: 0,
       tables: new Map(),
     });
@@ -203,8 +185,10 @@ export const ProjectStoreMemory = Layer.effect(
         }),
       eventsSince: (seq, limit) =>
         Effect.gen(function* () {
-          const state = yield* SynchronizedRef.get(ref);
-          const events = yield* decodeAll(EventTable, state.events);
+          const events = yield* all(
+            yield* SynchronizedRef.get(ref),
+            EventTable
+          );
 
           return Array.take(
             Array.flatMap(events, (event): readonly EventRow[] =>

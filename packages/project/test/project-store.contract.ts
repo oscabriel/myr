@@ -400,8 +400,17 @@ export const describeProjectStore = (
           seqs: [],
         });
 
+        // The replay carries a push event not seen yet, and the seen one twice:
+        // it still writes nothing, that new push event included.
         expect(
-          yield* store.commit({ ...everything, pushEvents: first })
+          yield* store.commit({
+            ...everything,
+            pushEvents: decodedAll(PushEventRow, [
+              pushEventOf("evt-1"),
+              pushEventOf("evt-2"),
+              pushEventOf("evt-1"),
+            ]),
+          })
         ).toStrictEqual({ duplicatePushEvents: ["evt-1"], seqs: [] });
 
         expect(yield* loaded).toStrictEqual(empty);
@@ -413,6 +422,26 @@ export const describeProjectStore = (
             pushEvents: decodedAll(PushEventRow, [pushEventOf("evt-2")]),
           })
         ).toStrictEqual({ duplicatePushEvents: [], seqs: [1] });
+      }).pipe(Effect.provide(layer))
+    );
+
+    it.effect("keeps a push event sent twice in one commit once", () =>
+      Effect.gen(function* () {
+        const store = yield* ProjectStore;
+
+        const twice = decodedAll(PushEventRow, [
+          pushEventOf("evt-1"),
+          pushEventOf("evt-1"),
+        ]);
+
+        expect(yield* store.commit({ pushEvents: twice })).toStrictEqual({
+          duplicatePushEvents: [],
+          seqs: [],
+        });
+        expect(yield* store.commit({ pushEvents: twice })).toStrictEqual({
+          duplicatePushEvents: ["evt-1"],
+          seqs: [],
+        });
       }).pipe(Effect.provide(layer))
     );
 
@@ -461,6 +490,28 @@ export const describeProjectStore = (
 
         expect((yield* loaded).outbox).toStrictEqual([secondOutbox]);
       }).pipe(Effect.provide(layer))
+    );
+
+    it.effect(
+      "loads landings newest first, the later write first on a tie",
+      () =>
+        Effect.gen(function* () {
+          const store = yield* ProjectStore;
+          const earlier = landingOf(1);
+          const first = landingOf(5);
+          const second = { ...landingOf(5), sha: sha(40) };
+
+          yield* store.commit({
+            landings: decodedAll(LandingRow, [first, earlier]),
+          });
+          yield* store.commit({ landings: decodedAll(LandingRow, [second]) });
+
+          expect((yield* loaded).landings).toStrictEqual([
+            second,
+            first,
+            earlier,
+          ]);
+        }).pipe(Effect.provide(layer))
     );
 
     it.effect("finds a landing older than the snapshot's newest 50", () =>

@@ -1,6 +1,7 @@
 import { ProjectEvent } from "@repo/protocol/domain/event";
-import { DateTime, Effect, Schema } from "effect";
+import { Array, DateTime, Effect, Option, Schema } from "effect";
 
+import type { ProjectWrites } from "../project-store.ts";
 import {
   AnswerRow,
   AskRow,
@@ -16,8 +17,9 @@ import {
 } from "./rows.ts";
 
 // How each kind of row is kept, shared by every adapter: the table it lives
-// in, the columns a row is found by, and its body, the row's encoded JSON.
-// The SQLite tables themselves are created by `migrations.ts`.
+// in, the columns a row is found by, its body (the row's encoded JSON), and
+// which tables a commit writes from which `ProjectWrites` field. The SQLite
+// tables themselves are created by `migrations.ts`.
 
 /** A column's value: text, or an integer. */
 export type Column = string | number;
@@ -115,3 +117,46 @@ export const QueueTable = tableOf(
 export const EventTable = tableOf("events", ProjectEvent, ["seq"], (event) => ({
   seq: event.seq,
 }));
+
+/** How an adapter writes one table's rows, each replacing any row under its key. */
+export type Upsert<E, R> = <A>(
+  table: Table<A>,
+  rows: readonly A[]
+) => Effect.Effect<void, E, R>;
+
+/**
+ * Writes every row in `writes` through an adapter's `upsert`, table by
+ * table, with the events numbered on from `lastSeq`, and returns the numbers
+ * it gave them. Both adapters commit through it, so a table `ProjectWrites`
+ * gains is written by both or by neither.
+ */
+export const writeAll = <E, R>(
+  writes: ProjectWrites,
+  lastSeq: number,
+  upsert: Upsert<E, R>
+): Effect.Effect<readonly number[], E, R> =>
+  Effect.gen(function* () {
+    const events = Array.map(writes.events ?? [], (event, index) => ({
+      ...event,
+      seq: lastSeq + index + 1,
+    }));
+
+    yield* upsert(
+      ProjectTable,
+      Option.toArray(Option.fromUndefinedOr(writes.project))
+    );
+    yield* upsert(Tables.asks, writes.asks ?? []);
+    yield* upsert(Tables.claims, writes.claims ?? []);
+    yield* upsert(Tables.answers, writes.answers ?? []);
+    yield* upsert(QueueTable, writes.queue === undefined ? [] : [writes.queue]);
+    yield* upsert(Tables.landings, writes.landings ?? []);
+    yield* upsert(Tables.proposals, writes.proposals ?? []);
+    yield* upsert(Tables.decisions, writes.decisions ?? []);
+    yield* upsert(Tables.budgetDays, writes.budgetDays ?? []);
+    yield* upsert(Tables.ratchets, writes.ratchets ?? []);
+    yield* upsert(Tables.pushEvents, writes.pushEvents ?? []);
+    yield* upsert(EventTable, events);
+    yield* upsert(Tables.outbox, writes.outbox ?? []);
+
+    return Array.map(events, (event) => event.seq);
+  });

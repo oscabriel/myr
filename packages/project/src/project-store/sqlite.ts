@@ -9,7 +9,13 @@ import {
 } from "../project-store.ts";
 import type { ProjectWrites } from "../project-store.ts";
 import { migrate } from "./migrations.ts";
-import { EventTable, ProjectTable, QueueTable, Tables } from "./tables.ts";
+import {
+  EventTable,
+  ProjectTable,
+  QueueTable,
+  Tables,
+  writeAll,
+} from "./tables.ts";
 import type { Table } from "./tables.ts";
 
 // What SQLite hands back is decoded like any other outside input.
@@ -58,9 +64,9 @@ export const ProjectStoreSqlite = Layer.effect(
 
     // One statement per row, so a key written twice in one commit replaces
     // its first row in place, as it does in `/memory`.
-    const upsert = <A>(table: Table<A>, rows: readonly A[] | undefined) =>
+    const upsert = <A>(table: Table<A>, rows: readonly A[]) =>
       Effect.forEach(
-        rows ?? [],
+        rows,
         (row) =>
           Effect.gen(function* () {
             const columns = {
@@ -96,41 +102,10 @@ export const ProjectStoreSqlite = Layer.effect(
 
     const write = (writes: ProjectWrites) =>
       Effect.gen(function* () {
-        yield* upsert(
-          ProjectTable,
-          Option.toArray(Option.fromUndefinedOr(writes.project))
-        );
-        yield* upsert(Tables.asks, writes.asks);
-        yield* upsert(Tables.claims, writes.claims);
-        yield* upsert(Tables.answers, writes.answers);
-        yield* upsert(
-          QueueTable,
-          writes.queue === undefined ? [] : [writes.queue]
-        );
-        yield* upsert(Tables.landings, writes.landings);
-        yield* upsert(Tables.proposals, writes.proposals);
-        yield* upsert(Tables.decisions, writes.decisions);
-        yield* upsert(Tables.budgetDays, writes.budgetDays);
-        yield* upsert(Tables.ratchets, writes.ratchets);
-        yield* upsert(Tables.pushEvents, writes.pushEvents);
-
         const last = yield* lastSeq;
-
-        const seqs = Array.map(
-          writes.events ?? [],
-          (_, index) => last + index + 1
-        );
-
-        yield* upsert(
-          EventTable,
-          Array.map(writes.events ?? [], (event, index) => ({
-            ...event,
-            seq: last + index + 1,
-          }))
-        );
+        const seqs = yield* writeAll(writes, last, upsert);
 
         yield* sql`DELETE FROM events WHERE seq <= ${last + seqs.length - keptEvents}`;
-        yield* upsert(Tables.outbox, writes.outbox);
 
         return { duplicatePushEvents: [], seqs };
       });
