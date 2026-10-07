@@ -11,7 +11,8 @@
  * 3. `matrix`: a workspace imports only the packages its `Matrix` row names
  *    (and only the subpaths `OnlySubpaths` names, where it names any).
  * 4. `adapter-through-port`: a port file never imports or re-exports its own
- *    adapters, and nothing reaches into another workspace by a relative path.
+ *    adapters, and nothing reaches into another workspace by a relative path
+ *    (the root's files only from config's tests).
  * 5. `worker-host`: Worker code, and everything it imports, stays free of host
  *    code; in packages, host code lives only in `/local` and `/bun` adapters.
  * 6. `test-only`: the test kit and the test principal are imported only from
@@ -68,7 +69,8 @@ export interface Import {
   readonly typeOnly: boolean;
 }
 
-const PACKAGES: readonly string[] = [
+/** Every package in the direction table: what the test kit may import. */
+const EVERY_PACKAGE: readonly string[] = [
   "@repo/agent-kit",
   "@repo/artifacts",
   "@repo/brand",
@@ -92,7 +94,7 @@ const PACKAGES: readonly string[] = [
  * Narrower than a row: `OnlySubpaths`. `@repo/web`'s dev backend (the
  * artifacts and project memory adapters) and `@repo/cli`'s narrower edges
  * (`rules/bun`, `artifacts/local`, visibility's parser) are added here when
- * those packages exist.
+ * the work that imports them (401, 501) builds those subpaths.
  */
 export const Matrix = {
   "@repo/agent-kit": ["@repo/brand", "@repo/checks", "@repo/protocol"],
@@ -146,8 +148,8 @@ export const Matrix = {
     "@repo/visibility",
   ],
   "@repo/sdk": ["@repo/brand", "@repo/protocol"],
-  // Every package; its own consumers are tests only.
-  "@repo/testkit": PACKAGES,
+  // Its own consumers are tests only.
+  "@repo/testkit": EVERY_PACKAGE,
   "@repo/visibility": [
     "@repo/artifacts",
     "@repo/brand",
@@ -156,7 +158,7 @@ export const Matrix = {
     "@repo/protocol",
   ],
   "@repo/web": ["@repo/brand", "@repo/protocol"],
-} satisfies Readonly<Record<string, readonly string[]>>;
+} as const satisfies Readonly<Record<string, readonly string[]>>;
 
 /**
  * The subpaths of `@repo/checks` that are pure: no port, no process, no I/O.
@@ -180,7 +182,7 @@ export const ChecksPureSubpaths: readonly string[] = [
 export const OnlySubpaths = {
   "@repo/gate": { "@repo/checks": ChecksPureSubpaths },
   "@repo/sdk": { "@repo/protocol": ["domain/*"] },
-} satisfies Readonly<
+} as const satisfies Readonly<
   Record<string, Readonly<Record<string, readonly string[]>>>
 >;
 
@@ -226,6 +228,7 @@ export const AdapterNames: readonly string[] = [
   "binding",
   "bun",
   "env-spec",
+  "inline",
   "isogit",
   "json",
   "local",
@@ -247,10 +250,17 @@ const TEST_ONLY = [TESTKIT, "@repo/protocol/testing"] as const;
 
 const CONFIG = "@repo/config";
 
+/**
+ * The one place a workspace may reach the root's files by a relative path:
+ * config's tests drive the root's fence (`scripts/`, `tools/oxlint/`,
+ * `oxlint.config.ts`).
+ */
+const FENCE_TESTS = "packages/config/test/";
+
 /** What a reader can do about each rule, one line each. */
 export const RuleHints: Readonly<Record<ImportRule, string>> = {
   "adapter-through-port":
-    "import an adapter by its own subpath (@repo/<package>/<port>/<adapter>), never through its port file, and reach another workspace by its name, never by a relative path.",
+    "import an adapter by its own subpath (@repo/<package>/<port>/<adapter>), never through its port file, and reach another workspace by its name, never by a relative path (only packages/config/test reaches the root's files).",
   "app-imports-app":
     "apps import packages only; move what both need into a package.",
   "infra-only": "alchemy stays in infra/.",
@@ -796,7 +806,7 @@ type Rule = (site: Site, tree: Tree) => Option.Option<Verdict>;
 const breaks = (rule: ImportRule, broken: boolean): Option.Option<Verdict> =>
   broken ? Option.some({ rule }) : Option.none();
 
-const ROWS = new Map(Object.entries(Matrix));
+const ROWS = new Map<string, readonly string[]>(Object.entries(Matrix));
 
 const NARROWED = new Map(
   Object.entries(OnlySubpaths).map(([importer, edges]) => [
@@ -896,10 +906,12 @@ const adapterThroughPort: Rule = (site, tree) => {
     ? reached(site, tree.workspaces)
     : undefined;
 
-  return breaks(
-    "adapter-through-port",
-    reachesOwnAdapter || (to !== undefined && to.dir !== "" && to !== site.from)
-  );
+  const reachesAcross =
+    to !== undefined &&
+    to !== site.from &&
+    (to.dir !== "" || !site.path.startsWith(FENCE_TESTS));
+
+  return breaks("adapter-through-port", reachesOwnAdapter || reachesAcross);
 };
 
 /** In a package, host code only in a `/local` or `/bun` adapter. */

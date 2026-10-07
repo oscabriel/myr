@@ -144,6 +144,12 @@ const clean: readonly SourceFile[] = [
     'import { memoryFs } from "./memory-fs.ts";'
   ),
   file("packages/artifacts/src/repo-host/memory-fs.ts"),
+  // A file in a port's folder that isn't an adapter.
+  file(
+    "packages/project/src/lander.ts",
+    'export { LandWire } from "./lander/wire.ts";'
+  ),
+  file("packages/project/src/lander/wire.ts"),
   file(
     "packages/git/test/git.ts",
     'import { spawn } from "node:child_process";'
@@ -152,9 +158,11 @@ const clean: readonly SourceFile[] = [
     "packages/git/vitest.config.ts",
     'export { preset as default } from "@repo/config/vitest";'
   ),
+  // Config's tests drive the root's fence: its scripts, tools and config.
   file(
     "packages/config/test/imports.test.ts",
-    'import { findViolations } from "../../../scripts/lib/imports.ts";'
+    'import { findViolations } from "../../../scripts/lib/imports.ts";',
+    'import oxlintConfig from "../../../oxlint.config.ts";'
   ),
   file("scripts/gen.ts", 'import { groups } from "@repo/protocol/refusal";'),
   file("infra/deploy.ts", 'import alchemy from "alchemy";'),
@@ -249,6 +257,24 @@ describe("import direction", () => {
         'export * from "./repo-host/memory.ts";'
       ),
       "./repo-host/memory.ts"
+    ),
+    refused(
+      "a port re-exports an adapter that runs in process",
+      "adapter-through-port",
+      file(
+        "packages/project/src/answer-runs.ts",
+        'export { AnswerRunsInline } from "./answer-runs/inline.ts";'
+      ),
+      "./answer-runs/inline.ts"
+    ),
+    refused(
+      "a package reaches the root's scripts by a relative path",
+      "adapter-through-port",
+      file(
+        "packages/gate/src/x.ts",
+        'import { findViolations } from "../../../scripts/lib/imports.ts";'
+      ),
+      "../../../scripts/lib/imports.ts"
     ),
     refused(
       "a file reaches into another package by a relative path",
