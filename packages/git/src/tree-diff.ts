@@ -2,7 +2,7 @@ import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
 import type { RepoNotFound, TreeEntry } from "@repo/artifacts/repo-host";
 import { BlobSha, RepoPath } from "@repo/protocol/ids";
 import type { RepoName, TreeSha } from "@repo/protocol/ids";
-import { Array, Effect, Option, Order } from "effect";
+import { Array, Effect, Option, Order, Semaphore } from "effect";
 
 /**
  * One file an answer changed, with its blob ids before and after. The same
@@ -21,14 +21,22 @@ export interface AddedLine {
   readonly text: string;
 }
 
-// Subtrees read at once: each read is a call to the store.
-const READS = { concurrency: 8 } as const;
+// Store calls under way at once, however deep the walk or long the change set.
+const STORE_CALLS = 8;
 
-const entriesOf = (repo: RepoName, tree: Option.Option<string>) =>
+// The walk forks freely; the semaphore alone holds the store to its calls.
+const ALL = { concurrency: "unbounded" } as const;
+
+const entriesOf = (
+  calls: Semaphore.Semaphore,
+  repo: RepoName,
+  tree: Option.Option<string>
+) =>
   Option.match(tree, {
     onNone: () => Effect.succeed<readonly TreeEntry[]>([]),
     onSome: (id) =>
       RepoHost.use((host) => host.readTree(repo, ObjectId.make(id))).pipe(
+        Semaphore.withPermit(calls),
         Effect.flatMap(
           Option.match({
             onNone: () => Effect.die(`${repo} has no tree ${id}`),
@@ -66,6 +74,7 @@ const fileChange = (
 };
 
 const walk = (
+  calls: Semaphore.Semaphore,
   repo: RepoName,
   prefix: string,
   base: Option.Option<string>,
@@ -73,40 +82,40 @@ const walk = (
 ): Effect.Effect<readonly Change[], RepoNotFound, RepoHost> =>
   Effect.gen(function* () {
     const [before, after] = yield* Effect.all(
-      [entriesOf(repo, base), entriesOf(repo, head)],
-      READS
+      [entriesOf(calls, repo, base), entriesOf(calls, repo, head)],
+      ALL
     );
 
     const beforeByName = new Map(before.map((entry) => [entry.name, entry]));
     const afterByName = new Map(after.map((entry) => [entry.name, entry]));
 
+    // The same id and mode: nothing under it changed, so it is never read.
     const names = Array.sort(
       new Set([...beforeByName.keys(), ...afterByName.keys()]),
       Order.String
-    );
+    ).filter((name) => {
+      const old = beforeByName.get(name);
+      const next = afterByName.get(name);
+
+      return old?.sha !== next?.sha || old?.mode !== next?.mode;
+    });
 
     const changed = yield* Effect.forEach(
       names,
       (name) => {
         const old = beforeByName.get(name);
         const next = afterByName.get(name);
-
-        // The same id and mode: nothing under it changed, so it is never read.
-        if (old?.sha === next?.sha && old?.mode === next?.mode) {
-          return Effect.succeed<readonly Change[]>([]);
-        }
-
         const path = `${prefix}${name}`;
         const files = fileChange(path, fileIdOf(old), fileIdOf(next));
         const inside = [treeIdOf(old), treeIdOf(next)] as const;
 
         return Option.isNone(inside[0]) && Option.isNone(inside[1])
           ? Effect.succeed(files)
-          : walk(repo, `${path}/`, inside[0], inside[1]).pipe(
+          : walk(calls, repo, `${path}/`, inside[0], inside[1]).pipe(
               Effect.map((nested) => [...files, ...nested])
             );
       },
-      READS
+      ALL
     );
 
     return changed.flat();
@@ -115,14 +124,17 @@ const walk = (
 /**
  * The files that differ between two trees of `repo`, read through the
  * `RepoHost` port alone: it walks both roots and descends only into subtrees
- * whose ids differ, since the store has no diff of its own.
+ * whose ids differ, since the store has no diff of its own. At most eight
+ * trees are read at once.
  */
 export const treeDiff = (
   repo: RepoName,
   base: TreeSha,
   head: TreeSha
 ): Effect.Effect<readonly Change[], RepoNotFound, RepoHost> =>
-  walk(repo, "", Option.some(base), Option.some(head));
+  Effect.flatMap(Semaphore.make(STORE_CALLS), (calls) =>
+    walk(calls, repo, "", Option.some(base), Option.some(head))
+  );
 
 // git's own test: a NUL among the first bytes means the blob is not text.
 const SNIFF = 8192;
@@ -279,28 +291,29 @@ const added = (
   }));
 };
 
-const blobOf = (repo: RepoName, blob: BlobSha) =>
-  RepoHost.use((host) => host.readBlob(repo, ObjectId.make(blob))).pipe(
-    Effect.flatMap(
-      Option.match({
-        onNone: () => Effect.die(`${repo} has no blob ${blob}`),
-        onSome: Effect.succeed,
-      })
-    )
-  );
-
+/**
+ * A file's lines; none for a binary blob, or for a submodule's pointer, whose
+ * id names a commit in another repo, so the store has no blob by it.
+ */
 const textOf = (repo: RepoName, blob: BlobSha | undefined) =>
   blob === undefined
     ? Effect.succeedSome<readonly string[]>([])
-    : blobOf(repo, blob).pipe(
-        Effect.map((bytes) =>
-          isBinary(bytes) ? Option.none() : Option.some(linesOf(bytes))
+    : RepoHost.use((host) => host.readBlob(repo, ObjectId.make(blob))).pipe(
+        Effect.map(
+          Option.flatMap((bytes) =>
+            isBinary(bytes) ? Option.none() : Option.some(linesOf(bytes))
+          )
         )
       );
 
+// Changes diffed at once, each reading its two blobs together: eight store
+// calls, and no more than four files' text held at a time.
+const CHANGES = { concurrency: STORE_CALLS / 2 } as const;
+
 /**
  * The lines each added or modified file gained, by a line diff of its blobs.
- * A binary blob (a NUL in its first 8 KiB) reports no lines.
+ * A binary blob (a NUL in its first 8 KiB) and a submodule's pointer report
+ * no lines. At most eight blobs are read at once.
  */
 export const addedLines = (
   repo: RepoName,
@@ -316,7 +329,7 @@ export const addedLines = (
       Effect.gen(function* () {
         const [previous, next] = yield* Effect.all(
           [textOf(repo, change.before), textOf(repo, change.after)],
-          READS
+          ALL
         );
 
         const lines = Option.match(next, {
@@ -330,5 +343,5 @@ export const addedLines = (
 
         return [change.path, lines] as const;
       }),
-    READS
+    CHANGES
   ).pipe(Effect.map((entries) => new Map(entries)));

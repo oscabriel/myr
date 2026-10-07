@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Fetch } from "@repo/artifacts/fetch";
+import { Fetch, FetchFailed } from "@repo/artifacts/fetch";
 import { RepoHost, RepoName, RepoNotFound } from "@repo/artifacts/repo-host";
 import type { TokenScope } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -14,7 +14,7 @@ import {
 } from "effect";
 import { TestClock } from "effect/testing";
 
-import { Exchange, Upstream } from "../src/upstream.ts";
+import { Exchange, Upstream, UpstreamFailure } from "../src/upstream.ts";
 import { UpstreamRepoHost } from "../src/upstream/repo-host.ts";
 
 const repo = RepoName.make("demo");
@@ -229,6 +229,40 @@ describe("the upstream over RepoHost", () => {
           );
         })
       )
+  );
+
+  it.effect("calls a request that got no response an UpstreamFailure", () =>
+    Effect.gen(function* () {
+      const unreachable = Layer.succeed(
+        Fetch,
+        Fetch.of({
+          fetch: (request) =>
+            Effect.fail(
+              new FetchFailed({ reason: "connection reset", url: request.url })
+            ),
+        })
+      );
+
+      const minted = yield* Ref.make<readonly Minted[]>([]);
+
+      const failure = yield* Effect.gen(function* () {
+        yield* RepoHost.use((host) => host.create(repo)).pipe(Effect.orDie);
+
+        return yield* Upstream.use((upstream) =>
+          upstream.exchange(repo, advertise)
+        ).pipe(Effect.flip);
+      }).pipe(
+        Effect.provide(
+          UpstreamRepoHost.pipe(
+            Layer.provideMerge(Layer.mergeAll(store(minted), unreachable))
+          )
+        )
+      );
+
+      expect(failure).toStrictEqual(
+        new UpstreamFailure({ reason: "connection reset", repo })
+      );
+    })
   );
 
   it.effect("passes RepoNotFound through for a repo the store lacks", () =>

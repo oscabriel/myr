@@ -5,6 +5,7 @@ import {
   RepoHost,
   RepoName,
 } from "@repo/artifacts/repo-host";
+import type { TreeEntry } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { BlobSha, RepoPath, TreeSha } from "@repo/protocol/ids";
@@ -50,6 +51,80 @@ const countedBy = (reads: Ref.Ref<readonly string[]>) =>
       });
     })
   ).pipe(Layer.provide(RepoHostMemory));
+
+/**
+ * The memory store, with a submodule's pointer added to the trees `links`
+ * names: git writes one as a `160000` entry naming a commit in another repo.
+ */
+const withSubmodules = (links: Ref.Ref<ReadonlyMap<string, TreeEntry>>) =>
+  Layer.effect(
+    RepoHost,
+    Effect.gen(function* () {
+      const host = yield* RepoHost;
+
+      return RepoHost.of({
+        ...host,
+        readTree: (name, tree) =>
+          Effect.gen(function* () {
+            const entries = yield* host.readTree(name, tree);
+            const link = (yield* Ref.get(links)).get(tree);
+
+            return link === undefined
+              ? entries
+              : Option.map(entries, (all) => [...all, link]);
+          }),
+      });
+    })
+  ).pipe(Layer.provide(RepoHostMemory));
+
+/** Store reads under way at once: now, and the most at any moment. */
+interface InFlight {
+  readonly now: number;
+  readonly most: number;
+}
+
+/** The memory store, with the `readTree` calls under way at once counted in `reads`. */
+const inFlightBy = (reads: Ref.Ref<InFlight>) =>
+  Layer.effect(
+    RepoHost,
+    Effect.gen(function* () {
+      const host = yield* RepoHost;
+
+      return RepoHost.of({
+        ...host,
+        readTree: (name, tree) =>
+          Ref.update(reads, ({ most, now }) => ({
+            most: Math.max(most, now + 1),
+            now: now + 1,
+          })).pipe(
+            Effect.andThen(Effect.yieldNow),
+            Effect.andThen(host.readTree(name, tree)),
+            Effect.ensuring(
+              Ref.update(reads, ({ most, now }) => ({ most, now: now - 1 }))
+            )
+          ),
+      });
+    })
+  ).pipe(Layer.provide(RepoHostMemory));
+
+/**
+ * Nine folders of nine folders, each file holding `content`: when every file
+ * changes, a walk that reads eight at a time at each depth has far more than
+ * eight reads under way.
+ */
+const grid = (content: string): Files =>
+  Array.from({ length: 81 }, (_, at) => [
+    `p${Math.floor(at / 9)}/q${at % 9}/f.txt`,
+    content,
+  ]);
+
+/** A submodule's pointer at `vendor`, naming commit `digit` × 40 in another repo. */
+const pointer = (digit: string): TreeEntry => ({
+  mode: "160000",
+  name: "vendor",
+  sha: ObjectId.make(digit.repeat(40)),
+  type: "commit",
+});
 
 /** Two commits in `demo`, and the ids of their trees and blobs as git wrote them. */
 const twoCommits = Effect.gen(function* () {
@@ -206,6 +281,81 @@ describe("the changes between two trees", () => {
         expect(read).not.toContain(kept);
       }).pipe(Effect.provide(countedBy(reads)));
     })
+  );
+
+  it.effect("reads at most eight trees from the store at once", () =>
+    Effect.gen(function* () {
+      const reads = yield* Ref.make<InFlight>({ most: 0, now: 0 });
+
+      yield* Effect.gen(function* () {
+        const repos = yield* RepoHost;
+        const client = yield* gitClient(memoryFs());
+        const first = yield* client.commit("before", grid("1\n"));
+        const second = yield* client.commit("after", grid("2\n"), [first]);
+
+        yield* repos.create(repo);
+        yield* repos.push(repo, client.source, [
+          { from: Option.none(), ref: main, to: second },
+        ]);
+
+        const treeOf = (sha: CommitSha) =>
+          repos
+            .readCommit(repo, sha)
+            .pipe(
+              Effect.map((commit) =>
+                TreeSha.make(Option.getOrThrow(commit).tree)
+              )
+            );
+
+        const changes = yield* treeDiff(
+          repo,
+          yield* treeOf(first),
+          yield* treeOf(second)
+        );
+
+        expect(changes).toHaveLength(81);
+      }).pipe(Effect.provide(inFlightBy(reads)));
+
+      expect(yield* Ref.get(reads)).toStrictEqual({ most: 8, now: 0 });
+    })
+  );
+
+  it.effect(
+    "counts a submodule's moved pointer as a change with no lines",
+    () =>
+      Effect.gen(function* () {
+        const links = yield* Ref.make<ReadonlyMap<string, TreeEntry>>(
+          new Map()
+        );
+
+        yield* Effect.gen(function* () {
+          const { base, head } = yield* twoCommits;
+
+          yield* Ref.set(
+            links,
+            new Map([
+              [base, pointer("a")],
+              [head, pointer("b")],
+            ])
+          );
+
+          const changes = yield* treeDiff(repo, base, head);
+          const lines = yield* addedLines(repo, changes);
+
+          expect(
+            changes.filter(({ path }) => path === RepoPath.make("vendor"))
+          ).toStrictEqual([
+            {
+              after: BlobSha.make("b".repeat(40)),
+              before: BlobSha.make("a".repeat(40)),
+              path: RepoPath.make("vendor"),
+              status: "modified",
+            },
+          ]);
+          expect(lines.get(RepoPath.make("vendor"))).toStrictEqual([]);
+          expect(lines.get(RepoPath.make("src/a.ts"))).toHaveLength(3);
+        }).pipe(Effect.provide(withSubmodules(links)));
+      })
   );
 
   it.effect("gives a modified file's new lines, numbered in the new file", () =>

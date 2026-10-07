@@ -18,19 +18,19 @@ export interface Trailer {
 }
 
 /** A git identity: the name and email of an author or committer line. */
-export interface Person {
+export interface GitIdentity {
   readonly name: string;
   readonly email: string;
 }
 
 /** The accountable person, as a landing's author: their handle at the platform's users domain. */
-export const authorLine = (handle: Handle): Person => ({
+export const authorLine = (handle: Handle): GitIdentity => ({
   email: `${handle}@users.${Brand.domain}`,
   name: handle,
 });
 
 /** The platform, which commits every landing. */
-export const committerLine: Person = {
+export const committerLine: GitIdentity = {
   email: `platform@${Brand.domain}`,
   name: Brand.name,
 };
@@ -54,8 +54,31 @@ export interface LandingMessage {
 
 const ASSISTED = "Assisted-by";
 
+// C's `isspace`, which git's trailer code tests with.
+const SPACE = /^[ \t\n\v\f\r]/u;
+
+const isSpace = (text: string) => SPACE.test(text);
+
+// git's scissors line: it and everything below it are not the message.
+const SCISSORS = "# ------------------------ >8 ------------------------";
+
+/**
+ * Whether git reads `line` as the end of a commit message: a `---` divider
+ * (then a blank or the line's end) or the scissors line.
+ */
+const endsMessage = (line: string) =>
+  line.startsWith(SCISSORS) ||
+  (line.startsWith("---") && (line.length === 3 || isSpace(line.slice(3))));
+
 /** One line, so no value or subject can open a paragraph or a trailer of its own. */
 const oneLine = (text: string) => text.replaceAll(/\s+/gu, " ").trim();
+
+/**
+ * A subject or body line as written, indented by a space if git would read
+ * it as the end of the message, which would hide the trailers below it and
+ * let a paragraph above it pass for them.
+ */
+const inMessage = (line: string) => (endsMessage(line) ? ` ${line}` : line);
 
 const personOf = (handle: Handle) => {
   const { email, name } = authorLine(handle);
@@ -112,14 +135,14 @@ export const formatLanding = (input: LandingMessage): string => {
       : [{ key: "Held-back", value: oneLine(input.heldBack) }]),
     ...(input.requestId === undefined
       ? []
-      : [{ key: "Request-id", value: input.requestId }]),
+      : [{ key: "Request-Id", value: input.requestId }]),
   ];
 
   const body = input.body?.trim() ?? "";
 
   const paragraphs = [
-    oneLine(input.subject),
-    ...(body === "" ? [] : [body]),
+    inMessage(oneLine(input.subject)),
+    ...(body === "" ? [] : [body.split("\n").map(inMessage).join("\n")]),
     ...(trailers.length === 0
       ? []
       : [trailers.map(({ key, value }) => `${key}: ${value}`).join("\n")]),
@@ -127,11 +150,6 @@ export const formatLanding = (input: LandingMessage): string => {
 
   return `${paragraphs.join("\n\n")}\n`;
 };
-
-// C's `isspace`, which git's trailer code tests with.
-const SPACE = /^[ \t\n\v\f\r]/u;
-
-const isSpace = (text: string) => SPACE.test(text);
 
 const isBlank = (line: string) => /^[ \t\n\v\f\r]*$/u.test(line);
 
@@ -169,31 +187,39 @@ const separatorOf = (line: string) => {
   return -1;
 };
 
-/** The message's lines up to a `---` divider, less trailing comments and empty lines. */
+/**
+ * The lines git reads as the log message: up to a `---` divider or the
+ * scissors line, less a closing run of comments, empty lines and an old
+ * `Conflicts:` block (git's `find_end_of_log_message`). Like git, it reads
+ * a last line with no newline as if it had one.
+ */
 const logLines = (message: string) => {
   const lines = message.split("\n");
-  const ended = message.endsWith("\n");
 
-  if (ended) {
+  if (message.endsWith("\n")) {
     lines.pop();
   }
 
-  const divider = lines.findIndex(
-    (line, at) =>
-      line.startsWith("---") &&
-      (line.length > 3
-        ? isSpace(line.slice(3))
-        : at < lines.length - 1 || ended)
-  );
+  const cut = lines.findIndex(endsMessage);
+  const kept = cut === -1 ? lines : lines.slice(0, cut);
 
-  const kept = divider === -1 ? lines : lines.slice(0, divider);
-  let end = kept.length;
+  // Where the closing run starts; git keeps a run that starts at the top.
+  let run = 0;
+  let conflicts = false;
 
-  while (end > 0 && (kept[end - 1] === "" || isComment(kept[end - 1] ?? ""))) {
-    end -= 1;
+  for (const [at, line] of kept.entries()) {
+    const header = line === "Conflicts:";
+
+    if (line === "" || isComment(line) || header) {
+      conflicts ||= header;
+      run = run === 0 ? at : run;
+    } else if (!(conflicts && line.startsWith("\t")) && run !== 0) {
+      run = 0;
+      conflicts = false;
+    }
   }
 
-  return kept.slice(0, end);
+  return kept.slice(0, run === 0 ? kept.length : run);
 };
 
 /**
