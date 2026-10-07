@@ -64,7 +64,11 @@ const bytesOfHex = (id: string) =>
 const deflate = (bytes: Uint8Array) =>
   Effect.promise(() =>
     new Response(
-      new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate"))
+      // A copy on its own `ArrayBuffer`: Node's `Blob` types refuse a view
+      // that may sit on a `SharedArrayBuffer`, as `@repo/project` sees them.
+      new Blob([Uint8Array.from(bytes)])
+        .stream()
+        .pipeThrough(new CompressionStream("deflate"))
     ).arrayBuffer()
   ).pipe(Effect.map((buffer) => new Uint8Array(buffer)));
 
