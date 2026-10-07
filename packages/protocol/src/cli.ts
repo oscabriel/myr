@@ -1,6 +1,7 @@
 // Ported from joelhooks/rat-stack@fba26d8 `packages/capability/src/to-command.ts`
 // (MIT, LICENSES/rat-stack.MIT.txt). Changes are listed in PROVENANCE.md.
 import {
+  Array,
   Context,
   Effect,
   Option,
@@ -9,7 +10,6 @@ import {
   Schema,
   SchemaAST,
 } from "effect";
-import type { Array } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 import type { Rpc, RpcClient, RpcClientError, RpcGroup } from "effect/rpc";
 
@@ -95,6 +95,12 @@ export interface ToCommandOptions<Success, OutputR, DefaultsR> {
   readonly defaults?: Defaults<DefaultsR> | undefined;
   /** The result as prose; none, or none given, prints the encoded JSON. */
   readonly render?: ((success: Success) => Option.Option<View>) | undefined;
+  /**
+   * The refusals a success carries in place of a result, such as a refused
+   * answer's receipt: they print as a refusal does, once, and the command
+   * fails with `Reported`.
+   */
+  readonly refusalsIn?: ((success: Success) => readonly Refusal[]) | undefined;
 }
 
 /**
@@ -378,8 +384,9 @@ const asJson = (text: string): View => ({
  * named by the last word of that annotation's name. Every command takes
  * `--json`; one that needs approval takes `--yes` and runs only with it;
  * one that changes something takes `--dry-run`, which prints the encoded
- * payload and calls nothing. A refusal goes to `output.refused` once, and
- * the command fails with `Reported`.
+ * payload and calls nothing. A refusal, or the refusals a success carries
+ * (`refusalsIn`), go to `output.refused` once, and the command fails with
+ * `Reported`.
  */
 export const toCommand = <
   R extends CommandRpc,
@@ -504,6 +511,14 @@ export const toCommand = <
           )
         );
 
+        const carried = options.refusalsIn?.(success) ?? [];
+
+        if (Array.isReadonlyArrayNonEmpty(carried)) {
+          yield* output.refused({ command, json, refusals: carried });
+
+          return yield* new Reported();
+        }
+
         const data = yield* Effect.orDie(encodeSuccess(success));
 
         const view = Option.getOrElse(
@@ -530,6 +545,10 @@ export interface ToCommandsOptions<Rpcs extends Rpc.Any, OutputR, DefaultsR> {
   readonly output: Effect.Effect<CommandOutput, never, OutputR>;
   readonly defaults?: Defaults<DefaultsR> | undefined;
   readonly views?: Views<Rpcs> | undefined;
+  /** The refusals any contract's success carries in place of a result. */
+  readonly refusalsIn?:
+    | ((success: Rpc.Success<Rpcs>) => readonly Refusal[])
+    | undefined;
   /** Tags a hand-written command wraps instead, such as `setEnv`'s `env set`. */
   readonly exclude: readonly string[];
 }
@@ -556,6 +575,7 @@ export const toCommands = <
             command: toCommand(rpc, client, {
               defaults: options.defaults,
               output: options.output,
+              refusalsIn: options.refusalsIn,
               render: options.views?.[rpc._tag],
             }),
             path: commandPath(rpc),

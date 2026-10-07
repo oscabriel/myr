@@ -9,6 +9,7 @@ import { Client, Contracts } from "@repo/protocol/contracts";
 import { Handle } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { asTester } from "@repo/protocol/testing";
+import type { Scope } from "effect";
 import {
   Context,
   Effect,
@@ -142,6 +143,26 @@ const verify = (token: string) =>
       : Option.none()
   );
 
+/** `app` served on an ephemeral port for the test's scope: returns its origin. */
+const serving = <E>(
+  app: Effect.Effect<
+    HttpServerResponse.HttpServerResponse,
+    E,
+    HttpServerRequest.HttpServerRequest | Scope.Scope
+  >
+) =>
+  Effect.gen(function* () {
+    const server = yield* Layer.build(
+      HttpServer.serve(app).pipe(Layer.provideMerge(NodeHttpServer.layerTest))
+    ).pipe(Effect.orDie);
+
+    const { address } = Context.get(server, HttpServer.HttpServer);
+
+    return "port" in address
+      ? `http://127.0.0.1:${address.port}`
+      : yield* Effect.die("the test platform listens on a socket, not a port");
+  });
+
 /**
  * The contracts over HTTP at `/rpc`, on an ephemeral port: `handlers` answer
  * as the person `knownToken` names, or as anyone for a public contract when
@@ -175,18 +196,12 @@ export const httpPlatform = (handlers: Handlers) =>
       return unknown ? HttpServerResponse.empty({ status: 401 }) : yield* rpc;
     });
 
-    const server = yield* Layer.build(
-      HttpServer.serve(gate).pipe(Layer.provideMerge(NodeHttpServer.layerTest))
-    ).pipe(Effect.orDie);
-
-    const { address } = Context.get(server, HttpServer.HttpServer);
-
-    const origin =
-      "port" in address
-        ? `http://127.0.0.1:${address.port}`
-        : yield* Effect.die(
-            "the test platform listens on a socket, not a port"
-          );
-
-    return { origin, seen: Ref.get(seen) };
+    return { origin: yield* serving(gate), seen: Ref.get(seen) };
   });
+
+/**
+ * A platform that answers every request with `status` and an empty body, as
+ * a platform that is down does: returns its origin.
+ */
+export const failingPlatform = (status: number) =>
+  serving(Effect.succeed(HttpServerResponse.empty({ status })));

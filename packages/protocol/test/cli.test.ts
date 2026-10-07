@@ -25,6 +25,7 @@ import {
   ShowAsk,
   SubmitAnswer,
 } from "../src/contracts.ts";
+import { Outcome } from "../src/domain/outcome.ts";
 import {
   AskId,
   CommitSha,
@@ -234,6 +235,47 @@ describe("a contract as a CLI command", () => {
           },
         ]);
         expect({ err, out }).toStrictEqual({ err: [], out: [] });
+      })
+  );
+
+  it.effect(
+    "hands the refusals a success carries to the output once, and fails as reported",
+    () =>
+      Effect.gen(function* () {
+        const refusal = new StaleBase({ base, conflicts: [path], main });
+
+        const refused = {
+          ask,
+          base,
+          head,
+          outcome: Outcome.cases.Refused.make({ refusals: [refusal] }),
+          project,
+          requestId,
+        };
+
+        const { printed, result } = yield* run(
+          Layer.mergeAll(
+            unanswered,
+            Contracts.toLayerHandler("submitAnswer", () =>
+              Effect.succeed(refused)
+            )
+          ),
+          (output) =>
+            toCommand(SubmitAnswer, Effect.service(Client), {
+              output,
+              refusalsIn: ({ outcome }) =>
+                Outcome.guards.Refused(outcome) ? outcome.refusals : [],
+            }),
+          answer
+        );
+
+        expect(result).toStrictEqual(Result.fail(new Reported()));
+        expect(printed).toStrictEqual([
+          {
+            input: { command: "submit", json: false, refusals: [refusal] },
+            kind: "refused",
+          },
+        ]);
       })
   );
 

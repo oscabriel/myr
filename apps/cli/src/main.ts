@@ -15,7 +15,12 @@ import { CredentialsFile } from "./credentials.ts";
 import { hook } from "./hook.ts";
 import { holdStdout, Output, OutputLive } from "./output.ts";
 import { CurrentMode, Policy } from "./policy.ts";
-import { isTransportFailure, noPlatformOf, RemoteClient } from "./remote.ts";
+import {
+  isTransportFailure,
+  noPlatformOf,
+  RemoteClient,
+  transportMessage,
+} from "./remote.ts";
 import { commands, mcp, UnknownCommand } from "./surfaces.ts";
 
 /**
@@ -98,7 +103,7 @@ const noteFor = (failure: Failure) => {
   }
 
   if (isTransportFailure(failure)) {
-    return `could not reach the platform: ${failure.message}`;
+    return `could not reach the platform: ${transportMessage(failure)}`;
   }
 
   return String(failure);

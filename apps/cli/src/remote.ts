@@ -52,8 +52,21 @@ const isDefect = Schema.is(RpcClientError.RpcClientDefect);
 
 const isNoPlatformError = Schema.is(NoPlatform);
 
+const isHttpFailure = Schema.is(HttpClientError.HttpClientErrorSchema);
+
 /** Whether a call failed in transit (not by the contract's own errors). */
 export const isTransportFailure = isClientError;
+
+/**
+ * What failed in transit, in words. An HTTP failure's own message is empty:
+ * its cause (the transport error, or the status and URL) says what failed.
+ */
+export const transportMessage = (failure: RpcClientError.RpcClientError) =>
+  isHttpFailure(failure.reason) &&
+  Predicate.hasProperty(failure.reason.cause, "message") &&
+  Predicate.isString(failure.reason.cause.message)
+    ? failure.reason.cause.message
+    : failure.message;
 
 /** The usage error a call failed with because no platform was there to call. */
 export const noPlatformOf = (

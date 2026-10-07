@@ -20,12 +20,14 @@ import {
   VerdictOf,
 } from "@repo/protocol/contracts";
 import type { Contract } from "@repo/protocol/contracts";
+import { LandReceipt } from "@repo/protocol/domain/answer";
 import type { AnswerReceipt } from "@repo/protocol/domain/answer";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
-import { explain, receiptLine } from "@repo/protocol/render";
-import { Array, DateTime, Option, Result, Schema } from "effect";
+import type { Refusal } from "@repo/protocol/refusal";
+import { receiptLine } from "@repo/protocol/render";
+import { DateTime, Option, Result, Schema } from "effect";
 import type { Rpc } from "effect/rpc";
 
 const short = (sha: string) => sha.slice(0, 7);
@@ -345,22 +347,33 @@ const front = viewOf(FrontPage.successSchema, ({ entries }) =>
 
 /**
  * Where an offered answer stands, in the line git's `remote:` output gives a
- * push of the same answer; a refused one, as its refusals' explanation.
+ * push of the same answer. A refused one never reaches its view: its
+ * refusals print as refusals (`refusalsIn`).
  */
 const receipt = (offered: AnswerReceipt) =>
-  Result.match(receiptLine(offered), {
-    onFailure: (refusals) =>
-      prose(
-        Array.isReadonlyArrayNonEmpty(refusals)
-          ? explain(refusals).join("\n")
-          : `${offered.ask} was refused`
-      ),
-    onSuccess: prose,
-  });
+  prose(
+    Result.getOrElse(receiptLine(offered), () => `${offered.ask} was refused`)
+  );
 
 const submitted = viewOf(SubmitAnswer.successSchema, receipt);
 
 const finished = viewOf(Finish.successSchema, receipt);
+
+/** Any receipt: an answer's (`submit`, `finish`) has a landing's fields too. */
+const isReceipt = Schema.is(LandReceipt);
+
+/**
+ * The refusals a contract's success carries in place of a result: a refused
+ * receipt's (`finish` and `land` refuse at stages 0–1 that way, and `submit`
+ * gives a refused request's receipt back again). The command prints them as
+ * refusals, once, and exits 1.
+ */
+export const refusalsIn = (
+  success: Rpc.Success<Contract>
+): readonly Refusal[] =>
+  isReceipt(success) && Outcome.guards.Refused(success.outcome)
+    ? success.outcome.refusals
+    : [];
 
 /** Each contract's view, by tag. */
 export const views = {

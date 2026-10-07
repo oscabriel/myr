@@ -8,7 +8,12 @@ import { ConfigProvider, Effect, Layer, Option, Redacted } from "effect";
 import { Credentials } from "../src/credentials.ts";
 import type { Profile } from "../src/credentials.ts";
 import { RemoteClient } from "../src/remote.ts";
-import { httpPlatform, knownToken, runProgram } from "./remote-server.ts";
+import {
+  failingPlatform,
+  httpPlatform,
+  knownToken,
+  runProgram,
+} from "./remote-server.ts";
 import type { Handlers } from "./remote-server.ts";
 
 /** `listAsks` (public) lists one ask; `status` (signed in) shows nothing yet. */
@@ -123,6 +128,25 @@ describe("the remote client", () => {
         "  retryable: no",
       ]);
     }).pipe(Effect.scoped)
+  );
+
+  it.live(
+    "says in one line what failed when the platform answers with an error",
+    () =>
+      Effect.gen(function* () {
+        const origin = yield* failingPlatform(503);
+
+        const run = yield* runProgram(["asks", "--project", "datekit"], {
+          client: remote(holding(Option.none()), { [urlVariable]: origin }),
+          handlers,
+        });
+
+        expect(run.code).toBe(1);
+        expect(run.out).toStrictEqual([]);
+        expect(run.err).toHaveLength(1);
+        expect(run.err[0]).toMatch(/^could not reach the platform: .*\b503\b/u);
+        expect(run.err[0]).toContain(`${origin}/rpc`);
+      }).pipe(Effect.scoped)
   );
 
   it.live("with no profile and no url, is a usage error naming login", () =>

@@ -31,7 +31,7 @@ import type { ChildProcessSpawner } from "effect/process";
 
 import { local } from "./local/index.ts";
 import { Output } from "./output.ts";
-import { views } from "./render.ts";
+import { refusalsIn, views } from "./render.ts";
 import { repoContext } from "./repo-context.ts";
 
 /** The folder the CLI stands in: the process's own, unless a test says otherwise. */
@@ -79,6 +79,7 @@ const projected = toCommands(Contracts, Effect.service(Client), {
   defaults: fromRepoContext,
   exclude: wrapped,
   output: Effect.service(Output),
+  refusalsIn,
   views,
 });
 

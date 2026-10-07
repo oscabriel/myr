@@ -12,7 +12,7 @@ import {
   RequestId,
 } from "@repo/protocol/ids";
 import { DecisionClosed, StaleBase } from "@repo/protocol/refusal";
-import { receiptLine } from "@repo/protocol/render";
+import { explain, receiptLine } from "@repo/protocol/render";
 import { unanswered } from "@repo/protocol/testing";
 import { gitOk } from "@repo/testkit/git";
 import {
@@ -426,46 +426,88 @@ describe("a misuse", () => {
   );
 });
 
+const submitArgs = [
+  "submit",
+  "--project",
+  project,
+  "--ask",
+  ask,
+  "--base",
+  base,
+  "--head",
+  head,
+  "--requestId",
+  requestId,
+];
+
+/** An answer's receipt, standing at `outcome`. */
+const receiptAt = (outcome: Outcome) => ({
+  ask,
+  base,
+  head,
+  outcome,
+  project,
+  requestId,
+});
+
+/** A platform whose `submitAnswer` gives `receipt` back. */
+const receiving = (receipt: ReturnType<typeof receiptAt>) =>
+  Layer.mergeAll(
+    unanswered,
+    Contracts.toLayerHandler("submitAnswer", () => Effect.succeed(receipt))
+  );
+
 describe("an answer offered with submit", () => {
   it.effect("prints the same line git's remote: output gives its push", () =>
     Effect.gen(function* () {
-      const offered = {
-        ask,
-        base,
-        head,
-        outcome: Outcome.cases.Checking.make({ stage: "merge" }),
-        project,
-        requestId,
-      };
-
-      const run = yield* runProgram(
-        [
-          "submit",
-          "--project",
-          project,
-          "--ask",
-          ask,
-          "--base",
-          base,
-          "--head",
-          head,
-          "--requestId",
-          requestId,
-        ],
-        {
-          handlers: Layer.mergeAll(
-            unanswered,
-            Contracts.toLayerHandler("submitAnswer", () =>
-              Effect.succeed(offered)
-            )
-          ),
-        }
+      const offered = receiptAt(
+        Outcome.cases.Checking.make({ stage: "merge" })
       );
+
+      const run = yield* runProgram(submitArgs, {
+        handlers: receiving(offered),
+      });
 
       expect(run.code).toBe(0);
       expect(Result.map(receiptLine(offered), (line) => [line])).toStrictEqual(
         Result.succeed(run.out)
       );
+    })
+  );
+
+  it.effect(
+    "prints a refused receipt as a refusal: once on stderr, nothing on stdout, exit 1",
+    () =>
+      Effect.gen(function* () {
+        const run = yield* runProgram(submitArgs, {
+          handlers: receiving(
+            receiptAt(Outcome.cases.Refused.make({ refusals: [refusal] }))
+          ),
+        });
+
+        expect(run.code).toBe(1);
+        expect(run.out).toStrictEqual([]);
+        expect(run.err).toStrictEqual(explain([refusal]));
+      })
+  );
+
+  it.effect("puts a refused receipt in one refused envelope under --json", () =>
+    Effect.gen(function* () {
+      const run = yield* runProgram([...submitArgs, "--json"], {
+        handlers: receiving(
+          receiptAt(Outcome.cases.Refused.make({ refusals: [refusal] }))
+        ),
+      });
+
+      expect(run.code).toBe(1);
+      expect(run.err).toStrictEqual([]);
+      expect(run.out).toHaveLength(1);
+      expect(yield* decodeEnvelope(run.out[0] ?? "")).toStrictEqual({
+        command: "submit",
+        ok: false,
+        refusals: [refusal],
+        v: 1,
+      });
     })
   );
 });
