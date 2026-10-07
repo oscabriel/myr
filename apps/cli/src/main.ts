@@ -13,6 +13,7 @@ import { CliConfig, CliError, Command, GlobalFlag } from "effect/cli";
 import { credential } from "./credential-helper.ts";
 import { CredentialsFile } from "./credentials.ts";
 import { hook } from "./hook.ts";
+import { refuseStrangeFlags } from "./local/env-set.ts";
 import { holdStdout, Output, OutputLive } from "./output.ts";
 import { CurrentMode, Policy } from "./policy.ts";
 import {
@@ -158,13 +159,17 @@ const builtInsFor = (policy: Option.Option<Policy["Service"]>) =>
  * Runs the command `argv` names. Help asked for, or shown for a group run
  * without a subcommand, is a success. A misuse (a parse error, a missing
  * value, `--yes` left out, any failure whose `Runtime.errorExitCode` is 2)
- * ends as `Misused` (exit 2) after one line on
- * stderr; every other failure ends as `Reported` (exit 1), printed once: a
- * refusal by the command, anything else here. A defect (a stub's "not
- * built") is not caught: the runtime prints it, loudly.
+ * ends as `Misused` (exit 2) after one line on stderr; every other failure
+ * ends as `Reported` (exit 1), printed once: a refusal by the command,
+ * anything else here. A defect (a stub's "not built") is not caught: the
+ * runtime prints it, loudly. `env set`'s words are screened before
+ * effect/cli parses them, so a value typed where a flag goes is never
+ * printed back.
  */
 export const program = (argv: readonly string[]) =>
   Effect.gen(function* () {
+    yield* refuseStrangeFlags(argv);
+
     const policy = yield* Effect.serviceOption(Policy);
     const stdout = holdStdout(yield* Console.Console);
 
