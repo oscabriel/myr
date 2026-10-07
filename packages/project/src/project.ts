@@ -14,7 +14,12 @@
  * schemas (`MethodSchemas`, principle 2), which W3's Durable Object boundary
  * reuses.
  */
-import { BranchName, RefName, RepoHost } from "@repo/artifacts/repo-host";
+import {
+  BranchName,
+  RefName,
+  RepoHost,
+  Revision,
+} from "@repo/artifacts/repo-host";
 import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { Brand } from "@repo/brand";
@@ -127,6 +132,7 @@ import { Finishers } from "@repo/rules/finish";
 import { RulesEvaluator, sdkVersion } from "@repo/rules/rules-evaluator";
 import {
   Array,
+  Cause,
   Context,
   DateTime,
   Effect,
@@ -172,10 +178,21 @@ import {
   strayDecision,
 } from "./deciders.ts";
 import type { DeciderApi, Opening } from "./deciders.ts";
-import { askClosed, askOpened, judged, listingOf, numbered } from "./events.ts";
-import type { ProjectEventInput } from "./events.ts";
+import {
+  askClosed,
+  askOpened,
+  judged,
+  listingOf,
+  numbered,
+  ProjectEventInput,
+} from "./events.ts";
 import { evaluationFacts, pushFacts, targetOf } from "./facts.ts";
 import type { MissingCommit } from "./facts.ts";
+import {
+  generatedFollowUp,
+  generatedRequestId,
+  ProjectGenerator,
+} from "./generated.ts";
 import { Lander, Rebuild } from "./lander.ts";
 import type { ComposedFile } from "./lander.ts";
 import {
@@ -1085,6 +1102,8 @@ export const projectService = (
     const runner = Context.get(ports, CheckRunner);
     const rules = Context.get(ports, RulesEvaluator);
     const alarms = Context.get(ports, Alarms);
+    // Read once, as the ports are: a call runs in its caller's context.
+    const generate = yield* ProjectGenerator;
     const lock = yield* Semaphore.make(1);
     const repo = RepoName.make(name);
 
@@ -1308,9 +1327,10 @@ export const projectService = (
      * One call that writes: under the project's lock it hydrates, runs
      * `body` (pure transitions, and the port calls that decide them), and
      * commits what it gathered; then, outside the lock, settles the outbox
-     * rows it wrote. A body that fails commits nothing.
+     * rows it wrote. A body that fails commits nothing. Every method calls
+     * it through `write`, which adds the generated follow-up to the body.
      */
-    const write = <A, E>(
+    const writeLocked = <A, E>(
       queue: AnswerQueue,
       body: (
         h: Hydrated,
@@ -1487,6 +1507,193 @@ export const projectService = (
               policyAt: at,
             })),
         })
+      );
+
+    // --------------------------------------------------------- generated
+
+    /** A file's text at a landed commit of the canonical repo; none where it has no such file. */
+    const textAt = (at: LandedSha) => (path: string) =>
+      host
+        .readFile(repo, Revision.Commit({ sha: at }), RepoPath.make(path))
+        .pipe(
+          Effect.map(Option.map((bytes) => new TextDecoder().decode(bytes))),
+          Effect.orDie
+        );
+
+    /**
+     * The platform's own landing of the regenerated files on top of
+     * `landed`, recorded with the landing it follows: the files composed
+     * onto main and landed through the Lander, a compare-and-swap push of
+     * `main` then the mirror, as every platform landing is, with the request
+     * id `gen-<landed>`, so a replay finds its commit.
+     */
+    const landFollowUp = (input: {
+      readonly h: Hydrated;
+      readonly landed: LandedSha;
+      readonly landing: LandingView;
+      readonly now: DateTime.Utc;
+      /** The policy read at `landed`, encoded as the row holds it. */
+      readonly policy: Exclude<ProjectRow["policy"], undefined>;
+      readonly row: ProjectRow;
+      readonly writes: Writes;
+    }) =>
+      Effect.gen(function* () {
+        const { h, landed, landing, now, row, writes } = input;
+
+        const made = yield* generatedFollowUp(
+          {
+            after: yield* Effect.orDie(decodePolicy(input.policy)),
+            before: h.policy,
+            initializer: row.initializer,
+            landing,
+            project: name,
+            read: textAt(landed),
+          },
+          generate
+        );
+
+        if (Option.isNone(made)) {
+          return;
+        }
+
+        const { author, credits, message, requestId } = made.value;
+
+        const files = Array.map(made.value.files, ({ content, path }) => ({
+          content,
+          path: RepoPath.make(path),
+        }));
+
+        const composed = yield* lander.compose({ files, main: landed, repo });
+
+        const { sha } = yield* lander.land({
+          author,
+          main: landed,
+          message,
+          rebuild: Rebuild.Compose({ files }),
+          repo,
+          requestId,
+          tree: composed.tree,
+          verdict: Option.none(),
+        });
+
+        const view: LandingView = {
+          assisted: [],
+          author,
+          credits,
+          landedAt: now,
+          parent: landed,
+          project: name,
+          requestId,
+          sha,
+        };
+
+        const moved = yield* withPolicyAt({ ...row, landed: sha }, sha, now);
+
+        writes.landings.push(view);
+        writes.events.push(
+          ProjectEventInput.Landed({ at: now, landing: view })
+        );
+        writes.project.set("row", moved);
+      });
+
+    /**
+     * A follow-up that did not land. When canonical `main` still stands at
+     * `landed`, nothing of it reached main: the landing it follows stands,
+     * and the failure is logged. When main moved on (the push went through
+     * and the Lander's answer was lost), or where it stands can't be read,
+     * the call fails and commits nothing, so the project's landed SHA never
+     * falls behind main: the same call run again finds both commits by their
+     * request ids.
+     */
+    const unlanded = <E>(landed: LandedSha, cause: Cause.Cause<E>) =>
+      Effect.gen(function* () {
+        const refs = yield* Effect.option(host.refs(repo));
+
+        if (Option.exists(refs, (all) => all.get(mainRef) === landed)) {
+          return yield* Effect.logWarning(
+            "the regenerated contribute skill and AGENTS.md block did not land",
+            cause
+          );
+        }
+
+        yield* Effect.logError(
+          `main moved past ${landed} while the regenerated files landed: the call records nothing, so it can run again`,
+          cause
+        );
+
+        return yield* Effect.orDie(Effect.failCause(cause));
+      });
+
+    /**
+     * After a call moved the landed SHA (the first adoption, an answer, a
+     * decider's own landing, an ask opened, a vouch): the platform's own
+     * landing of the regenerated contribute skill and AGENTS.md block on
+     * top, when the policy read at the new landed SHA changes what they say
+     * (spec D12, W4 410). It never joins the landing that changed the config
+     * ("land only the checked tree"), and it is recorded in the same commit
+     * as the landing it follows, under the project's lock. It is
+     * bookkeeping: one that cannot land is logged, and the landing it follows
+     * stands; the next landing that changes the config writes the files
+     * again (`unlanded`).
+     */
+    const followUp = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
+      Effect.gen(function* () {
+        const row = writes.project.get("row");
+        const landed = row?.landed;
+        const policy = row?.policy;
+
+        if (
+          row === undefined ||
+          policy === undefined ||
+          landed === undefined ||
+          row.policyAt !== landed ||
+          Option.exists(h.project, (before) => before.landed === landed)
+        ) {
+          return;
+        }
+
+        const requestId = generatedRequestId(landed);
+        const landing = writes.landings.find(({ sha }) => sha === landed);
+
+        const followed = [...h.landings, ...writes.landings].some(
+          (each) => each.requestId === requestId
+        );
+
+        if (landing === undefined || followed) {
+          return;
+        }
+
+        yield* landFollowUp({
+          h,
+          landed,
+          landing,
+          now,
+          policy,
+          row,
+          writes,
+        }).pipe(
+          Effect.catchCause((cause) =>
+            Cause.hasInterruptsOnly(cause)
+              ? Effect.interrupt
+              : unlanded(landed, cause)
+          )
+        );
+      });
+
+    /**
+     * One call that writes (`writeLocked`), with the generated follow-up of
+     * any landing the body recorded, in the same commit.
+     */
+    const write = <A, E>(
+      queue: AnswerQueue,
+      body: (
+        h: Hydrated,
+        writes: Writes,
+        now: DateTime.Utc
+      ) => Effect.Effect<A, E>
+    ): Effect.Effect<A, E> =>
+      writeLocked(queue, (h, writes, now) =>
+        Effect.tap(body(h, writes, now), () => followUp(h, writes, now))
       );
 
     /** A `main` for an imported repo whose branch had another name, at its tip. */
@@ -2094,8 +2301,17 @@ export const projectService = (
 
           const landed = LandedSha.make(head);
 
+          // The same first push again: still the project's adoption (the one
+          // landing with no parent), whatever the platform landed on top of
+          // it since, such as the regenerated contribute skill.
           if (row.state === "live") {
-            return row.landed === landed ? { landed } : yield* refused;
+            const adopted = h.landings.some(
+              ({ parent, sha }) => sha === landed && parent === undefined
+            );
+
+            return row.landed === landed || adopted
+              ? { landed }
+              : yield* refused;
           }
 
           writes.landings.push(adoption(row.initializer, landed, now));
@@ -3040,6 +3256,8 @@ export const projectService = (
 
             yield* tickAll(h, writes, now);
             yield* decided.expire(h, writes, now);
+            // A decision that took its default may have landed (a revert).
+            yield* followUp(h, writes, now);
 
             return [...(yield* commit(h, writes, now)), ...h.outbox];
           })
