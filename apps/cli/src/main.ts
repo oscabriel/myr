@@ -47,12 +47,15 @@ export const root = Command.make(Brand.cli).pipe(
  */
 const version = "0.0.0";
 
+/** The exit code of a usage error, as for a command line effect/cli can't parse. */
+const USAGE = 2;
+
 /**
  * The command was misused and said so in one line on stderr: the program
  * exits 2 and prints nothing more.
  */
 export class Misused extends Schema.TaggedError<Misused>()("Misused", {}) {
-  override readonly [Runtime.errorExitCode] = 2;
+  override readonly [Runtime.errorExitCode] = USAGE;
   override readonly [Runtime.errorReported] = false;
 }
 
@@ -62,8 +65,8 @@ const isReported = Schema.is(Reported);
 
 const isUnauthenticated = Schema.is(Unauthenticated);
 
-/** Usage errors that are this CLI's own, beside effect/cli's. */
-const isUsage = Schema.is(
+/** Usage errors this CLI shares across its commands, beside effect/cli's. */
+const isSharedUsage = Schema.is(
   Schema.Union([ApprovalNeeded, MissingValue, UnknownCommand])
 );
 
@@ -76,6 +79,13 @@ const signIn = [
 
 /** How running the tree can fail. */
 type Failure = Command.Error<typeof root> | CliError.CliError;
+
+/**
+ * Whether a failure is a usage error: a shared one, or one a command marks
+ * with exit code 2 (`init`'s `InitMisused`).
+ */
+const isUsage = (failure: Failure) =>
+  isSharedUsage(failure) || Runtime.getErrorExitCode(failure) === USAGE;
 
 /** One line for a failure that is a misuse of the command; none otherwise. */
 const usageLine = (failure: Failure): Option.Option<string> => {
@@ -147,7 +157,8 @@ const builtInsFor = (policy: Option.Option<Policy["Service"]>) =>
 /**
  * Runs the command `argv` names. Help asked for, or shown for a group run
  * without a subcommand, is a success. A misuse (a parse error, a missing
- * value, `--yes` left out) ends as `Misused` (exit 2) after one line on
+ * value, `--yes` left out, any failure whose `Runtime.errorExitCode` is 2)
+ * ends as `Misused` (exit 2) after one line on
  * stderr; every other failure ends as `Reported` (exit 1), printed once: a
  * refusal by the command, anything else here. A defect (a stub's "not
  * built") is not caught: the runtime prints it, loudly.

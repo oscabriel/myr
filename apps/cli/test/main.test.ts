@@ -95,7 +95,6 @@ describe(`${Brand.cli} --help`, () => {
 
 describe("each command a later issue builds", () => {
   const stubs = [
-    { args: ["init"], issue: "413" },
     { args: ["why"], issue: "414" },
     { args: ["env", "set"], issue: "414" },
     { args: ["hook"], issue: "415" },
