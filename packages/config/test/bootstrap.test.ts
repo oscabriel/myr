@@ -39,7 +39,9 @@ const PlatformStage = Schema.Struct({
   d1_databases: Schema.Tuple([
     Schema.Struct({ binding: Schema.String, database_name: Schema.String }),
   ]),
-  r2_buckets: Schema.Tuple([Schema.Struct({ bucket_name: Schema.String })]),
+  r2_buckets: Schema.Array(
+    Schema.Struct({ binding: Schema.String, bucket_name: Schema.String })
+  ),
   services: Schema.Tuple([Schema.Struct({ service: Schema.String })]),
   triggers: Schema.Struct({
     events: Schema.Tuple([
@@ -91,7 +93,12 @@ const everything: Existing = {
     { id: "44444444444444444444444444444444", title: "oauth-demo" },
   ],
   namespaces: ["projects-dev-oscabriel", "projects-demo"],
-  r2: ["evidence-dev-oscabriel", "evidence-demo"],
+  r2: [
+    "evidence-dev-oscabriel",
+    "evidence-demo",
+    "releases-dev-oscabriel",
+    "releases-demo",
+  ],
 };
 
 describe("the stage table", () => {
@@ -143,8 +150,19 @@ describe("the stage table", () => {
 
         expect(declared).toStrictEqual(named);
         expect(
-          stages.map((stage) => platform.env[stage]?.r2_buckets[0].bucket_name)
-        ).toStrictEqual(stages.map((stage) => resources(stage).evidence));
+          stages.map((stage) =>
+            Object.fromEntries(
+              (platform.env[stage]?.r2_buckets ?? []).map(
+                ({ binding, bucket_name }) => [binding, bucket_name]
+              )
+            )
+          )
+        ).toStrictEqual(
+          stages.map((stage) => ({
+            EVIDENCE: resources(stage).evidence,
+            RELEASES: resources(stage).releases,
+          }))
+        );
       })
   );
 
@@ -165,6 +183,7 @@ describe("the bootstrap plan", () => {
       Step.CreateD1({ name: "front-page-dev-oscabriel" }),
       Step.CreateKv({ title: "oauth-dev-oscabriel" }),
       Step.CreateR2({ name: "evidence-dev-oscabriel" }),
+      Step.CreateR2({ name: "releases-dev-oscabriel" }),
     ]);
   });
 
@@ -185,12 +204,13 @@ describe("the bootstrap plan", () => {
         },
       ],
       namespaces: ["projects-demo"],
-      r2: ["evidence-dev-oscabriel"],
+      r2: ["evidence-dev-oscabriel", "releases-demo"],
     };
 
     expect(plan("dev-oscabriel", demoOnly)).toStrictEqual([
       Step.CreateNamespace({ name: "projects-dev-oscabriel" }),
       Step.CreateD1({ name: "front-page-dev-oscabriel" }),
+      Step.CreateR2({ name: "releases-dev-oscabriel" }),
     ]);
   });
 });

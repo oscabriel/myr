@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./audit": "./src/audit.ts",
     "./cli": "./src/cli.ts",
     "./contracts": "./src/contracts.ts",
     "./domain/*": "./src/domain/*.ts",

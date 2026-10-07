@@ -93,9 +93,9 @@ export const plan = (stage: Stage, existing: Existing): readonly Step[] => {
     ...(existing.kv.some(({ title }) => title === names.oauth)
       ? []
       : [Step.CreateKv({ title: names.oauth })]),
-    ...(existing.r2.includes(names.evidence)
-      ? []
-      : [Step.CreateR2({ name: names.evidence })]),
+    ...[names.evidence, names.releases].flatMap((name) =>
+      existing.r2.includes(name) ? [] : [Step.CreateR2({ name })]
+    ),
   ];
 };
 

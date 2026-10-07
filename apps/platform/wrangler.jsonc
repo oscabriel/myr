@@ -58,7 +58,11 @@
   "kv_namespaces": [
     { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
   ],
-  "r2_buckets": [{ "binding": "EVIDENCE", "bucket_name": "evidence-local" }],
+  // Lane logs, and the CLI's releases the platform serves (issue 420).
+  "r2_buckets": [
+    { "binding": "EVIDENCE", "bucket_name": "evidence-local" },
+    { "binding": "RELEASES", "bucket_name": "releases-local" },
+  ],
   "worker_loaders": [{ "binding": "LOADER" }],
   "services": [{ "binding": "SANDBOX", "service": "sandbox" }],
   // Namespace ids differ per stage, so one stage's counts never spend
@@ -133,6 +137,7 @@
       ],
       "r2_buckets": [
         { "binding": "EVIDENCE", "bucket_name": "evidence-dev-oscabriel" },
+        { "binding": "RELEASES", "bucket_name": "releases-dev-oscabriel" },
       ],
       "worker_loaders": [{ "binding": "LOADER" }],
       "services": [
@@ -200,7 +205,10 @@
       "kv_namespaces": [
         { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
       ],
-      "r2_buckets": [{ "binding": "EVIDENCE", "bucket_name": "evidence-demo" }],
+      "r2_buckets": [
+        { "binding": "EVIDENCE", "bucket_name": "evidence-demo" },
+        { "binding": "RELEASES", "bucket_name": "releases-demo" },
+      ],
       "worker_loaders": [{ "binding": "LOADER" }],
       "services": [{ "binding": "SANDBOX", "service": "sandbox-demo" }],
       "ratelimits": [

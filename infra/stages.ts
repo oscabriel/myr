@@ -47,6 +47,8 @@ export interface Resources {
   readonly oauth: string;
   /** The R2 bucket that keeps lane logs. */
   readonly evidence: string;
+  /** The R2 bucket the CLI's releases are downloaded from (`/install.sh`, `/releases/*`). */
+  readonly releases: string;
   /** The Workflow that merges, checks and lands an answer. */
   readonly answer: string;
   /** The Workflow that hears every push to the public namespace. */
@@ -62,6 +64,7 @@ export const resources = (stage: Stage): Resources => ({
   onPush: `on-push-${stage}`,
   platform: `platform-${stage}`,
   projects: `projects-${stage}`,
+  releases: `releases-${stage}`,
   sandbox: `sandbox-${stage}`,
   web: `web-${stage}`,
 });

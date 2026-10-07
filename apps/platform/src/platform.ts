@@ -72,6 +72,8 @@ export const PlatformBindings = Schema.Struct({
   ON_PUSH: binding<Env["ON_PUSH"]>("the OnPush Workflow"),
   PROJECT: binding<Env["PROJECT"]>("the Project Durable Object"),
   PROPOSAL_LIMIT: binding<Env["PROPOSAL_LIMIT"]>("a rate limit"),
+  /** The CLI's releases, served at `/install.sh` and `/releases/*` (issue 420). */
+  RELEASES: binding<Env["RELEASES"]>("an R2 bucket"),
   /**
    * A service binding to the sandbox Worker's default entrypoint. The
    * generated `Env` types it as a plain `Fetcher`, since this app's types

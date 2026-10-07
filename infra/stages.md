@@ -21,6 +21,7 @@ Every name is a job name plus the stage, never the brand. For stage `<s>`:
 | D1 database (the front page) | `front-page-<s>` | bootstrap |
 | KV namespace (OAuth grants) | `oauth-<s>` | bootstrap |
 | R2 bucket (lane evidence) | `evidence-<s>` | bootstrap |
+| R2 bucket (CLI releases, served at `/install.sh` and `/releases/*`) | `releases-<s>` | bootstrap |
 | Push-event trigger | `cf.artifacts.repo.pushed` on `projects-<s>`, starting `on-push-<s>` | deploy (`triggers.events` in `apps/platform/wrangler.jsonc`), read back by bootstrap |
 
 The `witness` namespace belongs to another project. Nothing here reads, writes or deletes it, and neither should you.
@@ -111,5 +112,5 @@ None of this is automated: the scripts never delete, and the hook policy refuses
 2. The Artifacts repos, then the namespace. List the repos with `bun run ops -- artifacts namespaces repos list --namespace projects-<s>`, delete each one with `bun run ops -- artifacts namespaces repos delete <repo> --namespace projects-<s> --force`, then `bun run ops -- artifacts namespaces delete --namespace projects-<s>`. A namespace has to be empty before it can be deleted.
 3. The database: `wrangler d1 delete front-page-<s>`.
 4. The KV namespace: `wrangler kv namespace delete --namespace-id <id>`. The id is in the stage's block of `apps/platform/wrangler.jsonc`.
-5. The bucket: empty `evidence-<s>`, then run `wrangler r2 bucket delete evidence-<s>`.
+5. The buckets: empty `evidence-<s>` and `releases-<s>`, then run `wrangler r2 bucket delete evidence-<s>` and `wrangler r2 bucket delete releases-<s>`.
 6. Put the stage's placeholder ids back in `apps/platform/wrangler.jsonc`.

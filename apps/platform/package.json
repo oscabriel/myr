@@ -11,6 +11,7 @@
     "@cloudflare/workers-oauth-provider": "1.2.1",
     "@effect/sql-d1": "4.0.1",
     "@effect/sql-sqlite-do": "4.0.1",
+    "@repo/agent-kit": "workspace:*",
     "@repo/artifacts": "workspace:*",
     "@repo/brand": "workspace:*",
     "@repo/checks": "workspace:*",

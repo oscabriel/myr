@@ -125,6 +125,7 @@ export const fakeEnv = (): Env => ({
   PASSWORD_PEPPER: passwordPepper,
   PROJECT: fakeProjects(),
   PROPOSAL_LIMIT: untouchable("PROPOSAL_LIMIT"),
+  RELEASES: untouchable("RELEASES"),
   SANDBOX: untouchable("SANDBOX"),
   SIGN_IN_LIMIT: untouchable("SIGN_IN_LIMIT"),
   STAGE: "local",

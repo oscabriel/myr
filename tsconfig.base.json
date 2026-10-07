@@ -120,6 +120,7 @@
                 "effect/ai",
                 "effect/cli",
                 "effect/http",
+                "effect/process",
                 "effect/rpc"
               ]
             }
