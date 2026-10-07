@@ -3,8 +3,8 @@
  * `asks/<id>.ask.ts` exports by default.
  */
 import type { Brief } from "@repo/protocol/domain/ask";
+import { AskKind } from "@repo/protocol/domain/kind";
 import type {
-  AskKind,
   BriefField,
   CheckKind,
   ClaimRule,
@@ -15,6 +15,7 @@ import { Schema, Struct } from "effect";
 
 import { check } from "./check.ts";
 import type { CheckSpecInput } from "./check.ts";
+import { checked } from "./checked.ts";
 import { withFunctions } from "./functions.ts";
 import type { KindFunctions, OpensAlone, WithFunctions } from "./functions.ts";
 import type { TerritoryInput } from "./territory.ts";
@@ -138,6 +139,8 @@ export interface KindHandle<
   readonly ask: (input: AskArgs<Args, Mode>) => AskDefinition;
 }
 
+const askKindOf = checked(AskKind);
+
 const territoryOf = Schema.decodeUnknownSync(Territory);
 
 const encodeTerritory = Schema.encodeSync(Territory);
@@ -162,6 +165,8 @@ export interface KindBuilder {
 /**
  * Declares an ask kind: a typed template for asks, which fixes the brief's
  * args, the check kind, who may claim, and whether a finish is required.
+ * Its data is checked at the call, as an ask's args are, so a malformed
+ * kind fails where it is written.
  * `kind({ name: "fixBug", args: { repro: Schema.NonEmptyString }, checkKind:
  * "redThenGreen", check: ({ repro }) => check.redThenGreen(repro) })`.
  */
@@ -203,7 +208,7 @@ export const kind: KindBuilder = <
   return withFunctions(
     {
       ask,
-      askKind: {
+      askKind: askKindOf({
         checkKind: definition.checkKind,
         claimers: definition.claimers ?? "vouched",
         finish: definition.finish ?? "optional",
@@ -212,7 +217,7 @@ export const kind: KindBuilder = <
         race: definition.race ?? 1,
         requires: definition.requires ?? ["want", "check", "territory"],
         strength: definition.strength ?? "assertion",
-      },
+      }),
     },
     functions
   );

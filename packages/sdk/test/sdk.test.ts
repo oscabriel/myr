@@ -6,11 +6,13 @@ import { Schema } from "effect";
 
 import {
   check,
+  ClaimantFacts,
   defaults,
   functionsOf,
   kind,
   kinds,
   project,
+  ProposalFacts,
   run,
   territory,
   toAskInput,
@@ -24,11 +26,19 @@ const { LintToZero, Migrate, Ratchet, RedThenGreen } = CheckSpec.cases;
 const redThenGreen = (path: string) =>
   RedThenGreen.make({ path: RedThenGreen.fields.path.make(path) });
 
+// A name a migrate moves from or to: `from` and `to` share one schema.
+const symbol = (name: string) => Migrate.fields.from.make(name);
+
 const askFile = (id: string) => `${Brand.configDir}/asks/${id}.ask.ts`;
 
 const decodePolicy = Schema.decodeSync(PolicyInput);
 
 const decodeAsk = Schema.decodeSync(AskInput);
+
+// The rules evaluator is handed facts as unknown JSON and decodes them so.
+const decodeProposal = Schema.decodeUnknownSync(ProposalFacts);
+
+const decodeClaimant = Schema.decodeUnknownSync(ClaimantFacts);
 
 describe("the config folder's project file", () => {
   it("encodes the convex-merged example to policy data, with the run block found from CI", () => {
@@ -185,6 +195,34 @@ describe("the config folder's project file", () => {
     expect(policy.weakening).toStrictEqual({ markers: ["xit("] });
   });
 
+  it("encodes the settings a project writes, not the defaults", () => {
+    const written = decodePolicy(
+      toPolicyInput(
+        project({
+          agents: "none",
+          budget: { decisionsPerDay: 3, expire: "3 weeks" },
+          caps: { claimsPerPerson: 1, proposalsPerPerson: 4 },
+          record: { countsAfter: "1 week", window: "180 days" },
+          vouch: { file: "MAINTAINERS/vouched.td", mode: "all" },
+        })
+      )
+    );
+
+    expect(written).toMatchObject({
+      agents: "none",
+      budget: { decisionsPerDay: 3, expireDays: 21 },
+      caps: { claimsPerPerson: 1, proposalsPerPerson: 4 },
+      record: { countsAfterDays: 7, windowDays: 180 },
+      vouch: { file: "MAINTAINERS/vouched.td", mode: "all" },
+    });
+    expect(
+      decodePolicy(toPolicyInput(project({ vouch: "bansOnly" }))).vouch
+    ).toStrictEqual({
+      file: `${Brand.configDir}/vouched.td`,
+      mode: "bansOnly",
+    });
+  });
+
   it("encodes a project with no config folder to the defaults: one fix kind, the run block from CI", () => {
     const policy = decodePolicy(toPolicyInput(defaults));
 
@@ -273,6 +311,39 @@ describe("an ask file", () => {
     ).toThrow(Schema.SchemaError);
   });
 
+  it("takes its territory from its kind when the ask leaves it out", () => {
+    const fixIn = kind({
+      args: { path: Schema.NonEmptyString },
+      check: ({ path }) => check.redThenGreen(path),
+      checkKind: "redThenGreen",
+      name: "fixIn",
+      territory: ({ path }) =>
+        territory.paths(path.replace(/^test\//u, "src/")),
+    });
+
+    const derived = fixIn.ask({
+      path: "test/parse.test.ts",
+      want: "parseISO accepts ISO week dates",
+    });
+
+    const stated = fixIn.ask({
+      path: "test/parse.test.ts",
+      territory: territory.paths("src/week.ts"),
+      want: "parseISO accepts ISO week dates",
+    });
+
+    const origin = { askedBy: "ines-v", file: askFile("week") };
+
+    expect(decodeAsk(toAskInput(derived, origin)).territory).toStrictEqual({
+      module: ".",
+      paths: ["src/parse.test.ts"],
+    });
+    expect(decodeAsk(toAskInput(stated, origin)).territory).toStrictEqual({
+      module: ".",
+      paths: ["src/week.ts"],
+    });
+  });
+
   it("states a migrate step and a ratchet ask with their own check kinds", () => {
     const step = kinds.migrate.ask({
       count: "node scripts/count-callers.mjs legacyFetch --json",
@@ -297,8 +368,8 @@ describe("an ask file", () => {
         count: Migrate.fields.count.make(
           "node scripts/count-callers.mjs legacyFetch --json"
         ),
-        from: Migrate.fields.from.make("legacyFetch"),
-        to: Migrate.fields.from.make("http.get"),
+        from: symbol("legacyFetch"),
+        to: symbol("http.get"),
       }),
       kind: "migrate",
       parent: "drop-legacy-fetch",
@@ -311,6 +382,26 @@ describe("an ask file", () => {
       }),
       kind: "ratchetDown",
     });
+  });
+
+  it("fails at the call with a Schema issue when a kind's own data is malformed", () => {
+    expect(() =>
+      kind({
+        args: { path: Schema.NonEmptyString },
+        check: ({ path }) => check.redThenGreen(path),
+        checkKind: "redThenGreen",
+        name: "Fix Bug",
+      })
+    ).toThrow(Schema.SchemaError);
+    expect(() =>
+      kind({
+        args: { path: Schema.NonEmptyString },
+        check: ({ path }) => check.redThenGreen(path),
+        checkKind: "redThenGreen",
+        name: "fixHalf",
+        race: 1.5,
+      })
+    ).toThrow(Schema.SchemaError);
   });
 
   it("states a lint-to-zero ask with the rule and the project's own command", () => {
@@ -360,16 +451,44 @@ describe("function-valued rules", () => {
   it("answer opensAlone on demand, by the proposal's kind", () => {
     const { opensAlone } = functionsOf(definition);
 
-    const proposal = {
+    const facts = {
       kind: "trusted",
       proposer: "carol",
       record: 3,
       territory: ".",
     };
 
-    expect(opensAlone?.(proposal)).toBeTruthy();
-    expect(opensAlone?.({ ...proposal, record: 2 })).toBeFalsy();
-    expect(opensAlone?.({ ...proposal, kind: "fix" })).toBeFalsy();
+    expect(opensAlone?.(decodeProposal(facts))).toBeTruthy();
+    expect(opensAlone?.(decodeProposal({ ...facts, record: 2 }))).toBeFalsy();
+    expect(opensAlone?.(decodeProposal({ ...facts, kind: "fix" }))).toBeFalsy();
+  });
+
+  it("are told only facts that decode as the domain's handles, kinds and counts", () => {
+    const facts = {
+      kind: "trusted",
+      proposer: "carol",
+      record: 3,
+      territory: ".",
+    };
+
+    expect(() => decodeProposal({ ...facts, proposer: "@carol" })).toThrow(
+      Schema.SchemaError
+    );
+    expect(() => decodeProposal({ ...facts, kind: "Trusted Kind" })).toThrow(
+      Schema.SchemaError
+    );
+    expect(() => decodeProposal({ ...facts, record: -1 })).toThrow(
+      Schema.SchemaError
+    );
+    expect(() =>
+      decodeClaimant({
+        handle: "bram smith",
+        kind: "fix",
+        record: 0,
+        territory: ".",
+        vouched: true,
+      })
+    ).toThrow(Schema.SchemaError);
   });
 
   it("flag admit when the project writes one", () => {
@@ -382,13 +501,15 @@ describe("function-valued rules", () => {
       opensAlone: false,
     });
     expect(
-      functionsOf(admitting).admit?.({
-        handle: "bram",
-        kind: "fix",
-        record: 0,
-        territory: ".",
-        vouched: true,
-      })
+      functionsOf(admitting).admit?.(
+        decodeClaimant({
+          handle: "bram",
+          kind: "fix",
+          record: 0,
+          territory: ".",
+          vouched: true,
+        })
+      )
     ).toBeTruthy();
   });
 });

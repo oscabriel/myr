@@ -4,7 +4,22 @@
  * never meets, and says in its data which ones exist; the rules evaluator
  * calls them on demand, with facts the platform injects.
  */
+import { Ask } from "@repo/protocol/domain/ask";
+import { AskKind } from "@repo/protocol/domain/kind";
+import { Territory } from "@repo/protocol/domain/territory";
 import { Schema } from "effect";
+
+// The domain's own schemas for a person's handle, a kind's name and a
+// module, reached through the domain schemas that hold them, so facts decode
+// to the same branded values the rest of the platform uses.
+const Handle = Ask.fields.askedBy;
+
+const KindName = AskKind.fields.name;
+
+const Module = Territory.fields.module;
+
+/** A count of landings on a person's record: never negative. */
+const LandingCount = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 /**
  * What an `opensAlone` rule is told about a proposal: who proposed it, for
@@ -13,13 +28,13 @@ import { Schema } from "effect";
  */
 export const ProposalFacts = Schema.Struct({
   /** The ask kind the proposed ask is made from. */
-  kind: Schema.NonEmptyString,
+  kind: KindName,
   /** The person who made the proposal. */
-  proposer: Schema.NonEmptyString,
+  proposer: Handle,
   /** The proposer's landings in the territory that stayed unreverted. */
-  record: Schema.Int,
+  record: LandingCount,
   /** The proposed ask's territory, by module. */
-  territory: Schema.NonEmptyString,
+  territory: Module,
 });
 
 export type ProposalFacts = typeof ProposalFacts.Type;
@@ -37,13 +52,13 @@ export type OpensAlone = (proposal: ProposalFacts) => boolean;
  */
 export const ClaimantFacts = Schema.Struct({
   /** The person who wants to claim. */
-  handle: Schema.NonEmptyString,
+  handle: Handle,
   /** The ask's kind. */
-  kind: Schema.NonEmptyString,
+  kind: KindName,
   /** Their landings in the territory that stayed unreverted. */
-  record: Schema.Int,
+  record: LandingCount,
   /** The ask's territory, by module. */
-  territory: Schema.NonEmptyString,
+  territory: Module,
   /** Whether the vouch file vouches for them. */
   vouched: Schema.Boolean,
 });

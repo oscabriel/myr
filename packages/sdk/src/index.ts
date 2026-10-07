@@ -19,6 +19,7 @@ export {
 } from "./functions.ts";
 
 export {
+  type ArgFields,
   type AskArgs,
   type AskDefinition,
   type AskFields,
@@ -26,10 +27,13 @@ export {
   type AskOrigin,
   type AskStated,
   type DeclaredKind,
+  type DeriveTerritory,
   kind,
+  type KindBuilder,
   type KindDefinition,
   type KindHandle,
   kinds,
+  type TerritoryMode,
   toAskInput,
 } from "./kind.ts";
 
