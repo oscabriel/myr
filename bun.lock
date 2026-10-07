@@ -76,6 +76,8 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@cloudflare/workers-types": "5.20261006.1",
+        "@effect/platform-node": "4.0.1",
         "@effect/vitest": "catalog:",
         "@repo/config": "workspace:*",
         "typescript": "catalog:",

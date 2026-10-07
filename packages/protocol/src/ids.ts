@@ -23,3 +23,14 @@ export type CommitSha = typeof CommitSha.Type;
 export const RepoPath = Schema.NonEmptyString.pipe(Schema.brand("RepoPath"));
 
 export type RepoPath = typeof RepoPath.Type;
+
+/**
+ * A project's name. Lowercase letters, digits and dashes, like an ask's, so a
+ * command that names it is safe to paste into a shell.
+ */
+export const ProjectName = Schema.String.pipe(
+  Schema.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/u)),
+  Schema.brand("ProjectName")
+);
+
+export type ProjectName = typeof ProjectName.Type;

@@ -73,6 +73,23 @@
             }
           },
           {
+            "include": ["packages/protocol/src/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": ["effect/ai", "effect/cli", "effect/rpc"]
+            }
+          },
+          {
+            "include": ["packages/protocol/test/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/ai",
+                "effect/cli",
+                "effect/http",
+                "effect/rpc"
+              ]
+            }
+          },
+          {
             "include": ["packages/git/test/**/*.ts"],
             "options": {
               "allowedUnstableApis": ["effect/http", "effect/process"]

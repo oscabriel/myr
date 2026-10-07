@@ -1,0 +1,156 @@
+import { NodeServices } from "@effect/platform-node";
+import { describe, expect, it } from "@effect/vitest";
+import { Effect, Layer, Ref, Result, Schema } from "effect";
+import { CliOutput, Command } from "effect/cli";
+import type { Rpc, RpcGroup } from "effect/rpc";
+import { RpcTest } from "effect/rpc";
+import { TestConsole } from "effect/testing";
+
+import { toCommand } from "../src/cli.ts";
+import { Client, Contracts, ListAsks, SubmitAnswer } from "../src/contracts.ts";
+import { CommitSha } from "../src/ids.ts";
+import { StaleBase } from "../src/refusal.ts";
+import { ask, base, main, path } from "./examples.ts";
+
+const head = CommitSha.make("3333333333333333333333333333333333333333");
+
+/** Handlers that never refuse; `listAsks` echoes its project as the territory. */
+const quiet = Contracts.toLayer({
+  listAsks: ({ project }) =>
+    Effect.succeed({
+      asks: [
+        { ask, claimed: false, territory: project, want: "Parse a comma" },
+      ],
+    }),
+  submitAnswer: () => Effect.succeed({ main }),
+});
+
+/** What was printed, one entry per line however it was written. */
+const lines = (output: Effect.Effect<readonly unknown[]>) =>
+  Effect.map(output, (all) =>
+    all.flatMap((chunk) => String(chunk).split("\n"))
+  );
+
+/**
+ * Runs `command` on `args`, its calls answered by `handlers`, and returns how
+ * it ended with what it printed to stdout and stderr.
+ */
+const run = <Name extends string, Input, E, R, ContextInput>(
+  handlers: Layer.Layer<Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>>,
+  command: Command.Command<Name, Input, ContextInput, E, R>,
+  args: readonly string[]
+) =>
+  Effect.gen(function* () {
+    const result = yield* Effect.result(
+      Command.runWith(command, { version: "0.0.0" })(args)
+    );
+
+    return {
+      err: yield* lines(TestConsole.errorLines),
+      out: yield* lines(TestConsole.logLines),
+      result,
+    };
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        TestConsole.layer,
+        CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
+        Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
+          Layer.provide(handlers)
+        )
+      ).pipe(Layer.provideMerge(NodeServices.layer))
+    )
+  );
+
+const Json = Schema.fromJsonString(Schema.Unknown);
+
+const submitAnswer = toCommand(SubmitAnswer, Effect.service(Client));
+
+describe("the contracts as CLI commands", () => {
+  it.effect("takes the payload as flags and prints the success as JSON", () =>
+    Effect.gen(function* () {
+      const { out } = yield* run(
+        quiet,
+        toCommand(ListAsks, Effect.service(Client)),
+        ["--project", "demo"]
+      );
+
+      expect(yield* Schema.decodeEffect(Json)(out.join("\n"))).toStrictEqual({
+        asks: [
+          {
+            ask: "fix-parser",
+            claimed: false,
+            territory: "demo",
+            want: "Parse a comma",
+          },
+        ],
+      });
+    })
+  );
+
+  it.effect("prints a refusal as the renderer's text and fails with it", () =>
+    Effect.gen(function* () {
+      const refusal = new StaleBase({ base, conflicts: [path], main });
+
+      const { err, result } = yield* run(
+        Contracts.toLayer({
+          listAsks: () => Effect.succeed({ asks: [] }),
+          submitAnswer: () => Effect.fail(refusal),
+        }),
+        submitAnswer,
+        ["--ask", ask, "--base", base, "--head", head]
+      );
+
+      expect(result).toStrictEqual(Result.fail(refusal));
+      expect(err).toStrictEqual([
+        "StaleBase: main moved to 2222222, past your base 1111111; conflicts in src/a.ts",
+        "  next: git pull --rebase",
+        "  retryable: yes",
+      ]);
+    })
+  );
+
+  it.effect("with --json, prints the refusal as JSON that keeps its tag", () =>
+    Effect.gen(function* () {
+      const refusal = new StaleBase({ base, conflicts: [path], main });
+
+      const { err, out, result } = yield* run(
+        Contracts.toLayer({
+          listAsks: () => Effect.succeed({ asks: [] }),
+          submitAnswer: () => Effect.fail(refusal),
+        }),
+        submitAnswer,
+        ["--ask", ask, "--base", base, "--head", head, "--json"]
+      );
+
+      const printed = yield* Schema.decodeEffect(Json)(out.join("\n"));
+
+      expect(result).toStrictEqual(Result.fail(refusal));
+      expect(err).toStrictEqual([]);
+      expect(printed).toHaveProperty("_tag", "StaleBase");
+      expect(
+        yield* Schema.decodeUnknownEffect(StaleBase)(printed)
+      ).toStrictEqual(refusal);
+    })
+  );
+
+  it.effect("refuses a malformed commit id before calling anything", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make(0);
+
+      const { err, result } = yield* run(
+        Contracts.toLayer({
+          listAsks: () => Effect.succeed({ asks: [] }),
+          submitAnswer: () =>
+            Ref.update(calls, (count) => count + 1).pipe(Effect.as({ main })),
+        }),
+        submitAnswer,
+        ["--ask", ask, "--base", "not-a-sha", "--head", head]
+      );
+
+      expect(Result.isFailure(result)).toBeTruthy();
+      expect(yield* Ref.get(calls)).toBe(0);
+      expect(err.join("\n")).toContain("--base");
+    })
+  );
+});
