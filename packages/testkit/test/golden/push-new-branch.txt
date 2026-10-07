@@ -1,0 +1,3 @@
+remote: received <sha> for refs/heads/main
+To <tmp>/remote.git
+ * [new branch]      HEAD -> main
