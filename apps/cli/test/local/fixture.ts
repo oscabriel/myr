@@ -1,0 +1,144 @@
+/**
+ * A project's working repo, built by git in a temp folder, for the local
+ * `check`: two workspace packages `a` and `b`, a committed `policy.json`
+ * (`../fixtures/check/policy.json`) in the config folder with one ask,
+ * `fix-a`, whose territory is the package `a` and whose check is
+ * `packages/a/test/a.test.ts`, and two answers to it on branches of their
+ * own. The config folder's name comes from the brand, so no fixture on disk
+ * spells it: the fixture's `{configDir}` is written over with it.
+ */
+import { Brand } from "@repo/brand";
+import { gitOk } from "@repo/testkit/git";
+import { Effect, FileSystem, Path } from "effect";
+
+/** The project, the ask and the person the fixture's remote names. */
+export const project = "fixture";
+
+export const ask = "fix-a";
+
+export const handle = "alice";
+
+/** The platform the fixture's `origin` remote points at. */
+export const platform = "https://platform.example.dev";
+
+/** The claim's fork, as its remote names it: `<project>--<ask>--<handle>`. */
+const forkRemote = `${platform}/${project}--${ask}--${handle}.git`;
+
+/** The policy file, under the config folder. */
+export const policyFile = `${Brand.configDir}/policy.json`;
+
+/** The ask's check file: red on main, by its fourth line's assertion. */
+export const checkFile = "packages/a/test/a.test.ts";
+
+/** What the config folder states: the fixture, in the folder the brand names. */
+export const policyText = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+
+  const file = yield* path.fromFileUrl(
+    new URL("../fixtures/check/policy.json", import.meta.url)
+  );
+
+  const text = yield* fs.readFileString(file);
+
+  return text.replaceAll("{configDir}", Brand.configDir);
+});
+
+const testOnMain = [
+  'import { expect, it } from "vitest";',
+  'import { a } from "../src/a.ts";',
+  "",
+  'it("is two", () => expect(a).toBe(2));',
+  "",
+].join("\n");
+
+/** Main's files but the policy: the root manifest and both packages. */
+const onMain = {
+  [checkFile]: testOnMain,
+  "package.json":
+    '{ "name": "fixture", "private": true, "workspaces": ["packages/*"] }\n',
+  "packages/a/package.json":
+    '{ "name": "a", "exports": { ".": "./src/a.ts" } }\n',
+  "packages/a/src/a.ts": "export const a = 1;\n",
+  "packages/b/package.json": '{ "name": "b" }\n',
+  "packages/b/src/b.ts": "export const b = 1;\n",
+} as const satisfies Readonly<Record<string, string>>;
+
+/** The answer that strays: it edits `b`, skips a test at line 4, and fixes `a`. */
+const straying = {
+  [checkFile]: testOnMain.replace(
+    "it(",
+    'it.skip("is one", () => expect(a).toBe(1));\nit('
+  ),
+  "packages/a/src/a.ts": "export const a = 2;\n",
+  "packages/b/src/b.ts": "export const b = 2;\n",
+} as const satisfies Readonly<Record<string, string>>;
+
+/** The answer that stays inside its territory: it fixes `a`, and only that. */
+const clean = {
+  "packages/a/src/a.ts": "export const a = 2;\n",
+} as const satisfies Readonly<Record<string, string>>;
+
+/** The fixture's commits: `main`, and the two answers' heads. */
+export interface CheckRepo {
+  readonly root: string;
+  readonly main: string;
+  readonly straying: string;
+  readonly clean: string;
+}
+
+const write = (root: string, files: Readonly<Record<string, string>>) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+
+    for (const [file, content] of Object.entries(files)) {
+      const at = path.join(root, file);
+
+      yield* fs.makeDirectory(path.dirname(at), { recursive: true });
+      yield* fs.writeFileString(at, content);
+    }
+  });
+
+/** Writes `files` in `root` and commits them all; the new commit's id. */
+export const commit = (
+  root: string,
+  files: Readonly<Record<string, string>>,
+  message: string
+) =>
+  Effect.gen(function* () {
+    yield* write(root, files);
+    yield* gitOk(root, "add", "--all");
+    yield* gitOk(root, "commit", "--quiet", "--message", message);
+
+    return yield* gitOk(root, "rev-parse", "HEAD");
+  });
+
+/**
+ * The fixture repo, in a temp folder the scope removes: `main`, then the
+ * branches `straying` and `clean` from it, with HEAD on `straying` and the
+ * claim's fork as `origin`.
+ */
+export const aCheckRepo = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const root = yield* fs.realPath(yield* fs.makeTempDirectoryScoped());
+
+  yield* gitOk(root, "init", "--quiet", "--initial-branch", "main");
+  yield* gitOk(root, "remote", "add", "origin", forkRemote);
+
+  const main = yield* commit(
+    root,
+    { ...onMain, [policyFile]: yield* policyText },
+    "Start the fixture"
+  );
+
+  yield* gitOk(root, "checkout", "--quiet", "-b", "clean");
+
+  const fixed = yield* commit(root, clean, "Make a two");
+
+  yield* gitOk(root, "checkout", "--quiet", "-b", "straying", "main");
+
+  const strayed = yield* commit(root, straying, "Make a two, and more");
+
+  return { clean: fixed, main, root, straying: strayed } satisfies CheckRepo;
+});

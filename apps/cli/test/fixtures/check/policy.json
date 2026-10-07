@@ -1,0 +1,38 @@
+{
+  "asks": [
+    {
+      "askedBy": "olivia",
+      "blockedBy": [],
+      "brief": { "want": "a is two" },
+      "check": {
+        "_tag": "RedThenGreen",
+        "path": "packages/a/test/a.test.ts"
+      },
+      "file": "{configDir}/policy.json",
+      "id": "fix-a",
+      "kind": "fix",
+      "territory": { "module": "a", "paths": ["{dir}/**"] }
+    }
+  ],
+  "deciders": [{ "handles": "owners", "paths": "**" }],
+  "functions": { "admit": false, "opensAlone": false },
+  "kinds": [
+    {
+      "checkKind": "redThenGreen",
+      "claimers": "anyone",
+      "finish": "never",
+      "name": "fix",
+      "oneWay": false,
+      "race": 1,
+      "requires": ["want", "check"],
+      "strength": "assertion"
+    }
+  ],
+  "ratchets": [],
+  "run": {
+    "checks": { "bad": "false", "ok": "true" },
+    "test": "true {path}"
+  },
+  "source": "config",
+  "weakening": { "markers": [] }
+}
