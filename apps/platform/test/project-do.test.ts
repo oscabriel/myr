@@ -1,14 +1,18 @@
 import { describe, expect, it } from "@effect/vitest";
 import { AnswerRuns } from "@repo/project/answer-runs";
 import type { AnswerQueue } from "@repo/project/answer-runs";
+import { ProjectGenerator } from "@repo/project/generated";
 import { RequestId } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { advanceTo, at } from "@repo/testkit/clock";
 import { untouchable } from "@repo/testkit/untouchable";
-import { DateTime, Effect, Option } from "effect";
+import { Context, DateTime, Effect, Layer, Option } from "effect";
 
 import { AnswerRunsWorkflow } from "../src/adapters/answer-runs-workflow.ts";
-import { Project } from "../src/project-do.ts";
+import { decodeEnv } from "../src/platform.ts";
+import { doPorts, Project } from "../src/project-do.ts";
+import { generate } from "../src/workflows/generated.ts";
+import { fakeEnv } from "./fake-env.ts";
 import {
   alice,
   answerWorkflow,
@@ -238,4 +242,22 @@ describe("the Project DO class", () => {
       Object.getOwnPropertyNames(Project.prototype).toSorted()
     ).toStrictEqual(["alarm", "call", "constructor"]);
   });
+
+  it.effect(
+    "runs on ports that carry the platform's generator, so a landing that changes the config is followed (410)",
+    () =>
+      Effect.gen(function* () {
+        const config = yield* decodeEnv(fakeEnv()).pipe(Effect.orDie);
+
+        const ports = yield* Layer.build(
+          doPorts({
+            config,
+            name: Option.some(project),
+            storage: untouchable("storage"),
+          })
+        );
+
+        expect(Context.get(ports, ProjectGenerator)).toBe(generate);
+      })
+  );
 });

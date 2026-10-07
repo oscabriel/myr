@@ -17,13 +17,15 @@ import { DurableObject } from "cloudflare:workers";
 import { Context, Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 
 import { DoAlarms } from "./adapters/alarms.ts";
+import type { AlarmStorage } from "./adapters/alarms.ts";
 import { AnswerRunsWorkflow } from "./adapters/answer-runs-workflow.ts";
 import { decodeEnv } from "./platform.ts";
-import type { InvalidEnv } from "./platform.ts";
+import type { InvalidEnv, PlatformConfig } from "./platform.ts";
 import { workerPorts } from "./ports.ts";
 import type { CallRequest, ExitEncoded } from "./project-calls.ts";
 import { projectShell } from "./project-shell.ts";
 import type { ProjectShell } from "./project-shell.ts";
+import { ProjectSkillGenerator } from "./workflows/generated.ts";
 
 /** The shell one Project DO runs on. */
 class Shell extends Context.Service<Shell, ProjectShell>()(
@@ -41,6 +43,27 @@ const Nameless = Layer.succeed(
   })
 );
 
+/**
+ * Every port one Project DO's service runs on but its store: the stage's,
+ * the DO's own alarm, the project's answer runs, and the platform's
+ * generator for the project's own agent files, which the service runs after
+ * a landing that changes what they say (W4 410).
+ */
+export const doPorts = (input: {
+  readonly config: PlatformConfig;
+  readonly storage: AlarmStorage;
+  readonly name: Option.Option<ProjectName>;
+}) =>
+  Layer.mergeAll(
+    workerPorts(input.config),
+    DoAlarms(input.storage),
+    Option.match(input.name, {
+      onNone: () => Nameless,
+      onSome: (project) => AnswerRunsWorkflow(input.config.ANSWER, project),
+    }),
+    ProjectSkillGenerator
+  );
+
 /** The shell over the DO's storage, its name, and the stage's ports. */
 const shellOf = (ctx: DurableObjectState, env: Env) =>
   Layer.effect(
@@ -51,14 +74,7 @@ const shellOf = (ctx: DurableObjectState, env: Env) =>
 
       return yield* projectShell({
         name: Option.getOrUndefined(name),
-        ports: Layer.mergeAll(
-          workerPorts(config),
-          DoAlarms(ctx.storage),
-          Option.match(name, {
-            onNone: () => Nameless,
-            onSome: (project) => AnswerRunsWorkflow(config.ANSWER, project),
-          })
-        ),
+        ports: doPorts({ config, name, storage: ctx.storage }),
         // The storage itself, not `storage.sql`: transactions run through it.
         sql: SqliteClient.layer({ storage: ctx.storage }),
       });
