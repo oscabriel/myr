@@ -162,7 +162,9 @@ export interface DeciderApi {
   /**
    * One decider's choice on one decision, spent from their budget; what it
    * says yes to goes ahead in the same call (an accepted proposal opens its
-   * ask red first), and a declined proposal closes.
+   * ask red first), and a declined proposal closes. An accepted proposal
+   * whose ask meets a blocked Checker or a moved main fails with that
+   * refusal and decides nothing, so it can be decided again.
    */
   readonly decide: (
     caller: Person,
@@ -173,7 +175,7 @@ export interface DeciderApi {
     }
   ) => Effect.Effect<
     { readonly decision: Decision },
-    UnknownDecision | DecisionClosed | NotDecider
+    UnknownDecision | DecisionClosed | NotDecider | WaitRefusal
   >;
   /**
    * A decider finishes an answer that waits on a finish: at the answer's
@@ -325,6 +327,15 @@ export type OpenRefusal =
   | VerifierBlocked
   | StaleBase;
 
+/** The refusals waiting lifts: the call that met one fails, and is tried again. */
+export type WaitRefusal = VerifierBlocked | StaleBase;
+
+/** The refusals opening an ask gives that waiting does not lift. */
+type FinalOpenRefusal = Exclude<OpenRefusal, WaitRefusal>;
+
+/** A refusal that declines the proposal whose ask met it. */
+const declines = (refusal: FinalOpenRefusal) => Effect.succeedSome(refusal);
+
 /** The ports the decider-facing methods call, besides the store. */
 export type DeciderPorts = CheckRunner | Lander | RepoHost;
 
@@ -392,16 +403,31 @@ const mainRef = "refs/heads/main";
 
 const mainRefName = RefName.make(mainRef);
 
+/** The config folder, as a path prefix. */
+const configFolder = `${Brand.configDir}/`;
+
 /** The env shape's file, at the repo's root (VL §8.3). */
 const envFile = RepoPath.make(".env.schema");
 
 /** How many steps a decider's land takes at most: merges, checks and lands, with re-merges. */
 const landTurns = 16;
 
-const isDecider = (policy: Policy, handle: Handle) =>
+/** Whether `handle` decides for any paths in the project. */
+export const isDecider = (policy: Policy, handle: Handle) =>
   policy.deciders.some(({ handles }) =>
     handles.some((each) => sameHandle(each, handle))
   );
+
+/**
+ * Whether `handle` decides for the ask's territory: a deciders entry whose
+ * glob holds one of the territory's globs, each read as the path it spells
+ * (`packages/**` holds `packages/parser/**`; `**` holds every territory).
+ */
+export const decidesOn = (policy: Policy, ask: Ask, handle: Handle) =>
+  decidersFor(
+    policy,
+    ask.territory.paths.map((glob) => RepoPath.make(glob))
+  ).some((each) => sameHandle(each, handle));
 
 /** The handle as the policy spells it among its deciders: how decisions name them. */
 const asDecider = (policy: Policy, handle: Handle): Option.Option<Handle> =>
@@ -438,22 +464,25 @@ const moduleOf = (policy: Policy, territory: string) =>
       module.paths.some((glob) => glob === `${territory}/**`)
   );
 
-/** The paths a proposal is about: its files, and its territory's globs read as paths. */
+/**
+ * The paths whose deciders decide a proposal: its territory's globs read as
+ * paths, since opening the ask needs a decider of its territory (`openAsk`'s
+ * rule); without a territory, its files outside the config folder, where
+ * its check lives. The ask file's own place says nothing of its territory.
+ */
 const pathsOf = (
   policy: Policy,
   files: readonly RepoPath[],
   territory: Option.Option<string>
-): readonly RepoPath[] => [
-  ...files,
-  ...Option.match(territory, {
-    onNone: () => [],
+): readonly RepoPath[] =>
+  Option.match(territory, {
+    onNone: () => files.filter((path) => !path.startsWith(configFolder)),
     onSome: (named) =>
       Option.match(moduleOf(policy, named), {
         onNone: () => [RepoPath.make(named)],
         onSome: ({ paths }) => paths.map((glob) => RepoPath.make(glob)),
       }),
-  }),
-];
+  });
 
 /**
  * Who decides on `paths`: their deciders, else the project's own (`**`),
@@ -519,7 +548,7 @@ const filesOf = (
     )
   );
 
-const askFolder = `${Brand.configDir}/asks/`;
+const askFolder = `${configFolder}asks/`;
 
 const askSuffix = ".ask.ts";
 
@@ -1346,8 +1375,10 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
    * proposer and decided by `by`, and the proposal is accepted. A proposal
    * whose ask cannot open (its check is green on main, its brief lacks a
    * field) is declined, and why is logged: the decider's choice stands. A
-   * flag, or a proposal with no ask file, is accepted and opens nothing; a
-   * decider writes the change it asks for.
+   * refusal that waiting lifts (a blocked Checker or Lander, a main that
+   * moved) fails the call instead, so nothing is written and the decider
+   * can decide again. A flag, or a proposal with no ask file, is accepted
+   * and opens nothing; a decider writes the change it asks for.
    */
   const accept = (
     h: H,
@@ -1381,22 +1412,34 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
       const toOpen = Option.filter(opening, () => proposal.flags === undefined);
 
-      const refused: Option.Option<OpenRefusal> = yield* Option.match(toOpen, {
-        onNone: () => Effect.succeedNone,
-        onSome: ({ ask, files: proposed }) =>
-          kernel
-            .open(h, writes, now, {
-              ask,
-              asker: proposal.proposer,
-              credits: [
-                { handle: proposal.proposer, role: "Asked-by" },
-                { handle: input.by, role: "Decided-by" },
-              ],
-              decider: Person.make({ handle: input.by }),
-              files: proposed,
-            })
-            .pipe(Effect.flip, Effect.option),
-      });
+      const refused: Option.Option<FinalOpenRefusal> = yield* Option.match(
+        toOpen,
+        {
+          onNone: () => Effect.succeedNone,
+          onSome: ({ ask, files: proposed }) =>
+            kernel
+              .open(h, writes, now, {
+                ask,
+                asker: proposal.proposer,
+                credits: [
+                  { handle: proposal.proposer, role: "Asked-by" },
+                  { handle: input.by, role: "Decided-by" },
+                ],
+                decider: Person.make({ handle: input.by }),
+                files: proposed,
+              })
+              .pipe(
+                Effect.as(Option.none<FinalOpenRefusal>()),
+                Effect.catchTags({
+                  IncompleteBrief: declines,
+                  NotDecider: declines,
+                  NotRedFirst: declines,
+                  TouchedJudge: declines,
+                  WeakCheck: declines,
+                })
+              ),
+        }
+      );
 
       if (Option.isSome(refused)) {
         yield* Effect.logWarning(
@@ -1557,10 +1600,12 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
           writes.decisions.set(defaulted.id, defaulted);
 
+          // A default is its subject's no (213's `defaultChoice`), so an
+          // expiry never opens an ask, and opening's refusals never arise.
           return settleDecided(h, writes, now, {
             decision: defaulted,
             effects,
-          });
+          }).pipe(Effect.orDie);
         },
         { discard: true }
       );
@@ -1578,10 +1623,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         const decides = Option.exists(
           Option.all({ ask, live }),
           ({ ask: asked, live: { policy } }) =>
-            decidersFor(
-              policy,
-              asked.territory.paths.map((glob) => RepoPath.make(glob))
-            ).some((each) => sameHandle(each, caller.handle))
+            decidesOn(policy, asked, caller.handle)
         );
 
         if (Option.isNone(live) || !decides) {
@@ -1589,6 +1631,13 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         }
 
         const { landed: main, policy } = live.value;
+
+        // The decider as the policy spells them, as `decide` and Today do:
+        // the budget row and the credit name one person however they sign in.
+        const by = Option.getOrElse(
+          asDecider(policy, caller.handle),
+          () => caller.handle
+        );
 
         const receiptOf = (
           outcome: Outcome,
@@ -1635,7 +1684,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         const { record, row } = waiting.value;
         const { request } = record.landing;
 
-        spent(h, writes, { decider: caller.handle, now, on: "finish" });
+        spent(h, writes, { decider: by, now, on: "finish" });
 
         if (input.head === request.head) {
           const advanced = yield* advanceAndRun(
@@ -1643,7 +1692,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
             writes,
             now,
             row.requestId,
-            LandingCommand.Finished({ by: caller.handle })
+            LandingCommand.Finished({ by })
           );
 
           return receiptOf(advanced.outcome);
@@ -1697,10 +1746,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           {
             ...request,
             base: input.base,
-            credits: [
-              ...request.credits,
-              { handle: caller.handle, role: "Finished-by" },
-            ],
+            credits: [...request.credits, { handle: by, role: "Finished-by" }],
             head: input.head,
             requestId: input.requestId,
           },

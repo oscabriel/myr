@@ -146,7 +146,6 @@ import {
 } from "./answer-runs.ts";
 import type { AnswerQueue, AnswerRuns } from "./answer-runs.ts";
 import { isStep } from "./answer-runs/steps.ts";
-import { decidersFor } from "./attention/decisions.ts";
 import { recordOf, sameHandle } from "./attention/record.ts";
 import { mayClaim, standing } from "./attention/vouch.ts";
 import {
@@ -158,7 +157,13 @@ import {
   transition as claimTransition,
 } from "./claim.ts";
 import type { ClaimStep, Live } from "./claim.ts";
-import { deciderDeadlines, deciders, envSchemaMethod } from "./deciders.ts";
+import {
+  deciderDeadlines,
+  deciders,
+  decidesOn,
+  envSchemaMethod,
+  isDecider,
+} from "./deciders.ts";
 import type { DeciderApi, Opening } from "./deciders.ts";
 import { askClosed, askOpened, judged, listingOf, numbered } from "./events.ts";
 import { evaluationFacts, pushFacts, targetOf } from "./facts.ts";
@@ -411,9 +416,13 @@ export const MethodSchemas = {
     error: Schema.Never,
     success: Credits.successSchema,
   },
+  // The contract leaves out what waiting lifts: an accepted proposal whose
+  // ask meets a blocked Checker or a moved main decides nothing and fails
+  // with it, so the decider can decide again. 221's Comments ask 299 to add
+  // both.
   decide: {
     args: [Person, Decide.payloadSchema.mapFields(Struct.omit(["project"]))],
-    error: Decide.errorSchema,
+    error: Schema.Union([Decide.errorSchema, VerifierBlocked, StaleBase]),
     success: Decide.successSchema,
   },
   events: {
@@ -717,22 +726,6 @@ const deadlineOf = (state: ClaimState): Option.Option<DateTime.Utc> =>
     Released: () => Option.none(),
     Warned: ({ lapsesAt }) => Option.some(lapsesAt),
   });
-
-const isDecider = (policy: Policy, handle: Handle) =>
-  policy.deciders.some(({ handles }) =>
-    handles.some((each) => sameHandle(each, handle))
-  );
-
-/**
- * Whether `handle` decides for the ask's territory: a deciders entry whose
- * glob holds one of the territory's globs, each read as the path it spells
- * (`packages/**` holds `packages/parser/**`; `**` holds every territory).
- */
-const decidesOn = (policy: Policy, ask: Ask, handle: Handle) =>
-  decidersFor(
-    policy,
-    ask.territory.paths.map((glob) => RepoPath.make(glob))
-  ).some((each) => sameHandle(each, handle));
 
 /** A path a composed commit can hold: plain folder names and a file name. */
 const isPlainPath = (path: string) =>

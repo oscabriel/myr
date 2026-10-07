@@ -4,7 +4,7 @@ import { Brand } from "@repo/brand";
 import { authorLine, committerLine, parseTrailers } from "@repo/git/trailers";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
-import { RefNameText } from "@repo/protocol/domain/common";
+import { Glob, RefNameText } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
@@ -34,6 +34,7 @@ import {
   TouchedJudge,
   UnknownAsk,
   UnknownProject,
+  VerifierBlocked,
 } from "@repo/protocol/refusal";
 import { RulesEvaluator } from "@repo/rules/rules-evaluator";
 import { parseVouchFile } from "@repo/rules/vouch";
@@ -45,7 +46,15 @@ import {
   withKind,
   withVouches,
 } from "@repo/testkit/scenarios";
-import { Array, DateTime, Effect, Layer, Option, Redacted } from "effect";
+import {
+  Array,
+  DateTime,
+  Effect,
+  Layer,
+  Option,
+  Redacted,
+  Result,
+} from "effect";
 
 import { ScheduledAlarm } from "../src/alarms/memory.ts";
 import { platformHandle } from "../src/attention/effects.ts";
@@ -90,6 +99,9 @@ const person = (name: string) =>
   Person.make({ handle: scenario.people.get(name) ?? scenario.initializer });
 
 const alice = person("alice");
+
+/** alice, as a sign-in provider that capitalizes handles names her. */
+const aliceSignedIn = Person.make({ handle: Handle.make("Alice") });
 
 const bob = person("bob");
 
@@ -379,6 +391,81 @@ const expiring = (api: ProjectApi) =>
     };
   });
 
+/**
+ * carol proposes `trim-input`, and alice accepts it while the Checker cannot
+ * run its check; then again, once it can.
+ */
+const acceptingBlocked = (api: ProjectApi) =>
+  Effect.gen(function* () {
+    const files = askFiles("trim-input");
+
+    yield* api.proposeAsk(carol, {
+      files,
+      territory: "packages/trim",
+      want: askOf("trim-input").brief.want,
+    });
+
+    const blocked = yield* api
+      .decide(alice, { choice: "accept", decision: firstDecision })
+      .pipe(Effect.result, Effect.map(Result.getFailure));
+
+    const between = yield* stored;
+    const { budget } = yield* api.today(alice);
+
+    yield* redOnMain(files);
+
+    const accepted = yield* api
+      .decide(alice, { choice: "accept", decision: firstDecision })
+      .pipe(
+        Effect.result,
+        Effect.map(Result.getSuccess),
+        Effect.map(Option.map(({ decision }) => decision.decided?.choice))
+      );
+
+    return {
+      accepted,
+      blocked,
+      budget,
+      decided: between.decisions.map(({ decided }) => decided),
+      listed: (yield* api.listAsks(anyone)).asks.map(({ ask }) => ask),
+      proposals: between.proposals.map(({ state }) => state),
+    };
+  });
+
+/** datekit, where alice decides the packages and frank the config folder only. */
+const splitDeciders = {
+  policy: {
+    ...scenario.policy,
+    deciders: [
+      { handles: Array.make(alice.handle), paths: Glob.make("packages/**") },
+      {
+        handles: Array.make(frank.handle),
+        paths: Glob.make(`${Brand.configDir}/**`),
+      },
+    ],
+  },
+};
+
+/** carol proposes `trim-input` in the packages; who is asked to decide it. */
+const askedToDecide = Effect.gen(function* () {
+  const api = yield* begun;
+
+  const { proposal } = yield* api.proposeAsk(carol, {
+    files: askFiles("trim-input"),
+    territory: "packages/trim",
+    want: askOf("trim-input").brief.want,
+  });
+
+  return {
+    alice: (yield* api.today(alice)).decisions.map(({ deciders, subject }) => ({
+      deciders,
+      subject,
+    })),
+    frank: (yield* api.today(frank)).decisions,
+    proposal: proposal.id,
+  };
+});
+
 describe("a proposal", () => {
   const world = worldOf(scenario, "memory");
   const proposal = ProposalId.make("prop-000001");
@@ -467,6 +554,47 @@ describe("a proposal", () => {
   );
 
   it.effect(
+    "accepted while its check cannot run, decides nothing and stays open, so it can be accepted again",
+    () =>
+      Effect.map(
+        Effect.flatMap(begun, acceptingBlocked).pipe(Effect.provide(world)),
+        (run) => {
+          expect(run.blocked).toStrictEqual(
+            Option.some(new VerifierBlocked({}))
+          );
+          expect([run.decided, run.proposals, run.budget]).toStrictEqual([
+            [undefined],
+            ["open"],
+            { finishes: 0, total: 5, used: 0 },
+          ]);
+          expect([run.accepted, run.listed]).toStrictEqual([
+            Option.some("accept"),
+            [AskId.make("trim-input")],
+          ]);
+        }
+      )
+  );
+
+  it.effect(
+    "is put to the deciders of its territory, not to those of the config folder its ask file sits in",
+    () =>
+      Effect.map(
+        askedToDecide.pipe(Effect.provide(worldOf(splitDeciders, "memory"))),
+        (run) => {
+          expect(run.alice).toStrictEqual([
+            {
+              deciders: [alice.handle],
+              subject: DecisionSubject.cases.OpenProposal.make({
+                proposal: run.proposal,
+              }),
+            },
+          ]);
+          expect(run.frank).toStrictEqual([]);
+        }
+      )
+  );
+
+  it.effect(
     "left alone for fourteen days expires, and its decision takes its default by the platform's hand",
     () =>
       Effect.map(
@@ -524,11 +652,12 @@ const finishing = (api: ProjectApi) =>
       requestId: RequestId.make("finish-alice-01"),
     };
 
-    const receipt = yield* api.finish(alice, finish);
+    // Her sign-in cases her handle otherwise than the policy does.
+    const receipt = yield* api.finish(aliceSignedIn, finish);
     const landed = yield* mainTip;
 
     return {
-      again: yield* api.finish(alice, finish),
+      again: yield* api.finish(aliceSignedIn, finish),
       answer,
       bobFinishes,
       budget: (yield* api.today(alice)).budget,
@@ -694,7 +823,7 @@ describe("a finish", () => {
   );
 
   it.effect(
-    "lands the answer credited Finished-by, once however often it is sent, and counts in the decider's budget",
+    "lands the answer credited Finished-by, once however often it is sent, and counts in the decider's budget, however her sign-in cases her handle",
     () =>
       Effect.map(seen, (run) => {
         expect([run.settled, run.again.outcome]).toStrictEqual([
@@ -1166,26 +1295,27 @@ const crediting = Effect.gen(function* () {
   };
 });
 
+// Assisted-by never reaches a credit row (220's `creditsByArea` test, and
+// `CreditSummary`'s role type); no answer here carries an agent trailer,
+// since 214's answers carry none yet.
 describe("credits", () => {
-  it.effect(
-    "count a person's roles by project and area across projects, never Assisted-by",
-    () =>
-      Effect.map(
-        crediting.pipe(
-          Effect.provide(
-            ProjectsMemory.pipe(Layer.provideMerge(worldOf(scenario, "memory")))
-          )
-        ),
-        (seen) => {
-          expect(seen.bob).toStrictEqual([row(project, "Signed-off-by")]);
-          expect(seen.bobInDatekit).toStrictEqual({ credits: seen.bob });
-          expect(seen.alice).toStrictEqual([
-            row(burrow, "Asked-by"),
-            row(project, "Asked-by"),
-          ]);
-          expect(seen.dave).toStrictEqual([]);
-        }
-      )
+  it.effect("count a person's roles by project and area across projects", () =>
+    Effect.map(
+      crediting.pipe(
+        Effect.provide(
+          ProjectsMemory.pipe(Layer.provideMerge(worldOf(scenario, "memory")))
+        )
+      ),
+      (seen) => {
+        expect(seen.bob).toStrictEqual([row(project, "Signed-off-by")]);
+        expect(seen.bobInDatekit).toStrictEqual({ credits: seen.bob });
+        expect(seen.alice).toStrictEqual([
+          row(burrow, "Asked-by"),
+          row(project, "Asked-by"),
+        ]);
+        expect(seen.dave).toStrictEqual([]);
+      }
+    )
   );
 });
 
@@ -1205,6 +1335,32 @@ const withEnvSchema: Files = [
     ].join("\n"),
   ],
 ];
+
+/** A first landing whose env schema turns the two flags off, above an item and after one. */
+const withQuietSchema: Files = [
+  ...start,
+  [
+    ".env.schema",
+    [
+      "# @sensitive=false",
+      "# @required=false",
+      "LOG_LEVEL=info",
+      "",
+      "PORT=3000 # @sensitive=false",
+      "",
+    ].join("\n"),
+  ],
+];
+
+const readingQuiet = Effect.gen(function* () {
+  yield* advanceTo("2026-10-07T12:00:00Z");
+
+  const api = yield* projectService(project);
+
+  yield* made(api, repo, withQuietSchema);
+
+  return (yield* api.envShape(anyone)).items;
+});
 
 const reading = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
@@ -1269,6 +1425,32 @@ describe("until the visibility cartridge", () => {
             new NotSensitive({ key: EnvKey.make("PAYMENTS_KEY") })
           );
           expect(seen.bobSets).toStrictEqual(new NotDecider({}));
+        }
+      )
+  );
+});
+
+describe("the env shape's minimal reading", () => {
+  it.effect(
+    "turns a flag off where a decorator says false, above an item or after it",
+    () =>
+      Effect.map(
+        readingQuiet.pipe(Effect.provide(worldOf(scenario, "memory"))),
+        (items) => {
+          expect(items).toStrictEqual([
+            {
+              key: EnvKey.make("LOG_LEVEL"),
+              required: false,
+              sensitive: false,
+              tags: [],
+            },
+            {
+              key: EnvKey.make("PORT"),
+              required: true,
+              sensitive: false,
+              tags: [],
+            },
+          ]);
         }
       )
   );
