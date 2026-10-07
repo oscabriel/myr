@@ -13,7 +13,8 @@
     "./principal": "./src/principal.ts",
     "./refusal": "./src/refusal.ts",
     "./render": "./src/render.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",

@@ -60,8 +60,11 @@
         "isomorphic-git": "1.43.0",
       },
       "devDependencies": {
+        "@cloudflare/workers-types": "5.20261006.1",
         "@effect/vitest": "catalog:",
         "@repo/config": "workspace:*",
+        "@repo/testkit": "workspace:*",
+        "@types/node": "26.6.4",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -78,6 +81,23 @@
         "vitest": "catalog:",
       },
     },
+    "packages/checks": {
+      "name": "@repo/checks",
+      "dependencies": {
+        "@repo/brand": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "effect": "catalog:",
+        "yaml": "2.9.1",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "4.0.1",
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "@repo/testkit": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/config": {
       "name": "@repo/config",
       "devDependencies": {
@@ -88,10 +108,25 @@
         "vitest": "catalog:",
       },
     },
+    "packages/gate": {
+      "name": "@repo/gate",
+      "dependencies": {
+        "@repo/protocol": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "@repo/testkit": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/git": {
       "name": "@repo/git",
       "dependencies": {
         "@repo/artifacts": "workspace:*",
+        "@repo/brand": "workspace:*",
         "@repo/protocol": "workspace:*",
         "effect": "catalog:",
       },
@@ -100,6 +135,30 @@
         "@effect/platform-node": "4.0.1",
         "@effect/vitest": "catalog:",
         "@repo/config": "workspace:*",
+        "@repo/testkit": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/project": {
+      "name": "@repo/project",
+      "dependencies": {
+        "@repo/artifacts": "workspace:*",
+        "@repo/brand": "workspace:*",
+        "@repo/checks": "workspace:*",
+        "@repo/gate": "workspace:*",
+        "@repo/git": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "@repo/rules": "workspace:*",
+        "effect": "catalog:",
+        "isomorphic-git": "1.43.0",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "4.0.1",
+        "@effect/sql-sqlite-node": "4.0.1",
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "@repo/testkit": "workspace:*",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -113,6 +172,54 @@
       "devDependencies": {
         "@cloudflare/workers-types": "5.20261006.1",
         "@effect/platform-node": "4.0.1",
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/rules": {
+      "name": "@repo/rules",
+      "dependencies": {
+        "@repo/protocol": "workspace:*",
+        "@repo/sdk": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/platform-node": "4.0.1",
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "@repo/testkit": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/sdk": {
+      "name": "@repo/sdk",
+      "dependencies": {
+        "@repo/brand": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "@repo/testkit": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/testkit": {
+      "name": "@repo/testkit",
+      "dependencies": {
+        "@effect/platform-node": "4.0.1",
+        "@repo/brand": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "effect": "catalog:",
+        "isomorphic-git": "1.43.0",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "5.20261006.1",
         "@effect/vitest": "catalog:",
         "@repo/config": "workspace:*",
         "typescript": "catalog:",
@@ -171,6 +278,8 @@
     "@effect/platform-node": ["@effect/platform-node@4.0.1", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.1", "undici": "^8.11.2" }, "peerDependencies": { "effect": "^4.0.1", "redis": ">=5.0.0 <7.0.0" } }, "sha512-FT0Fu5LO0/XP9zBpj0HqrtJNLluK4StNKqf6TSulUsjp8FPBsDVXGJiDuyoN5J2yVMT7tgvhxSwaDcObWVRIaQ=="],
 
     "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.1", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.22.0" }, "peerDependencies": { "effect": "^4.0.1" } }, "sha512-VanaejudEhKJ4mpmqnEzdncVUhN6sGSO9ZDND54mRxAlZxj+4dYAWjDTYAy9o4tJo9aALeP2U8cVcOFzEdSeLg=="],
+
+    "@effect/sql-sqlite-node": ["@effect/sql-sqlite-node@4.0.1", "", { "peerDependencies": { "effect": "^4.0.1" } }, "sha512-VBlNvfFRxyyiu1viNygxA0ZVGZcpxBHA3+QLobaLQSXgAP0submgo98IzioWTHzdZUc9Xodi7ICci5ehhbD2fQ=="],
 
     "@effect/tsgo": ["@effect/tsgo@0.48.1", "", { "optionalDependencies": { "@effect/tsgo-darwin-arm64": "0.48.1", "@effect/tsgo-darwin-x64": "0.48.1", "@effect/tsgo-linux-arm": "0.48.1", "@effect/tsgo-linux-arm64": "0.48.1", "@effect/tsgo-linux-x64": "0.48.1", "@effect/tsgo-win32-arm64": "0.48.1", "@effect/tsgo-win32-x64": "0.48.1" }, "bin": { "effect-tsgo": "dist/effect-tsgo.cjs" } }, "sha512-yLgXNwPaUWfGxcQw7FwLYwOF7me69r+tY4oHYV5hwMFE16qClXbIRnotNPp8pZ5pnbeLgPeRvCE7AWGQyYqQ2A=="],
 
@@ -422,15 +531,27 @@
 
     "@repo/brand": ["@repo/brand@workspace:packages/brand"],
 
+    "@repo/checks": ["@repo/checks@workspace:packages/checks"],
+
     "@repo/cli": ["@repo/cli@workspace:apps/cli"],
 
     "@repo/config": ["@repo/config@workspace:packages/config"],
+
+    "@repo/gate": ["@repo/gate@workspace:packages/gate"],
 
     "@repo/git": ["@repo/git@workspace:packages/git"],
 
     "@repo/platform": ["@repo/platform@workspace:apps/platform"],
 
+    "@repo/project": ["@repo/project@workspace:packages/project"],
+
     "@repo/protocol": ["@repo/protocol@workspace:packages/protocol"],
+
+    "@repo/rules": ["@repo/rules@workspace:packages/rules"],
+
+    "@repo/sdk": ["@repo/sdk@workspace:packages/sdk"],
+
+    "@repo/testkit": ["@repo/testkit@workspace:packages/testkit"],
 
     "@rolldown/binding-android-arm-eabi": ["@rolldown/binding-android-arm-eabi@1.2.12", "", { "os": "android", "cpu": "arm" }, "sha512-dB/a1214qKfHMXCpgqR4OZT+jS4kTyEXbQGJPqzobt5EwH5rX080pxE37alt3RzvR1bf1Yz/yGqRfrYAxuPw0A=="],
 

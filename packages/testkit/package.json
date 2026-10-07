@@ -1,0 +1,33 @@
+{
+  "name": "@repo/testkit",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./git": "./src/git.ts",
+    "./http-backend": "./src/http-backend.ts",
+    "./git-client": "./src/git-client.ts",
+    "./scenarios": "./src/scenarios.ts",
+    "./golden": "./src/golden.ts",
+    "./clock": "./src/clock.ts",
+    "./fake-artifacts-binding": "./src/fake-artifacts-binding.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.1",
+    "@repo/brand": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "effect": "catalog:",
+    "isomorphic-git": "1.43.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261006.1",
+    "@effect/vitest": "catalog:",
+    "@repo/config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

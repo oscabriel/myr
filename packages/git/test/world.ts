@@ -1,15 +1,15 @@
 import { NodeHttpServer } from "@effect/platform-node";
+import type { RepoName } from "@repo/artifacts/repo-host";
 import { CommitSha } from "@repo/protocol/ids";
-import { Context, Effect, FileSystem, Layer } from "effect";
-import type { Option } from "effect";
+import { gitOk } from "@repo/testkit/git";
+import { httpBackend } from "@repo/testkit/http-backend";
+import { Context, Effect, FileSystem, Layer, Option, Stream } from "effect";
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 import type { ChildProcessSpawner } from "effect/process";
 
 import { Custody } from "../src/custody.ts";
 import { gateway } from "../src/gateway.ts";
-import { Upstream } from "../src/upstream.ts";
-import { gitOk } from "./git.ts";
-import { httpBackend } from "./http-backend.ts";
+import { Exchange, Upstream } from "../src/upstream.ts";
 
 /** Custody that lets every push through. */
 export const admitAll = Custody.of({
@@ -35,6 +35,84 @@ export const commit = (
 
     return CommitSha.make(yield* gitOk(cwd, "rev-parse", "HEAD"));
   });
+
+/** An exchange as the HTTP request a smart-HTTP server would get. */
+const requestOf = (repo: RepoName, exchange: Exchange) =>
+  Exchange.$match(exchange, {
+    Advertise: ({ headers, service }) =>
+      Effect.succeed(
+        new Request(
+          `http://upstream/${repo}.git/info/refs?service=${service}`,
+          { headers }
+        )
+      ),
+    // Read whole: a streamed request body needs Node's `duplex` option, which
+    // the Workers types lack.
+    Call: ({ body, headers, service }) =>
+      Stream.fromReadableStream({
+        evaluate: () => body,
+        onError: (cause) => cause,
+      }).pipe(
+        Stream.runCollect,
+        Effect.orDie,
+        Effect.map(
+          (chunks) =>
+            new Request(`http://upstream/${repo}.git/${service}`, {
+              body: new Blob(chunks),
+              headers,
+              method: "POST",
+            })
+        )
+      ),
+  });
+
+/**
+ * `git http-backend` over the bare repos in `root`, as the gateway's
+ * upstream. Like Artifacts, it takes no credentials from the client: an
+ * exchange carrying any is refused. `atPush` runs as each receive-pack call
+ * arrives, so a test can move a ref under a push; a reply it gives stands in
+ * for the upstream's.
+ */
+const upstreamAt = (
+  root: string,
+  atPush: Effect.Effect<
+    Option.Option<Response>,
+    never,
+    ChildProcessSpawner.ChildProcessSpawner
+  >
+) =>
+  Effect.map(
+    Effect.context<ChildProcessSpawner.ChildProcessSpawner>(),
+    (context) => {
+      const serve = httpBackend(root);
+
+      return Upstream.of({
+        exchange: (repo, exchange) =>
+          Effect.scoped(
+            Effect.gen(function* () {
+              if (exchange.headers.has("authorization")) {
+                return new Response(
+                  "the client's credentials reached the upstream",
+                  { status: 400 }
+                );
+              }
+
+              const instead =
+                Exchange.$is("Call")(exchange) &&
+                exchange.service === "git-receive-pack"
+                  ? yield* atPush
+                  : Option.none();
+
+              const request = yield* requestOf(repo, exchange);
+
+              return Option.isSome(instead)
+                ? instead.value
+                : yield* serve(request);
+            })
+          ).pipe(Effect.provide(context)),
+      });
+    }
+  );
 
 const app = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -91,7 +169,7 @@ export const world = (
         Layer.provide(
           Layer.effect(
             Upstream,
-            httpBackend(
+            upstreamAt(
               root,
               atPush({ seed, upstream }).pipe(
                 Effect.provideService(FileSystem.FileSystem, fs)

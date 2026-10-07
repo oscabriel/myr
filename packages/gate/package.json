@@ -1,0 +1,30 @@
+{
+  "name": "@repo/gate",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./facts": "./src/facts.ts",
+    "./stage": "./src/stage.ts",
+    "./stages/*": "./src/stages/*.ts",
+    "./classify": "./src/classify.ts",
+    "./verdict": "./src/verdict.ts",
+    "./markers": "./src/markers.ts",
+    "./gate": "./src/gate.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/protocol": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@repo/config": "workspace:*",
+    "@repo/testkit": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

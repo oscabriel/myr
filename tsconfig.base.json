@@ -134,6 +134,45 @@
             "options": {
               "allowedUnstableApis": ["effect/http", "effect/process"]
             }
+          },
+          {
+            "include": ["packages/project/src/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": ["effect/sql"]
+            }
+          },
+          {
+            "include": ["packages/project/test/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": ["effect/Arbitrary", "effect/sql"]
+            }
+          },
+          {
+            "include": [
+              "packages/checks/src/check-runner/local.ts",
+              "packages/rules/src/rules-evaluator/bun.ts",
+              "packages/testkit/src/**/*.ts"
+            ],
+            "options": {
+              "allowedUnstableApis": ["effect/process"]
+            }
+          },
+          {
+            "include": [
+              "packages/artifacts/test/**/*.ts",
+              "packages/checks/test/**/*.ts",
+              "packages/rules/test/**/*.ts",
+              "packages/testkit/test/**/*.ts"
+            ],
+            "options": {
+              "allowedUnstableApis": ["effect/process"]
+            }
+          },
+          {
+            "include": ["packages/artifacts/src/repo-host/local.ts"],
+            "options": {
+              "diagnosticSeverity": { "nodeBuiltinImport": "off" }
+            }
           }
         ]
       }

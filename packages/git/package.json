@@ -5,7 +5,13 @@
   "exports": {
     "./custody": "./src/custody.ts",
     "./gateway": "./src/gateway.ts",
-    "./upstream": "./src/upstream.ts"
+    "./upstream": "./src/upstream.ts",
+    "./upstream/repo-host": "./src/upstream/repo-host.ts",
+    "./trailers": "./src/trailers.ts",
+    "./tree-diff": "./src/tree-diff.ts",
+    "./patch-id": "./src/patch-id.ts",
+    "./notes": "./src/notes.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -13,6 +19,7 @@
   },
   "dependencies": {
     "@repo/artifacts": "workspace:*",
+    "@repo/brand": "workspace:*",
     "@repo/protocol": "workspace:*",
     "effect": "catalog:"
   },
@@ -21,6 +28,7 @@
     "@effect/platform-node": "4.0.1",
     "@effect/vitest": "catalog:",
     "@repo/config": "workspace:*",
+    "@repo/testkit": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

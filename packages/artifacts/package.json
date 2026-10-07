@@ -3,8 +3,15 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./fetch": "./src/fetch.ts",
     "./repo-host": "./src/repo-host.ts",
-    "./repo-host/memory": "./src/repo-host/memory.ts"
+    "./repo-host/memory": "./src/repo-host/memory.ts",
+    "./repo-host/memory-fs": "./src/repo-host/memory-fs.ts",
+    "./repo-host/binding": "./src/repo-host/binding.ts",
+    "./repo-host/rest": "./src/repo-host/rest.ts",
+    "./repo-host/local": "./src/repo-host/local.ts",
+    "./repo-host/smart-http": "./src/repo-host/smart-http.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -16,8 +23,11 @@
     "isomorphic-git": "1.43.0"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261006.1",
     "@effect/vitest": "catalog:",
     "@repo/config": "workspace:*",
+    "@repo/testkit": "workspace:*",
+    "@types/node": "26.6.4",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

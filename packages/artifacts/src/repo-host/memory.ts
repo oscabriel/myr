@@ -9,6 +9,7 @@ import {
   Match,
   Option,
   Redacted,
+  Schema,
   Semaphore,
 } from "effect";
 import {
@@ -26,6 +27,7 @@ import {
 } from "isomorphic-git";
 
 import {
+  ImportRefused,
   ObjectId,
   RefName,
   RefOutcome,
@@ -33,8 +35,15 @@ import {
   RepoHost,
   RepoNotFound,
   Revision,
+  TreeEntry,
 } from "../repo-host.ts";
-import type { Commit, PushSource, RefUpdate, RepoName } from "../repo-host.ts";
+import type {
+  Commit,
+  PushSource,
+  RefUpdate,
+  RepoCreated,
+  RepoName,
+} from "../repo-host.ts";
 import { memoryFs } from "./memory-fs.ts";
 
 class GitFailure extends Data.TaggedError("GitFailure")<{
@@ -73,7 +82,15 @@ const keep = (oid: string, write: () => Promise<string>) =>
 
 const mainRef = "refs/heads/main";
 
+// isomorphic-git's entries carry `path` and `oid`; the port's, `name` and `sha`.
+const decodeEntries = Schema.decodeUnknownEffect(Schema.Array(TreeEntry));
+
 const remoteOf = (name: RepoName) => `memory://${name}.git`;
+
+const createdOf = (name: RepoName): RepoCreated => ({
+  name,
+  remote: remoteOf(name),
+});
 
 interface Repo {
   readonly gitdir: string;
@@ -242,33 +259,70 @@ const make = () => {
         init({ bare: true, defaultBranch: "main", fs, gitdir: repo.gitdir })
       ).pipe(Effect.orDie);
 
-      return { name, remote: remoteOf(name) };
+      return repo;
+    });
+
+  /** A new repo `name` holding `from`'s `ref` at `tip`, copied as it stands. */
+  const seed = (
+    from: Repo,
+    name: RepoName,
+    ref: string,
+    tip: Option.Option<CommitSha>
+  ) =>
+    Effect.gen(function* () {
+      const repo = yield* open(name);
+
+      if (Option.isSome(tip)) {
+        yield* copyCommit({ fs, gitdir: from.gitdir }, repo, tip.value);
+        yield* git(() =>
+          writeRef({ fs, gitdir: repo.gitdir, ref, value: tip.value })
+        ).pipe(Effect.orDie);
+      }
+
+      return createdOf(name);
     });
 
   return RepoHost.of({
-    create: (name) => open(name),
+    create: (name) => open(name).pipe(Effect.as(createdOf(name))),
     // The default branch only, copied as it stands: later pushes to the base
     // or to a sibling never reach this fork.
     fork: (base, name) =>
       Effect.gen(function* () {
         const from = yield* known(base);
         const tip = yield* tipOf(from, mainRef);
-        const created = yield* open(name);
-        const repo = yield* known(name);
 
-        if (Option.isSome(tip)) {
-          yield* copyCommit({ fs, gitdir: from.gitdir }, repo, tip.value);
-          yield* git(() =>
-            writeRef({
-              fs,
-              gitdir: repo.gitdir,
-              ref: mainRef,
-              value: tip.value,
-            })
-          ).pipe(Effect.orDie);
+        return yield* seed(from, name, mainRef, tip);
+      }),
+    // Its test-only meaning of a public remote: another repo in this store,
+    // named by its `remote()` URL.
+    importFrom: (name, source) =>
+      Effect.gen(function* () {
+        if (repos.has(name)) {
+          return yield* new RepoExists({ name });
         }
 
-        return created;
+        const from = [...repos].find(
+          ([other]) => remoteOf(other) === source.url
+        )?.[1];
+
+        if (from === undefined) {
+          return yield* new ImportRefused({
+            name,
+            reason: `no repo at ${source.url}`,
+          });
+        }
+
+        const ref = `refs/heads/${source.branch ?? "main"}`;
+        const tip = yield* tipOf(from, ref);
+
+        if (Option.isNone(tip)) {
+          return yield* new ImportRefused({
+            name,
+            reason: `${source.url} has no branch ${source.branch ?? "main"}`,
+          });
+        }
+
+        return yield* seed(from, name, ref, tip);
       }),
     log: (name, at, limit) =>
       Effect.gen(function* () {
@@ -315,6 +369,19 @@ const make = () => {
           Effect.forEach(updates, (update) => apply(repo, source, update))
         );
       }),
+    // Only a blob by its own id: no tag or commit is peeled to one.
+    readBlob: (name, blob) =>
+      Effect.gen(function* () {
+        const repo = yield* known(name);
+
+        const read = yield* unlessMissing(() =>
+          readBlob({ fs, gitdir: repo.gitdir, oid: blob })
+        );
+
+        return Option.flatMap(read, ({ blob: bytes, oid }) =>
+          oid === blob ? Option.some(bytes) : Option.none()
+        );
+      }),
     readCommit: (name, sha) =>
       known(name).pipe(Effect.flatMap((repo) => commitAt(repo, sha))),
     readFile: (name, at, path) =>
@@ -336,6 +403,30 @@ const make = () => {
         );
 
         return Option.map(blob, ({ blob: bytes }) => bytes);
+      }),
+    // Only a tree by its own id: isomorphic-git peels a commit to its tree.
+    readTree: (name, tree) =>
+      Effect.gen(function* () {
+        const repo = yield* known(name);
+
+        const read = yield* unlessMissing(() =>
+          readTree({ fs, gitdir: repo.gitdir, oid: tree })
+        );
+
+        if (Option.isNone(read) || read.value.oid !== tree) {
+          return Option.none();
+        }
+
+        const entries = yield* decodeEntries(
+          read.value.tree.map((entry) => ({
+            mode: entry.mode,
+            name: entry.path,
+            sha: entry.oid,
+            type: entry.type,
+          }))
+        ).pipe(Effect.orDie);
+
+        return Option.some(entries);
       }),
     refs: (name) =>
       Effect.gen(function* () {

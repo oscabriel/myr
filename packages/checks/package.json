@@ -1,0 +1,36 @@
+{
+  "name": "@repo/checks",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./kinds": "./src/kinds.ts",
+    "./finder": "./src/finder.ts",
+    "./judge": "./src/judge.ts",
+    "./classify": "./src/classify.ts",
+    "./red-first": "./src/red-first.ts",
+    "./weak-shapes": "./src/weak-shapes.ts",
+    "./phases": "./src/phases.ts",
+    "./check-runner": "./src/check-runner.ts",
+    "./check-runner/memory": "./src/check-runner/memory.ts",
+    "./check-runner/local": "./src/check-runner/local.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/brand": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "effect": "catalog:",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "4.0.1",
+    "@effect/vitest": "catalog:",
+    "@repo/config": "workspace:*",
+    "@repo/testkit": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

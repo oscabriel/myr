@@ -1,0 +1,51 @@
+{
+  "name": "@repo/project",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./claim": "./src/claim.ts",
+    "./landing": "./src/landing.ts",
+    "./project-store": "./src/project-store.ts",
+    "./project-store/rows": "./src/project-store/rows.ts",
+    "./project-store/memory": "./src/project-store/memory.ts",
+    "./project-store/sqlite": "./src/project-store/sqlite.ts",
+    "./lander": "./src/lander.ts",
+    "./lander/memory": "./src/lander/memory.ts",
+    "./lander/isogit": "./src/lander/isogit.ts",
+    "./projects": "./src/projects.ts",
+    "./projects/memory": "./src/projects/memory.ts",
+    "./project": "./src/project.ts",
+    "./alarms": "./src/alarms.ts",
+    "./alarms/memory": "./src/alarms/memory.ts",
+    "./answer-runs": "./src/answer-runs.ts",
+    "./answer-runs/inline": "./src/answer-runs/inline.ts",
+    "./projection": "./src/projection.ts",
+    "./projection/memory": "./src/projection/memory.ts",
+    "./attention/*": "./src/attention/*.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/artifacts": "workspace:*",
+    "@repo/brand": "workspace:*",
+    "@repo/checks": "workspace:*",
+    "@repo/gate": "workspace:*",
+    "@repo/git": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "@repo/rules": "workspace:*",
+    "effect": "catalog:",
+    "isomorphic-git": "1.43.0"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "4.0.1",
+    "@effect/sql-sqlite-node": "4.0.1",
+    "@effect/vitest": "catalog:",
+    "@repo/config": "workspace:*",
+    "@repo/testkit": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

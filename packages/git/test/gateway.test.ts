@@ -3,10 +3,10 @@ import { describe, expect, it } from "@effect/vitest";
 import { CommitSha, RepoPath } from "@repo/protocol/ids";
 import { OutOfScope, StaleBase, TouchedJudge } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
+import { git, gitOk } from "@repo/testkit/git";
 import { Effect, Option, Ref } from "effect";
 
 import { Custody } from "../src/custody.ts";
-import { git, gitOk } from "./git.ts";
 import { admitAll, commit, world } from "./world.ts";
 
 /** Custody that refuses, before forwarding, any push touching `ref`. */

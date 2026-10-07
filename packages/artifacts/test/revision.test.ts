@@ -1,7 +1,15 @@
 import { describe, expect, it } from "@effect/vitest";
+import * as Ids from "@repo/protocol/ids";
 import { Schema } from "effect";
 
-import { BranchName } from "../src/repo-host.ts";
+import { BranchName, RepoName } from "../src/repo-host.ts";
+
+// One `RepoName` across the product: the port names repos with the domain's.
+describe("a repo name", () => {
+  it("is the domain's RepoName", () => {
+    expect(RepoName).toBe(Ids.RepoName);
+  });
+});
 
 // Artifacts' binding resolves short branch names and commit ids only (S1 #20),
 // so a full ref name cannot be a revision.

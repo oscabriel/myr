@@ -1,0 +1,32 @@
+{
+  "name": "@repo/rules",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./rules-evaluator": "./src/rules-evaluator.ts",
+    "./rules-evaluator/bun": "./src/rules-evaluator/bun.ts",
+    "./rules-evaluator/json": "./src/rules-evaluator/json.ts",
+    "./rules-evaluator/worker": "./src/rules-evaluator/worker.ts",
+    "./defaults": "./src/defaults.ts",
+    "./finish": "./src/finish.ts",
+    "./vouch": "./src/vouch.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/protocol": "workspace:*",
+    "@repo/sdk": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "4.0.1",
+    "@effect/vitest": "catalog:",
+    "@repo/config": "workspace:*",
+    "@repo/testkit": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

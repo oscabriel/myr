@@ -1,4 +1,4 @@
-import { CommitSha } from "@repo/protocol/ids";
+import { CommitSha, RepoName } from "@repo/protocol/ids";
 import type { RepoPath } from "@repo/protocol/ids";
 import { Context, Data, Schema } from "effect";
 import type {
@@ -11,13 +11,8 @@ import type {
 } from "effect";
 import type { FsClient } from "isomorphic-git";
 
-/** A repo's name in its namespace: letters, digits, dots, dashes, underscores. */
-export const RepoName = Schema.String.pipe(
-  Schema.check(Schema.isPattern(/^[A-Za-z0-9._-]+$/u)),
-  Schema.brand("RepoName")
-);
-
-export type RepoName = typeof RepoName.Type;
+/** A repo's name in its namespace: the one `RepoName`, from the domain. */
+export { RepoName } from "@repo/protocol/ids";
 
 /** A short branch name such as `main` or `feature/x`, never `refs/…`. */
 export const BranchName = Schema.String.pipe(
@@ -48,6 +43,19 @@ export const ObjectId = Schema.String.pipe(
 );
 
 export type ObjectId = typeof ObjectId.Type;
+
+/**
+ * One immediate child of a git tree, as `git ls-tree` lists it: `040000` and
+ * `tree` for a folder, `160000` and `commit` for a submodule.
+ */
+export const TreeEntry = Schema.Struct({
+  mode: Schema.Literals(["100644", "100755", "120000", "040000", "160000"]),
+  name: Schema.NonEmptyString,
+  sha: ObjectId,
+  type: Schema.Literals(["blob", "tree", "commit"]),
+});
+
+export type TreeEntry = typeof TreeEntry.Type;
 
 /**
  * Where a read starts. Artifacts' binding resolves short branch names and
@@ -126,6 +134,12 @@ export class ForkInProgress extends Schema.TaggedError<ForkInProgress>()(
   { name: RepoName }
 ) {}
 
+/** The store would not import from that remote: not git, not public, or not reachable. */
+export class ImportRefused extends Schema.TaggedError<ImportRefused>()(
+  "ImportRefused",
+  { name: RepoName, reason: Schema.String }
+) {}
+
 /** The store refused a whole push while busy with another (S1 #5); retry. */
 export class HostBusy extends Schema.TaggedError<HostBusy>()("HostBusy", {
   name: RepoName,
@@ -139,6 +153,14 @@ export class RepoHost extends Context.Service<
   RepoHost,
   {
     readonly create: (name: RepoName) => Effect.Effect<RepoCreated, RepoExists>;
+    /**
+     * A new repo holding one branch of a public remote: `branch`, or the
+     * remote's default branch, under its own name.
+     */
+    readonly importFrom: (
+      name: RepoName,
+      source: { readonly url: string; readonly branch?: BranchName }
+    ) => Effect.Effect<RepoCreated, RepoExists | ImportRefused>;
     /** Forks the default branch only, as Artifacts does by default. */
     readonly fork: (
       base: RepoName,
@@ -165,6 +187,16 @@ export class RepoHost extends Context.Service<
       name: RepoName,
       sha: CommitSha
     ) => Effect.Effect<Option.Option<Commit>, RepoNotFound>;
+    /** A tree's immediate children by the tree's id; `None` when no tree has it. */
+    readonly readTree: (
+      name: RepoName,
+      tree: ObjectId
+    ) => Effect.Effect<Option.Option<readonly TreeEntry[]>, RepoNotFound>;
+    /** A blob's bytes by its id; `None` when no blob has it. */
+    readonly readBlob: (
+      name: RepoName,
+      blob: ObjectId
+    ) => Effect.Effect<Option.Option<Uint8Array>, RepoNotFound>;
     /** First parents from `at`, newest first. */
     readonly log: (
       name: RepoName,
