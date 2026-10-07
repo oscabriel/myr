@@ -1,0 +1,28 @@
+{
+  "agents": "trailer",
+  "asks": [],
+  "budget": { "decisionsPerDay": 5, "expireDays": 14 },
+  "caps": { "claimsPerPerson": 3, "proposalsPerPerson": 2 },
+  "deciders": [
+    { "handles": ["priya"], "paths": "packages/parse/src/public/**" },
+    { "handles": "owners", "paths": "**" }
+  ],
+  "functions": { "admit": false, "opensAlone": true },
+  "kinds": [
+    {
+      "checkKind": "redThenGreen",
+      "claimers": { "record": { "area": "packages/parse", "atLeast": 1 } },
+      "finish": "optional",
+      "name": "fixBug",
+      "oneWay": false,
+      "race": 1,
+      "requires": ["want", "check"],
+      "strength": "assertion"
+    }
+  ],
+  "ratchets": [],
+  "record": { "countsAfterDays": 30, "windowDays": 365 },
+  "run": { "_tag": "FromCI" },
+  "source": "config",
+  "weakening": { "markers": [".skip(", ".only("] }
+}
