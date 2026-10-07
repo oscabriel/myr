@@ -1,5 +1,3 @@
-import { projectService } from "@repo/project/project";
-import type { ProjectApi, ProjectPorts } from "@repo/project/project";
 /**
  * One project's Durable Object, without the host: the project service over
  * its own SQLite, behind the encoded call boundary. Host-free, so Node tests
@@ -13,6 +11,8 @@ import type { ProjectApi, ProjectPorts } from "@repo/project/project";
  * its `Exit` encoded, so a refusal stays a refusal and never becomes a
  * defect at the boundary.
  */
+import { projectService } from "@repo/project/project";
+import type { ProjectApi, ProjectPorts } from "@repo/project/project";
 import { ProjectStore } from "@repo/project/project-store";
 import { ProjectStoreSqlite } from "@repo/project/project-store/sqlite";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -33,6 +33,7 @@ import type { SqlClient } from "effect/sql/SqlClient";
 import { CallRequest, ProjectCalls } from "./project-calls.ts";
 import type { ArgsOf, ExitEncoded, ProjectMethod } from "./project-calls.ts";
 
+/** One project's DO without its host: what `project-do.ts` runs each call and alarm on. */
 export interface ProjectShell {
   /** One call on the project: its `Exit`, encoded by the method's schemas. */
   readonly call: (

@@ -43,10 +43,11 @@ export interface ProjectNamespace {
 const isUnknownProject = Schema.is(UnknownProject);
 
 /**
- * A call on a project `get` found made: the DO's `UnknownProject` cannot
- * come back, so it is a defect if it does.
+ * A call that assumes its project is made: `get` found it, or `create`'s
+ * caller makes it with `initProject` first. `ProjectApi` has no room for the
+ * DO's `UnknownProject`, so one that comes back is a defect.
  */
-const made = <A, E>(effect: Effect.Effect<A, E>) =>
+const assumingMade = <A, E>(effect: Effect.Effect<A, E>) =>
   effect.pipe(
     Effect.catchIf<E, Extract<E, UnknownProject>, never, never, never>(
       (refused): refused is Extract<E, UnknownProject> =>
@@ -86,31 +87,33 @@ const apiOf = (
     advanceAnswer: (requestId, command, report) =>
       on("advanceAnswer", [requestId, command, report]),
     answer: (requestId) => on("answer", [requestId]),
-    claim: (caller, ask) => made(on("claim", [caller, ask])),
+    claim: (caller, ask) => assumingMade(on("claim", [caller, ask])),
     credits: (caller, handle) => on("credits", [caller, handle]),
-    decide: (caller, input) => made(on("decide", [caller, input])),
+    decide: (caller, input) => assumingMade(on("decide", [caller, input])),
     events: (since, limit) => on("events", [since, limit]),
-    finish: (caller, input) => made(on("finish", [caller, input])),
-    flagAsk: (caller, input) => made(on("flagAsk", [caller, input])),
-    fork: (caller) => made(on("fork", [caller])),
+    finish: (caller, input) => assumingMade(on("finish", [caller, input])),
+    flagAsk: (caller, input) => assumingMade(on("flagAsk", [caller, input])),
+    fork: (caller) => assumingMade(on("fork", [caller])),
     initProject: (caller, input) => on("initProject", [caller, input]),
-    land: (caller, input) => made(on("land", [caller, input])),
-    landing: (caller, sha) => made(on("landing", [caller, sha])),
-    ledger: (caller) => made(on("ledger", [caller])),
-    listAsks: (caller) => made(on("listAsks", [caller])),
+    land: (caller, input) => assumingMade(on("land", [caller, input])),
+    landing: (caller, sha) => assumingMade(on("landing", [caller, sha])),
+    ledger: (caller) => assumingMade(on("ledger", [caller])),
+    listAsks: (caller) => assumingMade(on("listAsks", [caller])),
     onAlarm: () => on("onAlarm", []),
-    openAsk: (caller, input) => made(on("openAsk", [caller, input])),
-    proposeAsk: (caller, input) => made(on("proposeAsk", [caller, input])),
+    openAsk: (caller, input) => assumingMade(on("openAsk", [caller, input])),
+    proposeAsk: (caller, input) =>
+      assumingMade(on("proposeAsk", [caller, input])),
     recordFirstPush: (caller, head) => on("recordFirstPush", [caller, head]),
     recordPush: (input) => on("recordPush", [input]),
-    release: (caller, ask) => made(on("release", [caller, ask])),
-    setEnv: (caller, input) => made(on("setEnv", [caller, input])),
-    showAsk: (caller, ask) => made(on("showAsk", [caller, ask])),
-    status: (caller) => made(on("status", [caller])),
-    submitAnswer: (caller, input) => made(on("submitAnswer", [caller, input])),
-    today: (caller) => made(on("today", [caller])),
-    verdict: (caller, input) => made(on("verdict", [caller, input])),
-    vouch: (caller, input) => made(on("vouch", [caller, input])),
+    release: (caller, ask) => assumingMade(on("release", [caller, ask])),
+    setEnv: (caller, input) => assumingMade(on("setEnv", [caller, input])),
+    showAsk: (caller, ask) => assumingMade(on("showAsk", [caller, ask])),
+    status: (caller) => assumingMade(on("status", [caller])),
+    submitAnswer: (caller, input) =>
+      assumingMade(on("submitAnswer", [caller, input])),
+    today: (caller) => assumingMade(on("today", [caller])),
+    verdict: (caller, input) => assumingMade(on("verdict", [caller, input])),
+    vouch: (caller, input) => assumingMade(on("vouch", [caller, input])),
   };
 };
 

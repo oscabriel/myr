@@ -117,6 +117,31 @@ describe("a Project DO's shell", () => {
         expect(yield* Instances.use(({ made }) => made)).toStrictEqual(
           startedOnce
         );
+        // The replay never reached the Workflow: one start, not a second the binding refused.
+        expect(yield* Instances.use(({ tries }) => tries)).toBe(1);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "takes a nameless DO's name from the project its storage holds, and dies with neither",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo(noon);
+
+        const file = yield* databaseFile;
+        const empty = through(yield* shellOver(":memory:", Option.none()));
+
+        expect(yield* outcomeOf(empty("listAsks", [anyone]))).toBe("died");
+
+        const call = through(yield* shellOver(file));
+        const { ask } = yield* opening(call);
+        const listed = yield* call("listAsks", [anyone]);
+        const nameless = through(yield* shellOver(file, Option.none()));
+
+        expect(listed.asks.map(({ ask: id }) => id)).toStrictEqual([ask.id]);
+        expect(yield* outcomeOf(nameless("listAsks", [anyone]))).toStrictEqual({
+          value: listed,
+        });
       }).pipe(Effect.provide(world))
   );
 

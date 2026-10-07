@@ -350,16 +350,20 @@ export const databaseFile = FileSystem.FileSystem.pipe(
   Effect.provide(NodeServices.layer)
 );
 
-/** A Project DO's shell for `name` over the SQLite at `filename`, on the world's ports. */
+/**
+ * A Project DO's shell over the SQLite at `filename`, on the world's ports,
+ * named `name` as `idFromName` names a DO; `Option.none()` for a DO whose id
+ * carries no name.
+ */
 export const shellOver = (
   filename: string,
-  name: ProjectName | undefined = project
+  name: Option.Option<ProjectName> = Option.some(project)
 ) =>
   Effect.gen(function* () {
     const ports = yield* Effect.context<World>();
 
     return yield* projectShell({
-      name,
+      name: Option.getOrUndefined(name),
       ports: Layer.succeedContext(ports),
       sql: SqliteClient.layer({ filename }).pipe(Layer.orDie),
     });
@@ -450,7 +454,7 @@ export const namespaceOf = Effect.gen(function* () {
       Option.match(Option.fromUndefinedOr(all.get(name)), {
         onNone: () =>
           Effect.map(
-            shellOver(":memory:", ProjectName.make(name)),
+            shellOver(":memory:", Option.some(ProjectName.make(name))),
             (shell) => [shell, new Map(all).set(name, shell)] as const
           ),
         onSome: (shell) => Effect.succeed([shell, all] as const),
