@@ -16,7 +16,7 @@ The plan is the synthesis: `~/Developer/projects/wanted-explainer/notes/git-plat
 
 Fence wins over prose: if this file and an enforced check disagree, the check wins; fix this file. A rule held by "No fence yet" is debt: give it a fence.
 
-In "Held by", each code-formatted name before "No fence yet:" is an enforcer: a file, a root script, a lint rule, an Effect diagnostic, a tsconfig key, a refusal tag or a branded id. Principle 1's test fails on any the repo lacks, so write everything else in the cell as plain text. After "No fence yet:", name what will hold the rule and the wave that builds it.
+In "Held by", each code-formatted name before "No fence yet:" is an enforcer: a file, a root script, a lint rule, an Effect diagnostic, a tsconfig key, a refusal tag or a branded id. Write everything else in the cell as plain text. Principle 1's test fails on an enforcer the repo lacks, and on a row with neither an enforcer nor "No fence yet:". After "No fence yet:", name what will hold the rule and the wave that builds it.
 
 | # | Principle | Held by |
 | --- | --- | --- |

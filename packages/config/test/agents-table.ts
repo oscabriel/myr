@@ -18,9 +18,9 @@
  * - a refusal or an id (PascalCase): a refusal class in `refusal.ts`, or an
  *   export of `ids.ts`, in `packages/protocol/src/`.
  *
- * Anything else is unclassified, and fails.
+ * Anything else is unclassified, and fails. So does a row that names no
+ * enforcer and says nothing after "No fence yet": prose alone holds nothing.
  */
-import { NodeServices } from "@effect/platform-node";
 import { Effect, FileSystem, Path, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import type { DummyRule, OxlintConfig } from "oxlint";
@@ -47,6 +47,8 @@ export interface Repo {
 export interface Row {
   readonly principle: string;
   readonly enforcers: readonly string[];
+  /** The cell says, after "No fence yet", what will hold the rest. */
+  readonly waiting: boolean;
 }
 
 type Kind =
@@ -140,6 +142,7 @@ export const principleRows = (markdown: string): readonly Row[] => {
     .map((cells, index) => ({
       enforcers: enforcersIn(cells[heldBy] ?? ""),
       principle: cells[numbered] ?? String(index + 1),
+      waiting: (cells[heldBy] ?? "").includes(CUT),
     }));
 };
 
@@ -250,9 +253,18 @@ const kindsOf = (token: string, repo: Repo): readonly Kind[] => {
   return PASCAL.test(token) ? ["refusal", "id"] : [];
 };
 
-/** One line for each enforcer in `row` that the repo doesn't hold. */
-export const missingEnforcers = (row: Row, repo: Repo): readonly string[] =>
-  row.enforcers.flatMap((token) => {
+/**
+ * One line for each enforcer in `row` that the repo doesn't hold, or one line
+ * when the row names no enforcer and no fence still to come.
+ */
+export const missingEnforcers = (row: Row, repo: Repo): readonly string[] => {
+  if (row.enforcers.length === 0 && !row.waiting) {
+    return [
+      `principle ${row.principle} names no enforcer; name one, or what will hold it after ${CUT}:`,
+    ];
+  }
+
+  return row.enforcers.flatMap((token) => {
     const kinds = kindsOf(token, repo);
 
     if (kinds.length === 0) {
@@ -269,6 +281,7 @@ export const missingEnforcers = (row: Row, repo: Repo): readonly string[] =>
             .join(" or ")}`,
         ];
   });
+};
 
 const isError = (setting: DummyRule | undefined) => {
   const severity = Array.isArray(setting) ? setting[0] : setting;
@@ -301,14 +314,19 @@ const rulesAtError = (config: OxlintConfig) => {
   );
 };
 
-/** Built-in plugins each layer turns on, and each JavaScript plugin's name. */
+/**
+ * Built-in plugins each layer or override turns on, and each JavaScript
+ * plugin's name: the vitest plugin, for one, is on only for test files.
+ */
 const pluginsOf = (config: OxlintConfig) =>
-  layersOf(config).flatMap((layer) => [
-    ...(layer.plugins ?? []),
-    ...(layer.jsPlugins ?? []).map((plugin) =>
-      Schema.is(Schema.String)(plugin) ? plugin : plugin.name
-    ),
-  ]);
+  layersOf(config)
+    .flatMap((layer) => [layer, ...(layer.overrides ?? [])])
+    .flatMap((scope) => [
+      ...(scope.plugins ?? []),
+      ...(scope.jsPlugins ?? []).map((plugin) =>
+        Schema.is(Schema.String)(plugin) ? plugin : plugin.name
+      ),
+    ]);
 
 const isJsonArray = Schema.is(Schema.Array(Schema.Json));
 
@@ -358,7 +376,54 @@ const namesIn = (source: string, pattern: RegExp) => [
   ),
 ];
 
-/** AGENTS.md's text, and what the repo holds, read from the repo root. */
+/** The texts and config a "Held by" cell is checked against. */
+export interface Sources {
+  /** Every file git tracks or would add, relative to the repo root. */
+  readonly files: readonly string[];
+  /** The root `package.json`. */
+  readonly rootPackage: string;
+  readonly oxlint: OxlintConfig;
+  /** `tsconfig.base.json`. */
+  readonly tsconfig: string;
+  /** `packages/protocol/src/refusal.ts`. */
+  readonly refusalSource: string;
+  /** `packages/protocol/src/ids.ts`. */
+  readonly idsSource: string;
+}
+
+/** What the repo holds, out of its sources. */
+export const repoOf = (sources: Sources) =>
+  Effect.gen(function* () {
+    const { scripts } = yield* Schema.decodeEffect(
+      Schema.fromJsonString(RootPackage)
+    )(sources.rootPackage);
+
+    const tsconfig = yield* Schema.decodeEffect(
+      Schema.fromJsonString(Schema.Json)
+    )(sources.tsconfig);
+
+    const { compilerOptions } =
+      yield* Schema.decodeUnknownEffect(TsconfigBase)(tsconfig);
+
+    const repo: Repo = {
+      configKeys: [...new Set(keysOf(tsconfig))],
+      diagnosticsAtError: compilerOptions.plugins.flatMap((plugin) =>
+        Object.entries(plugin.diagnosticSeverity ?? {}).flatMap(
+          ([diagnostic, severity]) => (severity === "error" ? [diagnostic] : [])
+        )
+      ),
+      files: sources.files,
+      ids: namesIn(sources.idsSource, EXPORTED),
+      lintPlugins: [...new Set(pluginsOf(sources.oxlint))],
+      lintRulesAtError: [...new Set(rulesAtError(sources.oxlint))],
+      refusals: namesIn(sources.refusalSource, REFUSAL_CLASS),
+      scripts: Object.keys(scripts),
+    };
+
+    return repo;
+  });
+
+/** AGENTS.md's principle rows, and what the repo holds, read from the repo root. */
 export const readAgentsTable = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -372,7 +437,7 @@ export const readAgentsTable = Effect.gen(function* () {
       ChildProcess.make("git", ["ls-files", ...args], { cwd: root })
     );
 
-  const [agents, rootPackage, tsconfigText, refusalSource, idsSource] =
+  const [agents, rootPackage, tsconfig, refusalSource, idsSource] =
     yield* Effect.all(
       [
         read("AGENTS.md"),
@@ -393,39 +458,14 @@ export const readAgentsTable = Effect.gen(function* () {
 
   const deleted = new Set(yield* lsFiles("--deleted"));
 
-  const { scripts } = yield* Schema.decodeEffect(
-    Schema.fromJsonString(RootPackage)
-  )(rootPackage);
-
-  const tsconfig = yield* Schema.decodeEffect(
-    Schema.fromJsonString(Schema.Json)
-  )(tsconfigText);
-
-  const { compilerOptions } =
-    yield* Schema.decodeUnknownEffect(TsconfigBase)(tsconfig);
-
-  const repo: Repo = {
-    configKeys: [...new Set(keysOf(tsconfig))],
-    diagnosticsAtError: compilerOptions.plugins.flatMap((plugin) =>
-      Object.entries(plugin.diagnosticSeverity ?? {}).flatMap(
-        ([diagnostic, severity]) => (severity === "error" ? [diagnostic] : [])
-      )
-    ),
+  const repo = yield* repoOf({
     files: listed.filter((file) => file.length > 0 && !deleted.has(file)),
-    ids: namesIn(idsSource, EXPORTED),
-    lintPlugins: [...new Set(pluginsOf(oxlintConfig))],
-    lintRulesAtError: [...new Set(rulesAtError(oxlintConfig))],
-    refusals: namesIn(refusalSource, REFUSAL_CLASS),
-    scripts: Object.keys(scripts),
-  };
+    idsSource,
+    oxlint: oxlintConfig,
+    refusalSource,
+    rootPackage,
+    tsconfig,
+  });
 
   return { repo, rows: principleRows(agents) };
 });
-
-/**
- * `readAgentsTable`, run once while vitest collects the tests: a test per
- * principle row needs the rows before any test runs, and `@effect/vitest`
- * runs Effects only inside a test.
- */
-export const loadAgentsTable = () =>
-  Effect.runPromise(readAgentsTable.pipe(Effect.provide(NodeServices.layer)));
