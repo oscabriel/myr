@@ -1,34 +1,60 @@
 /**
- * imports:check: fails when an import crosses a line the workspace graph
- * forbids (AGENTS.md principle 6). Files come from git, so ignored files are
- * never opened.
+ * imports:check: fails when an import crosses a line AGENTS.md principle 6
+ * draws: the package direction, the Worker host rules, adapters through their
+ * own subpaths, test-only and infra-only imports. Files come from git, so
+ * ignored files are never opened. The rules live in `lib/imports.ts`.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, pipe, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { findViolations } from "./lib/imports.ts";
+import { findViolations, formatViolation, RuleHints } from "./lib/imports.ts";
 import type { Workspace } from "./lib/imports.ts";
 
 class ImportsCrossed extends Data.TaggedError("ImportsCrossed")<{
   readonly count: number;
 }> {}
 
-const RootPackage = Schema.Struct({
-  workspaces: Schema.Struct({ packages: Schema.Array(Schema.String) }),
-});
-
 const Dependencies = Schema.optionalKey(
   Schema.Record(Schema.String, Schema.String)
 );
 
-const WorkspacePackage = Schema.Struct({
+/** An `exports` target: a path, or a path per condition. */
+const Target = Schema.Union([
+  Schema.String,
+  Schema.Record(Schema.String, Schema.String),
+]);
+
+const Manifest = Schema.Struct({
   dependencies: Dependencies,
   devDependencies: Dependencies,
+  exports: Schema.optionalKey(
+    Schema.Union([Schema.String, Schema.Record(Schema.String, Target)])
+  ),
   name: Schema.String,
 });
 
+const RootManifest = Schema.Struct({
+  ...Manifest.fields,
+  workspaces: Schema.Struct({ packages: Schema.Array(Schema.String) }),
+});
+
 const SOURCE = /\.(?:ts|tsx|mts|cts)$/u;
+
+/** Vendored, fixture, example and generated code: not ours to direct. */
+const SKIPPED = [
+  "tools/oxlint/anti-slop/",
+  "tools/oxlint/fence/fixtures/",
+  "examples/",
+  ".agent_sources/",
+];
+
+const GENERATED = /(?:^|\/)worker-configuration\.d\.ts$/u;
+
+const isChecked = (path: string) =>
+  SOURCE.test(path) &&
+  !GENERATED.test(path) &&
+  !SKIPPED.some((prefix) => path.startsWith(prefix));
 
 /** `apps/*` as a test of a folder path: `*` is one path segment. */
 const matchesGlob = (glob: string) => {
@@ -67,10 +93,41 @@ const readJson = <S extends Schema.Top>(file: string, schema: S) =>
       .pipe(Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(schema))))
   );
 
+/** Each subpath's files, with conditions flattened. */
+const exportsOf = (exports: (typeof Manifest.Type)["exports"]) => {
+  if (exports === undefined) {
+    return {};
+  }
+
+  if (Schema.is(Schema.String)(exports)) {
+    return { ".": [exports] };
+  }
+
+  return Object.fromEntries(
+    Object.entries(exports).map(([subpath, target]) => [
+      subpath,
+      Schema.is(Schema.String)(target) ? [target] : Object.values(target),
+    ])
+  );
+};
+
+const workspaceOf = (
+  dir: string,
+  manifest: typeof Manifest.Type
+): Workspace => ({
+  dependencies: Object.keys({
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+  }).toSorted(),
+  dir,
+  exports: exportsOf(manifest.exports),
+  name: manifest.name,
+});
+
 const check = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const paths = yield* listCommittable;
-  const root = yield* readJson("package.json", RootPackage);
+  const root = yield* readJson("package.json", RootManifest);
   const globs = root.workspaces.packages.map(matchesGlob);
 
   const manifests = paths.filter((path) => {
@@ -81,24 +138,22 @@ const check = Effect.gen(function* () {
     );
   });
 
-  const workspaces: readonly Workspace[] = yield* pipe(
+  const members = yield* pipe(
     manifests,
     Effect.forEach((manifest) =>
-      readJson(manifest, WorkspacePackage).pipe(
-        Effect.map((pkg) => ({
-          dependencies: Object.keys({
-            ...pkg.dependencies,
-            ...pkg.devDependencies,
-          }).toSorted(),
-          dir: manifest.slice(0, -"/package.json".length),
-          name: pkg.name,
-        }))
+      readJson(manifest, Manifest).pipe(
+        Effect.map((decoded) =>
+          workspaceOf(manifest.slice(0, -"/package.json".length), decoded)
+        )
       )
     )
   );
 
+  // The root's own files (`scripts/`, `infra/`) belong to the root workspace.
+  const workspaces = [workspaceOf("", root), ...members];
+
   const files = yield* pipe(
-    paths.filter((path) => SOURCE.test(path)),
+    paths.filter(isChecked),
     Effect.forEach((path) =>
       fs.exists(path).pipe(
         Effect.flatMap((exists) =>
@@ -118,14 +173,14 @@ const check = Effect.gen(function* () {
   }
 
   for (const violation of violations) {
-    yield* Console.error(
-      `${violation.path}:${violation.line}: ${violation.rule}: ${violation.specifier}`
-    );
+    yield* Console.error(formatViolation(violation));
   }
 
-  yield* Console.error(
-    "imports:check: apps import packages only; move what both need into a package."
-  );
+  const broken = [...new Set(violations.map((violation) => violation.rule))];
+
+  for (const rule of broken) {
+    yield* Console.error(`imports:check: ${rule}: ${RuleHints[rule]}`);
+  }
 
   return yield* new ImportsCrossed({ count: violations.length });
 });
