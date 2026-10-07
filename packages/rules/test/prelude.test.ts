@@ -72,6 +72,27 @@ describe(installFrozenGlobals, () => {
     });
   });
 
+  it("leaves no way back to the scope's own clock", () => {
+    const scope = scopeOf();
+    const own = scope.Date;
+
+    installFrozenGlobals(scope, facts);
+
+    expect({
+      // A date the runtime makes itself (`structuredClone` does) is the
+      // scope's own Date's: its constructor is the frozen one too.
+      madeByTheRuntime: new own(0).constructor === scope.Date,
+      // The frozen Date shares its dates' prototype, so nothing of the
+      // scope's own sits above it.
+      oneDatePrototype: scope.Date.prototype === own.prototype,
+      ownNow: own.now(),
+    }).toStrictEqual({
+      madeByTheRuntime: true,
+      oneDatePrototype: true,
+      ownNow: 1_791_374_400_000,
+    });
+  });
+
   it("gives the scope randomness seeded from the facts", () => {
     const scope = scopeOf();
 

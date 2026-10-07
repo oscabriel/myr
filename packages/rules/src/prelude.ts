@@ -19,10 +19,13 @@ export interface FrozenFacts {
   readonly seed: number;
 }
 
-/** A scope's `Date`: constructed with or without a time, and asked for one. */
+/**
+ * A scope's `Date`: constructed with or without a time, and asked for one.
+ * Its `now` is replaced too, so the frozen `Date` leads to no other clock.
+ */
 export interface DateClass {
   new (...args: readonly (Date | number | string)[]): Date;
-  readonly now: () => number;
+  now: () => number;
   readonly prototype: Date;
 }
 
@@ -55,14 +58,17 @@ export interface Frozen {
  * `Date.now()`, `new Date()` with no argument, `Date()`, a date's own
  * `constructor`, `performance.now()` (always 0), and `Math.random()`,
  * `crypto.getRandomValues()` and `crypto.randomUUID()` from a generator
- * seeded with `facts.seed`. The scope's own `Date` is left as it was: the
- * frozen one extends it.
+ * seeded with `facts.seed`. The frozen `Date` is the scope's own behind a
+ * proxy, whose `now` and whose dates' `constructor` it replaces as well, so
+ * no path from it (a date the runtime made, what sits above it) leads to
+ * the real clock: the same as `/bun`'s prelude.
  *
  * It is serialised into the prelude module with `Function#toString`, so its
  * body names nothing outside itself and defines no function or class a
- * bundler would name (only methods, and functions and classes assigned to
- * properties): a `keepNames` build, wrangler's default, would otherwise
- * call a naming helper the prelude module doesn't have.
+ * bundler would name (only methods, and functions assigned to a member; an
+ * arrow bound to a name or written as an object literal's property value
+ * is named): a `keepNames` build, wrangler's default, would otherwise call
+ * a naming helper the prelude module doesn't have.
  */
 export const installFrozenGlobals = (
   scope: FreezableScope,
@@ -90,31 +96,41 @@ export const installFrozenGlobals = (
   };
   /* oxlint-enable no-bitwise */
 
-  scope.Date = class extends RealDate {
-    constructor(...args: readonly (Date | number | string)[]) {
-      super(...(args.length === 0 ? [frozenAt] : args));
-    }
-
-    static override now(): number {
-      return frozenAt;
-    }
-  };
-
-  // A date's own constructor is the frozen `Date`, and `Date()` without
-  // `new` tells the frozen time, as the real one tells the real time.
-  const callable = new Proxy(scope.Date, {
+  // The frozen `Date` is the scope's own behind a proxy: `new Date()` with
+  // no time gets the frozen one, and `Date()` without `new` tells it, as
+  // the real one tells the real time. Everything else (`prototype`,
+  // `parse`, `UTC`, what sits above it) is the scope's own, so no path
+  // leads past it to another clock.
+  const frozenDate = new Proxy(RealDate, {
     apply(): string {
       return new RealDate(frozenAt).toString();
     },
+    // `newTarget` is the frozen `Date`, or a class config code derived
+    // from it, whose prototype the new date takes.
+    construct(
+      target,
+      args: readonly (Date | number | string)[],
+      newTarget: DateClass
+    ): Date {
+      return Reflect.construct(
+        target,
+        args.length === 0 ? [frozenAt] : args,
+        newTarget
+      );
+    },
   });
 
-  Object.defineProperty(scope.Date.prototype, "constructor", {
+  // The scope's own `Date` tells the frozen time too, and every date's
+  // constructor (one the runtime makes itself included) is the frozen one.
+  RealDate.now = () => frozenAt;
+
+  Object.defineProperty(RealDate.prototype, "constructor", {
     configurable: true,
-    value: callable,
+    value: frozenDate,
     writable: true,
   });
 
-  scope.Date = callable;
+  scope.Date = frozenDate;
   scope.performance.now = () => 0;
   scope.Math.random = () => generator.next();
 

@@ -205,6 +205,21 @@ const isModulePath = (path: string) =>
     .split("/")
     .every((segment) => segment !== "" && segment !== "." && segment !== "..");
 
+/** Refuses a bundle with a path outside the folder, before any worker loads. */
+const insideTheFolder = (bundle: ConfigBundle) => {
+  const outside = Object.keys(bundle.modules).filter(
+    (path) => !isModulePath(path)
+  );
+
+  return outside.length === 0
+    ? Effect.void
+    : Effect.fail(
+        loadFailed(
+          `${outside.join(", ")}: not a module path inside the config folder`
+        )
+      );
+};
+
 const parsedJson = Schema.decodeOption(Schema.fromJsonString(Schema.Json));
 
 /**
@@ -258,23 +273,11 @@ export const RulesEvaluatorWorker = (
       const cpuMs = options.cpuMs ?? 200;
       const timeoutMs = options.timeoutMs ?? 5000;
 
-      /** The code the Loader gets for a bundle under a clock. */
-      const codeOf = (
-        bundle: ConfigBundle,
-        clock: FrozenFacts
-      ): Effect.Effect<LoaderCode, RulesFailed> => {
-        const outside = Object.keys(bundle.modules).filter(
-          (path) => !isModulePath(path)
-        );
-
-        if (outside.length > 0) {
-          return Effect.fail(
-            loadFailed(
-              `${outside.join(", ")}: not a module path inside the config folder`
-            )
-          );
-        }
-
+      /**
+       * The code the Loader gets for a bundle under a clock. The Loader asks
+       * for it only for an id it doesn't hold, so a warm request builds none.
+       */
+      const codeOf = (bundle: ConfigBundle, clock: FrozenFacts): LoaderCode => {
         const modules: Record<string, LoaderModule> = {};
 
         for (const [path, source] of Object.entries(bundle.modules)) {
@@ -290,13 +293,13 @@ export const RulesEvaluatorWorker = (
 
         modules[preludeName] = { js: preludeModule(clock) };
 
-        return Effect.succeed({
+        return {
           compatibilityDate,
           globalOutbound: null,
           limits: { cpuMs, subRequests: 0 },
           mainModule: mainName,
           modules,
-        });
+        };
       };
 
       /**
@@ -309,12 +312,16 @@ export const RulesEvaluatorWorker = (
         clock: FrozenFacts,
         job: Job
       ): Effect.Effect<Output, RulesFailed> =>
-        Effect.flatMap(codeOf(bundle, clock), (code) =>
+        Effect.andThen(
+          insideTheFolder(bundle),
           Effect.acquireUseRelease(
             Effect.try({
               catch: (cause) =>
                 loadFailed(`the Worker Loader: ${messageOf(cause)}`),
-              try: () => loader.get(workerIdOf(bundle, at, clock), () => code),
+              try: () =>
+                loader.get(workerIdOf(bundle, at, clock), () =>
+                  codeOf(bundle, clock)
+                ),
             }),
             (worker) =>
               Effect.acquireUseRelease(

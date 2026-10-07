@@ -266,16 +266,44 @@ describe("the /worker adapter", () => {
         yield* evaluated(bundle);
         yield* evaluated(bundle);
         yield* evaluated(bundle, other);
+        yield* evaluated({ ...bundle, sdkVersion: "0.0.1" });
       }).pipe(Effect.provide(workerEvaluator(loader.binding)));
 
-      const ids = loader.loads.map(({ id }) => id);
+      // Each cold start, by what its id names.
+      const named = loader.loads.map(({ id }) => ({
+        at: [at, other].find((sha) => id.includes(sha)),
+        sdk: ["0.0.0", "0.0.1"].find((version) => id.includes(version)),
+      }));
 
-      expect(ids).toHaveLength(2);
-      expect(ids[0]).toContain(at);
-      expect(ids[0]).toContain(bundle.sdkVersion);
-      expect(ids[1]).toContain(other);
-      expect(loader.requests).toHaveLength(3);
+      expect(named).toStrictEqual([
+        { at, sdk: "0.0.0" },
+        { at: other, sdk: "0.0.0" },
+        { at, sdk: "0.0.1" },
+      ]);
+      expect(loader.requests).toHaveLength(4);
     })
+  );
+
+  it.effect(
+    "runs a rule call at a commit in a worker of its own, on the epoch's clock",
+    () =>
+      Effect.gen(function* () {
+        const loader = fakeLoader({ responds: collectedBase });
+
+        yield* Effect.gen(function* () {
+          yield* evaluated(bundle);
+          yield* called(bundle, proposal(3));
+        }).pipe(Effect.provide(workerEvaluator(loader.binding)));
+
+        // The warm evaluation worker froze the landing's clock, so the call
+        // must not reuse it.
+        expect(
+          loader.loads.map(({ code }) => scriptOf(code.modules, "prelude.js"))
+        ).toStrictEqual([
+          preludeModule({ now: Number(nowMs), seed: facts.seed }),
+          preludeModule({ now: 0, seed: 0 }),
+        ]);
+      })
   );
 
   it.effect("decodes what the folder exported into the policy", () =>
@@ -449,8 +477,10 @@ const running = Effect.gen(function* () {
  * A config whose project module reads the clock and randomness while it
  * loads, and whose one ask puts what it read into its context: the wall
  * clock, a dated `new Date()`, the clock reached through a date's own
- * constructor, whether `Date()` tells the same time as `new Date()`, then
- * `Math.random()`, `crypto.getRandomValues()` and `crypto.randomUUID()`.
+ * constructor, whether `Date()` tells the same time as `new Date()`, the
+ * clock reached through a date the runtime made (`structuredClone`) and
+ * through whatever sits above `Date`, then `Math.random()`,
+ * `crypto.getRandomValues()` and `crypto.randomUUID()`.
  */
 const readsTheClock = bundleOf({
   "asks/stamp.ask.ts": [
@@ -469,6 +499,8 @@ const readsTheClock = bundleOf({
     "  new Date().toISOString(),",
     "  String(new Date().constructor.now()),",
     "  String(Date() === new Date().toString()),",
+    "  String(structuredClone(new Date(0)).constructor.now()),",
+    "  String(Object.getPrototypeOf(Date).now?.()),",
     "  String(Math.random()),",
     '  crypto.getRandomValues(new Uint32Array(2)).join(","),',
     "  crypto.randomUUID(),",
@@ -505,11 +537,14 @@ describe("the /worker adapter's modules, run", () => {
 
       assert(Result.isSuccess(result), "the worker gave no policy");
 
-      expect(result.success.asks[0]?.brief.context?.slice(0, 4)).toStrictEqual([
+      expect(result.success.asks[0]?.brief.context?.slice(0, 6)).toStrictEqual([
         nowMs,
         now,
         nowMs,
         "true",
+        nowMs,
+        // Above the frozen `Date` there is no other clock.
+        "undefined",
       ]);
     }).pipe(Effect.provide(NodeServices.layer))
   );
