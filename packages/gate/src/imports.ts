@@ -22,6 +22,9 @@ type Mode = "code" | "comment" | "block" | "quote" | "template" | "regex";
 // After one of these, a `/` opens a regular expression, not a division.
 const OPENS_REGEX = new Set("(,=:[!&|?{};+-*%<>~^");
 
+// A postfix `++` or `--` ends an operand, so the `/` after it divides.
+const POSTFIX = /(?:\+\+|--)$/u;
+
 const KEYWORD_BEFORE_REGEX =
   /(?:^|[^\w$])(?:return|typeof|case|do|else|in|of|new|delete|void|throw|yield|await)$/u;
 
@@ -154,7 +157,7 @@ const maskOf = (text: string): string => {
 
     return (
       before === "" ||
-      OPENS_REGEX.has(before.slice(-1)) ||
+      (OPENS_REGEX.has(before.slice(-1)) && !POSTFIX.test(before)) ||
       KEYWORD_BEFORE_REGEX.test(before)
     );
   };
@@ -241,20 +244,23 @@ const maskOf = (text: string): string => {
 
 // Each form of import, read in the masked text: `… from "x"` (an import or
 // re-export, or the last line of one), `import "x"`, `import("x")` and
-// `require("x")`. A string's contents read as `_`.
+// `require("x")`. A string's contents read as `_`. A call may also name its
+// module by a template with no `${}`, which is as fixed as a string; one with
+// a substitution keeps its `${`, so it never matches.
 const FORMS = [
   /(?<![\w$.])from\s*(?<quote>["'])(?<contents>_+)\k<quote>/gu,
   /(?<![\w$.])import\s*(?<quote>["'])(?<contents>_+)\k<quote>/gu,
-  /(?<![\w$.])import\s*\(\s*(?<quote>["'])(?<contents>_+)\k<quote>/gu,
-  /(?<![\w$.])require\s*\(\s*(?<quote>["'])(?<contents>_+)\k<quote>/gu,
+  /(?<![\w$.])import\s*\(\s*(?<quote>["'`])(?<contents>_+)\k<quote>/gu,
+  /(?<![\w$.])require\s*\(\s*(?<quote>["'`])(?<contents>_+)\k<quote>/gu,
 ];
 
 /**
  * Every module specifier `text` imports: static imports and re-exports
  * (`… from "x"`, over any number of lines), side-effect imports, dynamic
- * `import("x")` and `require("x")`, each on the line its specifier sits on,
- * in the order they appear. Comments, strings, templates and regular
- * expressions import nothing.
+ * `import("x")` and `require("x")` (their specifier a string or a template
+ * with no substitution), each on the line its specifier sits on, in the
+ * order they appear. Comments, strings, templates and regular expressions
+ * import nothing.
  */
 export const importSpecifiers = (text: string): readonly ImportSpecifier[] => {
   const masked = maskOf(text);

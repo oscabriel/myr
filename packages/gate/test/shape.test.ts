@@ -220,7 +220,7 @@ const rows: readonly {
       [week],
       [[week, 7, "// oxlint-disable-next-line no-x -- reason given"]]
     ),
-    name: "an added escape with a reason (counted by the ratchet stage)",
+    name: "an added escape with a reason (counted by escapeDecisions)",
     refusals: [],
   },
   {
@@ -374,6 +374,11 @@ const rows: readonly {
     ),
     name: "a dynamic import and a require of another module's internal file",
     refusals: [reachedFromWeek(2, pad), reachedFromWeek(6, pad)],
+  },
+  {
+    facts: push([week], [[week, 4, `const pad = await import(\`${pad}\`);`]]),
+    name: "a dynamic import of another module's internal file, its specifier a template",
+    refusals: [reachedFromWeek(4, pad)],
   },
   {
     facts: push(

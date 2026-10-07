@@ -5,7 +5,7 @@ import { Option, Schema } from "effect";
 
 import { importSpecifiers, reachedInternals } from "../src/imports.ts";
 
-/** The text of `lines`, one per line, and each specifier it should give. */
+/** The text of `lines`, one per line. */
 const text = (...lines: readonly string[]) => lines.join("\n");
 
 describe(importSpecifiers, () => {
@@ -70,6 +70,33 @@ describe(importSpecifiers, () => {
       text: text(
         'const fs = require("node:fs");',
         "import config = require('./config.cjs');"
+      ),
+    },
+    {
+      found: [
+        { line: 1, specifier: "../b/src/internal.ts" },
+        { line: 2, specifier: "../b/src/cache.ts" },
+      ],
+      name: "a dynamic import and a require whose specifier is a template with no substitution",
+      text: text(
+        "const lazy = await import(`../b/src/internal.ts`);",
+        "const cache = require(`../b/src/cache.ts`);"
+      ),
+    },
+    {
+      found: [],
+      name: "nothing for a template specifier with a substitution, which only stage 3 resolves",
+      text: `const locale = await import(\`./locales/\${lang}.ts\`);`,
+    },
+    {
+      found: [
+        { line: 1, specifier: "./lazy.ts" },
+        { line: 2, specifier: "./later.ts" },
+      ],
+      name: "an import after a division by a postfix increment or decrement",
+      text: text(
+        'const half = n++ / 2, lazy = import("./lazy.ts");',
+        'const rest = m-- / 2, later = import("./later.ts");'
       ),
     },
     {
