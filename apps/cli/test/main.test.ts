@@ -100,7 +100,6 @@ describe("each command a later issue builds", () => {
     { args: ["check"], issue: "405" },
     { args: ["why"], issue: "414" },
     { args: ["env", "set"], issue: "414" },
-    { args: ["hook"], issue: "415" },
   ] as const;
 
   it.effect.each(stubs)(
