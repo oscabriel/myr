@@ -1,16 +1,22 @@
 /**
  * bytes:check: builds each Worker as a deploy would (`wrangler deploy
- * --dry-run`) and fails when its bundle passes the byte limits. The limits are
- * Rat Stack's, set just above its own minified Worker (an 822,362-byte entry
- * and 2,205,180 bytes of JavaScript): regression alarms, not Cloudflare's
- * upload limit. Startup time is evidence, not a gate; profile it with
- * `wrangler check startup` in the Worker's folder.
+ * --dry-run`) and fails when its bundle passes the byte limits: regression
+ * alarms, not Cloudflare's upload limit. Startup time is evidence, not a
+ * gate; profile it with `wrangler check startup` in the Worker's folder.
+ *
+ * The first limits were Rat Stack's (900,000 entry bytes for its 822,362-byte
+ * Worker). The platform Worker outgrew them in W3 by carrying more surfaces:
+ * 1,359,367 entry bytes (416 KiB gzip), of which Effect is 804,136. Its local
+ * startup profile was 84.2 ms active, on par with Rat Stack's ~80 ms median
+ * and far under Cloudflare's 1 s startup limit, so the entry limit now sits
+ * above our own Worker with room for W3's composition. Lower it as `yaml`
+ * and isomorphic-git move behind dynamic imports.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, Path, pipe } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-const entryBudget = 900_000;
+const entryBudget = 1_700_000;
 
 const javascriptBudget = 2_500_000;
 
