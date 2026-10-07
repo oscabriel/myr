@@ -1,9 +1,19 @@
+import {
+  contractCommandDocs,
+  localCommandDocs,
+} from "@repo/agent-kit/command-doc";
+import { platformSkill } from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
 import { Upstream } from "@repo/git/upstream";
 import { Projects } from "@repo/project/projects";
 import { authenticated, bearerToken } from "@repo/protocol/authenticate";
 import { Client, Contracts, surfaced } from "@repo/protocol/contracts";
 import { toToolkit } from "@repo/protocol/mcp";
+import {
+  briefResources,
+  skillIn,
+  skillPrompt,
+} from "@repo/protocol/mcp-extras";
 import { Authenticated } from "@repo/protocol/principal";
 import type { Person } from "@repo/protocol/principal";
 import { Context, Effect, Layer, Option } from "effect";
@@ -244,12 +254,34 @@ const forwardCredential = RpcMiddleware.layerClient(
 const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 
 /**
- * The MCP-surfaced contracts as tools at `/mcp`, for a signed-in caller
- * only (spec §8 D10: harnesses using MCP have tokens), each call made as
- * that caller.
+ * The platform's skill as the prompt `contribute`, made when the server
+ * starts from the rows `bun run gen` writes `skills/<slug>/SKILL.md` from,
+ * so the prompt and the file say the same.
  */
-const mcp = McpServer.toolkit(projection.toolkit).pipe(
-  Layer.provideMerge(projection.layer),
+const contribute = Layer.unwrap(
+  Effect.map(
+    skillIn(
+      platformSkill({
+        commands: [...contractCommandDocs(Contracts), ...localCommandDocs],
+      })
+    ),
+    skillPrompt
+  )
+);
+
+/**
+ * The MCP-surfaced contracts as tools at `/mcp`, beside each ask's brief
+ * and the projects as resources and the skill as a prompt, for a signed-in
+ * caller only (spec §8 D10: harnesses using MCP have tokens), each call
+ * made as that caller through one `Client`.
+ */
+const mcp = Layer.mergeAll(
+  McpServer.toolkit(projection.toolkit).pipe(
+    Layer.provideMerge(projection.layer)
+  ),
+  briefResources,
+  contribute
+).pipe(
   Layer.provide(Layer.effect(Client, RpcTest.makeClient(Contracts))),
   Layer.provide([asCaller, forwardCredential]),
   Layer.provide(

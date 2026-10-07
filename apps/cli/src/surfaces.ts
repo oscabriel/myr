@@ -4,6 +4,11 @@
  * prints a command's payload as JSON Schema; and `mcp`, the contracts as
  * tools over stdio. The only place the CLI's projections are built.
  */
+import {
+  contractCommandDocs,
+  localCommandDocs,
+} from "@repo/agent-kit/command-doc";
+import { platformSkill } from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
 import { commandName, toCommands } from "@repo/protocol/cli";
 import type { CommandRpc, Defaults } from "@repo/protocol/cli";
@@ -14,6 +19,12 @@ import {
   Surfaces,
 } from "@repo/protocol/contracts";
 import { toToolkit } from "@repo/protocol/mcp";
+import {
+  briefResources,
+  skillIn,
+  skillPrompt,
+} from "@repo/protocol/mcp-extras";
+import type { Skill } from "@repo/protocol/mcp-extras";
 import {
   Context,
   Effect,
@@ -274,28 +285,52 @@ export const commands: readonly TreeCommand[] = merge(entries);
 const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 
 /**
- * The MCP-surfaced contracts as tools over stdio, in every protocol a harness may
- * speak: the stateless 2026-07-28 one, and the four session-based ones before
- * it. Calls go through the `Client`.
+ * The platform's skill, made from the rows `bun run gen` writes
+ * `skills/<slug>/SKILL.md` from, so the prompt and the file say the same.
  */
-const server = McpServer.toolkit(projection.toolkit).pipe(
-  Layer.provideMerge(projection.layer),
-  Layer.provide(
-    McpServer.layerStdio({
-      name: Brand.name,
-      protocols: [
-        McpProtocol.v2026_07_28,
-        McpProtocol.v2025_11_25,
-        McpProtocol.v2025_06_18,
-        McpProtocol.v2025_03_26,
-        McpProtocol.v2024_11_05,
-      ],
-      version: "0.0.0",
-    })
-  )
+const skill = skillIn(
+  platformSkill({
+    commands: [...contractCommandDocs(Contracts), ...localCommandDocs],
+  })
 );
 
-/** `mcp`: serve the contracts to a harness that spawned this process. */
-export const mcp = Command.make("mcp", {}, () => Layer.launch(server)).pipe(
+/**
+ * The MCP-surfaced contracts as tools over stdio, beside each ask's brief
+ * and the projects as resources and `made` as the prompt `contribute`, in
+ * every protocol a harness may speak: the stateless 2026-07-28 one, and the
+ * four session-based ones before it. Calls go through the `Client`.
+ */
+const server = (made: Skill) =>
+  Layer.mergeAll(
+    McpServer.toolkit(projection.toolkit).pipe(
+      Layer.provideMerge(projection.layer)
+    ),
+    briefResources,
+    skillPrompt(made)
+  ).pipe(
+    Layer.provide(
+      McpServer.layerStdio({
+        name: Brand.name,
+        protocols: [
+          McpProtocol.v2026_07_28,
+          McpProtocol.v2025_11_25,
+          McpProtocol.v2025_06_18,
+          McpProtocol.v2025_03_26,
+          McpProtocol.v2024_11_05,
+        ],
+        version: "0.0.0",
+      })
+    )
+  );
+
+/**
+ * `mcp`: serve the contracts to a harness that spawned this process. The
+ * skill is made before the server reads stdin: the server starts reading
+ * as soon as it is built, so a prompt made while it builds could miss a
+ * client's first `prompts/get`.
+ */
+export const mcp = Command.make("mcp", {}, () =>
+  Effect.flatMap(skill, (made) => Layer.launch(server(made)))
+).pipe(
   Command.withDescription("Serve the platform's tools over MCP on stdio.")
 );
