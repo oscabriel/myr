@@ -1,6 +1,7 @@
 /**
- * Server sides for tests. Test code alone imports this module, through
- * `@repo/protocol/testing`; nothing under any `src/` may.
+ * Server sides for tests. Test code alone imports this module: other
+ * workspaces through `@repo/protocol/testing`, protocol's own tests by
+ * relative path. Nothing under any `src/` may.
  */
 import { Effect, Layer } from "effect";
 
