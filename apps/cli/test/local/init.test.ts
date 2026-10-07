@@ -497,6 +497,57 @@ describe(`${Brand.cli} init in an existing repo`, () => {
   );
 
   it.live(
+    "commits a config the work tree has and HEAD lacks, as it is, so a rerun after a failed commit pushes it",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const machine = yield* aMachine;
+        const mine = "// the maintainer's own\nexport default {};\n";
+
+        // What a run whose commit failed (no user.name yet, a hook) leaves.
+        yield* fs.makeDirectory(path.join(machine.repo, Brand.configDir));
+        yield* fs.writeFileString(path.join(machine.repo, CONFIG), mine);
+        yield* gitOk(machine.repo, "add", "--", CONFIG);
+
+        const platform = yield* aPlatform(created(machine));
+
+        const ran = yield* cli(machine, platform.layer, [
+          "init",
+          "--project",
+          "demo",
+          "--yes",
+          "--json",
+        ]);
+
+        expect(ran.code).toBe(0);
+        expect(yield* envelopeOf(ran.out)).toStrictEqual({
+          command: "init",
+          data: {
+            files: [CONFIG],
+            project: "demo",
+            pushed: true,
+            remote: machine.remote,
+          },
+          ok: true,
+          v: 1,
+        });
+        expect({
+          committed: yield* gitOk(
+            machine.repo,
+            "show",
+            "--name-only",
+            "--format=",
+            "HEAD"
+          ),
+          onPlatform: (yield* git(machine.bare, "show", `main:${CONFIG}`))
+            .stdout,
+        }).toStrictEqual({ committed: CONFIG, onPlatform: mine });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    { timeout: 30_000 }
+  );
+
+  it.live(
     "prints ProjectExists once and exits 1, pushing nothing",
     () =>
       Effect.gen(function* () {
@@ -576,7 +627,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         );
 
         expect({
-          helpers: helpers.stdout.split("\n"),
+          helpers: helpers.stdout.trimEnd().split("\n"),
           platformMain: (yield* state(machine)).platformMain,
           printed: ran.err.filter((line) =>
             line.includes(`credential.${platformUrl}.helper`)
@@ -590,7 +641,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           ),
         }).toStrictEqual({
           // An empty helper first drops any general one, then the CLI's.
-          helpers: ["", Brand.slug, ""],
+          helpers: ["", Brand.slug],
           platformMain: "",
           printed: 2,
           useHttpPath: "true",
@@ -715,6 +766,41 @@ describe(`${Brand.cli} init --import`, () => {
           ran.err.filter((line) => line.includes("https://"))
         ).toHaveLength(1);
         expect(yield* platform.calls).toStrictEqual([]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    { timeout: 30_000 }
+  );
+
+  it.live.each([
+    {
+      flags: [
+        "--import",
+        "https://example.test/acme/widgets.git",
+        "--branch",
+        "",
+      ],
+      names: "--branch",
+    },
+    { flags: ["--branch", "trunk"], names: "--import" },
+  ])(
+    "refuses $flags before any call, naming $names: a usage error, exit 2",
+    ({ flags, names }) =>
+      Effect.gen(function* () {
+        const machine = yield* aMachine;
+        const before = yield* state(machine);
+        const platform = yield* aPlatform(created(machine));
+
+        const ran = yield* cli(machine, platform.layer, [
+          "init",
+          ...flags,
+          "--yes",
+        ]);
+
+        expect({
+          calls: yield* platform.calls,
+          code: ran.code,
+          lines: ran.err.filter((line) => line.includes(names)).length,
+          state: yield* state(machine),
+        }).toStrictEqual({ calls: [], code: 2, lines: 1, state: before });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     { timeout: 30_000 }
   );

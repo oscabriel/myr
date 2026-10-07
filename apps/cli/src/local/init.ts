@@ -242,12 +242,18 @@ const lastSegment = (url: string) =>
 
 /** The project's remote and how to reach it: `git remote add|set-url`, the helper, the push. */
 const wiring = (input: {
-  readonly exists: boolean;
+  readonly hasRemote: boolean;
   readonly origin: Option.Option<string>;
   readonly push: boolean;
   readonly remote: string;
 }): readonly (readonly string[])[] => [
-  ["git", "remote", input.exists ? "set-url" : "add", Brand.slug, input.remote],
+  [
+    "git",
+    "remote",
+    input.hasRemote ? "set-url" : "add",
+    Brand.slug,
+    input.remote,
+  ],
   ...Option.match(input.origin, {
     onNone: () => [],
     onSome: gitHelperConfig,
@@ -256,8 +262,8 @@ const wiring = (input: {
 ];
 
 /** The config file's commit: added, then committed alone. */
-const committing = (files: readonly RepoFile[]) =>
-  files.flatMap(({ path }) => [
+const committing = (paths: readonly string[]) =>
+  paths.flatMap((path) => [
     ["git", "add", "--", path],
     ["git", "commit", "--quiet", "--message", SUBJECT, "--", path],
   ]);
@@ -364,9 +370,17 @@ const importing = (input: Input, url: string) =>
 
     const project = yield* projectNamed(input.project, lastSegment(url));
 
-    const source = Option.match(input.branch, {
-      onNone: () => ({ url }),
-      onSome: (branch) => ({ branch, url }),
+    // The contract takes a non-empty branch; the client can't send an empty one.
+    const source = yield* Option.match(input.branch, {
+      onNone: () => Effect.succeed({ url }),
+      onSome: (branch) =>
+        branch === ""
+          ? Effect.fail(
+              new InitMisused({
+                reason: "--branch takes the name of the branch to import",
+              })
+            )
+          : Effect.succeed({ branch, url }),
     });
 
     const payload: Payload = { import: source, project };
@@ -378,12 +392,14 @@ const importing = (input: Input, url: string) =>
 
 /** What `init` found in the repo it stands in, and so will do there. */
 interface Found {
+  /** The config file to commit: none when HEAD has one. */
+  readonly commits: readonly string[];
   /** Whether the repo already has a remote by the CLI's name. */
-  readonly exists: boolean;
-  /** The config file to write: none when the repo has one. */
-  readonly files: readonly RepoFile[];
+  readonly hasRemote: boolean;
   readonly payload: Payload;
   readonly root: string;
+  /** The config file to write: none when the work tree or HEAD has one. */
+  readonly writes: readonly RepoFile[];
 }
 
 /** Writes and commits the config, makes the project, wires the remote and pushes. */
@@ -392,20 +408,20 @@ const made = (input: Input, found: Found) =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const output = yield* Output;
-    const { exists, files, payload, root } = found;
+    const { commits, hasRemote, payload, root, writes } = found;
 
-    if (files.length === 0) {
+    if (writes.length === 0) {
       yield* output.note(`kept ${CONFIG} as it is`);
     }
 
-    for (const file of files) {
+    for (const file of writes) {
       yield* fs.makeDirectory(path.dirname(path.join(root, file.path)), {
         recursive: true,
       });
       yield* fs.writeFileString(path.join(root, file.path), file.content);
     }
 
-    for (const argv of committing(files)) {
+    for (const argv of committing(commits)) {
       yield* runOk(root, argv);
     }
 
@@ -413,7 +429,7 @@ const made = (input: Input, found: Found) =>
     const origin = Option.map(parseRemote(reply.remote), (at) => at.origin);
 
     for (const argv of wiring({
-      exists,
+      hasRemote,
       origin,
       push: input.push,
       remote: reply.remote,
@@ -429,11 +445,12 @@ const made = (input: Input, found: Found) =>
       }
     }
 
+    const config =
+      writes.length === 0 ? `Kept ${CONFIG} as it is` : `Wrote ${CONFIG}`;
+
     const done = [
       `Made project ${reply.project} at ${reply.remote}.`,
-      files.length === 0
-        ? `Kept ${CONFIG} as it is.`
-        : `Wrote ${CONFIG} and committed it alone.`,
+      commits.length === 0 ? `${config}.` : `${config} and committed it alone.`,
       input.push
         ? `Pushed HEAD to its main through the remote ${Brand.slug}.`
         : `Push when ready: git push ${Brand.slug} HEAD:main`,
@@ -443,7 +460,7 @@ const made = (input: Input, found: Found) =>
       command: COMMAND,
       data: withLanded(
         {
-          files: files.map((file) => file.path),
+          files: commits,
           project: reply.project,
           pushed: input.push,
           remote: reply.remote,
@@ -465,25 +482,35 @@ const inRepo = (input: Input) =>
     // The folder the CLI was started in: git and the spawner resolve it.
     const { root } = yield* repoContext(".");
     const project = yield* projectNamed(input.project, path.basename(root));
-    const kept = yield* fs.exists(path.join(root, CONFIG));
+    const inTree = yield* fs.exists(path.join(root, CONFIG));
+
+    // HEAD is what the push sends: a config only the work tree has (a run
+    // whose commit failed left it) is kept as it is, and committed.
+    const atHead =
+      (yield* run(root, ["git", "cat-file", "-e", `HEAD:${CONFIG}`]))
+        .exitCode === 0;
+
     const block = findRunBlock(yield* trackedFiles(root));
 
-    const files: readonly RepoFile[] = kept
-      ? []
-      : [{ content: projectFile(block.run, block.sources), path: CONFIG }];
+    const writes: readonly RepoFile[] =
+      inTree || atHead
+        ? []
+        : [{ content: projectFile(block.run, block.sources), path: CONFIG }];
 
-    const exists =
+    const commits: readonly string[] = atHead ? [] : [CONFIG];
+
+    const hasRemote =
       (yield* run(root, ["git", "remote", "get-url", Brand.slug])).exitCode ===
       0;
 
     const payload: Payload = { project };
 
     const plan: Plan = {
-      files,
+      files: writes,
       git: [
-        ...committing(files),
+        ...committing(commits),
         ...wiring({
-          exists,
+          hasRemote,
           origin: Option.some(PENDING.origin),
           push: input.push,
           remote: PENDING.remote,
@@ -493,7 +520,7 @@ const inRepo = (input: Input) =>
     };
 
     if (yield* approved(input, plan)) {
-      yield* made(input, { exists, files, payload, root });
+      yield* made(input, { commits, hasRemote, payload, root, writes });
     }
   });
 
