@@ -72,12 +72,13 @@ export type Notice = (line: string) => Effect.Effect<void>;
 const short = (sha: string) => sha.slice(0, 7);
 
 /**
- * The request a push to a claim's fork answers with: it names the pusher
- * and the head, so two people pushing one commit make two requests. A
- * request id holds 64 characters; a long handle shortens the head.
+ * The request a push to a claim's fork answers with: it names the head and
+ * the pusher, so two people pushing one commit make two requests. A request
+ * id holds 64 characters, so the head comes first and is never cut: a long
+ * handle is, and each new head is still a new request.
  */
 export const pushRequestId = (pusher: Handle, head: CommitSha) =>
-  RequestId.make(`push-${pusher.toLowerCase()}-${head}`.slice(0, 64));
+  RequestId.make(`push-${head}-${pusher.toLowerCase()}`.slice(0, 64));
 
 /** The push event a push reports: one per (repo, head), so a replay is acted on once. */
 const pushEventId = (repo: RepoName, head: CommitSha) => `push-${repo}-${head}`;
@@ -177,28 +178,31 @@ const canonical = (
     );
   });
 
+/** The claim `person` has on `ask`, as their own `status` shows it. */
+const claimOn = (api: ProjectApi, person: Person, ask: AskId) =>
+  Effect.map(api.status(person), ({ claims }) =>
+    Array.findFirst(claims, (claim) => claim.ask === ask)
+  );
+
 /**
  * Whether the claimant may push to their claim's fork: a live or warned
  * claim lets them; a lapsed one is `ClaimLapsed`; none, or one released or
  * answered, is `NotClaimed`.
  */
 const holds = (api: ProjectApi, person: Person, ask: AskId) =>
-  Effect.map(api.status(person), ({ claims }) =>
-    Option.match(
-      Array.findFirst(claims, (claim) => claim.ask === ask),
-      {
-        onNone: () => [NotClaimed.of(ask)],
-        onSome: ({ state }) => {
-          if (state === "live" || state === "warned") {
-            return [];
-          }
+  Effect.map(claimOn(api, person, ask), (claim) =>
+    Option.match(claim, {
+      onNone: () => [NotClaimed.of(ask)],
+      onSome: ({ state }) => {
+        if (state === "live" || state === "warned") {
+          return [];
+        }
 
-          return state === "lapsed"
-            ? [ClaimLapsed.of(ask)]
-            : [NotClaimed.of(ask)];
-        },
-      }
-    )
+        return state === "lapsed"
+          ? [ClaimLapsed.of(ask)]
+          : [NotClaimed.of(ask)];
+      },
+    })
   );
 
 /**
@@ -230,8 +234,7 @@ const offer = (input: {
       return refusals;
     }
 
-    const { claims } = yield* api.status(person);
-    const claim = Array.findFirst(claims, (held) => held.ask === ask);
+    const claim = yield* claimOn(api, person, ask);
 
     if (Option.isNone(claim)) {
       return [NotClaimed.of(ask)];

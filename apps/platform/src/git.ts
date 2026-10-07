@@ -90,9 +90,16 @@ const withNotices = (response: Response, notices: readonly string[]) =>
       return response;
     }
 
-    const reply = new Uint8Array(
-      yield* Effect.promise(() => response.arrayBuffer())
+    const read = yield* Effect.option(
+      Effect.tryPromise(() => response.arrayBuffer())
     );
+
+    // The gateway's own words when a push's report does not arrive whole.
+    if (Option.isNone(read)) {
+      return plain(502, "the push's report was cut off");
+    }
+
+    const reply = new Uint8Array(read.value);
 
     const first = Option.flatten(Option.liftThrowable(packetAt)(reply, 0));
 

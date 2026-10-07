@@ -482,6 +482,26 @@ describe("git through the platform", () => {
   );
 });
 
+describe("a push's request id", () => {
+  it("names the whole head, then as much of the pusher as fits", () => {
+    const head = CommitSha.make("0123456789abcdef0123456789abcdef01234567");
+    const next = CommitSha.make("0123456789abcdef0123456789abcdef01234568");
+    const long = Handle.make(`Long-${"handle".repeat(10)}`);
+
+    expect([
+      pushRequestId(alice.handle, head),
+      pushRequestId(bob.handle, head),
+      pushRequestId(long, head),
+      pushRequestId(long, next),
+    ]).toStrictEqual([
+      `push-${head}-alice`,
+      `push-${head}-bob`,
+      `push-${head}-long-handlehandleh`,
+      `push-${next}-long-handlehandleh`,
+    ]);
+  });
+});
+
 /** A person no project here names, who decides nothing. */
 const carol = Person.make({ handle: Handle.make("carol") });
 
@@ -551,7 +571,7 @@ describe("custody of one push", () => {
     "a decider pushes onto someone's claim fork to finish its answer, which the push itself does not offer",
     () =>
       Effect.gen(function* () {
-        const { api, landed, projects } = yield* withDatekit;
+        const { api, landed, projects, seen } = yield* withDatekit;
         const { claim } = yield* api.claim(bob, parseIso).pipe(Effect.orDie);
         const push = Array.of(moving(mainRef, Option.some(landed)));
 
@@ -559,7 +579,8 @@ describe("custody of one push", () => {
           admitted: [],
           reviewed: [],
         });
-        expect((yield* api.status(alice)).answers).toStrictEqual([]);
+        // No answer run started: neither the decider's nor the claimant's.
+        expect(yield* Ref.get(seen.started)).toStrictEqual([]);
         expect(
           (yield* judged(projects, carol, claim.fork, push)).admitted
         ).toStrictEqual([NotClaimed.of(parseIso)]);
