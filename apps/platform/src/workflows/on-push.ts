@@ -71,9 +71,7 @@ const recordOf = (event: OnPushEvent) =>
   });
 
 /** `main` moved to a commit no landing made, as far as the DO knew when it was asked. */
-class LooksStray extends Data.TaggedError("LooksStray")<{
-  readonly verdict: PushVerdict;
-}> {}
+class LooksStray extends Data.TaggedError("LooksStray") {}
 
 /**
  * How long a `main` that looks stray is asked about again before it is
@@ -88,21 +86,30 @@ const strayGrace: StepRetry = {
   limit: 4,
 };
 
-/** What `event` means, from what the DO says of it; a stray verdict fails, so the step asks again. */
-const classified = (event: OnPushEvent) =>
-  Effect.flatMap(factsOf(event), (facts) => {
-    const verdict = classifyPush(event, facts);
-
-    return PushVerdict.guards.Stray(verdict)
-      ? Effect.fail(new LooksStray({ verdict }))
-      : Effect.succeed(verdict);
-  });
+/** What `event` means, from what the DO says of it now. */
+const verdictOf = (event: OnPushEvent) =>
+  Effect.map(factsOf(event), (facts) => classifyPush(event, facts));
 
 /**
- * What `event` means, then what is recorded of it. Two steps, each run once
- * per instance (principle 8): `classify` (asked again during `strayGrace`
- * while `main` looks stray; a verdict that stays stray is the step's last
- * failure, so a replay asks again) and `record`, for a push the DO must
+ * What `event` means; a `main` moved to a commit that may yet be recorded
+ * as a landing fails, so the step asks again. A deleted `main` is no
+ * landing in flight: it is stray at once.
+ */
+const classified = (event: OnPushEvent) =>
+  Effect.flatMap(verdictOf(event), (verdict) =>
+    PushVerdict.guards.Stray(verdict) && !isZero(verdict.after)
+      ? Effect.fail(new LooksStray())
+      : Effect.succeed(verdict)
+  );
+
+/**
+ * What `event` means, then what is recorded of it, each a step run once per
+ * instance (principle 8). `classify` asks again during `strayGrace` while
+ * `main` looks stray. A `main` still stray after it is the step's last
+ * failure, which the engine keeps and throws again, unrun, in every replay
+ * (where the step's own failure is gone, so it arrives as a defect);
+ * either way `settle` asks once more and records the verdict as a value,
+ * which every replay reads back. `record` tells the DO of a push it must
  * hear of.
  */
 export const runOnPush = (
@@ -117,7 +124,7 @@ export const runOnPush = (
       classified(event),
       strayGrace
     ).pipe(
-      Effect.catchTag("LooksStray", (stray) => Effect.succeed(stray.verdict))
+      Effect.catchCause(() => step("settle", PushVerdict, verdictOf(event)))
     );
 
     if (!PushVerdict.guards.Ignored(verdict)) {

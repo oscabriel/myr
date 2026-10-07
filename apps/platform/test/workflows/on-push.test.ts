@@ -51,7 +51,7 @@ import {
   OnPushEvent,
   ZeroSha,
 } from "../../src/workflows/on-push/event.ts";
-import { memoSteps } from "../../src/workflows/step.ts";
+import { memoSteps, workflowSteps } from "../../src/workflows/step.ts";
 import type { WorkflowSteps } from "../../src/workflows/step.ts";
 import { fakeEnv, without } from "../fake-env.ts";
 
@@ -462,6 +462,41 @@ const onPush = (event: OnPushEvent, projects: Layer.Layer<Projects>) =>
     runOnPush(event).pipe(Effect.provide([steps, projects]))
   );
 
+/** `Projects` holding `api`, and the id of every push event the DO is told of. */
+const telling = (api: ProjectApi) =>
+  Effect.map(Ref.make<readonly string[]>([]), (told) => ({
+    projects: projectsOf({
+      ...api,
+      recordPush: (report) =>
+        Effect.andThen(
+          Ref.update(told, (ids) => [...ids, report.eventId]),
+          api.recordPush(report)
+        ),
+    }),
+    told,
+  }));
+
+/**
+ * A Workflow engine's steps in memory, as the engine keeps them: each runs
+ * once, and what it ended with, its JSON or its failure, is kept by name and
+ * handed to a replay without running it again.
+ */
+const engineSteps = () => {
+  const recorded = new Map<string, Promise<Schema.Json>>();
+
+  const steps: WorkflowSteps = {
+    do: (name, _config, body) => {
+      const kept = recorded.get(name) ?? body();
+
+      recorded.set(name, kept);
+
+      return kept;
+    },
+  };
+
+  return { recorded, steps };
+};
+
 describe(runOnPush, () => {
   it.effect(
     "ignores main moved to the landing the platform made, and its bookkeeping refs",
@@ -604,17 +639,7 @@ describe(runOnPush, () => {
     () =>
       Effect.gen(function* () {
         const { api } = yield* world;
-        const recorded = yield* Ref.make<readonly string[]>([]);
-
-        // Every push event the DO is told of, by id.
-        const projects = projectsOf({
-          ...api,
-          recordPush: (report) =>
-            Effect.andThen(
-              Ref.update(recorded, (ids) => [...ids, report.eventId]),
-              api.recordPush(report)
-            ),
-        });
+        const { projects, told } = yield* telling(api);
 
         const stray = pushed({
           after: strayHead,
@@ -643,7 +668,7 @@ describe(runOnPush, () => {
           "Stray",
           "Stray",
         ]);
-        expect(yield* Ref.get(recorded)).toStrictEqual([stray.id, stray.id]);
+        expect(yield* Ref.get(told)).toStrictEqual([stray.id, stray.id]);
         expect(decisions.map(({ subject }) => subject)).toStrictEqual([
           DecisionSubject.cases.StrayPush.make({
             after: strayHead,
@@ -651,6 +676,50 @@ describe(runOnPush, () => {
             ref: mainText,
           }),
         ]);
+      })
+  );
+
+  it.effect(
+    "settles a stray main as a recorded value, so a run the engine replays after keeping the grace's failure still opens one decision",
+    () =>
+      Effect.gen(function* () {
+        const { api } = yield* world;
+        const { projects, told } = yield* telling(api);
+        const engine = engineSteps();
+
+        const stray = pushed({
+          after: strayHead,
+          before: scenario.landed,
+          repo: "datekit",
+        });
+
+        // The instance's run, then the same run replayed by the engine.
+        const run = runOnPush(stray).pipe(
+          Effect.provide([workflowSteps(engine.steps), projects]),
+          Effect.catchDefect(() => Effect.succeed("died"))
+        );
+
+        const verdicts = [yield* run, yield* run];
+        const { decisions } = yield* api.today(alice);
+
+        const verdict = PushVerdict.cases.Stray.make({
+          after: strayHead,
+          before: scenario.landed,
+          project: datekit,
+          ref: mainText,
+        });
+
+        expect({
+          decisions: decisions.map(({ subject }) => subject._tag),
+          steps: [...engine.recorded.keys()],
+          told: yield* Ref.get(told),
+          verdicts,
+        }).toStrictEqual({
+          decisions: ["StrayPush"],
+          steps: ["classify", "settle", "record"],
+          told: [stray.id],
+          verdicts: [verdict, verdict],
+        });
       })
   );
 
@@ -706,6 +775,42 @@ describe(runOnPush, () => {
       })
   );
 
+  it.effect(
+    "calls a deleted main stray at once: no landing is in flight to wait for",
+    () =>
+      Effect.gen(function* () {
+        const { api, projects } = yield* world;
+        const engine = engineSteps();
+
+        const verdict = yield* runOnPush(
+          pushed({ after: ZeroSha, before: scenario.landed, repo: "datekit" })
+        ).pipe(Effect.provide([workflowSteps(engine.steps), projects]));
+
+        const { decisions } = yield* api.today(alice);
+
+        expect({
+          decisions: decisions.map(({ subject }) => subject),
+          steps: [...engine.recorded.keys()],
+          verdict,
+        }).toStrictEqual({
+          decisions: [
+            DecisionSubject.cases.StrayPush.make({
+              after: ZeroSha,
+              before: scenario.landed,
+              ref: mainText,
+            }),
+          ],
+          steps: ["classify", "record"],
+          verdict: PushVerdict.cases.Stray.make({
+            after: ZeroSha,
+            before: scenario.landed,
+            project: datekit,
+            ref: mainText,
+          }),
+        });
+      })
+  );
+
   it.effect("ignores a repo whose name no project of the platform's has", () =>
     Effect.gen(function* () {
       const { projects } = yield* world;
@@ -726,23 +831,6 @@ describe(runOnPush, () => {
 
 /** The delivered event as the engine hands it to an instance: its params. */
 const sent = Schema.encodeSync(OnPushEvent)(delivered);
-
-/** A Workflow engine's steps in memory: each runs once, its JSON kept by name. */
-const engineSteps = () => {
-  const recorded = new Map<string, Promise<Schema.Json>>();
-
-  const steps: WorkflowSteps = {
-    do: (name, _config, body) => {
-      const kept = recorded.get(name) ?? body();
-
-      recorded.set(name, kept);
-
-      return kept;
-    },
-  };
-
-  return { recorded, steps };
-};
 
 describe(runInstance, () => {
   it.effect("decodes its params before it reads the env", () =>
