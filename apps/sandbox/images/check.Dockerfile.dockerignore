@@ -1,0 +1,3 @@
+# The Checker's image copies nothing from its build context (this folder), so
+# nothing of it reaches the build.
+**
