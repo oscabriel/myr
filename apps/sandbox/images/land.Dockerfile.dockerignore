@@ -1,6 +1,9 @@
 # The Lander's build context is the repo root. Admit only what its image
-# copies: the sdk and what it imports, for `bundleRules` (W3 306). Nothing
-# else of the repo, no env file and no node_modules, reaches the build.
+# copies: the sdk and the packages it imports, for `bundleRules`. Nothing else
+# of the repo, no env file and no node_modules, reaches the build. Docker reads
+# this file only for a build that names the Dockerfile by its path; wrangler
+# pipes the Dockerfile on stdin, so the Dockerfile's COPY lines name each
+# path they take as well.
 **
 !packages/brand/package.json
 !packages/brand/src/**
