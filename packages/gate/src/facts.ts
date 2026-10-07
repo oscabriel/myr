@@ -92,4 +92,23 @@ export interface PushFacts {
    * it. Only then are the ask's own file and check file the push's to write.
    */
   readonly opensAsk: boolean;
+  /**
+   * Each ratchet's baseline, from the project's `ratchets` rows: the most a
+   * count may be. A territory's escape ratchet is named by `escapeRatchet`.
+   * Absent, or with no row for a ratchet, the baseline is 0.
+   */
+  readonly ratchetBaselines?: ReadonlyMap<RatchetName, number>;
+  /**
+   * The lines a push removes, by their 1-based number in the old file, so a
+   * removed escape offsets an added one. Absent, a push removes none, which
+   * only errs toward asking a decider.
+   */
+  readonly removedLines?: ReadonlyMap<RepoPath, readonly AddedLine[]>;
+  /**
+   * Each territory's count of reasoned escapes on main, by its escape
+   * ratchet, when the caller keeps it apart from the baseline: a decider's
+   * accepted `Waiver` raises the baseline before the answer lands, so the
+   * answer, checked again, is within it. Absent, the baseline stands for it.
+   */
+  readonly escapeCounts?: ReadonlyMap<RatchetName, number>;
 }
