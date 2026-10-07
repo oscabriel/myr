@@ -61,7 +61,7 @@ It never deletes anything and never prints or reads a secret's value.
 To set them for a stage, do one of these:
 
 - **varlock (H5).** Write `NAME=varlock(prompt)` for each one into `apps/platform/.env.local`, run `./node_modules/.bin/varlock load --path apps/platform/` in your own terminal, then deploy. `varlock-wrangler` hands the values to the Worker.
-- **A secrets file (dev stages only, spec §8.3 O1).** Keep a dotenv file outside the repo with mode 600, and deploy with `STAGE_SECRETS_FILE=<that file> bun run deploy -- --stage dev-<user>`. The platform's deploy step gets only the names `.env.schema` declares, as its environment, and that environment overrides any `.env` value. Nothing prints them.
+- **A secrets file (dev stages only, spec §8.3 O1).** Keep a dotenv file outside the repo with mode 600, and deploy with `STAGE_SECRETS_FILE=<that file> bun run deploy -- --stage dev-<user>`. The platform's deploy step gets only the names `.env.schema` declares, as its environment, and that environment overrides any `.env` value. Nothing prints them. A deploy to `demo` refuses the file before it runs anything.
 - **By hand**, one at a time: `apps/platform/node_modules/.bin/wrangler secret put <NAME> --env <s>` in `apps/platform`, with the value on stdin.
 
 To make the GitHub OAuth app (H4), use homepage `https://platform-<s>.<subdomain>.workers.dev` and callback `https://platform-<s>.<subdomain>.workers.dev/oauth/callback`. The subdomain is in `infra/workers-dev.json` once bootstrap has run.
@@ -81,7 +81,7 @@ Without `--stage`, or with a stage `stages.ts` doesn't declare, it refuses befor
 5. A read-back of the push-event trigger (`bun run bootstrap -- --stage <s> --check-triggers`), because Wrangler's output doesn't prove it exists.
 6. `bun scripts/smoke.ts --stage <s>`.
 
-Every command runs with `WRANGLER_SEND_METRICS=false`. The first failing step stops the deploy and names that step.
+Every command runs with `WRANGLER_SEND_METRICS=false`, and with its own folder's `node_modules/.bin` first on `PATH`, so each app deploys with its pinned Wrangler. The first failing step stops the deploy and names that step.
 
 ## Smoke-test a stage
 
@@ -89,6 +89,8 @@ Every command runs with `WRANGLER_SEND_METRICS=false`. The first failing step st
 bun run smoke -- --stage dev-oscabriel
 bun run smoke -- --stage dev-oscabriel --url http://localhost:8787
 ```
+
+The second form points smoke at another origin, such as `wrangler dev --env dev-oscabriel` in `apps/platform`. Plain `wrangler dev` serves stage `local`, which no `--stage` names, so its `health` probe fails.
 
 Smoke only reads. Every probe runs even when others fail, and the output names each probe that failed and why. It also prints how long each probe took.
 

@@ -16,6 +16,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import {
   deploy,
   NoStage,
+  SecretsFileNotForStage,
   StepFailed,
   UnknownStage,
 } from "../../../infra/deploy.ts";
@@ -216,6 +217,37 @@ describe("a deploy to dev-oscabriel", () => {
   );
 
   it.live(
+    "puts each step's own bins first on PATH, so varlock-wrangler starts the platform's pinned wrangler",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const root = yield* repoRoot;
+
+        // `bun run deploy` gives the root's bins, where no wrangler lives.
+        const inherited = `${path.join(root, "node_modules/.bin")}:/usr/bin`;
+
+        const { spawned } = yield* run(["--stage", "dev-oscabriel"], {
+          env: { PATH: inherited },
+        });
+
+        const first = spawned.map(({ cwd, env }) => ({
+          cwd,
+          first: env.PATH?.split(":")[0],
+          rest: env.PATH?.split(":").slice(1).join(":"),
+        }));
+
+        expect(first[2]).toStrictEqual({
+          cwd: "apps/platform",
+          first: path.join(root, "apps/platform/node_modules/.bin"),
+          rest: inherited,
+        });
+        expect(first[1]?.first).toBe(
+          path.join(root, "apps/sandbox/node_modules/.bin")
+        );
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
     "hands the platform's deploy the values in STAGE_SECRETS_FILE that its .env.schema names, and no other step any",
     () =>
       Effect.gen(function* () {
@@ -242,7 +274,7 @@ describe("a deploy to dev-oscabriel", () => {
 
         const carried = spawned.map(({ env }) =>
           Object.keys(env)
-            .filter((key) => key !== "WRANGLER_SEND_METRICS")
+            .filter((key) => key !== "PATH" && key !== "WRANGLER_SEND_METRICS")
             .toSorted()
         );
 
@@ -257,5 +289,71 @@ describe("a deploy to dev-oscabriel", () => {
           '{"alice-token-that-is-long-enough-0000":"alice"}'
         );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+});
+
+/**
+ * The message a failed `deploy(argv)` carries: `runMain` prints a failure as
+ * its tag and its message, and nothing else.
+ */
+const messageOf = (
+  argv: readonly string[],
+  options: Parameters<typeof run>[1] = {}
+) =>
+  run(argv, options).pipe(
+    Effect.map(({ result }) =>
+      Result.isFailure(result) ? result.failure.message : ""
+    )
+  );
+
+describe("what a failed deploy prints", () => {
+  it.live("names the stages it knows when it refuses one", () =>
+    Effect.gen(function* () {
+      expect(yield* messageOf([])).toBe(
+        "no --stage: name one of dev-oscabriel, demo"
+      );
+      expect(yield* messageOf(["--stage", "prod"])).toBe(
+        "--stage prod is not a stage infra/stages.ts declares (dev-oscabriel, demo)"
+      );
+    })
+  );
+
+  it.live("names the step that failed and how", () =>
+    Effect.gen(function* () {
+      const message = yield* messageOf(["--stage", "dev-oscabriel"], {
+        exitOf: ({ cwd }) => (cwd === "apps/platform" ? 3 : 0),
+      });
+
+      expect(message).toBe("platform exited 3, so nothing after it ran");
+    })
+  );
+
+  it.live("says where demo's secrets come from instead", () =>
+    Effect.gen(function* () {
+      const message = yield* messageOf(["--stage", "demo"], {
+        env: { STAGE_SECRETS_FILE: "/nowhere/demo.secrets" },
+      });
+
+      expect(message).toBe(
+        "STAGE_SECRETS_FILE is for dev stages only: set demo's secrets with varlock (infra/stages.md)"
+      );
+    })
+  );
+});
+
+describe("a deploy to demo", () => {
+  it.live(
+    "refuses STAGE_SECRETS_FILE, whose generated values are the dev stage's alone, before it spawns anything",
+    () =>
+      Effect.gen(function* () {
+        const { result, spawned } = yield* run(["--stage", "demo"], {
+          env: { STAGE_SECRETS_FILE: "/nowhere/demo.secrets" },
+        });
+
+        expect(result).toStrictEqual(
+          Result.fail(new SecretsFileNotForStage({ stage: "demo" }))
+        );
+        expect(spawned).toStrictEqual([]);
+      })
   );
 });

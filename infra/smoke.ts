@@ -68,7 +68,13 @@ export class SmokeFailed extends Schema.TaggedError<SmokeFailed>()(
     ),
     origin: Schema.String,
   }
-) {}
+) {
+  override get message() {
+    const failed = this.failures.map(({ probe }) => probe).join(", ");
+
+    return `${failed} failed at ${this.origin}`;
+  }
+}
 
 /** A passing run: the stage `/health` named, and how long each probe took. */
 export interface SmokeReport {
@@ -343,7 +349,11 @@ const decodeWorkersDev = Schema.decodeUnknownEffect(
 export class NoOrigin extends Schema.TaggedError<NoOrigin>()("NoOrigin", {
   file: Schema.String,
   stage: Schema.String,
-}) {}
+}) {
+  override get message() {
+    return `no --url, and ${this.file} doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage ${this.stage} first`;
+  }
+}
 
 /** Where `stage`'s platform lives: `--url`, or bootstrap's workers.dev record. */
 const originOf = (argv: readonly string[], stage: Stage) =>

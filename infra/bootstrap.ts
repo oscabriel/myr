@@ -205,6 +205,8 @@ export const TriggersResponse = Schema.Struct({
   success: Schema.Boolean,
 });
 
+const PUSHED = "cf.artifacts.repo.pushed";
+
 /** The platform has no push-event trigger for its stage's namespace. */
 export class TriggerMismatch extends Schema.TaggedError<TriggerMismatch>()(
   "TriggerMismatch",
@@ -215,9 +217,13 @@ export class TriggerMismatch extends Schema.TaggedError<TriggerMismatch>()(
     script: Schema.String,
     workflow: Schema.String,
   }
-) {}
+) {
+  override get message() {
+    const found = this.found.length === 0 ? "none" : this.found.join("; ");
 
-const PUSHED = "cf.artifacts.repo.pushed";
+    return `${this.script} has no ${PUSHED} trigger on ${this.namespace} starting ${this.workflow}; it has: ${found}`;
+  }
+}
 
 /** A success that carries nothing: `Result` has no `void`. */
 const held: Result.Result<void> = Result.flip(Result.failVoid);
@@ -340,19 +346,31 @@ export const missingSecrets = (
 export class CloudflareRefused extends Schema.TaggedError<CloudflareRefused>()(
   "CloudflareRefused",
   { route: Schema.String, status: Schema.Int }
-) {}
+) {
+  override get message() {
+    return `the Cloudflare API answered ${this.route} with ${this.status}`;
+  }
+}
 
 /** A Wrangler command exited non-zero; its own output said why. */
 export class WranglerFailed extends Schema.TaggedError<WranglerFailed>()(
   "WranglerFailed",
   { command: Schema.String, exitCode: Schema.Int }
-) {}
+) {
+  override get message() {
+    return `${this.command} exited ${this.exitCode}`;
+  }
+}
 
 /** The deployed platform lacks secrets its `.env.schema` requires (H5). */
 export class MissingSecrets extends Schema.TaggedError<MissingSecrets>()(
   "MissingSecrets",
   { names: Schema.Array(Schema.String), stage: Schema.String }
-) {}
+) {
+  override get message() {
+    return `${this.stage}'s platform lacks ${this.names.join(", ")}: set them by name (infra/stages.md)`;
+  }
+}
 
 const API = "https://api.cloudflare.com/client/v4";
 

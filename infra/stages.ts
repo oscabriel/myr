@@ -96,14 +96,27 @@ export const flagValue = (
   );
 };
 
+/**
+ * Each infra command's failures say, as their message, what went wrong and
+ * what to do: `runMain` prints a failure's tag and message, and nothing of
+ * its fields. They are a script's failures, not the protocol's refusals, and
+ * never carry a secret's value.
+ */
+
 /** No `--stage` was given: nothing touches a stage by default. */
-export class NoStage extends Schema.TaggedError<NoStage>()("NoStage", {}) {}
+export class NoStage extends Schema.TaggedError<NoStage>()("NoStage", {}) {
+  override readonly message = `no --stage: name one of ${stages.join(", ")}`;
+}
 
 /** `--stage` names no stage this table declares. */
 export class UnknownStage extends Schema.TaggedError<UnknownStage>()(
   "UnknownStage",
   { stage: Schema.String }
-) {}
+) {
+  override get message() {
+    return `--stage ${this.stage} is not a stage infra/stages.ts declares (${stages.join(", ")})`;
+  }
+}
 
 /** The stage `argv`'s `--stage` names, if this table declares it. */
 export const stageOf = (argv: readonly string[]) =>

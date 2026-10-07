@@ -13,7 +13,7 @@ import { Effect, Stdio } from "effect";
 
 import { main } from "../infra/smoke.ts";
 
-export { main, probes, smoke, SmokeFailed } from "../infra/smoke.ts";
+export { main, NoOrigin, probes, smoke, SmokeFailed } from "../infra/smoke.ts";
 
 export type { SmokeReport } from "../infra/smoke.ts";
 

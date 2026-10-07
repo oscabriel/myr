@@ -9,7 +9,13 @@ import {
 } from "effect/http";
 
 import { NoStage, UnknownStage } from "../../../infra/stages.ts";
-import { main, probes, smoke, SmokeFailed } from "../../../scripts/smoke.ts";
+import {
+  main,
+  NoOrigin,
+  probes,
+  smoke,
+  SmokeFailed,
+} from "../../../scripts/smoke.ts";
 
 /** What the fake platform answers one request with. */
 interface Reply {
@@ -281,6 +287,19 @@ describe("the smoke command", () => {
           ? failed.failures.map(({ probe }) => probe)
           : []
       ).toStrictEqual(["health"]);
+      // `runMain` prints a failure as its tag and its message, and nothing else.
+      expect(failed.message).toBe(`health failed at ${origin}`);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
+
+  it("says to bootstrap first when neither --url nor bootstrap's record names the origin", () => {
+    const failed = new NoOrigin({
+      file: "infra/workers-dev.json",
+      stage: "demo",
+    });
+
+    expect(failed.message).toBe(
+      "no --url, and infra/workers-dev.json doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage demo first"
+    );
+  });
 });

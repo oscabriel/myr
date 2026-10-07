@@ -5,14 +5,17 @@ import { Effect, FileSystem, Path, Result, Schema } from "effect";
 import {
   bucketsFrom,
   checkTriggers,
+  CloudflareRefused,
   d1From,
   kvFrom,
+  MissingSecrets,
   missingSecrets,
   plan,
   secretNames,
   Step,
   TriggerMismatch,
   TriggersResponse,
+  WranglerFailed,
   writeIds,
 } from "../../../infra/bootstrap.ts";
 import type { Existing } from "../../../infra/bootstrap.ts";
@@ -481,5 +484,46 @@ describe("secrets, by name only", () => {
       "OPERATOR_TOKEN",
     ]);
     expect(missingSecrets(items, ["OPERATOR_TOKEN"])).toStrictEqual([]);
+  });
+});
+
+describe("what a failed bootstrap prints", () => {
+  // `runMain` prints a failure as its tag and its message, and nothing else.
+  it.effect("names the triggers it found instead of the stage's", () =>
+    Effect.gen(function* () {
+      const live = yield* rootText("infra/fixtures/triggers.json").pipe(
+        Effect.flatMap(
+          Schema.decodeUnknownEffect(Schema.fromJsonString(TriggersResponse))
+        )
+      );
+
+      const verdict = checkTriggers("dev-oscabriel", {
+        ...live,
+        result: { ...live.result, triggers: live.result.triggers.slice(0, 1) },
+      });
+
+      expect(Result.isFailure(verdict) ? verdict.failure.message : "").toBe(
+        "platform-dev-oscabriel has no cf.artifacts.repo.pushed trigger on projects-dev-oscabriel starting on-push-dev-oscabriel; it has: cf.artifacts.repo.forked on layers-dev-oscabriel → platform-dev-oscabriel/on-push-dev-oscabriel"
+      );
+    })
+  );
+
+  it("names the secrets a deployed platform lacks, and the calls that failed", () => {
+    expect(
+      new MissingSecrets({
+        names: ["OPERATOR_TOKEN", "COOKIE_KEY"],
+        stage: "demo",
+      }).message
+    ).toBe(
+      "demo's platform lacks OPERATOR_TOKEN, COOKIE_KEY: set them by name (infra/stages.md)"
+    );
+    expect(
+      new CloudflareRefused({ route: "/workers/subdomain", status: 403 })
+        .message
+    ).toBe("the Cloudflare API answered /workers/subdomain with 403");
+    expect(
+      new WranglerFailed({ command: "wrangler d1 list --json", exitCode: 1 })
+        .message
+    ).toBe("wrangler d1 list --json exited 1");
   });
 });
