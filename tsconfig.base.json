@@ -153,6 +153,15 @@
             }
           },
           {
+            "include": ["packages/project/src/projection-d1/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/sql",
+                "@effect/sql-d1/D1Client#D1Client"
+              ]
+            }
+          },
+          {
             "include": ["packages/project/test/**/*.ts"],
             "options": {
               "allowedUnstableApis": ["effect/Arbitrary", "effect/sql"]
