@@ -12,7 +12,9 @@ import {
   Destructive,
   Idempotent,
   NeedsApproval,
+  partsOf,
   ReadOnly,
+  surfaced,
   SurfaceName,
   Surfaces,
 } from "@repo/protocol/contracts";
@@ -93,7 +95,7 @@ import {
  */
 export { Refusal } from "@repo/protocol/refusal";
 
-export { Contracts } from "@repo/protocol/contracts";
+export { Contracts, partsOf } from "@repo/protocol/contracts";
 
 /**
  * `docs/reference/commands.json`: every command the CLI has. `projected`
@@ -356,7 +358,7 @@ const refusalsDoc = (): GeneratedFile => ({
 
 /** The tools MCP serves, read from the same projection the servers use. */
 const tools = (): readonly ToolListing[] =>
-  listTools(toToolkit(Contracts, Effect.service(Client)).toolkit);
+  listTools(toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit);
 
 const jsonBlock = (schema: JsonSchema.JsonSchema) => [
   "```json",
@@ -394,7 +396,7 @@ const mcpToolsDoc = (): GeneratedFile => ({
     "",
     "# MCP tools",
     "",
-    `Each contract is one MCP tool, named by its tag, as \`tools/list\` shows it over \`/mcp\` and over stdio from \`${Brand.cli} mcp\`. A tool's input is the contract's payload and its output is the contract's success. A refusal comes back as the tool's error result: the refusal as JSON, \`_tag\` and all (see [refusals.md](refusals.md)).`,
+    `Each contract served on MCP is one tool, named by its tag, as \`tools/list\` shows it over \`/mcp\` and over stdio from \`${Brand.cli} mcp\`. A stream has no tool, and no tool takes a write-only value, which must never pass through an agent's transcript. A tool's input is the contract's payload and its output is the contract's success. A refusal comes back as the tool's error result: the refusal as JSON, \`_tag\` and all (see [refusals.md](refusals.md)).`,
     "",
     "The hints come from each contract's own annotations. No tool reaches anything outside the platform, so `openWorldHint` is always false.",
     "",
@@ -460,14 +462,25 @@ const kinds = new Map([
   ["string", "text"],
 ]);
 
-/** What a field takes on the command line, in the words `--help` uses. */
+/**
+ * A boolean field is a switch: the CLI turns it on by naming it, and it is
+ * off by default, so it is never required.
+ */
+const isSwitch = (field: Schema.Json) =>
+  isFieldSchema(field) && field.type === "boolean";
+
+/**
+ * What a field takes on the command line, in the words `--help` uses, as a
+ * table cell: a choice's values are split by an escaped pipe, which Markdown
+ * shows as a pipe and doesn't read as the cell's end.
+ */
 const takes = (field: Schema.Json) => {
   if (!isFieldSchema(field)) {
     return "JSON";
   }
 
   if (field.enum !== undefined) {
-    return field.enum.map((value) => JSON.stringify(value)).join(" | ");
+    return field.enum.map((value) => JSON.stringify(value)).join(" \\| ");
   }
 
   return (
@@ -487,13 +500,25 @@ const commandSection = (command: Command) => {
     ([field]) => !positional.has(field)
   );
 
+  /** Whether a person must give the flag: a switch never needs giving. */
+  const mustGive = ([field, schema]: readonly [string, Schema.Json]) =>
+    needed.has(field) && !isSwitch(schema);
+
+  const usageOf = (flag: readonly [string, Schema.Json]) => {
+    const [field, schema] = flag;
+
+    if (isSwitch(schema)) {
+      return `[--${field}]`;
+    }
+
+    return mustGive(flag) ? `--${field} <${field}>` : `[--${field} <${field}>]`;
+  };
+
   const usage = [
     Brand.cli,
     ...command.path,
     ...command.positional.map((field) => `<${field}>`),
-    ...flags.map(([field]) =>
-      needed.has(field) ? `--${field} <${field}>` : `[--${field} <${field}>]`
-    ),
+    ...flags.map(usageOf),
   ].join(" ");
 
   const rows = [
@@ -502,8 +527,8 @@ const commandSection = (command: Command) => {
         `| \`<${field}>\` | ${takes(properties[field] ?? null)} | ${yesNo(needed.has(field))} |`
     ),
     ...flags.map(
-      ([field, schema]) =>
-        `| \`--${field}\` | ${takes(schema)} | ${yesNo(needed.has(field))} |`
+      (flag) =>
+        `| \`--${flag[0]}\` | ${takes(flag[1])} | ${yesNo(mustGive(flag))} |`
     ),
   ];
 
@@ -559,16 +584,20 @@ const commandsJson = (commands: CommandCatalog): GeneratedFile => ({
 /**
  * One JSON Schema document for the whole protocol: a definition for each
  * contract's payload, success and error, and for the refusal union, sharing
- * the definitions they name.
+ * the definitions they name. A stream's success is one of its elements.
  */
 const protocolSchema = (): GeneratedFile => {
   const roots: Arr.NonEmptyReadonlyArray<readonly [string, Schema.Top]> = [
     ["Refusal", Refusal],
-    ...contracts.flatMap((rpc) => [
-      [`${rpc._tag}.payload`, rpc.payloadSchema] as const,
-      [`${rpc._tag}.success`, rpc.successSchema] as const,
-      [`${rpc._tag}.error`, rpc.errorSchema] as const,
-    ]),
+    ...contracts.flatMap((rpc) => {
+      const { error, payload, success } = partsOf(rpc);
+
+      return [
+        [`${rpc._tag}.payload`, payload] as const,
+        [`${rpc._tag}.success`, success] as const,
+        [`${rpc._tag}.error`, error] as const,
+      ];
+    }),
   ];
 
   // Each root as JSON encodes it, as `Schema.toJsonSchemaDocument` does.

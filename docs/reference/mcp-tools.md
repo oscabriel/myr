@@ -2,9 +2,223 @@
 
 # MCP tools
 
-Each contract is one MCP tool, named by its tag, as `tools/list` shows it over `/mcp` and over stdio from `myr mcp`. A tool's input is the contract's payload and its output is the contract's success. A refusal comes back as the tool's error result: the refusal as JSON, `_tag` and all (see [refusals.md](refusals.md)).
+Each contract served on MCP is one tool, named by its tag, as `tools/list` shows it over `/mcp` and over stdio from `myr mcp`. A stream has no tool, and no tool takes a write-only value, which must never pass through an agent's transcript. A tool's input is the contract's payload and its output is the contract's success. A refusal comes back as the tool's error result: the refusal as JSON, `_tag` and all (see [refusals.md](refusals.md)).
 
 The hints come from each contract's own annotations. No tool reaches anything outside the platform, so `openWorldHint` is always false.
+
+## listProjects
+
+List every project on the platform, with its posture and how many asks it has open.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": false,
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "projects": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "landedAt": {
+            "type": "string"
+          },
+          "openAsks": {
+            "type": "integer"
+          },
+          "posture": {
+            "enum": [
+              "open",
+              "openWithSealedEvidence",
+              "openOnSchedule",
+              "openCore",
+              "sourceAvailable"
+            ],
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "openAsks",
+          "posture",
+          "project"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "projects"
+  ],
+  "type": "object"
+}
+```
+
+## frontPage
+
+List the open asks across every project, each saying whether the caller may take it; optionally of one kind, or held for newcomers or people.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "kind": {
+      "pattern": "^[a-z][a-zA-Z0-9-]*$",
+      "type": "string"
+    },
+    "reserved": {
+      "enum": [
+        "newcomers",
+        "people"
+      ],
+      "type": "string"
+    }
+  },
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "entries": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "additionalProperties": true,
+            "properties": {
+              "ask": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "me",
+                        "layer"
+                      ]
+                    }
+                  }
+                ],
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "type": "string"
+              },
+              "blockedBy": {
+                "items": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "enum": [
+                          "me",
+                          "layer"
+                        ]
+                      }
+                    }
+                  ],
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "claimed": {
+                "type": "boolean"
+              },
+              "kind": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "reserve": {
+                "enum": [
+                  "newcomers",
+                  "people"
+                ],
+                "type": "string"
+              },
+              "territory": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "want": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "ask",
+              "blockedBy",
+              "claimed",
+              "kind",
+              "territory",
+              "want"
+            ],
+            "type": "object"
+          },
+          "posture": {
+            "enum": [
+              "open",
+              "openWithSealedEvidence",
+              "openOnSchedule",
+              "openCore",
+              "sourceAvailable"
+            ],
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "takeable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ask",
+          "posture",
+          "project",
+          "takeable"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "entries"
+  ],
+  "type": "object"
+}
+```
 
 ## listAsks
 
@@ -119,9 +333,14498 @@ List a project's open asks.
 }
 ```
 
+## showAsk
+
+Show one ask in full, with its brief in Markdown for an answerer to read first.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "additionalProperties": true,
+      "properties": {
+        "askedBy": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "brief": {
+          "additionalProperties": true,
+          "properties": {
+            "context": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "current": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "outOfScope": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "terms": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "want": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "want"
+          ],
+          "type": "object"
+        },
+        "check": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "LintToZero"
+                  ],
+                  "type": "string"
+                },
+                "command": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "rule": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "command",
+                "rule"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Migrate"
+                  ],
+                  "type": "string"
+                },
+                "count": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "from": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "to": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "count",
+                "from"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Ratchet"
+                  ],
+                  "type": "string"
+                },
+                "ratchet": {
+                  "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "ratchet"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "RedThenGreen"
+                  ],
+                  "type": "string"
+                },
+                "path": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "path"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "SymbolAbsent"
+                  ],
+                  "type": "string"
+                },
+                "count": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "symbol": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "count",
+                "symbol"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "file": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "kind": {
+          "pattern": "^[a-z][a-zA-Z0-9-]*$",
+          "type": "string"
+        },
+        "mentor": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
+        },
+        "openedAt": {
+          "type": "string"
+        },
+        "openedIn": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "parent": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "reserve": {
+          "enum": [
+            "newcomers",
+            "people"
+          ],
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "claimed",
+            "waitingOnParent",
+            "closed"
+          ],
+          "type": "string"
+        },
+        "territory": {
+          "additionalProperties": true,
+          "properties": {
+            "module": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "paths": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "publicFiles": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "module",
+            "paths"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "askedBy",
+        "blockedBy",
+        "brief",
+        "check",
+        "file",
+        "id",
+        "kind",
+        "openedAt",
+        "openedIn",
+        "project",
+        "state",
+        "territory"
+      ],
+      "type": "object"
+    },
+    "brief": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "brief"
+  ],
+  "type": "object"
+}
+```
+
+## status
+
+Show the caller's claims and answers, in one project or in every one.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "$defs": {
+    "AskBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskBlocked"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask",
+        "blockedBy"
+      ],
+      "type": "object"
+    },
+    "AskFullEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskFull"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "AttemptsExhaustedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AttemptsExhausted"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "resetsAt": {
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "resetsAt"
+      ],
+      "type": "object"
+    },
+    "CapReachedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "CapReached"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "cap": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "cap"
+      ],
+      "type": "object"
+    },
+    "ChecksFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ChecksFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "logRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane",
+        "logRef"
+      ],
+      "type": "object"
+    },
+    "ClaimLapsedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ClaimLapsed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "DecisionClosedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DecisionClosed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "DenouncedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Denounced"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "DirectPushEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DirectPush"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "FlakeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Flake"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane"
+      ],
+      "type": "object"
+    },
+    "HeldBackFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "HeldBackFailed"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "suite": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "suite"
+      ],
+      "type": "object"
+    },
+    "ImportFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ImportFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "IncompleteBriefEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "IncompleteBrief"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "missing": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "LayerContentInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "LayerContentInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "NoAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NoAsk"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotClaimedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotClaimed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "NotDeciderEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotDecider"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotRedFirstEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotRedFirst"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotSensitiveEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotSensitive"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "NotVouchedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotVouched"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "OutOfScopeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "OutOfScope"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "PostureChangeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PostureChange"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "PrivatePathInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PrivatePathInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "ProjectExistsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ProjectExists"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "ReachedInternalsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ReachedInternals"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RepoBusyEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "RepoBusy"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "SecretInOutputEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "SecretInOutput"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "item": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "where": {
+          "enum": [
+            "output",
+            "tree"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "item",
+        "where"
+      ],
+      "type": "object"
+    },
+    "StaleBaseEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleBase"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "conflicts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "main": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "base",
+        "conflicts",
+        "main"
+      ],
+      "type": "object"
+    },
+    "StaleLayerEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleLayer"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "layer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "layer"
+      ],
+      "type": "object"
+    },
+    "TouchedJudgeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "TouchedJudge"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "UnknownAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownAsk"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "UnknownCommitEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownCommit"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "sha"
+      ],
+      "type": "object"
+    },
+    "UnknownDecisionEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownDecision"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "UnknownEnvItemEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownEnvItem"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "UnknownProjectEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownProject"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "UnstatedRequirementEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnstatedRequirement"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area"
+      ],
+      "type": "object"
+    },
+    "ValueTooShortEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ValueTooShort"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "VerifierBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "VerifierBlocked"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "WeakCheckEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "WeakCheck"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakness": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakness"
+      ],
+      "type": "object"
+    },
+    "WeakenedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Weakened"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakening": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "marker"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "after": {
+                  "type": "integer"
+                },
+                "before": {
+                  "type": "integer"
+                },
+                "ratchet": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "after",
+                "before",
+                "ratchet",
+                "territory"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakening"
+      ],
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "answers": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "head": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "AwaitingDecision"
+                    ],
+                    "type": "string"
+                  },
+                  "decision": {
+                    "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "decision"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "AwaitingFinish"
+                    ],
+                    "type": "string"
+                  },
+                  "decider": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "Checking"
+                    ],
+                    "type": "string"
+                  },
+                  "stage": {
+                    "enum": [
+                      "parse",
+                      "shape",
+                      "merge",
+                      "cheap",
+                      "checks",
+                      "heldBack",
+                      "human"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "stage"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "Landed"
+                    ],
+                    "type": "string"
+                  },
+                  "sha": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "sha"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "Refused"
+                    ],
+                    "type": "string"
+                  },
+                  "refusals": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/NotClaimedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ClaimLapsedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NotVouchedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/CapReachedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/AskFullEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NoAskEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/RepoBusyEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/DirectPushEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/AskBlockedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/DenouncedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/OutOfScopeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/TouchedJudgeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/WeakenedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ReachedInternalsEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/StaleBaseEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/StaleLayerEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ChecksFailedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/HeldBackFailedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/FlakeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/VerifierBlockedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NotRedFirstEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/WeakCheckEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/IncompleteBriefEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/SecretInOutputEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnstatedRequirementEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/PostureChangeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NotDeciderEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/DecisionClosedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownProjectEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownAskEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownCommitEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownDecisionEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ProjectExistsEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ImportFailedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownEnvItemEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NotSensitiveEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ValueTooShortEncoded"
+                        }
+                      ]
+                    },
+                    "minItems": 1,
+                    "prefixItems": [
+                      {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/NotClaimedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ClaimLapsedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NotVouchedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/CapReachedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/AskFullEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NoAskEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/RepoBusyEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/DirectPushEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/AskBlockedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/DenouncedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/OutOfScopeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/TouchedJudgeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/WeakenedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ReachedInternalsEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/StaleBaseEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/StaleLayerEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ChecksFailedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/HeldBackFailedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/FlakeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/VerifierBlockedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NotRedFirstEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/WeakCheckEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/IncompleteBriefEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/SecretInOutputEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnstatedRequirementEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/PostureChangeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NotDeciderEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/DecisionClosedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownProjectEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownAskEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownCommitEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownDecisionEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ProjectExistsEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ImportFailedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownEnvItemEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NotSensitiveEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ValueTooShortEncoded"
+                          }
+                        ]
+                      }
+                    ],
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "refusals"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "WaitingOnParent"
+                    ],
+                    "type": "string"
+                  },
+                  "ask": {
+                    "allOf": [
+                      {
+                        "not": {
+                          "enum": [
+                            "me",
+                            "layer"
+                          ]
+                        }
+                      }
+                    ],
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "ask"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "requestId": {
+            "pattern": "^[A-Za-z0-9_-]{8,64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "at",
+          "head",
+          "outcome",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "claims": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "base": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "checkCommand": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "claimant": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+            "type": "string"
+          },
+          "fork": {
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "type": "string"
+          },
+          "lapsesAt": {
+            "type": "string"
+          },
+          "lastPushAt": {
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "remote": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "live",
+              "warned",
+              "lapsed",
+              "released",
+              "answered"
+            ],
+            "type": "string"
+          },
+          "suite": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "warnsAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "base",
+          "checkCommand",
+          "claimant",
+          "fork",
+          "lapsesAt",
+          "openedAt",
+          "project",
+          "remote",
+          "state",
+          "warnsAt"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "answers",
+    "claims"
+  ],
+  "type": "object"
+}
+```
+
+## verdict
+
+Show the verdict on an answer to an ask, for its latest head or the one named; held-back checks show one bit per area.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "head": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "$defs": {
+    "AskBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskBlocked"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask",
+        "blockedBy"
+      ],
+      "type": "object"
+    },
+    "AskFullEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskFull"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "AttemptsExhaustedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AttemptsExhausted"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "resetsAt": {
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "resetsAt"
+      ],
+      "type": "object"
+    },
+    "CapReachedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "CapReached"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "cap": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "cap"
+      ],
+      "type": "object"
+    },
+    "ChecksFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ChecksFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "logRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane",
+        "logRef"
+      ],
+      "type": "object"
+    },
+    "ClaimLapsedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ClaimLapsed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "DecisionClosedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DecisionClosed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "DenouncedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Denounced"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "DirectPushEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DirectPush"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "FlakeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Flake"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane"
+      ],
+      "type": "object"
+    },
+    "HeldBackFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "HeldBackFailed"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "suite": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "suite"
+      ],
+      "type": "object"
+    },
+    "ImportFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ImportFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "IncompleteBriefEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "IncompleteBrief"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "missing": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "LayerContentInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "LayerContentInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "NoAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NoAsk"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotClaimedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotClaimed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "NotDeciderEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotDecider"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotRedFirstEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotRedFirst"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotSensitiveEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotSensitive"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "NotVouchedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotVouched"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "OutOfScopeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "OutOfScope"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "PostureChangeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PostureChange"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "PrivatePathInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PrivatePathInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "ProjectExistsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ProjectExists"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "ReachedInternalsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ReachedInternals"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RepoBusyEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "RepoBusy"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "SecretInOutputEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "SecretInOutput"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "item": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "where": {
+          "enum": [
+            "output",
+            "tree"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "item",
+        "where"
+      ],
+      "type": "object"
+    },
+    "StaleBaseEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleBase"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "conflicts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "main": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "base",
+        "conflicts",
+        "main"
+      ],
+      "type": "object"
+    },
+    "StaleLayerEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleLayer"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "layer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "layer"
+      ],
+      "type": "object"
+    },
+    "TouchedJudgeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "TouchedJudge"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "UnknownAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownAsk"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "UnknownCommitEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownCommit"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "sha"
+      ],
+      "type": "object"
+    },
+    "UnknownDecisionEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownDecision"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "UnknownEnvItemEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownEnvItem"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "UnknownProjectEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownProject"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "UnstatedRequirementEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnstatedRequirement"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area"
+      ],
+      "type": "object"
+    },
+    "ValueTooShortEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ValueTooShort"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "VerifierBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "VerifierBlocked"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "WeakCheckEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "WeakCheck"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakness": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakness"
+      ],
+      "type": "object"
+    },
+    "WeakenedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Weakened"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakening": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "marker"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "after": {
+                  "type": "integer"
+                },
+                "before": {
+                  "type": "integer"
+                },
+                "ratchet": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "after",
+                "before",
+                "ratchet",
+                "territory"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakening"
+      ],
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "verdict": {
+      "additionalProperties": true,
+      "properties": {
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "checkVersion": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "head": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "heldBack": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "area": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "passed": {
+                "type": "integer"
+              },
+              "suite": {
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "total": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "area",
+              "passed",
+              "suite",
+              "total"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "lanes": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "command": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "durationMs": {
+                "type": "integer"
+              },
+              "lane": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "logRef": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "result": {
+                "enum": [
+                  "passed",
+                  "failed",
+                  "loadError",
+                  "flaked",
+                  "blocked"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "command",
+              "durationMs",
+              "lane",
+              "result"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "outcome": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "AwaitingDecision"
+                  ],
+                  "type": "string"
+                },
+                "decision": {
+                  "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "decision"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "AwaitingFinish"
+                  ],
+                  "type": "string"
+                },
+                "decider": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Checking"
+                  ],
+                  "type": "string"
+                },
+                "stage": {
+                  "enum": [
+                    "parse",
+                    "shape",
+                    "merge",
+                    "cheap",
+                    "checks",
+                    "heldBack",
+                    "human"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "stage"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Landed"
+                  ],
+                  "type": "string"
+                },
+                "sha": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "sha"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Refused"
+                  ],
+                  "type": "string"
+                },
+                "refusals": {
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/NotClaimedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/ClaimLapsedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/NotVouchedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/CapReachedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/AskFullEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/NoAskEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/RepoBusyEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/DirectPushEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/AskBlockedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/DenouncedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/OutOfScopeEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/TouchedJudgeEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/WeakenedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/ReachedInternalsEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/StaleBaseEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/StaleLayerEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/ChecksFailedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/HeldBackFailedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/FlakeEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/VerifierBlockedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/NotRedFirstEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/WeakCheckEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/IncompleteBriefEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/SecretInOutputEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/UnstatedRequirementEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/PostureChangeEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/NotDeciderEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/DecisionClosedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/UnknownProjectEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/UnknownAskEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/UnknownCommitEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/UnknownDecisionEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/ProjectExistsEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/ImportFailedEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/UnknownEnvItemEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/NotSensitiveEncoded"
+                      },
+                      {
+                        "$ref": "#/$defs/ValueTooShortEncoded"
+                      }
+                    ]
+                  },
+                  "minItems": 1,
+                  "prefixItems": [
+                    {
+                      "anyOf": [
+                        {
+                          "$ref": "#/$defs/NotClaimedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ClaimLapsedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NotVouchedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/CapReachedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/AskFullEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NoAskEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/RepoBusyEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/DirectPushEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/AskBlockedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/DenouncedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/OutOfScopeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/TouchedJudgeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/WeakenedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ReachedInternalsEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/StaleBaseEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/StaleLayerEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ChecksFailedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/HeldBackFailedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/FlakeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/VerifierBlockedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NotRedFirstEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/WeakCheckEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/IncompleteBriefEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/SecretInOutputEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnstatedRequirementEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/PostureChangeEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NotDeciderEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/DecisionClosedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownProjectEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownAskEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownCommitEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownDecisionEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ProjectExistsEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ImportFailedEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/UnknownEnvItemEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/NotSensitiveEncoded"
+                        },
+                        {
+                          "$ref": "#/$defs/ValueTooShortEncoded"
+                        }
+                      ]
+                    }
+                  ],
+                  "type": "array"
+                }
+              },
+              "required": [
+                "_tag",
+                "refusals"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "WaitingOnParent"
+                  ],
+                  "type": "string"
+                },
+                "ask": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "enum": [
+                          "me",
+                          "layer"
+                        ]
+                      }
+                    }
+                  ],
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "ask"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "patchId": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "parse",
+            "shape",
+            "merge",
+            "cheap",
+            "checks",
+            "heldBack",
+            "human"
+          ],
+          "type": "string"
+        },
+        "tree": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "verifier": {
+          "enum": [
+            "platform"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "ask",
+        "at",
+        "base",
+        "checkVersion",
+        "head",
+        "heldBack",
+        "lanes",
+        "outcome",
+        "patchId",
+        "project",
+        "stage",
+        "tree",
+        "verifier"
+      ],
+      "type": "object"
+    }
+  },
+  "type": "object"
+}
+```
+
+## landing
+
+Show one landing on a project's main: the ask it answered, the people it credits and its verdict.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "sha": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project",
+    "sha"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "$defs": {
+    "AskBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskBlocked"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask",
+        "blockedBy"
+      ],
+      "type": "object"
+    },
+    "AskFullEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskFull"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "AttemptsExhaustedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AttemptsExhausted"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "resetsAt": {
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "resetsAt"
+      ],
+      "type": "object"
+    },
+    "CapReachedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "CapReached"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "cap": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "cap"
+      ],
+      "type": "object"
+    },
+    "ChecksFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ChecksFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "logRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane",
+        "logRef"
+      ],
+      "type": "object"
+    },
+    "ClaimLapsedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ClaimLapsed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "DecisionClosedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DecisionClosed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "DenouncedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Denounced"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "DirectPushEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DirectPush"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "FlakeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Flake"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane"
+      ],
+      "type": "object"
+    },
+    "HeldBackFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "HeldBackFailed"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "suite": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "suite"
+      ],
+      "type": "object"
+    },
+    "ImportFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ImportFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "IncompleteBriefEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "IncompleteBrief"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "missing": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "LayerContentInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "LayerContentInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "NoAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NoAsk"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotClaimedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotClaimed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "NotDeciderEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotDecider"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotRedFirstEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotRedFirst"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotSensitiveEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotSensitive"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "NotVouchedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotVouched"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "OutOfScopeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "OutOfScope"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "PostureChangeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PostureChange"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "PrivatePathInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PrivatePathInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "ProjectExistsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ProjectExists"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "ReachedInternalsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ReachedInternals"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RepoBusyEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "RepoBusy"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "SecretInOutputEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "SecretInOutput"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "item": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "where": {
+          "enum": [
+            "output",
+            "tree"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "item",
+        "where"
+      ],
+      "type": "object"
+    },
+    "StaleBaseEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleBase"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "conflicts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "main": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "base",
+        "conflicts",
+        "main"
+      ],
+      "type": "object"
+    },
+    "StaleLayerEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleLayer"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "layer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "layer"
+      ],
+      "type": "object"
+    },
+    "TouchedJudgeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "TouchedJudge"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "UnknownAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownAsk"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "UnknownCommitEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownCommit"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "sha"
+      ],
+      "type": "object"
+    },
+    "UnknownDecisionEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownDecision"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "UnknownEnvItemEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownEnvItem"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "UnknownProjectEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownProject"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "UnstatedRequirementEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnstatedRequirement"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area"
+      ],
+      "type": "object"
+    },
+    "ValueTooShortEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ValueTooShort"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "VerifierBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "VerifierBlocked"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "WeakCheckEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "WeakCheck"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakness": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakness"
+      ],
+      "type": "object"
+    },
+    "WeakenedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Weakened"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakening": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "marker"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "after": {
+                  "type": "integer"
+                },
+                "before": {
+                  "type": "integer"
+                },
+                "ratchet": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "after",
+                "before",
+                "ratchet",
+                "territory"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakening"
+      ],
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "landing": {
+      "additionalProperties": true,
+      "properties": {
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "assisted": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "harness": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "model": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "harness",
+              "verified"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "author": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
+        },
+        "credits": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "handle": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "Asked-by",
+                  "Signed-off-by",
+                  "Decided-by",
+                  "Mentored-by",
+                  "Finished-by",
+                  "Advised-by",
+                  "Released-by"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "handle",
+              "role"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "heldBackTrailer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "landedAt": {
+          "type": "string"
+        },
+        "parent": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "requestId": {
+          "pattern": "^[A-Za-z0-9_-]{8,64}$",
+          "type": "string"
+        },
+        "sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "verdict": {
+          "additionalProperties": true,
+          "properties": {
+            "ask": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            "at": {
+              "type": "string"
+            },
+            "base": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "checkVersion": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "head": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "heldBack": {
+              "items": {
+                "additionalProperties": true,
+                "properties": {
+                  "area": {
+                    "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                    "type": "string"
+                  },
+                  "passed": {
+                    "type": "integer"
+                  },
+                  "suite": {
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "total": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "area",
+                  "passed",
+                  "suite",
+                  "total"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "lanes": {
+              "items": {
+                "additionalProperties": true,
+                "properties": {
+                  "command": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "durationMs": {
+                    "type": "integer"
+                  },
+                  "lane": {
+                    "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                    "type": "string"
+                  },
+                  "logRef": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "result": {
+                    "enum": [
+                      "passed",
+                      "failed",
+                      "loadError",
+                      "flaked",
+                      "blocked"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "command",
+                  "durationMs",
+                  "lane",
+                  "result"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "outcome": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "properties": {
+                    "_tag": {
+                      "enum": [
+                        "AwaitingDecision"
+                      ],
+                      "type": "string"
+                    },
+                    "decision": {
+                      "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "_tag",
+                    "decision"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": true,
+                  "properties": {
+                    "_tag": {
+                      "enum": [
+                        "AwaitingFinish"
+                      ],
+                      "type": "string"
+                    },
+                    "decider": {
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "_tag"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": true,
+                  "properties": {
+                    "_tag": {
+                      "enum": [
+                        "Checking"
+                      ],
+                      "type": "string"
+                    },
+                    "stage": {
+                      "enum": [
+                        "parse",
+                        "shape",
+                        "merge",
+                        "cheap",
+                        "checks",
+                        "heldBack",
+                        "human"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "_tag",
+                    "stage"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": true,
+                  "properties": {
+                    "_tag": {
+                      "enum": [
+                        "Landed"
+                      ],
+                      "type": "string"
+                    },
+                    "sha": {
+                      "pattern": "^[0-9a-f]{40}$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "_tag",
+                    "sha"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": true,
+                  "properties": {
+                    "_tag": {
+                      "enum": [
+                        "Refused"
+                      ],
+                      "type": "string"
+                    },
+                    "refusals": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/NotClaimedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ClaimLapsedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NotVouchedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/CapReachedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/AskFullEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NoAskEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/RepoBusyEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/DirectPushEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/AskBlockedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/DenouncedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/OutOfScopeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/TouchedJudgeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/WeakenedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ReachedInternalsEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/StaleBaseEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/StaleLayerEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ChecksFailedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/HeldBackFailedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/FlakeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/VerifierBlockedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NotRedFirstEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/WeakCheckEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/IncompleteBriefEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/SecretInOutputEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnstatedRequirementEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/PostureChangeEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NotDeciderEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/DecisionClosedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownProjectEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownAskEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownCommitEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownDecisionEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ProjectExistsEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ImportFailedEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/UnknownEnvItemEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/NotSensitiveEncoded"
+                          },
+                          {
+                            "$ref": "#/$defs/ValueTooShortEncoded"
+                          }
+                        ]
+                      },
+                      "minItems": 1,
+                      "prefixItems": [
+                        {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/NotClaimedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ClaimLapsedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NotVouchedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/CapReachedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/AskFullEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NoAskEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/RepoBusyEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/DirectPushEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/AskBlockedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/DenouncedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/OutOfScopeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/TouchedJudgeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/WeakenedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ReachedInternalsEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/StaleBaseEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/StaleLayerEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ChecksFailedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/HeldBackFailedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/FlakeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/VerifierBlockedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NotRedFirstEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/WeakCheckEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/IncompleteBriefEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/SecretInOutputEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnstatedRequirementEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/PostureChangeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NotDeciderEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/DecisionClosedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownProjectEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownAskEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownCommitEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownDecisionEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ProjectExistsEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ImportFailedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownEnvItemEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NotSensitiveEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ValueTooShortEncoded"
+                            }
+                          ]
+                        }
+                      ],
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "_tag",
+                    "refusals"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": true,
+                  "properties": {
+                    "_tag": {
+                      "enum": [
+                        "WaitingOnParent"
+                      ],
+                      "type": "string"
+                    },
+                    "ask": {
+                      "allOf": [
+                        {
+                          "not": {
+                            "enum": [
+                              "me",
+                              "layer"
+                            ]
+                          }
+                        }
+                      ],
+                      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "_tag",
+                    "ask"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "patchId": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "project": {
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            "stage": {
+              "enum": [
+                "parse",
+                "shape",
+                "merge",
+                "cheap",
+                "checks",
+                "heldBack",
+                "human"
+              ],
+              "type": "string"
+            },
+            "tree": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            },
+            "verifier": {
+              "enum": [
+                "platform"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "ask",
+            "at",
+            "base",
+            "checkVersion",
+            "head",
+            "heldBack",
+            "lanes",
+            "outcome",
+            "patchId",
+            "project",
+            "stage",
+            "tree",
+            "verifier"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "assisted",
+        "author",
+        "credits",
+        "landedAt",
+        "parent",
+        "project",
+        "sha"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "landing"
+  ],
+  "type": "object"
+}
+```
+
+## credits
+
+Count a person's credits by project, area and role; never a score.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "handle": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "handle"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "credits": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "area": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "Asked-by",
+              "Signed-off-by",
+              "Decided-by",
+              "Mentored-by",
+              "Finished-by",
+              "Advised-by",
+              "Released-by"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "area",
+          "count",
+          "project",
+          "role"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "credits"
+  ],
+  "type": "object"
+}
+```
+
+## today
+
+Show the caller's Today: the decisions to take, held to their budget, each with its evidence and a safe default.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "$defs": {
+    "AskBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskBlocked"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask",
+        "blockedBy"
+      ],
+      "type": "object"
+    },
+    "AskFullEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskFull"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "AttemptsExhaustedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AttemptsExhausted"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "resetsAt": {
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "resetsAt"
+      ],
+      "type": "object"
+    },
+    "CapReachedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "CapReached"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "cap": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "cap"
+      ],
+      "type": "object"
+    },
+    "ChecksFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ChecksFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "logRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane",
+        "logRef"
+      ],
+      "type": "object"
+    },
+    "ClaimLapsedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ClaimLapsed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "DecisionClosedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DecisionClosed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "DenouncedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Denounced"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "DirectPushEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DirectPush"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "FlakeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Flake"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane"
+      ],
+      "type": "object"
+    },
+    "HeldBackFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "HeldBackFailed"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "suite": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "suite"
+      ],
+      "type": "object"
+    },
+    "ImportFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ImportFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "IncompleteBriefEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "IncompleteBrief"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "missing": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "LayerContentInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "LayerContentInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "NoAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NoAsk"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotClaimedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotClaimed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "NotDeciderEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotDecider"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotRedFirstEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotRedFirst"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotSensitiveEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotSensitive"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "NotVouchedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotVouched"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "OutOfScopeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "OutOfScope"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "PostureChangeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PostureChange"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "PrivatePathInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PrivatePathInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "ProjectExistsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ProjectExists"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "ReachedInternalsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ReachedInternals"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RepoBusyEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "RepoBusy"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "SecretInOutputEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "SecretInOutput"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "item": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "where": {
+          "enum": [
+            "output",
+            "tree"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "item",
+        "where"
+      ],
+      "type": "object"
+    },
+    "StaleBaseEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleBase"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "conflicts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "main": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "base",
+        "conflicts",
+        "main"
+      ],
+      "type": "object"
+    },
+    "StaleLayerEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleLayer"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "layer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "layer"
+      ],
+      "type": "object"
+    },
+    "TouchedJudgeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "TouchedJudge"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "UnknownAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownAsk"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "UnknownCommitEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownCommit"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "sha"
+      ],
+      "type": "object"
+    },
+    "UnknownDecisionEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownDecision"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "UnknownEnvItemEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownEnvItem"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "UnknownProjectEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownProject"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "UnstatedRequirementEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnstatedRequirement"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area"
+      ],
+      "type": "object"
+    },
+    "ValueTooShortEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ValueTooShort"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "VerifierBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "VerifierBlocked"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "WeakCheckEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "WeakCheck"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakness": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakness"
+      ],
+      "type": "object"
+    },
+    "WeakenedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Weakened"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakening": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "marker"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "after": {
+                  "type": "integer"
+                },
+                "before": {
+                  "type": "integer"
+                },
+                "ratchet": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "after",
+                "before",
+                "ratchet",
+                "territory"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakening"
+      ],
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "budget": {
+      "additionalProperties": true,
+      "properties": {
+        "finishes": {
+          "type": "integer"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "used": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "finishes",
+        "total",
+        "used"
+      ],
+      "type": "object"
+    },
+    "decider": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+      "type": "string"
+    },
+    "decisions": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "decided": {
+            "additionalProperties": true,
+            "properties": {
+              "at": {
+                "type": "string"
+              },
+              "by": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                "type": "string"
+              },
+              "choice": {
+                "enum": [
+                  "accept",
+                  "decline",
+                  "adopt",
+                  "revert"
+                ],
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "at",
+              "by",
+              "choice"
+            ],
+            "type": "object"
+          },
+          "deciders": {
+            "items": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "prefixItems": [
+              {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "default": {
+            "enum": [
+              "accept",
+              "decline",
+              "adopt",
+              "revert"
+            ],
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "href": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "label": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+            "type": "string"
+          },
+          "openedAt": {
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "Finish"
+                    ],
+                    "type": "string"
+                  },
+                  "ask": {
+                    "allOf": [
+                      {
+                        "not": {
+                          "enum": [
+                            "me",
+                            "layer"
+                          ]
+                        }
+                      }
+                    ],
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                    "type": "string"
+                  },
+                  "head": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "ask",
+                  "head"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "OpenProposal"
+                    ],
+                    "type": "string"
+                  },
+                  "proposal": {
+                    "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "proposal"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "PostureChange"
+                    ],
+                    "type": "string"
+                  },
+                  "from": {
+                    "enum": [
+                      "open",
+                      "openWithSealedEvidence",
+                      "openOnSchedule",
+                      "openCore",
+                      "sourceAvailable"
+                    ],
+                    "type": "string"
+                  },
+                  "to": {
+                    "enum": [
+                      "open",
+                      "openWithSealedEvidence",
+                      "openOnSchedule",
+                      "openCore",
+                      "sourceAvailable"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "from",
+                  "to"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "ProxyWidened"
+                    ],
+                    "type": "string"
+                  },
+                  "hosts": {
+                    "items": {
+                      "pattern": "^(?:\\*\\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "item": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "hosts",
+                  "item"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "RaiseRatchet"
+                    ],
+                    "type": "string"
+                  },
+                  "after": {
+                    "type": "integer"
+                  },
+                  "ask": {
+                    "allOf": [
+                      {
+                        "not": {
+                          "enum": [
+                            "me",
+                            "layer"
+                          ]
+                        }
+                      }
+                    ],
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                    "type": "string"
+                  },
+                  "before": {
+                    "type": "integer"
+                  },
+                  "ratchet": {
+                    "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                    "type": "string"
+                  },
+                  "territory": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "after",
+                  "ask",
+                  "before",
+                  "ratchet",
+                  "territory"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "SecretInTree"
+                    ],
+                    "type": "string"
+                  },
+                  "ask": {
+                    "allOf": [
+                      {
+                        "not": {
+                          "enum": [
+                            "me",
+                            "layer"
+                          ]
+                        }
+                      }
+                    ],
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                    "type": "string"
+                  },
+                  "item": {
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "ask",
+                  "item"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "StrayPush"
+                    ],
+                    "type": "string"
+                  },
+                  "after": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  },
+                  "before": {
+                    "pattern": "^[0-9a-f]{40}$",
+                    "type": "string"
+                  },
+                  "ref": {
+                    "pattern": "^refs\\/(?!.*\\.\\.)[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)+$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "after",
+                  "before",
+                  "ref"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "Vouch"
+                    ],
+                    "type": "string"
+                  },
+                  "handle": {
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "handle"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "_tag": {
+                    "enum": [
+                      "Waiver"
+                    ],
+                    "type": "string"
+                  },
+                  "ask": {
+                    "allOf": [
+                      {
+                        "not": {
+                          "enum": [
+                            "me",
+                            "layer"
+                          ]
+                        }
+                      }
+                    ],
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                    "type": "string"
+                  },
+                  "at": {
+                    "additionalProperties": true,
+                    "properties": {
+                      "line": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "path": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "line",
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "marker": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "_tag",
+                  "ask",
+                  "at",
+                  "marker",
+                  "reason"
+                ],
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "required": [
+          "deciders",
+          "default",
+          "evidence",
+          "expiresAt",
+          "id",
+          "openedAt",
+          "project",
+          "subject"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "expiringSoon": {
+      "items": {
+        "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "newcomers": {
+      "items": {
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "overflow": {
+      "type": "integer"
+    },
+    "unattended": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "assisted": {
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "harness": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "model": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "verified": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "harness",
+                "verified"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "author": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+            "type": "string"
+          },
+          "credits": {
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "handle": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "Asked-by",
+                    "Signed-off-by",
+                    "Decided-by",
+                    "Mentored-by",
+                    "Finished-by",
+                    "Advised-by",
+                    "Released-by"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "handle",
+                "role"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "heldBackTrailer": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "landedAt": {
+            "type": "string"
+          },
+          "parent": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "requestId": {
+            "pattern": "^[A-Za-z0-9_-]{8,64}$",
+            "type": "string"
+          },
+          "sha": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "verdict": {
+            "additionalProperties": true,
+            "properties": {
+              "ask": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "me",
+                        "layer"
+                      ]
+                    }
+                  }
+                ],
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "base": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              },
+              "checkVersion": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "head": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              },
+              "heldBack": {
+                "items": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "area": {
+                      "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                      "type": "string"
+                    },
+                    "passed": {
+                      "type": "integer"
+                    },
+                    "suite": {
+                      "pattern": "^sha256:[0-9a-f]{64}$",
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "area",
+                    "passed",
+                    "suite",
+                    "total"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "lanes": {
+                "items": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "command": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "durationMs": {
+                      "type": "integer"
+                    },
+                    "lane": {
+                      "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                      "type": "string"
+                    },
+                    "logRef": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "result": {
+                      "enum": [
+                        "passed",
+                        "failed",
+                        "loadError",
+                        "flaked",
+                        "blocked"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "command",
+                    "durationMs",
+                    "lane",
+                    "result"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "outcome": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "properties": {
+                      "_tag": {
+                        "enum": [
+                          "AwaitingDecision"
+                        ],
+                        "type": "string"
+                      },
+                      "decision": {
+                        "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "_tag",
+                      "decision"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": true,
+                    "properties": {
+                      "_tag": {
+                        "enum": [
+                          "AwaitingFinish"
+                        ],
+                        "type": "string"
+                      },
+                      "decider": {
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "_tag"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": true,
+                    "properties": {
+                      "_tag": {
+                        "enum": [
+                          "Checking"
+                        ],
+                        "type": "string"
+                      },
+                      "stage": {
+                        "enum": [
+                          "parse",
+                          "shape",
+                          "merge",
+                          "cheap",
+                          "checks",
+                          "heldBack",
+                          "human"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "_tag",
+                      "stage"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": true,
+                    "properties": {
+                      "_tag": {
+                        "enum": [
+                          "Landed"
+                        ],
+                        "type": "string"
+                      },
+                      "sha": {
+                        "pattern": "^[0-9a-f]{40}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "_tag",
+                      "sha"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": true,
+                    "properties": {
+                      "_tag": {
+                        "enum": [
+                          "Refused"
+                        ],
+                        "type": "string"
+                      },
+                      "refusals": {
+                        "items": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/NotClaimedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ClaimLapsedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NotVouchedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/CapReachedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/AskFullEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NoAskEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/RepoBusyEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/DirectPushEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/AskBlockedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/DenouncedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/OutOfScopeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/TouchedJudgeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/WeakenedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ReachedInternalsEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/StaleBaseEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/StaleLayerEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ChecksFailedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/HeldBackFailedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/FlakeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/VerifierBlockedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NotRedFirstEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/WeakCheckEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/IncompleteBriefEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/SecretInOutputEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnstatedRequirementEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/PostureChangeEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NotDeciderEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/DecisionClosedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownProjectEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownAskEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownCommitEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownDecisionEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ProjectExistsEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ImportFailedEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/UnknownEnvItemEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/NotSensitiveEncoded"
+                            },
+                            {
+                              "$ref": "#/$defs/ValueTooShortEncoded"
+                            }
+                          ]
+                        },
+                        "minItems": 1,
+                        "prefixItems": [
+                          {
+                            "anyOf": [
+                              {
+                                "$ref": "#/$defs/NotClaimedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/ClaimLapsedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/NotVouchedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/CapReachedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/AskFullEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/NoAskEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/RepoBusyEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/DirectPushEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/AskBlockedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/DenouncedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/OutOfScopeEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/TouchedJudgeEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/WeakenedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/ReachedInternalsEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/StaleBaseEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/StaleLayerEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/ChecksFailedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/HeldBackFailedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/FlakeEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/VerifierBlockedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/NotRedFirstEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/WeakCheckEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/IncompleteBriefEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/SecretInOutputEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/UnstatedRequirementEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/PostureChangeEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/NotDeciderEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/DecisionClosedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/UnknownProjectEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/UnknownAskEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/UnknownCommitEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/UnknownDecisionEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/ProjectExistsEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/ImportFailedEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/UnknownEnvItemEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/NotSensitiveEncoded"
+                              },
+                              {
+                                "$ref": "#/$defs/ValueTooShortEncoded"
+                              }
+                            ]
+                          }
+                        ],
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "_tag",
+                      "refusals"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": true,
+                    "properties": {
+                      "_tag": {
+                        "enum": [
+                          "WaitingOnParent"
+                        ],
+                        "type": "string"
+                      },
+                      "ask": {
+                        "allOf": [
+                          {
+                            "not": {
+                              "enum": [
+                                "me",
+                                "layer"
+                              ]
+                            }
+                          }
+                        ],
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "_tag",
+                      "ask"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "patchId": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "project": {
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                "type": "string"
+              },
+              "stage": {
+                "enum": [
+                  "parse",
+                  "shape",
+                  "merge",
+                  "cheap",
+                  "checks",
+                  "heldBack",
+                  "human"
+                ],
+                "type": "string"
+              },
+              "tree": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              },
+              "verifier": {
+                "enum": [
+                  "platform"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "ask",
+              "at",
+              "base",
+              "checkVersion",
+              "head",
+              "heldBack",
+              "lanes",
+              "outcome",
+              "patchId",
+              "project",
+              "stage",
+              "tree",
+              "verifier"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "assisted",
+          "author",
+          "credits",
+          "landedAt",
+          "parent",
+          "project",
+          "sha"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "budget",
+    "decider",
+    "decisions",
+    "expiringSoon",
+    "newcomers",
+    "overflow",
+    "unattended"
+  ],
+  "type": "object"
+}
+```
+
+## ledger
+
+Show a project's ledger: its layers, counts, commitments, releases and posture changes.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "entries": {
+      "items": {
+        "anyOf": [
+          {
+            "additionalProperties": true,
+            "properties": {
+              "_tag": {
+                "enum": [
+                  "Admitted"
+                ],
+                "type": "string"
+              },
+              "area": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "knownBadCaught": {
+                "type": "integer"
+              },
+              "mainRuns": {
+                "type": "integer"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "suite": {
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "_tag",
+              "area",
+              "at",
+              "knownBadCaught",
+              "mainRuns",
+              "seq",
+              "suite"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": true,
+            "properties": {
+              "_tag": {
+                "enum": [
+                  "CommitmentPublished"
+                ],
+                "type": "string"
+              },
+              "area": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "authors": {
+                "type": "integer"
+              },
+              "checks": {
+                "type": "integer"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "suite": {
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "_tag",
+              "area",
+              "at",
+              "authors",
+              "checks",
+              "seq",
+              "suite"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": true,
+            "properties": {
+              "_tag": {
+                "enum": [
+                  "CountChanged"
+                ],
+                "type": "string"
+              },
+              "area": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "count": {
+                "type": "integer"
+              },
+              "layer": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "_tag",
+              "area",
+              "at",
+              "count",
+              "layer",
+              "seq"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": true,
+            "properties": {
+              "_tag": {
+                "enum": [
+                  "LayerDeclared"
+                ],
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "disclose": {
+                "enum": [
+                  "public",
+                  "sealed",
+                  "counted",
+                  "declared",
+                  "hidden",
+                  "writeOnly"
+                ],
+                "type": "string"
+              },
+              "kinds": {
+                "items": {
+                  "enum": [
+                    "checks",
+                    "agent-config",
+                    "env",
+                    "experiment",
+                    "notes",
+                    "fix",
+                    "session",
+                    "personal",
+                    "attachment",
+                    "source"
+                  ],
+                  "type": "string"
+                },
+                "minItems": 1,
+                "prefixItems": [
+                  {
+                    "enum": [
+                      "checks",
+                      "agent-config",
+                      "env",
+                      "experiment",
+                      "notes",
+                      "fix",
+                      "session",
+                      "personal",
+                      "attachment",
+                      "source"
+                    ],
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              "layer": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "_tag",
+              "at",
+              "disclose",
+              "kinds",
+              "layer",
+              "seq"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": true,
+            "properties": {
+              "_tag": {
+                "enum": [
+                  "PostureChanged"
+                ],
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "decision": {
+                "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+                "type": "string"
+              },
+              "from": {
+                "enum": [
+                  "open",
+                  "openWithSealedEvidence",
+                  "openOnSchedule",
+                  "openCore",
+                  "sourceAvailable"
+                ],
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              },
+              "to": {
+                "enum": [
+                  "open",
+                  "openWithSealedEvidence",
+                  "openOnSchedule",
+                  "openCore",
+                  "sourceAvailable"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "_tag",
+              "at",
+              "decision",
+              "from",
+              "seq",
+              "to"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": true,
+            "properties": {
+              "_tag": {
+                "enum": [
+                  "Released"
+                ],
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "by": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                "type": "string"
+              },
+              "landing": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              },
+              "layer": {
+                "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                "type": "string"
+              },
+              "paths": {
+                "type": "integer"
+              },
+              "seq": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "_tag",
+              "at",
+              "by",
+              "landing",
+              "layer",
+              "paths",
+              "seq"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": true,
+            "properties": {
+              "_tag": {
+                "enum": [
+                  "ValueSet"
+                ],
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "by": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                "type": "string"
+              },
+              "key": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              "seq": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "_tag",
+              "at",
+              "by",
+              "key",
+              "seq"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "type": "array"
+    },
+    "layers": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "audience": {
+            "enum": [
+              "public",
+              "contributors",
+              "claimants",
+              "maintainers",
+              "team",
+              "security",
+              "sponsors",
+              "personal",
+              "platform"
+            ],
+            "type": "string"
+          },
+          "disclose": {
+            "enum": [
+              "public",
+              "sealed",
+              "counted",
+              "declared",
+              "hidden",
+              "writeOnly"
+            ],
+            "type": "string"
+          },
+          "holds": {
+            "items": {
+              "enum": [
+                "checks",
+                "agent-config",
+                "env",
+                "experiment",
+                "notes",
+                "fix",
+                "session",
+                "personal",
+                "attachment",
+                "source"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "prefixItems": [
+              {
+                "enum": [
+                  "checks",
+                  "agent-config",
+                  "env",
+                  "experiment",
+                  "notes",
+                  "fix",
+                  "session",
+                  "personal",
+                  "attachment",
+                  "source"
+                ],
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "maxDays": {
+            "type": "integer"
+          },
+          "name": {
+            "pattern": "^[a-z][a-zA-Z0-9-]*$",
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "repo": {
+            "pattern": "^[A-Za-z0-9._-]+$",
+            "type": "string"
+          },
+          "sunsetDays": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "audience",
+          "disclose",
+          "holds",
+          "name",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "posture": {
+      "enum": [
+        "open",
+        "openWithSealedEvidence",
+        "openOnSchedule",
+        "openCore",
+        "sourceAvailable"
+      ],
+      "type": "string"
+    },
+    "postureLabel": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "entries",
+    "layers",
+    "posture",
+    "postureLabel",
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+## envShape
+
+Show a project's env shape: the public schema of its environment variables, and who set each write-only value; never a value.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `true` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "at": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "currentEnvKey": {
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+      "type": "string"
+    },
+    "file": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "imports": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "items": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "deprecated": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string"
+          },
+          "docs": {
+            "type": "string"
+          },
+          "key": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "placeholder": {
+            "type": "string"
+          },
+          "proxy": {
+            "additionalProperties": true,
+            "properties": {
+              "block": {
+                "type": "boolean"
+              },
+              "domains": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "minItems": 1,
+                "prefixItems": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              "method": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "domains"
+            ],
+            "type": "object"
+          },
+          "required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "enum": [
+                  "depends"
+                ],
+                "type": "string"
+              }
+            ]
+          },
+          "sensitive": {
+            "type": "boolean"
+          },
+          "tags": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "value": {
+            "additionalProperties": true,
+            "properties": {
+              "setAt": {
+                "type": "string"
+              },
+              "setBy": {
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "setAt",
+              "setBy"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "key",
+          "required",
+          "sensitive",
+          "tags"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "at",
+    "file",
+    "imports",
+    "items",
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+## initProject
+
+Make a project, empty or imported from a public git repo, with the caller as its decider. Asks a person first.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `false` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "import": {
+      "additionalProperties": true,
+      "properties": {
+        "branch": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "url": {
+          "pattern": "^https:\\/\\/\\S+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "type": "object"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "landed": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "remote": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "project",
+    "remote"
+  ],
+  "type": "object"
+}
+```
+
+## openAsk
+
+Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way. Asks a person first.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `false` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "files": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "path"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "additionalProperties": true,
+          "properties": {
+            "content": {
+              "type": "string"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "content",
+            "path"
+          ],
+          "type": "object"
+        }
+      ],
+      "type": "array"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "files",
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "additionalProperties": true,
+      "properties": {
+        "askedBy": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "brief": {
+          "additionalProperties": true,
+          "properties": {
+            "context": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "current": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "outOfScope": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "terms": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "want": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "want"
+          ],
+          "type": "object"
+        },
+        "check": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "LintToZero"
+                  ],
+                  "type": "string"
+                },
+                "command": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "rule": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "command",
+                "rule"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Migrate"
+                  ],
+                  "type": "string"
+                },
+                "count": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "from": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "to": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "count",
+                "from"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Ratchet"
+                  ],
+                  "type": "string"
+                },
+                "ratchet": {
+                  "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "ratchet"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "RedThenGreen"
+                  ],
+                  "type": "string"
+                },
+                "path": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "path"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "SymbolAbsent"
+                  ],
+                  "type": "string"
+                },
+                "count": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "symbol": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "count",
+                "symbol"
+              ],
+              "type": "object"
+            }
+          ]
+        },
+        "file": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "kind": {
+          "pattern": "^[a-z][a-zA-Z0-9-]*$",
+          "type": "string"
+        },
+        "mentor": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
+        },
+        "openedAt": {
+          "type": "string"
+        },
+        "openedIn": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "parent": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "reserve": {
+          "enum": [
+            "newcomers",
+            "people"
+          ],
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "claimed",
+            "waitingOnParent",
+            "closed"
+          ],
+          "type": "string"
+        },
+        "territory": {
+          "additionalProperties": true,
+          "properties": {
+            "module": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "paths": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "publicFiles": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "module",
+            "paths"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "askedBy",
+        "blockedBy",
+        "brief",
+        "check",
+        "file",
+        "id",
+        "kind",
+        "openedAt",
+        "openedIn",
+        "project",
+        "state",
+        "territory"
+      ],
+      "type": "object"
+    },
+    "landed": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "landed"
+  ],
+  "type": "object"
+}
+```
+
+## proposeAsk
+
+Propose an ask, optionally with a sealed answer; the proposal expires unless a decider accepts it.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `false` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "files": {
+      "items": {
+        "additionalProperties": true,
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "content",
+          "path"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "prefixItems": [
+        {
+          "additionalProperties": true,
+          "properties": {
+            "content": {
+              "type": "string"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "content",
+            "path"
+          ],
+          "type": "object"
+        }
+      ],
+      "type": "array"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "sealed": {
+      "additionalProperties": true,
+      "properties": {
+        "head": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "head"
+      ],
+      "type": "object"
+    },
+    "territory": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "want": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "project",
+    "want"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "proposal": {
+      "additionalProperties": true,
+      "properties": {
+        "expiresAt": {
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "flags": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "openedAt": {
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "proposer": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
+        },
+        "sealed": {
+          "additionalProperties": true,
+          "properties": {
+            "fork": {
+              "pattern": "^[A-Za-z0-9._-]+$",
+              "type": "string"
+            },
+            "head": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fork",
+            "head"
+          ],
+          "type": "object"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "accepted",
+            "declined",
+            "expired"
+          ],
+          "type": "string"
+        },
+        "territory": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "want": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "expiresAt",
+        "files",
+        "id",
+        "openedAt",
+        "project",
+        "proposer",
+        "state",
+        "want"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "proposal"
+  ],
+  "type": "object"
+}
+```
+
+## flagAsk
+
+Flag an open ask to its deciders with a reason, as a proposal that expires unless a decider accepts it.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `false` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "reason": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "project",
+    "reason"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "proposal": {
+      "additionalProperties": true,
+      "properties": {
+        "expiresAt": {
+          "type": "string"
+        },
+        "files": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "flags": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "openedAt": {
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "proposer": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
+        },
+        "sealed": {
+          "additionalProperties": true,
+          "properties": {
+            "fork": {
+              "pattern": "^[A-Za-z0-9._-]+$",
+              "type": "string"
+            },
+            "head": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fork",
+            "head"
+          ],
+          "type": "object"
+        },
+        "state": {
+          "enum": [
+            "open",
+            "accepted",
+            "declined",
+            "expired"
+          ],
+          "type": "string"
+        },
+        "territory": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "want": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "expiresAt",
+        "files",
+        "id",
+        "openedAt",
+        "project",
+        "proposer",
+        "state",
+        "want"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "proposal"
+  ],
+  "type": "object"
+}
+```
+
+## decide
+
+Take one decision from Today: accept, decline, adopt or revert. Asks a person first.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `false` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "choice": {
+      "enum": [
+        "accept",
+        "decline",
+        "adopt",
+        "revert"
+      ],
+      "type": "string"
+    },
+    "decision": {
+      "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "choice",
+    "decision",
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "decision": {
+      "additionalProperties": true,
+      "properties": {
+        "decided": {
+          "additionalProperties": true,
+          "properties": {
+            "at": {
+              "type": "string"
+            },
+            "by": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+              "type": "string"
+            },
+            "choice": {
+              "enum": [
+                "accept",
+                "decline",
+                "adopt",
+                "revert"
+              ],
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "at",
+            "by",
+            "choice"
+          ],
+          "type": "object"
+        },
+        "deciders": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "default": {
+          "enum": [
+            "accept",
+            "decline",
+            "adopt",
+            "revert"
+          ],
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "additionalProperties": true,
+            "properties": {
+              "href": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "label": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "value"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "expiresAt": {
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "openedAt": {
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "subject": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Finish"
+                  ],
+                  "type": "string"
+                },
+                "ask": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "enum": [
+                          "me",
+                          "layer"
+                        ]
+                      }
+                    }
+                  ],
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "head": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "ask",
+                "head"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "OpenProposal"
+                  ],
+                  "type": "string"
+                },
+                "proposal": {
+                  "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "proposal"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "PostureChange"
+                  ],
+                  "type": "string"
+                },
+                "from": {
+                  "enum": [
+                    "open",
+                    "openWithSealedEvidence",
+                    "openOnSchedule",
+                    "openCore",
+                    "sourceAvailable"
+                  ],
+                  "type": "string"
+                },
+                "to": {
+                  "enum": [
+                    "open",
+                    "openWithSealedEvidence",
+                    "openOnSchedule",
+                    "openCore",
+                    "sourceAvailable"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "from",
+                "to"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "ProxyWidened"
+                  ],
+                  "type": "string"
+                },
+                "hosts": {
+                  "items": {
+                    "pattern": "^(?:\\*\\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "item": {
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "hosts",
+                "item"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "RaiseRatchet"
+                  ],
+                  "type": "string"
+                },
+                "after": {
+                  "type": "integer"
+                },
+                "ask": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "enum": [
+                          "me",
+                          "layer"
+                        ]
+                      }
+                    }
+                  ],
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "before": {
+                  "type": "integer"
+                },
+                "ratchet": {
+                  "pattern": "^[a-z][a-zA-Z0-9-]*$",
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "after",
+                "ask",
+                "before",
+                "ratchet",
+                "territory"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "SecretInTree"
+                  ],
+                  "type": "string"
+                },
+                "ask": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "enum": [
+                          "me",
+                          "layer"
+                        ]
+                      }
+                    }
+                  ],
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "item": {
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "ask",
+                "item"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "StrayPush"
+                  ],
+                  "type": "string"
+                },
+                "after": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string"
+                },
+                "before": {
+                  "pattern": "^[0-9a-f]{40}$",
+                  "type": "string"
+                },
+                "ref": {
+                  "pattern": "^refs\\/(?!.*\\.\\.)[A-Za-z0-9._-]+(?:\\/[A-Za-z0-9._-]+)+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "after",
+                "before",
+                "ref"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Vouch"
+                  ],
+                  "type": "string"
+                },
+                "handle": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "handle"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "_tag": {
+                  "enum": [
+                    "Waiver"
+                  ],
+                  "type": "string"
+                },
+                "ask": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "enum": [
+                          "me",
+                          "layer"
+                        ]
+                      }
+                    }
+                  ],
+                  "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+                  "type": "string"
+                },
+                "at": {
+                  "additionalProperties": true,
+                  "properties": {
+                    "line": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "path": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "line",
+                    "path"
+                  ],
+                  "type": "object"
+                },
+                "marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_tag",
+                "ask",
+                "at",
+                "marker",
+                "reason"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "deciders",
+        "default",
+        "evidence",
+        "expiresAt",
+        "id",
+        "openedAt",
+        "project",
+        "subject"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "decision"
+  ],
+  "type": "object"
+}
+```
+
+## claim
+
+Claim an ask: an exclusive, expiring right to answer it, with a fork to push to; claiming it again returns the same claim.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "claim": {
+      "additionalProperties": true,
+      "properties": {
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "checkCommand": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "claimant": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
+        },
+        "fork": {
+          "pattern": "^[A-Za-z0-9._-]+$",
+          "type": "string"
+        },
+        "lapsesAt": {
+          "type": "string"
+        },
+        "lastPushAt": {
+          "type": "string"
+        },
+        "openedAt": {
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "remote": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "live",
+            "warned",
+            "lapsed",
+            "released",
+            "answered"
+          ],
+          "type": "string"
+        },
+        "suite": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "warnsAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ask",
+        "base",
+        "checkCommand",
+        "claimant",
+        "fork",
+        "lapsesAt",
+        "openedAt",
+        "project",
+        "remote",
+        "state",
+        "warnsAt"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "claim"
+  ],
+  "type": "object"
+}
+```
+
+## release
+
+Release the caller's claim on an ask, so anyone may claim it again.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "project"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "released": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "released"
+  ],
+  "type": "object"
+}
+```
+
 ## submitAnswer
 
-Offer the commit `head`, built on `base`, as an answer to an ask; once it lands, `main` is the new tip.
+Offer the commit `head`, built on `base`, as an answer to a claimed ask; the receipt says it is being checked, and it lands if it passes.
 
 | Hint | Value |
 | --- | --- |
@@ -157,12 +14860,8079 @@ Offer the commit `head`, built on `base`, as an answer to an ask; once it lands,
     "head": {
       "pattern": "^[0-9a-f]{40}$",
       "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[A-Za-z0-9_-]{8,64}$",
+      "type": "string"
     }
   },
   "required": [
     "ask",
     "base",
-    "head"
+    "head",
+    "project",
+    "requestId"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "$defs": {
+    "AskBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskBlocked"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask",
+        "blockedBy"
+      ],
+      "type": "object"
+    },
+    "AskFullEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskFull"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "AttemptsExhaustedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AttemptsExhausted"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "resetsAt": {
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "resetsAt"
+      ],
+      "type": "object"
+    },
+    "CapReachedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "CapReached"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "cap": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "cap"
+      ],
+      "type": "object"
+    },
+    "ChecksFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ChecksFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "logRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane",
+        "logRef"
+      ],
+      "type": "object"
+    },
+    "ClaimLapsedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ClaimLapsed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "DecisionClosedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DecisionClosed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "DenouncedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Denounced"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "DirectPushEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DirectPush"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "FlakeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Flake"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane"
+      ],
+      "type": "object"
+    },
+    "HeldBackFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "HeldBackFailed"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "suite": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "suite"
+      ],
+      "type": "object"
+    },
+    "ImportFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ImportFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "IncompleteBriefEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "IncompleteBrief"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "missing": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "LayerContentInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "LayerContentInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "NoAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NoAsk"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotClaimedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotClaimed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "NotDeciderEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotDecider"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotRedFirstEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotRedFirst"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotSensitiveEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotSensitive"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "NotVouchedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotVouched"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "OutOfScopeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "OutOfScope"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "PostureChangeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PostureChange"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "PrivatePathInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PrivatePathInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "ProjectExistsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ProjectExists"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "ReachedInternalsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ReachedInternals"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RepoBusyEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "RepoBusy"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "SecretInOutputEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "SecretInOutput"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "item": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "where": {
+          "enum": [
+            "output",
+            "tree"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "item",
+        "where"
+      ],
+      "type": "object"
+    },
+    "StaleBaseEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleBase"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "conflicts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "main": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "base",
+        "conflicts",
+        "main"
+      ],
+      "type": "object"
+    },
+    "StaleLayerEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleLayer"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "layer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "layer"
+      ],
+      "type": "object"
+    },
+    "TouchedJudgeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "TouchedJudge"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "UnknownAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownAsk"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "UnknownCommitEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownCommit"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "sha"
+      ],
+      "type": "object"
+    },
+    "UnknownDecisionEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownDecision"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "UnknownEnvItemEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownEnvItem"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "UnknownProjectEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownProject"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "UnstatedRequirementEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnstatedRequirement"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area"
+      ],
+      "type": "object"
+    },
+    "ValueTooShortEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ValueTooShort"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "VerifierBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "VerifierBlocked"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "WeakCheckEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "WeakCheck"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakness": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakness"
+      ],
+      "type": "object"
+    },
+    "WeakenedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Weakened"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakening": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "marker"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "after": {
+                  "type": "integer"
+                },
+                "before": {
+                  "type": "integer"
+                },
+                "ratchet": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "after",
+                "before",
+                "ratchet",
+                "territory"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakening"
+      ],
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "base": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "head": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "AwaitingDecision"
+              ],
+              "type": "string"
+            },
+            "decision": {
+              "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "decision"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "AwaitingFinish"
+              ],
+              "type": "string"
+            },
+            "decider": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Checking"
+              ],
+              "type": "string"
+            },
+            "stage": {
+              "enum": [
+                "parse",
+                "shape",
+                "merge",
+                "cheap",
+                "checks",
+                "heldBack",
+                "human"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "stage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Landed"
+              ],
+              "type": "string"
+            },
+            "sha": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "sha"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Refused"
+              ],
+              "type": "string"
+            },
+            "refusals": {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/NotClaimedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ClaimLapsedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotVouchedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/CapReachedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AskFullEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NoAskEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/RepoBusyEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DirectPushEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AskBlockedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DenouncedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/OutOfScopeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/TouchedJudgeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/WeakenedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ReachedInternalsEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/StaleBaseEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/StaleLayerEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ChecksFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/HeldBackFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/FlakeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/VerifierBlockedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotRedFirstEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/WeakCheckEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/IncompleteBriefEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/SecretInOutputEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnstatedRequirementEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/PostureChangeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotDeciderEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DecisionClosedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownProjectEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownAskEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownCommitEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownDecisionEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ProjectExistsEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ImportFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownEnvItemEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotSensitiveEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ValueTooShortEncoded"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/NotClaimedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ClaimLapsedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotVouchedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/CapReachedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AskFullEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NoAskEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/RepoBusyEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DirectPushEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AskBlockedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DenouncedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/OutOfScopeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/TouchedJudgeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/WeakenedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ReachedInternalsEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/StaleBaseEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/StaleLayerEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ChecksFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/HeldBackFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/FlakeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/VerifierBlockedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotRedFirstEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/WeakCheckEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/IncompleteBriefEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/SecretInOutputEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnstatedRequirementEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/PostureChangeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotDeciderEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DecisionClosedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownProjectEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownAskEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownCommitEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownDecisionEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ProjectExistsEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ImportFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownEnvItemEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotSensitiveEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ValueTooShortEncoded"
+                    }
+                  ]
+                }
+              ],
+              "type": "array"
+            }
+          },
+          "required": [
+            "_tag",
+            "refusals"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "WaitingOnParent"
+              ],
+              "type": "string"
+            },
+            "ask": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "ask"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[A-Za-z0-9_-]{8,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "base",
+    "head",
+    "outcome",
+    "project",
+    "requestId"
+  ],
+  "type": "object"
+}
+```
+
+## finish
+
+Finish a passing answer with a decider's own commits on top; they are checked again, and credited with Finished-by when it lands. Asks a person first.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "base": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "head": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[A-Za-z0-9_-]{8,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "base",
+    "head",
+    "project",
+    "requestId"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "$defs": {
+    "AskBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskBlocked"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask",
+        "blockedBy"
+      ],
+      "type": "object"
+    },
+    "AskFullEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskFull"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "AttemptsExhaustedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AttemptsExhausted"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "resetsAt": {
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "resetsAt"
+      ],
+      "type": "object"
+    },
+    "CapReachedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "CapReached"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "cap": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "cap"
+      ],
+      "type": "object"
+    },
+    "ChecksFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ChecksFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "logRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane",
+        "logRef"
+      ],
+      "type": "object"
+    },
+    "ClaimLapsedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ClaimLapsed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "DecisionClosedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DecisionClosed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "DenouncedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Denounced"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "DirectPushEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DirectPush"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "FlakeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Flake"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane"
+      ],
+      "type": "object"
+    },
+    "HeldBackFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "HeldBackFailed"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "suite": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "suite"
+      ],
+      "type": "object"
+    },
+    "ImportFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ImportFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "IncompleteBriefEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "IncompleteBrief"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "missing": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "LayerContentInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "LayerContentInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "NoAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NoAsk"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotClaimedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotClaimed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "NotDeciderEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotDecider"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotRedFirstEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotRedFirst"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotSensitiveEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotSensitive"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "NotVouchedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotVouched"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "OutOfScopeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "OutOfScope"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "PostureChangeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PostureChange"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "PrivatePathInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PrivatePathInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "ProjectExistsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ProjectExists"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "ReachedInternalsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ReachedInternals"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RepoBusyEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "RepoBusy"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "SecretInOutputEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "SecretInOutput"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "item": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "where": {
+          "enum": [
+            "output",
+            "tree"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "item",
+        "where"
+      ],
+      "type": "object"
+    },
+    "StaleBaseEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleBase"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "conflicts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "main": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "base",
+        "conflicts",
+        "main"
+      ],
+      "type": "object"
+    },
+    "StaleLayerEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleLayer"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "layer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "layer"
+      ],
+      "type": "object"
+    },
+    "TouchedJudgeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "TouchedJudge"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "UnknownAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownAsk"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "UnknownCommitEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownCommit"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "sha"
+      ],
+      "type": "object"
+    },
+    "UnknownDecisionEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownDecision"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "UnknownEnvItemEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownEnvItem"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "UnknownProjectEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownProject"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "UnstatedRequirementEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnstatedRequirement"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area"
+      ],
+      "type": "object"
+    },
+    "ValueTooShortEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ValueTooShort"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "VerifierBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "VerifierBlocked"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "WeakCheckEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "WeakCheck"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakness": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakness"
+      ],
+      "type": "object"
+    },
+    "WeakenedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Weakened"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakening": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "marker"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "after": {
+                  "type": "integer"
+                },
+                "before": {
+                  "type": "integer"
+                },
+                "ratchet": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "after",
+                "before",
+                "ratchet",
+                "territory"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakening"
+      ],
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "ask": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "base": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "head": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "AwaitingDecision"
+              ],
+              "type": "string"
+            },
+            "decision": {
+              "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "decision"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "AwaitingFinish"
+              ],
+              "type": "string"
+            },
+            "decider": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Checking"
+              ],
+              "type": "string"
+            },
+            "stage": {
+              "enum": [
+                "parse",
+                "shape",
+                "merge",
+                "cheap",
+                "checks",
+                "heldBack",
+                "human"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "stage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Landed"
+              ],
+              "type": "string"
+            },
+            "sha": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "sha"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Refused"
+              ],
+              "type": "string"
+            },
+            "refusals": {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/NotClaimedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ClaimLapsedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotVouchedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/CapReachedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AskFullEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NoAskEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/RepoBusyEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DirectPushEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AskBlockedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DenouncedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/OutOfScopeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/TouchedJudgeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/WeakenedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ReachedInternalsEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/StaleBaseEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/StaleLayerEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ChecksFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/HeldBackFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/FlakeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/VerifierBlockedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotRedFirstEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/WeakCheckEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/IncompleteBriefEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/SecretInOutputEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnstatedRequirementEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/PostureChangeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotDeciderEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DecisionClosedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownProjectEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownAskEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownCommitEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownDecisionEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ProjectExistsEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ImportFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownEnvItemEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotSensitiveEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ValueTooShortEncoded"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/NotClaimedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ClaimLapsedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotVouchedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/CapReachedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AskFullEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NoAskEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/RepoBusyEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DirectPushEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AskBlockedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DenouncedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/OutOfScopeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/TouchedJudgeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/WeakenedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ReachedInternalsEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/StaleBaseEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/StaleLayerEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ChecksFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/HeldBackFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/FlakeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/VerifierBlockedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotRedFirstEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/WeakCheckEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/IncompleteBriefEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/SecretInOutputEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnstatedRequirementEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/PostureChangeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotDeciderEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DecisionClosedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownProjectEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownAskEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownCommitEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownDecisionEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ProjectExistsEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ImportFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownEnvItemEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotSensitiveEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ValueTooShortEncoded"
+                    }
+                  ]
+                }
+              ],
+              "type": "array"
+            }
+          },
+          "required": [
+            "_tag",
+            "refusals"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "WaitingOnParent"
+              ],
+              "type": "string"
+            },
+            "ask": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "ask"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[A-Za-z0-9_-]{8,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "ask",
+    "base",
+    "head",
+    "outcome",
+    "project",
+    "requestId"
+  ],
+  "type": "object"
+}
+```
+
+## land
+
+Land a decider's own change from their working fork, after the same checks an answer passes. Asks a person first.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "base": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "head": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "message": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[A-Za-z0-9_-]{8,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "base",
+    "head",
+    "message",
+    "project",
+    "requestId"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "$defs": {
+    "AskBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskBlocked"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "blockedBy": {
+          "items": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask",
+        "blockedBy"
+      ],
+      "type": "object"
+    },
+    "AskFullEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AskFull"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "AttemptsExhaustedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "AttemptsExhausted"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "resetsAt": {
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "resetsAt"
+      ],
+      "type": "object"
+    },
+    "CapReachedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "CapReached"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "cap": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "cap"
+      ],
+      "type": "object"
+    },
+    "ChecksFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ChecksFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "logRef": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane",
+        "logRef"
+      ],
+      "type": "object"
+    },
+    "ClaimLapsedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ClaimLapsed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "DecisionClosedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DecisionClosed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "DenouncedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Denounced"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "DirectPushEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "DirectPush"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "FlakeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Flake"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "lane": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "lane"
+      ],
+      "type": "object"
+    },
+    "HeldBackFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "HeldBackFailed"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "suite": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area",
+        "suite"
+      ],
+      "type": "object"
+    },
+    "ImportFailedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ImportFailed"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "IncompleteBriefEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "IncompleteBrief"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "missing": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "missing"
+      ],
+      "type": "object"
+    },
+    "LayerContentInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "LayerContentInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "NoAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NoAsk"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotClaimedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotClaimed"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "NotDeciderEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotDecider"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotRedFirstEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotRedFirst"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "NotSensitiveEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotSensitive"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "NotVouchedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "NotVouched"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "OutOfScopeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "OutOfScope"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "PostureChangeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PostureChange"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "enum": [
+            "open",
+            "openWithSealedEvidence",
+            "openOnSchedule",
+            "openCore",
+            "sourceAvailable"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "PrivatePathInPublicTreeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "PrivatePathInPublicTree"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "ProjectExistsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ProjectExists"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "ReachedInternalsEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ReachedInternals"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "from": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "to": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "RepoBusyEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "RepoBusy"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "SecretInOutputEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "SecretInOutput"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "item": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "where": {
+          "enum": [
+            "output",
+            "tree"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "item",
+        "where"
+      ],
+      "type": "object"
+    },
+    "StaleBaseEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleBase"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "conflicts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "main": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "base",
+        "conflicts",
+        "main"
+      ],
+      "type": "object"
+    },
+    "StaleLayerEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "StaleLayer"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "layer": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "layer"
+      ],
+      "type": "object"
+    },
+    "TouchedJudgeEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "TouchedJudge"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "prefixItems": [
+            {
+              "minLength": 1,
+              "type": "string"
+            }
+          ],
+          "type": "array"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "UnknownAskEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownAsk"
+          ],
+          "type": "string"
+        },
+        "ask": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "me",
+                  "layer"
+                ]
+              }
+            }
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "ask"
+      ],
+      "type": "object"
+    },
+    "UnknownCommitEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownCommit"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "sha"
+      ],
+      "type": "object"
+    },
+    "UnknownDecisionEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownDecision"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "decision": {
+          "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "decision"
+      ],
+      "type": "object"
+    },
+    "UnknownEnvItemEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownEnvItem"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key"
+      ],
+      "type": "object"
+    },
+    "UnknownProjectEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnknownProject"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "project"
+      ],
+      "type": "object"
+    },
+    "UnstatedRequirementEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "UnstatedRequirement"
+          ],
+          "type": "string"
+        },
+        "area": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "area"
+      ],
+      "type": "object"
+    },
+    "ValueTooShortEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "ValueTooShort"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "key",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "VerifierBlockedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "VerifierBlocked"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable"
+      ],
+      "type": "object"
+    },
+    "WeakCheckEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "WeakCheck"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakness": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakness"
+      ],
+      "type": "object"
+    },
+    "WeakenedEncoded": {
+      "additionalProperties": true,
+      "properties": {
+        "_tag": {
+          "enum": [
+            "Weakened"
+          ],
+          "type": "string"
+        },
+        "at": {
+          "additionalProperties": true,
+          "properties": {
+            "line": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "path": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "line",
+            "path"
+          ],
+          "type": "object"
+        },
+        "next": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "retryable": {
+          "enum": [
+            false
+          ],
+          "type": "boolean"
+        },
+        "weakening": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "properties": {
+                "marker": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "marker"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": true,
+              "properties": {
+                "after": {
+                  "type": "integer"
+                },
+                "before": {
+                  "type": "integer"
+                },
+                "ratchet": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "territory": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "after",
+                "before",
+                "ratchet",
+                "territory"
+              ],
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "required": [
+        "_tag",
+        "next",
+        "retryable",
+        "weakening"
+      ],
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "base": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "head": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "AwaitingDecision"
+              ],
+              "type": "string"
+            },
+            "decision": {
+              "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "decision"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "AwaitingFinish"
+              ],
+              "type": "string"
+            },
+            "decider": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Checking"
+              ],
+              "type": "string"
+            },
+            "stage": {
+              "enum": [
+                "parse",
+                "shape",
+                "merge",
+                "cheap",
+                "checks",
+                "heldBack",
+                "human"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "stage"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Landed"
+              ],
+              "type": "string"
+            },
+            "sha": {
+              "pattern": "^[0-9a-f]{40}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "sha"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "Refused"
+              ],
+              "type": "string"
+            },
+            "refusals": {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/NotClaimedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ClaimLapsedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotVouchedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/CapReachedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AskFullEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NoAskEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/RepoBusyEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DirectPushEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AskBlockedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DenouncedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/OutOfScopeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/TouchedJudgeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/WeakenedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ReachedInternalsEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/StaleBaseEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/StaleLayerEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ChecksFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/HeldBackFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/FlakeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/VerifierBlockedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotRedFirstEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/WeakCheckEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/IncompleteBriefEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/SecretInOutputEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnstatedRequirementEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/PostureChangeEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotDeciderEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/DecisionClosedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownProjectEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownAskEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownCommitEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownDecisionEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ProjectExistsEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ImportFailedEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/UnknownEnvItemEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/NotSensitiveEncoded"
+                  },
+                  {
+                    "$ref": "#/$defs/ValueTooShortEncoded"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "prefixItems": [
+                {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/NotClaimedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ClaimLapsedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotVouchedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/CapReachedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AskFullEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NoAskEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/RepoBusyEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DirectPushEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AskBlockedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DenouncedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/OutOfScopeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/TouchedJudgeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/WeakenedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/PrivatePathInPublicTreeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ReachedInternalsEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/StaleBaseEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/StaleLayerEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ChecksFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/HeldBackFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/AttemptsExhaustedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/FlakeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/VerifierBlockedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotRedFirstEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/WeakCheckEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/IncompleteBriefEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/LayerContentInPublicTreeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/SecretInOutputEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnstatedRequirementEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/PostureChangeEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotDeciderEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/DecisionClosedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownProjectEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownAskEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownCommitEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownDecisionEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ProjectExistsEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ImportFailedEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/UnknownEnvItemEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/NotSensitiveEncoded"
+                    },
+                    {
+                      "$ref": "#/$defs/ValueTooShortEncoded"
+                    }
+                  ]
+                }
+              ],
+              "type": "array"
+            }
+          },
+          "required": [
+            "_tag",
+            "refusals"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": true,
+          "properties": {
+            "_tag": {
+              "enum": [
+                "WaitingOnParent"
+              ],
+              "type": "string"
+            },
+            "ask": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "_tag",
+            "ask"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "requestId": {
+      "pattern": "^[A-Za-z0-9_-]{8,64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "base",
+    "head",
+    "outcome",
+    "project",
+    "requestId"
+  ],
+  "type": "object"
+}
+```
+
+## fork
+
+Make the caller's working fork of a project, or return it if it exists.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `true` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project"
   ],
   "type": "object"
 }
@@ -174,13 +22944,81 @@ Offer the commit `head`, built on `base`, as an answer to an ask; once it lands,
 {
   "additionalProperties": true,
   "properties": {
-    "main": {
+    "fork": {
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "type": "string"
+    },
+    "remote": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "fork",
+    "remote"
+  ],
+  "type": "object"
+}
+```
+
+## vouch
+
+Vouch for a person, or denounce them, by landing a line in the project's vouch file. Asks a person first.
+
+| Hint | Value |
+| --- | --- |
+| `destructiveHint` | `false` |
+| `idempotentHint` | `false` |
+| `openWorldHint` | `false` |
+| `readOnlyHint` | `false` |
+
+### Input
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "handle": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "project": {
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "type": "string"
+    },
+    "verdict": {
+      "enum": [
+        "vouch",
+        "denounce"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "handle",
+    "project",
+    "verdict"
+  ],
+  "type": "object"
+}
+```
+
+### Output
+
+```json
+{
+  "additionalProperties": true,
+  "properties": {
+    "landed": {
       "pattern": "^[0-9a-f]{40}$",
       "type": "string"
     }
   },
   "required": [
-    "main"
+    "landed"
   ],
   "type": "object"
 }

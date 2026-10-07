@@ -1,8 +1,15 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Contracts } from "@repo/protocol/contracts";
-import { AskId, CommitSha, RepoPath } from "@repo/protocol/ids";
+import { Contracts, surfaced } from "@repo/protocol/contracts";
+import {
+  AskId,
+  CommitSha,
+  ProjectName,
+  RepoPath,
+  RequestId,
+} from "@repo/protocol/ids";
 import { StaleBase } from "@repo/protocol/refusal";
-import { Effect, Schema } from "effect";
+import { unanswered } from "@repo/protocol/testing";
+import { Effect, Layer, Schema } from "effect";
 
 import { session } from "./stdio.ts";
 
@@ -14,6 +21,10 @@ const main = CommitSha.make("2222222222222222222222222222222222222222");
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
 
+const project = ProjectName.make("datekit");
+
+const requestId = RequestId.make("answer-0001");
+
 const refusal = new StaleBase({
   base,
   conflicts: [RepoPath.make("src/a.ts")],
@@ -21,10 +32,10 @@ const refusal = new StaleBase({
 });
 
 /** Contracts whose answers always meet a moved main. */
-const stale = Contracts.toLayer({
-  listAsks: () => Effect.succeed({ asks: [] }),
-  submitAnswer: () => Effect.fail(refusal),
-});
+const stale = Layer.mergeAll(
+  unanswered,
+  Contracts.toLayerHandler("submitAnswer", () => Effect.fail(refusal))
+);
 
 const clientInfo = { name: "test", version: "0.0.0" };
 
@@ -91,6 +102,30 @@ describe("the CLI's MCP server over stdio", () => {
     })
   );
 
+  // A stream has no tool form, and a write-only value must never pass
+  // through an agent's transcript.
+  it.effect("lists the MCP-surfaced contracts only: no watch, no setEnv", () =>
+    Effect.gen(function* () {
+      const replies = yield* session(stale, [
+        initialize("2025-11-25"),
+        { jsonrpc: "2.0", method: "notifications/initialized" },
+        { id: 2, jsonrpc: "2.0", method: "tools/list", params: {} },
+      ]);
+
+      const { tools } = yield* Schema.decodeUnknownEffect(
+        Schema.Struct({
+          tools: Schema.Array(Schema.Struct({ name: Schema.String })),
+        })
+      )(replies.get(2));
+
+      const names = tools.map(({ name }) => name);
+
+      expect(names).toStrictEqual([...surfaced("mcp").requests.keys()]);
+      expect(names).not.toContain("watch");
+      expect(names).not.toContain("setEnv");
+    })
+  );
+
   it.effect("returns a refusal as JSON that keeps its tag", () =>
     Effect.gen(function* () {
       const replies = yield* session(stale, [
@@ -100,7 +135,10 @@ describe("the CLI's MCP server over stdio", () => {
           id: 2,
           jsonrpc: "2.0",
           method: "tools/call",
-          params: { arguments: { ask, base, head }, name: "submitAnswer" },
+          params: {
+            arguments: { ask, base, head, project, requestId },
+            name: "submitAnswer",
+          },
         },
       ]);
 

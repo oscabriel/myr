@@ -18,8 +18,8 @@ describe("the platform Worker's env", () => {
 
       const operator = yield* rpcClient(handler, token);
 
-      expect(yield* operator.listAsks({ project })).toStrictEqual({
-        asks: [],
+      expect(yield* operator.listProjects({})).toStrictEqual({
+        projects: [],
       });
     })
   );

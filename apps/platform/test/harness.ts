@@ -18,19 +18,24 @@ const meta = {
   "io.modelcontextprotocol/protocolVersion": version,
 };
 
-/** A tools/call over MCP's HTTP transport, as `token`'s bearer if given. */
-export const toolCall = (
-  name: string,
-  args: Readonly<Record<string, string>>,
-  token?: string
-) => {
+/** What an MCP request carries: a tool call names its tool and its arguments. */
+interface Params {
+  readonly arguments?: Readonly<Record<string, string>>;
+  readonly name?: string;
+}
+
+/** One MCP request over the HTTP transport, as `token`'s bearer if given. */
+const mcpRequest = (method: string, params: Params, token?: string) => {
   const headers = new Headers({
     accept: "application/json, text/event-stream",
     "content-type": "application/json",
-    "mcp-method": "tools/call",
-    "mcp-name": name,
+    "mcp-method": method,
     "mcp-protocol-version": version,
   });
+
+  if (params.name !== undefined) {
+    headers.set("mcp-name", params.name);
+  }
 
   if (token !== undefined) {
     headers.set("authorization", `Bearer ${token}`);
@@ -40,13 +45,23 @@ export const toolCall = (
     body: JSON.stringify({
       id: 1,
       jsonrpc: "2.0",
-      method: "tools/call",
-      params: { _meta: meta, arguments: args, name },
+      method,
+      params: { _meta: meta, ...params },
     }),
     headers,
     method: "POST",
   });
 };
+
+/** A tools/call over MCP's HTTP transport, as `token`'s bearer if given. */
+export const toolCall = (
+  name: string,
+  args: Readonly<Record<string, string>>,
+  token?: string
+) => mcpRequest("tools/call", { arguments: args, name }, token);
+
+/** A tools/list over MCP's HTTP transport, as `token`'s bearer. */
+export const toolList = (token: string) => mcpRequest("tools/list", {}, token);
 
 /** A tools/call result whose one content block is JSON text. */
 const ToolResult = Schema.Struct({
@@ -73,6 +88,21 @@ const lastMessage = (response: Response) =>
             ?.slice("data: ".length) ?? "")
         : text
     )
+  );
+
+const Listed = Schema.fromJsonString(
+  Schema.Struct({
+    result: Schema.Struct({
+      tools: Schema.Array(Schema.Struct({ name: Schema.String })),
+    }),
+  })
+);
+
+/** The names of the tools a tools/list reply lists, in its order. */
+export const toolNames = (response: Response) =>
+  lastMessage(response).pipe(
+    Effect.flatMap(Schema.decodeEffect(Listed)),
+    Effect.map(({ result }) => result.tools.map(({ name }) => name))
   );
 
 /** A tool call's outcome: whether it failed, and its JSON. */

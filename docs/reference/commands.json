@@ -1,6 +1,67 @@
 {
   "commands": [
     {
+      "contract": "listProjects",
+      "description": "List every project on the platform, with its posture and how many asks it has open.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "projects",
+      "needsApproval": false,
+      "path": [
+        "projects"
+      ],
+      "payloadSchema": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "frontPage",
+      "description": "List the open asks across every project, each saying whether the caller may take it; optionally of one kind, or held for newcomers or people.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "front",
+      "needsApproval": false,
+      "path": [
+        "front"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "kind": {
+            "pattern": "^[a-z][a-zA-Z0-9-]*$",
+            "type": "string"
+          },
+          "reserved": {
+            "enum": [
+              "newcomers",
+              "people"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
       "contract": "listAsks",
       "description": "List a project's open asks.",
       "destructive": false,
@@ -34,8 +95,741 @@
       ]
     },
     {
+      "contract": "showAsk",
+      "description": "Show one ask in full, with its brief in Markdown for an answerer to read first.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "ask",
+      "needsApproval": false,
+      "path": [
+        "ask"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [
+        "ask"
+      ],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "status",
+      "description": "Show the caller's claims and answers, in one project or in every one.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "status",
+      "needsApproval": false,
+      "path": [
+        "status"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "verdict",
+      "description": "Show the verdict on an answer to an ask, for its latest head or the one named; held-back checks show one bit per area.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "verdict",
+      "needsApproval": false,
+      "path": [
+        "verdict"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "head": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "landing",
+      "description": "Show one landing on a project's main: the ask it answered, the people it credits and its verdict.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "landing",
+      "needsApproval": false,
+      "path": [
+        "landing"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "sha": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "sha"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "credits",
+      "description": "Count a person's credits by project, area and role; never a score.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "credits",
+      "needsApproval": false,
+      "path": [
+        "credits"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "handle": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "today",
+      "description": "Show the caller's Today: the decisions to take, held to their budget, each with its evidence and a safe default.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "today",
+      "needsApproval": false,
+      "path": [
+        "today"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "ledger",
+      "description": "Show a project's ledger: its layers, counts, commitments, releases and posture changes.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "ledger",
+      "needsApproval": false,
+      "path": [
+        "ledger"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "envShape",
+      "description": "Show a project's env shape: the public schema of its environment variables, and who set each write-only value; never a value.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "env shape",
+      "needsApproval": false,
+      "path": [
+        "env",
+        "shape"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "initProject",
+      "description": "Make a project, empty or imported from a public git repo, with the caller as its decider.",
+      "destructive": false,
+      "idempotent": false,
+      "name": "init",
+      "needsApproval": true,
+      "path": [
+        "init"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "import": {
+            "additionalProperties": true,
+            "properties": {
+              "branch": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "url": {
+                "pattern": "^https:\\/\\/\\S+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "contract": "openAsk",
+      "description": "Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way.",
+      "destructive": false,
+      "idempotent": false,
+      "name": "ask open",
+      "needsApproval": true,
+      "path": [
+        "ask",
+        "open"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "path": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "path"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "prefixItems": [
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "content",
+                  "path"
+                ],
+                "type": "object"
+              }
+            ],
+            "type": "array"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "files",
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "contract": "proposeAsk",
+      "description": "Propose an ask, optionally with a sealed answer; the proposal expires unless a decider accepts it.",
+      "destructive": false,
+      "idempotent": false,
+      "name": "propose",
+      "needsApproval": false,
+      "path": [
+        "propose"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "files": {
+            "items": {
+              "additionalProperties": true,
+              "properties": {
+                "content": {
+                  "type": "string"
+                },
+                "path": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "content",
+                "path"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "prefixItems": [
+              {
+                "additionalProperties": true,
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "content",
+                  "path"
+                ],
+                "type": "object"
+              }
+            ],
+            "type": "array"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "sealed": {
+            "additionalProperties": true,
+            "properties": {
+              "head": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "head"
+            ],
+            "type": "object"
+          },
+          "territory": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "want": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "want"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "flagAsk",
+      "description": "Flag an open ask to its deciders with a reason, as a proposal that expires unless a decider accepts it.",
+      "destructive": false,
+      "idempotent": false,
+      "name": "ask flag",
+      "needsApproval": false,
+      "path": [
+        "ask",
+        "flag"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "project",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "contract": "decide",
+      "description": "Take one decision from Today: accept, decline, adopt or revert.",
+      "destructive": false,
+      "idempotent": false,
+      "name": "decide",
+      "needsApproval": true,
+      "path": [
+        "decide"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "choice": {
+            "enum": [
+              "accept",
+              "decline",
+              "adopt",
+              "revert"
+            ],
+            "type": "string"
+          },
+          "decision": {
+            "pattern": "^[a-z]+-[0-9a-z]{6,26}$",
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice",
+          "decision",
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli",
+        "web"
+      ]
+    },
+    {
+      "contract": "claim",
+      "description": "Claim an ask: an exclusive, expiring right to answer it, with a fork to push to; claiming it again returns the same claim.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "claim",
+      "needsApproval": false,
+      "path": [
+        "claim"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [
+        "ask"
+      ],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "contract": "release",
+      "description": "Release the caller's claim on an ask, so anyone may claim it again.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "release",
+      "needsApproval": false,
+      "path": [
+        "release"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
       "contract": "submitAnswer",
-      "description": "Offer the commit `head`, built on `base`, as an answer to an ask; once it lands, `main` is the new tip.",
+      "description": "Offer the commit `head`, built on `base`, as an answer to a claimed ask; the receipt says it is being checked, and it lands if it passes.",
       "destructive": false,
       "idempotent": true,
       "name": "submit",
@@ -67,12 +861,22 @@
           "head": {
             "pattern": "^[0-9a-f]{40}$",
             "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "requestId": {
+            "pattern": "^[A-Za-z0-9_-]{8,64}$",
+            "type": "string"
           }
         },
         "required": [
           "ask",
           "base",
-          "head"
+          "head",
+          "project",
+          "requestId"
         ],
         "type": "object"
       },
@@ -82,8 +886,245 @@
       "surfaces": [
         "rpc",
         "mcp",
-        "cli",
-        "web"
+        "cli"
+      ]
+    },
+    {
+      "contract": "finish",
+      "description": "Finish a passing answer with a decider's own commits on top; they are checked again, and credited with Finished-by when it lands.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "finish",
+      "needsApproval": true,
+      "path": [
+        "finish"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "ask": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "base": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "head": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "requestId": {
+            "pattern": "^[A-Za-z0-9_-]{8,64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ask",
+          "base",
+          "head",
+          "project",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "contract": "land",
+      "description": "Land a decider's own change from their working fork, after the same checks an answer passes.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "land",
+      "needsApproval": true,
+      "path": [
+        "land"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "base": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "head": {
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "requestId": {
+            "pattern": "^[A-Za-z0-9_-]{8,64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "base",
+          "head",
+          "message",
+          "project",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "contract": "fork",
+      "description": "Make the caller's working fork of a project, or return it if it exists.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "fork",
+      "needsApproval": false,
+      "path": [
+        "fork"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "contract": "vouch",
+      "description": "Vouch for a person, or denounce them, by landing a line in the project's vouch file.",
+      "destructive": false,
+      "idempotent": false,
+      "name": "vouch",
+      "needsApproval": true,
+      "path": [
+        "vouch"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "handle": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "verdict": {
+            "enum": [
+              "vouch",
+              "denounce"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle",
+          "project",
+          "verdict"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "mcp",
+        "cli"
+      ]
+    },
+    {
+      "contract": "setEnv",
+      "description": "Set the write-only value of a sensitive env item; nobody can read it back.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "env set",
+      "needsApproval": true,
+      "path": [
+        "env",
+        "set"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "acknowledgeShort": {
+            "type": "boolean"
+          },
+          "key": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "project",
+          "value"
+        ],
+        "type": "object"
+      },
+      "positional": [],
+      "readOnly": false,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "cli"
       ]
     }
   ],

@@ -8,16 +8,35 @@ import { TestConsole } from "effect/testing";
 
 import { toCommand } from "../src/cli.ts";
 import { Client, Contracts, ListAsks, SubmitAnswer } from "../src/contracts.ts";
-import { CommitSha, KindName } from "../src/ids.ts";
+import { CommitSha, KindName, ProjectName, RequestId } from "../src/ids.ts";
 import { StaleBase } from "../src/refusal.ts";
-import { asTester } from "../src/testing.ts";
+import { asTester, unanswered } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
 
-/** Handlers that never refuse; `listAsks` echoes its project as the territory. */
-const quiet = Contracts.toLayer({
-  listAsks: ({ project }) =>
+const project = ProjectName.make("datekit");
+
+const requestId = RequestId.make("answer-0001");
+
+/** An answer's flags, as a person types them. */
+const answer = [
+  "--project",
+  project,
+  "--ask",
+  ask,
+  "--base",
+  base,
+  "--head",
+  head,
+  "--requestId",
+  requestId,
+];
+
+/** `listAsks` echoes its project as the territory. */
+const quiet = Layer.mergeAll(
+  unanswered,
+  Contracts.toLayerHandler("listAsks", ({ project: echoed }) =>
     Effect.succeed({
       asks: [
         {
@@ -25,13 +44,20 @@ const quiet = Contracts.toLayer({
           blockedBy: [],
           claimed: false,
           kind: KindName.make("fix"),
-          territory: project,
+          territory: echoed,
           want: "Parse a comma",
         },
       ],
-    }),
-  submitAnswer: () => Effect.succeed({ main }),
-});
+    })
+  )
+);
+
+/** Contracts whose answers always meet a moved main. */
+const stale = (refusal: StaleBase) =>
+  Layer.mergeAll(
+    unanswered,
+    Contracts.toLayerHandler("submitAnswer", () => Effect.fail(refusal))
+  );
 
 /** What was printed, one entry per line however it was written. */
 const lines = (output: Effect.Effect<readonly unknown[]>) =>
@@ -102,14 +128,7 @@ describe("the contracts as CLI commands", () => {
     Effect.gen(function* () {
       const refusal = new StaleBase({ base, conflicts: [path], main });
 
-      const { err, result } = yield* run(
-        Contracts.toLayer({
-          listAsks: () => Effect.succeed({ asks: [] }),
-          submitAnswer: () => Effect.fail(refusal),
-        }),
-        submitAnswer,
-        ["--ask", ask, "--base", base, "--head", head]
-      );
+      const { err, result } = yield* run(stale(refusal), submitAnswer, answer);
 
       expect(result).toStrictEqual(Result.fail(refusal));
       expect(err).toStrictEqual([
@@ -124,14 +143,10 @@ describe("the contracts as CLI commands", () => {
     Effect.gen(function* () {
       const refusal = new StaleBase({ base, conflicts: [path], main });
 
-      const { err, out, result } = yield* run(
-        Contracts.toLayer({
-          listAsks: () => Effect.succeed({ asks: [] }),
-          submitAnswer: () => Effect.fail(refusal),
-        }),
-        submitAnswer,
-        ["--ask", ask, "--base", base, "--head", head, "--json"]
-      );
+      const { err, out, result } = yield* run(stale(refusal), submitAnswer, [
+        ...answer,
+        "--json",
+      ]);
 
       const printed = yield* Schema.decodeEffect(Json)(out.join("\n"));
 
@@ -149,13 +164,16 @@ describe("the contracts as CLI commands", () => {
       const calls = yield* Ref.make(0);
 
       const { err, result } = yield* run(
-        Contracts.toLayer({
-          listAsks: () => Effect.succeed({ asks: [] }),
-          submitAnswer: () =>
-            Ref.update(calls, (count) => count + 1).pipe(Effect.as({ main })),
-        }),
+        Layer.mergeAll(
+          unanswered,
+          Contracts.toLayerHandler("submitAnswer", () =>
+            Ref.update(calls, (count) => count + 1).pipe(
+              Effect.andThen(Effect.die("a malformed answer reached the call"))
+            )
+          )
+        ),
         submitAnswer,
-        ["--ask", ask, "--base", "not-a-sha", "--head", head]
+        answer.map((value) => (value === base ? "not-a-sha" : value))
       );
 
       expect(Result.isFailure(result)).toBeTruthy();

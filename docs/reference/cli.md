@@ -4,6 +4,43 @@
 
 Each command below is a contract projected onto the `myr` CLI: the payload's fields become flags, or positional arguments where the contract names them. Every command also takes `--json`, which prints the encoded result, or the refusal, as JSON. [commands.json](commands.json) holds the same catalog as data.
 
+## `myr projects`
+
+List every project on the platform, with its posture and how many asks it has open.
+
+```sh
+myr projects
+```
+
+- Contract: `listProjects`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+It takes no arguments.
+
+## `myr front`
+
+List the open asks across every project, each saying whether the caller may take it; optionally of one kind, or held for newcomers or people.
+
+```sh
+myr front [--kind <kind>] [--reserved <reserved>]
+```
+
+- Contract: `frontPage`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--kind` | text | no |
+| `--reserved` | "newcomers" \| "people" | no |
+
 ## `myr asks`
 
 List a project's open asks.
@@ -23,16 +60,55 @@ myr asks --project <project>
 | --- | --- | --- |
 | `--project` | text | yes |
 
-## `myr submit`
+## `myr ask`
 
-Offer the commit `head`, built on `base`, as an answer to an ask; once it lands, `main` is the new tip.
+Show one ask in full, with its brief in Markdown for an answerer to read first.
 
 ```sh
-myr submit --ask <ask> --base <base> --head <head>
+myr ask <ask> --project <project>
 ```
 
-- Contract: `submitAnswer`
-- Reads only: no
+- Contract: `showAsk`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `<ask>` | text | yes |
+| `--project` | text | yes |
+
+## `myr status`
+
+Show the caller's claims and answers, in one project or in every one.
+
+```sh
+myr status [--project <project>]
+```
+
+- Contract: `status`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--project` | text | no |
+
+## `myr verdict`
+
+Show the verdict on an answer to an ask, for its latest head or the one named; held-back checks show one bit per area.
+
+```sh
+myr verdict --ask <ask> [--head <head>] --project <project>
+```
+
+- Contract: `verdict`
+- Reads only: yes
 - Idempotent: yes
 - Destructive: no
 - Needs approval: no
@@ -41,5 +117,380 @@ myr submit --ask <ask> --base <base> --head <head>
 | Argument | Takes | Required |
 | --- | --- | --- |
 | `--ask` | text | yes |
+| `--head` | text | no |
+| `--project` | text | yes |
+
+## `myr landing`
+
+Show one landing on a project's main: the ask it answered, the people it credits and its verdict.
+
+```sh
+myr landing --project <project> --sha <sha>
+```
+
+- Contract: `landing`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--project` | text | yes |
+| `--sha` | text | yes |
+
+## `myr credits`
+
+Count a person's credits by project, area and role; never a score.
+
+```sh
+myr credits --handle <handle>
+```
+
+- Contract: `credits`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--handle` | text | yes |
+
+## `myr today`
+
+Show the caller's Today: the decisions to take, held to their budget, each with its evidence and a safe default.
+
+```sh
+myr today [--project <project>]
+```
+
+- Contract: `today`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--project` | text | no |
+
+## `myr ledger`
+
+Show a project's ledger: its layers, counts, commitments, releases and posture changes.
+
+```sh
+myr ledger --project <project>
+```
+
+- Contract: `ledger`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--project` | text | yes |
+
+## `myr env shape`
+
+Show a project's env shape: the public schema of its environment variables, and who set each write-only value; never a value.
+
+```sh
+myr env shape --project <project>
+```
+
+- Contract: `envShape`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--project` | text | yes |
+
+## `myr init`
+
+Make a project, empty or imported from a public git repo, with the caller as its decider.
+
+```sh
+myr init [--import <import>] --project <project>
+```
+
+- Contract: `initProject`
+- Reads only: no
+- Idempotent: no
+- Destructive: no
+- Needs approval: yes
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--import` | JSON | no |
+| `--project` | text | yes |
+
+## `myr ask open`
+
+Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way.
+
+```sh
+myr ask open --ask <ask> --files <files> --project <project>
+```
+
+- Contract: `openAsk`
+- Reads only: no
+- Idempotent: no
+- Destructive: no
+- Needs approval: yes
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--ask` | text | yes |
+| `--files` | JSON | yes |
+| `--project` | text | yes |
+
+## `myr propose`
+
+Propose an ask, optionally with a sealed answer; the proposal expires unless a decider accepts it.
+
+```sh
+myr propose [--files <files>] --project <project> [--sealed <sealed>] [--territory <territory>] --want <want>
+```
+
+- Contract: `proposeAsk`
+- Reads only: no
+- Idempotent: no
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--files` | JSON | no |
+| `--project` | text | yes |
+| `--sealed` | JSON | no |
+| `--territory` | text | no |
+| `--want` | text | yes |
+
+## `myr ask flag`
+
+Flag an open ask to its deciders with a reason, as a proposal that expires unless a decider accepts it.
+
+```sh
+myr ask flag --ask <ask> --project <project> --reason <reason>
+```
+
+- Contract: `flagAsk`
+- Reads only: no
+- Idempotent: no
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--ask` | text | yes |
+| `--project` | text | yes |
+| `--reason` | text | yes |
+
+## `myr decide`
+
+Take one decision from Today: accept, decline, adopt or revert.
+
+```sh
+myr decide --choice <choice> --decision <decision> [--note <note>] --project <project>
+```
+
+- Contract: `decide`
+- Reads only: no
+- Idempotent: no
+- Destructive: no
+- Needs approval: yes
+- Surfaces: rpc, mcp, cli, web
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--choice` | "accept" \| "decline" \| "adopt" \| "revert" | yes |
+| `--decision` | text | yes |
+| `--note` | text | no |
+| `--project` | text | yes |
+
+## `myr claim`
+
+Claim an ask: an exclusive, expiring right to answer it, with a fork to push to; claiming it again returns the same claim.
+
+```sh
+myr claim <ask> --project <project>
+```
+
+- Contract: `claim`
+- Reads only: no
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `<ask>` | text | yes |
+| `--project` | text | yes |
+
+## `myr release`
+
+Release the caller's claim on an ask, so anyone may claim it again.
+
+```sh
+myr release --ask <ask> --project <project>
+```
+
+- Contract: `release`
+- Reads only: no
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--ask` | text | yes |
+| `--project` | text | yes |
+
+## `myr submit`
+
+Offer the commit `head`, built on `base`, as an answer to a claimed ask; the receipt says it is being checked, and it lands if it passes.
+
+```sh
+myr submit --ask <ask> --base <base> --head <head> --project <project> --requestId <requestId>
+```
+
+- Contract: `submitAnswer`
+- Reads only: no
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--ask` | text | yes |
 | `--base` | text | yes |
 | `--head` | text | yes |
+| `--project` | text | yes |
+| `--requestId` | text | yes |
+
+## `myr finish`
+
+Finish a passing answer with a decider's own commits on top; they are checked again, and credited with Finished-by when it lands.
+
+```sh
+myr finish --ask <ask> --base <base> --head <head> --project <project> --requestId <requestId>
+```
+
+- Contract: `finish`
+- Reads only: no
+- Idempotent: yes
+- Destructive: no
+- Needs approval: yes
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--ask` | text | yes |
+| `--base` | text | yes |
+| `--head` | text | yes |
+| `--project` | text | yes |
+| `--requestId` | text | yes |
+
+## `myr land`
+
+Land a decider's own change from their working fork, after the same checks an answer passes.
+
+```sh
+myr land --base <base> --head <head> --message <message> --project <project> --requestId <requestId>
+```
+
+- Contract: `land`
+- Reads only: no
+- Idempotent: yes
+- Destructive: no
+- Needs approval: yes
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--base` | text | yes |
+| `--head` | text | yes |
+| `--message` | text | yes |
+| `--project` | text | yes |
+| `--requestId` | text | yes |
+
+## `myr fork`
+
+Make the caller's working fork of a project, or return it if it exists.
+
+```sh
+myr fork --project <project>
+```
+
+- Contract: `fork`
+- Reads only: no
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--project` | text | yes |
+
+## `myr vouch`
+
+Vouch for a person, or denounce them, by landing a line in the project's vouch file.
+
+```sh
+myr vouch --handle <handle> [--note <note>] --project <project> --verdict <verdict>
+```
+
+- Contract: `vouch`
+- Reads only: no
+- Idempotent: no
+- Destructive: no
+- Needs approval: yes
+- Surfaces: rpc, mcp, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--handle` | text | yes |
+| `--note` | text | no |
+| `--project` | text | yes |
+| `--verdict` | "vouch" \| "denounce" | yes |
+
+## `myr env set`
+
+Set the write-only value of a sensitive env item; nobody can read it back.
+
+```sh
+myr env set [--acknowledgeShort] --key <key> --project <project> --value <value>
+```
+
+- Contract: `setEnv`
+- Reads only: no
+- Idempotent: yes
+- Destructive: no
+- Needs approval: yes
+- Surfaces: rpc, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `--acknowledgeShort` | nothing (a switch) | no |
+| `--key` | text | yes |
+| `--project` | text | yes |
+| `--value` | text | yes |

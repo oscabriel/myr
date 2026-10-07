@@ -5,6 +5,7 @@ import {
   CommandCatalog,
   Contracts,
   generate,
+  partsOf,
   Refusal,
 } from "../../../scripts/lib/gen.ts";
 
@@ -117,9 +118,11 @@ const catalog = () =>
     content("docs/reference/commands.json")
   );
 
-/** The fields a command's payload schema names. */
+/** The fields a command's payload schema names; a command may take none. */
 const payloadFields = Schema.decodeUnknownSync(
-  Schema.Struct({ properties: Schema.Record(Schema.String, Schema.Json) })
+  Schema.Struct({
+    properties: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  })
 );
 
 /** A union of pointers, as a contract's error is written. */
@@ -227,7 +230,7 @@ describe("the generated JSON Schema", () => {
     const $defs = definitions();
 
     const infallible = contracts.flatMap((rpc) =>
-      SchemaAST.isNever(rpc.errorSchema.ast) ? [rpc._tag] : []
+      SchemaAST.isNever(partsOf(rpc).error.ast) ? [rpc._tag] : []
     );
 
     expect(infallible).not.toHaveLength(0);
@@ -236,10 +239,31 @@ describe("the generated JSON Schema", () => {
     );
   });
 
+  // `watch` streams: what it sends is a run of project events, and it can
+  // still be refused before the first one.
+  it("defines a stream's success as one of its elements, and its error as the stream's", () => {
+    const $defs = definitions();
+
+    expect(JSON.stringify($defs["watch.success"])).toContain('"AskOpened"');
+    expect($defs["watch.error"]).toStrictEqual(ref("UnknownProject"));
+  });
+
   it("admits no non-finite number string and no null under an optional key", () => {
     expect(
       leaks(parseJson(content("docs/reference/protocol.schema.json")))
     ).toStrictEqual([]);
+  });
+
+  // A stream has no tool form, and a write-only value must never pass
+  // through an agent's transcript.
+  it("lists only the tools MCP serves: no watch, no setEnv", () => {
+    const tools = [...sections(content("docs/reference/mcp-tools.md")).keys()];
+
+    expect(tools).toContain("listProjects");
+    expect(tools).toContain("submitAnswer");
+    expect(tools).not.toContain("watch");
+    expect(tools).not.toContain("setEnv");
+    expect(tools).toHaveLength(contracts.length - 2);
   });
 
   it("gives every MCP tool's input and output schema, with no leak in either", () => {
@@ -300,7 +324,7 @@ describe("the command catalog", () => {
       const path = command.path.join(" ");
       const body = byPath.get(path) ?? "";
       const positional = new Set(command.positional);
-      const { properties } = payloadFields(command.payloadSchema);
+      const { properties = {} } = payloadFields(command.payloadSchema);
 
       return [
         ...command.positional.map((field) => `<${field}>`),
@@ -319,6 +343,37 @@ describe("the command catalog", () => {
     // Known rows, so an empty catalog can't pass.
     expect(byPath.get("asks")).toContain("| `--project` | text | yes |");
     expect(byPath.get("submit")).toContain("| `--head` | text | yes |");
+  });
+
+  // The CLI takes a boolean as a switch that defaults to off, so it is never
+  // required and takes no value.
+  it("writes a boolean field as an optional switch", () => {
+    const [, envSet = ""] =
+      [...sections(content("docs/reference/cli.md"))].find(([heading]) =>
+        heading.endsWith(" env set`")
+      ) ?? [];
+
+    expect(envSet).toContain(" [--acknowledgeShort]");
+    expect(envSet).not.toContain("<acknowledgeShort>");
+    expect(envSet).toContain(
+      "| `--acknowledgeShort` | nothing (a switch) | no |"
+    );
+  });
+
+  // A table cell ends at any pipe Markdown doesn't see escaped, so a choice
+  // written `"a" | "b"` would push its row past the table's three columns.
+  it("keeps every argument row to its three columns, a choice's values included", () => {
+    const rows = content("docs/reference/cli.md")
+      .split("\n")
+      .filter((line) => line.startsWith("| `"));
+
+    const split = rows.flatMap((row) =>
+      row.split(/(?<!\\)\|/u).length === 5 ? [] : [row]
+    );
+
+    expect(rows).not.toHaveLength(0);
+    expect(split).toStrictEqual([]);
+    expect(rows).toContain('| `--verdict` | "vouch" \\| "denounce" | yes |');
   });
 });
 

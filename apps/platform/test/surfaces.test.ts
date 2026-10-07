@@ -1,31 +1,57 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Contracts } from "@repo/protocol/contracts";
-import { AskId, CommitSha, Handle } from "@repo/protocol/ids";
+import { Contracts, surfaced } from "@repo/protocol/contracts";
+import { Outcome } from "@repo/protocol/domain/outcome";
+import {
+  AskId,
+  CommitSha,
+  Handle,
+  ProjectName,
+  RequestId,
+} from "@repo/protocol/ids";
 import { CurrentPrincipal, Principal } from "@repo/protocol/principal";
 import { NotClaimed } from "@repo/protocol/refusal";
 import { Effect, Layer, Ref } from "effect";
 
 import { MemorySessions } from "../src/sessions/memory.ts";
-import { rpcClient, served, toolCall, toolResult } from "./harness.ts";
+import { Vacant } from "../src/vacant.ts";
+import {
+  rpcClient,
+  served,
+  toolCall,
+  toolList,
+  toolNames,
+  toolResult,
+} from "./harness.ts";
 
 const ask = AskId.make("fix-parser");
 
 const base = CommitSha.make("1111111111111111111111111111111111111111");
 
-const main = CommitSha.make("2222222222222222222222222222222222222222");
-
 const head = CommitSha.make("3333333333333333333333333333333333333333");
+
+const project = ProjectName.make("datekit");
+
+const requestId = RequestId.make("answer-0001");
+
+/** An answer, as a client offers it. */
+const args = { ask, base, head, project, requestId };
+
+/** What the platform answers when it takes the answer in. */
+const receipt = {
+  ...args,
+  outcome: Outcome.cases.Checking.make({ stage: "merge" }),
+};
 
 const sessions = MemorySessions.layer({
   "alice-token": Handle.make("alice"),
   "bob-token": Handle.make("bob"),
 });
 
-/** Contracts where only `holder` holds the ask's claim. */
+/** The platform where only `holder` holds the ask's claim. */
 const claimHeldBy = (holder: string) =>
-  Contracts.toLayer({
-    listAsks: () => Effect.succeed({ asks: [] }),
-    submitAnswer: (payload) =>
+  Layer.mergeAll(
+    Vacant,
+    Contracts.toLayerHandler("submitAnswer", (payload) =>
       Effect.gen(function* () {
         const holds = Principal.match(yield* CurrentPrincipal, {
           Anonymous: () => false,
@@ -36,9 +62,10 @@ const claimHeldBy = (holder: string) =>
           return yield* NotClaimed.of(payload.ask);
         }
 
-        return { main };
-      }),
-  });
+        return receipt;
+      })
+    )
+  );
 
 describe("the platform's MCP surface", () => {
   it.effect("calls a tool as the principal its bearer token names", () =>
@@ -46,8 +73,6 @@ describe("the platform's MCP surface", () => {
       const { fetch } = yield* served(
         Layer.mergeAll(claimHeldBy("alice"), sessions)
       );
-
-      const args = { ask, base, head };
 
       const asAlice = yield* toolResult(
         yield* fetch(toolCall("submitAnswer", args, "alice-token"))
@@ -57,9 +82,24 @@ describe("the platform's MCP surface", () => {
         yield* fetch(toolCall("submitAnswer", args, "bob-token"))
       );
 
-      expect(asAlice).toStrictEqual({ isError: false, json: { main } });
+      expect(asAlice).toStrictEqual({ isError: false, json: receipt });
       expect(asBob.isError).toBeTruthy();
       expect(asBob.json).toHaveProperty("_tag", "NotClaimed");
+    })
+  );
+
+  // A stream has no tool form, and a write-only value must never pass
+  // through an agent's transcript.
+  it.effect("lists the MCP-surfaced contracts only: no watch, no setEnv", () =>
+    Effect.gen(function* () {
+      const { fetch } = yield* served(Layer.mergeAll(Vacant, sessions));
+
+      const names = yield* toolNames(yield* fetch(toolList("alice-token")));
+
+      expect(names).toStrictEqual([...surfaced("mcp").requests.keys()]);
+      expect(names).toContain("submitAnswer");
+      expect(names).not.toContain("watch");
+      expect(names).not.toContain("setEnv");
     })
   );
 
@@ -69,27 +109,25 @@ describe("the platform's MCP surface", () => {
       Effect.gen(function* () {
         const calls = yield* Ref.make(0);
 
+        const counted = Effect.andThen(
+          Ref.update(calls, (count) => count + 1),
+          Effect.die("a turned-away call reached a contract")
+        );
+
         const { fetch } = yield* served(
           Layer.mergeAll(
-            Contracts.toLayer({
-              listAsks: () =>
-                Ref.update(calls, (count) => count + 1).pipe(
-                  Effect.as({ asks: [] })
-                ),
-              submitAnswer: () =>
-                Ref.update(calls, (count) => count + 1).pipe(
-                  Effect.as({ main })
-                ),
-            }),
+            Vacant,
+            Contracts.toLayerHandler("listAsks", () => counted),
+            Contracts.toLayerHandler("submitAnswer", () => counted),
             sessions
           )
         );
 
-        const args = { ask, base, head };
-
         const responses = [
           yield* fetch(toolCall("submitAnswer", args)),
           yield* fetch(toolCall("submitAnswer", args, "mallory-token")),
+          yield* fetch(toolCall("listAsks", { project })),
+          yield* fetch(toolCall("listAsks", { project }, "mallory-token")),
         ];
 
         expect(
@@ -97,10 +135,9 @@ describe("the platform's MCP surface", () => {
             challenge: response.headers.get("www-authenticate"),
             status: response.status,
           }))
-        ).toStrictEqual([
-          { challenge: "Bearer", status: 401 },
-          { challenge: "Bearer", status: 401 },
-        ]);
+        ).toStrictEqual(
+          responses.map(() => ({ challenge: "Bearer", status: 401 }))
+        );
         expect(yield* Ref.get(calls)).toBe(0);
       })
   );
@@ -113,12 +150,10 @@ describe("the platform's RPC surface", () => {
         Layer.mergeAll(claimHeldBy("alice"), sessions)
       );
 
-      const args = { ask, base, head };
-
       const alice = yield* rpcClient(handler, "alice-token");
       const bob = yield* rpcClient(handler, "bob-token");
 
-      expect(yield* alice.submitAnswer(args)).toStrictEqual({ main });
+      expect(yield* alice.submitAnswer(args)).toStrictEqual(receipt);
       expect(yield* Effect.flip(bob.submitAnswer(args))).toStrictEqual(
         NotClaimed.of(ask)
       );

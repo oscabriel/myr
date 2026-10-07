@@ -1,11 +1,8 @@
 import { Brand } from "@repo/brand";
-import { Client, Contracts } from "@repo/protocol/contracts";
+import { authenticated, bearerToken } from "@repo/protocol/authenticate";
+import { Client, Contracts, surfaced } from "@repo/protocol/contracts";
 import { toToolkit } from "@repo/protocol/mcp";
-import {
-  Authenticated,
-  CurrentPrincipal,
-  Unauthenticated,
-} from "@repo/protocol/principal";
+import { Authenticated } from "@repo/protocol/principal";
 import { Effect, Layer, Option } from "effect";
 import { McpProtocol, McpServer } from "effect/ai";
 import {
@@ -29,16 +26,12 @@ export type Services =
   | Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>
   | Sessions;
 
-/** The token in an `Authorization: Bearer <token>` header. */
-const bearer = (authorization: string | undefined) =>
-  /^Bearer (?<token>\S+)$/u.exec(authorization ?? "")?.groups?.token;
-
 /** The person an `Authorization` header names, if any. */
-const principalOf = (sessions: Sessions["Service"], authorization?: string) => {
-  const token = bearer(authorization);
-
-  return token === undefined ? Effect.succeedNone : sessions.verify(token);
-};
+const principalOf = (sessions: Sessions["Service"], authorization?: string) =>
+  Option.match(bearerToken(authorization), {
+    onNone: () => Effect.succeedNone,
+    onSome: (token) => sessions.verify(token),
+  });
 
 /**
  * Every request needs a credential the platform knows; anything else gets a
@@ -70,27 +63,13 @@ const requireCredential = HttpRouter.middleware(
   { global: true }
 );
 
-/** Server side: a call runs as the person its credential names, or not at all. */
-const verifyCredential = Layer.effect(
-  Authenticated,
-  Effect.gen(function* () {
-    const sessions = yield* Sessions;
-
-    return (effect, { headers }) =>
-      Effect.gen(function* () {
-        const principal = yield* principalOf(sessions, headers.authorization);
-
-        if (Option.isNone(principal)) {
-          return yield* new Unauthenticated();
-        }
-
-        return yield* Effect.provideService(
-          effect,
-          CurrentPrincipal,
-          principal.value
-        );
-      });
-  })
+/**
+ * Server side: a call runs as the person its credential names. A call with no
+ * credential runs as anyone only on a `public` contract; the 401 gate above
+ * turns those away until anonymous reads open.
+ */
+const verifyCredential = authenticated((credential) =>
+  Sessions.use(({ verify }) => verify(credential))
 );
 
 /**
@@ -122,9 +101,12 @@ const forwardCredential = RpcMiddleware.layerClient(
     })
 );
 
-const projection = toToolkit(Contracts, Effect.service(Client));
+const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 
-/** The contracts as MCP tools at `/mcp`, each call made as the caller. */
+/**
+ * The MCP-surfaced contracts as tools at `/mcp`, each call made as the
+ * caller.
+ */
 const mcp = McpServer.toolkit(projection.toolkit).pipe(
   Layer.provideMerge(projection.layer),
   Layer.provide(Layer.effect(Client, RpcTest.makeClient(Contracts))),

@@ -1,14 +1,14 @@
 import { Brand } from "@repo/brand";
-import { Client, Contracts } from "@repo/protocol/contracts";
+import { Client, surfaced } from "@repo/protocol/contracts";
 import { toToolkit } from "@repo/protocol/mcp";
 import { Effect, Layer } from "effect";
 import { McpProtocol, McpServer } from "effect/ai";
 import { Command } from "effect/cli";
 
-const projection = toToolkit(Contracts, Effect.service(Client));
+const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 
 /**
- * The contracts as MCP tools over stdio, in every protocol a harness may
+ * The MCP-surfaced contracts as tools over stdio, in every protocol a harness may
  * speak: the stateless 2026-07-28 one, and the four session-based ones before
  * it. Calls go through the `Client`.
  */
