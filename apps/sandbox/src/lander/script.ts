@@ -562,10 +562,10 @@ export const readMerge = (stdout: string) => {
   };
 };
 
-/** A raw diff's status letter as a change's status; a type change is a modification. */
 /** A change's status, as a merge reports it. */
 type Status = (typeof Merged.Type)["changes"][number]["status"];
 
+/** A raw diff's status letter as a change's status; a type change is a modification. */
 const statusOf = (letter: string): Status | undefined => {
   switch (letter) {
     case "A": {

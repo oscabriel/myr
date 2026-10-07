@@ -1,7 +1,7 @@
 # The Lander's image: trusted, it runs git and bun's bundler and never an
 # answer's code (spec §4.3). Debian trixie slim with its git (2.47.3 when this
-# was written; `merge-tree --write-tree` needs 2.38 or later, and the build
-# prints the version), Bun 1.4.2 for `bundleRules`, the sdk under /opt/sdk
+# was written; `merge-tree --write-tree --merge-base` needs 2.40 or later, and
+# the build prints the version), Bun 1.4.2 for `bundleRules`, the sdk under /opt/sdk
 # with the packages it imports beside it, and the Sandbox SDK's
 # `sandbox-shim`, which `Files` runs.
 #

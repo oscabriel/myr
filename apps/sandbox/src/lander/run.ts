@@ -15,6 +15,7 @@ import { Rebuild } from "@repo/project/lander/wire";
 import type {
   BundleWire,
   ComposeWire,
+  Landed,
   LandWire,
   MergeWire,
 } from "@repo/project/lander/wire";
@@ -150,15 +151,19 @@ const subcommandOf = (step: GitStep) =>
       index > 0 && !argument.startsWith("-") && step.argv[index - 1] !== "-c"
   ) ?? "git";
 
-/** The job is blocked; what git said goes to the log, never into the refusal. */
-const blockedBy = (step: GitStep, why: string, tokens: Tokens) =>
+/**
+ * The job is blocked at `step` (a git subcommand, or the Box operation); what
+ * went wrong goes to the log, token-free, never into the refusal.
+ */
+const blockedBy = (step: string, why: string, tokens: Tokens) =>
   Effect.logWarning("a Lander step failed").pipe(
-    Effect.annotateLogs({
-      step: subcommandOf(step),
-      why: scrubbed(why, tokens),
-    }),
+    Effect.annotateLogs({ step, why: scrubbed(why, tokens) }),
     Effect.andThen(Effect.fail(new VerifierBlocked({})))
   );
+
+/** Everything a command printed, for a log: its exit, then stdout and stderr. */
+const printed = (ran: Executed) =>
+  `exit ${ran.exitCode}: ${ran.stdout}\n${ran.stderr}`;
 
 /** git's env for every step: no config but the step's own, no prompt, English. */
 const baseEnv = (layout: LanderLayout) => ({
@@ -177,26 +182,39 @@ const header = (token: Redacted.Redacted) => ({
   GIT_CONFIG_VALUE_0: `Authorization: Bearer ${Redacted.value(token)}`,
 });
 
-/**
- * Runs steps for one job: each in the work folder, with the token of the
- * remote it reaches. A step expected to succeed that does not blocks the
- * job; the others hand back what git printed for the caller to read.
- */
-const runner = (tokens: Tokens) =>
-  Effect.gen(function* () {
+/** How one job runs its steps, and how it says one blocked it. */
+interface Steps {
+  /**
+   * Runs a step in the work folder, with the token of the remote it reaches.
+   * A step expected to succeed that does not blocks the job; the others hand
+   * back what git printed for the caller to read.
+   */
+  readonly run: (step: GitStep) => Effect.Effect<Executed, VerifierBlocked>;
+  /** Blocks the job at `step`, logging `why` with the job's tokens taken out. */
+  readonly blocked: (
+    step: GitStep,
+    why: string
+  ) => Effect.Effect<never, VerifierBlocked>;
+}
+
+/** The steps of one job, which carries `tokens`. */
+const runner = (tokens: Tokens) => {
+  const blocked = (step: GitStep, why: string) =>
+    blockedBy(subcommandOf(step), why, tokens);
+
+  return Effect.gen(function* () {
     const box = yield* Box;
     const layout = yield* Layout;
 
-    return (step: GitStep): Effect.Effect<Executed, VerifierBlocked> =>
+    const run = (step: GitStep): Effect.Effect<Executed, VerifierBlocked> =>
       Effect.gen(function* () {
         const token =
           step.remote === undefined ? undefined : tokens[step.remote];
 
         if (step.remote !== undefined && token === undefined) {
-          return yield* blockedBy(
+          return yield* blocked(
             step,
-            `the job carries no token for ${step.remote}`,
-            tokens
+            `the job carries no token for ${step.remote}`
           );
         }
 
@@ -212,9 +230,7 @@ const runner = (tokens: Tokens) =>
             timeoutMs: step.remote === undefined ? LOCAL_MS : REMOTE_MS,
           })
           .pipe(
-            Effect.catchTag("BoxFailed", ({ reason }) =>
-              blockedBy(step, reason, tokens)
-            )
+            Effect.catchTag("BoxFailed", ({ reason }) => blocked(step, reason))
           );
 
         const expected =
@@ -222,15 +238,12 @@ const runner = (tokens: Tokens) =>
             ? ran.exitCode === 0
             : step.expect !== "merge" || ran.exitCode <= 1;
 
-        return expected
-          ? ran
-          : yield* blockedBy(
-              step,
-              `exit ${ran.exitCode}: ${ran.stderr}`,
-              tokens
-            );
+        return expected ? ran : yield* blocked(step, printed(ran));
       });
+
+    return { blocked, run } satisfies Steps;
   });
+};
 
 /**
  * The answer's head merged onto canonical `main` with its base as the merge
@@ -240,7 +253,11 @@ const runner = (tokens: Tokens) =>
 export const merge = (wire: typeof MergeWire.Type) =>
   Effect.gen(function* () {
     const { job } = wire;
-    const run = yield* runner({ fork: wire.fork.token, main: wire.main.token });
+
+    const { run } = yield* runner({
+      fork: wire.fork.token,
+      main: wire.main.token,
+    });
 
     const script = mergeScript(job, {
       fork: wire.fork.url,
@@ -287,23 +304,28 @@ const prepared = (job: Job) =>
     yield* job.run(initCopy(job.repo));
   });
 
+/** `text` written to `file` in the container; a file it would not take blocks the job. */
+const writtenAt = (file: string, text: string) =>
+  Box.use((box) => box.writeFile(file, new TextEncoder().encode(text))).pipe(
+    Effect.catchTag("BoxFailed", ({ reason }) =>
+      blockedBy("writeFile", reason, {})
+    )
+  );
+
 /** Writes `text` to a scratch file for git to read: a message, a note. */
 const written = (name: string, text: string) =>
   Effect.gen(function* () {
     const file = yield* scratch(name);
 
-    yield* Box.use((box) =>
-      box.writeFile(file, new TextEncoder().encode(text))
-    ).pipe(Effect.mapError(() => new VerifierBlocked({})));
+    yield* writtenAt(file, text);
 
     return file;
   });
 
-/** What one job runs its steps with. */
-interface Job {
+/** What one job runs its steps with: its canonical repo, that repo's URL, and its steps. */
+interface Job extends Steps {
   readonly repo: RepoName;
   readonly url: string;
-  readonly run: (step: GitStep) => Effect.Effect<Executed, VerifierBlocked>;
 }
 
 /** `rev` in the Lander's copy, if it names something there. */
@@ -317,7 +339,8 @@ const idOf = (job: Job, rev: string) =>
   resolved(job, rev).pipe(
     Effect.flatMap(
       Option.match({
-        onNone: () => Effect.fail(new VerifierBlocked({})),
+        onNone: () =>
+          job.blocked(revParse(job.repo, rev), `the copy has no ${rev}`),
         onSome: Effect.succeed,
       })
     )
@@ -386,7 +409,10 @@ const composed = (
     const modes = paths.map((path) => existing.get(path)?.mode ?? "100644");
 
     if (!modes.every((mode) => FILE_MODES.has(mode))) {
-      return yield* new VerifierBlocked({});
+      return yield* job.blocked(
+        lsTree(job.repo, main, paths),
+        "a composed file's path is a folder, a symlink or a submodule on main"
+      );
     }
 
     const index = yield* scratch("compose.index");
@@ -423,10 +449,9 @@ const rebuilt = (
       Merge: ({ base, fork, head }) =>
         Effect.gen(function* () {
           if (wire.fork === undefined) {
-            return yield* blockedBy(
+            return yield* job.blocked(
               mergeTree(job.repo, { base, head, main: wire.job.main }),
-              "a merge rebuild needs the fork's remote",
-              {}
+              "a merge rebuild needs the fork's remote"
             );
           }
 
@@ -507,21 +532,21 @@ const note = (job: Job, landing: CommitSha, verdict: Verdict, at: number) =>
       tree,
     });
 
-    const pushed = readPush(
-      yield* job.run(pushRef(job.repo, job.url, { ref: notesRef, to: commit })),
-      notesRef
-    );
+    const step = pushRef(job.repo, job.url, { ref: notesRef, to: commit });
+    const ran = yield* job.run(step);
 
-    return pushed === "moved" ? commit : yield* new VerifierBlocked({});
+    return readPush(ran, notesRef) === "moved"
+      ? commit
+      : yield* job.blocked(step, printed(ran));
   });
 
+/** A piece of bookkeeping a landing may leave pending. */
+type Bookkeeping = (typeof Landed.Type)["pending"][number];
+
 /** One piece of bookkeeping: `None` once written, its name when it was not. */
-const attempt = <A, E, R>(
-  item: "mirror" | "notes",
-  write: Effect.Effect<A, E, R>
-) =>
+const attempt = <A, E, R>(item: Bookkeeping, write: Effect.Effect<A, E, R>) =>
   write.pipe(
-    Effect.as(Option.none<"mirror" | "notes">()),
+    Effect.as(Option.none<Bookkeeping>()),
     Effect.catchCause((cause) =>
       Effect.as(
         Effect.logWarning(`a landing's ${item} was not written`, cause),
@@ -553,7 +578,7 @@ const settle = (
         ? Effect.flatMap(job.run(script.mirror), (ran) =>
             readPush(ran, landedRef) === "moved"
               ? Effect.void
-              : Effect.fail(new VerifierBlocked({}))
+              : job.blocked(script.mirror, printed(ran))
           )
         : Effect.void
     );
@@ -633,12 +658,12 @@ export const land = (wire: typeof LandWire.Type) =>
     }
 
     const job: Job = {
-      repo: landing.repo,
-      run: yield* runner(
+      ...(yield* runner(
         wire.fork === undefined
           ? { main: wire.main.token }
           : { fork: wire.fork.token, main: wire.main.token }
-      ),
+      )),
+      repo: landing.repo,
       url: wire.main.url,
     };
 
@@ -671,7 +696,8 @@ export const land = (wire: typeof LandWire.Type) =>
     });
 
     const script = landScript(landing, job.url, commit, landedRef);
-    const pushed = readPush(yield* job.run(script.main), mainRef);
+    const ran = yield* job.run(script.main);
+    const pushed = readPush(ran, mainRef);
 
     if (pushed === "moved") {
       return yield* settle(job, wire, commit, commit);
@@ -687,7 +713,7 @@ export const land = (wire: typeof LandWire.Type) =>
       return yield* moved(job, wire, yield* idOf(job, mainCopy));
     }
 
-    return yield* blockedBy(script.main, "the push of main failed", {});
+    return yield* job.blocked(script.main, printed(ran));
   });
 
 // What a composed commit says: the platform made it, for a check, off main.
@@ -702,8 +728,8 @@ const COMPOSE_MESSAGE = "Compose files onto main for a check\n";
 export const compose = (wire: typeof ComposeWire.Type) =>
   Effect.gen(function* () {
     const job: Job = {
+      ...(yield* runner({ main: wire.main.token })),
       repo: wire.job.repo,
-      run: yield* runner({ main: wire.main.token }),
       url: wire.main.url,
     };
 
@@ -747,8 +773,10 @@ export const compose = (wire: typeof ComposeWire.Type) =>
         : { lease: existing, ref, to: commit }
     );
 
-    if (readPush(yield* job.run(step), ref) !== "moved") {
-      return yield* blockedBy(step, "the push of the compose ref failed", {});
+    const ran = yield* job.run(step);
+
+    if (readPush(ran, ref) !== "moved") {
+      return yield* job.blocked(step, printed(ran));
     }
 
     return { commit, tree };
@@ -770,10 +798,9 @@ const present = (job: Job, commit: string) =>
 
     return (yield* hasCommit(job, commit))
       ? commit
-      : yield* blockedBy(
+      : yield* job.blocked(
           objectType(job.repo, commit),
-          `canonical has no commit ${commit}`,
-          {}
+          `canonical has no commit ${commit}`
         );
   });
 
@@ -814,9 +841,7 @@ const built = (
 
     const tsconfig = `${root}/tsconfig.json`;
 
-    yield* Box.use((box) =>
-      box.writeFile(tsconfig, new TextEncoder().encode(resolution(sdk.entry)))
-    ).pipe(Effect.mapError(() => new VerifierBlocked({})));
+    yield* writtenAt(tsconfig, resolution(sdk.entry));
     yield* job.run(symlink(sdk.modules, `${root}/node_modules`));
     yield* job.run(bundle({ entries, out, root, tsconfig }));
 
@@ -824,10 +849,9 @@ const built = (
     const owners = new Map(entries.map((entry) => [bundledAs(entry), entry]));
 
     if (!entries.every((entry) => outputs.includes(bundledAs(entry)))) {
-      return yield* blockedBy(
+      return yield* job.blocked(
         listFiles(out),
-        "bun wrote no bundle for an entry",
-        {}
+        "bun wrote no bundle for an entry"
       );
     }
 
@@ -852,8 +876,8 @@ export const bundleRules = (wire: typeof BundleWire.Type) =>
     const { sdk } = yield* Layout;
 
     const job: Job = {
+      ...(yield* runner({ main: wire.main.token })),
       repo: wire.job.repo,
-      run: yield* runner({ main: wire.main.token }),
       url: wire.main.url,
     };
 
@@ -873,7 +897,7 @@ export const bundleRules = (wire: typeof BundleWire.Type) =>
     const sdkVersion = (yield* job.run(readFile(sdk.version))).stdout.trim();
 
     if (sdkVersion === "") {
-      return yield* blockedBy(readFile(sdk.version), "no sdk version", {});
+      return yield* job.blocked(readFile(sdk.version), "no sdk version");
     }
 
     const data = yield* Effect.forEach(

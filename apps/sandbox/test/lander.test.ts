@@ -1,11 +1,10 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { authorLine } from "@repo/git/trailers";
 import { MergeExit, MergeWire, Rebuild } from "@repo/project/lander/wire";
 import { Verdict } from "@repo/protocol/domain/answer";
 import { CommitSha, LandedSha, RepoPath } from "@repo/protocol/ids";
 import type { TreeSha } from "@repo/protocol/ids";
-import { StaleBase, VerifierBlocked } from "@repo/protocol/refusal";
+import { RepoBusy, StaleBase, VerifierBlocked } from "@repo/protocol/refusal";
 import { sdkVersion } from "@repo/rules/rules-evaluator";
 import { gitOk } from "@repo/testkit/git";
 import { untouchable } from "@repo/testkit/untouchable";
@@ -112,9 +111,6 @@ const commitIn = (repo: string, sha: string) =>
     };
   });
 
-const identity = ({ email, name }: { name: string; email: string }) =>
-  `${name} <${email}>`;
-
 const decodeNote = Schema.decodeEffect(Schema.fromJsonString(Verdict));
 
 /** Whether a command is the push that moves canonical `main`. */
@@ -179,6 +175,40 @@ const mirrorRefused = (inner: Box["Service"]): Box["Service"] => ({
           exitCode: 1,
           stderr: "error: failed to push some refs\n",
           stdout: `!\t${argv.at(-1) ?? ""}\t[remote rejected] (refused)\nDone\n`,
+        })
+      : inner.exec(argv, options),
+});
+
+/**
+ * The Lander's container, where Artifacts is busy with another push to the
+ * repo when the Lander pushes `main`: one side-band error packet and no
+ * report, as S2 #9 recorded it.
+ */
+const busyOnMain = (inner: Box["Service"]): Box["Service"] => ({
+  ...inner,
+  exec: (argv, options) =>
+    pushesMain(argv)
+      ? Effect.succeed({
+          exitCode: 128,
+          stderr:
+            "remote: artifacts_git_receive_pack_busy\n\nfatal: the remote end hung up unexpectedly\nerror: failed to push some refs\n",
+          stdout: "",
+        })
+      : inner.exec(argv, options),
+});
+
+/**
+ * The Lander's container, where the remote refuses the push of `main` for a
+ * reason of its own, and its message repeats the token it was sent.
+ */
+const mainDeclined = (inner: Box["Service"]): Box["Service"] => ({
+  ...inner,
+  exec: (argv, options) =>
+    pushesMain(argv)
+      ? Effect.succeed({
+          exitCode: 1,
+          stderr: `remote: no push for ${secret}\nerror: failed to push some refs\n`,
+          stdout: `!\t${argv.at(-1) ?? ""}\t[remote rejected] (pre-receive hook declined)\nDone\n`,
         })
       : inner.exec(argv, options),
 });
@@ -394,7 +424,7 @@ describe("the Lander's git", () => {
             Exit.succeed({ pending: [], sha: LandedSha.make(tip) })
           );
           expect(yield* commitIn(repos.canonical, tip)).toStrictEqual({
-            author: identity(authorLine(bob)),
+            author: `bob <bob@users.${Brand.domain}>`,
             committer: `${Brand.name} <platform@${Brand.domain}>`,
             message: message.trim(),
             parents: [sides.main],
@@ -501,6 +531,60 @@ describe("the Lander's git", () => {
           expect(
             yield* repos.revision(repos.canonical, "refs/heads/main")
           ).toStrictEqual(Option.some(other));
+        }).pipe(Effect.scoped, Effect.provide(TestServices))
+    );
+
+    it.live(
+      "answers RepoBusy when Artifacts is busy with another push to the repo, and leaves main alone",
+      () =>
+        Effect.gen(function* () {
+          const repos = yield* world;
+          const sides = yield* diverged(repos);
+          const tree = yield* repos.mergedTree(sides.main, sides.head);
+
+          const landed = yield* land(landWire(repos, { ...sides, tree })).pipe(
+            Effect.provide(box(repos.work, busyOnMain)),
+            Effect.exit
+          );
+
+          expect(landed).toStrictEqual(Exit.fail(new RepoBusy({})));
+          expect(
+            yield* Effect.all([
+              repos.revision(repos.canonical, "refs/heads/main"),
+              repos.revision(repos.canonical, landedRefName),
+            ])
+          ).toStrictEqual([Option.some(sides.main), Option.none()]);
+        }).pipe(Effect.scoped, Effect.provide(TestServices))
+    );
+
+    it.live(
+      "blocks a land whose push of main the remote refuses for a reason of its own, and logs what git said with the token taken out",
+      () =>
+        Effect.gen(function* () {
+          const repos = yield* world;
+          const sides = yield* diverged(repos);
+          const tree = yield* repos.mergedTree(sides.main, sides.head);
+          const lines: string[] = [];
+
+          const landed = yield* land(landWire(repos, { ...sides, tree })).pipe(
+            Effect.provide(
+              Layer.merge(box(repos.work, mainDeclined), keeping(lines))
+            ),
+            Effect.exit
+          );
+
+          expect(landed).toStrictEqual(Exit.fail(new VerifierBlocked({})));
+          expect(
+            yield* repos.revision(repos.canonical, "refs/heads/main")
+          ).toStrictEqual(Option.some(sides.main));
+          expect([
+            lines.filter(
+              (line) =>
+                line.includes("pre-receive hook declined") &&
+                line.includes("no push for [token]")
+            ).length,
+            lines.filter((line) => line.includes(secret)),
+          ]).toStrictEqual([1, []]);
         }).pipe(Effect.scoped, Effect.provide(TestServices))
     );
 
