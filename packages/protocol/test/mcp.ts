@@ -4,7 +4,7 @@ import { HttpRouter } from "effect/http";
 import type { Rpc, RpcGroup } from "effect/rpc";
 import { RpcTest } from "effect/rpc";
 
-import { Client, Contracts } from "../src/contracts.ts";
+import { Client, Contracts, surfaced } from "../src/contracts.ts";
 import { toToolkit } from "../src/mcp.ts";
 import { asTester } from "../src/testing.ts";
 
@@ -43,13 +43,13 @@ interface Params {
 }
 
 /**
- * Serves the contracts' tools over MCP's HTTP transport, the way a Worker's
- * fetch handler would, with `handlers` answering each call.
+ * Serves the MCP-surfaced contracts' tools over MCP's HTTP transport, the way
+ * a Worker's fetch handler would, with `handlers` answering each call.
  */
 export const serve = Effect.fnUntraced(function* (
   handlers: Layer.Layer<Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>>
 ) {
-  const projection = toToolkit(Contracts, Effect.service(Client));
+  const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 
   const app = McpServer.toolkit(projection.toolkit).pipe(
     Layer.provideMerge(projection.layer),

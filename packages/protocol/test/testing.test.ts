@@ -5,12 +5,13 @@ import { RpcTest } from "effect/rpc";
 import { Contracts } from "../src/contracts.ts";
 import { AskId, Handle, KindName, ProjectName } from "../src/ids.ts";
 import { CurrentPrincipal, Principal } from "../src/principal.ts";
-import { NotClaimed } from "../src/refusal.ts";
 import { asPerson, asTester } from "../src/testing.ts";
+import { unanswered } from "./handlers.ts";
 
 /** Contracts whose one listed ask wants whoever called: their handle, or `anyone`. */
-const echoCaller = Contracts.toLayer({
-  listAsks: () =>
+const echoCaller = Layer.mergeAll(
+  unanswered,
+  Contracts.toLayerHandler("listAsks", () =>
     Effect.gen(function* () {
       const caller = Principal.match(yield* CurrentPrincipal, {
         Anonymous: () => "anyone",
@@ -29,9 +30,9 @@ const echoCaller = Contracts.toLayer({
           },
         ],
       };
-    }),
-  submitAnswer: ({ ask }) => Effect.fail(NotClaimed.of(ask)),
-});
+    })
+  )
+);
 
 /** Who the server side took the call to be, as `echoCaller` reports it. */
 const caller = Effect.gen(function* () {

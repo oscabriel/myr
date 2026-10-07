@@ -1,17 +1,29 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Context, Effect, Schema } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 import { Tool } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
 
 import { Description, NeedsApproval } from "../src/annotations.ts";
-import { Client, Contracts, ListAsks, SubmitAnswer } from "../src/contracts.ts";
+import {
+  Client,
+  Contracts,
+  ListAsks,
+  SubmitAnswer,
+  surfaced,
+} from "../src/contracts.ts";
 import { AskId, CommitSha, KindName, ProjectName } from "../src/ids.ts";
 import { listTools, toJsonSchema, toToolkit } from "../src/mcp.ts";
 import { StaleBase } from "../src/refusal.ts";
 import { ask, base, main, path } from "./examples.ts";
+import { unanswered } from "./handlers.ts";
 import { serve } from "./mcp.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
+
+const project = ProjectName.make("datekit");
+
+/** An answer's arguments, as an agent passes them to `submitAnswer`. */
+const answer = { ask, base, head, project, requestId: "answer-0001" };
 
 /** A tools/call result whose one content block is JSON text. */
 const ToolResult = Schema.Struct({
@@ -24,17 +36,20 @@ const ToolResult = Schema.Struct({
   isError: Schema.Boolean,
 });
 
-/** Handlers that never refuse, for tests about the tools themselves. */
-const quiet = Contracts.toLayer({
-  listAsks: () => Effect.succeed({ asks: [] }),
-  submitAnswer: () => Effect.succeed({ main }),
-});
+/** Contracts whose answers always meet a moved main. */
+const stale = (refusal: StaleBase) =>
+  Layer.mergeAll(
+    unanswered,
+    Contracts.toLayerHandler("submitAnswer", () => Effect.fail(refusal))
+  );
 
 const ToolList = Schema.Struct({
   tools: Schema.Array(
     Schema.Struct({
       description: Schema.String,
-      inputSchema: Schema.Struct({ required: Schema.Array(Schema.String) }),
+      inputSchema: Schema.Struct({
+        required: Schema.optionalKey(Schema.Array(Schema.String)),
+      }),
       name: Schema.String,
     })
   ),
@@ -77,30 +92,47 @@ const receipt = {
 };
 
 describe("the contracts as MCP tools", () => {
-  it.effect("lists each contract as a tool, its payload as the input", () =>
+  it.effect(
+    "lists each MCP-surfaced contract as a tool, its payload as the input",
+    () =>
+      Effect.gen(function* () {
+        const mcp = yield* serve(unanswered);
+
+        const { tools } = yield* mcp.call("tools/list", {}, ToolList);
+
+        const byName = new Map(tools.map((tool) => [tool.name, tool]));
+
+        expect(tools.map(({ name }) => name)).toStrictEqual([
+          ...surfaced("mcp").requests.keys(),
+        ]);
+        expect(byName.get("listAsks")).toStrictEqual({
+          description: Context.get(ListAsks.annotations, Description),
+          inputSchema: { required: ["project"] },
+          name: "listAsks",
+        });
+        expect(byName.get("submitAnswer")).toStrictEqual({
+          description: Context.get(SubmitAnswer.annotations, Description),
+          inputSchema: {
+            required: ["ask", "base", "head", "project", "requestId"],
+          },
+          name: "submitAnswer",
+        });
+      })
+  );
+
+  // A stream has no tool form, and a write-only value must never pass
+  // through an agent's transcript.
+  it.effect("offers no tool for watching a project or setting a value", () =>
     Effect.gen(function* () {
-      const mcp = yield* serve(quiet);
+      const mcp = yield* serve(unanswered);
 
       const { tools } = yield* mcp.call("tools/list", {}, ToolList);
 
-      expect(
-        tools.map(({ description, inputSchema, name }) => ({
-          description,
-          name,
-          required: inputSchema.required,
-        }))
-      ).toStrictEqual([
-        {
-          description: Context.get(ListAsks.annotations, Description),
-          name: "listAsks",
-          required: ["project"],
-        },
-        {
-          description: Context.get(SubmitAnswer.annotations, Description),
-          name: "submitAnswer",
-          required: ["ask", "base", "head"],
-        },
-      ]);
+      const names = tools.map(({ name }) => name);
+
+      expect(names).toContain("listProjects");
+      expect(names).not.toContain("watch");
+      expect(names).not.toContain("setEnv");
     })
   );
 
@@ -108,11 +140,15 @@ describe("the contracts as MCP tools", () => {
     "hints that listing asks only reads, and that an answer can be offered again",
     () =>
       Effect.gen(function* () {
-        const mcp = yield* serve(quiet);
+        const mcp = yield* serve(unanswered);
 
         const { tools } = yield* mcp.call("tools/list", {}, HintedTools);
 
-        expect(tools).toStrictEqual([
+        expect(
+          tools.filter(({ name }) =>
+            ["listAsks", "submitAnswer"].includes(name)
+          )
+        ).toStrictEqual([
           {
             annotations: {
               destructiveHint: false,
@@ -138,12 +174,12 @@ describe("the contracts as MCP tools", () => {
   // The generated reference reads `listTools`, so it says what a client sees.
   it.effect("lists each tool exactly as the reference describes it", () =>
     Effect.gen(function* () {
-      const mcp = yield* serve(quiet);
+      const mcp = yield* serve(unanswered);
 
       const { tools } = yield* mcp.call("tools/list", {}, ListedTools);
 
       expect(tools).toStrictEqual(
-        listTools(toToolkit(Contracts, Effect.service(Client)).toolkit)
+        listTools(toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit)
       );
     })
   );
@@ -188,16 +224,11 @@ describe("the contracts as MCP tools", () => {
     Effect.gen(function* () {
       const refusal = new StaleBase({ base, conflicts: [path], main });
 
-      const mcp = yield* serve(
-        Contracts.toLayer({
-          listAsks: () => Effect.succeed({ asks: [] }),
-          submitAnswer: () => Effect.fail(refusal),
-        })
-      );
+      const mcp = yield* serve(stale(refusal));
 
       const result = yield* mcp.call(
         "tools/call",
-        { arguments: { ask, base, head }, name: "submitAnswer" },
+        { arguments: answer, name: "submitAnswer" },
         ToolResult
       );
 
@@ -214,8 +245,9 @@ describe("the contracts as MCP tools", () => {
   it.effect("returns a contract's success as structured content", () =>
     Effect.gen(function* () {
       const mcp = yield* serve(
-        Contracts.toLayer({
-          listAsks: () =>
+        Layer.mergeAll(
+          unanswered,
+          Contracts.toLayerHandler("listAsks", () =>
             Effect.succeed({
               asks: [
                 {
@@ -227,9 +259,9 @@ describe("the contracts as MCP tools", () => {
                   want: "Parse a trailing comma",
                 },
               ],
-            }),
-          submitAnswer: () => Effect.succeed({ main }),
-        })
+            })
+          )
+        )
       );
 
       const result = yield* mcp.call(
