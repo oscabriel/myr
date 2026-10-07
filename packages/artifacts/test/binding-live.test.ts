@@ -100,7 +100,8 @@ const freshPrefix = () =>
 
 /**
  * The live binding with every name prefixed, and every repo made through it
- * deleted when the scope closes.
+ * deleted when the scope closes. Each method is forwarded by name: a binding
+ * and its handles are RPC stubs, whose methods a spread would not copy.
  */
 const prefixed = (binding: Artifacts) =>
   Effect.gen(function* () {
@@ -120,20 +121,29 @@ const prefixed = (binding: Artifacts) =>
       )
     );
 
+    const handle = (repo: ArtifactsRepo): ArtifactsRepo => ({
+      createToken: (scope, ttl) => repo.createToken(scope, ttl),
+      fork: (target, options) => repo.fork(named(target), options),
+      info: () => repo.info(),
+      listTokens: () => repo.listTokens(),
+      log: (options) => repo.log(options),
+      readBlob: (hash) => repo.readBlob(hash),
+      readCommit: (hash) => repo.readCommit(hash),
+      readFile: (args) => repo.readFile(args),
+      readTree: (hash) => repo.readTree(hash),
+      revokeToken: (tokenOrId) => repo.revokeToken(tokenOrId),
+      [Symbol.dispose]: () => {
+        repo[Symbol.dispose]();
+      },
+    });
+
     return {
-      ...binding,
       create: (name, options) => binding.create(named(name), options),
       delete: (name) => binding.delete(`${prefix}${name}`),
       get: (name) =>
         run(
           Effect.promise(() => binding.get(`${prefix}${name}`)).pipe(
-            Effect.map((repo): ArtifactsRepo => ({
-              ...repo,
-              fork: (target, options) => repo.fork(named(target), options),
-              [Symbol.dispose]: () => {
-                repo[Symbol.dispose]();
-              },
-            }))
+            Effect.map(handle)
           )
         ),
       import: ({ source, target }) =>
@@ -141,6 +151,7 @@ const prefixed = (binding: Artifacts) =>
           source,
           target: { ...target, name: named(target.name) },
         }),
+      list: (options) => binding.list(options),
     } satisfies Artifacts;
   });
 

@@ -1,7 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { RepoPath } from "@repo/protocol/ids";
-import type { CommitSha } from "@repo/protocol/ids";
+import { CommitSha, RepoPath } from "@repo/protocol/ids";
 import { fakeArtifactsBinding } from "@repo/testkit/fake-artifacts-binding";
 import type {
   FakeOptions,
@@ -12,6 +11,7 @@ import { httpBackend } from "@repo/testkit/http-backend";
 import {
   Duration,
   Effect,
+  Exit,
   FiberSet,
   Layer,
   Option,
@@ -27,6 +27,7 @@ import {
   BranchName,
   ForkInProgress,
   HostBusy,
+  ObjectId,
   RefName,
   RefOutcome,
   RepoExists,
@@ -42,6 +43,8 @@ import { fetchInto, listRefs, pushRefs } from "../src/repo-host/smart-http.ts";
 import { describeRepoHost } from "./repo-host-contract.ts";
 
 const main = RefName.make("refs/heads/main");
+
+const landed = RefName.make("refs/asked/landed");
 
 /** Where the store's repos are served, in Artifacts' shape: `<base>/<name>.git`. */
 const remoteBase = "https://artifacts.test/git/projects";
@@ -406,34 +409,77 @@ describe("the Workers binding's surprises, typed", () => {
       )
   );
 
+  // S1 #4: Artifacts takes any update whose old value matches, and `/memory`
+  // and `/local` apply it too: the compare-and-swap is the only check.
   it.live(
-    "never forces a ref: a push that is not a fast-forward is Stale",
+    "moves a ref whose tip is `from` to a `to` that is not a fast-forward",
     () =>
       within(() =>
         Effect.gen(function* () {
           const repos = yield* RepoHost;
-          const name = RepoName.make("no-force");
+          const name = RepoName.make("rewound");
           const { client, first } = yield* seeded(name);
           const unrelated = yield* client.commit("unrelated", [["b.txt", "1"]]);
 
           expect(
-            yield* repos
-              .push(name, client.source, [
+            yield* Effect.exit(
+              repos.push(name, client.source, [
                 { from: Option.some(first), ref: main, to: unrelated },
               ])
-              .pipe(Effect.orDie)
-          ).toStrictEqual([
-            RefOutcome.Stale({ ref: main, tip: Option.some(first) }),
-          ]);
+            )
+          ).toStrictEqual(Exit.succeed([RefOutcome.Updated({ ref: main })]));
           expect(yield* repos.refs(name).pipe(Effect.orDie)).toStrictEqual(
-            new Map([[main, first]])
+            new Map([[main, unrelated]])
           );
         })
       )
   );
 
-  // Artifacts' `readTree` throws `INTERNAL_ERROR` for an object that is no tree.
-  it.live("reads no tree at a blob's id", () =>
+  // The Lander moves its mirror ref to a landing the store already holds,
+  // pushing from a scratch repo that holds none of its objects.
+  it.live(
+    "moves a ref to a commit the store has, from a source that has none of it",
+    () =>
+      within(() =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("mirrored");
+          const { client, first } = yield* seeded(name);
+          const empty = yield* gitClient(memoryFs());
+
+          const second = yield* client.commit(
+            "second",
+            [["a.txt", "2"]],
+            [first]
+          );
+
+          yield* repos
+            .push(name, client.source, [
+              { from: Option.none(), ref: landed, to: first },
+              { from: Option.some(first), ref: main, to: second },
+            ])
+            .pipe(Effect.orDie);
+
+          expect(
+            yield* Effect.exit(
+              repos.push(name, empty.source, [
+                { from: Option.some(first), ref: landed, to: second },
+              ])
+            )
+          ).toStrictEqual(Exit.succeed([RefOutcome.Updated({ ref: landed })]));
+          expect(yield* repos.refs(name).pipe(Effect.orDie)).toStrictEqual(
+            new Map([
+              [landed, second],
+              [main, second],
+            ])
+          );
+        })
+      )
+  );
+
+  // Artifacts' `readTree` throws `INTERNAL_ERROR` for an object that is no
+  // tree; the other stores read no tree there (202 Comment 5).
+  it.live("reads no tree at a blob's id or a commit's id", () =>
     within(
       () =>
         Effect.gen(function* () {
@@ -453,25 +499,33 @@ describe("the Workers binding's surprises, typed", () => {
           const blob = Option.getOrThrow(entries)[0]?.sha ?? tree;
 
           expect(blob).not.toBe(tree);
+          expect(yield* Effect.exit(repos.readTree(name, blob))).toStrictEqual(
+            Exit.succeed(Option.none())
+          );
           expect(
-            yield* repos.readTree(name, blob).pipe(Effect.orDie)
-          ).toStrictEqual(Option.none());
+            yield* Effect.exit(repos.readTree(name, ObjectId.make(first)))
+          ).toStrictEqual(Exit.succeed(Option.none()));
         }),
       {
         wrap: (host) => ({
           ...host,
           readTree: (repo, sha) =>
-            Effect.flatMap(host.readBlob(repo, sha), (bytes) =>
-              Option.isSome(bytes)
-                ? Effect.die(
+            Effect.gen(function* () {
+              const tree = yield* host.readTree(repo, sha);
+              const blob = yield* host.readBlob(repo, sha);
+              const commit = yield* host.readCommit(repo, CommitSha.make(sha));
+
+              return Option.isNone(tree) &&
+                (Option.isSome(blob) || Option.isSome(commit))
+                ? yield* Effect.die(
                     Object.assign(new Error("An internal error occurred."), {
                       code: "INTERNAL_ERROR",
                       name: "ArtifactsError",
                       numericCode: 10_400,
                     })
                   )
-                : host.readTree(repo, sha)
-            ),
+                : tree;
+            }),
         }),
       }
     )
@@ -620,7 +674,6 @@ describe("git smart HTTP over the Fetch port", () => {
             [first]
           );
 
-          const landed = RefName.make("refs/asked/landed");
           const remote = `${remoteBase}/${name}.git`;
 
           yield* store.create(name).pipe(Effect.orDie);

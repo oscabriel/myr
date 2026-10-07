@@ -56,7 +56,7 @@ class GitFailure extends Data.TaggedError("GitFailure")<{
 const ABSENT = "0".repeat(40);
 
 // What a receive-pack says when a ref moved under a push: Artifacts (S1 #5),
-// git's own receive-pack (2.56), and a server that refuses to rewind a ref.
+// git's own receive-pack (2.56), and a server set to refuse rewinding a ref.
 // `fetch first` is git's client-side word and never reaches a server.
 const MOVED = ["stale ref", "incorrect old value provided", "non-fast-forward"];
 
@@ -291,22 +291,22 @@ export const listRefs = (
 const isMoved = (reason: string) =>
   MOVED.some((moved) => reason.includes(moved));
 
-/** Whether a push of `ref` was refused because the ref moved. */
+/** Whether the store refused a push of `ref` because the ref moved. */
 const refusedAsMoved = ({ cause }: GitFailure, ref: RefName) =>
-  Match.value(cause).pipe(
-    Match.when(Match.instanceOf(Errors.PushRejectedError), () => true),
-    Match.when(Match.instanceOf(Errors.GitPushError), (failed) =>
-      isMoved(failed.data.result.refs[ref]?.error ?? "")
-    ),
-    Match.orElse(() => false)
-  );
+  cause instanceof Errors.GitPushError &&
+  isMoved(cause.data.result.refs[ref]?.error ?? "");
 
 /**
  * One ref's compare-and-swap. The push's own ref discovery is the check: if
  * the tip it finds is not `from`, the push stops there, before any pack is
- * built, so the old value the push names is the one checked. It never forces:
- * a push that is not a fast-forward, or a ref that moved after the check, is
+ * built, so the old value the push names is the one checked, and the store
+ * checks it again as it moves the ref. A ref that moved after the check is
  * `Stale` at the tip a fresh listing shows.
+ *
+ * The old value is the only check, as on every store: `to` need not descend
+ * from `from` (Artifacts takes such an update, S1 #4). So isomorphic-git's
+ * own fast-forward test is off (`force`), which also spares it walking the
+ * history of `to` in a source that holds only the new objects.
  */
 const pushOne = (
   remote: string,
@@ -321,6 +321,7 @@ const pushOne = (
     const pushed = yield* git((signal) =>
       push({
         ...source,
+        force: true,
         http,
         onPrePush: ({ remoteRef }) => {
           found = remoteRef.oid;

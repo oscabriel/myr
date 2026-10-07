@@ -84,8 +84,8 @@ class Thrown extends Data.TaggedError("Thrown")<{
   readonly error: unknown;
 }> {}
 
-/** An `INTERNAL_ERROR` from a fork, which may still have made the repo (S7 #2). */
-class Internal extends Data.TaggedError("Internal")<{
+/** A fork that answered `INTERNAL_ERROR`, which may still have made the repo (S7 #2). */
+class MaybeForked extends Data.TaggedError("MaybeForked")<{
   readonly thrown: Thrown;
 }> {}
 
@@ -293,7 +293,7 @@ const confirmed = (binding: Artifacts, name: RepoName) =>
 
 /**
  * One fork call. The base's absence names the base; any other refusal names
- * the target, and a 500 is `Internal`, since it may have made the target.
+ * the target, and a 500 is `MaybeForked`, since it may have made the target.
  */
 const forkOnce = (binding: Artifacts, base: RepoName, name: RepoName) =>
   withRepo(binding, base, (repo) =>
@@ -302,7 +302,7 @@ const forkOnce = (binding: Artifacts, base: RepoName, name: RepoName) =>
       Effect.catchTag("Thrown", (thrown) =>
         Match.value(thrown).pipe(
           Match.when(threw("INTERNAL_ERROR"), () =>
-            Effect.fail(new Internal({ thrown }))
+            Effect.fail(new MaybeForked({ thrown }))
           ),
           Match.when(threw("NOT_FOUND"), () =>
             Effect.fail(new RepoNotFound({ name: base }))
@@ -313,18 +313,39 @@ const forkOnce = (binding: Artifacts, base: RepoName, name: RepoName) =>
     )
   );
 
+/**
+ * Whether the repo holds `id` as a blob or a commit: `readBlob` answers
+ * `null` for any other kind, and `readCommit` throws for a non-commit.
+ */
+const blobOrCommit = (name: RepoName, repo: ArtifactsRepo, id: string) =>
+  call(name, () => repo.readBlob(id)).pipe(
+    Effect.flatMap((blob) =>
+      blob === null
+        ? attempt(() => repo.readCommit(id)).pipe(
+            Effect.map((commit) => commit !== null),
+            Effect.catchIf(threw("INTERNAL_ERROR"), () =>
+              Effect.succeed(false)
+            ),
+            Effect.catchTag("Thrown", (thrown) =>
+              fromArtifactsError(name, thrown)
+            )
+          )
+        : Effect.succeed(true)
+    )
+  );
+
 /** Artifacts throws `INTERNAL_ERROR` for an object that is no tree (workers-types). */
 const treeAt = (name: RepoName, repo: ArtifactsRepo, tree: string) =>
   attempt(() => repo.readTree(tree)).pipe(
     Effect.flatMap((found) =>
       found === null ? Effect.succeedNone : Effect.asSome(entriesOf(found))
     ),
-    // A blob's id names no tree, as on the other stores; any other failure
-    // stays one.
+    // A blob's or a commit's id names no tree, as on the other stores (202
+    // Comment 5); any other failure stays one.
     Effect.catchIf(threw("INTERNAL_ERROR"), ({ error }) =>
-      call(name, () => repo.readBlob(tree)).pipe(
-        Effect.flatMap((blob) =>
-          blob === null ? Effect.die(error) : Effect.succeedNone
+      blobOrCommit(name, repo, tree).pipe(
+        Effect.flatMap((other) =>
+          other ? Effect.succeedNone : Effect.die(error)
         )
       )
     ),
@@ -448,10 +469,10 @@ const make = (binding: Artifacts) =>
       // it may be the fork the first made, so it is confirmed, not trusted.
       fork: (base, name) =>
         forkOnce(binding, base, name).pipe(
-          Effect.catchTag("Internal", () =>
+          Effect.catchTag("MaybeForked", () =>
             forkOnce(binding, base, name).pipe(
               Effect.catchTags({
-                Internal: () => confirmed(binding, name),
+                MaybeForked: () => confirmed(binding, name),
                 RepoExists: () => confirmed(binding, name),
               })
             )
