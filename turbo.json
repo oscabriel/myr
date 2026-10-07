@@ -11,6 +11,11 @@
     "test": {
       "dependsOn": ["types", "^types"],
       "outputs": []
+    },
+    "@repo/config#test": {
+      "cache": false,
+      "dependsOn": ["types", "^types"],
+      "outputs": []
     }
   }
 }

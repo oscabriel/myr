@@ -35,7 +35,7 @@ describe(findLeaks, () => {
   });
 
   it("flags the name in a path", () => {
-    const path = `examples/x/${Brand.configDir}/project.ts`;
+    const path = `packages/x/${Brand.configDir}/project.ts`;
     expect(findLeaks([{ content: "", path }])).toStrictEqual([
       { line: 0, path, text: path },
     ]);
@@ -52,6 +52,45 @@ describe(findLeaks, () => {
         { content, path: "LICENSE" },
       ])
     ).toStrictEqual([]);
+  });
+
+  it("allows generated output: skills, plugins and the reference docs", () => {
+    const content = `${Brand.cli} asks`;
+
+    expect(
+      findLeaks([
+        { content, path: "skills/contribute/hooks.json" },
+        { content, path: "plugins/claude-code/plugin.json" },
+        { content, path: "docs/reference/commands.json" },
+      ])
+    ).toStrictEqual([]);
+  });
+
+  it("allows an example's config folder, name and all", () => {
+    const content = `import { project } from "${Brand.npmScope}/sdk";`;
+    const path = `examples/datekit/${Brand.configDir}/project.ts`;
+
+    expect(findLeaks([{ content, path }])).toStrictEqual([]);
+  });
+
+  it("still flags the name in an example's own code", () => {
+    const content = `const cli = "${Brand.cli}";`;
+
+    expect(
+      findLeaks([
+        { content, path: "examples/datekit/src/index.ts" },
+        {
+          content,
+          path: `examples/datekit/src/${Brand.configDir}/project.ts`,
+        },
+        { content, path: "docs/guide/setup.ts" },
+      ]).map((leak) => [leak.path, leak.line])
+    ).toStrictEqual([
+      ["examples/datekit/src/index.ts", 1],
+      [`examples/datekit/src/${Brand.configDir}/project.ts`, 0],
+      [`examples/datekit/src/${Brand.configDir}/project.ts`, 1],
+      ["docs/guide/setup.ts", 1],
+    ]);
   });
 
   it("ignores words that only contain the name", () => {

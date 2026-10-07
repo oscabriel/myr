@@ -235,9 +235,7 @@ export class PostureChange extends Schema.TaggedError<PostureChange>()(
   { ...Final, ...nextIs(cli("today")), from: Posture, to: Posture }
 ) {}
 
-/** The closed union. Each member's tag is public: rename one only with an alias. */
-export const Refusal = Schema.Union([
-  // Push and claim
+const pushAndClaim = [
   NotClaimed,
   ClaimLapsed,
   NotVouched,
@@ -245,29 +243,53 @@ export const Refusal = Schema.Union([
   AskFull,
   NoAsk,
   RepoBusy,
-  // Shape: these accumulate, so one push hears about every one at once
+] as const;
+
+// These accumulate, so one push hears about every one at once.
+const accumulating = [
   OutOfScope,
   TouchedJudge,
   Weakened,
   PrivatePathInPublicTree,
-  // Merge
-  StaleBase,
-  // Checks
-  ChecksFailed,
-  HeldBackFailed,
-  AttemptsExhausted,
-  // Never counted against the answerer
-  Flake,
-  VerifierBlocked,
-  // At ask open
-  NotRedFirst,
-  WeakCheck,
-  IncompleteBrief,
-  // Maintainers only
-  LayerContentInPublicTree,
-  SecretInOutput,
-  // Decision
-  PostureChange,
+] as const;
+
+const merge = [StaleBase] as const;
+
+const checks = [ChecksFailed, HeldBackFailed, AttemptsExhausted] as const;
+
+const neverCounted = [Flake, VerifierBlocked] as const;
+
+const atAskOpen = [NotRedFirst, WeakCheck, IncompleteBrief] as const;
+
+const maintainersOnly = [LayerContentInPublicTree, SecretInOutput] as const;
+
+const decision = [PostureChange] as const;
+
+/**
+ * The union's members by group, in union order. The reference docs file each
+ * refusal under its group; a new refusal joins its group here and in the union.
+ */
+export const groups = [
+  { members: pushAndClaim, name: "Push and claim" },
+  { members: accumulating, name: "Shape" },
+  { members: merge, name: "Merge" },
+  { members: checks, name: "Checks" },
+  { members: neverCounted, name: "Never counted against the answerer" },
+  { members: atAskOpen, name: "At ask open" },
+  { members: maintainersOnly, name: "Maintainers only" },
+  { members: decision, name: "Decision" },
+] as const;
+
+/** The closed union. Each member's tag is public: rename one only with an alias. */
+export const Refusal = Schema.Union([
+  ...pushAndClaim,
+  ...accumulating,
+  ...merge,
+  ...checks,
+  ...neverCounted,
+  ...atAskOpen,
+  ...maintainersOnly,
+  ...decision,
 ]);
 
 export type Refusal = typeof Refusal.Type;

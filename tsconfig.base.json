@@ -73,6 +73,23 @@
             }
           },
           {
+            "include": ["scripts/gen.ts", "scripts/lib/gen.ts"],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/ai",
+                "effect/cli",
+                "effect/process",
+                "effect/rpc"
+              ]
+            }
+          },
+          {
+            "include": ["packages/config/test/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": ["effect/process"]
+            }
+          },
+          {
             "include": ["apps/platform/**/*.ts"],
             "options": {
               "allowedUnstableApis": ["effect/ai", "effect/http", "effect/rpc"]

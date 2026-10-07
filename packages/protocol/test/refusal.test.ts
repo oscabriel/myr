@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 
 import { RepoPath } from "../src/ids.ts";
-import { Refusal, StaleBase } from "../src/refusal.ts";
+import { groups, Refusal, StaleBase } from "../src/refusal.ts";
 import { base, examples, main } from "./examples.ts";
 
 // What Effect's MCP server sends for a declared tool failure that has no
@@ -45,6 +45,14 @@ describe("the refusal union", () => {
     const document = JSON.stringify(Schema.toJsonSchemaDocument(Refusal));
 
     expect(document).not.toMatch(/Infinity|NaN|"null"/u);
+  });
+
+  it("files every member under exactly one group, in union order", () => {
+    expect(
+      groups.flatMap((group) =>
+        group.members.map((member) => member.identifier)
+      )
+    ).toStrictEqual(Refusal.members.map((member) => member.identifier));
   });
 
   // A failure here means a tag was added, removed or renamed, or a refusal

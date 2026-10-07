@@ -15,3 +15,9 @@ coverage/
 .env.*.local
 .dev.vars*
 env.d.ts
+
+# The build's spec and issues name local paths and the private plan, so they
+# stay out of the public repo (W8 899 asks the user before H3 whether to publish
+# a scrubbed copy). A worktree holds only tracked files, so every agent reads
+# them by absolute path in the main checkout.
+.scratch/build/

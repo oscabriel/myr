@@ -9,6 +9,7 @@
         "@effect/tsgo": "0.48.1",
         "@oxlint/plugins": "1.87.0",
         "@repo/brand": "workspace:*",
+        "@repo/protocol": "workspace:*",
         "cf": "1.0.0-beta.12",
         "effect": "catalog:",
         "oxfmt": "0.72.0",
@@ -80,6 +81,9 @@
     "packages/config": {
       "name": "@repo/config",
       "devDependencies": {
+        "@effect/platform-node": "4.0.1",
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },

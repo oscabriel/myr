@@ -6,9 +6,13 @@
     "./vitest": "./src/vitest.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@effect/platform-node": "4.0.1",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

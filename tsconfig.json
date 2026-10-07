@@ -3,6 +3,17 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true
   },
-  "include": ["*.config.ts", "scripts/**/*.ts"],
-  "exclude": ["node_modules", "dist", ".agent_sources", ".turbo"]
+  "include": [
+    "*.config.ts",
+    "scripts/**/*.ts",
+    "tools/oxlint/fence/**/*.ts",
+    ".pi/extensions/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".agent_sources",
+    ".turbo",
+    "tools/oxlint/fence/fixtures/**"
+  ]
 }

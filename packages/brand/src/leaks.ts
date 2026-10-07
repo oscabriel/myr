@@ -17,11 +17,26 @@ const HOME = "packages/brand/";
 // Prose names the product; code takes it from this package.
 const PROSE = /^LICENSES\/|(?:^|\/)(?:LICENSE[^/]*|[^/]+\.md)$/u;
 
+// `bun run gen` writes these from the brand, so they spell the name.
+const GENERATED = ["docs/reference/", "plugins/", "skills/"] as const;
+
+// An example project's config folder is named after the brand, and its files
+// import the SDK by its published name: `examples/<name>/<config dir>/…`. The
+// example's own code is not exempt.
+const inExampleConfig = (path: string) => {
+  const [root, , dir] = path.split("/");
+
+  return root === "examples" && dir === Brand.configDir;
+};
+
 // Letters on either side make it another word ("myriad"), not the name.
 const NAME = new RegExp(`(?<![a-z])${Brand.slug}(?![a-z])`, "iu");
 
 const mayNameTheBrand = (path: string) =>
-  path.startsWith(HOME) || PROSE.test(path);
+  path.startsWith(HOME) ||
+  PROSE.test(path) ||
+  GENERATED.some((root) => path.startsWith(root)) ||
+  inExampleConfig(path);
 
 const leaksIn = (file: SourceFile): readonly BrandLeak[] => {
   if (mayNameTheBrand(file.path)) {
