@@ -3,17 +3,23 @@
  * one schema in `packages/protocol`, and how the disk differs from it.
  * `scripts/gen.ts` writes or checks; tests import this directly.
  */
+import {
+  contractCommandDocs,
+  localCommandDocs,
+} from "@repo/agent-kit/command-doc";
+import type { CommandDoc } from "@repo/agent-kit/command-doc";
+import {
+  agentPluginsBundle,
+  claudePlugin,
+  platformSkill,
+} from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
 import {
-  Cli,
   Client,
   Contracts,
-  Description,
   Destructive,
   Idempotent,
-  NeedsApproval,
   partsOf,
-  ReadOnly,
   surfaced,
   SurfaceName,
   Surfaces,
@@ -97,25 +103,36 @@ export { Refusal } from "@repo/protocol/refusal";
 
 export { Contracts, partsOf } from "@repo/protocol/contracts";
 
+export { Brand } from "@repo/brand";
+
 /**
- * `docs/reference/commands.json`: every command the CLI has. `projected`
- * commands come from a contract; W4 merges in the hand-written `local` ones.
+ * `docs/reference/commands.json`: every command the CLI has, one row per
+ * `CommandDoc` (`@repo/agent-kit`), sorted by its words. A `contract` row is
+ * a contract projected onto the CLI and carries that contract's hints and
+ * payload; a `local` row is written by hand in the CLI, and may name the
+ * contract it calls (`init` calls `initProject`). `cli.md`, the platform's
+ * skill and `llms.txt` render from the same rows.
  */
 export const CommandCatalog = Schema.Struct({
   commands: Schema.Array(
     Schema.Struct({
-      contract: Schema.optionalKey(Schema.String),
+      contract: Schema.optionalKey(Schema.NonEmptyString),
       description: Schema.String,
-      destructive: Schema.Boolean,
-      idempotent: Schema.Boolean,
+      /** A contract row's; a hand-written command has no annotation to give it. */
+      destructive: Schema.optionalKey(Schema.Boolean),
+      /** Every flag it takes, as typed: `--project`, `--json`. */
+      flags: Schema.Array(Schema.NonEmptyString),
+      /** A contract row's; a hand-written command has no annotation to give it. */
+      idempotent: Schema.optionalKey(Schema.Boolean),
       name: Schema.NonEmptyString,
       needsApproval: Schema.Boolean,
       path: Schema.Array(Schema.NonEmptyString),
-      // The payload as JSON Schema: the same schema MCP lists as the input.
-      payloadSchema: Schema.Json,
+      // A contract row's payload as JSON Schema: the same schema MCP lists
+      // as the input.
+      payloadSchema: Schema.optionalKey(Schema.Json),
       positional: Schema.Array(Schema.String),
       readOnly: Schema.Boolean,
-      source: Schema.Literals(["projected", "local"]),
+      source: Schema.Literals(["contract", "local"]),
       surfaces: Schema.Array(SurfaceName),
     })
   ),
@@ -407,35 +424,58 @@ const mcpToolsDoc = (): GeneratedFile => ({
 
 // --- commands.json and cli.md -------------------------------------------------
 
-/** The CLI commands the contracts project onto, in the group's order. */
-const catalog = (): CommandCatalog => ({
-  commands: contracts.flatMap((rpc): readonly Command[] => {
-    const surfaces = Context.get(rpc.annotations, Surfaces);
+const byWords = Order.mapInput(Order.String, (doc: CommandDoc) =>
+  doc.path.join(" ")
+);
 
-    if (!surfaces.includes("cli")) {
-      return [];
-    }
+/**
+ * Every command the CLI has, one row each, sorted by its words: the
+ * contracts it projects, and the commands written by hand in it.
+ * `apps/cli/test/commands-doc.test.ts` holds this list to the CLI's tree.
+ */
+const commandDocs = (): readonly CommandDoc[] =>
+  Arr.sort([...contractCommandDocs(Contracts), ...localCommandDocs], byWords);
 
-    const cli = Context.get(rpc.annotations, Cli);
-    const name = cli.name ?? rpc._tag;
+/** The contract a contract row projects; a row naming none is a defect. */
+const contractOf = (doc: CommandDoc) => {
+  const rpc =
+    doc.contract === undefined
+      ? undefined
+      : Contracts.requests.get(doc.contract);
 
-    return [
-      {
-        contract: rpc._tag,
-        description: Context.get(rpc.annotations, Description),
-        destructive: Context.get(rpc.annotations, Destructive),
-        idempotent: Context.get(rpc.annotations, Idempotent),
-        name,
-        needsApproval: Context.get(rpc.annotations, NeedsApproval),
-        path: name.split(" "),
-        payloadSchema: toJson(toJsonSchema(rpc.payloadSchema)),
-        positional: cli.positional ?? [],
-        readOnly: Context.get(rpc.annotations, ReadOnly),
-        source: "projected",
-        surfaces,
-      },
-    ];
-  }),
+  if (rpc === undefined) {
+    throw new Error(
+      `commands.json: ${doc.path.join(" ")} names no contract the group has`
+    );
+  }
+
+  return rpc;
+};
+
+/** A row as commands.json holds it. */
+const rowOf = (doc: CommandDoc): Command => {
+  // The doc's own keys: `contract` only where the doc names one.
+  const { source: _source, summary, ...shared } = doc;
+  const common = { ...shared, description: summary, name: doc.path.join(" ") };
+
+  if (doc.source === "local") {
+    return { ...common, source: "local", surfaces: ["cli"] };
+  }
+
+  const rpc = contractOf(doc);
+
+  return {
+    ...common,
+    destructive: Context.get(rpc.annotations, Destructive),
+    idempotent: Context.get(rpc.annotations, Idempotent),
+    payloadSchema: toJson(toJsonSchema(rpc.payloadSchema)),
+    source: "contract",
+    surfaces: Context.get(rpc.annotations, Surfaces),
+  };
+};
+
+const catalogOf = (docs: readonly CommandDoc[]): CommandCatalog => ({
+  commands: docs.map(rowOf),
   version: 1,
 });
 
@@ -460,6 +500,18 @@ const kinds = new Map([
   ["integer", "a number"],
   ["number", "a number"],
   ["string", "text"],
+]);
+
+const SWITCH = "nothing (a switch)";
+
+/**
+ * The required payload fields the CLI fills, when they are left out, from
+ * the repo it stands in, with where the value comes from: `fromRepoContext`
+ * in `apps/cli/src/surfaces.ts`. Its test (`commands-doc.test.ts`) holds
+ * every contract command's `--project` optional.
+ */
+const filledFromRepo = new Map([
+  ["project", "the project of the repo you stand in"],
 ]);
 
 /**
@@ -488,9 +540,32 @@ const takes = (field: Schema.Json) => {
   );
 };
 
-const commandSection = (command: Command) => {
+/** The words a section is headed by and starts its usage with. */
+const commandLine = (command: Command) =>
+  [Brand.cli, ...command.path].join(" ");
+
+const heading = (command: Command) => [
+  `## \`${commandLine(command)}\``,
+  "",
+  command.description,
+  "",
+];
+
+const usageBlock = (usage: readonly string[]) => [
+  "```sh",
+  usage.join(" "),
+  "```",
+  "",
+];
+
+/**
+ * A contract's command: its payload's fields as flags (or positionals), each
+ * with what it takes and whether a person must give it, then the switches
+ * the CLI adds (`--json`, `--yes`, `--dry-run`).
+ */
+const contractSection = (command: Command) => {
   const { properties = {}, required = [] } = decodePayloadFields(
-    command.payloadSchema
+    command.payloadSchema ?? {}
   );
 
   const positional = new Set(command.positional);
@@ -500,9 +575,16 @@ const commandSection = (command: Command) => {
     ([field]) => !positional.has(field)
   );
 
-  /** Whether a person must give the flag: a switch never needs giving. */
+  const fromPayload = new Set(flags.map(([field]) => `--${field}`));
+  const switches = command.flags.filter((flag) => !fromPayload.has(flag));
+
+  /** Where the CLI takes a required field's value from when it is left out. */
+  const filled = (field: string) =>
+    needed.has(field) ? filledFromRepo.get(field) : undefined;
+
+  /** Whether a person must give the flag: a switch or a filled field never needs giving. */
   const mustGive = ([field, schema]: readonly [string, Schema.Json]) =>
-    needed.has(field) && !isSwitch(schema);
+    needed.has(field) && !isSwitch(schema) && filled(field) === undefined;
 
   const usageOf = (flag: readonly [string, Schema.Json]) => {
     const [field, schema] = flag;
@@ -514,12 +596,11 @@ const commandSection = (command: Command) => {
     return mustGive(flag) ? `--${field} <${field}>` : `[--${field} <${field}>]`;
   };
 
-  const usage = [
-    Brand.cli,
-    ...command.path,
-    ...command.positional.map((field) => `<${field}>`),
-    ...flags.map(usageOf),
-  ].join(" ");
+  const requiredCell = (flag: readonly [string, Schema.Json]) => {
+    const from = filled(flag[0]);
+
+    return from === undefined ? yesNo(mustGive(flag)) : `no: ${from}`;
+  };
 
   const rows = [
     ...command.positional.map(
@@ -528,25 +609,25 @@ const commandSection = (command: Command) => {
     ),
     ...flags.map(
       (flag) =>
-        `| \`--${flag[0]}\` | ${takes(flag[1])} | ${yesNo(mustGive(flag))} |`
+        `| \`--${flag[0]}\` | ${takes(flag[1])} | ${requiredCell(flag)} |`
     ),
+    ...switches.map((flag) => `| \`${flag}\` | ${SWITCH} | no |`),
   ];
 
   return [
-    `## \`${Brand.cli} ${command.path.join(" ")}\``,
-    "",
-    command.description,
-    "",
-    "```sh",
-    usage,
-    "```",
-    "",
+    ...heading(command),
+    ...usageBlock([
+      commandLine(command),
+      ...command.positional.map((field) => `<${field}>`),
+      ...flags.map(usageOf),
+      ...switches.map((flag) => `[${flag}]`),
+    ]),
     ...(command.contract === undefined
       ? []
       : [`- Contract: \`${command.contract}\``]),
     `- Reads only: ${yesNo(command.readOnly)}`,
-    `- Idempotent: ${yesNo(command.idempotent)}`,
-    `- Destructive: ${yesNo(command.destructive)}`,
+    `- Idempotent: ${yesNo(command.idempotent ?? false)}`,
+    `- Destructive: ${yesNo(command.destructive ?? false)}`,
     `- Needs approval: ${yesNo(command.needsApproval)}`,
     `- Surfaces: ${command.surfaces.join(", ")}`,
     "",
@@ -557,17 +638,65 @@ const commandSection = (command: Command) => {
   ];
 };
 
+const named = (names: readonly string[]) =>
+  names.length === 0 ? "none" : names.map((name) => `\`${name}\``).join(", ");
+
+/**
+ * A command written by hand in the CLI: its arguments and flags by name,
+ * and `--help` for what each takes, which only the command itself knows.
+ */
+const localSection = (command: Command) => [
+  ...heading(command),
+  ...usageBlock([
+    commandLine(command),
+    ...command.positional.map((field) => `<${field}>`),
+    ...(command.flags.length === 0 ? [] : ["[flags]"]),
+  ]),
+  command.contract === undefined
+    ? "- Written by hand in the CLI"
+    : `- Written by hand in the CLI; calls the contract \`${command.contract}\``,
+  `- Reads only: ${yesNo(command.readOnly)}`,
+  `- Needs approval: ${yesNo(command.needsApproval)}`,
+  `- Arguments: ${named(command.positional.map((field) => `<${field}>`))}`,
+  `- Flags: ${named(command.flags)}`,
+  "",
+  `\`${commandLine(command)} --help\` says what each one takes.`,
+  "",
+];
+
+const commandSection = (command: Command) =>
+  command.source === "contract"
+    ? contractSection(command)
+    : localSection(command);
+
+/** Words joined as a sentence lists them: `a`, `a and b`, `a, b and c`. */
+const listed = (items: readonly string[]) =>
+  items.length < 2
+    ? items.join("")
+    : `${items.slice(0, -1).join(", ")} and ${items.at(-1) ?? ""}`;
+
+/** Which commands take `--json`: every one, or every one but those named. */
+const withJson = ({ commands }: CommandCatalog) => {
+  const without = commands.flatMap((command) =>
+    command.flags.includes("--json") ? [] : [`\`${command.name}\``]
+  );
+
+  return `Every command${without.length === 0 ? "" : ` but ${listed(without)}`} takes \`--json\`, which prints one versioned JSON envelope instead of Markdown.`;
+};
+
 /** cli.md is rendered from the catalog commands.json holds, so the two agree. */
 const cliDoc = (commands: CommandCatalog): GeneratedFile => ({
   content: page([
     generatedBy(
-      "packages/protocol/src/contracts.ts through commands.json",
-      "the contracts"
+      "packages/protocol/src/contracts.ts and the CLI's hand-written commands (packages/agent-kit/src/command-doc.ts) through commands.json",
+      "those"
     ),
     "",
     "# CLI",
     "",
-    `Each command below is a contract projected onto the \`${Brand.cli}\` CLI: the payload's fields become flags, or positional arguments where the contract names them. Every command also takes \`--json\`, which prints the encoded result, or the refusal, as JSON. [commands.json](commands.json) holds the same catalog as data.`,
+    `Every command the \`${Brand.cli}\` CLI has, sorted by its words. Most are contracts projected onto the CLI: the payload's fields become flags, or positional arguments where the contract names them. The rest are written by hand in the CLI, for work done on your machine (\`login\`, \`check\`, \`init\`) or to keep a value out of an argument list (\`env set\`). [commands.json](commands.json) holds the same list as data.`,
+    "",
+    `${withJson(commands)} A command that needs a person's approval runs only with \`--yes\`, and a contract's command that changes anything takes \`--dry-run\`, which prints what it would send. Inside a project's repo (its own, a claim's fork or a working fork), a contract's command left without the \`--project\` it needs takes the repo's. \`${Brand.cli} schema <command>\` prints the JSON Schema of the payload a command sends.`,
     "",
     ...commands.commands.flatMap(commandSection),
   ]),
@@ -578,6 +707,44 @@ const commandsJson = (commands: CommandCatalog): GeneratedFile => ({
   content: `${printJson(commands)}\n`,
   path: "docs/reference/commands.json",
 });
+
+// --- skills/ and plugins/ -------------------------------------------------------
+
+/**
+ * The repo's own skill and its plugin, from the same command rows. The
+ * Claude Code plugin and the Agent Plugins bundle share `plugins/<slug>/`
+ * and both carry the platform's skill there, with the same bytes, so it is
+ * written once; two different files at one path are a defect.
+ */
+const agentFiles = (commands: readonly CommandDoc[]) =>
+  Effect.all([
+    platformSkill({ commands }),
+    claudePlugin({ commands }),
+    agentPluginsBundle({ commands }),
+  ]).pipe(
+    Effect.flatMap((all) => {
+      const byPathOf = new Map<string, string>();
+
+      for (const file of all.flat()) {
+        const seen = byPathOf.get(file.path);
+
+        if (seen !== undefined && seen !== file.content) {
+          return Effect.die(
+            new Error(`gen: two different files for ${file.path}`)
+          );
+        }
+
+        byPathOf.set(file.path, file.content);
+      }
+
+      return Effect.succeed(
+        [...byPathOf].map(([where, content]): GeneratedFile => ({
+          content,
+          path: where,
+        }))
+      );
+    })
+  );
 
 // --- protocol.schema.json -----------------------------------------------------
 
@@ -635,21 +802,30 @@ const protocolSchema = (): GeneratedFile => {
   };
 };
 
-/** Every file gen writes, sorted by path. */
-export const generate = (): readonly GeneratedFile[] => {
-  const commands = catalog();
+/**
+ * Every file gen writes, sorted by path: the reference under
+ * `docs/reference/`, the platform's skill under `skills/` and its plugin
+ * under `plugins/`. Nothing in them depends on the clock, so running it
+ * twice gives the same bytes.
+ */
+export const generate = (): Effect.Effect<readonly GeneratedFile[]> =>
+  Effect.gen(function* () {
+    const docs = commandDocs();
+    const commands = catalogOf(docs);
+    const agents = yield* agentFiles(docs);
 
-  return Arr.sort(
-    [
-      cliDoc(commands),
-      commandsJson(commands),
-      mcpToolsDoc(),
-      protocolSchema(),
-      refusalsDoc(),
-    ],
-    byPath
-  );
-};
+    return Arr.sort(
+      [
+        cliDoc(commands),
+        commandsJson(commands),
+        mcpToolsDoc(),
+        protocolSchema(),
+        refusalsDoc(),
+        ...agents,
+      ],
+      byPath
+    );
+  });
 
 /**
  * How the files on disk under the owned roots differ from what gen would

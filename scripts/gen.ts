@@ -51,7 +51,7 @@ const readOwned = Effect.gen(function* () {
 });
 
 const check = Effect.gen(function* () {
-  const expected = generate();
+  const expected = yield* generate();
   const { extra, missing, stale } = drift(expected, yield* readOwned);
 
   if (extra.length + missing.length + stale.length === 0) {
@@ -76,7 +76,7 @@ const check = Effect.gen(function* () {
 const write = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const expected = generate();
+  const expected = yield* generate();
   const { extra } = drift(expected, yield* readOwned);
 
   for (const file of expected) {
