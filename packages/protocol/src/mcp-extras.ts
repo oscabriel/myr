@@ -49,10 +49,11 @@ const refusedAsText = <A, E, R>(read: Effect.Effect<A, E, R>) =>
     )
   );
 
-/** A cell's text, safe inside a Markdown table row. */
-const cell = (text: string) =>
-  text.replaceAll("|", "\\|").replaceAll(/\s*\n\s*/gu, " ");
-
+/**
+ * The projects as a Markdown table. Every cell is a decoded value whose
+ * schema already keeps out `|` and line breaks (a `ProjectName`, a
+ * `Posture`, a count, an ISO time), so none needs escaping.
+ */
 const projectsTable = (projects: readonly ProjectListing[]) =>
   projects.length === 0
     ? "No projects yet."
@@ -66,9 +67,7 @@ const projectsTable = (projects: readonly ProjectListing[]) =>
               posture,
               String(openAsks),
               landedAt === undefined ? "never" : DateTime.formatIso(landedAt),
-            ]
-              .map(cell)
-              .join(" | ")} |`
+            ].join(" | ")} |`
         ),
       ].join("\n");
 

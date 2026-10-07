@@ -641,6 +641,23 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
     );
 
     test.effect(
+      "answers contribute for a project nobody made with an error naming UnknownProject",
+      () =>
+        Effect.gen(function* () {
+          const { fetch } = yield* Seeded;
+
+          const message = yield* errorOf(fetch, "prompts/get", {
+            arguments: { project: nowhere },
+            name: "contribute",
+          });
+
+          expect(message).toContain(
+            explain([new UnknownProject({ project: nowhere })]).join("\n")
+          );
+        })
+    );
+
+    test.effect(
       "keeps resources and prompts from a caller with no credential",
       () =>
         Effect.gen(function* () {
@@ -687,11 +704,14 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
 
           const [{ text }] = result.content;
 
+          // Before decoding: a call that wrongly succeeded fails here, by
+          // this assertion, rather than as a decode error.
+          expect(result.isError, `${tag} was not refused`).toBeTruthy();
+
           const refusal = yield* Schema.decodeUnknownEffect(rpc.errorSchema)(
             text
           );
 
-          expect(result.isError).toBeTruthy();
           expect(text).toMatchObject({
             _tag: row.refusal._tag,
             next: row.refusal.next,
