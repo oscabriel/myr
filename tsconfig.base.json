@@ -101,6 +101,18 @@
             }
           },
           {
+            "include": ["apps/platform/src/project-do.ts"],
+            "options": {
+              "allowedUnstableApis": [
+                "@effect/sql-sqlite-do/SqliteClient#layer",
+                "effect/ai",
+                "effect/http",
+                "effect/rpc",
+                "effect/sql"
+              ]
+            }
+          },
+          {
             "include": ["apps/cli/**/*.ts"],
             "options": {
               "allowedUnstableApis": [
