@@ -98,8 +98,6 @@ describe("each command a later issue builds", () => {
     { args: ["credential"], issue: "412" },
     { args: ["init"], issue: "413" },
     { args: ["check"], issue: "405" },
-    { args: ["why"], issue: "414" },
-    { args: ["env", "set"], issue: "414" },
     { args: ["hook"], issue: "415" },
   ] as const;
 
