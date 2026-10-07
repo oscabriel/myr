@@ -14,8 +14,11 @@
   "name": "platform",
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-05",
-  // isomorphic-git needs `Buffer` (the /isogit Lander).
-  "compatibility_flags": ["nodejs_compat"],
+  // isomorphic-git needs `Buffer` (the /isogit Lander). The OAuth provider
+  // resolves a Client ID Metadata Document (the CLI's, served at /oauth/cli,
+  // and an MCP client's) only with `global_fetch_strictly_public`, which
+  // sends the fetch through the public internet (SSRF protection).
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   // Rat Stack's byte limits are for a minified bundle (scripts/startup-budget.ts).
   "minify": true,
   "workers_dev": true,
@@ -30,9 +33,10 @@
     "LANDER_ADAPTER": "container",
   },
   "secrets": {
-    // Declared in .env.schema; the user sets the values. SESSION_TOKENS and
-    // the GitHub and cookie keys are optional, so a stage deploys before H4.
-    "required": ["OPERATOR_TOKEN"],
+    // Declared in .env.schema; the user sets the values. SESSION_TOKENS is
+    // optional; sign-in's cookie key and pepper are not, since accounts are
+    // the platform's own and need no third party.
+    "required": ["OPERATOR_TOKEN", "COOKIE_KEY", "PASSWORD_PEPPER"],
   },
   "durable_objects": {
     "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
@@ -70,6 +74,13 @@
       "namespace_id": "1002",
       "simple": { "limit": 5, "period": 60 },
     },
+    // Sign-in attempts per handle and per client address (W3 316): the
+    // sixth in a minute is refused before the password is checked.
+    {
+      "name": "SIGN_IN_LIMIT",
+      "namespace_id": "1003",
+      "simple": { "limit": 5, "period": 60 },
+    },
   ],
   "triggers": {
     "events": [
@@ -87,7 +98,9 @@
         "STAGE": "dev-oscabriel",
         "LANDER_ADAPTER": "container",
       },
-      "secrets": { "required": ["OPERATOR_TOKEN"] },
+      "secrets": {
+        "required": ["OPERATOR_TOKEN", "COOKIE_KEY", "PASSWORD_PEPPER"],
+      },
       "durable_objects": {
         "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
       },
@@ -136,6 +149,11 @@
           "namespace_id": "1102",
           "simple": { "limit": 5, "period": 60 },
         },
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1103",
+          "simple": { "limit": 5, "period": 60 },
+        },
       ],
       "triggers": {
         "events": [
@@ -155,7 +173,9 @@
         "STAGE": "demo",
         "LANDER_ADAPTER": "container",
       },
-      "secrets": { "required": ["OPERATOR_TOKEN"] },
+      "secrets": {
+        "required": ["OPERATOR_TOKEN", "COOKIE_KEY", "PASSWORD_PEPPER"],
+      },
       "durable_objects": {
         "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
       },
@@ -192,6 +212,11 @@
         {
           "name": "PROPOSAL_LIMIT",
           "namespace_id": "1202",
+          "simple": { "limit": 5, "period": 60 },
+        },
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1203",
           "simple": { "limit": 5, "period": 60 },
         },
       ],

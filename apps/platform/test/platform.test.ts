@@ -8,10 +8,6 @@ import { rpcClient, served, toolCall } from "./harness.ts";
 
 const project = ProjectName.make("datekit");
 
-const cookieKey = "cookie-key-0123456789abcdef0123456789";
-
-const clientId = "github-client-id-0123";
-
 /** What building the platform from `env` failed with. */
 const failureOf = (env: Env) => Effect.flip(Layer.build(platform(env)));
 
@@ -75,22 +71,21 @@ describe("the platform Worker's env", () => {
   );
 
   it.effect(
-    "fails to start with GitHub's client id but not its secret, naming the key only",
+    "fails to start without sign-in's pepper, or with a short one, naming the key only",
     () =>
       Effect.gen(function* () {
-        const env = {
+        const missing = yield* failureOf(without(fakeEnv(), "PASSWORD_PEPPER"));
+
+        const short = yield* failureOf({
           ...fakeEnv(),
-          COOKIE_KEY: cookieKey,
-          GITHUB_CLIENT_ID: clientId,
-        };
+          PASSWORD_PEPPER: "short-pepper",
+        });
 
-        const failure = yield* failureOf(env);
-
-        expect(failure).toStrictEqual(
-          new InvalidEnv({ keys: ["GITHUB_CLIENT_SECRET"] })
-        );
-        expect(JSON.stringify(failure)).not.toContain(clientId);
-        expect(JSON.stringify(failure)).not.toContain(cookieKey);
+        expect([missing, short]).toStrictEqual([
+          new InvalidEnv({ keys: ["PASSWORD_PEPPER"] }),
+          new InvalidEnv({ keys: ["PASSWORD_PEPPER"] }),
+        ]);
+        expect(JSON.stringify(short)).not.toContain("short-pepper");
       })
   );
 

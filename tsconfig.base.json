@@ -96,7 +96,8 @@
                 "effect/ai",
                 "effect/http",
                 "effect/rpc",
-                "effect/sql"
+                "effect/sql",
+                "@effect/sql-d1/D1Client#layer"
               ]
             }
           },
