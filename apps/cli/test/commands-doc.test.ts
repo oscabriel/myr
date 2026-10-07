@@ -13,6 +13,7 @@ import {
 } from "@repo/agent-kit/command-doc";
 import type { CommandDoc } from "@repo/agent-kit/command-doc";
 import { Client, Contracts } from "@repo/protocol/contracts";
+import { toJsonSchema } from "@repo/protocol/mcp";
 import { Effect, Layer, Schema } from "effect";
 import { CliOutput, Command } from "effect/cli";
 import type { HelpDoc } from "effect/cli";
@@ -161,6 +162,35 @@ const declared = (row: CommandDoc, takes: Takes) => {
   );
 };
 
+/** A payload's JSON Schema, as cli.md reads it: its fields and the required ones. */
+const PayloadFields = Schema.Struct({
+  properties: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  required: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+
+const decodePayloadFields = Schema.decodeUnknownSync(PayloadFields);
+
+/** The payload of the contract a contract row projects, as JSON Schema. */
+const payloadOf = (row: CommandDoc) => {
+  const rpc = Contracts.requests.get(row.contract ?? "");
+
+  return rpc === undefined
+    ? {}
+    : decodePayloadFields(toJsonSchema(rpc.payloadSchema));
+};
+
+const isBoolean = Schema.is(Schema.Struct({ type: Schema.Literal("boolean") }));
+
+/** A boolean field is a switch, which the CLI never requires. */
+const isSwitch = (field: Schema.Json | undefined) =>
+  field !== undefined && isBoolean(field);
+
+/**
+ * The required fields the CLI fills from the repo it stands in, which cli.md
+ * writes as optional: the same list as `filledFromRepo` in scripts/lib/gen.ts.
+ */
+const filledFromRepo = new Set(["project"]);
+
 describe("the command rows against the CLI", () => {
   it.effect(
     "name exactly the commands the CLI has: none without a row, no row without a command",
@@ -208,28 +238,43 @@ describe("the command rows against the CLI", () => {
     30_000
   );
 
-  // cli.md says a contract's `--project` may be left out inside a project's
-  // repo: the CLI fills it from the repo's remote.
+  // cli.md marks a contract's flag required when its payload field is,
+  // unless it is a switch or the CLI fills it from the repo it stands in:
+  // `project`, as `filledFromRepo` in scripts/lib/gen.ts says. A field the
+  // CLI starts filling, or stops filling, fails here until gen says so too.
   it.effect(
-    "leave a contract command's --project optional, for the repo to fill",
+    "require a contract's required fields as flags, all but the --project the repo fills",
     () =>
       Effect.gen(function* () {
         const commands = yield* runnable;
 
-        const required = contractCommandDocs(Contracts).flatMap((row) =>
-          (commands.get(words(row))?.takes.flags ?? []).some(
-            ({ name, required: needed }) => name === "project" && needed
-          )
-            ? [words(row)]
-            : []
-        );
+        const differ = contractCommandDocs(Contracts).flatMap((row) => {
+          const { properties = {}, required = [] } = payloadOf(row);
 
+          const asked = required.filter(
+            (field) =>
+              !row.positional.includes(field) &&
+              !isSwitch(properties[field]) &&
+              !filledFromRepo.has(field)
+          );
+
+          const real = (commands.get(words(row))?.takes.flags ?? []).flatMap(
+            ({ name, required: needed }) => (needed ? [name] : [])
+          );
+
+          return asked.toSorted().join(" ") === real.toSorted().join(" ")
+            ? []
+            : [{ asked, command: words(row), real }];
+        });
+
+        // Known fills, so a CLI that requires `--project` everywhere and a
+        // gen that fills nothing can't agree.
         expect(
-          contractCommandDocs(Contracts).filter(({ flags }) =>
-            flags.includes("--project")
+          contractCommandDocs(Contracts).filter((row) =>
+            (payloadOf(row).required ?? []).includes("project")
           )
         ).not.toHaveLength(0);
-        expect(required).toStrictEqual([]);
+        expect(differ).toStrictEqual([]);
       }),
     30_000
   );

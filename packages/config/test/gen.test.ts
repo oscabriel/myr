@@ -492,13 +492,37 @@ describe("the command catalog", () => {
         expect(submit?.flags).toContain("--dry-run");
         expect(
           commands.flatMap((command) =>
-            command.payloadSchema === undefined
-              ? []
-              : leaks(command.payloadSchema)
+            command.source === "contract" ? leaks(command.payloadSchema) : []
           )
         ).toStrictEqual([]);
       })
   );
+
+  // A contract's row is there to give its contract's hints and payload; a
+  // hand-written command has no annotations to give, even when it calls one.
+  it("holds a contract's row to its hints and payload, and asks none of a hand-written one", () => {
+    const row = {
+      description: "List a project's open asks.",
+      flags: ["--json"],
+      name: "asks",
+      needsApproval: false,
+      path: ["asks"],
+      positional: [],
+      readOnly: true,
+      surfaces: ["cli"],
+    };
+
+    const facts = { destructive: false, idempotent: true, payloadSchema: {} };
+    const isCatalog = Schema.is(CommandCatalog);
+
+    expect(
+      [
+        { ...row, contract: "listAsks", source: "contract" },
+        { ...row, contract: "listAsks", ...facts, source: "contract" },
+        { ...row, contract: "landing", source: "local" },
+      ].map((command) => isCatalog({ commands: [command], version: 1 }))
+    ).toStrictEqual([false, true, true]);
+  });
 
   // `init` and `env set` do local work around the contract they call, so
   // their hand-written rows stand for those contracts.

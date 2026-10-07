@@ -3,7 +3,7 @@ name: myr
 description: "Contribute to projects on Myr with the `myr` CLI: find an ask, claim it, check your answer locally, push it to your fork, and read the verdict. Use when a repo's remote is on Myr, or when a push was refused with a refusal such as OutOfScope or StaleBase."
 metadata:
   managed-by: "myr"
-  content-hash: "sha256:12563228d3a1f5a33bc476a9f1ba58661bfbab4bc3a07810aafbf8f2197170d7"
+  content-hash: "sha256:d6fad2ea309b06cc5be6b6ebe7bc0f43bebea43160eabc12b87ea29c47064936"
 ---
 # Myr
 
@@ -23,7 +23,7 @@ A project's own `<project>-contribute` skill and the block in its AGENTS.md give
 
 ## Output
 
-Every command prints Markdown; `--json` prints one versioned JSON envelope instead. A command that needs a person's approval runs only with `--yes`, and `--dry-run` prints what it would send.
+A command whose flags list `--json` prints Markdown, or one versioned JSON envelope with `--json`. A command that needs a person's approval runs only with `--yes`, and `--dry-run` prints what it would send.
 
 ## Commands
 

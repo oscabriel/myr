@@ -1,7 +1,8 @@
 /**
  * Generation's pure core: every file `bun run gen` writes, computed from the
- * one schema in `packages/protocol`, and how the disk differs from it.
- * `scripts/gen.ts` writes or checks; tests import this directly.
+ * one schema in `packages/protocol` and the command rows and generators in
+ * `packages/agent-kit`, and how the disk differs from it. `scripts/gen.ts`
+ * writes or checks; tests import this directly.
  */
 import {
   contractCommandDocs,
@@ -113,35 +114,51 @@ export { Brand } from "@repo/brand";
  * contract it calls (`init` calls `initProject`). `cli.md`, the platform's
  * skill and `llms.txt` render from the same rows.
  */
+const commandFields = {
+  description: Schema.String,
+  /** Every flag it takes, as typed: `--project`, `--json`. */
+  flags: Schema.Array(Schema.NonEmptyString),
+  name: Schema.NonEmptyString,
+  needsApproval: Schema.Boolean,
+  path: Schema.Array(Schema.NonEmptyString),
+  positional: Schema.Array(Schema.String),
+  readOnly: Schema.Boolean,
+  surfaces: Schema.Array(SurfaceName),
+};
+
+/** A contract projected onto the CLI, with its contract's hints and payload. */
+const ContractCommand = Schema.Struct({
+  ...commandFields,
+  contract: Schema.NonEmptyString,
+  destructive: Schema.Boolean,
+  idempotent: Schema.Boolean,
+  // The payload as JSON Schema: the same schema MCP lists as the input.
+  payloadSchema: Schema.Json,
+  source: Schema.Literal("contract"),
+});
+
+/**
+ * A command written by hand in the CLI: it has no annotations, so no hints
+ * and no payload, and it may name the contract it calls.
+ */
+const LocalCommand = Schema.Struct({
+  ...commandFields,
+  contract: Schema.optionalKey(Schema.NonEmptyString),
+  source: Schema.Literal("local"),
+});
+
 export const CommandCatalog = Schema.Struct({
-  commands: Schema.Array(
-    Schema.Struct({
-      contract: Schema.optionalKey(Schema.NonEmptyString),
-      description: Schema.String,
-      /** A contract row's; a hand-written command has no annotation to give it. */
-      destructive: Schema.optionalKey(Schema.Boolean),
-      /** Every flag it takes, as typed: `--project`, `--json`. */
-      flags: Schema.Array(Schema.NonEmptyString),
-      /** A contract row's; a hand-written command has no annotation to give it. */
-      idempotent: Schema.optionalKey(Schema.Boolean),
-      name: Schema.NonEmptyString,
-      needsApproval: Schema.Boolean,
-      path: Schema.Array(Schema.NonEmptyString),
-      // A contract row's payload as JSON Schema: the same schema MCP lists
-      // as the input.
-      payloadSchema: Schema.optionalKey(Schema.Json),
-      positional: Schema.Array(Schema.String),
-      readOnly: Schema.Boolean,
-      source: Schema.Literals(["contract", "local"]),
-      surfaces: Schema.Array(SurfaceName),
-    })
-  ),
+  commands: Schema.Array(Schema.Union([ContractCommand, LocalCommand])),
   version: Schema.Literal(1),
 });
 
 export type CommandCatalog = typeof CommandCatalog.Type;
 
 type Command = CommandCatalog["commands"][number];
+
+type ContractCommand = typeof ContractCommand.Type;
+
+type LocalCommand = typeof LocalCommand.Type;
 
 export interface GeneratedFile {
   readonly path: string;
@@ -466,6 +483,7 @@ const rowOf = (doc: CommandDoc): Command => {
 
   return {
     ...common,
+    contract: rpc._tag,
     destructive: Context.get(rpc.annotations, Destructive),
     idempotent: Context.get(rpc.annotations, Idempotent),
     payloadSchema: toJson(toJsonSchema(rpc.payloadSchema)),
@@ -494,15 +512,16 @@ const decodePayloadFields = Schema.decodeUnknownSync(PayloadFields);
 
 const isFieldSchema = Schema.is(FieldSchema);
 
+/** What a switch takes on the command line: `--json`, or a boolean field. */
+const SWITCH = "nothing (a switch)";
+
 /** What a field of each JSON type takes on the command line. */
 const kinds = new Map([
-  ["boolean", "nothing (a switch)"],
+  ["boolean", SWITCH],
   ["integer", "a number"],
   ["number", "a number"],
   ["string", "text"],
 ]);
-
-const SWITCH = "nothing (a switch)";
 
 /**
  * The required payload fields the CLI fills, when they are left out, from
@@ -563,9 +582,9 @@ const usageBlock = (usage: readonly string[]) => [
  * with what it takes and whether a person must give it, then the switches
  * the CLI adds (`--json`, `--yes`, `--dry-run`).
  */
-const contractSection = (command: Command) => {
+const contractSection = (command: ContractCommand) => {
   const { properties = {}, required = [] } = decodePayloadFields(
-    command.payloadSchema ?? {}
+    command.payloadSchema
   );
 
   const positional = new Set(command.positional);
@@ -622,12 +641,10 @@ const contractSection = (command: Command) => {
       ...flags.map(usageOf),
       ...switches.map((flag) => `[${flag}]`),
     ]),
-    ...(command.contract === undefined
-      ? []
-      : [`- Contract: \`${command.contract}\``]),
+    `- Contract: \`${command.contract}\``,
     `- Reads only: ${yesNo(command.readOnly)}`,
-    `- Idempotent: ${yesNo(command.idempotent ?? false)}`,
-    `- Destructive: ${yesNo(command.destructive ?? false)}`,
+    `- Idempotent: ${yesNo(command.idempotent)}`,
+    `- Destructive: ${yesNo(command.destructive)}`,
     `- Needs approval: ${yesNo(command.needsApproval)}`,
     `- Surfaces: ${command.surfaces.join(", ")}`,
     "",
@@ -645,7 +662,7 @@ const named = (names: readonly string[]) =>
  * A command written by hand in the CLI: its arguments and flags by name,
  * and `--help` for what each takes, which only the command itself knows.
  */
-const localSection = (command: Command) => [
+const localSection = (command: LocalCommand) => [
   ...heading(command),
   ...usageBlock([
     commandLine(command),
@@ -723,10 +740,10 @@ const agentFiles = (commands: readonly CommandDoc[]) =>
     agentPluginsBundle({ commands }),
   ]).pipe(
     Effect.flatMap((all) => {
-      const byPathOf = new Map<string, string>();
+      const contentByPath = new Map<string, string>();
 
       for (const file of all.flat()) {
-        const seen = byPathOf.get(file.path);
+        const seen = contentByPath.get(file.path);
 
         if (seen !== undefined && seen !== file.content) {
           return Effect.die(
@@ -734,11 +751,11 @@ const agentFiles = (commands: readonly CommandDoc[]) =>
           );
         }
 
-        byPathOf.set(file.path, file.content);
+        contentByPath.set(file.path, file.content);
       }
 
       return Effect.succeed(
-        [...byPathOf].map(([where, content]): GeneratedFile => ({
+        [...contentByPath].map(([where, content]): GeneratedFile => ({
           content,
           path: where,
         }))
