@@ -1,0 +1,1 @@
+../../../.agents/skills/add-check-kind/SKILL.md
