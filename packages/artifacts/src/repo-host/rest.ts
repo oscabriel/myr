@@ -42,8 +42,9 @@
  * answers 409 (cf's generated client declares 409 for a repo's info and a
  * token's mint too); errors carry Artifacts' numeric codes (its errors
  * page), which the binding's `numericCode` matches (workers-types), and S7
- * saw 10201 and 10400 live. A refusal with no code Artifacts names, such as
- * a proxy's, is read by its status: 404 is not found, 5xx internal.
+ * saw 10201 and 10400 live. A refusal that names no code at all, such as a
+ * proxy's, is read by its status: 404 is not found, 5xx internal. One that
+ * names only Cloudflare's own codes (7000, an unknown route) is a defect.
  * ASSUMPTIONs, for a live run (W3 308, W7's bench) to settle:
  *
  * - a commit is the binding's metadata, spelled in snake case
@@ -113,7 +114,7 @@ type Code =
  * Each REST `errors[].code` by the binding's name for it, from Artifacts'
  * errors page. The page gives `CREATE_IN_PROGRESS` no number.
  */
-const NUMBERED = new Map<number, Code>([
+const NUMBERED: ReadonlyMap<number, Code> = new Map<number, Code>([
   [10_100, "INVALID_INPUT"],
   [10_101, "INVALID_REPO_NAME"],
   [10_103, "INVALID_TTL"],
@@ -128,7 +129,7 @@ const NUMBERED = new Map<number, Code>([
   [10_402, "MEMORY_LIMIT"],
 ]);
 
-/** A refusal with no code Artifacts names, such as a proxy's, read by status. */
+/** A refusal that names no code at all, such as a proxy's, read by status. */
 const byStatus = (status: number): Option.Option<Code> =>
   Match.value(status).pipe(
     Match.when(404, () => Option.some<Code>("NOT_FOUND")),
@@ -159,7 +160,13 @@ const Failure = Schema.fromJsonString(
 
 const decodeFailure = Schema.decodeOption(Failure);
 
-/** A refused reply read: by the first code Artifacts names, then its status. */
+/**
+ * A refused reply read: by the first code Artifacts names, or by its status
+ * when it names no code at all. One that names only codes Artifacts does not
+ * own, such as Cloudflare's 7000 for a route it does not know, reads as no
+ * code, so a wrong route, account or namespace is a defect and never passes
+ * for a missing repo or object.
+ */
 const refusedBy = (status: number, text: string) => {
   const problems = Option.match(decodeFailure(text), {
     onNone: () => [],
@@ -167,12 +174,12 @@ const refusedBy = (status: number, text: string) => {
   });
 
   return new Refused({
-    code: Option.orElse(
-      Option.firstSomeOf(
-        problems.map(({ code }) => Option.fromNullishOr(NUMBERED.get(code)))
-      ),
-      () => byStatus(status)
-    ),
+    code:
+      problems.length === 0
+        ? byStatus(status)
+        : Option.firstSomeOf(
+            problems.map(({ code }) => Option.fromNullishOr(NUMBERED.get(code)))
+          ),
     message:
       problems.map(({ message }) => message).join("; ") || `HTTP ${status}`,
     status,
@@ -357,6 +364,12 @@ const BEING_MADE = [
   "CREATE_IN_PROGRESS",
   "FORK_IN_PROGRESS",
   "IMPORT_IN_PROGRESS",
+] as const satisfies readonly Code[];
+
+/** What a create or an import refuses a name with: one taken, or being made. */
+const TAKEN = [
+  "ALREADY_EXISTS",
+  ...BEING_MADE,
 ] as const satisfies readonly Code[];
 
 const make = (options: {
@@ -747,12 +760,13 @@ const make = (options: {
       });
 
     return RepoHost.of({
+      // A repo of that name still being made is a name already taken.
       create: (name) =>
         httpPost("/repos", { name }).pipe(
           Effect.flatMap(decoded(Remote)),
           Effect.map(({ result }) => ({ name, remote: result.remote })),
           Effect.catchTag("Refused", (refused) =>
-            is("ALREADY_EXISTS")(refused)
+            is(...TAKEN)(refused)
               ? Effect.fail(new RepoExists({ name }))
               : Effect.die(refused)
           )
@@ -770,7 +784,6 @@ const make = (options: {
             )
           )
         ),
-      // A repo of that name still being made is a name already taken.
       importFrom: (name, source) =>
         httpPost(
           `${repoPath(name)}/import`,
@@ -782,7 +795,7 @@ const make = (options: {
           Effect.map(({ result }) => ({ name, remote: result.remote })),
           Effect.catchTag("Refused", (refused) =>
             Match.value(refused).pipe(
-              Match.when(is("ALREADY_EXISTS", ...BEING_MADE), () =>
+              Match.when(is(...TAKEN), () =>
                 Effect.fail(new RepoExists({ name }))
               ),
               Match.when(is(...NO_SOURCE), ({ message }) =>

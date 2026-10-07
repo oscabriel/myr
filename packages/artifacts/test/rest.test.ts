@@ -25,6 +25,7 @@ import {
   ImportRefused,
   ObjectId,
   RefName,
+  RepoExists,
   RepoHost,
   RepoName,
   RepoNotFound,
@@ -162,6 +163,25 @@ const world = (
   });
 
 type World = Effect.Success<ReturnType<typeof world>>;
+
+/** The REST adapter over a `Fetch` that gives every request the same reply. */
+const answering = (reply: () => Response) =>
+  RepoHostRest.layer({
+    accountId,
+    namespace,
+    token: Redacted.make(apiToken),
+  }).pipe(
+    Layer.provide(
+      Layer.succeed(Fetch, Fetch.of({ fetch: () => Effect.sync(reply) }))
+    )
+  );
+
+/** A refusal in Cloudflare's v4 envelope. */
+const refused = (status: number, code: number, message: string) => () =>
+  Response.json(
+    { errors: [{ code, message }], messages: [], result: null, success: false },
+    { status }
+  );
 
 /** A test body over a fresh world, with the REST adapter's `RepoHost` in scope. */
 const within = <A, E>(
@@ -495,6 +515,36 @@ describe("the tokens the REST adapter carries", () => {
       { revokeLag: 1 }
     )
   );
+
+  // A removed repo's tokens go with it (workers-types), so git calls to a
+  // repo made again under its name need a token of the new repo's.
+  it.live(
+    "mints a fresh token for git calls to a repo made again under a removed one's name",
+    () =>
+      within(({ seen }) =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("again");
+
+          yield* repos.create(name).pipe(Effect.orDie);
+          yield* repos.refs(name).pipe(Effect.orDie);
+          yield* repos.remove(name);
+          yield* repos.create(name).pipe(Effect.orDie);
+          yield* repos.refs(name).pipe(Effect.orDie);
+
+          // The fake's tokens repeat across a repo's lives, so count mints.
+          const mints = yield* Effect.forEach(
+            yield* requestsTo(seen, "POST", "/tokens"),
+            ({ body }) => decodeJson(body)
+          );
+
+          expect(mints).toMatchObject([
+            { repo: name, scope: "read" },
+            { repo: name, scope: "read" },
+          ]);
+        })
+      )
+  );
 });
 
 describe("Artifacts' error codes, read as the port's errors", () => {
@@ -520,6 +570,68 @@ describe("Artifacts' error codes, read as the port's errors", () => {
         ).toStrictEqual(new RepoNotFound({ name: missing }));
       })
     )
+  );
+
+  // 10302 is "an import is in progress for this repository", 10303 "a fork
+  // is in progress" (errors page): the name is taken, as `importFrom` reads it.
+  it.effect.each([
+    { code: 10_302, making: "an import" },
+    { code: 10_303, making: "a fork" },
+  ])(
+    "refuses to create a repo while $making of that name is in progress",
+    ({ code, making }) =>
+      Effect.gen(function* () {
+        const repos = yield* RepoHost;
+        const name = RepoName.make("being-made");
+
+        expect(yield* Effect.exit(repos.create(name))).toStrictEqual(
+          Exit.fail(new RepoExists({ name }))
+        );
+      }).pipe(
+        Effect.provide(answering(refused(409, code, `${making} in progress`)))
+      )
+  );
+
+  // A proxy's or an edge's reply carries no envelope: its status is all it says.
+  it.effect("reads a refusal that names no code by its status", () =>
+    Effect.gen(function* () {
+      const repos = yield* RepoHost;
+      const name = RepoName.make("unseen");
+
+      expect(yield* Effect.exit(repos.remote(name))).toStrictEqual(
+        Exit.fail(new RepoNotFound({ name }))
+      );
+    }).pipe(
+      Effect.provide(
+        answering(() => new Response("Not Found", { status: 404 }))
+      )
+    )
+  );
+
+  // Cloudflare's own codes, such as 7000 for a route it does not know, say the
+  // adapter asked for the wrong thing. Read by status, a wrong route, account
+  // or namespace would pass for a missing repo, and a remove for a done one.
+  it.effect(
+    "fails as a defect on a refusal that names only Cloudflare's own codes",
+    () =>
+      Effect.gen(function* () {
+        const repos = yield* RepoHost;
+        const name = RepoName.make("unrouted");
+
+        const died = [
+          Exit.hasDies(yield* Effect.exit(repos.remote(name))),
+          Exit.hasDies(yield* Effect.exit(repos.remove(name))),
+          Exit.hasDies(
+            yield* Effect.exit(
+              repos.readBlob(name, ObjectId.make("0".repeat(40)))
+            )
+          ),
+        ];
+
+        expect(died).toStrictEqual([true, true, true]);
+      }).pipe(
+        Effect.provide(answering(refused(404, 7000, "No route for that URI")))
+      )
   );
 });
 
