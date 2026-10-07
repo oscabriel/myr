@@ -15,7 +15,7 @@
  * - `CheckRunner` is W2's `/memory`, scripted by the test; `Lander` is W2's
  *   `/isogit`; `RulesEvaluator` is W2's `/bun`, over the config folder as
  *   committed; the front page, the rate limits and the evidence are kept in
- *   memory.
+ *   memory, the evidence unless the test gives the world its own store.
  *
  * `settle` carries every queued answer run: 304's `runAnswer` over the same
  * ports, its steps kept in memory, as the Answer Workflow runs it over the
@@ -30,6 +30,7 @@ import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostLocal } from "@repo/artifacts/repo-host/local";
 import type { CheckAt } from "@repo/checks/check-runner";
 import { CheckRunnerMemory, scriptKey } from "@repo/checks/check-runner/memory";
+import type { EvidenceStore } from "@repo/checks/evidence-store";
 import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import { AlarmsMemory } from "@repo/project/alarms/memory";
@@ -176,11 +177,14 @@ const helperScript = (as: Someone) =>
     "",
   ].join("\n");
 
-export const coreLoopWorld = (): Effect.Effect<
-  CoreLoopWorld,
-  never,
-  Scope.Scope
-> =>
+/** What a test may set in its world: where lane logs are kept, in memory by default. */
+export interface WorldOptions {
+  readonly evidence?: Layer.Layer<EvidenceStore>;
+}
+
+export const coreLoopWorld = (
+  options: WorldOptions = {}
+): Effect.Effect<CoreLoopWorld, never, Scope.Scope> =>
   Effect.gen(function* () {
     const node = yield* Layer.build(NodeServices.layer);
     const fs = Context.get(node, FileSystem.FileSystem);
@@ -208,7 +212,7 @@ export const coreLoopWorld = (): Effect.Effect<
         LanderIsogit,
         CheckRunnerMemory.layer(script),
         RulesEvaluatorBun.pipe(Layer.provide(FinishersFromChecks)),
-        EvidenceStoreMemory,
+        options.evidence ?? EvidenceStoreMemory,
         FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
         ProjectionMemory,
         MemoryRateLimits(WorkerCaps)

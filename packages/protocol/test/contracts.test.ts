@@ -269,6 +269,14 @@ const table = [
     tag: "vouch",
   },
   {
+    audience: "signedIn",
+    cli: "evidence <ref>",
+    errors: ["UnknownProject", "NotDecider"],
+    flags: "RI",
+    on: "RC",
+    tag: "evidence",
+  },
+  {
     audience: "decider",
     cli: "env set",
     errors: [
@@ -399,7 +407,7 @@ describe("the contracts group", () => {
   });
 
   // Web caching reads it: no cache may keep a response for maintainers.
-  it("sets each contract's visibility explicitly, keeping only a decider's Today and decisions to maintainers", () => {
+  it("sets each contract's visibility explicitly, keeping only a decider's Today and decisions, and a lane's log, to maintainers", () => {
     expect(
       contracts.flatMap((rpc) => {
         const visibility = Context.getOrUndefined(rpc.annotations, Visibility);
@@ -409,6 +417,7 @@ describe("the contracts group", () => {
     ).toStrictEqual([
       { tag: "today", visibility: "maintainers" },
       { tag: "decide", visibility: "maintainers" },
+      { tag: "evidence", visibility: "maintainers" },
     ]);
   });
 
@@ -491,17 +500,18 @@ describe("the group a surface serves", () => {
   it("types each surface's group as the contracts on it", () => {
     expectTypeOf<TagOn<"rpc">>().toEqualTypeOf<Contract["_tag"]>();
     expectTypeOf<TagOn<"mcp">>().toEqualTypeOf<
-      Exclude<Contract["_tag"], "setEnv" | "watch">
+      Exclude<Contract["_tag"], "evidence" | "setEnv" | "watch">
     >();
     expectTypeOf<TagOn<"cli">>().toEqualTypeOf<
       Exclude<Contract["_tag"], "watch">
     >();
   });
 
-  it("never gives MCP a stream, or a contract that carries a write-only value", () => {
+  it("never gives MCP a stream, a contract that carries a write-only value, or a lane's log", () => {
     const mcp = [...surfaced("mcp").requests.values()];
 
     expect(mcp.map(({ _tag }) => _tag)).not.toContain("setEnv");
+    expect(mcp.map(({ _tag }) => _tag)).not.toContain("evidence");
     expect(
       mcp.flatMap((rpc) =>
         RpcSchema.isStreamSchema(rpc.successSchema) ? [rpc._tag] : []

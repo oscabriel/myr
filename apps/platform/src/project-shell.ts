@@ -11,6 +11,7 @@
  * its `Exit` encoded, so a refusal stays a refusal and never becomes a
  * defect at the boundary.
  */
+import { EvidenceStore } from "@repo/checks/evidence-store";
 import { projectService } from "@repo/project/project";
 import type { ProjectApi, ProjectPorts } from "@repo/project/project";
 import { ProjectStore } from "@repo/project/project-store";
@@ -45,14 +46,16 @@ export interface ProjectShell {
 
 /**
  * The service's methods as one table, each over its own arguments: what a
- * call indexed by a method name runs.
+ * call indexed by a method name runs. A method may read lane logs
+ * (`evidence`), so each runs with the stage's `EvidenceStore`.
  */
 type Methods = {
   readonly [M in ProjectMethod]: (
     ...args: Readonly<ArgsOf<M>>
   ) => Effect.Effect<
     Effect.Success<ReturnType<ProjectApi[M]>>,
-    Effect.Error<ReturnType<ProjectApi[M]>>
+    Effect.Error<ReturnType<ProjectApi[M]>>,
+    EvidenceStore
   >;
 };
 
@@ -66,8 +69,13 @@ export const projectShell = (input: {
   readonly name: ProjectName | undefined;
   /** SQL over the DO's own storage; sqlite-node in tests. */
   readonly sql: Layer.Layer<SqlClient>;
-  /** Every port the service runs on but its store. */
-  readonly ports: Layer.Layer<Exclude<ProjectPorts, ProjectStore>>;
+  /**
+   * Every port the service runs on but its store, and where lane logs are
+   * kept, which `evidence` reads.
+   */
+  readonly ports: Layer.Layer<
+    Exclude<ProjectPorts, ProjectStore> | EvidenceStore
+  >;
 }): Effect.Effect<ProjectShell, never, Scope.Scope> =>
   Effect.gen(function* () {
     const context = yield* Layer.build(
@@ -79,6 +87,13 @@ export const projectShell = (input: {
     );
 
     const store = Context.get(context, ProjectStore);
+
+    /** A method's run, with the stage's lane logs to read. */
+    const withEvidence = Effect.provideService(
+      EvidenceStore,
+      Context.get(context, EvidenceStore)
+    );
+
     const made = yield* Ref.make(false);
     const built = yield* SynchronizedRef.make(Option.none<Methods>());
 
@@ -154,7 +169,7 @@ export const projectShell = (input: {
         }
 
         const api = yield* service;
-        const outcome = yield* Effect.exit(api[method](...args));
+        const outcome = yield* Effect.exit(withEvidence(api[method](...args)));
 
         return yield* Schema.encodeUnknownEffect(call.exit)(outcome).pipe(
           Effect.orDie
@@ -166,7 +181,9 @@ export const projectShell = (input: {
         Effect.gen(function* () {
           // A DO no project was made in has nothing to wake for.
           if (yield* isMade) {
-            yield* Effect.flatMap(service, (api) => api.onAlarm());
+            yield* Effect.flatMap(service, (api) =>
+              withEvidence(api.onAlarm())
+            );
           }
         }),
       call: (request) =>

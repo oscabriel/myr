@@ -473,6 +473,26 @@ myr vouch --handle <handle> [--note <note>] --project <project> --verdict <verdi
 | `--project` | text | yes |
 | `--verdict` | "vouch" \| "denounce" | yes |
 
+## `myr evidence`
+
+Show the log a failing lane left, by the logRef its verdict names, to the answer's own claimant and the project's deciders only; the last 256 KiB.
+
+```sh
+myr evidence <ref> --project <project>
+```
+
+- Contract: `evidence`
+- Reads only: yes
+- Idempotent: yes
+- Destructive: no
+- Needs approval: no
+- Surfaces: rpc, cli
+
+| Argument | Takes | Required |
+| --- | --- | --- |
+| `<ref>` | text | yes |
+| `--project` | text | yes |
+
 ## `myr env set`
 
 Set the write-only value of a sensitive env item; nobody can read it back.

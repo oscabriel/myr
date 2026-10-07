@@ -35,6 +35,7 @@ export const unanswered = Contracts.toLayer({
   decide: uncalled,
   // Keyed by the class: lint keeps "shape" out of code names.
   [EnvSchemaOf._tag]: uncalled,
+  evidence: uncalled,
   finish: uncalled,
   flagAsk: uncalled,
   fork: uncalled,

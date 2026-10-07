@@ -91,6 +91,9 @@ const apiOf = (
     credits: (caller, handle) => on("credits", [caller, handle]),
     decide: (caller, input) => assumingMade(on("decide", [caller, input])),
     events: (since, limit) => on("events", [since, limit]),
+    // A name pointing at another project is the service's own
+    // `UnknownProject`, so it crosses as the refusal it is.
+    evidence: (caller, ref) => on("evidence", [caller, ref]),
     finish: (caller, input) => assumingMade(on("finish", [caller, input])),
     firstPusher: () => on("firstPusher", []),
     flagAsk: (caller, input) => assumingMade(on("flagAsk", [caller, input])),

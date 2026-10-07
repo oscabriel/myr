@@ -16,6 +16,7 @@ import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { CheckAt } from "@repo/checks/check-runner";
 import { CheckRunnerMemory, scriptKey } from "@repo/checks/check-runner/memory";
+import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { Lander } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
 import { FinishersFromChecks } from "@repo/project/project";
@@ -358,6 +359,7 @@ export const world = Layer.mergeAll(
   alarms,
   answers,
   checker,
+  EvidenceStoreMemory,
   ProjectionMemory,
   pusher,
   rules

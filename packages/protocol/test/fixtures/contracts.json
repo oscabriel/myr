@@ -95,6 +95,17 @@
         "project": "datekit"
       }
     },
+    "evidence": {
+      "payload": {
+        "project": "datekit",
+        "ref": "datekit/push-1111111111111111111111111111111111111111-alice/unit#1"
+      },
+      "success": {
+        "lane": "unit",
+        "text": "FAIL test/parse.test.ts > parses ISO weeks\nexpected 52 to be 53",
+        "truncated": false
+      }
+    },
     "finish": {
       "payload": {
         "ask": "iso-week",

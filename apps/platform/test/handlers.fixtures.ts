@@ -12,6 +12,7 @@ import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { CheckRunner } from "@repo/checks/check-runner";
+import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { AlarmsMemory } from "@repo/project/alarms/memory";
 import { AnswerRunsInline } from "@repo/project/answer-runs/inline";
 import type { FrontPageSeed } from "@repo/project/front-page/memory";
@@ -160,7 +161,8 @@ export const worldOf = (
       )
     ),
     FrontPageMemory.layer(options.frontPage ?? noFrontPage),
-    MemoryRateLimits(options.limits ?? { claim: 100, proposal: 100 })
+    MemoryRateLimits(options.limits ?? { claim: 100, proposal: 100 }),
+    EvidenceStoreMemory
   ).pipe(Layer.provideMerge(RepoHostMemory));
 
 /**
