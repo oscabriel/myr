@@ -6,7 +6,7 @@ import { Brand } from "@repo/brand";
 import { toCommand } from "@repo/protocol/cli";
 import { Claim, Cli, Client, ListAsks } from "@repo/protocol/contracts";
 import { Refusal } from "@repo/protocol/refusal";
-import { Context, Effect, Schema } from "effect";
+import { Context, Effect, Runtime, Schema } from "effect";
 import { CliError, Command } from "effect/cli";
 
 import { credential } from "./credential-helper.ts";
@@ -74,12 +74,26 @@ const version = "0.0.0";
 
 const isRefusal = Schema.is(Refusal);
 
+/** The exit code of a usage error, as for a command line effect/cli can't parse. */
+const USAGE = 2;
+
+/**
+ * A command was used wrongly (`init` without `--yes`), and the line saying
+ * how has been printed: the process exits 2 and prints nothing more.
+ */
+class Misused extends Schema.TaggedError<Misused>()("Misused", {}) {
+  override readonly [Runtime.errorExitCode] = USAGE;
+  override readonly [Runtime.errorReported] = false;
+}
+
 const isReported = Schema.is(Reported);
 
 /**
  * Runs the command `argv` names. Every failure has been printed once by the
  * time it ends as `Reported` (exit 1): a parse error by effect/cli, a
- * refusal by the command, anything else here, as a note. Help asked for, or
+ * refusal by the command, anything else here, as a note. A failure that
+ * says it is a usage error (its `Runtime.errorExitCode` is 2) ends as
+ * `Misused` (exit 2) instead. Help asked for, or
  * shown for a group run without a subcommand, is a success. A defect (a
  * stub's "not built") is not caught: the runtime prints it, loudly.
  */
@@ -94,5 +108,9 @@ export const program = (argv: readonly string[]) =>
         ? Effect.void
         : Output.use((output) => output.note(String(failure)))
     ),
-    Effect.mapError(() => new Reported())
+    Effect.mapError((failure) =>
+      Runtime.getErrorExitCode(failure) === USAGE
+        ? new Misused()
+        : new Reported()
+    )
   );
