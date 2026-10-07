@@ -46,8 +46,8 @@ const ListAsksCall = Schema.fromJsonString(
 /**
  * The platform's `/rpc` reply to `body`: the bytes its server sent for an
  * anonymous `listAsks` of a project it doesn't hold (captured from
- * `apps/platform`'s `serve` over its Vacant handlers, the refusal's `next`
- * aside), or a 400 for anything else.
+ * `apps/platform`'s `serve` before any project existed, the refusal's
+ * `next` aside), or a 400 for anything else.
  */
 const rpcReply = (body: string): Reply =>
   Option.match(Schema.decodeOption(ListAsksCall)(body), {

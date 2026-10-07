@@ -1,5 +1,3 @@
-import { NodeServices } from "@effect/platform-node";
-import type { D1Client } from "@effect/sql-d1";
 /**
  * The binding fence: what each Worker's code reads from its env and what its
  * `wrangler.jsonc` declares are one set, at the top level and in every
@@ -8,14 +6,28 @@ import type { D1Client } from "@effect/sql-d1";
  * `wrangler.jsonc` and regenerated (`bun run types`) also fails `typecheck`
  * where the code reads it.
  */
+import { NodeServices } from "@effect/platform-node";
+import type { D1Client } from "@effect/sql-d1";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RepoHostBinding } from "@repo/artifacts/repo-host/binding";
 import type { RulesEvaluatorWorker } from "@repo/rules/rules-evaluator/worker";
-import { Array, Effect, FileSystem, Order, Schema, SchemaAST } from "effect";
+import {
+  Array,
+  Effect,
+  Exit,
+  FileSystem,
+  Order,
+  Schema,
+  SchemaAST,
+} from "effect";
 
 import type { AnswerRunsWorkflow } from "../src/adapters/answer-runs-workflow.ts";
-import type { SandboxBinding } from "../src/adapters/check-runner-sandbox.ts";
+import type {
+  CheckRunnerSandbox,
+  SandboxBinding,
+} from "../src/adapters/check-runner-sandbox.ts";
 import type { DoProjects } from "../src/adapters/do-projects.ts";
+import type { LanderSandbox } from "../src/adapters/lander-sandbox.ts";
 import type { WorkerRateLimits } from "../src/adapters/rate-limits.ts";
 import type { SignInAttemptsBinding } from "../src/auth/attempts/binding.ts";
 import type { tokenReader } from "../src/auth/provider.ts";
@@ -37,42 +49,63 @@ const stringEnd = (text: string, start: number) => {
   return at + 1;
 };
 
-/** Whether only whitespace stands between `at` and a closing bracket. */
-const closesAfter = (text: string, at: number) =>
-  /^\s*[\]}]/u.test(text.slice(at + 1));
+/** Where the token that opens at `at` ends: a string literal, a comment, or one character. */
+const tokenEnd = (text: string, at: number) => {
+  if (text[at] === '"') {
+    return stringEnd(text, at);
+  }
 
-/**
- * `text` (JSONC, as `wrangler.jsonc` is written) as JSON: each comment and
- * trailing comma dropped, every string kept whole.
- */
-const fromJsonc = (text: string) => {
-  const kept: string[] = [];
+  if (text.startsWith("//", at)) {
+    const end = text.indexOf("\n", at);
+
+    return end === -1 ? text.length : end;
+  }
+
+  if (text.startsWith("/*", at)) {
+    const end = text.indexOf("*/", at + 2);
+
+    return end === -1 ? text.length : end + 2;
+  }
+
+  return at + 1;
+};
+
+/** `text` cut into its tokens, so nothing below looks inside a string. */
+const tokensOf = (text: string) => {
+  const tokens: string[] = [];
   let at = 0;
 
   while (at < text.length) {
-    if (text[at] === '"') {
-      const end = stringEnd(text, at);
+    const end = tokenEnd(text, at);
 
-      kept.push(text.slice(at, end));
-      at = end;
-    } else if (text.startsWith("//", at)) {
-      const end = text.indexOf("\n", at);
-
-      at = end === -1 ? text.length : end;
-    } else if (text.startsWith("/*", at)) {
-      const end = text.indexOf("*/", at + 2);
-
-      at = end === -1 ? text.length : end + 2;
-    } else {
-      if (text[at] !== "," || !closesAfter(text, at)) {
-        kept.push(text.charAt(at));
-      }
-
-      at += 1;
-    }
+    tokens.push(text.slice(at, end));
+    at = end;
   }
 
-  return kept.join("");
+  return tokens;
+};
+
+const isComment = (token: string) =>
+  token.startsWith("//") || token.startsWith("/*");
+
+/** Whether the next token after `tokens[index]` that is not whitespace closes a bracket. */
+const closesAfter = (tokens: readonly string[], index: number) => {
+  const next = tokens.find((token, at) => at > index && token.trim() !== "");
+
+  return next === "]" || next === "}";
+};
+
+/**
+ * `text` (JSONC, as `wrangler.jsonc` is written) as JSON: its comments
+ * dropped first, then each comma that only a closing bracket follows, so a
+ * comment between the two hides nothing; every string is kept whole.
+ */
+const fromJsonc = (text: string) => {
+  const tokens = tokensOf(text).filter((token) => !isComment(token));
+
+  return tokens
+    .filter((token, index) => token !== "," || !closesAfter(tokens, index))
+    .join("");
 };
 
 const Bound = Schema.Array(Schema.Struct({ binding: Schema.String }));
@@ -127,6 +160,10 @@ const Block = Schema.Struct({
 /** A config as data: its blocks are read one key at a time. */
 const Raw = Schema.Record(Schema.String, Schema.Unknown);
 
+/** A config's text, JSONC as `wrangler.jsonc` is written, as data. */
+const readJsonc = (text: string) =>
+  Schema.decodeEffect(Schema.fromJsonString(Raw))(fromJsonc(text));
+
 /** The stages' blocks, by name. */
 const Staged = Schema.Struct({
   env: Schema.optionalKey(Schema.Record(Schema.String, Raw)),
@@ -167,10 +204,7 @@ const fileText = (path: string) =>
 /** What the `wrangler.jsonc` at `path` declares, by block: `top` and each stage. */
 const wranglerOf = (path: string) =>
   Effect.gen(function* () {
-    const raw = yield* fileText(path).pipe(
-      Effect.map(fromJsonc),
-      Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(Raw)))
-    );
+    const raw = yield* Effect.flatMap(fileText(path), readJsonc);
 
     const { env = {} } = yield* Schema.decodeUnknownEffect(Staged)(raw);
 
@@ -214,6 +248,31 @@ const sandboxEnvKeys = Effect.map(
       ].flatMap(({ groups }) => (groups?.key === undefined ? [] : [groups.key]))
     )
 );
+
+describe("a wrangler.jsonc, read as data", () => {
+  it.effect(
+    "loses its comments and trailing commas, a comment between a comma and its bracket too, and keeps every string whole",
+    () =>
+      Effect.gen(function* () {
+        const text = [
+          "{",
+          '  "vars": {',
+          '    "STAGE": "local", // the stage',
+          "    // more vars go here",
+          "  },",
+          '  "note": "a // b, } /* c */", /* the last key */',
+          "}",
+        ].join("\n");
+
+        expect(yield* Effect.exit(readJsonc(text))).toStrictEqual(
+          Exit.succeed({
+            note: "a // b, } /* c */",
+            vars: { STAGE: "local" },
+          })
+        );
+      })
+  );
+});
 
 describe("the platform Worker's bindings", () => {
   it.effect(
@@ -280,9 +339,17 @@ describe("the platform Worker's bindings", () => {
   it("type the sandbox service binding by the entrypoint the platform calls", () => {
     // The generated `Env` types `SANDBOX` as a plain `Fetcher` (an app's
     // types may not name another app's entrypoint), so the env's decode
-    // declares the entrypoint's methods on it (314's `SandboxBinding`).
+    // declares the entrypoint's methods on it (314's `SandboxBinding`). Should
+    // `Env` ever carry them, or turn `any`, the first line fails: drop the
+    // declaration, or find what made the binding untyped.
+    expectTypeOf<Env["SANDBOX"]>().not.toExtend<SandboxBinding>();
     expectTypeOf<PlatformConfig["SANDBOX"]>().toExtend<Env["SANDBOX"]>();
-    expectTypeOf<PlatformConfig["SANDBOX"]>().toExtend<SandboxBinding>();
+    expectTypeOf<PlatformConfig["SANDBOX"]>().toExtend<
+      Parameters<typeof CheckRunnerSandbox>[0]
+    >();
+    expectTypeOf<PlatformConfig["SANDBOX"]>().toExtend<
+      Parameters<typeof LanderSandbox>[0]
+    >();
   });
 });
 

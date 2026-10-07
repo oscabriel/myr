@@ -50,6 +50,13 @@ import {
   tokenRequest,
 } from "./oauth.fixtures.ts";
 
+/**
+ * What the shim's `PROJECT` was sent while `src/worker.ts` loaded, read
+ * before any test runs: importing the module built its handler, and any
+ * other binding it read would have thrown there.
+ */
+const sentWhileLoading = [...callsTo(env.PROJECT)];
+
 /** A Worker's context, which nothing here needs. */
 const context = untouchable<ExecutionContext>("ExecutionContext");
 
@@ -175,9 +182,9 @@ describe("the Worker module", () => {
     "builds its handler from the env without touching a binding, and answers /health",
     () =>
       Effect.gen(function* () {
-        // Importing the module built the handler; any binding it read would
-        // have thrown there.
-        expect(callsTo(env.PROJECT)).toStrictEqual([]);
+        expect(sentWhileLoading).toStrictEqual([]);
+
+        const before = callsTo(env.PROJECT).length;
 
         const health = yield* Effect.promise(() =>
           workerFetch(new Request(`${origin}/health`))
@@ -188,7 +195,7 @@ describe("the Worker module", () => {
           ok: true,
           stage: "local",
         });
-        expect(callsTo(env.PROJECT)).toStrictEqual([]);
+        expect(callsTo(env.PROJECT).slice(before)).toStrictEqual([]);
       })
   );
 
