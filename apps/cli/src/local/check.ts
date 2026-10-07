@@ -127,13 +127,16 @@ const refuse = (
     )
   );
 
-/** What a stale copy is told: which file, the landing it names, and how to get a current one. */
+/**
+ * What a stale copy is told: which file, the landing it names, why it can
+ * differ (an older config or a hand edit; the copy alone can't say which),
+ * and how to get a current one.
+ */
 const staleNote = ({ landed, path }: StaleCopy) =>
-  `${path} is out of date: ${Option.match(landed, {
-    onNone: () => "it is not what main's config gives",
-    onSome: (sha) =>
-      `it was generated at ${sha}, and main's config now gives other text`,
-  })}. The platform regenerates it whenever the config changes; pull main for the current copy instead of editing it.`;
+  `${path} differs from what main's config gives${Option.match(landed, {
+    onNone: () => "",
+    onSome: (sha) => ` (it says it was generated at ${sha})`,
+  })}: it was generated for an older config, or edited by hand. The platform regenerates it whenever the config changes; pull main for the current copy instead of editing it.`;
 
 /** The stale copies as `--json` lists them: absent when there are none. */
 const staleField = (stale: readonly StaleCopy[]) =>

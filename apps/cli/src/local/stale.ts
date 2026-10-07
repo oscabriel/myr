@@ -7,9 +7,10 @@
  * they say, so a copy that differs was generated for an older config, or
  * was edited by hand; `<cli> check` warns about each one and lists it.
  *
- * Read only: nothing here writes a file. A file that is missing, or one the
- * platform does not manage (a skill with no frontmatter of ours, an
- * AGENTS.md with no block), is no copy, and never stale.
+ * Read only: nothing here writes a file. A missing file is no copy, and
+ * never stale; nor is an AGENTS.md with no block, whose text is all the
+ * project's own. A skill copy without the platform's frontmatter is stale:
+ * its path is the platform's, so the frontmatter was taken off (`isStale`).
  */
 import { agentsBlock, upsertAgentsBlock } from "@repo/agent-kit/agents-block";
 import { isStale } from "@repo/agent-kit/generated-file";
@@ -21,7 +22,7 @@ import { Effect, FileSystem, Option, Path } from "effect";
 /** A generated file on disk that is not what main's policy gives, and the landing its copy names. */
 export interface StaleCopy {
   readonly path: string;
-  /** The landing the copy says it came from; none for the AGENTS.md block, which names none. */
+  /** The landing the copy says it came from; none for the AGENTS.md block, which names none, and for a skill copy without frontmatter. */
   readonly landed: Option.Option<LandedSha>;
 }
 

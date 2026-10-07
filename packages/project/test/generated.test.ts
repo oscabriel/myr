@@ -8,7 +8,7 @@ import { aProject } from "@repo/testkit/scenarios";
 import { DateTime, Effect, Option, Schema } from "effect";
 
 import { platformHandle } from "../src/attention/effects.ts";
-import { generatedFollowUp, generatedRequestId } from "../src/generated.ts";
+import { generatedFollowUp } from "../src/generated.ts";
 import type { Generate } from "../src/generated.ts";
 
 const scenario = aProject({ deciders: ["alice", "dora"], people: ["bob"] });
@@ -297,6 +297,12 @@ describe(generatedFollowUp, () => {
           ],
         };
 
+        const doraLands: LandingView = {
+          ...aliceLands,
+          author: dora,
+          credits: [{ handle: dora, role: "Signed-off-by" }],
+        };
+
         const bobAlone: LandingView = {
           ...aliceLands,
           author: bob,
@@ -304,16 +310,14 @@ describe(generatedFollowUp, () => {
         };
 
         expect({
-          bob: yield* creditOf(bobAlone),
-          dora: yield* creditOf(decidedByDora),
+          decidedBy: yield* creditOf(decidedByDora),
+          deciderAuthor: yield* creditOf(doraLands),
+          neither: yield* creditOf(bobAlone),
         }).toStrictEqual({
-          bob: Option.some([{ handle: alice, role: "Decided-by" }]),
-          dora: Option.some([{ handle: dora, role: "Decided-by" }]),
+          decidedBy: Option.some([{ handle: dora, role: "Decided-by" }]),
+          deciderAuthor: Option.some([{ handle: dora, role: "Decided-by" }]),
+          neither: Option.some([{ handle: alice, role: "Decided-by" }]),
         });
       })
   );
-
-  it("names its request for the landing it follows", () => {
-    expect(generatedRequestId(landed)).toBe(`gen-${landed}`);
-  });
 });

@@ -113,8 +113,42 @@ describe("check, on generated files", () => {
           data: { stale: [{ landed: older, path: skill }] },
           ok: true,
         });
-        expect(printed.err).toContain(`${skill} is out of date`);
+        expect(printed.err).toContain(
+          `${skill} differs from what main's config gives`
+        );
         expect(printed.err).toContain(older);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "notes a contribute skill edited by hand since it was generated, naming the landing it came from",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* cleanRepo;
+        const policy = yield* policyAtMain(repo);
+
+        const [copy] = yield* projectSkill({
+          landed: older,
+          policy,
+          project: name,
+        });
+
+        yield* writeFile(
+          repo,
+          skill,
+          `${copy?.content ?? ""}\nOne more rule of our own.\n`
+        );
+
+        const printed = yield* checked(repo.root);
+
+        expect(printed.envelope).toMatchObject({
+          data: { stale: [{ landed: older, path: skill }] },
+          ok: true,
+        });
+        expect(printed.err).toContain(
+          `${skill} differs from what main's config gives (it says it was generated at ${older})`
+        );
+        expect(printed.err).toContain("edited by hand");
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
@@ -143,7 +177,9 @@ describe("check, on generated files", () => {
           data: { stale: [{ path: "AGENTS.md" }] },
           ok: true,
         });
-        expect(printed.err).toContain("AGENTS.md");
+        expect(printed.err).toContain(
+          "AGENTS.md differs from what main's config gives"
+        );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
@@ -189,7 +225,7 @@ describe("check, on generated files", () => {
         ok: true,
         v: 1,
       });
-      expect(printed.err).not.toContain("out of date");
+      expect(printed.err).not.toContain("differs from");
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 });
