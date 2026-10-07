@@ -1,0 +1,21 @@
+{
+  // The platform Worker: the contracts over RPC at /rpc and MCP at /mcp.
+  // Deploy only through infra/deploy.ts, to an explicit stage.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "platform",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-05",
+  // Rat Stack's byte limits are for a minified bundle (scripts/startup-budget.ts).
+  "minify": true,
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "vars": {
+    // Until sign-in exists, one operator holds the only session.
+    "OPERATOR_HANDLE": "oscabriel",
+  },
+  "secrets": {
+    // Declared in .env.schema; the user sets the value.
+    "required": ["OPERATOR_TOKEN"],
+  },
+}

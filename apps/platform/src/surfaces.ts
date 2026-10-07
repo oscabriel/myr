@@ -147,7 +147,7 @@ const rpc = RpcServer.layerHttp({
 }).pipe(Layer.provide([verifyCredential, RpcSerialization.layerJson]));
 
 /** The platform's fetch handler over `services`. */
-export const serve = (services: Layer.Layer<Services>) =>
+export const serve = <E>(services: Layer.Layer<Services, E>) =>
   HttpRouter.toWebHandler(
     Layer.mergeAll(mcp, rpc, requireCredential).pipe(Layer.provide(services)),
     { disableLogger: true }

@@ -24,9 +24,10 @@
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "test": "turbo run test",
     "brand:check": "bun scripts/brand.ts",
+    "bytes:check": "bun scripts/startup-budget.ts",
     "env:check": "varlock load --agent --path infra/",
     "ops": "varlock run --path infra/ -- cf",
-    "verify": "bun run lockfile:check && bun run check && bun run typecheck && bun run test && bun run brand:check"
+    "verify": "bun run lockfile:check && bun run check && bun run typecheck && bun run test && bun run brand:check && bun run bytes:check"
   },
   "devDependencies": {
     "@effect/platform-bun": "catalog:",

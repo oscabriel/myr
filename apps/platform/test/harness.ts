@@ -89,8 +89,8 @@ export const toolResult = (response: Response) =>
  * The platform's fetch handler over `services`, disposed with the scope: as
  * an Effect, and as the plain function a fetch client calls.
  */
-export const served = Effect.fnUntraced(function* (
-  services: Layer.Layer<Services>
+export const served = Effect.fnUntraced(function* <E>(
+  services: Layer.Layer<Services, E>
 ) {
   const { dispose, handler } = serve(services);
 

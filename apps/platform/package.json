@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "types": "wrangler types --include-runtime=false --strict-vars=false",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
@@ -16,6 +17,7 @@
     "@effect/vitest": "catalog:",
     "@repo/config": "workspace:*",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "wrangler": "4.147.0"
   }
 }
