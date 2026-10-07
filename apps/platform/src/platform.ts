@@ -16,6 +16,7 @@ import { OAuthSessions } from "./adapters/sessions-oauth.ts";
 import { tokenReader } from "./auth/provider.ts";
 import { Handlers } from "./handlers.ts";
 import { workerPorts } from "./ports.ts";
+import type { WorkerPorts } from "./ports.ts";
 import { Sessions } from "./sessions.ts";
 import { firstOf } from "./sessions/first-of.ts";
 import { sessionTable } from "./sessions/table.ts";
@@ -174,15 +175,28 @@ const sessionsOf = (config: PlatformConfig) =>
   );
 
 /**
- * The surfaces' services from the decoded env: every contract's handler,
- * sessions, the stage, and the ports they run on, each over its binding.
+ * The surfaces' services over `ports`: every contract's handler, sessions
+ * and the stage from the decoded env, and the ports beside them (git's
+ * routes take the same `Projects` and `Upstream` the handlers do). The
+ * Worker runs them over `workerPorts(config)`; the core-loop test runs the
+ * same composition over its own adapters of the same ports.
  */
-export const platformOf = (config: PlatformConfig): Layer.Layer<Services> =>
+export const platformOn = (
+  config: PlatformConfig,
+  ports: Layer.Layer<WorkerPorts>
+): Layer.Layer<Services> =>
   Layer.mergeAll(
     Handlers,
     sessionsOf(config),
     Layer.succeed(Stage, Stage.of({ name: config.STAGE }))
-  ).pipe(Layer.provideMerge(workerPorts(config)));
+  ).pipe(Layer.provideMerge(ports));
+
+/**
+ * The surfaces' services from the decoded env: every contract's handler,
+ * sessions, the stage, and the ports they run on, each over its binding.
+ */
+export const platformOf = (config: PlatformConfig): Layer.Layer<Services> =>
+  platformOn(config, workerPorts(config));
 
 /** The surfaces' services from the Worker's env, decoded once. */
 export const platform = (env: Env): Layer.Layer<Services, InvalidEnv> =>

@@ -27,11 +27,7 @@ import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
 import { Array, DateTime, Effect, Option, Ref } from "effect";
 import { TestClock } from "effect/testing";
 
-import {
-  custodyFor,
-  FirstPushes,
-  pushRequestId,
-} from "../src/adapters/custody.ts";
+import { custodyFor, pushRequestId } from "../src/adapters/custody.ts";
 import { WorkerFetch } from "../src/adapters/fetch.ts";
 import { repoKind } from "../src/repo-names.ts";
 import {
@@ -608,7 +604,7 @@ describe("custody of one push", () => {
   );
 
   it.live(
-    "a canonical repo takes no ref but main, and no first push while nothing says who may make it",
+    "a canonical repo takes no ref but main, and its first push only from its initializer, as the project says",
     () =>
       Effect.gen(function* () {
         const { projects } = yield* gatewayWorld([scenario]);
@@ -622,19 +618,23 @@ describe("custody of one push", () => {
 
         yield* api.initProject(alice, {}).pipe(Effect.orDie);
 
-        const unread = yield* judged(projects, alice, fresh, first);
+        // bob first: alice's push, once reviewed, is the project's first.
+        const byBob = yield* judged(projects, bob, fresh, first);
+        const byAlice = yield* judged(projects, alice, fresh, first);
 
-        const read = yield* judged(projects, alice, fresh, first).pipe(
-          Effect.provideService(FirstPushes, {
-            firstPusher: () => Effect.succeedSome(alice.handle),
-          })
+        const unmade = yield* judged(
+          projects,
+          alice,
+          ProjectName.make("nokit"),
+          first
         );
 
-        expect(unread.admitted).toStrictEqual([
+        expect(byAlice.admitted).toStrictEqual([new DirectPush({ ref: side })]);
+        expect(byBob.admitted).toStrictEqual([
           new DirectPush({ ref: mainRef }),
           new DirectPush({ ref: side }),
         ]);
-        expect(read.admitted).toStrictEqual([new DirectPush({ ref: side })]);
+        expect(unmade.admitted).toStrictEqual(byBob.admitted);
       }).pipe(Effect.provide(NodeServices.layer)),
     30_000
   );

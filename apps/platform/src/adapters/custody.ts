@@ -4,7 +4,8 @@
  *
  * `admit` is stage 0, before anything reaches the upstream: what the pusher
  * may move, from the project's own record through `ProjectApi`. A canonical
- * repo takes no push (`DirectPush`, spec D1) but its initializer's first;
+ * repo takes no push (`DirectPush`, spec D1) but its initializer's first
+ * (`firstPusher`);
  * a claim's fork takes its claimant's pushes while the claim is live, and a
  * decider's commits on top when they finish its answer; a working fork takes
  * its owner's. `ProjectApi` has no read of the push facts the gate's parse
@@ -41,30 +42,12 @@ import { Principal } from "@repo/protocol/principal";
 import type { Person } from "@repo/protocol/principal";
 import { ClaimLapsed, DirectPush, NotClaimed } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
-import { Array, Context, Effect, Option, Result } from "effect";
+import { Array, Effect, Option, Result } from "effect";
 
 import { RepoKind } from "../repo-names.ts";
 
 /** The branch every repo the platform makes keeps its work on. */
 const mainRef = "refs/heads/main";
-
-/**
- * Who may make a project's first push to its canonical `main`: its
- * initializer, while the project awaits that push (spec §5 step 1).
- * `ProjectApi` has no read that says so (303's Comments ask W3 310 for
- * one), so custody asks this reference. By default it names no one, and
- * every push to a canonical `main` is `DirectPush`: custody fails closed.
- */
-export interface FirstPushes {
-  readonly firstPusher: (
-    project: ProjectName
-  ) => Effect.Effect<Option.Option<Handle>>;
-}
-
-export const FirstPushes = Context.Reference<FirstPushes>(
-  "platform/FirstPushes",
-  { defaultValue: () => ({ firstPusher: () => Effect.succeedNone }) }
-);
 
 /** Says a line to the pusher, as a `remote:` line of git's output. */
 export type Notice = (line: string) => Effect.Effect<void>;
@@ -141,14 +124,21 @@ const custodyOf = (
     review,
   });
 
-/** A project's canonical repo: only its initializer's first push reaches it. */
+/**
+ * A project's canonical repo: only its initializer's first push reaches it,
+ * as the project says (`firstPusher`). A project never made has no first
+ * pusher, so every push there is a direct push: custody fails closed.
+ */
 const canonical = (
   projects: Projects["Service"],
   project: ProjectName,
   pusher: Person
 ) =>
   Effect.gen(function* () {
-    const first = yield* (yield* FirstPushes).firstPusher(project);
+    const first = yield* projects.get(project).pipe(
+      Effect.flatMap((api) => api.firstPusher()),
+      Effect.catchTag("UnknownProject", () => Effect.succeedNone)
+    );
 
     const isFirst = Option.exists(first, (initializer) =>
       sameHandle(initializer, pusher.handle)

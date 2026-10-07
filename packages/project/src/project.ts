@@ -296,6 +296,13 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   ) => Effect.Effect<
     readonly { readonly event: ProjectEvent; readonly seq: number }[]
   >;
+  /**
+   * Who may make the project's first push to its canonical `main`: its
+   * initializer, while the project awaits that push (spec §5 step 1); no
+   * one once it has a landed SHA. The gateway's custody reads it before a
+   * push reaches the canonical repo.
+   */
+  readonly firstPusher: () => Effect.Effect<Option.Option<Handle>>;
   // writes
   readonly initProject: (
     caller: Person,
@@ -426,6 +433,11 @@ export const MethodSchemas = {
     args: [Person, Finish.payloadSchema.mapFields(Struct.omit(["project"]))],
     error: Finish.errorSchema,
     success: Finish.successSchema,
+  },
+  firstPusher: {
+    args: [],
+    error: Schema.Never,
+    success: Schema.Option(Handle),
   },
   flagAsk: {
     args: [Person, FlagAsk.payloadSchema.mapFields(Struct.omit(["project"]))],
@@ -2894,6 +2906,18 @@ export const projectService = (
           MethodSchemas.finish,
           [caller, input],
           decided.finish(api, caller, input)
+        ),
+      firstPusher: () =>
+        checked(
+          MethodSchemas.firstPusher,
+          [],
+          Effect.map(hydrate, (h) =>
+            Option.flatMap(h.project, (row) =>
+              row.state === "awaitingFirstPush"
+                ? Option.some(row.initializer)
+                : Option.none()
+            )
+          )
         ),
       flagAsk: (caller, input) =>
         checked(

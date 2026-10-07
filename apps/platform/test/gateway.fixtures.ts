@@ -12,7 +12,7 @@
  * the store minted, and every answer run started.
  */
 import { NodeHttpServer, NodeServices } from "@effect/platform-node";
-import { RefName, RepoHost } from "@repo/artifacts/repo-host";
+import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostLocal } from "@repo/artifacts/repo-host/local";
 import { CheckAt } from "@repo/checks/check-runner";
 import { CheckRunnerMemory, scriptKey } from "@repo/checks/check-runner/memory";
@@ -56,7 +56,6 @@ import {
 } from "effect";
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 
-import { FirstPushes } from "../src/adapters/custody.ts";
 import { WorkerFetch } from "../src/adapters/fetch.ts";
 import { serveGit } from "../src/git.ts";
 import { MemorySessions } from "../src/sessions/memory.ts";
@@ -292,23 +291,6 @@ const startedRuns = (started: Seen["started"]) =>
   );
 
 /**
- * Who may make a project's first push, as a test knows it: `initializer`,
- * while the project's canonical repo has no `main` yet. It stands in for the
- * read `ProjectApi` lacks (303's Comments).
- */
-const firstPushesOf = (initializer: Handle, host: RepoHost["Service"]) => ({
-  firstPusher: (project: ProjectName) =>
-    host.refs(RepoName.make(project)).pipe(
-      Effect.map((refs) =>
-        refs.has(RefName.make("refs/heads/main"))
-          ? Option.none()
-          : Option.some(initializer)
-      ),
-      Effect.orElseSucceed(() => Option.none<Handle>())
-    ),
-});
-
-/**
  * The world: bare repos under a temporary folder, `git http-backend` over
  * them on one port, and the platform's git endpoint on another, whose
  * services are built here once. Projects follow `scenarios`; alice made
@@ -372,15 +354,7 @@ export const gatewayWorld = (scenarios: readonly Scenario[]) =>
 
     const repoHost = Context.get(services, RepoHost);
 
-    const origin = yield* listen(
-      gatewayApp.pipe(
-        Effect.provideService(
-          FirstPushes,
-          firstPushesOf(alice.handle, repoHost)
-        )
-      ),
-      services
-    );
+    const origin = yield* listen(gatewayApp, services);
 
     /**
      * `decider` opens `ask` (one of the scenario's) on main: the Checker
