@@ -10,6 +10,7 @@
     "./envelope": "./src/envelope.ts",
     "./ids": "./src/ids.ts",
     "./mcp": "./src/mcp.ts",
+    "./mcp-extras": "./src/mcp-extras.ts",
     "./posture": "./src/posture.ts",
     "./principal": "./src/principal.ts",
     "./refusal": "./src/refusal.ts",
