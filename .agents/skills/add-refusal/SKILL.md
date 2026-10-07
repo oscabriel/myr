@@ -41,6 +41,8 @@ Done when the only typecheck error in `packages/protocol` is the missing reason 
 
 Add its reason to `reason` in `packages/protocol/src/render.ts`: a lowercase clause, shown on git's `remote:` lines, in the CLI and in MCP text. `protocol/render` is the one renderer, and `Match.typeTags` makes typecheck name a missing reason.
 
+Done when `bun run typecheck` inside `packages/protocol` passes.
+
 ## 5. Add its example
 
 Add one instance to `examples` in `packages/protocol/test/examples.ts`, in union order. The round-trip, render and group tests then cover it.

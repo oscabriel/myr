@@ -25,7 +25,7 @@ Done when each of the three cases is a small tree or recorded run you could comm
 
 Add a tagged member to `CheckSpec` in `packages/protocol/src/domain/check.ts` (from W2). Its fields are what the maintainer gives, never facts the platform derives. Wire fields follow AGENTS.md "Effect traps".
 
-Done when a round-trip test of the new member passes, seen red first.
+Done when a round-trip test of the new member in `packages/protocol/test/domain.test.ts` (from W2) passes, seen red first.
 
 ## 3. Add the builder
 
@@ -47,11 +47,11 @@ Done when every step 1 case has a passing test here.
 
 ## 5. Teach the gate
 
-In `packages/gate/src/` (from W2):
+In `packages/gate/src/`:
 
-- how a failure of this kind classifies in `classify.ts`: failed checks, a flake, a blocked verifier or a stale base;
-- if the kind counts something, its ratchet in `stages/ratchet.ts`;
-- if an answer could weaken it with a marker (a disable comment), that marker in the default weakening markers.
+- how a failure of this kind classifies in `classify.ts` (from W2): failed checks, a flake, a blocked verifier or a stale base;
+- if the kind counts something, its ratchet in `stages/ratchet.ts` (from W2);
+- if an answer could weaken it with a marker (a disable comment), that marker in `defaultMarkers` in `markers.ts` (from W4).
 
 Done when gate tests cover the kind's classification, and each marker or ratchet it adds refuses a weakened answer with `Weakened`.
 

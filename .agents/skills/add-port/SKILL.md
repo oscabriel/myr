@@ -25,7 +25,7 @@ In `packages/<pkg>/src/<port>.ts`:
 - its errors as `Schema.TaggedError` classes beside it, named for what went wrong in the job (`RepoNotFound`, `HostBusy`). Map the vendor's errors to them inside each adapter;
 - its values as Schemas or branded types, so a caller needs no vendor package to use it.
 
-Keep the operations few and named for what callers need. Say in each doc comment what is idempotent and what is not atomic, as `RepoHost.push` does.
+Keep the operations few and named for what callers need. Say in a doc comment what is idempotent and what is not atomic, as `RefOutcome` says a `RepoHost.push` is never atomic across refs.
 
 Done when the port file imports no adapter.
 
