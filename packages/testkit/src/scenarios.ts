@@ -314,14 +314,15 @@ const openAsk = (
 
 /**
  * Adds an open ask, asked by the initializer in the landed commit, and its
- * territory's module. The territory is a folder (`packages/parser`) or `.`;
- * the kind defaults to `fix`, the check to a `RedThenGreen` file in the
- * territory, the want to a sentence naming both.
+ * territory's module. The territory is a folder (`packages/parser`) or `.`
+ * (the whole repo, which is no module: modules are workspaces); the kind
+ * defaults to `fix`, the check to a `RedThenGreen` file in the territory, the
+ * want to a sentence naming both.
  */
 export const withAsk =
   (ask: AskOptions) =>
   (scenario: Scenario): Scenario =>
-    openAsk(scenario, ask, territoryOf(ask.territory), true);
+    openAsk(scenario, ask, territoryOf(ask.territory), ask.territory !== ".");
 
 /** Adds an ask kind, in place of one with the same name. */
 export const withKind =

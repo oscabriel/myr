@@ -37,6 +37,16 @@ const hello = new TextEncoder().encode("hello\n");
 
 const answerer = { email: "answerer@example.com", name: "Answerer" };
 
+/** The one commit every repo holds on `main`. */
+const firstCommit = {
+  author: answerer,
+  committer: answerer,
+  message: "first",
+  parents: [],
+  sha: commit,
+  tree,
+};
+
 /**
  * A repo host as small as the fake needs: every repo holds one commit on
  * `main`, whose tree has `a.txt` ("hello") and a folder `src`.
@@ -71,16 +81,7 @@ const tinyHost = (): HostLike => {
             Branch: ({ name: branch }) => branch === "main",
             Commit: ({ sha }) => sha === commit,
           })
-            ? [
-                {
-                  author: answerer,
-                  committer: answerer,
-                  message: "first",
-                  parents: [],
-                  sha: commit,
-                  tree,
-                },
-              ]
+            ? [firstCommit]
             : []
         )
       ),
@@ -106,18 +107,7 @@ const tinyHost = (): HostLike => {
       ),
     readCommit: (name, sha) =>
       known(name).pipe(
-        Effect.as(
-          sha === commit
-            ? Option.some({
-                author: answerer,
-                committer: answerer,
-                message: "first",
-                parents: [],
-                sha: commit,
-                tree,
-              })
-            : Option.none()
-        )
+        Effect.as(sha === commit ? Option.some(firstCommit) : Option.none())
       ),
     readFile: (name, at, path) =>
       known(name).pipe(
@@ -428,5 +418,52 @@ describe("the fake Artifacts binding", () => {
       expect([deleted, again]).toStrictEqual([true, false]);
       expect(described(gone).code).toBe("NOT_FOUND");
     })
+  );
+
+  it.effect("reports a repo made read-only as read-only", () =>
+    Effect.gen(function* () {
+      const { binding, repo } = yield* withDatekit();
+
+      yield* call(() => binding.create("archive", { readOnly: true }));
+      yield* call(() => repo.fork("datekit--mirror", { readOnly: true }));
+
+      const { repos } = yield* call(() => binding.list());
+
+      expect(repos.map(({ name, readOnly }) => [name, readOnly])).toStrictEqual(
+        [
+          ["datekit", false],
+          ["archive", true],
+          ["datekit--mirror", true],
+        ]
+      );
+    })
+  );
+
+  it.effect(
+    "lists nothing it deleted, even after a stale handle reads the repo",
+    () =>
+      Effect.gen(function* () {
+        const { binding, repo } = yield* withDatekit();
+
+        yield* call(() => binding.delete("datekit"));
+
+        const codes = [
+          yield* thrown(() => repo.info()),
+          yield* thrown(() => repo.log()),
+          yield* thrown(() => repo.revokeToken("secret-1")),
+          yield* thrown(() => repo.listTokens()),
+        ].map((error) => described(error).code);
+
+        expect(codes).toStrictEqual([
+          "NOT_FOUND",
+          "NOT_FOUND",
+          "NOT_FOUND",
+          "NOT_FOUND",
+        ]);
+        expect(yield* call(() => binding.list())).toStrictEqual({
+          repos: [],
+          total: 0,
+        });
+      })
   );
 });

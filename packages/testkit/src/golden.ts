@@ -31,9 +31,11 @@ const LOCAL_SERVER = /\b(?:127\.0\.0\.1|localhost):\d+/gu;
 
 /**
  * What a terminal shows of one line git rewrote with carriage returns (a
- * progress meter): the last version of it.
+ * progress meter): the last version of it. A carriage return with nothing
+ * after it only moves the cursor, so the version before it still shows.
  */
-const lastRewrite = (line: string) => line.split("\r").at(-1) ?? line;
+const lastRewrite = (line: string) =>
+  line.split("\r").findLast((version) => version !== "") ?? "";
 
 /**
  * Git's output, the same on every run of the same push: without the eight

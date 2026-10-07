@@ -122,6 +122,14 @@ describe("git output, normalised", () => {
     ).toBe("Writing objects: 100% (2/2), done.\nTo x\n");
   });
 
+  it("keeps a progress line that ends in a carriage return, as a terminal still shows it", () => {
+    expect(
+      normaliseGitOutput(
+        "Counting objects: 1\rCounting objects: 2\r\r\nTo x\nWriting objects:  50% (1/2)\r"
+      )
+    ).toBe("Counting objects: 2\nTo x\nWriting objects:  50% (1/2)");
+  });
+
   it.live(
     "makes two runs of the same push compare equal, and match their golden file",
     () =>

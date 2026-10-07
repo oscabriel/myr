@@ -12,7 +12,7 @@ import {
   RequestId,
 } from "@repo/protocol/ids";
 import { DateTime, Equal, Schema } from "effect";
-import { vi } from "vitest";
+import { onTestFinished, vi } from "vitest";
 
 import {
   aProject,
@@ -157,6 +157,18 @@ describe("a project scenario", () => {
       reserve: "newcomers",
     });
     expect(scenario.policy.modules).toHaveLength(1);
+  });
+
+  it("opens an ask over the whole repo without making the repo a module", () => {
+    const scenario = aProject().pipe(
+      withAsk({ id: "tidy-readme", territory: "." })
+    );
+
+    expect(scenario.policy.asks[0]?.territory).toStrictEqual({
+      module: ".",
+      paths: ["**"],
+    });
+    expect(scenario.policy.modules).toStrictEqual([]);
   });
 
   it("refuses an ask the domain refuses, such as one named after a reserved word", () => {
@@ -309,15 +321,39 @@ describe("deterministic ids", () => {
     expect(ids().request()).toBe("req-000001");
   });
 
-  it("mints ids the domain accepts, without reading randomness", () => {
-    const random = vi.spyOn(crypto, "randomUUID");
+  it("mints ids the domain accepts", () => {
     const next = ids();
 
     expect(Schema.is(RequestId)(next.request())).toBeTruthy();
     expect(Schema.is(ProposalId)(next.proposal())).toBeTruthy();
     expect(Schema.is(DecisionId)(next.decision())).toBeTruthy();
-    expect(random).not.toHaveBeenCalled();
+  });
 
-    random.mockRestore();
+  it("builds every value without reading the clock or randomness", () => {
+    const reads = {
+      getRandomValues: vi.spyOn(crypto, "getRandomValues"),
+      now: vi.spyOn(Date, "now"),
+      random: vi.spyOn(Math, "random"),
+      randomUUID: vi.spyOn(crypto, "randomUUID"),
+    };
+
+    onTestFinished(() => {
+      for (const read of Object.values(reads)) {
+        read.mockRestore();
+      }
+    });
+
+    const next = ids();
+
+    parserFix();
+    sixChildren();
+    sha("main");
+    next.request();
+    next.proposal();
+    next.decision();
+
+    expect(
+      Object.values(reads).map((read) => read.mock.calls.length)
+    ).toStrictEqual([0, 0, 0, 0]);
   });
 });

@@ -190,8 +190,8 @@ const numericOf = (code: ArtifactsError["code"]) =>
     Match.orElse(() => 0)
   );
 
-/** A host's error as the binding words it (S1 #22, S7 #2). */
-const refusalOf = (error: HostError) =>
+/** A host's error as the binding words it (S1 #22, S7 #2); a refusal stays as it is. */
+const refusalOf = (error: HostError | Refused) =>
   Match.valueTags(error, {
     ForkInProgress: ({ name }) =>
       new Refused({
@@ -204,6 +204,7 @@ const refusalOf = (error: HostError) =>
         reason: "An internal error occurred.",
       }),
     ImportRefused: ({ reason }) => new Refused({ code: "INVALID_URL", reason }),
+    Refused: (refused) => refused,
     RepoExists: ({ name }) =>
       new Refused({
         code: "ALREADY_EXISTS",
@@ -319,24 +320,7 @@ export const fakeArtifactsBinding = (
   /** Runs one call as the binding answers: a promise, rejected with its error. */
   const run = <A>(effect: Effect.Effect<A, Refused | HostError>) =>
     Effect.runPromise(
-      effect.pipe(
-        Effect.matchEffect({
-          onFailure: (error) =>
-            Effect.die(
-              thrown(
-                Match.valueTags(error, {
-                  ForkInProgress: refusalOf,
-                  HostBusy: refusalOf,
-                  ImportRefused: refusalOf,
-                  Refused: (refused) => refused,
-                  RepoExists: refusalOf,
-                  RepoNotFound: refusalOf,
-                })
-              )
-            ),
-          onSuccess: Effect.succeed,
-        })
-      )
+      Effect.mapError(effect, (failure) => thrown(refusalOf(failure)))
     );
 
   const remoteOf = (name: RepoName) =>
@@ -346,7 +330,9 @@ export const fakeArtifactsBinding = (
 
   const keep = (
     name: RepoName,
-    fields: Partial<Pick<Kept, "description" | "defaultBranch" | "source">>
+    fields: Partial<
+      Pick<Kept, "description" | "defaultBranch" | "readOnly" | "source">
+    >
   ) => {
     made += 1;
 
@@ -355,7 +341,7 @@ export const fakeArtifactsBinding = (
       description: fields.description ?? null,
       id: `repo-${String(made).padStart(6, "0")}`,
       name,
-      readOnly: false,
+      readOnly: fields.readOnly ?? false,
       source: fields.source ?? null,
       tokens: new Map(),
     };
@@ -365,27 +351,37 @@ export const fakeArtifactsBinding = (
     return repo;
   };
 
-  /** What `info()` shows for a repo the fake did not make itself. */
-  const keptOf = (name: RepoName) => kept.get(name) ?? keep(name, {});
+  /**
+   * The fake's record of a repo the host has: the one it made, or a fresh one
+   * for a repo made on the host directly. A repo the host lacks fails with
+   * `RepoNotFound` and leaves no record, so `list()` never shows it.
+   */
+  const keptOf = (name: RepoName) =>
+    host.remote(name).pipe(Effect.map(() => kept.get(name) ?? keep(name, {})));
 
   const mint = (name: RepoName, scope: "read" | "write", seconds: number) =>
-    host.mintToken(name, scope, Duration.seconds(seconds)).pipe(
-      Effect.map((token) => {
-        const plaintext = Redacted.value(token.secret);
-        const expiresAt = DateTime.formatIso(token.expiresAt);
+    Effect.gen(function* () {
+      const token = yield* host.mintToken(
+        name,
+        scope,
+        Duration.seconds(seconds)
+      );
 
-        keptOf(name).tokens.set(token.id, {
-          createdAt: stamped,
-          expiresAt,
-          id: token.id,
-          plaintext,
-          scope,
-          state: "active",
-        });
+      const { tokens } = yield* keptOf(name);
+      const plaintext = Redacted.value(token.secret);
+      const expiresAt = DateTime.formatIso(token.expiresAt);
 
-        return { expiresAt, id: token.id, plaintext, scope: token.scope };
-      })
-    );
+      tokens.set(token.id, {
+        createdAt: stamped,
+        expiresAt,
+        id: token.id,
+        plaintext,
+        scope,
+        state: "active",
+      });
+
+      return { expiresAt, id: token.id, plaintext, scope: token.scope };
+    });
 
   /** A new repo's result: its metadata, its remote and a day-long write token (S1 #2). */
   const createdOf = (repo: Kept) =>
@@ -448,6 +444,7 @@ export const fakeArtifactsBinding = (
 
           const repo = keep(fork, {
             description: forkOptions?.description ?? null,
+            readOnly: forkOptions?.readOnly ?? false,
             source: `artifacts:fake/${name}`,
           });
 
@@ -463,12 +460,12 @@ export const fakeArtifactsBinding = (
           return yield* createdOf(repo);
         })
       ),
-    info: () => run(info(keptOf(name))),
+    info: () => run(keptOf(name).pipe(Effect.flatMap(info))),
     listTokens: () =>
       run(
-        host.remote(name).pipe(
-          Effect.map(() => {
-            const tokens = [...keptOf(name).tokens.values()].map(
+        keptOf(name).pipe(
+          Effect.map((repo) => {
+            const tokens = [...repo.tokens.values()].map(
               ({ createdAt, expiresAt, id, scope, state }) => ({
                 createdAt,
                 expiresAt,
@@ -489,14 +486,10 @@ export const fakeArtifactsBinding = (
           const limit = Math.min(logOptions?.limit ?? 50, 1000);
           const offset = logOptions?.offset ?? 0;
 
-          const at =
-            ref === "HEAD"
-              ? Option.some(
-                  Revision.Branch({
-                    name: BranchName.make(keptOf(name).defaultBranch),
-                  })
-                )
-              : revisionOf(ref);
+          // `HEAD` is the repo's default branch.
+          const at = revisionOf(
+            ref === "HEAD" ? (yield* keptOf(name)).defaultBranch : ref
+          );
 
           if (Option.isNone(at)) {
             return [];
@@ -564,7 +557,7 @@ export const fakeArtifactsBinding = (
             );
           }
 
-          const { tokens } = keptOf(name);
+          const { tokens } = yield* keptOf(name);
 
           const token = [...tokens.values()].find(
             ({ id, plaintext }) => id === tokenOrId || plaintext === tokenOrId
@@ -594,6 +587,7 @@ export const fakeArtifactsBinding = (
             keep(repoName, {
               defaultBranch: createOptions?.setDefaultBranch ?? "main",
               description: createOptions?.description ?? null,
+              readOnly: createOptions?.readOnly ?? false,
             })
           );
         })
@@ -638,6 +632,7 @@ export const fakeArtifactsBinding = (
           return yield* createdOf(
             keep(repoName, {
               description: target.opts?.description ?? null,
+              readOnly: target.opts?.readOnly ?? false,
               source: source.url,
             })
           );
