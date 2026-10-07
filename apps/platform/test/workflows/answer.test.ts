@@ -13,7 +13,7 @@ import {
 import { drive } from "@repo/project/answer-runs/steps";
 import type { Lander } from "@repo/project/lander";
 import { LanderJob } from "@repo/project/lander/memory";
-import type { Projects } from "@repo/project/projects";
+import { Projects } from "@repo/project/projects";
 import { Verdict } from "@repo/protocol/domain/answer";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
@@ -21,11 +21,12 @@ import { LaneName, RequestId } from "@repo/protocol/ids";
 import type { CommitSha, LandedSha } from "@repo/protocol/ids";
 import {
   ChecksFailed,
+  Flake,
   StaleBase,
   VerifierBlocked,
 } from "@repo/protocol/refusal";
 import { untouchable } from "@repo/testkit/untouchable";
-import { DateTime, Effect, Exit, Layer, Option, Schema } from "effect";
+import { DateTime, Effect, Exit, Layer, Option, Schema, Struct } from "effect";
 import type { Context } from "effect";
 
 import type { AnswerParams } from "../../src/answer-runs.ts";
@@ -34,6 +35,7 @@ import {
   OutcomeJson,
   runWorkflow,
 } from "../../src/workflows/answer.ts";
+import { failingPathsOf } from "../../src/workflows/answer/lanes.ts";
 import { runAnswer } from "../../src/workflows/answer/program.ts";
 import { memoSteps } from "../../src/workflows/step.ts";
 import type { StepRunner, WorkflowSteps } from "../../src/workflows/step.ts";
@@ -170,6 +172,29 @@ const landedAt = (sha: LandedSha) => Outcome.cases.Landed.make({ sha });
 
 /** A clean answer, admitted, its lanes all green on the merged tree. */
 const cleanAnswer = Effect.tap(admitted(), (answer) => allGreen(answer.merged));
+
+/**
+ * The world's projects, each answer's run handed on without its landing
+ * message: a run that holds the landing slot, but whose land no step can
+ * make.
+ */
+const withoutMessage = Layer.effect(
+  Projects,
+  Effect.map(Projects, (inner) =>
+    Projects.of({
+      create: inner.create,
+      get: (name) =>
+        Effect.map(inner.get(name), (api) => ({
+          ...api,
+          answer: (requestId) =>
+            Effect.map(
+              api.answer(requestId),
+              Option.map((found) => Struct.omit(found, ["message"]))
+            ),
+        })),
+    })
+  )
+);
 
 describe(runAnswer, () => {
   it.effect(
@@ -351,6 +376,67 @@ describe(runAnswer, () => {
       }).pipe(Effect.provide(world))
   );
 
+  it.effect(
+    "3. a lane that never got going runs once more on the merged tree, and green then is a flake",
+    () =>
+      Effect.gen(function* () {
+        const answer = yield* admitted();
+
+        yield* allGreen(answer.merged);
+        yield* Checker.use((script) =>
+          script.script(answer.merged, unit, [
+            { result: "flaked" },
+            { result: "passed" },
+          ])
+        );
+
+        expect(yield* run(answer, yield* freshSteps())).toStrictEqual(
+          Outcome.cases.Refused.make({ refusals: [new Flake({ lane: unit })] })
+        );
+        expect(
+          (yield* jobsOn(answer.merged)).map(({ lanes, on }) => ({
+            lanes: lanes.map(({ lane }) => lane),
+            on,
+          }))
+        ).toStrictEqual([
+          { lanes: [lint, "types"], on: bobFork },
+          { lanes: [askLane, unit], on: bobFork },
+          { lanes: [unit], on: bobFork },
+        ]);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "3. a lane that never got going and then fails on its fresh run is the answer's failure",
+    () =>
+      Effect.gen(function* () {
+        const answer = yield* admitted();
+
+        yield* failsOnMerged(answer, unit, "AssertionError: red", "passed");
+        yield* Checker.use((script) =>
+          script.script(answer.merged, unit, [
+            { result: "blocked" },
+            {
+              result: "failed",
+              signature: `AssertionError: expected {} to equal { year: 2026 } at ${parsePath}:1:22`,
+            },
+          ])
+        );
+
+        expect(yield* run(answer, yield* freshSteps())).toStrictEqual(
+          Outcome.cases.Refused.make({
+            refusals: [
+              new ChecksFailed({
+                lane: unit,
+                logRef: `${project}/${answer.requestId}/unit#1`,
+                next: "bun run test",
+              }),
+            ],
+          })
+        );
+      }).pipe(Effect.provide(world))
+  );
+
   it.effect("3. a red cheap lane refuses before the costlier checks run", () =>
     Effect.gen(function* () {
       const answer = yield* admitted();
@@ -489,6 +575,25 @@ describe(runAnswer, () => {
           "Busy",
         ]);
         expect(yield* mainTip).toBe(answer.opened);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "a land step that finds nothing to do ends the run there, as the in-process run does",
+    () =>
+      Effect.gen(function* () {
+        const answer = yield* cleanAnswer;
+        const steps = yield* freshSteps();
+
+        const exit = yield* Effect.exit(
+          run(answer, steps).pipe(Effect.provide(withoutMessage))
+        );
+
+        expect(Exit.getSuccess(exit)).toStrictEqual(
+          Option.some(Outcome.cases.Checking.make({ stage: "human" }))
+        );
+        expect(yield* namesOf(steps)).toStrictEqual(["load", ...pass(1)]);
+        expect(yield* landsOf(answer)).toHaveLength(0);
       }).pipe(Effect.provide(world))
   );
 
@@ -688,6 +793,30 @@ describe(runAnswer, () => {
         expect(inProcess).toStrictEqual([viaProgram]);
       })
   );
+});
+
+describe(failingPathsOf, () => {
+  it("names the repo files a failure points at, tests and absolute paths left out", () => {
+    expect(
+      failingPathsOf(
+        [
+          `lexes words: AssertionError: expected 2 to be 3 at ${lexPath}:1:30`,
+          `    at packages/parser/test/parse-iso.test.ts:5:7`,
+          "    at /home/ci/node_modules/vitest/dist/index.js:10:3",
+          `    at (${parsePath}:3)`,
+          `    at ${lexPath}:2:1`,
+        ].join("\n")
+      )
+    ).toStrictEqual([lexPath, parsePath]);
+  });
+
+  it("reads no network address as a file", () => {
+    expect(
+      failingPathsOf(
+        "serves: AssertionError: expected 'listening on 127.0.0.1:8080' to be 'up'"
+      )
+    ).toStrictEqual([]);
+  });
 });
 
 /**

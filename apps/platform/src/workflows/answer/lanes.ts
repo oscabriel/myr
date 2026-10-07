@@ -118,9 +118,13 @@ export type StageRun = typeof StageRun.Type;
 
 type Ran = Extract<StageRun, { readonly _tag: "Ran" }>;
 
-/** A path with a line, as a stack frame or a compiler prints one: `src/lex.ts:3:7`. */
+/**
+ * A path with a line, as a stack frame or a compiler prints one:
+ * `src/lex.ts:3:7`. Its extension starts with a letter, so an address and
+ * its port (`127.0.0.1:8080`) is no file.
+ */
 const LOCATION =
-  /(?<![\w./@+-])(?<path>(?:[\w@+-][\w.@+-]*\/)*[\w@+-][\w.@+-]*\.[A-Za-z0-9]+):\d+/gu;
+  /(?<![\w./@+-])(?<path>(?:[\w@+-][\w.@+-]*\/)*[\w@+-][\w.@+-]*\.[A-Za-z][A-Za-z0-9]*):\d+/gu;
 
 /** A file whose failure says nothing about where the code broke: a test itself. */
 const TEST_FILE =

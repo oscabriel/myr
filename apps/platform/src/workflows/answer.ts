@@ -6,8 +6,9 @@
  * lives in `answer/program.ts`. The class name is frozen.
  *
  * Every port comes from the Worker's env through `workerPorts`, as the
- * Worker's own do. The project's Durable Object is reached as the platform
- * itself: its answer queue (`answer`, `advanceAnswer`) takes no caller.
+ * Worker's own ports do. The project's Durable Object is reached as the
+ * platform itself: its answer queue (`answer`, `advanceAnswer`) takes no
+ * caller.
  */
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { WorkflowEntrypoint } from "cloudflare:workers";

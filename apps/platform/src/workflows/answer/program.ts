@@ -17,7 +17,10 @@
  * The run stops when the answer lands, is refused, waits on a person or on
  * the landing slot, or must wait for a retry: the project starts it again
  * then. A busy repo during a land is retried by the land step's own
- * retries first.
+ * retries first. It also stops when a port step finds nothing to do (the
+ * answer no longer waits on that call), as W2's in-process run does:
+ * whatever moved the answer on carries it, and a run that went on from the
+ * state it found could ask for the same call forever.
  */
 import type { CheckRunner } from "@repo/checks/check-runner";
 import type { EvidenceStore } from "@repo/checks/evidence-store";
@@ -28,18 +31,16 @@ import {
   ReportedCommand,
   Steps,
 } from "@repo/project/answer-runs";
-import { nextSteps } from "@repo/project/answer-runs/steps";
-import { Lander, Rebuild } from "@repo/project/lander";
+import { nextSteps, runStep } from "@repo/project/answer-runs/steps";
+import type { Lander } from "@repo/project/lander";
 import {
   LandingCommand,
   LandingEffect,
-  LandingState,
   outcomeOf,
 } from "@repo/project/landing";
 import { Projects } from "@repo/project/projects";
 import { LaneOutcome } from "@repo/protocol/domain/answer";
 import type { Outcome } from "@repo/protocol/domain/outcome";
-import { LandedSha } from "@repo/protocol/ids";
 import type { LaneName, ProjectName, RequestId } from "@repo/protocol/ids";
 import { Array, Data, Effect, Match, Option, Schema } from "effect";
 
@@ -142,18 +143,6 @@ const keyOf = (call: NextStep): string =>
 const waitsOn = (run: AnswerRun, call: NextStep) =>
   callsOf(nextSteps(run)).some((each) => keyOf(each) === keyOf(call));
 
-/** The attempt a port's `Blocked` report is about: the state's own. */
-const attemptOf = (state: LandingState) =>
-  LandingState.matchOrElse(
-    state,
-    {
-      Checking: ({ attempt }) => attempt,
-      Landing: ({ attempt }) => attempt,
-      Merging: ({ attempt }) => attempt,
-    },
-    () => 0
-  );
-
 /** The answer's project, as the platform reaches it. */
 const projectOf = (project: ProjectName) =>
   Projects.use((projects) => projects.get(project)).pipe(Effect.orDie);
@@ -162,50 +151,33 @@ const projectOf = (project: ProjectName) =>
 const load = ({ project, requestId }: AnswerParams) =>
   Effect.flatMap(projectOf(project), (api) => api.answer(requestId));
 
-/** `use` on the answer's run now; `None` when the project no longer holds it. */
-const withRun = <E, R>(
+/**
+ * The port call `effect` names, run as W2's in-process run runs it
+ * (`runStep`), on the answer's run as its project holds it now; `None`
+ * when the run no longer waits on `call`.
+ */
+const portCall = (
   params: AnswerParams,
-  use: (run: AnswerRun) => Effect.Effect<Option.Option<Reported>, E, R>
+  call: Call<"Land" | "Merge">,
+  effect: LandingEffect
 ) =>
   Effect.flatMap(load(params), (run) =>
-    Option.match(run, {
-      onNone: () => Effect.succeedNone,
-      onSome: use,
-    })
+    Option.isSome(run) && waitsOn(run.value, call)
+      ? runStep(run.value, effect)
+      : Effect.succeedNone
   );
 
 /** The answer's head merged onto the main the call names. */
 const merge = (params: AnswerParams, call: Call<"Merge">) =>
-  withRun(params, (run) =>
-    waitsOn(run, call)
-      ? Lander.use((lander) =>
-          lander.merge({
-            base: call.base,
-            fork: call.fork,
-            head: call.head,
-            main: call.main,
-            repo: run.repo,
-          })
-        ).pipe(
-          Effect.map(({ changes, tree }) =>
-            reported(LandingCommand.Merged({ changes, main: call.main, tree }))
-          ),
-          Effect.catchTags({
-            StaleBase: ({ conflicts }) =>
-              Effect.succeed(
-                reported(
-                  LandingCommand.MergeConflict({ conflicts, main: call.main })
-                )
-              ),
-            VerifierBlocked: () =>
-              Effect.succeed(
-                reported(
-                  LandingCommand.Blocked({ attempt: attemptOf(run.state) })
-                )
-              ),
-          })
-        )
-      : Effect.succeedNone
+  portCall(
+    params,
+    call,
+    LandingEffect.Merge({
+      base: call.base,
+      fork: call.fork,
+      head: call.head,
+      main: call.main,
+    })
   );
 
 /**
@@ -215,59 +187,17 @@ const merge = (params: AnswerParams, call: Call<"Merge">) =>
  * fails the step, for its retries.
  */
 const land = (params: AnswerParams, call: Call<"Land">) =>
-  withRun(params, (run) => {
-    const { message, state } = run;
-
-    if (
-      !waitsOn(run, call) ||
-      !LandingState.guards.Landing(state) ||
-      message === undefined
-    ) {
-      return Effect.succeedNone;
-    }
-
-    const { request } = state;
-
-    return Lander.use((lander) =>
-      lander.land({
-        author: request.answerer,
-        main: state.main,
-        message,
-        rebuild: Rebuild.Merge({
-          base: request.base,
-          fork: request.fork,
-          head: request.head,
-        }),
-        repo: run.repo,
-        requestId: request.requestId,
-        tree: state.tree,
-        verdict: Option.fromUndefinedOr(run.verdict),
-      })
-    ).pipe(
-      Effect.map(({ pending, sha }) =>
-        reported(
-          LandingCommand.LandedOk({ sha }),
-          Array.isReadonlyArrayNonEmpty(pending) ? { pending } : undefined
-        )
-      ),
-      Effect.catchTags({
-        RepoBusy: () => Effect.fail(new LandBusy({ attempt: state.attempt })),
-        StaleBase: ({ main }) =>
-          Effect.succeed(
-            reported(
-              LandingCommand.MainMoved({
-                from: state.main,
-                main: LandedSha.make(main),
-              })
-            )
-          ),
-        VerifierBlocked: () =>
-          Effect.succeed(
-            reported(LandingCommand.Blocked({ attempt: state.attempt }))
-          ),
-      })
-    );
-  });
+  Effect.flatMap(
+    portCall(
+      params,
+      call,
+      LandingEffect.Land({ main: call.main, tree: call.tree })
+    ),
+    (given) =>
+      Option.isSome(given) && LandingCommand.$is("Busy")(given.value.command)
+        ? Effect.fail(new LandBusy({ attempt: given.value.command.attempt }))
+        : Effect.succeed(given)
+  );
 
 /**
  * One stage's lanes on the merged tree, then each failing lane on main, one
@@ -363,9 +293,9 @@ const checks = (
 
 /**
  * A port step's report given to the project, and the calls to run next.
- * When nothing comes next, the run's own state says what it waits on: a
- * person, the landing slot, a retry, or nothing (the report was given
- * already, by a step whose effect ran twice).
+ * When nothing comes next, or the step had nothing to report, the run's own
+ * state says what it waits on: a person, the landing slot, a retry, or
+ * nothing (the report was given already, by a step whose effect ran twice).
  */
 const record = (params: AnswerParams, given: Option.Option<Reported>) =>
   Effect.gen(function* () {
@@ -467,6 +397,10 @@ const carry = (
       Steps,
       record(params, given)
     );
+
+    if (Option.isNone(given)) {
+      return next.outcome;
+    }
 
     if (NextStep.guards.RunChecks(call)) {
       yield* notes(params, next);

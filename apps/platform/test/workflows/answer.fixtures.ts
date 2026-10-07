@@ -589,11 +589,15 @@ export class StepLog extends Context.Service<
   }
 >()("test/StepLog") {}
 
+/** More steps than any run of the scenario asks for: past it, the program ran away. */
+const runaway = 64;
+
 /**
  * `inner`'s steps, each name the program asks for recorded, replays
  * included. With `twice`, a step that runs runs its effect twice and keeps
  * the second value, as an engine does when it retries a step whose first
- * run took effect before its record was written.
+ * run took effect before its record was written. A program that asks for
+ * more than `runaway` steps dies there, so a test fails rather than hangs.
  */
 export const logged = (
   inner: Layer.Layer<StepRunner>,
@@ -611,7 +615,16 @@ export const logged = (
       return Context.make(StepRunner, {
         step: (name, schema, effect, retry) =>
           Effect.gen(function* () {
-            yield* Ref.update(names, (all) => [...all, name]);
+            const asked = yield* Ref.updateAndGet(names, (all) => [
+              ...all,
+              name,
+            ]);
+
+            if (asked.length > runaway) {
+              return yield* Effect.die(
+                `ran away: ${runaway} steps, then ${name}`
+              );
+            }
 
             if (retry !== undefined) {
               yield* Ref.update(retries, (all) =>
