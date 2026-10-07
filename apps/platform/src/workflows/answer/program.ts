@@ -20,8 +20,12 @@
  * retries first. It also stops when a port step finds nothing to do (the
  * answer no longer waits on that call), as W2's in-process run does:
  * whatever moved the answer on carries it, and a run that went on from the
- * state it found could ask for the same call forever.
+ * state it found could ask for the same call forever. Wherever it stops,
+ * its last step writes the verdict, as it stands then, as the note on the
+ * answer's head in its fork (`notes`).
  */
+import { HostBusy } from "@repo/artifacts/repo-host";
+import type { RepoHost } from "@repo/artifacts/repo-host";
 import type { CheckRunner } from "@repo/checks/check-runner";
 import type { EvidenceStore } from "@repo/checks/evidence-store";
 import {
@@ -40,11 +44,23 @@ import {
 } from "@repo/project/landing";
 import { Projects } from "@repo/project/projects";
 import { LaneOutcome } from "@repo/protocol/domain/answer";
+import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Outcome } from "@repo/protocol/domain/outcome";
+import { CommitSha } from "@repo/protocol/ids";
 import type { LaneName, ProjectName, RequestId } from "@repo/protocol/ids";
-import { Array, Data, Effect, Match, Option, Schema } from "effect";
+import {
+  Array,
+  Cause,
+  Data,
+  Effect,
+  Match,
+  Option,
+  Schedule,
+  Schema,
+} from "effect";
 
 import type { AnswerParams } from "../../answer-runs.ts";
+import { writeVerdictNote } from "../notes.ts";
 import { StepRunner } from "../step.ts";
 import type { StepRetry } from "../step.ts";
 import {
@@ -62,6 +78,7 @@ export type AnswerPorts =
   | EvidenceStore
   | Lander
   | Projects
+  | RepoHost
   | StepRunner;
 
 /** A run was started for a request its project does not hold: the project never does that. */
@@ -328,13 +345,93 @@ const record = (params: AnswerParams, given: Option.Option<Reported>) =>
   });
 
 /**
- * Where the verdict note on the answer's head, in its fork, is written after
- * a step that judged it (W4 407: `writeVerdictNote` in its own step). Empty
- * until then; the canonical note is written by `Lander.land` with the
- * verdict.
+ * What writing an answer's verdict note came to, kept as the step's value:
+ * a replay reads it back, and a note that could not be written never fails
+ * the run, in this run or a replay (W3 313 #5).
  */
-const notes = (_params: AnswerParams, _judged: Steps): Effect.Effect<void> =>
-  Effect.void;
+const Noted = Schema.TaggedUnion({
+  /** The answer has no verdict to note: no tree of it was checked. */
+  Unjudged: {},
+  /** The note could not be written, for this reason; the verdict stands in the project. */
+  Unwritten: { reason: Schema.String },
+  Written: { changed: Schema.Boolean, notesTip: CommitSha },
+});
+
+/** How often a busy fork is asked again for the note before it is given up. */
+const noteRetry = {
+  schedule: Schedule.exponential("250 millis"),
+  times: 2,
+  while: Schema.is(HostBusy),
+};
+
+/** The verdict as `verdict` shows it: the one the checks gave, with where the answer stands now. */
+const shownVerdict = (run: AnswerRun) =>
+  Option.map(Option.fromUndefinedOr(run.verdict), (made): Verdict => ({
+    ...made,
+    outcome: outcomeOf(run.state),
+  }));
+
+/** The answer's verdict, as it stands, written as the note on its head in its fork. */
+const noteVerdict = (params: AnswerParams) =>
+  Effect.gen(function* () {
+    const run = yield* load(params);
+
+    const judged = Option.flatMap(run, (found) =>
+      Option.map(shownVerdict(found), (verdict) => ({
+        fork: found.state.request.fork,
+        verdict,
+      }))
+    );
+
+    if (Option.isNone(judged)) {
+      return Noted.cases.Unjudged.make({});
+    }
+
+    const { fork, verdict } = judged.value;
+
+    const written = yield* writeVerdictNote({
+      fork,
+      head: verdict.head,
+      verdict,
+    }).pipe(Effect.retry(noteRetry));
+
+    return Noted.cases.Written.make(written);
+  }).pipe(
+    // Anything but an interruption is recorded: the note is bookkeeping, and
+    // a fork its answerer filled with refs of their own may break it.
+    Effect.catchCause((cause) =>
+      Cause.hasInterruptsOnly(cause)
+        ? Effect.interrupt
+        : Effect.as(
+            Effect.logWarning(
+              "an answer's verdict note was not written",
+              cause
+            ),
+            Noted.cases.Unwritten.make({
+              reason: Option.match(Cause.findErrorOption(cause), {
+                onNone: () => "defect",
+                onSome: ({ _tag }) => _tag,
+              }),
+            })
+          )
+    )
+  );
+
+/**
+ * Once the run stops, the verdict note on the answer's head in its fork
+ * (spec D22, W4 407): the verdict as `verdict` shows it, so an answerer
+ * reads where the answer stands with plain git, refused, waiting or
+ * landed. Its own step, named for the outcome the run stopped at, so a
+ * replay reads the record and a restarted run writes the same note again,
+ * which changes nothing. The canonical note is `Lander.land`'s.
+ */
+const notes = (
+  params: AnswerParams,
+  outcome: Outcome
+): Effect.Effect<void, never, AnswerPorts> =>
+  Effect.flatMap(StepRunner, ({ step }) =>
+    Effect.asVoid(step(`notes:${outcome._tag}`, Noted, noteVerdict(params)))
+  );
 
 /** The port call a step runs, under its name. */
 const portStep = (
@@ -402,10 +499,6 @@ const carry = (
       return next.outcome;
     }
 
-    if (NextStep.guards.RunChecks(call)) {
-      yield* notes(params, next);
-    }
-
     return yield* carry(params, next, { ...attempts, [call._tag]: attempt });
   });
 
@@ -426,7 +519,7 @@ export const runAnswer = (
       return yield* Effect.die(new UnknownRequest(params));
     }
 
-    return yield* carry(
+    const outcome = yield* carry(
       params,
       {
         effects: callsOf(nextSteps(run.value)),
@@ -434,4 +527,8 @@ export const runAnswer = (
       },
       { Land: 0, Merge: 0, RunChecks: 0 }
     );
+
+    yield* notes(params, outcome);
+
+    return outcome;
   });
