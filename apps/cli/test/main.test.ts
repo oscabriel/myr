@@ -6,6 +6,7 @@ import { Cause, Effect, Exit, Layer } from "effect";
 import { CliOutput, Command } from "effect/cli";
 import { TestConsole } from "effect/testing";
 
+import { Credentials } from "../src/credentials.ts";
 import { program, root } from "../src/main.ts";
 import { OutputPlain } from "../src/output.ts";
 
@@ -16,12 +17,13 @@ const printed = Effect.map(TestConsole.logLines, (all) =>
 
 /**
  * What the CLI runs with in these tests: a test console, plain output, and
- * a client no command here calls.
+ * a client and credentials no command here calls.
  */
 const services = Layer.mergeAll(
   TestConsole.layer,
   CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
   Layer.mock(Client)({}),
+  Layer.mock(Credentials)({}),
   OutputPlain
 ).pipe(Layer.provideMerge(NodeServices.layer));
 
@@ -93,9 +95,6 @@ describe(`${Brand.cli} --help`, () => {
 
 describe("each command a later issue builds", () => {
   const stubs = [
-    { args: ["login"], issue: "412" },
-    { args: ["logout"], issue: "412" },
-    { args: ["credential"], issue: "412" },
     { args: ["init"], issue: "413" },
     { args: ["why"], issue: "414" },
     { args: ["env", "set"], issue: "414" },
