@@ -165,6 +165,16 @@
             }
           },
           {
+            "include": ["packages/project/src/projection-d1/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/sql",
+                "@effect/sql-d1/D1Client#D1Client",
+                "@effect/sql-d1/D1Client#TypeId"
+              ]
+            }
+          },
+          {
             "include": ["packages/project/test/**/*.ts"],
             "options": {
               "allowedUnstableApis": ["effect/Arbitrary", "effect/sql"]
