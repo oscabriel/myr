@@ -216,8 +216,11 @@ const stringEnd = (text: string, at: number): number => {
   return Math.min(next + 1, text.length);
 };
 
+/** Where the comment that opens at `at` ends, if one opens there. */
+type CommentEnd = (text: string, at: number) => Option.Option<number>;
+
 // The index just past the comment that opens at `at`, if one does.
-const commentEnd = (text: string, at: number): Option.Option<number> => {
+const commentEnd: CommentEnd = (text, at) => {
   if (text.startsWith("//", at)) {
     const end = text.indexOf("\n", at);
 
@@ -233,10 +236,27 @@ const commentEnd = (text: string, at: number): Option.Option<number> => {
   return Option.none();
 };
 
+// The index just past the `#` comment (TOML's) that opens at `at`, if one does.
+const hashCommentEnd: CommentEnd = (text, at) => {
+  if (text.charAt(at) !== "#") {
+    return Option.none();
+  }
+
+  const end = text.indexOf("\n", at);
+
+  return Option.some(end === -1 ? text.length : end);
+};
+
 const QUOTES = new Set(['"', "'", "`"]);
 
-/** Source text with each `//` and `/* *\/` comment outside a string as one space. */
-const withoutComments = (text: string): string => {
+/**
+ * Text with each comment outside a string as one space: `//` and `/* *\/`
+ * ones by default (JavaScript, JSONC), or those `opens` finds.
+ */
+const withoutComments = (
+  text: string,
+  opens: CommentEnd = commentEnd
+): string => {
   let kept = "";
   let at = 0;
 
@@ -249,7 +269,7 @@ const withoutComments = (text: string): string => {
       kept += text.slice(at, end);
       at = end;
     } else {
-      const end = commentEnd(text, at);
+      const end = opens(text, at);
 
       kept += Option.isSome(end) ? " " : char;
       at = Option.isSome(end) ? end.value : at + 1;
@@ -468,11 +488,15 @@ const literal = (quote: string, body: string): Token =>
 
 /**
  * Source text as words, string literals and single marks, comments
- * dropped. Enough to read imports and literal arrays without running the
- * file; a regex literal that holds a quote can mislead it.
+ * dropped (JavaScript's by default; TOML passes its `#`). Enough to read
+ * imports and literal arrays without running the file; a regex literal that
+ * holds a quote can mislead it.
  */
-const tokensOf = (source: string): readonly Token[] => {
-  const text = withoutComments(source);
+const tokensOf = (
+  source: string,
+  comments: CommentEnd = commentEnd
+): readonly Token[] => {
+  const text = withoutComments(source, comments);
   const tokens: Token[] = [];
   let at = 0;
 
@@ -569,10 +593,16 @@ const listedAt = (tokens: readonly Token[], at: number): readonly string[] => {
   return found;
 };
 
-/** The `jsPlugins` arrays of an oxlint config's source, read as text. */
+/**
+ * The `jsPlugins` arrays of an oxlint config's source, read as text: a key's
+ * (`jsPlugins: [...]`) or a variable's (`const jsPlugins = [...]`).
+ */
 const jsPluginsInSource = (tokens: readonly Token[]): PluginList => {
   const starts = tokens.flatMap((token, at) =>
-    token.text === "jsPlugins" && tokens[at + 1]?.text === ":" ? [at + 2] : []
+    token.text === "jsPlugins" &&
+    (tokens[at + 1]?.text === ":" || tokens[at + 1]?.text === "=")
+      ? [at + 2]
+      : []
   );
 
   return {
@@ -776,18 +806,104 @@ const settle = (path: string, paths: ReadonlySet<string>): Settled => {
       };
 };
 
-const CODE = /\.[cm]?[jt]sx?$/u;
+// A command's words that could name a file: split on whitespace and shell
+// operators, quotes dropped, a leading `$VAR/` or `${VAR}/` dropped (the
+// project folder a harness exports), a `--flag=value`'s value, and a path
+// after `$(…)` read from the root.
+const wordsOf = (command: string): readonly string[] =>
+  command
+    .split(/[\s;&|()<>`]+/u)
+    .map((word) =>
+      word.replaceAll(/["']/gu, "").replace(/^\$(?:\{\w+\}|\w+)\//u, "")
+    )
+    .flatMap((word) => [word, word.slice(word.indexOf("=") + 1)])
+    .flatMap((word) => [word, word.replace(/^\/+/u, "")])
+    .map(withoutDotSlash);
 
 /**
- * Every module the seeds reach by relative imports, settled to globs: what
- * a lint plugin, a hook script or a check script runs is judged with it.
- * Packages, workspace ones included, are not followed. A file without
+ * Manifests, lockfiles and dependency lists. A command may name one (`pip
+ * install -r requirements.txt`), and it stays editable all the same:
+ * dependency edits are allowed, as they are in `package.json`, whose scripts
+ * alone judge, by pointer.
+ */
+const dependencyFileGlobs = [
+  "**/package.json",
+  "**/bun.lock",
+  "**/bun.lockb",
+  "**/package-lock.json",
+  "**/npm-shrinkwrap.json",
+  "**/yarn.lock",
+  "**/pnpm-lock.yaml",
+  "**/requirements*.txt",
+  "**/constraints*.txt",
+  "**/poetry.lock",
+  "**/uv.lock",
+  "**/Pipfile.lock",
+  "**/Cargo.lock",
+  "**/go.sum",
+  "**/Gemfile.lock",
+  "**/composer.lock",
+];
+
+const isDependencyFile = (path: string) =>
+  dependencyFileGlobs.some((glob) => matchGlob(glob, path));
+
+/**
+ * The tracked files commands run or read, from the words that name one:
+ * `bun "${CLAUDE_PROJECT_DIR}/scripts/hooks/x.ts"` → `scripts/hooks/x.ts`.
+ * A manifest, lockfile or dependency list is never one (dependency edits stay
+ * allowed). Sorted.
+ */
+export const commandScripts = (
+  commands: readonly string[],
+  files: ReadonlySet<string>
+): readonly RepoPath[] =>
+  [
+    ...new Set(
+      commands
+        .flatMap(wordsOf)
+        .filter((word) => files.has(word) && !isDependencyFile(word))
+    ),
+  ]
+    .toSorted()
+    .map((path) => RepoPath.make(path));
+
+const isShell = (path: string) =>
+  /\.(?:ba|z)?sh$/u.test(path) || !hasExtension(path);
+
+const CODE = /\.[cm]?[jt]sx?$/u;
+
+// What one file runs, as repo paths: a code file's relative imports and
+// `jsPlugins` strings, or the tracked files a shell script's lines name.
+const runsFrom = (
+  path: string,
+  content: string,
+  paths: ReadonlySet<string>
+): readonly string[] => {
+  if (CODE.test(path)) {
+    const tokens = tokensOf(content);
+
+    return relativeFrom(path, [
+      ...importSpecifiers(tokens),
+      ...jsPluginsInSource(tokens).specifiers,
+    ]);
+  }
+
+  return isShell(path) ? commandScripts(content.split("\n"), paths) : [];
+};
+
+/**
+ * Every module the seeds reach by relative imports, and every script a
+ * shell script among them runs, settled to globs: what a lint plugin, a hook
+ * script or a check script runs is judged with it. Packages, workspace ones
+ * included, are not followed, nor any path `follows` refuses. A file without
  * contents ends its branch.
  */
 const walkImports = (
   seeds: readonly string[],
   contents: ReadonlyMap<string, string>,
-  paths: ReadonlySet<string>
+  paths: ReadonlySet<string>,
+  follows: (path: string) => boolean = () => true
 ): readonly string[] => {
   const queue = [...seeds];
   const globs: string[] = [];
@@ -795,15 +911,9 @@ const walkImports = (
   for (const path of queue) {
     const content = contents.get(path);
 
-    if (content !== undefined && CODE.test(path)) {
-      const tokens = tokensOf(content);
-
-      const targets = [
-        ...importSpecifiers(tokens),
-        ...jsPluginsInSource(tokens).specifiers,
-      ]
-        .filter(isRelative)
-        .flatMap((specifier) => Option.toArray(join(dirname(path), specifier)))
+    if (content !== undefined) {
+      const targets = runsFrom(path, content, paths)
+        .filter(follows)
         .map((target) => settle(target, paths));
 
       globs.push(...targets.flatMap((target) => target.globs));
@@ -980,68 +1090,6 @@ export const ruleFixtures = (
     .map((glob) => Glob.make(glob));
 };
 
-// A command's words that could name a file: split on whitespace and shell
-// operators, quotes dropped, a leading `$VAR/` or `${VAR}/` dropped (the
-// project folder a harness exports), a `--flag=value`'s value, and a path
-// after `$(…)` read from the root.
-const wordsOf = (command: string): readonly string[] =>
-  command
-    .split(/[\s;&|()<>`]+/u)
-    .map((word) =>
-      word.replaceAll(/["']/gu, "").replace(/^\$(?:\{\w+\}|\w+)\//u, "")
-    )
-    .flatMap((word) => [word, word.slice(word.indexOf("=") + 1)])
-    .flatMap((word) => [word, word.replace(/^\/+/u, "")])
-    .map(withoutDotSlash);
-
-/**
- * Manifests, lockfiles and dependency lists. A command may name one (`pip
- * install -r requirements.txt`), and it stays editable all the same:
- * dependency edits are allowed, as they are in `package.json`, whose scripts
- * alone judge, by pointer.
- */
-const dependencyFileGlobs = [
-  "**/package.json",
-  "**/bun.lock",
-  "**/bun.lockb",
-  "**/package-lock.json",
-  "**/npm-shrinkwrap.json",
-  "**/yarn.lock",
-  "**/pnpm-lock.yaml",
-  "**/requirements*.txt",
-  "**/constraints*.txt",
-  "**/poetry.lock",
-  "**/uv.lock",
-  "**/Pipfile.lock",
-  "**/Cargo.lock",
-  "**/go.sum",
-  "**/Gemfile.lock",
-  "**/composer.lock",
-];
-
-const isDependencyFile = (path: string) =>
-  dependencyFileGlobs.some((glob) => matchGlob(glob, path));
-
-/**
- * The tracked files commands run or read, from the words that name one:
- * `bun "${CLAUDE_PROJECT_DIR}/scripts/hooks/x.ts"` → `scripts/hooks/x.ts`.
- * A manifest, lockfile or dependency list is never one (dependency edits stay
- * allowed). Sorted.
- */
-export const commandScripts = (
-  commands: readonly string[],
-  files: ReadonlySet<string>
-): readonly RepoPath[] =>
-  [
-    ...new Set(
-      commands
-        .flatMap(wordsOf)
-        .filter((word) => files.has(word) && !isDependencyFile(word))
-    ),
-  ]
-    .toSorted()
-    .map((path) => RepoPath.make(path));
-
 // Keys whose strings a hook manager runs: Claude Code, Cursor, Codex and
 // Gemini's `command` (with `args`), Copilot's `bash` and `powershell`,
 // lefthook's `run` and `script`, pre-commit's `entry`.
@@ -1086,9 +1134,6 @@ const decodeYaml = (text: string): Option.Option<Schema.Json> =>
     )(text)
   );
 
-const isShell = (path: string) =>
-  /\.(?:ba|z)?sh$/u.test(path) || !hasExtension(path);
-
 /** What one hook config runs, as command lines, and why it could not be read. */
 interface HookCommands {
   readonly commands: readonly string[];
@@ -1124,7 +1169,10 @@ const hookCommands = (hook: RepoFile): HookCommands => {
 
   if (CODE.test(path) || path.endsWith(".toml")) {
     return {
-      commands: tokensOf(content)
+      commands: tokensOf(
+        content,
+        path.endsWith(".toml") ? hashCommentEnd : commentEnd
+      )
         .filter((token) => token.kind === "string")
         .map((token) => token.text),
       notes: [],
@@ -1178,9 +1226,31 @@ export interface JudgeClosure {
 }
 
 /**
+ * What the scripts run commands name import and run in turn, inside each
+ * script's own folder only: a check script's helpers sit beside it, while
+ * what it imports from elsewhere is the product it checks, which an answer
+ * must stay free to change. A script at the root follows nothing.
+ */
+const checkScripts = (
+  scripts: readonly string[],
+  contents: ReadonlyMap<string, string>,
+  paths: ReadonlySet<string>
+): readonly string[] =>
+  scripts.flatMap((script) => {
+    const folder = dirname(script);
+
+    return folder === ""
+      ? []
+      : walkImports([script], contents, paths, (path) =>
+          path.startsWith(`${folder}/`)
+        );
+  });
+
+/**
  * The judge closure for a run block over a repo's files: the defaults (the
  * policy files and every hook config among them); every file a run command
- * or a hook command names (`./test.sh` → `test.sh`) and what it imports;
+ * names (`./test.sh` → `test.sh`) and what it imports or runs from its own
+ * folder; every script a hook command names, with all it imports or runs;
  * each tsconfig's `extends` chain; every lint plugin and module a lint config
  * loads, with what it imports and its rule fixture tests; and each
  * `package.json`'s scripts as a pointer. Manifests, lockfiles and dependency
@@ -1220,7 +1290,7 @@ export const judgeClosure = (
 
   const derived = [
     ...named,
-    ...walkImports(named, contents, paths),
+    ...checkScripts(named, contents, paths),
     ...hooks.globs,
     ...chains.flatMap(({ chain }) => chain.slice(1)),
     ...lint.globs,

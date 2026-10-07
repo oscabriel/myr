@@ -12,12 +12,10 @@ import {
   commandScripts,
   defaultJudgeGlobs,
   eslintLocalPlugins,
-  hookConfigGlobs,
   isJudged,
   jsPluginSpecifiers,
   judgeClosure,
   matchGlob,
-  policyFileGlobs,
   ruleFixtures,
   touchedPointers,
   tsconfigChain,
@@ -128,6 +126,52 @@ describe(judgeClosure, () => {
 
   it("gives the same closure for the same files in any order", () => {
     expect(judgeClosure(run, fence.toReversed())).toStrictEqual(closure);
+  });
+
+  it("walks a check script's own folder, never into the product it checks", () => {
+    const judge = judgeClosure(
+      {
+        checks: {
+          [LaneName.make("api")]: Command.make("bun scripts/check-api.ts"),
+          [LaneName.make("unit")]: Command.make("bun test test/parse.test.ts"),
+          [LaneName.make("root")]: Command.make("node check.mjs"),
+        },
+        test: Command.make("bun test {path}"),
+      },
+      [
+        file(
+          "scripts/check-api.ts",
+          'import * as api from "../src/index.ts";\nimport { snap } from "./lib/snap.ts";'
+        ),
+        file("scripts/lib/snap.ts"),
+        file(
+          "test/parse.test.ts",
+          'import { parse } from "../src/parse.ts";\nimport { cases } from "./cases.ts";'
+        ),
+        file("test/cases.ts"),
+        file("check.mjs", 'import "./src/parse.ts";'),
+        file("src/index.ts", 'export * from "./parse.ts";'),
+        file("src/parse.ts"),
+      ]
+    );
+
+    expect(
+      [
+        "scripts/check-api.ts",
+        "scripts/lib/snap.ts",
+        "test/parse.test.ts",
+        "test/cases.ts",
+        "check.mjs",
+        "src/index.ts",
+        "src/parse.ts",
+      ].filter((path) => isJudged(judge, path))
+    ).toStrictEqual([
+      "scripts/check-api.ts",
+      "scripts/lib/snap.ts",
+      "test/parse.test.ts",
+      "test/cases.ts",
+      "check.mjs",
+    ]);
   });
 });
 
@@ -412,6 +456,15 @@ describe(jsPluginSpecifiers, () => {
     ]);
   });
 
+  it("reads a jsPlugins array the config assigns to a variable first", () => {
+    const config = `const jsPlugins = ["./lint/plugin.mjs", "oxlint-plugin-package"];
+      export default defineConfig({ jsPlugins });`;
+
+    expect(jsPluginSpecifiers(file("oxlint.config.ts", config))).toStrictEqual([
+      "lint/plugin.mjs",
+    ]);
+  });
+
   it("finds nothing in a malformed .oxlintrc.json", () => {
     expect(
       jsPluginSpecifiers(file(".oxlintrc.json", '{ "jsPlugins": ["./a.mjs"'))
@@ -627,7 +680,7 @@ describe("the judge closure over harness hooks", () => {
     ),
     file(
       ".codex/config.toml",
-      '[[hooks.Stop]]\ncommand = "bash tools/stop.sh"\n'
+      '# The Stop hook reads src/*.ts (Codex\'s own)\n[[hooks.Stop]]\ncommand = "bash tools/stop.sh"\n'
     ),
     file(
       ".github/hooks/policy.json",
@@ -690,6 +743,9 @@ describe("the judge closure over harness hooks", () => {
     file(".pi/extensions/guard/README.md", "Runs src/b.ts on every edit."),
     file("scripts/hooks/x.ts", 'import { decide } from "./lib/policy.ts";'),
     file("scripts/hooks/lib/policy.ts"),
+    file("scripts/pre-push.sh", "#!/bin/sh\nbun scripts/hooks/push.ts\n"),
+    file("scripts/hooks/push.ts", 'import "./lib/push-rules.ts";'),
+    file("scripts/hooks/lib/push-rules.ts"),
     ...[
       "tools/stop.sh",
       "tools/guard.sh",
@@ -698,7 +754,6 @@ describe("the judge closure over harness hooks", () => {
       "tools/opencode.ts",
       "tools/pre-commit.sh",
       ".claude/hooks/stop.sh",
-      "scripts/pre-push.sh",
       "tools/unrelated.sh",
       "src/a.ts",
       "src/b.ts",
@@ -706,12 +761,6 @@ describe("the judge closure over harness hooks", () => {
   ];
 
   const judge = judgeClosure(run, hooks);
-
-  it("holds every hook config glob among its defaults", () => {
-    expect(
-      hookConfigGlobs.filter((glob) => !defaultJudgeGlobs.includes(glob))
-    ).toStrictEqual([]);
-  });
 
   it.each([
     ".codex/hooks.json",
@@ -727,11 +776,13 @@ describe("the judge closure over harness hooks", () => {
     expect(isJudged(judge, path)).toBeTruthy();
   });
 
-  it("judges the scripts each hook command names, and what they import", () => {
+  it("judges the scripts each hook command names, what they import and what they run", () => {
     expect(
       [
         "scripts/hooks/x.ts",
         "scripts/hooks/lib/policy.ts",
+        "scripts/hooks/push.ts",
+        "scripts/hooks/lib/push-rules.ts",
         "tools/stop.sh",
         "tools/guard.sh",
         "tools/guard.ps1",
@@ -770,12 +821,6 @@ describe("the judge closure over workspace and task-runner policy", () => {
     file("src/a.ts"),
   ]);
 
-  it("holds every policy file glob among its defaults", () => {
-    expect(
-      policyFileGlobs.filter((glob) => !defaultJudgeGlobs.includes(glob))
-    ).toStrictEqual([]);
-  });
-
   it.each([
     ["bunfig.toml", true],
     ["packages/a/bunfig.toml", true],
@@ -804,8 +849,8 @@ describe("the judge closure over workspace and task-runner policy", () => {
   });
 });
 
-// A file the platform reads for the closure is small; a larger one is read
-// as empty, as `evaluationFacts` drops it.
+// The platform reads no file above this size for the closure; here such a
+// file keeps its path and is given with empty content.
 const MAX_BYTES = 256 * 1024;
 
 /** This repo's tracked files, as `git ls-files` lists them, and its closure. */
