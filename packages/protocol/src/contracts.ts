@@ -39,6 +39,7 @@ import {
   Handle,
   KindName,
   LandedSha,
+  LaneName,
   ProjectName,
   RepoName,
   RequestId,
@@ -106,6 +107,8 @@ const servedOn = {
   credits: SurfaceName.literals,
   decide: SurfaceName.literals,
   [envSchemaTag]: SurfaceName.literals,
+  // A log may hold text an agent's transcript should not carry: never MCP.
+  evidence: ["rpc", "cli"],
   finish: ["rpc", "mcp", "cli"],
   flagAsk: ["rpc", "mcp", "cli"],
   fork: ["rpc", "mcp", "cli"],
@@ -701,6 +704,36 @@ export class Vouch extends Rpc.make("vouch", {
   .annotate(Cli, { name: "vouch" })
   .annotate(Surfaces, servedOn.vouch) {}
 
+export class EvidenceOf extends Rpc.make("evidence", {
+  error: Schema.Union([UnknownProject, NotDecider]),
+  payload: {
+    project: ProjectName,
+    /** The `logRef` a verdict's lane or a `ChecksFailed` refusal names. */
+    ref: Schema.NonEmptyString,
+  },
+  success: Schema.Struct({
+    lane: LaneName,
+    /** The log's tail: its last 256 KiB, where a failure prints. */
+    text: Schema.String,
+    /** Whether the log was longer than the tail given back. */
+    truncated: Schema.Boolean,
+  }),
+})
+  .annotate(
+    Description,
+    "Show the log a failing lane left, by the logRef its verdict names, to the answer's own claimant and the project's deciders only; the last 256 KiB."
+  )
+  // The handler lets in the answer's claimant and the project's deciders.
+  .annotate(Audience, "signedIn")
+  // A log is for its answerer and the deciders: no cache keeps it.
+  .annotate(Visibility, "maintainers")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Cli, { name: "evidence", positional: ["ref"] })
+  .annotate(Surfaces, servedOn.evidence) {}
+
 export class SetEnv extends Rpc.make("setEnv", {
   error: Schema.Union([
     UnknownProject,
@@ -763,6 +796,7 @@ export class Contracts extends RpcGroup.make(
   Land,
   Fork,
   Vouch,
+  EvidenceOf,
   SetEnv
 ).middleware(Authenticated) {}
 

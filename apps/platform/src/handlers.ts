@@ -7,10 +7,13 @@
  * `today` without a project ask every project the projection lists and
  * merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
  * caller's rate limit first, so a call past it reaches no project.
+ * `evidence` asks the project who may read a lane's log, which it reads
+ * from the stage's `EvidenceStore`.
  *
  * Every `remote` a caller gets back is the platform's git URL for the repo,
  * at the origin the caller reached the platform by: never a storage URL.
  */
+import { EvidenceStore, LogRef } from "@repo/checks/evidence-store";
 import { envSchemaMethod } from "@repo/project/deciders";
 import { FrontPage } from "@repo/project/front-page";
 import { GatewayUrl } from "@repo/project/project";
@@ -147,12 +150,13 @@ const acrossProjects = (
 export const Handlers: Layer.Layer<
   Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>,
   never,
-  Projects | FrontPage | RateLimits
+  Projects | FrontPage | RateLimits | EvidenceStore
 > = Contracts.toLayer(
   Effect.gen(function* () {
     const projects = yield* Projects;
     const frontPage = yield* FrontPage;
     const rateLimits = yield* RateLimits;
+    const evidence = yield* EvidenceStore;
 
     /** `call` on the project named `project`; one never made is `UnknownProject`. */
     const on = <A, E>(
@@ -205,6 +209,14 @@ export const Handlers: Layer.Layer<
       decide: ({ project, ...input }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.decide(who, input))
+        ),
+      evidence: ({ project, ref }) =>
+        Effect.flatMap(person, (who) =>
+          on(project, (api) =>
+            api
+              .evidence(who, LogRef.make(ref))
+              .pipe(Effect.provideService(EvidenceStore, evidence))
+          )
         ),
       [EnvSchemaOf._tag]: ({ project }) =>
         Effect.flatMap(caller, (who) =>

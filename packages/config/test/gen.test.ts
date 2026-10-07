@@ -254,16 +254,17 @@ describe("the generated JSON Schema", () => {
     ).toStrictEqual([]);
   });
 
-  // A stream has no tool form, and a write-only value must never pass
-  // through an agent's transcript.
-  it("lists only the tools MCP serves: no watch, no setEnv", () => {
+  // A stream has no tool form, and a write-only value or a lane's log
+  // must never pass through an agent's transcript.
+  it("lists only the tools MCP serves: no watch, no setEnv, no evidence", () => {
     const tools = [...sections(content("docs/reference/mcp-tools.md")).keys()];
 
     expect(tools).toContain("listProjects");
     expect(tools).toContain("submitAnswer");
-    expect(tools).not.toContain("watch");
-    expect(tools).not.toContain("setEnv");
-    expect(tools).toHaveLength(contracts.length - 2);
+    expect(
+      ["watch", "setEnv", "evidence"].filter((tag) => tools.includes(tag))
+    ).toStrictEqual([]);
+    expect(tools).toHaveLength(contracts.length - 3);
   });
 
   it("gives every MCP tool's input and output schema, with no leak in either", () => {

@@ -103,6 +103,7 @@ export const ProjectCalls = byMethod({
   [envSchemaMethod]: callOf(MethodSchemas[envSchemaMethod]),
   decide: callOf(MethodSchemas.decide),
   events: callOf(MethodSchemas.events),
+  evidence: callOf(MethodSchemas.evidence),
   finish: callOf(MethodSchemas.finish),
   firstPusher: callOf(MethodSchemas.firstPusher),
   flagAsk: callOf(MethodSchemas.flagAsk),

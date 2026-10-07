@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { LogRef } from "@repo/checks/evidence-store";
 import { envSchemaMethod } from "@repo/project/deciders";
 import { LandingCommand } from "@repo/project/landing";
 import type { ProjectApi } from "@repo/project/project";
@@ -45,7 +46,10 @@ const sha = CommitSha.make("a".repeat(40));
 const requestId = RequestId.make("req-none0001");
 
 /** A call's `Exit` as JSON, by its method's own schemas: equal when the outcomes are. */
-const settled = <A, E>(method: ProjectMethod, effect: Effect.Effect<A, E>) =>
+const settled = <A, E, R>(
+  method: ProjectMethod,
+  effect: Effect.Effect<A, E, R>
+) =>
   Effect.exit(effect).pipe(
     Effect.flatMap((exit) =>
       Schema.encodeUnknownEffect(ProjectCalls[method].exit)(exit)
@@ -75,6 +79,10 @@ const everyMethod = (api: ProjectApi) =>
     ),
     [envSchemaMethod]: settled(envSchemaMethod, api[envSchemaMethod](anyone)),
     events: settled("events", api.events(0, 100)),
+    evidence: settled(
+      "evidence",
+      api.evidence(alice, LogRef.make(`${project}/${requestId}/unit#1`))
+    ),
     finish: settled(
       "finish",
       api.finish(bob, { ask: parseIso, base: sha, head: sha, requestId })

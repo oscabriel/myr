@@ -19,6 +19,7 @@ import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { Brand } from "@repo/brand";
 import { CheckAt, CheckLane, CheckRunner } from "@repo/checks/check-runner";
+import { EvidenceStore, LogRef, logOfRef } from "@repo/checks/evidence-store";
 import { findRunBlock } from "@repo/checks/finder";
 import { judgeClosure } from "@repo/checks/judge";
 import { checkVersion, commandFor } from "@repo/checks/kinds";
@@ -36,6 +37,7 @@ import {
   Credits,
   Decide,
   EnvSchemaOf,
+  EvidenceOf,
   Finish,
   FlagAsk,
   Fork,
@@ -105,6 +107,7 @@ import {
   TouchedJudge,
   UnknownAsk,
   UnknownCommit,
+  UnknownProject,
   VerifierBlocked,
   WeakCheck,
 } from "@repo/protocol/refusal";
@@ -293,6 +296,29 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
     caller: Principal,
     sha: CommitSha
   ) => Effect.Effect<{ readonly landing: LandingView }, UnknownCommit>;
+  /**
+   * The log a failing lane left, by the name its verdict gives it (spec
+   * §2.3 `LaneResult.logRef`), for the project's deciders and the claimant
+   * of the answer the name points at. A name `logRefOf` never makes, or one
+   * that points at another project, is `UnknownProject` for anyone; past
+   * that, anyone else is `NotDecider` whether or not a log is kept under the
+   * name, and a reader allowed in finds no log kept as `UnknownProject`
+   * too. A log over 256 KiB comes back as its last 256 KiB, where a
+   * failure prints. The log is read from the `EvidenceStore` the call runs
+   * with (the stage's bucket), outside the project's lock.
+   */
+  readonly evidence: (
+    caller: Principal,
+    ref: LogRef
+  ) => Effect.Effect<
+    {
+      readonly lane: LaneName;
+      readonly text: string;
+      readonly truncated: boolean;
+    },
+    NotDecider | UnknownProject,
+    EvidenceStore
+  >;
   readonly events: (
     since: number,
     limit: number
@@ -431,6 +457,11 @@ export const MethodSchemas = {
     success: Schema.Array(
       Schema.Struct({ event: ProjectEvent, seq: Schema.Int })
     ),
+  },
+  evidence: {
+    args: [Principal, LogRef],
+    error: EvidenceOf.errorSchema,
+    success: EvidenceOf.successSchema,
   },
   finish: {
     args: [Person, Finish.payloadSchema.mapFields(Struct.omit(["project"]))],
@@ -597,11 +628,11 @@ const encodePolicy = Schema.encodeEffect(PolicyJson);
  * the boundary that decoded it would have refused it) and the check that its
  * success encodes.
  */
-const checked = <A, E>(
+const checked = <A, E, R>(
   schemas: MethodSchema,
   args: readonly unknown[],
-  run: Effect.Effect<A, E>
-): Effect.Effect<A, E> =>
+  run: Effect.Effect<A, E, R>
+): Effect.Effect<A, E, R> =>
   Effect.forEach(
     schemas.args,
     (schema, index) =>
@@ -615,6 +646,32 @@ const checked = <A, E>(
       Effect.orDie(Schema.encodeUnknownEffect(schemas.success)(value))
     )
   );
+
+/** The most of a lane's log `evidence` gives back: its last 256 KiB. */
+const EVIDENCE_TAIL = 256 * 1024;
+
+/** Whether a UTF-8 byte starts a character: it is no continuation byte (`10xxxxxx`). */
+const startsCharacter = (byte: number) => byte < 0x80 || byte >= 0xc0;
+
+/**
+ * A log as `evidence` gives it back: whole up to 256 KiB, else its last
+ * 256 KiB, where a failure prints, cut between characters, never inside one.
+ */
+const tailOf = (log: string) => {
+  const bytes = new TextEncoder().encode(log);
+
+  if (bytes.length <= EVIDENCE_TAIL) {
+    return { text: log, truncated: false };
+  }
+
+  const tail = bytes.subarray(bytes.length - EVIDENCE_TAIL);
+  const from = tail.findIndex(startsCharacter);
+
+  return {
+    text: from === -1 ? "" : new TextDecoder().decode(tail.subarray(from)),
+    truncated: true,
+  };
+};
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -2905,6 +2962,54 @@ export const projectService = (
         return Effect.succeed(field("verdict", verdict));
       });
 
+    // ---------------------------------------------------------- evidence
+
+    /**
+     * Who may read the log named `ref`, and then the log: the name must
+     * point at this project (anything else is that project unknown, as a
+     * name nobody made is); then the caller must decide here, or be the
+     * claimant of the answer it points at (`NotDecider` otherwise, whether
+     * or not a log is kept, so the reply tells no one which logs exist);
+     * then the log must be kept.
+     */
+    const evidenceOf = (caller: Principal, ref: LogRef) =>
+      Effect.gen(function* () {
+        const named = logOfRef(ref);
+
+        if (Option.isNone(named) || named.value.project !== name) {
+          return yield* new UnknownProject({
+            project: Option.match(named, {
+              onNone: () => name,
+              onSome: ({ project }) => project,
+            }),
+          });
+        }
+
+        const { lane, requestId } = named.value;
+        const h = yield* hydrate;
+
+        const allowed = Principal.match(caller, {
+          Anonymous: () => false,
+          Person: ({ handle }) =>
+            Option.exists(h.policy, (policy) => isDecider(policy, handle)) ||
+            Option.exists(findAnswer(h, requestId), ({ row }) =>
+              sameHandle(row.answerer, handle)
+            ),
+        });
+
+        if (!allowed) {
+          return yield* new NotDecider({});
+        }
+
+        const kept = yield* EvidenceStore.use((logs) => logs.get(ref));
+
+        if (Option.isNone(kept)) {
+          return yield* new UnknownProject({ project: name });
+        }
+
+        return { lane, ...tailOf(kept.value) };
+      });
+
     // ---------------------------------------------------------- deciders
 
     /** The decider-facing methods (221), over the same hydrate, write and helpers. */
@@ -2992,6 +3097,8 @@ export const projectService = (
             rows.map(({ event, seq }) => ({ event, seq }))
           )
         ),
+      evidence: (caller, ref) =>
+        checked(MethodSchemas.evidence, [caller, ref], evidenceOf(caller, ref)),
       finish: (caller, input) =>
         checked(
           MethodSchemas.finish,

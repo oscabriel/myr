@@ -18,7 +18,7 @@ import type { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostBinding } from "@repo/artifacts/repo-host/binding";
 import type { CheckRunner } from "@repo/checks/check-runner";
 import type { EvidenceStore } from "@repo/checks/evidence-store";
-import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
+import { EvidenceStoreR2 } from "@repo/checks/evidence-store/r2";
 import type { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import type { FrontPage } from "@repo/project/front-page";
@@ -71,7 +71,7 @@ const memoryFrontPage = Layer.merge(
  * upstream and every repo read over it, each project's Durable Object, the
  * sandbox's Checker, the Lander `LANDER_ADAPTER` names (spec §8 D6), config
  * folders evaluated in the Worker Loader, the front page in D1, the rate
- * limits, and evidence in memory until W4 418 moves it to `EVIDENCE`.
+ * limits, and lane logs in the `EVIDENCE` bucket (W4 418).
  */
 export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
   Layer.mergeAll(
@@ -96,7 +96,7 @@ export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
       claim: config.CLAIM_LIMIT,
       proposal: config.PROPOSAL_LIMIT,
     }),
-    EvidenceStoreMemory
+    EvidenceStoreR2(config.EVIDENCE)
   ).pipe(
     Layer.provideMerge(RepoHostBinding.layer(config.ARTIFACTS)),
     Layer.provideMerge(WorkerFetch)

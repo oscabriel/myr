@@ -1084,6 +1084,44 @@
       ]
     },
     {
+      "contract": "evidence",
+      "description": "Show the log a failing lane left, by the logRef its verdict names, to the answer's own claimant and the project's deciders only; the last 256 KiB.",
+      "destructive": false,
+      "idempotent": true,
+      "name": "evidence",
+      "needsApproval": false,
+      "path": [
+        "evidence"
+      ],
+      "payloadSchema": {
+        "additionalProperties": true,
+        "properties": {
+          "project": {
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "ref": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "ref"
+        ],
+        "type": "object"
+      },
+      "positional": [
+        "ref"
+      ],
+      "readOnly": true,
+      "source": "projected",
+      "surfaces": [
+        "rpc",
+        "cli"
+      ]
+    },
+    {
       "contract": "setEnv",
       "description": "Set the write-only value of a sensitive env item; nobody can read it back.",
       "destructive": false,

@@ -3179,6 +3179,55 @@
       ],
       "type": "object"
     },
+    "evidence.error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UnknownProjectEncoded"
+        },
+        {
+          "$ref": "#/$defs/NotDeciderEncoded"
+        }
+      ]
+    },
+    "evidence.payload": {
+      "additionalProperties": true,
+      "properties": {
+        "project": {
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "ref": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "evidence.success": {
+      "additionalProperties": true,
+      "properties": {
+        "lane": {
+          "pattern": "^[a-z][a-zA-Z0-9-]*$",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "lane",
+        "text",
+        "truncated"
+      ],
+      "type": "object"
+    },
     "finish.error": {
       "anyOf": [
         {

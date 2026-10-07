@@ -1,3 +1,4 @@
+import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { Upstream } from "@repo/git/upstream";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { Projects } from "@repo/project/projects";
@@ -142,7 +143,8 @@ const defaults = Layer.mergeAll(
 /**
  * The contracts before any project exists, served by the platform's own
  * handlers: a call that names a project finds none (`UnknownProject`), the
- * front page lists nothing, and nobody is near a rate limit.
+ * front page lists nothing, nobody is near a rate limit, and no lane has
+ * left a log.
  */
 export const noProjects = Handlers.pipe(
   Layer.provide([
@@ -155,6 +157,7 @@ export const noProjects = Handlers.pipe(
     ),
     FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
     MemoryRateLimits(WorkerCaps),
+    EvidenceStoreMemory,
   ])
 );
 
