@@ -161,10 +161,13 @@ export const Handlers: Layer.Layer<
     ) => Effect.flatMap(projects.get(project), call);
 
     /**
-     * `call` on every project the projection lists, in name order; a
-     * project that is gone, or that refuses the caller, adds nothing.
+     * `call` on every project the projection lists, in name order. A
+     * project the platform never made adds nothing, and so does one where
+     * `call` finds nothing for the caller; any other failure is the call's.
      */
-    const everywhere = <A, E>(call: (api: ProjectApi) => Effect.Effect<A, E>) =>
+    const everywhere = <A, E>(
+      call: (api: ProjectApi) => Effect.Effect<Option.Option<A>, E>
+    ) =>
       Effect.gen(function* () {
         const listed = yield* frontPage.projects();
 
@@ -175,7 +178,11 @@ export const Handlers: Layer.Layer<
 
         const each = yield* Effect.forEach(
           names,
-          (project) => Effect.option(on(project, call)),
+          (project) =>
+            Effect.flatMap(
+              Effect.option(projects.get(project)),
+              Option.match({ onNone: () => Effect.succeedNone, onSome: call })
+            ),
           { concurrency: FAN_OUT }
         );
 
@@ -292,7 +299,9 @@ export const Handlers: Layer.Layer<
             );
           }
 
-          const each = yield* everywhere((api) => api.status(who));
+          const each = yield* everywhere((api) =>
+            Effect.map(api.status(who), Option.some)
+          );
 
           return yield* statusAtGateway({
             answers: each.flatMap(({ answers }) => answers),
@@ -311,10 +320,15 @@ export const Handlers: Layer.Layer<
             return yield* on(project, (api) => api.today(who));
           }
 
-          return yield* acrossProjects(
-            who,
-            yield* everywhere((api) => api.today(who))
+          // A project the caller decides nothing in has no page for them.
+          const pages = yield* everywhere((api) =>
+            api.today(who).pipe(
+              Effect.map(Option.some),
+              Effect.catchTag("NotDecider", () => Effect.succeedNone)
+            )
           );
+
+          return yield* acrossProjects(who, pages);
         }),
       verdict: ({ project, ...input }) =>
         Effect.flatMap(caller, (who) =>

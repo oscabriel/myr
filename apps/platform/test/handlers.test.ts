@@ -2,34 +2,43 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import type { FrontPageSeed } from "@repo/project/front-page/memory";
+import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
+import type { Decision } from "@repo/protocol/domain/decision";
 import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
+import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
-  DecisionId,
+  CommitSha,
   EnvKey,
   Handle,
   KindName,
   ProjectName,
   RepoPath,
+  RequestId,
 } from "@repo/protocol/ids";
 import {
   Anonymous,
   Authenticated,
   CurrentPrincipal,
+  Person,
 } from "@repo/protocol/principal";
 import {
   AskFull,
   CapReached,
   NotClaimed,
   NotDecider,
+  NotSensitive,
   ProjectExists,
+  UnknownCommit,
   UnknownProject,
 } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
 import {
+  Array,
+  DateTime,
   Effect,
   Exit,
   FileSystem,
@@ -70,10 +79,14 @@ const lexTokens = AskId.make("lex-tokens");
 
 const nowhere = ProjectName.make("nowhere");
 
-/** Both projects as the projection lists them. */
+/**
+ * Both projects as the projection lists them, and one it lists that the
+ * platform never made, which a call across projects passes over.
+ */
 const listed: FrontPageSeed["projects"] = [
   { openAsks: 2, posture: "open", project: datekit.project },
   { openAsks: 1, posture: "open", project: burrow.project },
+  { openAsks: 0, posture: "open", project: nowhere },
 ];
 
 /** The handlers over both projects' world. */
@@ -96,6 +109,20 @@ const reachedAt =
       HttpServerRequest.HttpServerRequest,
       HttpServerRequest.fromWeb(new Request(url, { method: "POST" }))
     );
+
+/** The open decision on `proposal` among a Today's; none fails the test. */
+const decisionOn = (
+  decisions: readonly Decision[],
+  proposal: Pick<Proposal, "id">
+) =>
+  Effect.fromOption(
+    Array.findFirst(
+      decisions,
+      ({ subject }) =>
+        DecisionSubject.guards.OpenProposal(subject) &&
+        subject.proposal === proposal.id
+    )
+  );
 
 describe("project reads", () => {
   it.effect("list and show a project's asks, and know no other project", () =>
@@ -162,6 +189,46 @@ describe("project reads", () => {
           yield* Effect.flip(Stream.runCollect(bob.watch({ project: nowhere })))
         ).toStrictEqual(new UnknownProject({ project: nowhere }));
       }).pipe(Effect.provide(platform()))
+  );
+
+  it.effect("replay every event of a project that has more than a page", () =>
+    Effect.gen(function* () {
+      yield* made;
+
+      const api = yield* (yield* Projects).get(datekit.project);
+      const bobs = Person.make({ handle: Handle.make("bob") });
+
+      // 60 claims, each released: 120 events after datekit's two asks opened.
+      yield* Effect.forEach(
+        Array.range(1, 60),
+        () =>
+          Effect.andThen(
+            api.claim(bobs, parseIso),
+            api.release(bobs, parseIso)
+          ),
+        { discard: true }
+      );
+
+      const bob = yield* as("bob");
+
+      const all = yield* Stream.runCollect(
+        bob.watch({ project: datekit.project })
+      );
+
+      const tail = yield* Stream.runCollect(
+        bob.watch({ project: datekit.project, since: 120 })
+      );
+
+      expect({
+        count: all.length,
+        first: all[0]?._tag,
+        last: all.at(-1)?._tag,
+      }).toStrictEqual({ count: 122, first: "AskOpened", last: "Released" });
+      expect(tail.map(({ _tag }) => _tag)).toStrictEqual([
+        "Claimed",
+        "Released",
+      ]);
+    }).pipe(Effect.provide(platform()))
   );
 });
 
@@ -330,23 +397,67 @@ describe("calls that name no project", () => {
 
         const alice = yield* as("alice");
         const bob = yield* as("bob");
+        const carol = yield* as("carol");
 
-        yield* bob.proposeAsk({
+        // bob is new in both projects; datekit's second proposal opens
+        // before burrow's, so it expires first.
+        yield* bob.claim({ ask: parseIso, project: datekit.project });
+        yield* bob.claim({ ask: lexTokens, project: burrow.project });
+
+        const declined = yield* bob.proposeAsk({
           project: datekit.project,
           want: "Parse ISO week dates.",
         });
+
+        yield* advanceTo("2026-10-07T12:05:00Z");
+        yield* carol.proposeAsk({
+          project: datekit.project,
+          want: "Trim tabs too.",
+        });
+        yield* advanceTo("2026-10-07T12:10:00Z");
         yield* bob.proposeAsk({
           project: burrow.project,
           want: "Lex comments.",
         });
 
+        const { decisions: inDatekit } = yield* alice.today({
+          project: datekit.project,
+        });
+
+        const first = yield* decisionOn(inDatekit, declined.proposal);
+
+        yield* alice.decide({
+          choice: "decline",
+          decision: first.id,
+          project: datekit.project,
+        });
+
         const today = yield* alice.today({});
 
-        expect(today.decider).toBe("alice");
-        expect(today.decisions.map(({ project }) => project)).toStrictEqual([
-          "burrow",
-          "datekit",
-        ]);
+        expect({
+          budget: today.budget,
+          decider: today.decider,
+          decisions: today.decisions.map(({ openedAt, project }) => ({
+            openedAt: DateTime.formatIso(openedAt),
+            project,
+          })),
+          expiringSoon: today.expiringSoon,
+          newcomers: today.newcomers,
+          overflow: today.overflow,
+          unattended: today.unattended,
+        }).toStrictEqual({
+          // Five decisions a day in each project; one spent in datekit.
+          budget: { finishes: 0, total: 10, used: 1 },
+          decider: "alice",
+          decisions: [
+            { openedAt: "2026-10-07T12:05:00.000Z", project: "datekit" },
+            { openedAt: "2026-10-07T12:10:00.000Z", project: "burrow" },
+          ],
+          expiringSoon: [],
+          newcomers: ["bob"],
+          overflow: 0,
+          unattended: [],
+        });
         expect(yield* Effect.flip(bob.today({}))).toStrictEqual(
           new NotDecider({})
         );
@@ -498,13 +609,15 @@ describe("each call", () => {
           })
         );
 
-        const bobSets = yield* Effect.flip(
-          bob.setEnv({
-            key: EnvKey.make("PAYMENTS_KEY"),
-            project,
-            value: Redacted.make("not-a-real-value-0123456789abcdef"),
-          })
-        );
+        // Until W6 gives the project a vault, no item takes a value.
+        const setPaymentsKey = {
+          key: EnvKey.make("PAYMENTS_KEY"),
+          project,
+          value: Redacted.make("not-a-real-value-0123456789abcdef"),
+        };
+
+        const bobSets = yield* Effect.flip(bob.setEnv(setPaymentsKey));
+        const aliceSets = yield* Effect.flip(alice.setEnv(setPaymentsKey));
 
         const alicesFork = yield* alice
           .fork({ project })
@@ -517,29 +630,22 @@ describe("each call", () => {
 
         const today = yield* alice.today({ project });
 
-        const decision = today.decisions.find(
-          ({ subject }) =>
-            DecisionSubject.guards.OpenProposal(subject) &&
-            subject.proposal === proposal.id
-        );
+        const decision = yield* decisionOn(today.decisions, proposal);
 
         const bobDecides = yield* Effect.flip(
-          bob.decide({
-            choice: "decline",
-            decision: decision?.id ?? DecisionId.make("dec-000000"),
-            project,
-          })
+          bob.decide({ choice: "decline", decision: decision.id, project })
         );
 
         const aliceDecides = yield* alice.decide({
           choice: "decline",
-          decision: decision?.id ?? DecisionId.make("dec-000000"),
+          decision: decision.id,
           project,
         });
 
         expect({
           aliceDecides: aliceDecides.decision.decided?.by,
           aliceReleases,
+          aliceSets,
           alicesClaims: alicesStatus.claims,
           alicesFork,
           bobDecides,
@@ -550,6 +656,7 @@ describe("each call", () => {
         }).toStrictEqual({
           aliceDecides: "alice",
           aliceReleases: NotClaimed.of(parseIso),
+          aliceSets: new NotSensitive({ key: setPaymentsKey.key }),
           alicesClaims: [],
           alicesFork: {
             fork: "datekit--me--alice",
@@ -561,6 +668,64 @@ describe("each call", () => {
           bobReleases: { released: true },
           bobSets: new NotDecider({}),
           bobsClaims: ["bob"],
+        });
+      }).pipe(Effect.provide(platform()))
+  );
+
+  it.effect(
+    "reaches the project it names, not another, for every other read and write",
+    () =>
+      Effect.gen(function* () {
+        yield* made;
+
+        const bob = yield* as("bob");
+        const { project } = burrow;
+        const unseen = CommitSha.make("0".repeat(40));
+        const requestId = RequestId.make("request-0001");
+        const answer = { base: unseen, head: unseen, project, requestId };
+
+        const ledger = yield* bob.ledger({ project });
+        const envItems = yield* bob.envShape({ project });
+        const verdict = yield* bob.verdict({ ask: lexTokens, project });
+
+        const landing = yield* Effect.flip(
+          bob.landing({ project, sha: unseen })
+        );
+
+        const submits = yield* Effect.flip(
+          bob.submitAnswer({ ...answer, ask: lexTokens })
+        );
+
+        const finishes = yield* Effect.flip(
+          bob.finish({ ...answer, ask: lexTokens })
+        );
+
+        const lands = yield* Effect.flip(
+          bob.land({ ...answer, message: "Tidy the lexer." })
+        );
+
+        const vouches = yield* Effect.flip(
+          bob.vouch({ handle: Handle.make("dave"), project, verdict: "vouch" })
+        );
+
+        expect({
+          envItems: envItems.project,
+          finishes,
+          landing,
+          lands,
+          ledger: ledger.project,
+          submits,
+          verdict,
+          vouches,
+        }).toStrictEqual({
+          envItems: "burrow",
+          finishes: new NotDecider({}),
+          landing: new UnknownCommit({ sha: unseen }),
+          lands: new NotDecider({}),
+          ledger: "burrow",
+          submits: NotClaimed.of(lexTokens),
+          verdict: {},
+          vouches: new NotDecider({}),
         });
       }).pipe(Effect.provide(platform()))
   );
