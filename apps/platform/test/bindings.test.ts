@@ -299,7 +299,10 @@ describe("the platform Worker's bindings", () => {
 
   it("are all the Env the Worker is given, and nothing else", () => {
     expectTypeOf<keyof Env>().toEqualTypeOf<
-      Exclude<keyof PlatformConfig, "SESSION_TOKENS">
+      Exclude<
+        keyof PlatformConfig,
+        "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "SESSION_TOKENS"
+      >
     >();
   });
 

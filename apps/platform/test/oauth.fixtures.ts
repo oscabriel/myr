@@ -5,6 +5,7 @@
  * client's metadata document through the global `fetch`; here the Worker
  * itself answers it, as the public internet does on Cloudflare.
  */
+import { Fetch } from "@repo/artifacts/fetch";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Clock, Effect, Layer, Option, Schema } from "effect";
 import { vi } from "vitest";
@@ -13,6 +14,7 @@ import { Accounts } from "../src/auth/accounts.ts";
 import { AccountsMemory } from "../src/auth/accounts/memory.ts";
 import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
 import { cliClientId } from "../src/auth/cli-client.ts";
+import { IdentitiesMemory } from "../src/auth/identities/memory.ts";
 import { OAuthStore } from "../src/auth/oauth-store.ts";
 import { OAuthStoreMemory } from "../src/auth/oauth-store/memory.ts";
 import { oauthProvider, signInSettings } from "../src/auth/provider.ts";
@@ -72,9 +74,13 @@ export const signInWorld = Effect.gen(function* () {
 
   const store = OAuthStoreMemory.make();
 
+  // Google sign-in is off here (no Google client), so it reaches neither
+  // its links nor Google (W4 419).
   const services = Layer.mergeAll(
     Layer.succeed(Accounts, accounts),
     Layer.succeed(OAuthStore, store),
+    IdentitiesMemory.layer,
+    Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch")),
     SignInAttemptsMemory.layer,
     signInSettings(config)
   );
