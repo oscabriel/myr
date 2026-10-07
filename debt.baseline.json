@@ -1,5 +1,5 @@
 {
-  "@effect-diagnostics": 0,
+  "@effect-diagnostics": 1,
   "@ts-expect-error": 0,
   "@ts-ignore": 0,
   "@ts-nocheck": 0,

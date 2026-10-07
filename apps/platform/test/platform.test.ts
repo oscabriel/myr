@@ -163,13 +163,14 @@ describe("the platform Worker's env", () => {
     Effect.gen(function* () {
       const { fetch } = yield* served(platform(fakeEnv()));
 
+      // A name the platform never makes (spec §4.5): the gateway answers
+      // before any port, and nobody is asked to sign in.
       const response = yield* fetch(
         new Request(
-          "http://localhost/datekit.git/info/refs?service=git-upload-pack"
+          "http://localhost/datekit--layer--alice.git/info/refs?service=git-upload-pack"
         )
       );
 
-      // No gateway yet (303): no repo answers, and nobody is asked to sign in.
       expect(response.status).toBe(404);
     })
   );
