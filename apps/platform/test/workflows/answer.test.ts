@@ -209,7 +209,11 @@ describe(runAnswer, () => {
 
         expect(outcome).toStrictEqual(landedAt(tip));
         expect(yield* parentsOf(tip)).toStrictEqual([answer.opened]);
-        expect(yield* namesOf(steps)).toStrictEqual(["load", ...pass(1)]);
+        expect(yield* namesOf(steps)).toStrictEqual([
+          "load",
+          ...pass(1),
+          "notes:Landed",
+        ]);
         expect(yield* landsOf(answer)).toHaveLength(1);
       }).pipe(Effect.provide(world))
   );
@@ -511,6 +515,7 @@ describe(runAnswer, () => {
           "load",
           ...pass(1),
           ...pass(2),
+          "notes:Landed",
         ]);
         expect(
           Option.map(yield* verdictOf(answer.api), ({ tree }) => tree)
@@ -606,7 +611,11 @@ describe(runAnswer, () => {
         expect(Exit.getSuccess(exit)).toStrictEqual(
           Option.some(Outcome.cases.Checking.make({ stage: "human" }))
         );
-        expect(yield* namesOf(steps)).toStrictEqual(["load", ...pass(1)]);
+        expect(yield* namesOf(steps)).toStrictEqual([
+          "load",
+          ...pass(1),
+          "notes:Checking",
+        ]);
         expect(yield* landsOf(answer)).toHaveLength(0);
       }).pipe(Effect.provide(world))
   );
@@ -628,6 +637,7 @@ describe(runAnswer, () => {
           "cheap#1",
           "checks#1",
           "record:checks#1",
+          "notes:AwaitingFinish",
         ]);
         expect(yield* landsOf(answer)).toHaveLength(0);
       }).pipe(Effect.provide(worldWith(finishRequired)))
@@ -881,7 +891,7 @@ const event = (payload: typeof AnswerParams.Encoded) => ({
 
 /** The world's ports, as the Workflow's run takes them. */
 const portsOfWorld = Effect.map(
-  Effect.context<CheckRunner | EvidenceStore | Lander | Projects>(),
+  Effect.context<CheckRunner | EvidenceStore | Lander | Projects | RepoHost>(),
   Layer.succeedContext
 );
 
@@ -903,7 +913,7 @@ describe(runWorkflow, () => {
 
         const recorded = yield* engine.record("record:land#1");
 
-        expect(engine.ran).toStrictEqual(["load", ...pass(1)]);
+        expect(engine.ran).toStrictEqual(["load", ...pass(1), "notes:Landed"]);
         expect(isJson(outcome)).toBeTruthy();
         expect(yield* Schema.decodeEffect(OutcomeJson)(outcome)).toStrictEqual(
           landedAt(tip)
