@@ -36,9 +36,10 @@ const isTrouble = (result: LaneResult["result"]) =>
 
 /**
  * How a lane's failure counts, or `None` when the lane passed on the merged
- * tree. A failure that is the platform's own trouble earns one fresh run
- * (`Flake`); a second one, or a lane that fails on main too, is
- * `VerifierBlocked`; a failure only outside the diff is `StaleBase`.
+ * tree. A lane red on main too is `VerifierBlocked`. A checker that never
+ * started on a tree whose main passes earns one fresh run (`Flake`); an
+ * identical second failure means it was never a flake, so it counts as the
+ * answer's (CAA §2.B). A failure only outside the diff is `StaleBase`.
  */
 export const classifyFailure = (
   evidence: LaneEvidence,
@@ -60,16 +61,12 @@ export const classifyFailure = (
     return Option.some(new Flake({ lane: evidence.lane }));
   }
 
-  if (isTrouble(result)) {
-    return Option.some(
-      Option.isNone(evidence.rerun)
-        ? new Flake({ lane: evidence.lane })
-        : new VerifierBlocked({})
-    );
-  }
-
   if (evidence.onMain !== "passed") {
     return Option.some(new VerifierBlocked({}));
+  }
+
+  if (isTrouble(result) && Option.isNone(evidence.rerun)) {
+    return Option.some(new Flake({ lane: evidence.lane }));
   }
 
   const outsideOnly =

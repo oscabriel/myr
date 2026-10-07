@@ -187,6 +187,38 @@ const rows: readonly {
     facts: push(
       [week],
       [
+        [week, 1, "import {"],
+        [week, 2, "  pad,"],
+        [week, 3, '  trim } from "../../format/src/pad.ts";'],
+      ]
+    ),
+    name: "an import of another module's internal file, over several lines",
+    refusals: [
+      new ReachedInternals({
+        at: at(week, 3),
+        from: RepoPath.make(week),
+        to: "../../format/src/pad.ts",
+      }),
+    ],
+  },
+  {
+    facts: push(
+      [week],
+      [[week, 1, 'export * from "../../format/src/pad.ts";']]
+    ),
+    name: "a re-export of another module's internal file",
+    refusals: [
+      new ReachedInternals({
+        at: at(week, 1),
+        from: RepoPath.make(week),
+        to: "../../format/src/pad.ts",
+      }),
+    ],
+  },
+  {
+    facts: push(
+      [week],
+      [
         [week, 1, 'import { pad } from "../../format/src/index.ts";'],
         [week, 2, 'import { lex } from "./lex.ts";'],
         [week, 3, 'import { Array, Effect } from "effect";'],

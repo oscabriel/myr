@@ -49,7 +49,11 @@ const sourceOf = (glob: string) => {
   return `^${source}$`;
 };
 
-/** The glob as one anchored at the root, by `.gitignore`'s rules. */
+/**
+ * The glob as one anchored at the root, by `.gitignore`'s rules. Whether it
+ * is anchored is read before a trailing `/` becomes `/**`, so `generated/`
+ * is every folder of that name.
+ */
 const anchored = (glob: string) => {
   const folder = glob.endsWith("/") ? `${glob}**` : glob;
 
@@ -57,7 +61,7 @@ const anchored = (glob: string) => {
     return folder.slice(1);
   }
 
-  return folder.slice(0, -1).includes("/") ? folder : `**/${folder}`;
+  return glob.slice(0, -1).includes("/") ? folder : `**/${folder}`;
 };
 
 /** Whether `path` matches `glob`. */

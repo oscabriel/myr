@@ -132,9 +132,10 @@ const privatePaths = (facts: PushFacts): readonly Refusal[] =>
   );
 
 // A module specifier on an import or re-export line: `from "…"` (also the
-// last line of a multi-line import), a bare `import "…"`, or `import("…")`.
+// last line of a multi-line import, `  pad } from "…"`), a bare
+// `import "…"`, or `import("…")`.
 const SPECIFIERS = [
-  /^\s*(?:import|export|\})\b.*?\bfrom\s*["'](?<specifier>[^"']+)["']/u,
+  /(?:^\s*(?:import|export)\b.*?|\}\s*)\bfrom\s*["'](?<specifier>[^"']+)["']/u,
   /^\s*import\s*["'](?<specifier>[^"']+)["']/u,
   /\bimport\s*\(\s*["'](?<specifier>[^"']+)["']\s*\)/u,
 ];
@@ -188,22 +189,24 @@ const reachedInternals = (facts: PushFacts): readonly Refusal[] =>
         .toSorted(([one], [other]) => Order.String(one, other))
         .filter(([path]) => matchAny(territory.paths, path))
         .flatMap(([from, lines]) =>
-          lines.flatMap(({ line, text }) =>
-            Option.match(specifierIn(text), {
-              onNone: () => [],
-              onSome: (to) =>
-                to.startsWith(".") &&
-                isInternal(facts, territory.module, resolve(from, to))
-                  ? [
-                      new ReachedInternals({
-                        at: { line, path: from },
-                        from,
-                        to,
-                      }),
-                    ]
-                  : [],
-            })
-          )
+          lines
+            .toSorted((one, other) => one.line - other.line)
+            .flatMap(({ line, text }) =>
+              Option.match(specifierIn(text), {
+                onNone: () => [],
+                onSome: (to) =>
+                  to.startsWith(".") &&
+                  isInternal(facts, territory.module, resolve(from, to))
+                    ? [
+                        new ReachedInternals({
+                          at: { line, path: from },
+                          from,
+                          to,
+                        }),
+                      ]
+                    : [],
+              })
+            )
         ),
   });
 

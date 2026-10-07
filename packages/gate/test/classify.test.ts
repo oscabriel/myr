@@ -86,7 +86,18 @@ const rows: readonly {
   },
   {
     evidence: { ...red, onMerged: "blocked", rerun: Option.some("blocked") },
-    name: "the checker could not start twice",
+    name: "the checker could not start twice on a tree whose main passes",
+    refusal: Option.some(
+      new ChecksFailed({
+        lane: unit,
+        logRef: "logs/datekit/unit-2222222",
+        next: "bun run test",
+      })
+    ),
+  },
+  {
+    evidence: { ...red, onMain: "blocked", onMerged: "blocked" },
+    name: "the checker could not start on main either, so no fresh run is spent",
     refusal: Option.some(new VerifierBlocked({})),
   },
   {
