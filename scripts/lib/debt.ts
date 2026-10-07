@@ -124,21 +124,21 @@ const perKind = (count: (kind: Kind) => number): Tally => ({
 export const tally = (entries: readonly LedgerEntry[]): Tally =>
   perKind((kind) => entries.filter((entry) => entry.kind === kind).length);
 
+/** Each kind whose count is not its baseline, in `Kind`'s order. */
+const changes = (counted: Tally, baseline: Baseline): readonly Change[] =>
+  Kind.literals.flatMap((kind) =>
+    counted[kind] === baseline[kind]
+      ? []
+      : [{ baseline: baseline[kind], count: counted[kind], kind }]
+  );
+
 /** Each kind whose count is above the baseline, in `Kind`'s order. */
 export const rises = (counted: Tally, baseline: Baseline): readonly Change[] =>
-  Kind.literals.flatMap((kind) =>
-    counted[kind] > baseline[kind]
-      ? [{ baseline: baseline[kind], count: counted[kind], kind }]
-      : []
-  );
+  changes(counted, baseline).filter((change) => change.count > change.baseline);
 
 /** Each kind whose count is below the baseline, in `Kind`'s order. */
 export const falls = (counted: Tally, baseline: Baseline): readonly Change[] =>
-  Kind.literals.flatMap((kind) =>
-    counted[kind] < baseline[kind]
-      ? [{ baseline: baseline[kind], count: counted[kind], kind }]
-      : []
-  );
+  changes(counted, baseline).filter((change) => change.count < change.baseline);
 
 /**
  * Each escape with nothing after ` -- ` on its own line. A comment above the

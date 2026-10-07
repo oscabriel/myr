@@ -10,7 +10,7 @@ import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, Path, Schema, Stdio } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import type { Change } from "./lib/debt.ts";
+import type { Change, LedgerEntry } from "./lib/debt.ts";
 import {
   Baseline,
   judge,
@@ -29,7 +29,7 @@ const baselineFile = "debt.baseline.json";
 
 class DebtRose extends Data.TaggedError("DebtRose")<{
   readonly rises: readonly Change[];
-  readonly unreasoned: number;
+  readonly unreasoned: readonly LedgerEntry[];
 }> {}
 
 const main = Effect.gen(function* () {
@@ -80,13 +80,13 @@ const main = Effect.gen(function* () {
 
         if (lowering) {
           yield* Console.error(
-            `debt: not writing ${baselineFile}: --lower only lowers, and raising the baseline needs the user's sign-off (AGENTS.md principle 10).`
+            `debt: not writing ${baselineFile} while the check fails. --lower only lowers, and raising the baseline needs the user's sign-off (AGENTS.md principle 10).`
           );
         }
 
         return yield* new DebtRose({
           rises: rose.rises,
-          unreasoned: rose.unreasoned.length,
+          unreasoned: rose.unreasoned,
         });
       }),
   });
