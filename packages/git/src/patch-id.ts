@@ -1,0 +1,29 @@
+import { PatchId } from "@repo/protocol/ids";
+import { Array, Effect, Order } from "effect";
+
+import type { Change } from "./tree-diff.ts";
+
+const hex = (bytes: ArrayBuffer) =>
+  [...new Uint8Array(bytes)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+
+/**
+ * An answer's patch id (spec D7): SHA-256 over its change set as sorted
+ * `path\0before\0after\n` lines, an absent blob as the empty string. It
+ * ignores order and moves exactly when a blob the answer touches moves. It
+ * is the platform's own id, not `git patch-id`, so a Worker computes it with
+ * WebCrypto and no diff.
+ */
+export const patchId = (changes: readonly Change[]): Effect.Effect<PatchId> => {
+  const lines = Array.sort(
+    changes.map(
+      ({ after, before, path }) => `${path}\0${before ?? ""}\0${after ?? ""}\n`
+    ),
+    Order.String
+  );
+
+  return Effect.promise(() =>
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(lines.join("")))
+  ).pipe(Effect.map((digest) => PatchId.make(hex(digest))));
+};
