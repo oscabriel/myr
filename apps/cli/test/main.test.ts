@@ -2,12 +2,12 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client } from "@repo/protocol/contracts";
-import { Cause, Effect, Exit, Layer } from "effect";
+import { Effect, Layer } from "effect";
 import { CliOutput, Command } from "effect/cli";
 import { TestConsole } from "effect/testing";
 
 import { Credentials } from "../src/credentials.ts";
-import { program, root } from "../src/main.ts";
+import { root } from "../src/main.ts";
 import { OutputPlain } from "../src/output.ts";
 
 /** What was printed to stdout, one entry per line however it was written. */
@@ -90,27 +90,5 @@ describe(`${Brand.cli} --help`, () => {
           ])
         );
       })
-  );
-});
-
-describe("each command a later issue builds", () => {
-  const stubs = [
-    { args: ["hook"], issue: "415" },
-  ] as const;
-
-  it.effect.each(stubs)(
-    "$args dies naming issue $issue, so a missed stub is loud",
-    ({ args, issue }) =>
-      Effect.gen(function* () {
-        const exit = yield* Effect.exit(program(args));
-
-        const defect = Exit.match(exit, {
-          onFailure: (cause) =>
-            Cause.hasDies(cause) ? String(Cause.squash(cause)) : "no defect",
-          onSuccess: () => "succeeded",
-        });
-
-        expect(defect).toBe(`not built: issue ${issue}`);
-      }).pipe(Effect.provide(services))
   );
 });
