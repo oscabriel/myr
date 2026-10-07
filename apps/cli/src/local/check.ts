@@ -11,7 +11,12 @@
  * the person checking, and says so on stderr.
  */
 import { Brand } from "@repo/brand";
-import { CheckAt, CheckLane, CheckRunner } from "@repo/checks/check-runner";
+import {
+  CheckAt,
+  CheckLane,
+  CheckRunner,
+  shaOf,
+} from "@repo/checks/check-runner";
 import { CheckRunnerLocal } from "@repo/checks/check-runner/local";
 import { commandFor } from "@repo/checks/kinds";
 import { PushTarget } from "@repo/gate/facts";
@@ -56,7 +61,7 @@ import { Credentials } from "../credentials.ts";
 import { Output, Reported } from "../output.ts";
 import { repoContext } from "../repo-context.ts";
 import type { RepoContext } from "../repo-context.ts";
-import { localFacts, runGit } from "./facts.ts";
+import { localFacts, outsideAnyHook, runGit } from "./facts.ts";
 import {
   ConfigBundler,
   ConfigBundlerBun,
@@ -193,27 +198,30 @@ const claimsOn = (project: ProjectName, json: boolean) =>
 const syntheticClaim = (input: {
   readonly ask: Ask;
   readonly claimant: Handle;
+  readonly fork: RepoName;
+  /** The platform the repo's remote reaches, which serves the fork. */
+  readonly origin: Option.Option<string>;
   readonly policy: Policy;
-  readonly remote: string;
 }) =>
   Effect.map(DateTime.now, (now): ClaimView => {
-    const { ask, claimant, policy } = input;
+    const { ask, claimant, fork, policy } = input;
 
     return {
       ask: ask.id,
       base: policy.at,
       checkCommand: `${Brand.cli} ${COMMAND} --ask ${ask.id}`,
       claimant,
-      fork: RepoName.make(
-        `${ask.project}--${ask.id}--${claimant.toLowerCase()}`
-      ),
+      fork,
       lapsesAt: DateTime.addDuration(
         now,
         Duration.millis(policy.claims.lapseAfterMs)
       ),
       openedAt: now,
       project: ask.project,
-      remote: input.remote,
+      remote: Option.match(input.origin, {
+        onNone: () => `${fork}.git`,
+        onSome: (origin) => `${origin}/${fork}.git`,
+      }),
       state: "live",
       warnsAt: DateTime.addDuration(
         now,
@@ -262,10 +270,7 @@ const checkoutOf = (input: {
 
       const tree = path.join(folder, "tree");
 
-      const sha = CheckAt.match(at, {
-        Commit: ({ commit }): string => commit,
-        Tree: ({ tree: id }): string => id,
-      });
+      const sha = shaOf(at);
 
       const steps = [
         ["clone", "--shared", "--no-checkout", "--quiet", input.root, tree],
@@ -302,6 +307,8 @@ const checkoutOf = (input: {
           spawner.spawn(
             ChildProcess.make("sh", ["-c", input.setup.value], {
               cwd: tree,
+              env: outsideAnyHook,
+              extendEnv: true,
               stdin: "ignore",
             })
           ),
@@ -390,6 +397,10 @@ export const check = Command.make(
         "Run only this lane (repeat for more); every lane when left out"
       )
     ),
+    noLanes: Flag.Boolean("shape-only").pipe(
+      Flag.withDefault(false),
+      Flag.withDescription("Stop after the gate's shape stage: run no lanes")
+    ),
     offline: Flag.Boolean("offline").pipe(
       Flag.withDefault(false),
       Flag.withDescription(
@@ -402,10 +413,6 @@ export const check = Command.make(
       Flag.withDescription(
         "The project; the repo's remote names it when left out"
       )
-    ),
-    scanOnly: Flag.Boolean("shape-only").pipe(
-      Flag.withDefault(false),
-      Flag.withDescription("Stop after the gate's shape stage: run no lanes")
     ),
   },
   (flags) =>
@@ -465,7 +472,10 @@ export const check = Command.make(
         return yield* refuse(json, [new UnknownAsk({ ask: askId })]);
       }
 
-      const fork = `${project}--${askId}--${handle.toLowerCase()}`;
+      // The claim's fork, named as the platform names it.
+      const fork = RepoName.make(
+        `${project}--${askId}--${handle.toLowerCase()}`
+      );
 
       const facts = yield* localFacts({
         ask,
@@ -475,11 +485,9 @@ export const check = Command.make(
               yield* syntheticClaim({
                 ask: ask.value,
                 claimant: handle,
+                fork,
+                origin: context.origin,
                 policy,
-                remote: Option.match(context.origin, {
-                  onNone: () => `${fork}.git`,
-                  onSome: (origin) => `${origin}/${fork}.git`,
-                }),
               })
             )
           : claim,
@@ -515,7 +523,7 @@ export const check = Command.make(
 
       const judged = { ask: askId, base: facts.base, head: facts.head };
 
-      if (flags.scanOnly) {
+      if (flags.noLanes) {
         const checked: Checked = { ...judged, lanes: [], stage: "shape" };
 
         return yield* output.success({
@@ -560,7 +568,7 @@ export const check = Command.make(
           placeholders: [],
           project,
           proxies: [],
-          repo: RepoName.make(fork),
+          repo: fork,
           run: policy.run,
         })
       ).pipe(

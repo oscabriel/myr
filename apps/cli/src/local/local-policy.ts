@@ -71,7 +71,8 @@ export class ConfigBundler extends Context.Service<
 /** The project module's path: it names the folder, as the platform's bundles do. */
 const configEntry = `${Brand.configDir}/project.ts`;
 
-const SCRIPT = /\.[cm]?[jt]s$/u;
+// Code, which a bundle carries only inlined: as the Lander reads the folder.
+const SCRIPT = /\.[cm]?[jt]sx?$/u;
 
 const ASK_FILE = /\.ask\.[cm]?[jt]s$/u;
 
@@ -89,15 +90,41 @@ const bundledAs = (entry: string) => entry.replace(/\.[^./]*$/u, ".js");
 const loadFailed = (detail: string) =>
   new RulesFailed({ detail, reason: "load" });
 
-/** A file path from a `file:` URL `import.meta.resolve` gave. */
-const fileOf = (path: Path.Path, url: string) =>
-  Effect.orDie(path.fromFileUrl(new URL(url)));
+/**
+ * The file this CLI's own copy of `specifier` is, looked up only when a
+ * TypeScript folder is bundled: a build of the CLI that carries no copy on
+ * disk still reads a `policy.json` or the defaults.
+ */
+const ownCopyOf = (path: Path.Path, specifier: string) =>
+  Effect.try({
+    catch: () =>
+      loadFailed(
+        `this build of ${Brand.cli} carries no ${specifier} to bundle the config folder with`
+      ),
+    try: () => new URL(import.meta.resolve(specifier)),
+  }).pipe(
+    Effect.flatMap((url) =>
+      path
+        .fromFileUrl(url)
+        .pipe(
+          Effect.mapError(() =>
+            loadFailed(
+              `this build of ${Brand.cli} keeps its ${specifier} where bun build cannot read it`
+            )
+          )
+        )
+    )
+  );
+
+const NODE_MODULES = "/node_modules";
 
 /** The `node_modules` folder a resolved module sits in. */
 const packagesOf = (file: string) => {
-  const at = file.lastIndexOf("/node_modules/");
+  const at = file.lastIndexOf(`${NODE_MODULES}/`);
 
-  return at === -1 ? Option.none() : Option.some(file.slice(0, at + 13));
+  return at === -1
+    ? Option.none()
+    : Option.some(file.slice(0, at + NODE_MODULES.length));
 };
 
 /**
@@ -116,8 +143,6 @@ export const ConfigBundlerBun: Layer.Layer<
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const sdk = yield* fileOf(path, import.meta.resolve("@repo/sdk"));
-    const effect = yield* fileOf(path, import.meta.resolve("effect"));
 
     /** Writes `content` at `file` under `root`, refusing a path that leaves it. */
     const writeUnder = (root: string, file: string, content: string) => {
@@ -144,6 +169,8 @@ export const ConfigBundlerBun: Layer.Layer<
       entries: readonly string[]
     ) =>
       Effect.gen(function* () {
+        const sdk = yield* ownCopyOf(path, "@repo/sdk");
+        const effect = yield* ownCopyOf(path, "effect");
         const root = path.join(dir, "src");
         const out = path.join(dir, "out");
         const tsconfig = path.join(dir, "tsconfig.json");
@@ -285,10 +312,15 @@ export interface PolicyAbout {
 
 /** One file of a commit, as `git ls-tree -r -l` lists it. */
 interface TreeFile {
+  readonly mode: string;
   readonly path: string;
   readonly sha: string;
   readonly size: number;
 }
+
+// A regular file, executable or not: the Lander bundles only these from the
+// config folder, never a link or a submodule.
+const FILE_MODES: ReadonlySet<string> = new Set(["100644", "100755"]);
 
 const ENTRY =
   /^(?<mode>\d+) (?<type>\w+) (?<sha>[0-9a-f]+) +(?<size>-|\d+)\t(?<path>.+)$/su;
@@ -302,10 +334,12 @@ const filesAt = (root: string, sha: CommitSha) =>
         const groups = ENTRY.exec(record)?.groups;
 
         return groups?.type === "blob" &&
+          groups.mode !== undefined &&
           groups.sha !== undefined &&
           groups.path !== undefined
           ? [
               {
+                mode: groups.mode,
                 path: groups.path,
                 sha: groups.sha,
                 size: Math.trunc(Number(groups.size ?? "0")),
@@ -500,7 +534,13 @@ const factsAt = (input: {
 
     // The commit's own time and first eight hex digits: the same commit
     // always sees the same clock and randomness.
-    const seconds = yield* runGit(root, ["show", "-s", "--format=%ct", sha]);
+    const seconds = yield* runGit(root, [
+      "show",
+      "-s",
+      "--no-show-signature",
+      "--format=%ct",
+      sha,
+    ]);
 
     const now = yield* Effect.fromOption(
       DateTime.make(Math.trunc(Number(seconds.stdout.trim())) * 1000)
@@ -553,8 +593,9 @@ export const localPolicy = (
 
     const files = yield* filesAt(root, sha);
 
-    const config = files.filter(({ path }) =>
-      path.startsWith(`${Brand.configDir}/`)
+    const config = files.filter(
+      ({ mode, path }) =>
+        path.startsWith(`${Brand.configDir}/`) && FILE_MODES.has(mode)
     );
 
     const entries = entriesOf(config.map(({ path }) => path));

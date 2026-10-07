@@ -250,6 +250,43 @@ describe(localPolicy, () => {
   );
 
   it.live(
+    "holds the config folder as the Lander bundles it: regular files, and no code it leaves out",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const root = yield* fs.realPath(yield* fs.makeTempDirectoryScoped());
+
+        yield* gitOk(root, "init", "--quiet", "--initial-branch", "main");
+        yield* fs.makeDirectory(path.join(root, Brand.configDir));
+
+        // A policy.json that is a link, and a helper no entry imports: the
+        // Lander's bundle holds neither, so the project runs on the defaults.
+        yield* fs.symlink("../policy.json", path.join(root, policyFile));
+
+        yield* commit(
+          root,
+          {
+            [`${Brand.configDir}/helper.tsx`]: "export const helper = 1;\n",
+            "package.json": JSON.stringify({
+              name: "plain",
+              scripts: { test: "vitest run" },
+            }),
+            "policy.json": "{}\n",
+          },
+          "Start"
+        );
+
+        const source = yield* policyAt(root).pipe(
+          Effect.map((policy) => policy.source),
+          Effect.catchTag("RulesFailed", ({ detail }) => Effect.succeed(detail))
+        );
+
+        expect(source).toBe("defaults");
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
     "evaluates a TypeScript config folder at main, bundled with this CLI's own sdk",
     () =>
       Effect.gen(function* () {

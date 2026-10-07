@@ -1,5 +1,5 @@
 import { NodeServices } from "@effect/platform-node";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, it, vi } from "@effect/vitest";
 import { Fetch, FetchFailed } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostLocal } from "@repo/artifacts/repo-host/local";
@@ -50,7 +50,16 @@ import { TestConsole } from "effect/testing";
 import { ConfigBundlerBun, localPolicy } from "../../src/local/local-policy.ts";
 import { program } from "../../src/main.ts";
 import { OutputPlain } from "../../src/output.ts";
-import { aCheckRepo, ask, checkFile, handle, project } from "./fixture.ts";
+import {
+  aCheckRepo,
+  ask,
+  checkFile,
+  commit,
+  handle,
+  policyFile,
+  policyText,
+  project,
+} from "./fixture.ts";
 import type { CheckRepo } from "./fixture.ts";
 
 /** A platform that says the caller holds no claims anywhere, and answers nothing else. */
@@ -224,6 +233,41 @@ const gateSays = (repo: CheckRepo, head: string) =>
     return { encoded: yield* encodeRefusals(refusals), refusals };
   });
 
+/**
+ * What `check` must leave as it found it: where HEAD points, every ref, the
+ * repo's config and index, its worktrees, and the files in its git folder.
+ */
+const stateOf = (root: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const store = path.join(root, ".git");
+
+    return {
+      config: yield* fs.readFileString(path.join(store, "config")),
+      head: yield* gitOk(root, "rev-parse", "--symbolic-full-name", "HEAD"),
+      index: yield* fs.readFile(path.join(store, "index")),
+      refs: yield* gitOk(root, "for-each-ref"),
+      store: (yield* fs.readDirectory(store)).toSorted(),
+      worktrees: yield* gitOk(root, "worktree", "list", "--porcelain"),
+    };
+  });
+
+/**
+ * What git exports to a hook that runs the CLI, such as a pre-commit hook
+ * under `git commit -a`: its own repo and index, and the config given with
+ * `git -c`. Restored when the scope closes.
+ */
+const inHook = (root: string) =>
+  Effect.acquireRelease(
+    Effect.sync(() => {
+      vi.stubEnv("GIT_DIR", `${root}/.git`);
+      vi.stubEnv("GIT_INDEX_FILE", `${root}/.git/index`);
+      vi.stubEnv("GIT_CONFIG_PARAMETERS", "'core.bare'='false'");
+    }),
+    () => Effect.sync(() => vi.unstubAllEnvs())
+  );
+
 describe(`${Brand.cli} check`, () => {
   it.live(
     "prints the refusals the gateway would give the same head, in one envelope, and exits 1",
@@ -320,6 +364,54 @@ describe(`${Brand.cli} check`, () => {
           ],
           v: 1,
         });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "leaves the repo, its config and its refs as they were, even when a git hook runs it",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* aCheckRepo;
+
+        // A setup that writes git config, as an install's `prepare` script
+        // does: it belongs to the temp clone the lanes run in.
+        yield* gitOk(repo.root, "checkout", "--quiet", "main");
+
+        yield* commit(
+          repo.root,
+          {
+            [policyFile]: (yield* policyText).replace(
+              '"checks":',
+              '"setup": "git config check.setup ran", "checks":'
+            ),
+          },
+          "Set the lanes up"
+        );
+
+        yield* gitOk(repo.root, "checkout", "--quiet", "clean");
+
+        const before = yield* stateOf(repo.root);
+
+        const printed = yield* inHook(repo.root).pipe(
+          Effect.andThen(
+            run([
+              "check",
+              "--dir",
+              repo.root,
+              "--ask",
+              ask,
+              "--offline",
+              "--lane",
+              "ok",
+              "--json",
+            ])
+          ),
+          Effect.provide(services(unreachable)),
+          Effect.scoped
+        );
+
+        expect(Exit.isSuccess(printed.exit)).toBeTruthy();
+        expect(yield* stateOf(repo.root)).toStrictEqual(before);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 

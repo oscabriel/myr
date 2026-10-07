@@ -6,9 +6,10 @@
  * local answer matches the gateway's by construction: no diff of its own.
  *
  * Nothing here writes to the working repo, its config or its refs: git runs
- * with optional locks off, and `/local` reads the repo's objects through a
- * link in a temp folder (or a temp bare copy, when the objects live in
- * another repo's store, which isomorphic-git cannot follow).
+ * with optional locks off and never sees the repo a git hook exported (so a
+ * temp repo's git stays in the temp repo), and `/local` reads its objects
+ * through a link in a temp folder (or a temp bare copy, when the objects
+ * live in another repo's store, which isomorphic-git cannot follow).
  */
 import { Fetch, FetchFailed } from "@repo/artifacts/fetch";
 import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
@@ -57,9 +58,34 @@ export interface GitRan {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
+/**
+ * What git exports to a hook that runs the CLI: where its repo, index and
+ * objects are, and the config given with `git -c`. A git that saw them in a
+ * temp repo would read and write the hook's repo instead (its HEAD, its
+ * index, its refs), so every git and every setup here runs without them and
+ * finds its repo from the folder it runs in. `undefined` leaves one out.
+ */
+export const outsideAnyHook = {
+  GIT_ALTERNATE_OBJECT_DIRECTORIES: undefined,
+  GIT_COMMON_DIR: undefined,
+  GIT_CONFIG: undefined,
+  GIT_CONFIG_COUNT: undefined,
+  GIT_CONFIG_PARAMETERS: undefined,
+  GIT_DIR: undefined,
+  GIT_INDEX_FILE: undefined,
+  GIT_NAMESPACE: undefined,
+  GIT_OBJECT_DIRECTORY: undefined,
+  GIT_PREFIX: undefined,
+  GIT_WORK_TREE: undefined,
+};
+
 // Reads only: git takes no optional lock (a read that would refresh the
 // index leaves it as it is), and never asks for a password.
-const readOnly = { GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0" };
+const readOnly = {
+  ...outsideAnyHook,
+  GIT_OPTIONAL_LOCKS: "0",
+  GIT_TERMINAL_PROMPT: "0",
+};
 
 /** Runs git in `cwd` to its end; a failing git is a result, not an error. */
 export const runGit = (
@@ -151,11 +177,9 @@ const readsAll = (name: RepoName, shas: readonly CommitSha[]) =>
   );
 
 /** A repo `/local` can read: the host's layer, and the repo's name there. */
-export interface Opened {
+interface Opened {
   readonly host: Layer.Layer<RepoHost>;
   readonly name: RepoName;
-  /** How it was opened: a link to the repo's own store, or a temp bare copy. */
-  readonly how: "link" | "copy";
 }
 
 /**
@@ -168,7 +192,7 @@ export interface Opened {
  * commits are fetched into a temp bare repo, which reads the working repo
  * and writes only the copy.
  */
-export const openWorking = (
+const openWorking = (
   root: string,
   shas: readonly CommitSha[]
 ): Effect.Effect<
@@ -212,7 +236,7 @@ export const openWorking = (
         .pipe(Effect.mapError(failed));
 
       if (yield* readsAll(WORKING, shas).pipe(Effect.provide(host))) {
-        return { host, how: "link", name: WORKING } satisfies Opened;
+        return { host, name: WORKING } satisfies Opened;
       }
     }
 
@@ -232,7 +256,7 @@ export const openWorking = (
       return yield* failed();
     }
 
-    return { host, how: "copy", name: COPY } satisfies Opened;
+    return { host, name: COPY } satisfies Opened;
   });
 
 /** What `localFacts` is told: the repo, the push, and what the project knows of it. */
