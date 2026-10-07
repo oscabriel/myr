@@ -20,11 +20,11 @@ import {
 } from "@repo/git/trailers";
 import { Verdict } from "@repo/protocol/domain/answer";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import type { CommitSha } from "@repo/protocol/ids";
 import {
   AskId,
   BlobSha,
   CheckVersion,
+  CommitSha,
   Handle,
   LandedSha,
   PatchId,
@@ -33,12 +33,12 @@ import {
   RequestId,
   TreeSha,
 } from "@repo/protocol/ids";
-import { StaleBase, VerifierBlocked } from "@repo/protocol/refusal";
-import { advanceTo } from "@repo/testkit/clock";
+import { RepoBusy, StaleBase, VerifierBlocked } from "@repo/protocol/refusal";
+import { advanceTo, at } from "@repo/testkit/clock";
 import { gitClient } from "@repo/testkit/git-client";
 import type { Files } from "@repo/testkit/git-client";
-import { DateTime, Effect, Layer, Option, Schema } from "effect";
-import { hashBlob, readCommit } from "isomorphic-git";
+import { Context, DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
+import { hashBlob, readCommit, writeCommit } from "isomorphic-git";
 
 import { composeRef, Lander, landedRef, Rebuild } from "../src/lander.ts";
 import type { LandJob } from "../src/lander.ts";
@@ -56,29 +56,54 @@ const bob = Handle.make("bob");
 
 const requestId = RequestId.make("request-fix-parser-1");
 
+// When the landing in the first land test is made, by the TestClock.
+const landingTime = "2026-10-07T12:30:00Z";
+
 /** The Lander over a fresh memory store, with the store itself for the test to read. */
 const world = Layer.provideMerge(LanderIsogit, RepoHostMemory);
 
+/** The refs whose pushes the store refuses as busy; the test sets them as it goes. */
+class BusyRefs extends Context.Service<
+  BusyRefs,
+  Ref.Ref<ReadonlySet<RefName>>
+>()("test/BusyRefs") {}
+
+/** From now on, the store refuses every push of one of `refs` as busy. */
+const busy = (...refs: readonly RefName[]) =>
+  BusyRefs.use((busyRefs) => Ref.set(busyRefs, new Set(refs)));
+
 /**
- * A memory store whose pushes of any ref but `main` are refused as busy: the
- * bookkeeping after a landing cannot be written.
+ * The Lander over a fresh memory store that refuses as busy any push of a
+ * ref in `BusyRefs` (none at first), with the store for the test to read.
  */
-const busyBookkeeping = Layer.provideMerge(
+const busyWorld = Layer.provideMerge(
   LanderIsogit,
   Layer.effect(
     RepoHost,
     Effect.gen(function* () {
       const host = yield* RepoHost;
+      const busyRefs = yield* BusyRefs;
 
       return RepoHost.of({
         ...host,
         push: (name, source, updates) =>
-          updates.some(({ ref }) => ref !== mainRef)
-            ? Effect.fail(new HostBusy({ name }))
-            : host.push(name, source, updates),
+          Effect.gen(function* () {
+            const refused = yield* Ref.get(busyRefs);
+
+            if (updates.some(({ ref }) => refused.has(ref))) {
+              return yield* new HostBusy({ name });
+            }
+
+            return yield* host.push(name, source, updates);
+          }),
       });
     })
-  ).pipe(Layer.provide(RepoHostMemory))
+  ).pipe(
+    Layer.provide(RepoHostMemory),
+    Layer.provideMerge(
+      Layer.effect(BusyRefs, Ref.make<ReadonlySet<RefName>>(new Set()))
+    )
+  )
 );
 
 /** git's id for a blob holding `text`. */
@@ -133,7 +158,43 @@ const project = (files: Files) =>
         return TreeSha.make(commit.tree);
       });
 
-    return { advance, base, treeOf };
+    /**
+     * The id git gives a platform commit of `tree` on `parent` by `author`,
+     * made at `iso`: written in the client and never pushed.
+     */
+    const platformCommitOf = (input: {
+      readonly tree: TreeSha;
+      readonly parent: CommitSha;
+      readonly author: Handle;
+      readonly message: string;
+      readonly iso: string;
+    }) =>
+      Effect.gen(function* () {
+        const timestamp = Math.floor(
+          DateTime.toEpochMillis(at(input.iso)) / 1000
+        );
+
+        const oid = yield* Effect.promise(() =>
+          writeCommit({
+            ...client.source,
+            commit: {
+              author: {
+                ...authorLine(input.author),
+                timestamp,
+                timezoneOffset: 0,
+              },
+              committer: { ...committerLine, timestamp, timezoneOffset: 0 },
+              message: input.message,
+              parent: [input.parent],
+              tree: input.tree,
+            },
+          })
+        );
+
+        return CommitSha.make(oid);
+      });
+
+    return { advance, base, platformCommitOf, treeOf };
   });
 
 /** The tip of `main`, as the platform last landed it. */
@@ -203,7 +264,7 @@ const start: Files = [
  * and added `docs/guide.md`.
  */
 const diverged = Effect.gen(function* () {
-  const { advance, base, treeOf } = yield* project(start);
+  const { advance, base, platformCommitOf, treeOf } = yield* project(start);
 
   const main = yield* advance(demo, base, "Touch b", [
     ["src/a.ts", "a1\n"],
@@ -216,7 +277,14 @@ const diverged = Effect.gen(function* () {
     ["src/b.ts", "b1\n"],
   ]);
 
-  return { advance, base, head, main: landed(main), treeOf };
+  return {
+    advance,
+    base,
+    head,
+    main: landed(main),
+    platformCommitOf,
+    treeOf,
+  };
 });
 
 /** A land of alice's merged answer onto `main`. */
@@ -307,18 +375,24 @@ describe("the isomorphic-git Lander", () => {
     );
 
     it.effect(
-      "refuses a head that conflicts with main as StaleBase, naming the path",
+      "refuses a head that conflicts with main as StaleBase, naming every conflicting path in order",
       () =>
         Effect.gen(function* () {
           const lander = yield* Lander;
-          const { advance, base } = yield* project(start);
 
-          const main = yield* advance(demo, base, "Main's a", [
+          const { advance, base } = yield* project([
+            ...start,
+            ["src-x.ts", "x1\n"],
+          ]);
+
+          const main = yield* advance(demo, base, "Main's a and x", [
+            ["src-x.ts", "x-main\n"],
             ["src/a.ts", "a-main\n"],
             ["src/b.ts", "b1\n"],
           ]);
 
-          const head = yield* advance(fork, base, "Alice's a", [
+          const head = yield* advance(fork, base, "Alice's a and x", [
+            ["src-x.ts", "x-alice\n"],
             ["src/a.ts", "a-alice\n"],
             ["src/b.ts", "b1\n"],
           ]);
@@ -330,7 +404,7 @@ describe("the isomorphic-git Lander", () => {
           expect(refused).toStrictEqual(
             new StaleBase({
               base,
-              conflicts: [RepoPath.make("src/a.ts")],
+              conflicts: [RepoPath.make("src-x.ts"), RepoPath.make("src/a.ts")],
               main,
             })
           );
@@ -345,7 +419,7 @@ describe("the isomorphic-git Lander", () => {
         Effect.gen(function* () {
           const lander = yield* Lander;
           const repos = yield* RepoHost;
-          const { base, head, main } = yield* diverged;
+          const { base, head, main, platformCommitOf } = yield* diverged;
 
           const merged = yield* lander.merge({
             base,
@@ -355,7 +429,7 @@ describe("the isomorphic-git Lander", () => {
             repo: demo,
           });
 
-          yield* advanceTo("2026-10-07T12:30:00Z");
+          yield* advanceTo(landingTime);
 
           const job = landOf({ base, head, main, tree: merged.tree });
           const result = yield* lander.land(job);
@@ -394,6 +468,16 @@ describe("the isomorphic-git Lander", () => {
             ],
             tree: merged.tree,
           });
+          // The whole commit, its time from the Clock included.
+          expect(result.sha).toBe(
+            yield* platformCommitOf({
+              author: alice,
+              iso: landingTime,
+              message,
+              parent: main,
+              tree: merged.tree,
+            })
+          );
           expect(landedRef).toBe(`${Brand.refsPrefix}landed`);
 
           const note = Option.getOrThrow(yield* noteOn(demo, result.sha));
@@ -487,6 +571,8 @@ describe("the isomorphic-git Lander", () => {
             repo: demo,
           });
 
+          yield* busy(landedRef, notesRef);
+
           const result = yield* lander.land(
             landOf({ base, head, main, tree: merged.tree })
           );
@@ -499,7 +585,137 @@ describe("the isomorphic-git Lander", () => {
             false,
             false,
           ]);
-        }).pipe(Effect.provide(busyBookkeeping))
+        }).pipe(Effect.provide(busyWorld))
+    );
+
+    it.effect(
+      "writes the pending mirror ref and note when the same job lands again, with no new commit",
+      () =>
+        Effect.gen(function* () {
+          const lander = yield* Lander;
+          const repos = yield* RepoHost;
+          const { base, head, main } = yield* diverged;
+
+          const merged = yield* lander.merge({
+            base,
+            fork,
+            head,
+            main,
+            repo: demo,
+          });
+
+          const job = landOf({ base, head, main, tree: merged.tree });
+
+          yield* busy(landedRef, notesRef);
+
+          const first = yield* lander.land(job);
+
+          yield* busy();
+
+          const again = yield* lander.land(job);
+          const refs = yield* repos.refs(demo);
+
+          expect({
+            again,
+            first: first.pending,
+            mirror: refs.get(landedRef),
+            onMain: refs.get(mainRef),
+          }).toStrictEqual({
+            again: { pending: [], sha: first.sha },
+            first: ["mirror", "notes"],
+            mirror: first.sha,
+            onMain: first.sha,
+          });
+
+          const note = Option.getOrThrow(yield* noteOn(demo, first.sha));
+
+          expect(yield* decodeNote(note)).toStrictEqual(
+            Option.getOrThrow(job.verdict)
+          );
+        }).pipe(Effect.provide(busyWorld))
+    );
+
+    it.effect(
+      "never moves the mirror back to an earlier landing that lands again after a later one",
+      () =>
+        Effect.gen(function* () {
+          const lander = yield* Lander;
+          const repos = yield* RepoHost;
+          const { base, head, main } = yield* diverged;
+          const forked = Option.getOrThrow(yield* repos.readCommit(demo, base));
+          const revertId = RequestId.make("request-revert-1");
+
+          const merged = yield* lander.merge({
+            base,
+            fork,
+            head,
+            main,
+            repo: demo,
+          });
+
+          const job = landOf({ base, head, main, tree: merged.tree });
+
+          yield* busy(landedRef);
+
+          const first = yield* lander.land(job);
+
+          yield* busy();
+
+          const later = yield* lander.land({
+            author: bob,
+            main: first.sha,
+            message: formatLanding({
+              assisted: [],
+              credits: [{ handle: bob, role: "Signed-off-by" }],
+              requestId: revertId,
+              subject: "Revert the parser fix",
+            }),
+            rebuild: Rebuild.Existing({ commit: base }),
+            repo: demo,
+            requestId: revertId,
+            tree: TreeSha.make(forked.tree),
+            verdict: Option.none(),
+          });
+
+          const again = yield* lander.land(job);
+
+          expect({
+            again,
+            first: first.pending,
+            mirror: (yield* repos.refs(demo)).get(landedRef),
+          }).toStrictEqual({
+            again: { pending: [], sha: first.sha },
+            first: ["mirror"],
+            mirror: later.sha,
+          });
+        }).pipe(Effect.provide(busyWorld))
+    );
+
+    it.effect(
+      "refuses as RepoBusy when the store is busy with main, and leaves main where it was",
+      () =>
+        Effect.gen(function* () {
+          const lander = yield* Lander;
+          const repos = yield* RepoHost;
+          const { base, head, main } = yield* diverged;
+
+          const merged = yield* lander.merge({
+            base,
+            fork,
+            head,
+            main,
+            repo: demo,
+          });
+
+          yield* busy(mainRef);
+
+          const refused = yield* lander
+            .land(landOf({ base, head, main, tree: merged.tree }))
+            .pipe(Effect.flip);
+
+          expect(refused).toStrictEqual(new RepoBusy({}));
+          expect((yield* repos.refs(demo)).get(mainRef)).toBe(main);
+        }).pipe(Effect.provide(busyWorld))
     );
 
     it.effect(

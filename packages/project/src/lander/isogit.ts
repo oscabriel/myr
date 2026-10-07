@@ -545,10 +545,14 @@ const mergeOnto = (into: Scratch, job: MergeJob) =>
       }
     );
 
+    // Sorted as whole paths: the walk's folder-by-folder order puts
+    // `src/a.ts` before `src-x.ts`, which a sort by path does not.
     if (merged.conflicts.length > 0) {
       return yield* new StaleBase({
         base: job.base,
-        conflicts: merged.conflicts.map((path) => RepoPath.make(path)),
+        conflicts: Array.sort(merged.conflicts, Order.String).map((path) =>
+          RepoPath.make(path)
+        ),
         main: job.main,
       });
     }
