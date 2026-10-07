@@ -1,0 +1,23 @@
+==> AGENTS.md <==
+<!-- BEGIN __SLUG__ contribute (generated; content-hash: sha256:__HASH__) -->
+## Contributing to datekit
+
+This project takes changes through __NAME__: an answer to one of its asks lands only by passing the gate. This block is generated from the config folder, and the gate decides what lands. The full guide is the `datekit-contribute` skill (`.agents/skills/datekit-contribute/SKILL.md`).
+
+1. Read the ask, then claim it: `__CLI__ ask <ask>`, then `__CLI__ claim <ask>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
+2. Work inside the ask's territory until its check passes.
+3. Run `__CLI__ check`. It gives the refusals a push would get, then runs the ask's check and the project's lanes; fix everything it reports.
+4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused; follow the answer with `__CLI__ status`.
+5. Read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
+
+- Change only files in the ask's territory; a push that changes anything else is refused with `OutOfScope`.
+- Never change the judge closure (`.__SLUG__/**`, `bunfig.toml`, `tsconfig.json`, `package.json#/scripts`); a push that does is refused with `TouchedJudge`.
+- Never add a marker that turns a check off (`.skip(`, `.only(`, `@ts-ignore`); one without a reason is refused with `Weakened`.
+- Test one file with `bun test {path}`. The lanes are `lint` (`bun run lint`), `types` (`bun run typecheck`) and `unit` (`bun test`).
+- Every refusal has a `_tag`, `retryable` and `next`: run `next`. Add `--json` to any command for JSON.
+
+No fence yet: nothing checks these, so the gate won't refuse you for them.
+
+- Keep an answer to its ask's want. The gate holds the files you change to the territory, but nothing measures how much you change inside it.
+- Name the agent you work through. A landing carries an `Assisted-by:` trailer for the agent your harness's environment names; a harness that names none goes unnamed.
+<!-- END __SLUG__ contribute -->

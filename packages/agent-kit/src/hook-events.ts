@@ -20,3 +20,15 @@ export const claudeEventOf = {
   "session-start": "SessionStart",
   stop: "Stop",
 } as const satisfies Record<HookEvent, "SessionStart" | "PreToolUse" | "Stop">;
+
+/**
+ * The tools whose use the `pre-tool-use` hook guards: every Claude Code tool
+ * that writes a file. The generated hook config matches them, and the CLI's
+ * hook decides on the same names.
+ */
+export const guardedTools = [
+  "Edit",
+  "Write",
+  "MultiEdit",
+  "NotebookEdit",
+] as const;

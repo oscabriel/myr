@@ -1,0 +1,221 @@
+==> .agents/skills/datekit-contribute/SKILL.md <==
+---
+name: datekit-contribute
+description: "Answer one of datekit's asks on __NAME__: claim it, change only its territory, run `__CLI__ check`, push it to your fork, and read the verdict. Use when working on datekit, or when a push to it was refused."
+metadata:
+  managed-by: "__SLUG__"
+  landed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  content-hash: "sha256:__HASH__"
+---
+# Contribute to datekit
+
+How to answer datekit's asks on __NAME__. It is generated from datekit's config folder: the gate decides what lands, and where this text and the gate differ, the gate wins. Don't edit it by hand; it is regenerated when the config changes.
+
+## The loop
+
+1. Read the ask, then claim it: `__CLI__ ask <ask>`, then `__CLI__ claim <ask>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
+2. Work inside the ask's territory until its check passes.
+3. Run `__CLI__ check`. It gives the refusals a push would get, then runs the ask's check and the project's lanes; fix everything it reports.
+4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused; follow the answer with `__CLI__ status`.
+5. Read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
+
+A claim stays alive only while you push to it: after 2 hours without a push it is warned, and after 1 day it lapses. You may hold 3 claims at once in this project.
+
+List the open asks with `__CLI__ asks`. Add `--json` to any command for one JSON envelope instead of Markdown.
+
+## What an answer may change
+
+Change files only inside the ask's territory, the module `__CLI__ ask <ask>` names; a push that changes anything else is refused with `OutOfScope`.
+
+| Module | Paths | Public files |
+| --- | --- | --- |
+| `format` | `packages/format/**` | `packages/format/src/index.ts` |
+| `parse` | `packages/parse/**` | `packages/parse/src/index.ts` |
+
+Import another module only through its public files; an import that reaches past them is refused with `ReachedInternals`.
+
+Never change the judge closure, the files that decide what the checks do; a push that changes one is refused with `TouchedJudge`:
+
+- `.__SLUG__/**`
+- `bunfig.toml`
+- `tsconfig.json`
+- `package.json#/scripts` (only that part of the file)
+
+Never add a marker that turns a check off: `.skip(`, `.only(`, `@ts-ignore`. One without a reason is refused with `Weakened`; one with a reason waits for a decider.
+
+## The run block
+
+The project's own commands. The platform runs them exactly as written, on the merged tree, in the `checker:default` image; `__CLI__ check` runs them on your machine.
+
+- One check file: `bun test {path}`, with `{path}` the ask's check file
+- Lanes, each run on every answer:
+  - `lint`: `bun run lint`
+  - `types`: `bun run typecheck`
+  - `unit`: `bun test`
+
+## Ask kinds
+
+Each ask is of one kind, which says how its check judges an answer, who may claim it and whether a decider finishes it; `__CLI__ ask <ask>` names it.
+
+### `fix`
+
+- Check: one check file fails on main by an assertion, and passes with your answer; `__CLI__ check` runs it with `bun test {path}`.
+- Who may claim: anyone a member has vouched for in `.__SLUG__/vouched.td`.
+- Claims at once: 1; the claim is exclusive.
+- Finish: a decider may add commits of their own to a passing answer before it lands, credited `Finished-by`.
+- The brief states: want, check and territory.
+
+### `lint`
+
+- Check: a lint rule's findings in the territory go to zero; the ask names the rule and the command that counts them.
+- Who may claim: anyone signed in.
+- Claims at once: up to 2.
+- Finish: none: a passing answer lands as it is.
+- The brief states: want and check.
+
+## Refusals
+
+Instead of landing an answer, the platform answers with refusals. Git prints them on its `remote:` lines, `__CLI__ check` and `__CLI__ status` print them, and the verdict note holds them as JSON. Each one has a `_tag`, `retryable` (whether trying the same thing again can help) and `next` (the command to run next). The refusals about an answer's files arrive together, so one push hears about all of them.
+
+| `_tag` | Retryable | `next` | What to do |
+| --- | --- | --- | --- |
+| `NotClaimed` | yes | `__CLI__ claim <ask>` | Claim the ask, then push again. |
+| `ClaimLapsed` | yes | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
+| `NotVouched` | no | `__CLI__ status` | Ask a member of the project to vouch for you. |
+| `CapReached` | yes | `__CLI__ status` | Release a claim you hold, or land one, before you take another. |
+| `AskFull` | yes | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
+| `NoAsk` | no | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
+| `RepoBusy` | yes | `git push` | Push again. |
+| `DirectPush` | no | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
+| `AskBlocked` | yes | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
+| `Denounced` | no | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `OutOfScope` | no | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
+| `TouchedJudge` | no | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
+| `Weakened` | no | `__CLI__ check` | Take the marker out, or give it a reason for a decider to weigh; never raise a ratchet. |
+| `PrivatePathInPublicTree` | no | `__CLI__ check` | Take the held-back paths it names out of your answer. |
+| `ReachedInternals` | no | `__CLI__ check` | Import the other module only through its public files. |
+| `StaleBase` | yes | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
+| `StaleLayer` | yes | `__CLI__ status` | Nothing: the answer is checked again. |
+| `ChecksFailed` | no | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
+| `HeldBackFailed` | no | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
+| `AttemptsExhausted` | yes | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
+| `Flake` | yes | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
+| `VerifierBlocked` | yes | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
+
+## No fence yet
+
+Norms that nothing checks yet. Keep them; the gate does not refuse an answer that breaks one.
+
+- Keep an answer to its ask's want. The gate holds the files you change to the territory, but nothing measures how much you change inside it.
+- Name the agent you work through. A landing carries an `Assisted-by:` trailer for the agent your harness's environment names; a harness that names none goes unnamed.
+
+==> .claude/skills/datekit-contribute/SKILL.md <==
+---
+name: datekit-contribute
+description: "Answer one of datekit's asks on __NAME__: claim it, change only its territory, run `__CLI__ check`, push it to your fork, and read the verdict. Use when working on datekit, or when a push to it was refused."
+metadata:
+  managed-by: "__SLUG__"
+  landed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  content-hash: "sha256:__HASH__"
+---
+# Contribute to datekit
+
+How to answer datekit's asks on __NAME__. It is generated from datekit's config folder: the gate decides what lands, and where this text and the gate differ, the gate wins. Don't edit it by hand; it is regenerated when the config changes.
+
+## The loop
+
+1. Read the ask, then claim it: `__CLI__ ask <ask>`, then `__CLI__ claim <ask>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
+2. Work inside the ask's territory until its check passes.
+3. Run `__CLI__ check`. It gives the refusals a push would get, then runs the ask's check and the project's lanes; fix everything it reports.
+4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused; follow the answer with `__CLI__ status`.
+5. Read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
+
+A claim stays alive only while you push to it: after 2 hours without a push it is warned, and after 1 day it lapses. You may hold 3 claims at once in this project.
+
+List the open asks with `__CLI__ asks`. Add `--json` to any command for one JSON envelope instead of Markdown.
+
+## What an answer may change
+
+Change files only inside the ask's territory, the module `__CLI__ ask <ask>` names; a push that changes anything else is refused with `OutOfScope`.
+
+| Module | Paths | Public files |
+| --- | --- | --- |
+| `format` | `packages/format/**` | `packages/format/src/index.ts` |
+| `parse` | `packages/parse/**` | `packages/parse/src/index.ts` |
+
+Import another module only through its public files; an import that reaches past them is refused with `ReachedInternals`.
+
+Never change the judge closure, the files that decide what the checks do; a push that changes one is refused with `TouchedJudge`:
+
+- `.__SLUG__/**`
+- `bunfig.toml`
+- `tsconfig.json`
+- `package.json#/scripts` (only that part of the file)
+
+Never add a marker that turns a check off: `.skip(`, `.only(`, `@ts-ignore`. One without a reason is refused with `Weakened`; one with a reason waits for a decider.
+
+## The run block
+
+The project's own commands. The platform runs them exactly as written, on the merged tree, in the `checker:default` image; `__CLI__ check` runs them on your machine.
+
+- One check file: `bun test {path}`, with `{path}` the ask's check file
+- Lanes, each run on every answer:
+  - `lint`: `bun run lint`
+  - `types`: `bun run typecheck`
+  - `unit`: `bun test`
+
+## Ask kinds
+
+Each ask is of one kind, which says how its check judges an answer, who may claim it and whether a decider finishes it; `__CLI__ ask <ask>` names it.
+
+### `fix`
+
+- Check: one check file fails on main by an assertion, and passes with your answer; `__CLI__ check` runs it with `bun test {path}`.
+- Who may claim: anyone a member has vouched for in `.__SLUG__/vouched.td`.
+- Claims at once: 1; the claim is exclusive.
+- Finish: a decider may add commits of their own to a passing answer before it lands, credited `Finished-by`.
+- The brief states: want, check and territory.
+
+### `lint`
+
+- Check: a lint rule's findings in the territory go to zero; the ask names the rule and the command that counts them.
+- Who may claim: anyone signed in.
+- Claims at once: up to 2.
+- Finish: none: a passing answer lands as it is.
+- The brief states: want and check.
+
+## Refusals
+
+Instead of landing an answer, the platform answers with refusals. Git prints them on its `remote:` lines, `__CLI__ check` and `__CLI__ status` print them, and the verdict note holds them as JSON. Each one has a `_tag`, `retryable` (whether trying the same thing again can help) and `next` (the command to run next). The refusals about an answer's files arrive together, so one push hears about all of them.
+
+| `_tag` | Retryable | `next` | What to do |
+| --- | --- | --- | --- |
+| `NotClaimed` | yes | `__CLI__ claim <ask>` | Claim the ask, then push again. |
+| `ClaimLapsed` | yes | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
+| `NotVouched` | no | `__CLI__ status` | Ask a member of the project to vouch for you. |
+| `CapReached` | yes | `__CLI__ status` | Release a claim you hold, or land one, before you take another. |
+| `AskFull` | yes | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
+| `NoAsk` | no | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
+| `RepoBusy` | yes | `git push` | Push again. |
+| `DirectPush` | no | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
+| `AskBlocked` | yes | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
+| `Denounced` | no | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `OutOfScope` | no | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
+| `TouchedJudge` | no | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
+| `Weakened` | no | `__CLI__ check` | Take the marker out, or give it a reason for a decider to weigh; never raise a ratchet. |
+| `PrivatePathInPublicTree` | no | `__CLI__ check` | Take the held-back paths it names out of your answer. |
+| `ReachedInternals` | no | `__CLI__ check` | Import the other module only through its public files. |
+| `StaleBase` | yes | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
+| `StaleLayer` | yes | `__CLI__ status` | Nothing: the answer is checked again. |
+| `ChecksFailed` | no | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
+| `HeldBackFailed` | no | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
+| `AttemptsExhausted` | yes | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
+| `Flake` | yes | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
+| `VerifierBlocked` | yes | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
+
+## No fence yet
+
+Norms that nothing checks yet. Keep them; the gate does not refuse an answer that breaks one.
+
+- Keep an answer to its ask's want. The gate holds the files you change to the territory, but nothing measures how much you change inside it.
+- Name the agent you work through. A landing carries an `Assisted-by:` trailer for the agent your harness's environment names; a harness that names none goes unnamed.
