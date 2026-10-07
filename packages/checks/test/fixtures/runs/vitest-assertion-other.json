@@ -1,0 +1,58 @@
+{
+  "code": 1,
+  "report": {
+    "numTotalTestSuites": 2,
+    "numPassedTestSuites": 0,
+    "numFailedTestSuites": 2,
+    "numPendingTestSuites": 0,
+    "numTotalTests": 1,
+    "numPassedTests": 0,
+    "numFailedTests": 1,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "snapshot": {
+      "added": 0,
+      "failure": false,
+      "filesAdded": 0,
+      "filesRemoved": 0,
+      "filesRemovedList": [],
+      "filesUnmatched": 0,
+      "filesUpdated": 0,
+      "matched": 0,
+      "total": 0,
+      "unchecked": 0,
+      "uncheckedKeysByFile": [],
+      "unmatched": 0,
+      "updated": 0,
+      "didUpdate": false
+    },
+    "startTime": 1791367638442,
+    "success": false,
+    "testResults": [
+      {
+        "assertionResults": [
+          {
+            "ancestorTitles": ["parseWeek"],
+            "fullName": "parseWeek reads the first week of a year",
+            "status": "failed",
+            "title": "reads the first week of a year",
+            "duration": 4.0999769999999955,
+            "failureMessages": [
+              "AssertionError: expected { week: 2, year: 2026 } to strictly equal { week: 1, year: 2026 }\n    at /work/datekit/test/week.test.js:5:35\n    at file:///work/datekit/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:1628:35\n    at file:///work/datekit/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:26\n    at file:///work/datekit/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3321:20\n    at new Promise (<anonymous>)\n    at runWithCancel (file:///work/datekit/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3316:10)\n    at file:///work/datekit/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3301:20\n    at new Promise (<anonymous>)\n    at runWithTimeout (file:///work/datekit/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3259:10)\n    at file:///work/datekit/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3882:64"
+            ],
+            "meta": {},
+            "tags": [],
+            "benchmarks": []
+          }
+        ],
+        "startTime": 1791367638532,
+        "endTime": 1791367638536.1,
+        "status": "failed",
+        "message": "",
+        "name": "/work/datekit/test/week.test.js"
+      }
+    ]
+  },
+  "stderr": "\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  test/week.test.js > parseWeek > reads the first week of a year\nAssertionError: expected { week: 2, year: 2026 } to strictly equal { week: 1, year: 2026 }\n\n- Expected\n+ Received\n\n  {\n-   \"week\": 1,\n+   \"week\": 2,\n    \"year\": 2026,\n  }\n\n ❯ test/week.test.js:5:35\n      3| describe(\"parseWeek\", () => {\n      4|   it(\"reads the first week of a year\", () => {\n      5|     expect(parseWeek(\"2026-W01\")).toStrictEqual({ week: 1, year: 2026 …\n       |                                   ^\n      6|   });\n      7| });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
+  "stdout": "\n RUN  v5.0.3 /work/datekit\n\n ❯ test/week.test.js (1 test | 1 failed) 5ms\n   ❯ parseWeek (1)\n     × reads the first week of a year 4ms\n\n Test Files  1 failed (1)\n      Tests  1 failed (1)\n   Start at  03:07:18\n   Duration  95ms (transform 45%, import 24%, tests 18%, worker 12%)\n\nJSON report written to /work/datekit/report.json\n"
+}

@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stderr": "The following filters did not match any test files in --cwd=\"/work/datekit\":\n nothing-here\n5 files were searched [1.00ms]\n\nnote: Tests need \".test\", \"_test_\", \".spec\" or \"_spec_\" in the filename (ex: \"MyApp.test.ts\")\n\n",
+  "stdout": "bun test v1.4.2 (744846f84)\n"
+}

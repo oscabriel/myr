@@ -1,0 +1,35 @@
+{
+  "code": 1,
+  "report": {
+    "numTotalTestSuites": 0,
+    "numPassedTestSuites": 0,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 0,
+    "numTotalTests": 0,
+    "numPassedTests": 0,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "snapshot": {
+      "added": 0,
+      "failure": false,
+      "filesAdded": 0,
+      "filesRemoved": 0,
+      "filesRemovedList": [],
+      "filesUnmatched": 0,
+      "filesUpdated": 0,
+      "matched": 0,
+      "total": 0,
+      "unchecked": 0,
+      "uncheckedKeysByFile": [],
+      "unmatched": 0,
+      "updated": 0,
+      "didUpdate": false
+    },
+    "startTime": 1791367639031,
+    "success": false,
+    "testResults": []
+  },
+  "stderr": "No test files found, exiting with code 1\n\nfilter: nothing-matches\ninclude: **/*.{test,spec}.?(c|m)[jt]s?(x)\nexclude:  **/node_modules/**, **/.git/**\n\n",
+  "stdout": "\n RUN  v5.0.3 /work/datekit\n\nJSON report written to /work/datekit/report.json\n"
+}

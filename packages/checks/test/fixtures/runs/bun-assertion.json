@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stderr": "\ntest/week.test.ts:\n2 | \n3 | import { weekOf } from \"../src/week.ts\";\n4 | \n5 | describe(\"weekOf\", () => {\n6 |   test(\"reads the first week of a year\", () => {\n7 |     expect(weekOf(\"2026-W01\")).toBe(1);\n                                   ^\nerror: expect(received).toBe(expected)\n\nExpected: 1\nReceived: 0\n\n      at <anonymous> (/work/datekit/test/week.test.ts:7:32)\n(fail) weekOf > reads the first week of a year [2.87ms]\n\n 0 pass\n 1 fail\n 1 expect() calls\nRan 1 test across 1 file. [5.00ms]\n",
+  "stdout": "bun test v1.4.2 (744846f84)\n"
+}

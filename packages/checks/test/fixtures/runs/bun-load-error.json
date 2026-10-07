@@ -1,0 +1,5 @@
+{
+  "code": 1,
+  "stderr": "\ntest/week.test.ts:\n\n# Unhandled error between tests\n-------------------------------\nerror: Cannot find module '../src/weeks.ts' from '/work/datekit/test/week.test.ts'\n-------------------------------\n\n\n 0 pass\n 1 fail\n 1 error\nRan 1 test across 1 file. [1.00ms]\n",
+  "stdout": "bun test v1.4.2 (744846f84)\n"
+}
