@@ -1,0 +1,13 @@
+{
+  "askedBy": "priya",
+  "blockedBy": [],
+  "brief": { "want": "Parse ISO week dates such as 2026-W40-6" },
+  "check": {
+    "_tag": "RedThenGreen",
+    "path": "packages/parse/test/iso-week.repro.test.ts"
+  },
+  "kind": "fixBug",
+  "mentor": "priya",
+  "reserve": "newcomers",
+  "territory": { "module": "@datekit/parse", "paths": ["packages/parse/**"] }
+}

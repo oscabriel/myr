@@ -1,0 +1,41 @@
+{
+  "agents": "none",
+  "asks": [
+    {
+      "askedBy": "olivia",
+      "blockedBy": [],
+      "brief": { "want": "Format durations as ISO 8601" },
+      "check": {
+        "_tag": "RedThenGreen",
+        "path": "test/duration.repro.test.ts"
+      },
+      "file": "policy.json",
+      "id": "iso-duration",
+      "kind": "fix",
+      "territory": { "module": ".", "paths": ["**"] }
+    }
+  ],
+  "budget": { "decisionsPerDay": 3, "expireDays": 7 },
+  "deciders": [{ "handles": "owners", "paths": "**" }],
+  "functions": { "admit": false, "opensAlone": false },
+  "kinds": [
+    {
+      "checkKind": "redThenGreen",
+      "claimers": "anyone",
+      "finish": "never",
+      "name": "fix",
+      "oneWay": false,
+      "race": 1,
+      "requires": ["want", "check"],
+      "strength": "assertion"
+    }
+  ],
+  "ratchets": [],
+  "run": {
+    "checks": { "lint": "npm run lint" },
+    "setup": "npm ci --ignore-scripts",
+    "test": "npx vitest run {path}"
+  },
+  "source": "config",
+  "weakening": { "markers": [".skip("] }
+}

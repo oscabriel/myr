@@ -1,0 +1,12 @@
+{
+  "brief": {
+    "context": ["February 29 exists only in leap years"],
+    "want": "Reject February 29 in a year that is not a leap year"
+  },
+  "check": {
+    "_tag": "RedThenGreen",
+    "path": "packages/parse/test/leap-year.repro.test.ts"
+  },
+  "kind": "fixBug",
+  "territory": { "module": "@datekit/parse", "paths": ["packages/parse/**"] }
+}
