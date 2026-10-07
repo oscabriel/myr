@@ -41,6 +41,7 @@ import { RepoHostLocal } from "../src/repo-host/local.ts";
 import { memoryFs } from "../src/repo-host/memory-fs.ts";
 import { fetchInto, listRefs, pushRefs } from "../src/repo-host/smart-http.ts";
 import { describeRepoHost } from "./repo-host-contract.ts";
+import { temporaryRoot } from "./temporary-root.ts";
 
 const main = RefName.make("refs/heads/main");
 
@@ -83,7 +84,7 @@ const world = (
   options: FakeOptions & { readonly wrap?: (host: HostLike) => HostLike } = {}
 ) =>
   Effect.gen(function* () {
-    const root = yield* RepoHostLocal.temporaryRoot;
+    const root = yield* temporaryRoot;
 
     const spawner =
       yield* Effect.context<ChildProcessSpawner.ChildProcessSpawner>();

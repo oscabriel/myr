@@ -81,6 +81,7 @@ import {
   RepoName,
   RepoPath,
   RequestId,
+  sameHandle,
 } from "@repo/protocol/ids";
 import type {
   DecisionId,
@@ -97,7 +98,6 @@ import {
   NotClaimed,
   NotDecider,
   NotRedFirst,
-  NotVouched,
   ProjectExists,
   Refusal,
   StaleBase,
@@ -117,9 +117,10 @@ import type {
   ReachedInternals,
   RepoBusy,
   Weakened,
+  NotVouched,
 } from "@repo/protocol/refusal";
 import { Finishers } from "@repo/rules/finish";
-import { RulesEvaluator } from "@repo/rules/rules-evaluator";
+import { RulesEvaluator, sdkVersion } from "@repo/rules/rules-evaluator";
 import {
   Array,
   Context,
@@ -146,7 +147,7 @@ import {
 } from "./answer-runs.ts";
 import type { AnswerQueue, AnswerRuns } from "./answer-runs.ts";
 import { isStep } from "./answer-runs/steps.ts";
-import { recordOf, sameHandle } from "./attention/record.ts";
+import { recordOf } from "./attention/record.ts";
 import { mayClaim, standing } from "./attention/vouch.ts";
 import {
   ClaimCommand,
@@ -166,6 +167,7 @@ import {
 } from "./deciders.ts";
 import type { DeciderApi, Opening } from "./deciders.ts";
 import { askClosed, askOpened, judged, listingOf, numbered } from "./events.ts";
+import type { ProjectEventInput } from "./events.ts";
 import { evaluationFacts, pushFacts, targetOf } from "./facts.ts";
 import type { MissingCommit } from "./facts.ts";
 import { Lander, Rebuild } from "./lander.ts";
@@ -193,7 +195,6 @@ import type {
   BudgetDayRow,
   ClaimRow,
   OutboxRow,
-  ProjectEventInput,
   ProjectRow,
   PushEventRow,
 } from "./project-store/rows.ts";
@@ -219,13 +220,6 @@ export type ProjectPorts =
 export const GatewayUrl = Context.Reference<string>("project/GatewayUrl", {
   defaultValue: () => `https://${Brand.domain}`,
 });
-
-/**
- * The SDK version a check's version is keyed by. ASSUMPTION: the platform's
- * own, `0.0.0` until release, as the isogit Lander reports it (212's
- * Comments); 299 decides where both come from.
- */
-const sdkVersion = "0.0.0";
 
 /**
  * The rules evaluator's finishers from `@repo/checks`: the run-block finder
@@ -416,13 +410,9 @@ export const MethodSchemas = {
     error: Schema.Never,
     success: Credits.successSchema,
   },
-  // The contract leaves out what waiting lifts: an accepted proposal whose
-  // ask meets a blocked Checker or a moved main decides nothing and fails
-  // with it, so the decider can decide again. 221's Comments ask 299 to add
-  // both.
   decide: {
     args: [Person, Decide.payloadSchema.mapFields(Struct.omit(["project"]))],
-    error: Schema.Union([Decide.errorSchema, VerifierBlocked, StaleBase]),
+    error: Decide.errorSchema,
     success: Decide.successSchema,
   },
   events: {
@@ -484,14 +474,12 @@ export const MethodSchemas = {
     error: OpenAsk.errorSchema,
     success: OpenAsk.successSchema,
   },
-  // The contract leaves `NotVouched` out; a project whose vouch mode is
-  // `all` gives it (213's `propose`). 221's Comments ask 299 to add it.
   proposeAsk: {
     args: [
       Person,
       ProposeAsk.payloadSchema.mapFields(Struct.omit(["project"])),
     ],
-    error: Schema.Union([ProposeAsk.errorSchema, NotVouched]),
+    error: ProposeAsk.errorSchema,
     success: ProposeAsk.successSchema,
   },
   recordFirstPush: {

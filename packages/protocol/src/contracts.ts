@@ -1,4 +1,4 @@
-import { Context, Schema, Struct } from "effect";
+import { Context, Schema } from "effect";
 import { Rpc, RpcGroup, RpcSchema } from "effect/rpc";
 import type { RpcClient, RpcClientError } from "effect/rpc";
 
@@ -14,9 +14,15 @@ import {
   Surfaces,
   Visibility,
 } from "./annotations.ts";
-import { AnswerReceipt, AnswerView, Verdict } from "./domain/answer.ts";
+import {
+  AnswerReceipt,
+  AnswerView,
+  LandReceipt,
+  Verdict,
+} from "./domain/answer.ts";
 import { Ask, AskListing, Reserve } from "./domain/ask.ts";
 import { ClaimView } from "./domain/claim.ts";
+import { ConfigFile } from "./domain/common.ts";
 import { Choice, Decision, Today } from "./domain/decision.ts";
 import { EnvSchemaView } from "./domain/env.ts";
 import { ProjectEvent } from "./domain/event.ts";
@@ -35,7 +41,6 @@ import {
   LandedSha,
   ProjectName,
   RepoName,
-  RepoPath,
   RequestId,
 } from "./ids.ts";
 import { Authenticated } from "./principal.ts";
@@ -132,18 +137,6 @@ const servedOn = {
  * input needs; this is the form `Tool.EmptyParams` takes.
  */
 const NoPayload = Schema.Record(Schema.String, Schema.Never);
-
-/**
- * One file an ask or a proposal adds to the config folder: its path and its
- * text.
- */
-const ConfigFile = Schema.Struct({ content: Schema.String, path: RepoPath });
-
-/**
- * What a decider gets back on landing their own change: the request, and
- * where it stands. An answer's receipt, without an ask.
- */
-const LandReceipt = AnswerReceipt.mapFields(Struct.omit(["ask"]));
 
 // --- Reads ------------------------------------------------------------------
 
@@ -446,7 +439,9 @@ export class OpenAsk extends Rpc.make("openAsk", {
   .annotate(Surfaces, servedOn.openAsk) {}
 
 export class ProposeAsk extends Rpc.make("proposeAsk", {
-  error: Schema.Union([UnknownProject, Denounced, CapReached]),
+  // `NotVouched` under the `all` mode, or for a sealed answer from someone
+  // unvouched under `forCode` (a vouch admits sealed answers).
+  error: Schema.Union([UnknownProject, Denounced, CapReached, NotVouched]),
   payload: {
     files: Schema.optionalKey(Schema.NonEmptyArray(ConfigFile)),
     project: ProjectName,
@@ -498,6 +493,11 @@ export class Decide extends Rpc.make("decide", {
     UnknownDecision,
     DecisionClosed,
     NotDecider,
+    // Accepting a proposal opens its ask, red first on main: a blocked
+    // Checker or a main that moved fails the call, and the decider can
+    // accept again.
+    VerifierBlocked,
+    StaleBase,
   ]),
   payload: {
     choice: Choice,

@@ -4,6 +4,7 @@
  * breaks is its one refusal.
  */
 import type { Policy } from "@repo/protocol/domain/policy";
+import { sameHandle } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Principal } from "@repo/protocol/principal";
 import {
@@ -25,10 +26,6 @@ import type { Stage } from "../stage.ts";
 
 type Rule = (facts: PushFacts) => Option.Option<Refusal>;
 
-/** Handles name one person however their sign-in provider cases them. */
-const sameHandle = (one: Handle, other: Handle) =>
-  one.toLowerCase() === other.toLowerCase();
-
 const handleOf = (pusher: Principal): Option.Option<Handle> =>
   Principal.guards.Person(pusher) ? Option.some(pusher.handle) : Option.none();
 
@@ -37,13 +34,21 @@ const isPusher = (facts: PushFacts, handle: Handle) =>
 
 /**
  * Where a person stands by the vouch file: a line names them vouched or
- * denounced. Deciders vouch for others, so a decider with no line is vouched.
+ * denounced, and a denouncement on any line wins, as the project service
+ * reads the file (`attention/vouch.ts`). Deciders vouch for others, so a
+ * decider with no line is vouched.
  */
 const standingOf = (policy: Policy, handle: Handle) => {
-  const line = policy.vouches.find((vouch) => sameHandle(vouch.handle, handle));
+  const lines = policy.vouches.filter((vouch) =>
+    sameHandle(vouch.handle, handle)
+  );
 
-  if (line !== undefined) {
-    return line.denounced ? "denounced" : "vouched";
+  if (lines.some(({ denounced }) => denounced)) {
+    return "denounced";
+  }
+
+  if (lines.length > 0) {
+    return "vouched";
   }
 
   const decides = policy.deciders.some((decider) =>
@@ -69,7 +74,13 @@ const directPush: Rule = (facts) =>
         : Option.some(new DirectPush({ ref: facts.ref })),
   });
 
-/** A denounced person pushes nothing; an unvouched one only when the mode says so. */
+/**
+ * A denounced person pushes nothing. An unvouched one pushes to a working
+ * fork (a sealed answer, a decider's own change) only when the mode says so.
+ * A push to a claim's fork is not judged on the vouch again: the claim
+ * already passed the kind's `claimers` rule, which may admit a person no one
+ * vouched for (an `anyone` kind, a record, a newcomer's mentor).
+ */
 const trust: Rule = (facts) =>
   Option.flatMap(handleOf(facts.pusher), (handle) => {
     const standing = standingOf(facts.policy, handle);
@@ -78,7 +89,9 @@ const trust: Rule = (facts) =>
       return Option.some<Refusal>(new Denounced({}));
     }
 
-    return standing === "unknown" && facts.policy.vouch.mode !== "bansOnly"
+    return standing === "unknown" &&
+      facts.policy.vouch.mode !== "bansOnly" &&
+      !PushTarget.$is("ClaimFork")(facts.target)
       ? Option.some(new NotVouched({}))
       : Option.none();
   });

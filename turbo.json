@@ -10,6 +10,7 @@
     },
     "test": {
       "dependsOn": ["types", "^types"],
+      "env": ["UPDATE_GOLDEN"],
       "outputs": []
     },
     "@repo/config#test": {

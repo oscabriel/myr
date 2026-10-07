@@ -239,3 +239,12 @@ export const Handle = Schema.String.pipe(
 );
 
 export type Handle = typeof Handle.Type;
+
+/**
+ * Whether two handles name one person: without case, as the sign-in provider
+ * (GitHub) tells logins apart and as claim forks name them, so a vouch
+ * file's or a policy's `Alice` is the person signed in as `alice`. The one
+ * rule every package compares handles by.
+ */
+export const sameHandle = (one: Handle, other: Handle): boolean =>
+  one.toLowerCase() === other.toLowerCase();

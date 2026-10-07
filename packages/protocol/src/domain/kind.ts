@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import { Handle, KindName } from "../ids.ts";
 import { Strength } from "./check.ts";
+import { AtLeastOne, NoneOrMore } from "./common.ts";
 
 /** A field of an ask's brief that its kind can require. */
 export const BriefField = Schema.Literals([
@@ -34,7 +35,7 @@ export type CheckKind = typeof CheckKind.Type;
 export const ClaimRule = Schema.Union([
   Schema.Literals(["vouched", "anyone"]),
   Schema.Struct({
-    record: Schema.Struct({ area: Schema.NonEmptyString, atLeast: Schema.Int }),
+    record: Schema.Struct({ area: Schema.NonEmptyString, atLeast: NoneOrMore }),
   }),
   Schema.Struct({ newcomer: Schema.Struct({ mentor: Handle }) }),
 ]);
@@ -55,7 +56,7 @@ export const AskKind = Schema.Struct({
   /** Answers can't be undone by a later answer: judge changes and dependency changes. */
   oneWay: Schema.Boolean,
   /** How many claims an ask takes at once; 1 is exclusive (ADR 0008). */
-  race: Schema.Int,
+  race: AtLeastOne,
   /** The brief's fields an ask of this kind must have. */
   requires: Schema.Array(BriefField),
   strength: Strength,

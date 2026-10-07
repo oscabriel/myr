@@ -43,6 +43,7 @@ import {
   RequestId,
   SuiteRoot,
   TreeSha,
+  sameHandle,
 } from "../src/ids.ts";
 import { Anonymous, Person, Principal } from "../src/principal.ts";
 import wire from "./fixtures/domain.json" with { type: "json" };
@@ -174,9 +175,52 @@ describe("the domain schemas", () => {
       vouch: { file: `${Brand.configDir}/vouched.td`, mode: "forCode" },
     });
   });
+
+  // A span the config folder writes as `"-1 days"` is a valid string to the
+  // sdk; the policy is where a count or a span that can't hold is refused.
+  const [kind] = wire.withoutDefaults.kinds;
+
+  it.each([
+    ["budget", { budget: { decisionsPerDay: 0, expireDays: 14 } }],
+    ["budget", { budget: { decisionsPerDay: 5, expireDays: -1 } }],
+    ["caps", { caps: { claimsPerPerson: 0, proposalsPerPerson: 2 } }],
+    ["caps", { caps: { claimsPerPerson: 3, proposalsPerPerson: -1 } }],
+    ["claims", { claims: { lapseAfterMs: 0, warnAfterMs: 7_200_000 } }],
+    ["claims", { claims: { lapseAfterMs: 86_400_000, warnAfterMs: -1 } }],
+    ["record", { record: { countsAfterDays: -1, windowDays: 365 } }],
+    ["record", { record: { countsAfterDays: 30, windowDays: 0 } }],
+    ["a kind's race", { kinds: [{ ...kind, race: 0 }] }],
+    [
+      "a kind's record rule",
+      {
+        kinds: [{ ...kind, claimers: { record: { area: "x", atLeast: -1 } } }],
+      },
+    ],
+  ] as const)("refuse %s below what can hold", (_name, change) => {
+    expect(
+      refuses(PolicyInput, { ...wire.withoutDefaults, ...change })
+    ).toBeTruthy();
+  });
+
+  it("let a project turn proposals off and count a landing at once", () => {
+    expect(
+      refuses(PolicyInput, {
+        ...wire.withoutDefaults,
+        caps: { claimsPerPerson: 1, proposalsPerPerson: 0 },
+        record: { countsAfterDays: 0, windowDays: 1 },
+      })
+    ).toBeFalsy();
+  });
 });
 
 describe("names and ids", () => {
+  // GitHub tells logins apart without case, and claim forks lowercase them,
+  // so a vouch file's or a policy's `Alice` is the person signed in as `alice`.
+  it("tell two handles apart without case, as sign-in does", () => {
+    expect(sameHandle(Handle.make("Alice"), Handle.make("alice"))).toBeTruthy();
+    expect(sameHandle(Handle.make("alice"), Handle.make("alicia"))).toBeFalsy();
+  });
+
   it.each(["a--b", "-a", "a-", "A", "a_b", ""])(
     "a project or an ask may not be named %j",
     (name) => {

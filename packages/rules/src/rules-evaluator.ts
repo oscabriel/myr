@@ -1,8 +1,8 @@
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { LandedSha } from "@repo/protocol/ids";
 import { Handle, ProjectName, RepoPath } from "@repo/protocol/ids";
-import { Context, Schema } from "effect";
-import type { Effect } from "effect";
+import { ClaimantFacts, ProposalFacts } from "@repo/sdk/functions";
+import { Context, Effect, Schema } from "effect";
 
 /**
  * The config folder as it stood at one landed commit, ready to evaluate.
@@ -23,6 +23,13 @@ export const ConfigBundle = Schema.Struct({
 });
 
 export type ConfigBundle = typeof ConfigBundle.Type;
+
+/**
+ * The version of the rules the platform runs, the sdk's own: what a bundle
+ * the platform makes reports, and part of every check version. Callers that
+ * may not import the sdk (`@repo/project`) read it here.
+ */
+export { sdkVersion } from "@repo/sdk";
 
 /** One workspace package, as the repo's manifests declare it. */
 const Workspace = Schema.Struct({
@@ -79,6 +86,27 @@ export const RuleName = Schema.Literals(["opensAlone", "admit"]);
 export type RuleName = typeof RuleName.Type;
 
 /**
+ * One function-valued rule and the facts it is told, typed by the sdk's own
+ * fact schemas (principle 2): `opensAlone` hears about a proposal, `admit`
+ * about a person who wants to claim. The facts are encoded as JSON before
+ * they cross into the sandbox.
+ */
+export type RuleCall =
+  | { readonly rule: "opensAlone"; readonly facts: ProposalFacts }
+  | { readonly rule: "admit"; readonly facts: ClaimantFacts };
+
+/** A call's facts as JSON carries them into the sandbox. */
+export const factsOf = (call: RuleCall): Effect.Effect<Schema.Json> => {
+  const encoded: Effect.Effect<Schema.Json, Schema.SchemaError> =
+    call.rule === "opensAlone"
+      ? Schema.encodeEffect(ProposalFacts)(call.facts)
+      : Schema.encodeEffect(ClaimantFacts)(call.facts);
+
+  // The facts were typed by the same schemas, so encoding them can't fail.
+  return Effect.orDie(encoded);
+};
+
+/**
  * Turns the config folder at a landed commit into its `Policy`, the same
  * one every time for the same facts, and calls its function-valued rules on
  * demand. Adapters: `/bun` (a subprocess with frozen time), `/json` (a
@@ -87,12 +115,12 @@ export type RuleName = typeof RuleName.Type;
 export class RulesEvaluator extends Context.Service<
   RulesEvaluator,
   {
-    readonly call: (input: {
-      readonly at: LandedSha;
-      readonly facts: Schema.Json;
-      readonly modules: ConfigBundle;
-      readonly rule: RuleName;
-    }) => Effect.Effect<boolean, RulesFailed>;
+    readonly call: (
+      input: RuleCall & {
+        readonly at: LandedSha;
+        readonly modules: ConfigBundle;
+      }
+    ) => Effect.Effect<boolean, RulesFailed>;
     readonly evaluate: (input: {
       readonly at: LandedSha;
       readonly facts: EvaluationFacts;

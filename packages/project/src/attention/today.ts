@@ -8,6 +8,7 @@
 import type { CreditRole } from "@repo/protocol/domain/credit";
 import type { Decision, Today } from "@repo/protocol/domain/decision";
 import type { LandingView } from "@repo/protocol/domain/landing";
+import { sameHandle } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Array as Arr, DateTime, Order } from "effect";
 
@@ -77,7 +78,7 @@ export const today = (input: {
     input.decisions.filter(
       (decision) =>
         decision.decided === undefined &&
-        decision.deciders.includes(decider) &&
+        decision.deciders.some((each) => sameHandle(each, decider)) &&
         DateTime.isLessThan(now, decision.expiresAt)
     ),
     byExpiry

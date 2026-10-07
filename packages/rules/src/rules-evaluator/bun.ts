@@ -21,7 +21,7 @@ import {
 } from "../config-folder.ts";
 import { defaultPolicyInput } from "../defaults.ts";
 import { Finishers, finishPolicy } from "../finish.ts";
-import { RulesEvaluator, RulesFailed } from "../rules-evaluator.ts";
+import { factsOf, RulesEvaluator, RulesFailed } from "../rules-evaluator.ts";
 import type { ConfigBundle } from "../rules-evaluator.ts";
 import { bunMain } from "./bun-main.ts";
 import { bunPrelude, clockVariable } from "./bun-prelude.ts";
@@ -301,20 +301,24 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
         );
 
       return RulesEvaluator.of({
-        call: ({ facts, modules, rule }) => {
+        call: (input) => {
+          const { modules, rule } = input;
           const project = projectModule(modules);
 
           if (project === undefined) {
             return Effect.succeed(false);
           }
 
-          return limited(
-            run(modules, epoch, (written) => ({
-              ...modulesOf(written, project, []),
-              facts,
-              rule,
-            }))
-          ).pipe(
+          return factsOf(input).pipe(
+            Effect.flatMap((facts) =>
+              limited(
+                run(modules, epoch, (written) => ({
+                  ...modulesOf(written, project, []),
+                  facts,
+                  rule,
+                }))
+              )
+            ),
             Effect.flatMap(
               Output.match({
                 Called: ({ result }) =>

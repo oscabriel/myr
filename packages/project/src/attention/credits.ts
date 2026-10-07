@@ -11,10 +11,11 @@
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { CreditSummary } from "@repo/protocol/domain/record";
+import { sameHandle } from "@repo/protocol/ids";
 import type { AskId, Handle } from "@repo/protocol/ids";
 import { Array as Arr, Option, Order } from "effect";
 
-import { areaOf, sameHandle } from "./record.ts";
+import { areaOf } from "./record.ts";
 
 /** What a person's credits are counted from. */
 export interface CreditsInput {

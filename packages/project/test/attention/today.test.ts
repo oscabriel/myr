@@ -92,6 +92,12 @@ describe("a decider's Today", () => {
     expect(page.decider).toBe(alice);
   });
 
+  it("shows a decider their decisions however sign-in cases the handle", () => {
+    const page = todayFor({ decider: handle("ALICE"), decisions: eight });
+
+    expect(page.decisions).toStrictEqual([p1, p2, p3, p4, p5]);
+  });
+
   it("shows only what is left of the budget once some of it is used", () => {
     const page = todayFor({
       budget: { finishes: 0, total: 5, used: 2 },
@@ -294,6 +300,14 @@ describe("the budget", () => {
       total: 5,
       used: 2,
     });
+  });
+
+  it("counts what a decider spent under any casing of their handle", () => {
+    const days = spendAll([{ decider: alice, now: thursday, on: "decision" }]);
+
+    expect(
+      budgetFor(scenario.policy, handle("Alice"), days, thursday).used
+    ).toBe(1);
   });
 
   it("counts a finish apart from the decisions", () => {

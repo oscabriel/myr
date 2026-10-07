@@ -88,46 +88,24 @@ import {
   RepoExists,
   RepoHost,
   RepoNotFound,
-  Revision,
   TreeEntry,
 } from "../repo-host.ts";
-import type { Commit, RepoName, RepoToken, TokenScope } from "../repo-host.ts";
+import type {
+  Commit,
+  RepoName,
+  RepoToken,
+  TokenScope,
+  Revision,
+} from "../repo-host.ts";
+import {
+  LOG_PAGE,
+  NO_SOURCE,
+  NUMBERED,
+  refOf,
+  secondsOf,
+} from "./artifacts-api.ts";
+import type { Code } from "./artifacts-api.ts";
 import { listRefs, pushRefs } from "./smart-http.ts";
-
-/** The binding's names for Artifacts' errors (`ArtifactsError.code`). */
-type Code =
-  | "ALREADY_EXISTS"
-  | "NOT_FOUND"
-  | "CREATE_IN_PROGRESS"
-  | "IMPORT_IN_PROGRESS"
-  | "FORK_IN_PROGRESS"
-  | "INVALID_INPUT"
-  | "INVALID_REPO_NAME"
-  | "INVALID_TTL"
-  | "INVALID_URL"
-  | "REMOTE_AUTH_REQUIRED"
-  | "UPSTREAM_UNAVAILABLE"
-  | "MEMORY_LIMIT"
-  | "INTERNAL_ERROR";
-
-/**
- * Each REST `errors[].code` by the binding's name for it, from Artifacts'
- * errors page. The page gives `CREATE_IN_PROGRESS` no number.
- */
-const NUMBERED: ReadonlyMap<number, Code> = new Map<number, Code>([
-  [10_100, "INVALID_INPUT"],
-  [10_101, "INVALID_REPO_NAME"],
-  [10_103, "INVALID_TTL"],
-  [10_104, "INVALID_URL"],
-  [10_106, "REMOTE_AUTH_REQUIRED"],
-  [10_200, "NOT_FOUND"],
-  [10_201, "ALREADY_EXISTS"],
-  [10_302, "IMPORT_IN_PROGRESS"],
-  [10_303, "FORK_IN_PROGRESS"],
-  [10_400, "INTERNAL_ERROR"],
-  [10_401, "UPSTREAM_UNAVAILABLE"],
-  [10_402, "MEMORY_LIMIT"],
-]);
 
 /** A refusal that names no code at all, such as a proxy's, read by status. */
 const byStatus = (status: number): Option.Option<Code> =>
@@ -265,13 +243,6 @@ const entriesOf = (entries: typeof TreeReply.Type.result) =>
     })
   ).pipe(Effect.orDie);
 
-/** The API's name for a revision: a short branch name or a commit id (S1 #20). */
-const refOf = (at: Revision) =>
-  Revision.$match(at, {
-    Branch: ({ name }) => name,
-    Commit: ({ sha }) => sha,
-  });
-
 const repoPath = (name: RepoName) => `/repos/${encodeURIComponent(name)}`;
 
 const textOf = (response: Response) => Effect.promise(() => response.text());
@@ -305,20 +276,6 @@ const accepted = (response: Response) =>
 
 const main = RefName.make("refs/heads/main");
 
-/** `log` asks for at most this many commits per request, as the binding does. */
-const LOG_PAGE = 1000;
-
-// Artifacts takes a token's ttl in whole seconds, from a minute to a year.
-const MIN_TTL_SECONDS = 60;
-
-const MAX_TTL_SECONDS = 31_536_000;
-
-const secondsOf = (ttl: Duration.Duration) =>
-  Math.min(
-    Math.max(Math.ceil(Duration.toSeconds(ttl)), MIN_TTL_SECONDS),
-    MAX_TTL_SECONDS
-  );
-
 /** How long a token for git calls lives, and how near its expiry it is replaced. */
 const CALL_TOKEN_TTL = Duration.minutes(30);
 
@@ -348,16 +305,6 @@ const keeping = <K, V>(
   keep: (value: V, key: K) => boolean
 ): ReadonlyMap<K, V> =>
   new Map([...map].filter(([key, value]) => keep(value, key)));
-
-/** The import refusals that say the source is no repo to take (the binding's). */
-const NO_SOURCE = [
-  "INVALID_INPUT",
-  "INVALID_URL",
-  "MEMORY_LIMIT",
-  "NOT_FOUND",
-  "REMOTE_AUTH_REQUIRED",
-  "UPSTREAM_UNAVAILABLE",
-] as const satisfies readonly Code[];
 
 /** A repo that exists but is still being made answers its info and mints 409. */
 const BEING_MADE = [

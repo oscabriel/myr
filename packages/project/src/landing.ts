@@ -9,7 +9,6 @@ import { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import type { CreditRole } from "@repo/protocol/domain/credit";
 import type { Choice } from "@repo/protocol/domain/decision";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
-import type { ProjectEvent } from "@repo/protocol/domain/event";
 import { AskKind } from "@repo/protocol/domain/kind";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
@@ -33,6 +32,8 @@ import {
   Weakened,
 } from "@repo/protocol/refusal";
 import { Array, Data, DateTime, Duration, Match, Option, Schema } from "effect";
+
+import { ProjectEventInput } from "./events.ts";
 
 /** How many times a moved main may send an answer back to merge before it is refused as stale. */
 export const maxRemerges = 3;
@@ -177,13 +178,6 @@ export type LandingCommand = Data.TaggedEnum<{
 }>;
 
 export const LandingCommand = Data.taggedEnum<LandingCommand>();
-
-type WithoutSeq<E> = E extends ProjectEvent ? Omit<E, "seq"> : never;
-
-/** A project event before the store gives it its place in the sequence. */
-export type ProjectEventInput = WithoutSeq<ProjectEvent>;
-
-export const ProjectEventInput = Data.taggedEnum<ProjectEventInput>();
 
 /** What the service runs for a landing: the transition only describes it. */
 export type LandingEffect = Data.TaggedEnum<{

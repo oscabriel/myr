@@ -37,31 +37,23 @@ import {
   RepoExists,
   RepoHost,
   RepoNotFound,
-  Revision,
   TreeEntry,
 } from "../repo-host.ts";
-import type { RepoName, RepoToken, TokenScope } from "../repo-host.ts";
+import type {
+  RepoName,
+  RepoToken,
+  TokenScope,
+  Revision,
+} from "../repo-host.ts";
+import {
+  isCode,
+  LOG_PAGE,
+  NO_SOURCE,
+  refOf,
+  secondsOf,
+} from "./artifacts-api.ts";
+import type { Code } from "./artifacts-api.ts";
 import { listRefs, pushRefs } from "./smart-http.ts";
-
-const Code = Schema.Literals([
-  "ALREADY_EXISTS",
-  "NOT_FOUND",
-  "CREATE_IN_PROGRESS",
-  "IMPORT_IN_PROGRESS",
-  "FORK_IN_PROGRESS",
-  "INVALID_INPUT",
-  "INVALID_REPO_NAME",
-  "INVALID_TTL",
-  "INVALID_URL",
-  "REMOTE_AUTH_REQUIRED",
-  "UPSTREAM_UNAVAILABLE",
-  "MEMORY_LIMIT",
-  "INTERNAL_ERROR",
-]);
-
-type Code = typeof Code.Type;
-
-const isCode = Schema.is(Code);
 
 /**
  * The codes a message names when the error carries none (S1 #22): Artifacts'
@@ -154,36 +146,8 @@ const main = RefName.make("refs/heads/main");
 /** How long a token minted for one call lives; it is revoked after the call. */
 const CALL_TOKEN_TTL = Duration.minutes(5);
 
-// Artifacts takes a token's ttl in whole seconds, from a minute to a year.
-const MIN_TTL_SECONDS = 60;
-
-const MAX_TTL_SECONDS = 31_536_000;
-
-const secondsOf = (ttl: Duration.Duration) =>
-  Math.min(
-    Math.max(Math.ceil(Duration.toSeconds(ttl)), MIN_TTL_SECONDS),
-    MAX_TTL_SECONDS
-  );
-
-/** `log` reads at most this many commits per call. */
-const LOG_PAGE = 1000;
-
-/** The codes `import` refuses a source with: not git, not public, not reachable, too big. */
-const IMPORT_REFUSALS: ReadonlySet<Code> = new Set([
-  "INVALID_INPUT",
-  "INVALID_URL",
-  "MEMORY_LIMIT",
-  "NOT_FOUND",
-  "REMOTE_AUTH_REQUIRED",
-  "UPSTREAM_UNAVAILABLE",
-]);
-
-/** The binding's name for a revision: never `refs/…` (S1 #20). */
-const refOf = (at: Revision) =>
-  Revision.$match(at, {
-    Branch: ({ name }) => name,
-    Commit: ({ sha }) => sha,
-  });
+/** The codes `import` refuses a source with. */
+const IMPORT_REFUSALS: ReadonlySet<Code> = new Set(NO_SOURCE);
 
 const bytesOf = (blob: Blob) =>
   attempt(() => blob.arrayBuffer()).pipe(

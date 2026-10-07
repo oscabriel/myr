@@ -4,7 +4,7 @@ import { Effect, Schema, Struct } from "effect";
 import { Handle, LandedSha, RepoPath } from "../ids.ts";
 import { Ask } from "./ask.ts";
 import { RatchetSpec } from "./check.ts";
-import { Glob } from "./common.ts";
+import { AtLeastOne, Glob, NoneOrMore } from "./common.ts";
 import { AskKind } from "./kind.ts";
 import { RunBlock } from "./run.ts";
 import { Territory } from "./territory.ts";
@@ -14,26 +14,28 @@ const Source = Schema.Literals(["config", "defaults"]);
 
 /** How many decisions a decider takes a day, and how long one waits before its default. */
 const Budget = Schema.Struct({
-  decisionsPerDay: Schema.Int,
-  expireDays: Schema.Int,
+  decisionsPerDay: AtLeastOne,
+  expireDays: AtLeastOne,
 });
 
 /** How many proposals and claims one person may hold open at once. */
 const Caps = Schema.Struct({
-  claimsPerPerson: Schema.Int,
-  proposalsPerPerson: Schema.Int,
+  claimsPerPerson: AtLeastOne,
+  /** `0` turns proposals off. */
+  proposalsPerPerson: NoneOrMore,
 });
 
 /** How long a claim may go without a push before it is warned, and before it lapses. */
 const Claims = Schema.Struct({
-  lapseAfterMs: Schema.Int,
-  warnAfterMs: Schema.Int,
+  lapseAfterMs: AtLeastOne,
+  warnAfterMs: AtLeastOne,
 });
 
 /** When a landing starts to count on a person's record, and how long it counts. */
 const RecordWindow = Schema.Struct({
-  countsAfterDays: Schema.Int,
-  windowDays: Schema.Int,
+  /** `0` counts a landing from the day it lands. */
+  countsAfterDays: NoneOrMore,
+  windowDays: AtLeastOne,
 });
 
 /**

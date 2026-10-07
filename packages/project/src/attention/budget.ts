@@ -6,6 +6,7 @@
  */
 import type { Today } from "@repo/protocol/domain/decision";
 import type { Policy } from "@repo/protocol/domain/policy";
+import { sameHandle } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { DateTime } from "effect";
 
@@ -28,7 +29,7 @@ const rowFor = (
   const day = dayOf(now);
 
   return (
-    days.find((row) => row.day === day && row.decider === decider) ?? {
+    days.find((row) => row.day === day && sameHandle(row.decider, decider)) ?? {
       day,
       decider,
       finishes: 0,

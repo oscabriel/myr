@@ -25,10 +25,10 @@ import {
   ClaimEffect,
   ClaimState,
   forkName,
-  ProjectEventInput,
   toView,
   transition,
 } from "../src/claim.ts";
+import { ProjectEventInput } from "../src/events.ts";
 
 const { Claim, Land, Push, Release, Tick } = ClaimCommand.cases;
 

@@ -5,7 +5,6 @@
  * (`ClaimEffect`) for the project service to settle.
  */
 import { ClaimView } from "@repo/protocol/domain/claim";
-import type { ProjectEvent } from "@repo/protocol/domain/event";
 import type { Policy } from "@repo/protocol/domain/policy";
 import {
   AskId,
@@ -26,6 +25,8 @@ import {
   NotVouched,
 } from "@repo/protocol/refusal";
 import { Array as Arr, Data, DateTime, Option, Result, Schema } from "effect";
+
+import { ProjectEventInput } from "./events.ts";
 
 /** What a claim holds while it lasts, and keeps once it ends. */
 const claimFields = {
@@ -65,17 +66,6 @@ export type ClaimState = typeof ClaimState.Type;
 
 /** A claim's fields, which `Live` and `Warned` hold and the ended states keep. */
 export type Live = Omit<typeof ClaimState.cases.Live.Type, "_tag">;
-
-/** A project event before the store gives it its place in the sequence. */
-type Unsequenced<Event> = Event extends ProjectEvent
-  ? Omit<Event, "seq">
-  : never;
-
-/** A project event without its `seq`, which the store assigns at commit. */
-export type ProjectEventInput = Unsequenced<ProjectEvent>;
-
-/** Constructors for project events without their `seq`. */
-export const ProjectEventInput = Data.taggedEnum<ProjectEventInput>();
 
 /**
  * What can happen to a claim. `Claim` carries what the project service knows

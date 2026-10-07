@@ -24,7 +24,7 @@ import type { CheckRunner } from "@repo/checks/check-runner";
 import { pushStages, runGate } from "@repo/gate/gate";
 import { scan } from "@repo/gate/stages/shape";
 import { formatLanding } from "@repo/git/trailers";
-import type { AnswerReceipt } from "@repo/protocol/domain/answer";
+import type { AnswerReceipt, LandReceipt } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { Evidence } from "@repo/protocol/domain/common";
 import type { Credit } from "@repo/protocol/domain/credit";
@@ -47,6 +47,7 @@ import {
   RepoPath,
   RequestId,
   TreeSha,
+  sameHandle,
 } from "@repo/protocol/ids";
 import type { CommitSha, ProjectName, Handle } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -98,21 +99,18 @@ import {
   openDecision,
 } from "./attention/decisions.ts";
 import type { Decided } from "./attention/decisions.ts";
-import {
-  AttentionEffect,
-  AttentionEvent,
-  platformHandle,
-} from "./attention/effects.ts";
+import { AttentionEffect, platformHandle } from "./attention/effects.ts";
 import {
   expire as expireProposals,
   propose,
   ProposalCommand,
 } from "./attention/proposals.ts";
 import type { Proposed } from "./attention/proposals.ts";
-import { recordOf, sameHandle } from "./attention/record.ts";
+import { recordOf } from "./attention/record.ts";
 import { today } from "./attention/today.ts";
 import { standing } from "./attention/vouch.ts";
 import { ClaimState } from "./claim.ts";
+import { ProjectEventInput } from "./events.ts";
 import { pushFacts } from "./facts.ts";
 import { Lander, Rebuild } from "./lander.ts";
 import type { ComposedFile } from "./lander.ts";
@@ -130,7 +128,6 @@ import type {
   BudgetDayRow,
   ClaimRow,
   OutboxRow,
-  ProjectEventInput,
   ProjectRow,
 } from "./project-store/rows.ts";
 
@@ -140,9 +137,6 @@ import type {
  * table that holds the method keys it by this constant.
  */
 export const envSchemaMethod = "envShape";
-
-/** What a decider's land returns: an answer's receipt, without an ask. */
-export type LandReceipt = Omit<AnswerReceipt, "ask">;
 
 /** The decider-facing methods of one project's service (spec §3.2's decider rows). */
 export interface DeciderApi {
@@ -798,7 +792,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
   ) =>
     Effect.gen(function* () {
       writes.landings.push(landing);
-      writes.events.push(AttentionEvent.Landed({ at: now, landing }));
+      writes.events.push(ProjectEventInput.Landed({ at: now, landing }));
 
       const row = rowNow(h, writes);
 

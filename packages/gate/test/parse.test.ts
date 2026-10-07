@@ -43,6 +43,16 @@ const danasPush = (mode: PushFacts["policy"]["vouch"]["mode"]) =>
     }),
   });
 
+/** Dana's push to her own working fork (`<project>--me--dana`). */
+const danasWorkingForkPush = (mode: PushFacts["policy"]["vouch"]["mode"]) =>
+  testFacts({
+    ask: Option.none(),
+    claim: Option.none(),
+    policy: { ...policy, vouch: { ...policy.vouch, mode } },
+    pusher: Person.make({ handle: dana }),
+    target: PushTarget.WorkingFork({ owner: dana, project: ask.project }),
+  });
+
 const main = RefNameText.make("refs/heads/main");
 
 // Each row is one push; parse answers with at most one refusal, the first
@@ -99,20 +109,39 @@ const rows: readonly {
     name: "a push by a denounced person",
     refusals: [new Denounced({})],
   },
+  // The claim already passed the kind's `claimers` rule (`mayClaim`), which
+  // may admit an unvouched person (an `anyone` kind, a record, a mentor), so
+  // a push to the claim's own fork does not judge the vouch again.
   {
     facts: danasPush("forCode"),
-    name: "a push by an unvouched person when code needs a vouch",
-    refusals: [new NotVouched({})],
+    name: "an unvouched claimant's push to their claim's fork when code needs a vouch",
+    refusals: [],
   },
   {
     facts: danasPush("all"),
-    name: "a push by an unvouched person when everything needs a vouch",
+    name: "an unvouched claimant's push to their claim's fork when everything needs a vouch",
+    refusals: [],
+  },
+  {
+    facts: danasWorkingForkPush("forCode"),
+    name: "an unvouched person's push to their working fork when code needs a vouch",
     refusals: [new NotVouched({})],
   },
   {
-    facts: danasPush("bansOnly"),
-    name: "a push by an unvouched person when only denouncements count",
+    facts: danasWorkingForkPush("bansOnly"),
+    name: "an unvouched person's push to their working fork when only denouncements count",
     refusals: [],
+  },
+  {
+    facts: testFacts({
+      policy: {
+        ...policy,
+        vouches: [{ denounced: false, handle: mallory }, ...policy.vouches],
+      },
+      pusher: Person.make({ handle: mallory }),
+    }),
+    name: "a push by a person the vouch file both vouches for and denounces",
+    refusals: [new Denounced({})],
   },
   {
     facts: testFacts({

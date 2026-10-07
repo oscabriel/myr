@@ -42,8 +42,10 @@ export interface RepoHostSuite {
 }
 
 /**
- * What every RepoHost adapter must do, written against the port. `/memory`
- * runs it on every `verify`; `/binding` runs it against live Artifacts.
+ * What every RepoHost adapter must do, written against the port. `/memory`,
+ * `/local`, `/binding` (over testkit's fake Artifacts on `/local`) and
+ * `/rest` (over a fake REST API on `/local`) run it on every `verify`;
+ * `binding-live.test.ts` runs it against live Artifacts when asked.
  */
 export const describeRepoHost = (
   adapter: string,

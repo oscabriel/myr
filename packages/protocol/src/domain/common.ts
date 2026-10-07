@@ -69,9 +69,26 @@ export const Evidence = Schema.Struct({
 
 export type Evidence = typeof Evidence.Type;
 
+/**
+ * One file an ask or a proposal adds to the config folder: its path and its
+ * text, as `openAsk` and `proposeAsk` carry them.
+ */
+export const ConfigFile = Schema.Struct({
+  content: Schema.String,
+  path: RepoPath,
+});
+
+export type ConfigFile = typeof ConfigFile.Type;
+
+/** A count or span that must hold at least one: a cap, a budget, a race, a window. */
+export const AtLeastOne = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1));
+
+/** A count or span that may be zero but never less: a record's count, a delay. */
+export const NoneOrMore = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+
 /** Where in the tree something points, when it points at one line. */
 export const At = Schema.Struct({
-  line: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  line: AtLeastOne,
   path: RepoPath,
 });
 

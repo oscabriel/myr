@@ -15,11 +15,12 @@
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { AskKind, ClaimRule } from "@repo/protocol/domain/kind";
 import type { Policy } from "@repo/protocol/domain/policy";
+import { sameHandle } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Denounced, NotVouched } from "@repo/protocol/refusal";
 import { Array as Arr, DateTime, Match, Option, Order, Result } from "effect";
 
-import { meets, sameHandle } from "./record.ts";
+import { meets } from "./record.ts";
 import type { RecordEntry } from "./record.ts";
 
 /** Where a person stands with a project: vouched for, denounced, or neither. */

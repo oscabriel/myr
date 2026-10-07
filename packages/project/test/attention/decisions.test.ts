@@ -33,9 +33,9 @@ import {
 } from "../../src/attention/decisions.ts";
 import {
   AttentionEffect,
-  AttentionEvent,
   platformHandle,
 } from "../../src/attention/effects.ts";
+import { ProjectEventInput } from "../../src/events.ts";
 
 const scenario = aProject({ deciders: ["alice", "dana"], people: ["bob"] });
 
@@ -197,7 +197,7 @@ describe("deciding", () => {
         effects: [
           AttentionEffect.OpenAsk({ proposal }),
           AttentionEffect.Emit({
-            event: AttentionEvent.Decided({
+            event: ProjectEventInput.Decided({
               at: later,
               choice: "accept",
               decision: proposalDecision.id,
@@ -214,7 +214,7 @@ describe("deciding", () => {
     ).toStrictEqual(
       Result.succeed([
         AttentionEffect.Emit({
-          event: AttentionEvent.Decided({
+          event: ProjectEventInput.Decided({
             at: later,
             choice: "decline",
             decision: proposalDecision.id,
@@ -231,7 +231,7 @@ describe("deciding", () => {
       Result.succeed([
         AttentionEffect.Revert({ ref: main, to: before }),
         AttentionEffect.Emit({
-          event: AttentionEvent.Decided({
+          event: ProjectEventInput.Decided({
             at: later,
             choice: "revert",
             decision: strayPush.id,
@@ -248,7 +248,7 @@ describe("deciding", () => {
       Result.succeed([
         AttentionEffect.Land({ subject: strayPush.subject }),
         AttentionEffect.Emit({
-          event: AttentionEvent.Decided({
+          event: ProjectEventInput.Decided({
             at: later,
             choice: "adopt",
             decision: strayPush.id,
@@ -270,6 +270,14 @@ describe("deciding", () => {
       Result.succeed("accept"),
       Result.succeed("decline"),
     ]);
+  });
+
+  // One rule for handles everywhere (`sameHandle`): the policy's `alice` is
+  // the person GitHub signs in as `Alice`.
+  it("takes a decision from its decider however sign-in cases the handle", () => {
+    expect(
+      Result.isSuccess(choose(proposalDecision, "accept", Handle.make("Alice")))
+    ).toBeTruthy();
   });
 
   it("refuses a person who does not decide for it", () => {
@@ -363,7 +371,7 @@ describe("a decision nobody took in time", () => {
 
     expect(effects).toStrictEqual([
       AttentionEffect.Emit({
-        event: AttentionEvent.Decided({
+        event: ProjectEventInput.Decided({
           at: due,
           choice: "decline",
           decision: proposalDecision.id,
@@ -371,7 +379,7 @@ describe("a decision nobody took in time", () => {
       }),
       AttentionEffect.Revert({ ref: main, to: before }),
       AttentionEffect.Emit({
-        event: AttentionEvent.Decided({
+        event: ProjectEventInput.Decided({
           at: due,
           choice: "revert",
           decision: strayPush.id,
@@ -399,7 +407,7 @@ describe("a decision nobody took in time", () => {
       effects: [
         AttentionEffect.Revert({ ref: main, to: before }),
         AttentionEffect.Emit({
-          event: AttentionEvent.Decided({
+          event: ProjectEventInput.Decided({
             at: due,
             choice: "revert",
             decision: strayPush.id,

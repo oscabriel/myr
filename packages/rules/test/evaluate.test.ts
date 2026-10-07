@@ -3,6 +3,7 @@ import { assert, describe, expect, it } from "@effect/vitest";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { Policy } from "@repo/protocol/domain/policy";
 import { RepoPath } from "@repo/protocol/ids";
+import { ClaimantFacts, ProposalFacts } from "@repo/sdk";
 import { Duration, Effect, Layer, Result, Schema } from "effect";
 
 import { Finishers } from "../src/finish.ts";
@@ -21,6 +22,17 @@ import {
   folder,
   now,
 } from "./world.ts";
+
+const decodeProposal = Schema.decodeUnknownSync(ProposalFacts);
+
+const decodeClaimant = Schema.decodeUnknownSync(ClaimantFacts);
+
+/** A proposal for an ask of the example's `fixBug` kind, but its record. */
+const fixBugProposal = {
+  kind: "fixBug",
+  proposer: "carol",
+  territory: "@datekit/parse",
+};
 
 /** A red-then-green check on one file, as `CheckSpec` encodes it. */
 const redThenGreen = (path: string) =>
@@ -170,8 +182,8 @@ const jsonEncoded = {
 };
 
 /**
- * The defaults (convex-merged design §3, "no folder means defaults"; the
- * weakening markers from spec §4.2), as `Policy` encodes them.
+ * The defaults (convex-merged design §3, "no folder means defaults"), as
+ * `Policy` encodes them: the sdk's `defaults`, finished with the facts.
  */
 const defaultsEncoded = {
   ...fromFacts,
@@ -191,7 +203,7 @@ const defaultsEncoded = {
       name: "fix",
       oneWay: false,
       race: 1,
-      requires: ["want", "check"],
+      requires: ["want", "check", "territory"],
       strength: "assertion",
     },
   ],
@@ -200,27 +212,8 @@ const defaultsEncoded = {
   run: foundRun,
   source: "defaults",
   vouch: { file: defaultVouchFile, mode: "forCode" },
-  weakening: {
-    markers: [
-      ".skip(",
-      ".only(",
-      ".todo(",
-      "eslint-disable",
-      "oxlint-disable",
-      "biome-ignore",
-      "@ts-ignore",
-      "@ts-expect-error",
-      "@ts-nocheck",
-      // The Effect language service would read the whole word as a directive.
-      ["@effect", "diagnostics"].join("-"),
-      "# noqa",
-      "# type: ignore",
-      "#[allow(",
-      "//nolint",
-      "istanbul ignore",
-      "c8 ignore",
-    ],
-  },
+  // The gate scans its own default markers plus these, a project's own.
+  weakening: { markers: [] },
 };
 
 /** Evaluates a bundle at `at` with the shared facts, and encodes the policy. */
@@ -434,17 +427,119 @@ describe("the /bun adapter", () => {
     }).pipe(Effect.provide(bunEvaluator()))
   );
 
+  // A project written with the real sdk: the rules ride under its symbol,
+  // and the facts are the sdk's own fact schemas.
+  const sdkProject = bundleOf({
+    "project.ts": [
+      'import { check, kind, kinds, project } from "@repo/sdk";',
+      "",
+      "const trusted = kind({",
+      "  args: {},",
+      '  check: () => check.redThenGreen("test/trusted.test.ts"),',
+      '  checkKind: "redThenGreen",',
+      '  name: "trusted",',
+      "  opensAlone: (proposal) => proposal.record >= 3,",
+      "});",
+      "",
+      "export default project({",
+      "  admit: (claimant) => claimant.vouched || claimant.record > 0,",
+      "  kinds: [kinds.fix, trusted],",
+      "});",
+    ].join("\n"),
+  });
+
+  it.live("calls the rules a project written with the sdk carries", () =>
+    Effect.gen(function* () {
+      const evaluator = yield* RulesEvaluator;
+      const modules = sdkProject;
+
+      const proposal = (kind: string, record: number) =>
+        evaluator.call({
+          at,
+          facts: decodeProposal({
+            kind,
+            proposer: "carol",
+            record,
+            territory: ".",
+          }),
+          modules,
+          rule: "opensAlone",
+        });
+
+      const claimant = (vouched: boolean, record: number) =>
+        evaluator.call({
+          at,
+          facts: decodeClaimant({
+            handle: "bram",
+            kind: "fix",
+            record,
+            territory: ".",
+            vouched,
+          }),
+          modules,
+          rule: "admit",
+        });
+
+      expect([
+        yield* proposal("trusted", 3),
+        yield* proposal("trusted", 2),
+        yield* proposal("fix", 9),
+        yield* claimant(true, 0),
+        yield* claimant(false, 1),
+        yield* claimant(false, 0),
+      ]).toStrictEqual([true, false, false, true, true, false]);
+    }).pipe(Effect.provide(bunEvaluator()))
+  );
+
+  it.live(
+    "evaluates a project file that states nothing as no folder at all",
+    () =>
+      Effect.gen(function* () {
+        const stated = yield* evaluated(
+          bundleOf({
+            "project.ts": [
+              'import { project } from "@repo/sdk";',
+              "",
+              "export default project({});",
+            ].join("\n"),
+          })
+        );
+
+        expect(stated).toStrictEqual({ ...defaultsEncoded, source: "config" });
+      }).pipe(Effect.provide(bunEvaluator()))
+  );
+
   it.live("calls a function-valued rule with the facts it is given", () =>
     Effect.gen(function* () {
       const evaluator = yield* RulesEvaluator;
       const modules = yield* folder("cm");
 
-      const call = (rule: "admit" | "opensAlone", held: number) =>
-        evaluator.call({ at, facts: { held }, modules, rule });
+      const opensAlone = (record: number) =>
+        evaluator.call({
+          at,
+          facts: decodeProposal({ ...fixBugProposal, record }),
+          modules,
+          rule: "opensAlone",
+        });
 
-      expect(yield* call("opensAlone", 3)).toBeTruthy();
-      expect(yield* call("opensAlone", 1)).toBeFalsy();
-      expect(yield* call("admit", 3)).toBeFalsy();
+      const admit = evaluator.call({
+        at,
+        facts: decodeClaimant({
+          handle: "bram",
+          kind: "fixBug",
+          record: 3,
+          territory: "@datekit/parse",
+          vouched: true,
+        }),
+        modules,
+        rule: "admit",
+      });
+
+      expect([
+        yield* opensAlone(3),
+        yield* opensAlone(1),
+        yield* admit,
+      ]).toStrictEqual([true, false, false]);
     }).pipe(Effect.provide(bunEvaluator()))
   );
 });
@@ -500,7 +595,7 @@ describe("the /json adapter", () => {
 
       const called = yield* evaluator.call({
         at,
-        facts: { held: 3 },
+        facts: decodeProposal({ ...fixBugProposal, record: 3 }),
         modules: yield* folder("cm"),
         rule: "opensAlone",
       });

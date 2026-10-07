@@ -159,13 +159,18 @@
           },
           {
             "include": [
-              "packages/artifacts/test/**/*.ts",
               "packages/checks/test/**/*.ts",
               "packages/rules/test/**/*.ts",
               "packages/testkit/test/**/*.ts"
             ],
             "options": {
               "allowedUnstableApis": ["effect/process"]
+            }
+          },
+          {
+            "include": ["packages/artifacts/test/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": ["effect/http", "effect/process"]
             }
           },
           {

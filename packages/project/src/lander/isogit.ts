@@ -44,6 +44,7 @@ import type { Verdict } from "@repo/protocol/domain/answer";
 import { CommitSha, LandedSha, RepoPath, TreeSha } from "@repo/protocol/ids";
 import type { RepoName, RequestId } from "@repo/protocol/ids";
 import { RepoBusy, StaleBase, VerifierBlocked } from "@repo/protocol/refusal";
+import { sdkVersion } from "@repo/rules/rules-evaluator";
 import type { ConfigBundle } from "@repo/rules/rules-evaluator";
 import { Array, Clock, DateTime, Effect, Layer, Option, Order } from "effect";
 import {
@@ -70,13 +71,6 @@ import type {
 const mainRef = RefName.make("refs/heads/main");
 
 const mainBranch = BranchName.make("main");
-
-/**
- * The SDK version a bundle reports. ASSUMPTION: the platform's own, `0.0.0`
- * until release. `@repo/project` may not import `@repo/sdk`, which states it,
- * so 299 decides where this comes from (212's Comments).
- */
-const sdkVersion = "0.0.0";
 
 // How far back from main's tip a second land looks for the first one's commit.
 const LOOKBACK = 16;

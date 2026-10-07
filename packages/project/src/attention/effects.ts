@@ -12,7 +12,7 @@ import type { CommitSha, ProposalId } from "@repo/protocol/ids";
 import { Data } from "effect";
 import type { DateTime } from "effect";
 
-import type { ProjectEventInput } from "../project-store/rows.ts";
+import type { ProjectEventInput } from "../events.ts";
 
 /** What the project service does after a proposal or decision moved, in order. */
 export type AttentionEffect = Data.TaggedEnum<{
@@ -29,9 +29,6 @@ export type AttentionEffect = Data.TaggedEnum<{
 
 /** Constructors for attention's effects. */
 export const AttentionEffect = Data.taggedEnum<AttentionEffect>();
-
-/** Constructors for the project events attention emits, before the store numbers them. */
-export const AttentionEvent = Data.taggedEnum<ProjectEventInput>();
 
 /**
  * The platform's own handle: who `decided.by` names when nobody decided in

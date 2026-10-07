@@ -159,7 +159,7 @@ const table = [
   {
     audience: "signedIn",
     cli: "propose",
-    errors: ["UnknownProject", "Denounced", "CapReached"],
+    errors: ["UnknownProject", "Denounced", "CapReached", "NotVouched"],
     flags: "",
     on: "RMCW",
     tag: "proposeAsk",
@@ -180,6 +180,8 @@ const table = [
       "UnknownDecision",
       "DecisionClosed",
       "NotDecider",
+      "VerifierBlocked",
+      "StaleBase",
     ],
     flags: "A",
     on: "RMCW",

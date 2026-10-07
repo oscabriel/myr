@@ -3,7 +3,8 @@ import { FromCI, Policy } from "@repo/protocol/domain/policy";
 import type { PolicyInput } from "@repo/protocol/domain/policy";
 import { RunBlock } from "@repo/protocol/domain/run";
 import type { LandedSha, RepoPath } from "@repo/protocol/ids";
-import { Context, DateTime, Effect, Schema } from "effect";
+import { packageDir } from "@repo/sdk";
+import { Array as Arr, Context, DateTime, Effect, Schema } from "effect";
 
 import { failedAt } from "./config-folder.ts";
 import { RulesFailed } from "./rules-evaluator.ts";
@@ -129,6 +130,43 @@ const territoriesOf = (
           : { module: name, paths, publicFiles: exports };
       });
 
+/** A glob with the package's folder written over the sdk's `{dir}`. */
+const placed = (glob: string, folder: string) => {
+  const written = glob.replaceAll(packageDir, folder).replace(/^\/+/u, "");
+
+  return written === "" ? "**" : written;
+};
+
+/**
+ * An ask's territory with its package's folder written in. The sdk's
+ * `territory.package(name)` can't know where the package lives, so it names
+ * the workspace by `module` and writes `{dir}` in its paths; here the
+ * workspace's folder replaces it, and its `exports` become the public files
+ * unless the ask states its own. A module no workspace names keeps the
+ * placeholder, which matches no real path, so the gate refuses every change
+ * (it fails closed).
+ */
+const placedIn = (
+  workspaces: EvaluationFacts["workspaces"],
+  territory: PolicyInput["asks"][number]["territory"]
+) => {
+  const workspace = workspaces.find(({ name }) => name === territory.module);
+
+  if (
+    workspace === undefined ||
+    !territory.paths.some((glob) => glob.includes(packageDir))
+  ) {
+    return territory;
+  }
+
+  const folder = folderOf(workspace.dir);
+  const paths = Arr.map(territory.paths, (glob) => placed(glob, folder));
+
+  return territory.publicFiles !== undefined || workspace.exports.length === 0
+    ? { ...territory, paths }
+    : { ...territory, paths, publicFiles: workspace.exports };
+};
+
 /** Fails when two asks share an id: an id names one ask, and one fork per claim. */
 const distinctAsks = (asks: PolicyInput["asks"]) => {
   const seen = new Map<string, string>();
@@ -154,8 +192,8 @@ const distinctAsks = (asks: PolicyInput["asks"]) => {
 /**
  * Turns what the config folder evaluated to into the project's `Policy` at
  * `at`, filling in what the platform knows from the facts: the run block
- * (`fromCI` resolved by the finder), the modules from the workspaces, the
- * judge closure, `owners` as the initializer (spec D20), and the vouch
+ * (`fromCI` resolved by the finder), the modules from the workspaces, each
+ * package territory's folder (the sdk's `{dir}`), the judge closure, `owners` as the initializer (spec D20), and the vouch
  * file's lines. Each ask counts as open, opened at `facts.now` in `at`: the
  * Project DO overwrites `openedAt`, `openedIn` and `state` from its own rows.
  * The whole is decoded with `Policy`, so a value the finishers or facts got
@@ -184,6 +222,7 @@ export const finishPolicy = (input: {
         openedIn: at,
         project: facts.project,
         state: "open" as const,
+        territory: placedIn(facts.workspaces, ask.territory),
       })),
       at,
       budget: policy.budget,

@@ -3,18 +3,20 @@
  * Worker in W3): it hands what the config folder's modules exported back as
  * data, which the sandbox's main sends as JSON, so functions and
  * non-enumerable properties drop out and the host decodes the rest; and it
- * finds a function-valued rule to call. It imports only `effect`, which the
- * sdk brings anyway, so a bundler can inline it beside the sdk.
+ * finds a function-valued rule to call. It imports only `effect` and the
+ * sdk's `Functions` key, which config code brings anyway, so a bundler can
+ * inline it beside the sdk.
  */
+import { Functions } from "@repo/sdk/functions";
 import { Predicate } from "effect";
 import type { Schema } from "effect";
 
 /**
  * What a config module's default export is: the sdk's definition, plain
- * data shaped as `PolicyInput` or `AskInput` once encoded. A function-valued
- * rule rides on the project's definition as an own property named after the
- * rule (`opensAlone`, `admit`) that JSON leaves out: the sdk makes it
- * non-enumerable, and `functions` in the data says it exists.
+ * data shaped as `PolicyInput` or `AskInput` once encoded. Its
+ * function-valued rules (`opensAlone`, `admit`) ride under the sdk's
+ * `Functions` symbol, which JSON never meets, and `functions` in the data
+ * says which exist.
  */
 export type Definition = Schema.Json;
 
@@ -57,19 +59,23 @@ export const collect = (
 
 const isRule = (value: unknown): value is Rule => Predicate.isFunction(value);
 
-/** The project definition's function-valued rule, when it has one. */
+/**
+ * The project definition's function-valued rule, when it has one: read
+ * where the sdk keeps it (`functionsOf`), under its `Functions` symbol.
+ */
 export const ruleOf = (
   definition: Definition | undefined,
   rule: string
 ): Rule | undefined => {
-  if (definition === undefined || definition === null) {
+  if (!Predicate.hasProperty(definition, Functions)) {
     return undefined;
   }
 
-  const found: unknown = Object.getOwnPropertyDescriptor(
-    definition,
-    rule
-  )?.value;
+  const carried = definition[Functions];
+
+  const found = Predicate.hasProperty(carried, rule)
+    ? carried[rule]
+    : undefined;
 
   return isRule(found) ? found : undefined;
 };

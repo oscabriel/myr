@@ -28,6 +28,7 @@ import {
   Schema,
 } from "effect";
 
+import { ProjectEventInput } from "../src/events.ts";
 import {
   enqueue,
   LandingCommand,
@@ -36,7 +37,6 @@ import {
   LandingState,
   maxRemerges,
   next as admitNext,
-  ProjectEventInput,
   Request,
   settle,
   transition,

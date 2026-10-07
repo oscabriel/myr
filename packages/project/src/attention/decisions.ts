@@ -9,6 +9,7 @@ import type { Evidence } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import type { Policy } from "@repo/protocol/domain/policy";
+import { sameHandle } from "@repo/protocol/ids";
 import type {
   DecisionId,
   Handle,
@@ -22,7 +23,8 @@ import {
 } from "@repo/protocol/refusal";
 import { Array as Arr, DateTime, Option, Result } from "effect";
 
-import { AttentionEffect, AttentionEvent, platformHandle } from "./effects.ts";
+import { ProjectEventInput } from "../events.ts";
+import { AttentionEffect, platformHandle } from "./effects.ts";
 
 /** How a subject's deciders say yes, and no. */
 interface Words {
@@ -118,7 +120,7 @@ const take = (
     effects: [
       ...consequences(decision.subject, worded),
       AttentionEffect.Emit({
-        event: AttentionEvent.Decided({
+        event: ProjectEventInput.Decided({
           at: now,
           choice: worded,
           decision: decision.id,
@@ -181,7 +183,7 @@ export const decide = (
     return Result.fail(new UnknownDecision({ decision: input.id }));
   }
 
-  if (!found.deciders.includes(input.by)) {
+  if (!found.deciders.some((each) => sameHandle(each, input.by))) {
     return Result.fail(new NotDecider({}));
   }
 

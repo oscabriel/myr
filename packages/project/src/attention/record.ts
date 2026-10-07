@@ -49,15 +49,8 @@ export interface RecordRule {
   readonly atLeast: number;
 }
 
-/**
- * A handle as people are told apart: without case, as the sign-in provider
- * (GitHub) tells them apart, and as claim forks already name them.
- */
+/** A handle as a map key: the form `sameHandle` (`@repo/protocol/ids`) compares by. */
 const personOf = (handle: Handle) => handle.toLowerCase();
-
-/** Whether two handles name one person: a vouch file's `Alice` is `alice`. */
-export const sameHandle = (one: Handle, other: Handle): boolean =>
-  personOf(one) === personOf(other);
 
 /**
  * A landing's area: the module of the territory its ask was in. A landing

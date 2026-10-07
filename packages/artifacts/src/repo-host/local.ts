@@ -1,5 +1,4 @@
 import * as fs from "node:fs";
-import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import type { CommitSha } from "@repo/protocol/ids";
@@ -15,7 +14,7 @@ import {
   Semaphore,
   Stream,
 } from "effect";
-import type { Context, Scope } from "effect";
+import type { Context } from "effect";
 import {
   Errors,
   addRemote,
@@ -537,16 +536,4 @@ export const RepoHostLocal = {
     readonly remoteBase: string;
   }): Layer.Layer<RepoHost, never, Fetch> =>
     Layer.effect(RepoHost, make(options)),
-  /**
-   * A new, empty directory for a store, deleted with everything in it when
-   * the scope closes: a root for callers with no file system of their own,
-   * such as this package's tests.
-   */
-  temporaryRoot: Effect.acquireRelease(
-    io(() => fs.promises.mkdtemp(`${tmpdir()}/repo-host-`)).pipe(Effect.orDie),
-    (root) =>
-      io(() => fs.promises.rm(root, { force: true, recursive: true })).pipe(
-        Effect.orDie
-      )
-  ) satisfies Effect.Effect<string, never, Scope.Scope>,
 };

@@ -8,15 +8,13 @@ import { at } from "@repo/testkit/clock";
 import { aProject, ids, sha, withAsk } from "@repo/testkit/scenarios";
 import { DateTime, Option, Result } from "effect";
 
-import {
-  AttentionEffect,
-  AttentionEvent,
-} from "../../src/attention/effects.ts";
+import { AttentionEffect } from "../../src/attention/effects.ts";
 import {
   expire,
   ProposalCommand,
   propose,
 } from "../../src/attention/proposals.ts";
+import { ProjectEventInput } from "../../src/events.ts";
 
 const scenario = aProject({ people: ["carol"] }).pipe(
   withAsk({ id: "parse-iso", territory: "packages/parser" })
@@ -87,7 +85,7 @@ describe("proposing an ask", () => {
         effects: [
           AttentionEffect.SetAlarm({ at: at("2026-10-21T12:00:00Z") }),
           AttentionEffect.Emit({
-            event: AttentionEvent.ProposalOpened({
+            event: ProjectEventInput.ProposalOpened({
               at: now,
               proposal: command.id,
             }),

@@ -5,14 +5,27 @@
  * the outbox, so the front page hears every one.
  */
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
+import type { ProjectEvent as Event } from "@repo/protocol/domain/event";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { Outcome } from "@repo/protocol/domain/outcome";
 import type { AskId, CommitSha, LandedSha } from "@repo/protocol/ids";
-import { Effect, Schema } from "effect";
+import { Data, Effect, Schema } from "effect";
 import type { DateTime } from "effect";
 
-import { ProjectEventInput as EventInput } from "./claim.ts";
-import type { ProjectEventInput } from "./project-store/rows.ts";
+/** Drops a key from each member of a union, not from the union as a whole. */
+type OmitEach<Union, Key extends PropertyKey> = Union extends unknown
+  ? Omit<Union, Key>
+  : never;
+
+/**
+ * A project event before the store numbers it: every `ProjectEvent` but its
+ * `seq`, which the store assigns at commit. The one type the lifecycles,
+ * attention, the service and the store all write events as.
+ */
+export type ProjectEventInput = OmitEach<Event, "seq">;
+
+/** Constructors and matchers for project events before the store numbers them. */
+export const ProjectEventInput = Data.taggedEnum<ProjectEventInput>();
 
 /** An ask as `listAsks`, the front page and `AskOpened` show it. */
 export const listingOf = (ask: Ask): AskListing => {
@@ -32,14 +45,14 @@ export const listingOf = (ask: Ask): AskListing => {
 
 /** An ask opened. */
 export const askOpened = (ask: Ask, at: DateTime.Utc): ProjectEventInput =>
-  EventInput.AskOpened({ ask: listingOf(ask), at });
+  ProjectEventInput.AskOpened({ ask: listingOf(ask), at });
 
 /** An answer's landing closed its ask. */
 export const askClosed = (
   ask: AskId,
   landing: LandedSha,
   at: DateTime.Utc
-): ProjectEventInput => EventInput.AskClosed({ ask, at, landing });
+): ProjectEventInput => ProjectEventInput.AskClosed({ ask, at, landing });
 
 /** An answer was judged: its checks or its merge decided where it stands. */
 export const judged = (
@@ -47,7 +60,7 @@ export const judged = (
   head: CommitSha,
   outcome: Outcome,
   at: DateTime.Utc
-): ProjectEventInput => EventInput.Judged({ ask, at, head, outcome });
+): ProjectEventInput => ProjectEventInput.Judged({ ask, at, head, outcome });
 
 const asEvent = Schema.decodeUnknownEffect(Schema.toType(ProjectEvent));
 

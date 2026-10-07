@@ -55,14 +55,18 @@ export type ClaimRow = typeof ClaimRow.Type;
 
 /**
  * One answer request, keyed by its `requestId` so a request sent twice is
- * one row; its landing lifecycle state encoded.
+ * one row; where it stands, encoded.
  */
 export const AnswerRow = Schema.Struct({
   answerer: Handle,
   ask: Schema.optionalKey(AskId),
   head: CommitSha,
   requestId: RequestId,
-  /** The encoded landing lifecycle state. */
+  /**
+   * The service's `AnswerRecord` (`src/project.ts`), encoded: the landing
+   * lifecycle's state, the receipt the request was first given, and the
+   * verdict on its last checked tree. The store keeps it as one JSON value.
+   */
   state: Schema.Json,
   updatedAt: Schema.DateTimeUtcFromString,
 });
@@ -141,11 +145,3 @@ export const EventRow = Schema.Struct({
 });
 
 export type EventRow = typeof EventRow.Type;
-
-/** Drops a key from each member of a union, not from the union as a whole. */
-type OmitEach<Union, Key extends PropertyKey> = Union extends unknown
-  ? Omit<Union, Key>
-  : never;
-
-/** An event before the store numbers it: every `ProjectEvent` but its `seq`. */
-export type ProjectEventInput = OmitEach<ProjectEvent, "seq">;

@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Schema, Struct } from "effect";
 
 import {
   AreaName,
@@ -89,6 +89,14 @@ export const AnswerReceipt = Schema.Struct({
 });
 
 export type AnswerReceipt = typeof AnswerReceipt.Type;
+
+/**
+ * What a decider gets back on landing their own change from their working
+ * fork: an answer's receipt without an ask, since such a landing answers none.
+ */
+export const LandReceipt = AnswerReceipt.mapFields(Struct.omit(["ask"]));
+
+export type LandReceipt = typeof LandReceipt.Type;
 
 /** One of a person's answers, as their status shows it. */
 export const AnswerView = Schema.Struct({

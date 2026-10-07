@@ -2,6 +2,7 @@ import type { CommitSha } from "@repo/protocol/ids";
 import { Context } from "effect";
 import type { Effect, Option, Schema } from "effect";
 
+import type { ProjectEventInput } from "./events.ts";
 import type {
   AnswerRow,
   AskRow,
@@ -11,7 +12,6 @@ import type {
   EventRow,
   LandingRow,
   OutboxRow,
-  ProjectEventInput,
   ProjectRow,
   ProposalRow,
   PushEventRow,

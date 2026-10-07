@@ -12,6 +12,7 @@ import {
 import { DateTime, Effect, Exit, Option, Schema, Struct } from "effect";
 import type { Layer } from "effect";
 
+import type { ProjectEventInput } from "../src/events.ts";
 import { ProjectStore } from "../src/project-store.ts";
 import type { ProjectWrites } from "../src/project-store.ts";
 import {
@@ -27,7 +28,6 @@ import {
   PushEventRow,
   RatchetRow,
 } from "../src/project-store/rows.ts";
-import type { ProjectEventInput } from "../src/project-store/rows.ts";
 
 // Rows are written here encoded, as the store keeps them, and decoded once;
 // a snapshot is compared encoded, so every field reads back as written.

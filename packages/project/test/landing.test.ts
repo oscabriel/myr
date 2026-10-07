@@ -23,6 +23,7 @@ import {
 } from "@repo/protocol/refusal";
 import { DateTime, Duration, Option, Schema } from "effect";
 
+import { ProjectEventInput } from "../src/events.ts";
 import {
   backoff,
   enqueue,
@@ -34,7 +35,6 @@ import {
   next as admitNext,
   outcomeOf,
   pendingEffects,
-  ProjectEventInput,
   Request,
   settle,
   transition,

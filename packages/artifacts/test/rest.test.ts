@@ -38,6 +38,7 @@ import { RepoHostRest } from "../src/repo-host/rest.ts";
 import { fakeRest } from "./fake-rest.ts";
 import type { FakeRestOptions } from "./fake-rest.ts";
 import { describeRepoHost } from "./repo-host-contract.ts";
+import { temporaryRoot } from "./temporary-root.ts";
 
 const main = RefName.make("refs/heads/main");
 
@@ -88,7 +89,7 @@ const world = (
   options: Omit<FakeRestOptions, "accountId" | "namespace" | "token"> = {}
 ) =>
   Effect.gen(function* () {
-    const root = yield* RepoHostLocal.temporaryRoot;
+    const root = yield* temporaryRoot;
 
     const spawner =
       yield* Effect.context<ChildProcessSpawner.ChildProcessSpawner>();

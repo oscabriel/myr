@@ -23,7 +23,8 @@ import type { Person } from "@repo/protocol/principal";
 import { CapReached, Denounced, NotVouched } from "@repo/protocol/refusal";
 import { Data, DateTime, Option, Result } from "effect";
 
-import { AttentionEffect, AttentionEvent } from "./effects.ts";
+import { ProjectEventInput } from "../events.ts";
+import { AttentionEffect } from "./effects.ts";
 
 /**
  * What every proposal command carries: the id the service minted, the
@@ -164,7 +165,10 @@ const opened = (proposal: Proposal, now: DateTime.Utc): Proposed => ({
   effects: [
     AttentionEffect.SetAlarm({ at: proposal.expiresAt }),
     AttentionEffect.Emit({
-      event: AttentionEvent.ProposalOpened({ at: now, proposal: proposal.id }),
+      event: ProjectEventInput.ProposalOpened({
+        at: now,
+        proposal: proposal.id,
+      }),
     }),
   ],
   proposal,
