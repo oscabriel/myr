@@ -1,16 +1,34 @@
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Contracts, surfaced } from "@repo/protocol/contracts";
+import { Contracts, Surfaces, surfaced } from "@repo/protocol/contracts";
+import { Outcome } from "@repo/protocol/domain/outcome";
+import { Envelope } from "@repo/protocol/envelope";
 import {
   AskId,
   CommitSha,
+  DecisionId,
   ProjectName,
   RepoPath,
   RequestId,
 } from "@repo/protocol/ids";
-import { StaleBase } from "@repo/protocol/refusal";
+import { DecisionClosed, StaleBase } from "@repo/protocol/refusal";
+import { receiptLine } from "@repo/protocol/render";
 import { unanswered } from "@repo/protocol/testing";
-import { Effect, Layer, Schema } from "effect";
+import { gitOk } from "@repo/testkit/git";
+import {
+  Context,
+  Effect,
+  FileSystem,
+  Layer,
+  Ref,
+  Result,
+  Schema,
+} from "effect";
+import type { Command } from "effect/cli";
 
+import { local } from "../src/local/index.ts";
+import { commands, entries } from "../src/surfaces.ts";
+import { runProgram } from "./remote-server.ts";
 import { session } from "./stdio.ts";
 
 const ask = AskId.make("fix-parser");
@@ -152,6 +170,301 @@ describe("the CLI's MCP server over stdio", () => {
       expect(text).toHaveProperty("_tag", "StaleBase");
       expect(yield* Schema.decodeUnknownEffect(StaleBase)(text)).toStrictEqual(
         refusal
+      );
+    })
+  );
+});
+
+/** The names of a command's subcommands, in order. */
+const subcommandsOf = (command: Command.Command.Any | undefined) =>
+  (command?.subcommands ?? []).flatMap(({ commands: group }) =>
+    group.map(({ name }) => name)
+  );
+
+const top = (name: string) => commands.find((command) => command.name === name);
+
+describe("the CLI's command tree", () => {
+  it("has one command per contract served on the CLI, every local one, and schema", () => {
+    const onCli = [...Contracts.requests.values()].filter((rpc) =>
+      Context.get(rpc.annotations, Surfaces).includes("cli")
+    );
+
+    const paths = entries.map(({ path: words }) => words.join(" "));
+
+    // `init` and `env set` are the local commands that wrap their contracts.
+    expect(paths).toHaveLength(onCli.length - 2 + local.length + 1);
+    expect(new Set(paths).size).toBe(paths.length);
+    expect(paths).toStrictEqual(
+      expect.arrayContaining([
+        "asks",
+        "ask",
+        "ask open",
+        "ask flag",
+        "env shape",
+        "env set",
+        "init",
+        "schema",
+      ])
+    );
+  });
+
+  it("puts ask open and ask flag under ask, and env shape beside env set", () => {
+    expect(subcommandsOf(top("ask"))).toStrictEqual(["open", "flag"]);
+    expect(subcommandsOf(top("env"))).toStrictEqual(["shape", "set"]);
+  });
+
+  it("leaves init and env set to their local commands", () => {
+    const [localInit, localEnvSet] = [
+      local.find(({ path }) => path.join(" ") === "init")?.command,
+      local.find(({ path }) => path.join(" ") === "env set")?.command,
+    ];
+
+    const envSet = top("env")
+      ?.subcommands.flatMap(({ commands: group }) => group)
+      .find(({ name }) => name === "set");
+
+    expect(top("init")).toBe(localInit);
+    expect(envSet).toBe(localEnvSet);
+  });
+});
+
+const decision = DecisionId.make("dec-000001");
+
+const decideArgs = [
+  "decide",
+  "--project",
+  "datekit",
+  "--decision",
+  decision,
+  "--choice",
+  "accept",
+];
+
+/** A platform that counts the decisions it is asked to take, and takes none. */
+const deciding = (calls: Ref.Ref<number>) =>
+  Layer.mergeAll(
+    unanswered,
+    Contracts.toLayerHandler("decide", () =>
+      Ref.update(calls, (count) => count + 1).pipe(
+        Effect.andThen(Effect.fail(new DecisionClosed({ decision })))
+      )
+    )
+  );
+
+const decodeEnvelope = Schema.decodeEffect(
+  Schema.fromJsonString(Envelope(Schema.Unknown))
+);
+
+describe("a command that needs approval", () => {
+  it.effect(
+    "exits 2 without --yes, in one line naming --yes, and calls nothing",
+    () =>
+      Effect.gen(function* () {
+        const calls = yield* Ref.make(0);
+
+        const run = yield* runProgram(decideArgs, {
+          handlers: deciding(calls),
+        });
+
+        expect(run.code).toBe(2);
+        expect(run.err).toHaveLength(1);
+        expect(run.err[0]).toContain("--yes");
+        expect(run.out).toStrictEqual([]);
+        expect(yield* Ref.get(calls)).toBe(0);
+      })
+  );
+
+  it.effect(
+    "prints the payload it would send under --dry-run, and calls nothing",
+    () =>
+      Effect.gen(function* () {
+        const calls = yield* Ref.make(0);
+
+        const run = yield* runProgram([...decideArgs, "--dry-run", "--json"], {
+          handlers: deciding(calls),
+        });
+
+        expect(run.code).toBe(0);
+        expect(run.out).toHaveLength(1);
+        expect(yield* decodeEnvelope(run.out[0] ?? "")).toStrictEqual({
+          command: "decide",
+          data: {
+            dryRun: true,
+            payload: { choice: "accept", decision, project: "datekit" },
+          },
+          ok: true,
+          v: 1,
+        });
+        expect(yield* Ref.get(calls)).toBe(0);
+      })
+  );
+
+  it.effect("prints the payload as text for a person under --dry-run", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make(0);
+
+      const run = yield* runProgram([...decideArgs, "--dry-run"], {
+        handlers: deciding(calls),
+      });
+
+      expect(run.out.join("\n")).toContain(`"decision": "${decision}"`);
+      expect(yield* Ref.get(calls)).toBe(0);
+    })
+  );
+
+  it.effect("calls the platform with --yes", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make(0);
+
+      const run = yield* runProgram([...decideArgs, "--yes"], {
+        handlers: deciding(calls),
+      });
+
+      expect(run.code).toBe(1);
+      expect(yield* Ref.get(calls)).toBe(1);
+    })
+  );
+});
+
+describe("a read", () => {
+  it.effect("has no --dry-run: asking for one is a usage error", () =>
+    Effect.gen(function* () {
+      const run = yield* runProgram(
+        ["asks", "--project", "datekit", "--dry-run"],
+        { handlers: unanswered }
+      );
+
+      expect(run.code).toBe(2);
+      expect(run.err.join("\n")).toContain("--dry-run");
+    })
+  );
+});
+
+/** A platform that lists no asks, recording the project each listing names. */
+const listing = (asked: Ref.Ref<readonly string[]>) =>
+  Layer.mergeAll(
+    unanswered,
+    Contracts.toLayerHandler("listAsks", ({ project: named }) =>
+      Ref.update(asked, (all) => [...all, named]).pipe(Effect.as({ asks: [] }))
+    )
+  );
+
+/** A fresh git repo whose `origin` is `url`, at its real path. */
+const repoWithOrigin = (url: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const dir = yield* fs.realPath(yield* fs.makeTempDirectoryScoped());
+
+    yield* gitOk(dir, "init", "--quiet");
+    yield* gitOk(dir, "remote", "add", "origin", url);
+
+    return dir;
+  });
+
+describe("the project a command is about", () => {
+  it.live("comes from the repo's remote when --project is left out", () =>
+    Effect.gen(function* () {
+      const asked = yield* Ref.make<readonly string[]>([]);
+
+      const cwd = yield* repoWithOrigin(
+        "https://platform-dev.example.workers.dev/datekit--fix-week--tester.git"
+      );
+
+      const run = yield* runProgram(["asks", "--json"], {
+        cwd,
+        handlers: listing(asked),
+      });
+
+      expect(run.code).toBe(0);
+      expect(yield* Ref.get(asked)).toStrictEqual(["datekit"]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live("is a usage error outside a platform's repo, naming --project", () =>
+    Effect.gen(function* () {
+      const asked = yield* Ref.make<readonly string[]>([]);
+      const fs = yield* FileSystem.FileSystem;
+      const cwd = yield* fs.makeTempDirectoryScoped();
+
+      const run = yield* runProgram(["asks"], {
+        cwd,
+        handlers: listing(asked),
+      });
+
+      expect(run.code).toBe(2);
+      expect(run.err.join("\n")).toContain("--project");
+      expect(yield* Ref.get(asked)).toStrictEqual([]);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+});
+
+describe("a misuse", () => {
+  it.effect(
+    "prints one line on stderr and nothing on stdout, even with --json",
+    () =>
+      Effect.gen(function* () {
+        const run = yield* runProgram(
+          ["asks", "--project", "datekit", "--bogus", "--json"],
+          { env: { CLAUDECODE: "1" }, handlers: unanswered }
+        );
+
+        expect(run.code).toBe(2);
+        expect(run.out).toStrictEqual([]);
+        expect(run.err).toHaveLength(1);
+        expect(run.err[0]).toContain("--bogus");
+      })
+  );
+
+  it.effect("leaves help asked for on stdout", () =>
+    Effect.gen(function* () {
+      const run = yield* runProgram(["--help"], { handlers: unanswered });
+
+      expect(run.code).toBe(0);
+      expect(run.out.join("\n")).toContain("Start here:");
+      expect(run.err).toStrictEqual([]);
+    })
+  );
+});
+
+describe("an answer offered with submit", () => {
+  it.effect("prints the same line git's remote: output gives its push", () =>
+    Effect.gen(function* () {
+      const offered = {
+        ask,
+        base,
+        head,
+        outcome: Outcome.cases.Checking.make({ stage: "merge" }),
+        project,
+        requestId,
+      };
+
+      const run = yield* runProgram(
+        [
+          "submit",
+          "--project",
+          project,
+          "--ask",
+          ask,
+          "--base",
+          base,
+          "--head",
+          head,
+          "--requestId",
+          requestId,
+        ],
+        {
+          handlers: Layer.mergeAll(
+            unanswered,
+            Contracts.toLayerHandler("submitAnswer", () =>
+              Effect.succeed(offered)
+            )
+          ),
+        }
+      );
+
+      expect(run.code).toBe(0);
+      expect(Result.map(receiptLine(offered), (line) => [line])).toStrictEqual(
+        Result.succeed(run.out)
       );
     })
   );
