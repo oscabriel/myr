@@ -29,6 +29,11 @@ export class IdentityTaken extends Data.TaggedError("IdentityTaken")<{
 export class Identities extends Context.Service<
   Identities,
   {
+    /**
+     * The handle the subject is linked to, as its key (lowercased, as
+     * `accounts` keys it): find the account by it, and show the account's
+     * own handle, never this one.
+     */
     readonly handleOf: (
       provider: IdentityProvider,
       subject: string

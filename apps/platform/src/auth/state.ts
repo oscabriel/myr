@@ -81,10 +81,15 @@ const hmacKey = (key: Redacted.Redacted) =>
 /**
  * Seals and opens one kind of value carried through the browser: as
  * `<payload>.<signature>`, the payload base64url JSON of the value and when
- * it stops being good (ten minutes on), signed under `COOKIE_KEY`. A value
- * this platform did not seal, or sealed too long ago, opens to `startAgain`.
+ * it stops being good (ten minutes on), signed under `COOKIE_KEY` together
+ * with `purpose`. A value this platform did not seal, sealed for another
+ * purpose (however its shape fits: a schema ignores extra keys), or sealed
+ * too long ago, opens to `startAgain`.
  */
-export const sealing = <A, I>(schema: Schema.Codec<A, I>) => {
+export const sealing = <A, I>(purpose: string, schema: Schema.Codec<A, I>) => {
+  /** What the signature covers: the purpose, then the payload. */
+  const signed = (payload: string) => utf8(`${purpose}.${payload}`);
+
   const Payload = Schema.StringFromBase64Url.pipe(
     Schema.decodeTo(
       Schema.fromJsonString(
@@ -110,7 +115,7 @@ export const sealing = <A, I>(schema: Schema.Codec<A, I>) => {
       const hmac = yield* hmacKey(key);
 
       const signature = yield* Effect.promise(() =>
-        crypto.subtle.sign("HMAC", hmac, utf8(payload))
+        crypto.subtle.sign("HMAC", hmac, signed(payload))
       );
 
       return `${payload}.${yield* encodeSignature(new Uint8Array(signature)).pipe(Effect.orDie)}`;
@@ -135,7 +140,7 @@ export const sealing = <A, I>(schema: Schema.Codec<A, I>) => {
           "HMAC",
           hmac,
           new Uint8Array(signature),
-          utf8(payload)
+          signed(payload)
         )
       );
 
@@ -159,7 +164,7 @@ export const sealing = <A, I>(schema: Schema.Codec<A, I>) => {
   return { open, seal };
 };
 
-const pendingSignIns = sealing(PendingSignIn);
+const pendingSignIns = sealing("sign-in", PendingSignIn);
 
 /** `pending`, good for ten minutes from now, as `<payload>.<signature>`. */
 export const sealState = pendingSignIns.seal;

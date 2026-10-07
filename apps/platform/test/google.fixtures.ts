@@ -105,18 +105,22 @@ const keyPair = (kid: string) =>
 export type KeyPair = Effect.Success<ReturnType<typeof keyPair>>;
 
 /**
- * How Google answers one code: the person (`sub`), and anything a test
- * changes about the ID token: its claims, the key it is signed with, or the
- * `kid` its header names.
+ * The ID token claims a test may change, beside the subject. An `azp` set
+ * to `undefined` leaves the claim out (JSON drops it).
  */
-/** The ID token claims a test may change, beside the subject. */
 export interface Claims {
-  readonly aud?: string;
+  readonly aud?: string | readonly string[];
+  readonly azp?: string | undefined;
   readonly exp?: number;
   readonly iss?: string;
   readonly nonce?: string;
 }
 
+/**
+ * How Google answers one code: the person (`sub`), and anything a test
+ * changes about the ID token: its claims, the key it is signed with, or the
+ * `kid` its header names.
+ */
 export interface Consent {
   readonly claims?: Claims;
   readonly kid?: string;

@@ -479,7 +479,7 @@ const GoogleLeg = Schema.Struct({
   request: AuthRequest,
 });
 
-const legs = sealing(GoogleLeg);
+const legs = sealing("google-leg", GoogleLeg);
 
 /**
  * A first Google sign-in waiting for its handle, sealed into the form that
@@ -492,7 +492,7 @@ const PendingHandle = Schema.Struct({
   subject: GoogleSubject,
 });
 
-const pendingHandles = sealing(PendingHandle);
+const pendingHandles = sealing("google-handle", PendingHandle);
 
 const encodeBytes = Schema.encodeEffect(Schema.Uint8ArrayFromBase64Url);
 

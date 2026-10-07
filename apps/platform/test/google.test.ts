@@ -388,6 +388,40 @@ describe("the person Google confirms", () => {
   );
 
   it.live(
+    "is nobody when the token names another party, or several audiences without naming this client its party",
+    () =>
+      withGoogle((google) =>
+        Effect.gen(function* () {
+          const audiences = [clientId, "another.apps.googleusercontent.com"];
+
+          const named = yield* subjectOf(google, {
+            claims: { aud: audiences, azp: clientId },
+            sub: "1042",
+          });
+
+          const refusals = yield* Effect.forEach(
+            [
+              subjectOf(google, {
+                claims: { aud: audiences, azp: undefined },
+                sub: "1042",
+              }),
+              subjectOf(google, {
+                claims: { azp: "another.apps.googleusercontent.com" },
+                sub: "1042",
+              }),
+            ],
+            (attempt) => Effect.flip(attempt)
+          );
+
+          expect([
+            named,
+            ...refusals.map((refusal) => refusal instanceof SignInFailed),
+          ]).toStrictEqual(["1042", true, true]);
+        })
+      )
+  );
+
+  it.live(
     "is checked against keys fetched once per isolate, and fetched again once for a key not kept",
     () =>
       withGoogle((google) =>
@@ -470,12 +504,21 @@ const locationOf = (response: Response) =>
     Option.flatMap((location) => Option.fromNullishOr(URL.parse(location)))
   );
 
-/** A request to `src/worker.ts`'s own handler, on the shim's fake env (no Google client). */
-const sendToWorker = (path: string) =>
+/**
+ * A request to `src/worker.ts`'s own handler, on the shim's fake env (no
+ * Google client): a GET, or an empty form post to a POST-only path (a GET
+ * there answers 404 with Google on too).
+ */
+const sendToWorker = (method: "GET" | "POST", path: string) =>
   Effect.promise(() =>
     Promise.resolve(
       worker.fetch(
-        new Request(new URL(path, origin)),
+        method === "POST"
+          ? new Request(new URL(path, origin), {
+              body: new URLSearchParams(),
+              method: "POST",
+            })
+          : new Request(new URL(path, origin)),
         fakeEnv(),
         untouchable<ExecutionContext>("ExecutionContext")
       )
@@ -517,12 +560,13 @@ describe("Google sign-in, without a Google OAuth client", () => {
 
         const statuses = yield* Effect.forEach(
           [
-            "/oauth/google/start?request=x",
-            "/oauth/google/callback?code=x&state=y",
-            "/oauth/google/link",
-            "/oauth/google/handle",
-          ],
-          (path) => Effect.map(sendToWorker(path), ({ status }) => status)
+            ["GET", "/oauth/google/start?request=x"],
+            ["GET", "/oauth/google/callback?code=x&state=y"],
+            ["POST", "/oauth/google/link"],
+            ["POST", "/oauth/google/handle"],
+          ] as const,
+          ([method, path]) =>
+            Effect.map(sendToWorker(method, path), ({ status }) => status)
         );
 
         expect([started.status, ...statuses]).toStrictEqual([
@@ -754,6 +798,49 @@ describe("coming back from Google", () => {
           handle: "Carol",
         });
         expect(yield* world.google.timesFetched(jwksUri)).toBe(1);
+      })
+  );
+
+  it.live(
+    "signs a double-clicked handle form in as the handle both times, not as taken",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* googleWorld();
+
+        const page = yield* backFromGoogle(
+          world,
+          yield* continueWithGoogle(world),
+          { sub: "1042" }
+        );
+
+        const form = yield* formIn(page);
+
+        const first = yield* chooseHandle(world, page, "carol");
+
+        // The second click left before the first answer cleared the CSRF
+        // cookie, so it still carries it; the jar is empty by now, so the
+        // browser adds nothing over it.
+        const second = new Request(
+          formPost("/oauth/google/handle", {
+            csrf: form.csrf,
+            handle: "carol",
+            request: form.request,
+          }),
+          {
+            headers: {
+              "cf-connecting-ip": "198.51.100.7",
+              "content-type": "application/x-www-form-urlencoded",
+              cookie: `__Host-sign-in=${form.csrf}`,
+            },
+          }
+        );
+
+        const again = yield* visit(world, second);
+
+        expect([first.status, again.status]).toStrictEqual([302, 302]);
+        expect(yield* propsFor(world, again)).toStrictEqual({
+          handle: "carol",
+        });
       })
   );
 
@@ -1053,5 +1140,48 @@ describe("linking Google to an account signed in by password", () => {
         Option.some(Handle.make("bob"))
       );
     })
+  );
+});
+
+describe("a sealed form, opened only where it was made", () => {
+  it.live(
+    "refuses a pick-a-handle form's seal as a password sign-in, or to start Google's",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* googleWorld();
+
+        yield* withAlice(world);
+
+        const page = yield* backFromGoogle(
+          world,
+          yield* continueWithGoogle(world),
+          { sub: "1042" }
+        );
+
+        const form = yield* formIn(page);
+
+        const answers = yield* Effect.forEach(
+          [
+            `/oauth/google/start?request=${encodeURIComponent(form.request)}`,
+            formPost("/authorize", {
+              csrf: form.csrf,
+              handle: "alice",
+              password: alicePassword,
+              request: form.request,
+            }),
+          ],
+          (request) => visit(world, request).pipe(Effect.flatMap(read))
+        );
+
+        expect(
+          answers.map(({ html, response }) => [
+            response.status,
+            html.includes("Start signing in again"),
+          ])
+        ).toStrictEqual([
+          [400, true],
+          [400, true],
+        ]);
+      })
   );
 });
