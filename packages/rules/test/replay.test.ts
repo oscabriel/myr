@@ -63,15 +63,20 @@ const stampOf = (policy: typeof Policy.Encoded) =>
   policy.asks[0]?.brief.context;
 
 describe("evaluating a config folder twice", () => {
-  it.live("gives equal policies for equal facts", () =>
-    Effect.gen(function* () {
-      for (const modules of [yield* folder("cm"), yield* readsTheClock]) {
-        const first = yield* evaluated(modules);
-        const second = yield* evaluated(modules);
+  it.live(
+    "gives equal policies for equal facts",
+    () =>
+      Effect.gen(function* () {
+        for (const modules of [yield* folder("cm"), yield* readsTheClock]) {
+          const first = yield* evaluated(modules);
+          const second = yield* evaluated(modules);
 
-        expect(second).toStrictEqual(first);
-      }
-    }).pipe(Effect.provide(bunEvaluator()))
+          expect(second).toStrictEqual(first);
+        }
+      }).pipe(Effect.provide(bunEvaluator())),
+    // Four bun processes: a third of a second alone, near four while turbo
+    // runs every package's tests at once. The limit catches a hang.
+    30_000
   );
 
   it.live("gives config code the facts' clock, not the wall clock", () =>

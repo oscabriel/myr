@@ -444,6 +444,10 @@ describe("the changes between two trees", () => {
             ({ kept, longest, subsequence }) => !subsequence || kept !== longest
           )
         ).toStrictEqual([]);
-      }).pipe(Effect.provide(RepoHostMemory))
+      }).pipe(Effect.provide(RepoHostMemory)),
+    // Sixty repos of real git objects: a fifth of a second alone, near four
+    // while turbo runs every package's tests at once. The limit catches a
+    // hang.
+    30_000
   );
 });

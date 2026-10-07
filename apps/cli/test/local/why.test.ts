@@ -43,6 +43,7 @@ import { TestConsole } from "effect/testing";
 import { WorkingDirectory, parseLocation } from "../../src/local/why.ts";
 import { program } from "../../src/main.ts";
 import { Output, OutputPlain } from "../../src/output.ts";
+import { SignedOut } from "../signed-out.ts";
 
 const project = ProjectName.make("datekit");
 
@@ -207,7 +208,8 @@ const run = (
         TestConsole.layer,
         CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
         client,
-        output
+        output,
+        SignedOut
       )
     )
   );

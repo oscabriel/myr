@@ -24,6 +24,7 @@ import { Output } from "../output.ts";
 import type { Mode } from "../output.ts";
 import { repoContext } from "../repo-context.ts";
 import { WorkingDirectory, projectOf, reportRefusals, usage } from "./why.ts";
+import type { UsageError } from "./why.ts";
 
 const command = "env set";
 
@@ -129,7 +130,7 @@ const strangeFlag = (word: string) => {
  */
 export const refuseStrangeFlags = (
   argv: readonly string[]
-): Effect.Effect<void, never, Output> => {
+): Effect.Effect<void, UsageError> => {
   const end = argv.indexOf("--");
   const words = end === -1 ? argv : argv.slice(0, end);
 

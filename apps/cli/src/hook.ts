@@ -36,19 +36,22 @@ import { loadSession, saveSession } from "./hook/session.ts";
 import type { SessionState } from "./hook/session.ts";
 import { Output } from "./output.ts";
 
+const EVENTS = HookEvent.literals.join(", ");
+
 /**
  * The hook was called with an event it does not answer: its config is
- * wrong. A defect, so the program's exit-1 mapping of failures leaves its
- * exit code (2, a usage error) alone; its usage was printed already.
+ * wrong. A usage error: `program` prints its one line and exits 2.
  */
 export class HookUsage extends Schema.TaggedError<HookUsage>()("HookUsage", {
   event: Schema.String,
 }) {
   override readonly [Runtime.errorExitCode] = 2;
   override readonly [Runtime.errorReported] = false;
-}
 
-const EVENTS = HookEvent.literals.join(", ");
+  override get message() {
+    return `hook: no event ${this.event}; the events are ${EVENTS}`;
+  }
+}
 
 const decodeEvent = Schema.decodeUnknownOption(HookEvent);
 
@@ -167,11 +170,7 @@ const run = (name: string, json: boolean) =>
     const event = decodeEvent(name);
 
     if (Option.isNone(event)) {
-      yield* Output.use((output) =>
-        output.note(`hook: no event ${name}; the events are ${EVENTS}`)
-      );
-
-      return yield* Effect.die(new HookUsage({ event: name }));
+      return yield* new HookUsage({ event: name });
     }
 
     const input = yield* Effect.flatMap(stdinText, decodeHookInput).pipe(

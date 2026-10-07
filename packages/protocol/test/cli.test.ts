@@ -571,6 +571,7 @@ describe("the group as CLI commands", () => {
       "land",
       "fork",
       "vouch",
+      "evidence",
     ]);
   });
 

@@ -637,7 +637,15 @@ const firstBreak = (layout: Layout, steps: readonly Step[]) => {
   return [];
 };
 
-describe("the claim lifecycle, over generated histories", () => {
+/**
+ * Generated histories are CPU work alone: under a second on an idle machine,
+ * several seconds while turbo runs every package's tests at once (the CLI's
+ * build test compiles binaries beside them). This limit is there to catch a
+ * hang, not a busy machine.
+ */
+const generated = { timeout: 30_000 };
+
+describe("the claim lifecycle, over generated histories", generated, () => {
   it.prop(
     "keeps every invariant after every step",
     { history: histories, layout: layouts },

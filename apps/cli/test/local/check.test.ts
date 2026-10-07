@@ -50,6 +50,7 @@ import { TestConsole } from "effect/testing";
 import { ConfigBundlerBun, localPolicy } from "../../src/local/local-policy.ts";
 import { program } from "../../src/main.ts";
 import { OutputPlain } from "../../src/output.ts";
+import { SignedOut } from "../signed-out.ts";
 import {
   aCheckRepo,
   ask,
@@ -84,7 +85,8 @@ const services = (client: Layer.Layer<Client>) =>
     TestConsole.layer,
     CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
     client,
-    OutputPlain
+    OutputPlain,
+    SignedOut
   ).pipe(Layer.provideMerge(NodeServices.layer));
 
 /** Runs the CLI on `argv`: how it ended, and what it printed where. */

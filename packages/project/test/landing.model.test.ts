@@ -668,7 +668,15 @@ const holds = (moves: readonly Move[]) =>
     onSuccess: () => Effect.succeed(true),
   });
 
-describe("the landing lifecycle over generated histories", () => {
+/**
+ * Generated histories are CPU work alone: under a second on an idle machine,
+ * several seconds while turbo runs every package's tests at once (the CLI's
+ * build test compiles binaries beside them). This limit is there to catch a
+ * hang, not a busy machine.
+ */
+const generated = { timeout: 30_000 };
+
+describe("the landing lifecycle over generated histories", generated, () => {
   it.effect("keeps every invariant after every step", () =>
     Effect.gen(function* () {
       const result = yield* Arbitrary.checkEffect(histories, holds, {
@@ -793,7 +801,7 @@ const serial = (moves: readonly QueueMove[]) => {
   return Effect.succeed(true);
 };
 
-describe("the landing queue over generated histories", () => {
+describe("the landing queue over generated histories", generated, () => {
   it.effect("never admits a second request while one is landing", () =>
     Effect.gen(function* () {
       const result = yield* Arbitrary.checkEffect(

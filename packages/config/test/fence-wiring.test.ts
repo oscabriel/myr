@@ -74,25 +74,31 @@ describe("verify", () => {
 });
 
 describe("the debt count", () => {
-  it.live("matches debt.baseline.json over the tree as it stands", () =>
-    Effect.gen(function* () {
-      const path = yield* Path.Path;
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const root = yield* repoRoot;
-      const baseline = yield* readRootJson("debt.baseline.json", Tally);
+  it.live(
+    "matches debt.baseline.json over the tree as it stands",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const root = yield* repoRoot;
+        const baseline = yield* readRootJson("debt.baseline.json", Tally);
 
-      const report = yield* spawner.string(
-        ChildProcess.make(
-          path.join(root, "node_modules/.bin/oxlint"),
-          ledgerArgs,
-          { cwd: root }
-        )
-      );
+        const report = yield* spawner.string(
+          ChildProcess.make(
+            path.join(root, "node_modules/.bin/oxlint"),
+            ledgerArgs,
+            { cwd: root }
+          )
+        );
 
-      const ledger = yield* ledgerFromOxlintJson(report);
+        const ledger = yield* ledgerFromOxlintJson(report);
 
-      expect(tally(ledger)).toStrictEqual(baseline);
-    }).pipe(Effect.provide(NodeServices.layer))
+        expect(tally(ledger)).toStrictEqual(baseline);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    // oxlint over the whole tree, which grows each wave: under half a second
+    // alone, near four while turbo runs every package's tests at once. The
+    // limit catches a hang.
+    30_000
   );
 
   it.effect(

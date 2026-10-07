@@ -30,6 +30,7 @@ import { program } from "../src/main.ts";
 import { OutputLive } from "../src/output.ts";
 import { policyFor } from "../src/policy.ts";
 import { WorkingDirectory } from "../src/surfaces.ts";
+import { SignedOut } from "./signed-out.ts";
 
 /** Handlers for every contract, as a test sets them up. */
 export type Handlers = Layer.Layer<
@@ -97,7 +98,8 @@ export const runProgram = (
         ),
       policy,
       OutputLive.pipe(Layer.provide(policy)),
-      promptless(prompts)
+      promptless(prompts),
+      SignedOut
     );
 
     const run = Effect.gen(function* () {

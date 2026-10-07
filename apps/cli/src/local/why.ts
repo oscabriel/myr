@@ -41,7 +41,7 @@ export const WorkingDirectory = Context.Reference<string>(
 );
 
 /**
- * A command used wrongly: its one line is already on stderr, and the
+ * A command used wrongly: `program` prints its one line on stderr and the
  * process exits 2 with nothing more printed. Shared with `env set`.
  */
 export class UsageError extends Schema.TaggedError<UsageError>()("UsageError", {
@@ -49,18 +49,18 @@ export class UsageError extends Schema.TaggedError<UsageError>()("UsageError", {
 }) {
   override readonly [Runtime.errorExitCode] = 2;
   override readonly [Runtime.errorReported] = false;
+
+  override get message() {
+    return this.reason;
+  }
 }
 
 /**
- * Prints `reason` once on stderr and ends the command with exit 2. It ends
- * as a defect only because `program` turns every typed failure into
- * `Reported` (exit 1) and lets defects through; 414's Comments ask for a
- * typed failure once `program` maps usage errors to exit 2 (issue 404).
+ * Ends the command as a usage error: `program` prints `reason` once on
+ * stderr, as it does every misuse, and exits 2.
  */
 export const usage = (reason: string) =>
-  Output.use((output) => output.note(reason)).pipe(
-    Effect.andThen(Effect.die(new UsageError({ reason })))
-  );
+  Effect.fail(new UsageError({ reason }));
 
 const isRefusal = Schema.is(Refusal);
 

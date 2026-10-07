@@ -29,6 +29,7 @@ import { TestConsole } from "effect/testing";
 import { projectFile } from "../../src/local/project-file.ts";
 import { program } from "../../src/main.ts";
 import { OutputPlain } from "../../src/output.ts";
+import { SignedOut } from "../signed-out.ts";
 
 const CONFIG = `${Brand.configDir}/project.ts`;
 
@@ -207,6 +208,7 @@ const cli = (
         CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
         OutputPlain,
         platform,
+        SignedOut,
         startedIn(machine)
       )
     )
@@ -375,7 +377,8 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const Plan = Schema.Struct({
           command: Schema.Literal("init"),
           data: Schema.Struct({
-            dryRun: Schema.Struct({
+            dryRun: Schema.Literal(true),
+            payload: Schema.Struct({
               files: Schema.Array(
                 Schema.Struct({ content: Schema.String, path: Schema.String })
               ),
@@ -386,10 +389,11 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           ok: Schema.Literal(true),
         });
 
-        const { dryRun } = (yield* Schema.decodeUnknownEffect(Plan)(envelope))
-          .data;
+        const { payload: plan } = (yield* Schema.decodeUnknownEffect(Plan)(
+          envelope
+        )).data;
 
-        expect(dryRun).toStrictEqual({
+        expect(plan).toStrictEqual({
           files: [{ content: proposal, path: CONFIG }],
           git: [
             ["git", "add", "--", CONFIG],

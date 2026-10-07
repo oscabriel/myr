@@ -61,6 +61,7 @@ import {
 } from "../src/hook/push-check.ts";
 import { program } from "../src/main.ts";
 import { OutputPlain } from "../src/output.ts";
+import { SignedOut } from "./signed-out.ts";
 
 /** The repo's top folder, as the session found it. */
 const root = "/work/datekit";
@@ -614,6 +615,7 @@ const runHook = (
         CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
         OutputPlain,
         services,
+        SignedOut,
         ConfigProvider.layer(
           ConfigProvider.fromEnv({
             env: Predicate.isString(env) ? { XDG_STATE_HOME: env } : { ...env },

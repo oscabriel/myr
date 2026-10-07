@@ -498,7 +498,15 @@ const holds = (moves: readonly Move[]) =>
     onSuccess: () => Effect.succeed(true),
   });
 
-describe("ratchets over generated histories", () => {
+/**
+ * Generated histories are CPU work alone: under a second on an idle machine,
+ * several seconds while turbo runs every package's tests at once (the CLI's
+ * build test compiles binaries beside them). This limit is there to catch a
+ * hang, not a busy machine.
+ */
+const generated = { timeout: 30_000 };
+
+describe("ratchets over generated histories", generated, () => {
   it.effect("no baseline rises but through an accepted RaiseRatchet", () =>
     Effect.gen(function* () {
       const result = yield* Arbitrary.checkEffect(histories, holds, {

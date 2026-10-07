@@ -35,6 +35,7 @@ import { refuseStrangeFlags } from "../../src/local/env-set.ts";
 import { program } from "../../src/main.ts";
 import { Output, OutputPlain } from "../../src/output.ts";
 import type { Mode } from "../../src/output.ts";
+import { SignedOut } from "../signed-out.ts";
 
 /** A value no output, note or log line may ever hold. */
 const secret = "sk_live_0123456789abcdef";
@@ -181,6 +182,7 @@ const run = (args: readonly string[], setup: Setup = {}) =>
             CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
             platform,
             output,
+            SignedOut,
             terminal,
             Logger.layer([
               Logger.make((options) => {
@@ -425,7 +427,8 @@ describe(`${Brand.cli} env set`, () => {
         expect(yield* decodeEnvelope(ran.out)).toStrictEqual({
           command: "env set",
           data: {
-            dryRun: {
+            dryRun: true,
+            payload: {
               key: "SENTRY_AUTH_TOKEN",
               project: "datekit",
               value: "<redacted>",

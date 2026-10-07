@@ -224,11 +224,13 @@ const exportedNames = (source: string) => {
 const request = "protocol=https\nhost=example.test\n\n";
 
 /**
- * An import, export, `import()` or `require` of a workspace package (prose
- * in a comment may still name one).
+ * An import, export, `import()` or `require` of a workspace package. A
+ * static import or export names its module in quotes, never backticks, so
+ * prose in a kept doc comment ("from `@repo/git`'s `treeDiff`") is not one;
+ * only a call may take a template literal.
  */
 const workspaceSpecifier =
-  /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)["'`]@repo\//u;
+  /(?:\b(?:from|import)\s*["']|\b(?:import|require)\s*\(\s*["'`])@repo\//u;
 
 layer(BuiltOnce, { excludeTestServices: true, timeout: "180 seconds" })(
   "bun run build",
@@ -311,6 +313,9 @@ layer(BuiltOnce, { excludeTestServices: true, timeout: "180 seconds" })(
             stdin: request,
           });
 
+          // No profile is stored under the temp HOME: the helper says
+          // nothing, so git goes on without a credential.
+          expect(helper).toMatchObject({ exitCode: 0, stdout: "" });
           expect(helper).toStrictEqual(direct);
           expect(helper).not.toStrictEqual(unrouted);
         }),

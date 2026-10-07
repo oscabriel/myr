@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * The CLI's process entry: `program` over the arguments the process was
- * started with, on Bun's services, the credentials file and plain output.
+ * started with, on Bun's services and `CliServices` (the credentials file,
+ * the invocation policy, output in its form and the remote client).
  * Tests never import this file; they run `program` with their own services,
  * and `test/build.test.ts` runs what `build.ts` makes of it. One file plays
  * two roles, chosen by the name it was started by: the CLI, and git's
@@ -9,23 +10,11 @@
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Brand } from "@repo/brand";
-import { Client } from "@repo/protocol/contracts";
 import { Effect, Layer, Path, Stdio } from "effect";
 
-import { CredentialsFile } from "./credentials.ts";
-import { program } from "./main.ts";
-import { OutputPlain } from "./output.ts";
+import { CliServices, program } from "./main.ts";
 
-/**
- * The platform as the CLI calls it, until issue 404 builds the remote
- * client: every call dies, naming the contract, while commands that never
- * call the platform (help among them) run.
- */
-const ClientUnbuilt = Layer.mock(Client)({});
-
-const live = Layer.mergeAll(CredentialsFile, OutputPlain, ClientUnbuilt).pipe(
-  Layer.provideMerge(BunServices.layer)
-);
+const live = CliServices.pipe(Layer.provideMerge(BunServices.layer));
 
 /**
  * The names this process may have been started by. The compiled binary

@@ -626,8 +626,17 @@ const conflicting = Effect.gen(function* () {
   ]);
 });
 
+/**
+ * The first case runs the whole story (real git objects, every gate stage,
+ * each landing): under half a second alone, near five while turbo runs every
+ * package's tests at once. This limit is there to catch a hang, not a busy
+ * machine.
+ */
+const wholeStory = { timeout: 30_000 };
+
 describe.each(["memory", "sqlite"] as const)(
   "one project over memory adapters, its store in %s",
+  wholeStory,
   (store: StoreKind) => {
     const seen = story.pipe(Effect.provide(worldOf(scenario, store)));
 
