@@ -15,7 +15,7 @@ import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
 import { cliClientId } from "../src/auth/cli-client.ts";
 import { OAuthStore } from "../src/auth/oauth-store.ts";
 import { OAuthStoreMemory } from "../src/auth/oauth-store/memory.ts";
-import { oauthProvider, signInKeys } from "../src/auth/provider.ts";
+import { oauthProvider, signInSettings } from "../src/auth/provider.ts";
 import { decodeEnv } from "../src/platform.ts";
 import { fakeEnv } from "./fake-env.ts";
 
@@ -31,6 +31,17 @@ export const challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
 export const port = 43_123;
 
 export const redirectUri = `http://127.0.0.1:${port}/callback`;
+
+/** A person a named session holds (spec §8 D9), in the world's `SESSION_TOKENS`. */
+export const namedPerson = "carol";
+
+/** The fake env with one named session, as the demo's stages run. */
+const worldEnv = () => ({
+  ...fakeEnv(),
+  SESSION_TOKENS: JSON.stringify({
+    "carol-token-0123456789abcdef01234567": namedPerson,
+  }),
+});
 
 /** A Worker's context the provider is handed and never needs. */
 const context = untouchable<ExecutionContext>("ExecutionContext");
@@ -52,7 +63,7 @@ const decodeTokenRecord = Schema.decodeUnknownEffect(
  * length.
  */
 export const signInWorld = Effect.gen(function* () {
-  const config = yield* decodeEnv(fakeEnv()).pipe(Effect.orDie);
+  const config = yield* decodeEnv(worldEnv()).pipe(Effect.orDie);
 
   const accounts = yield* Effect.provide(
     Effect.service(Accounts),
@@ -65,7 +76,7 @@ export const signInWorld = Effect.gen(function* () {
     Layer.succeed(Accounts, accounts),
     Layer.succeed(OAuthStore, store),
     SignInAttemptsMemory.layer,
-    signInKeys(config)
+    signInSettings(config)
   );
 
   const { dispose, handler } = oauthProvider(services, platformFetch);
@@ -158,14 +169,14 @@ export const codeOf = (response: Response) =>
   );
 
 /** The authorization request the CLI opens in a browser. */
-export const authorizeUrl = (state = "state-1") => {
+export const authorizeUrl = (state = "state-1", redirect = redirectUri) => {
   const url = new URL("/authorize", origin);
 
   for (const [name, value] of Object.entries({
     client_id: cliClient,
     code_challenge: challenge,
     code_challenge_method: "S256",
-    redirect_uri: redirectUri,
+    redirect_uri: redirect,
     response_type: "code",
     state,
   })) {

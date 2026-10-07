@@ -12,7 +12,7 @@
  */
 import { OAuthAuthorizationServer } from "@cloudflare/workers-oauth-provider";
 import { D1Client } from "@effect/sql-d1";
-import { Context, Layer } from "effect";
+import { Context, Layer, Option, Redacted } from "effect";
 import { HttpRouter } from "effect/http";
 
 import { AccountsD1 } from "../adapters/accounts-d1.ts";
@@ -23,6 +23,7 @@ import { OAuthStore } from "./oauth-store.ts";
 import {
   Authorization,
   AUTHORIZATION_SERVER_PATHS,
+  HeldHandles,
   SIGN_IN_PATHS,
   SignInKeys,
   signInRoutes,
@@ -121,18 +122,35 @@ export const tokenReader = (store: OAuthStore["Service"]): TokenReader => {
   return { unwrapToken: (token) => api.unwrapToken(token) };
 };
 
-/** Sign-in's two secrets, from the decoded env. */
-export const signInKeys = (config: PlatformConfig) =>
-  Layer.succeed(
-    SignInKeys,
-    SignInKeys.of({
-      cookieKey: config.COOKIE_KEY,
-      pepper: config.PASSWORD_PEPPER,
-    })
+/**
+ * Sign-in's settings from the decoded env: its two secrets, and the handles
+ * the operator and `SESSION_TOKENS` already hold, which nobody signs up as.
+ */
+export const signInSettings = (config: PlatformConfig) =>
+  Layer.mergeAll(
+    Layer.succeed(
+      SignInKeys,
+      SignInKeys.of({
+        cookieKey: config.COOKIE_KEY,
+        pepper: config.PASSWORD_PEPPER,
+      })
+    ),
+    Layer.succeed(
+      HeldHandles,
+      HeldHandles.of({
+        handles: [
+          config.OPERATOR_HANDLE,
+          ...Option.match(Option.fromUndefinedOr(config.SESSION_TOKENS), {
+            onNone: () => [],
+            onSome: (table) => Object.values(Redacted.value(table)),
+          }),
+        ],
+      })
+    )
   );
 
 /**
- * Sign-in's services on Cloudflare: the keys from the decoded env, accounts
+ * Sign-in's services on Cloudflare: the settings from the decoded env, accounts
  * in the `FRONT_PAGE` D1 database (`migrations/0002_accounts.sql`), attempts
  * counted by `SIGN_IN_LIMIT`, grants in `OAUTH_KV`.
  */
@@ -140,7 +158,7 @@ export const signInServices = (
   config: PlatformConfig
 ): Layer.Layer<SignInServices> =>
   Layer.mergeAll(
-    signInKeys(config),
+    signInSettings(config),
     AccountsD1.pipe(
       Layer.provide(D1Client.layer({ db: config.FRONT_PAGE })),
       Layer.orDie

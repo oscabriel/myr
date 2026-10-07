@@ -30,6 +30,7 @@ import {
   cliClient,
   codeOf,
   formOf,
+  namedPerson,
   origin,
   port,
   post,
@@ -458,6 +459,27 @@ describe("the platform as its own OAuth authorization server", () => {
         expect(Option.isSome(formOf(page.response, page.html))).toBeTruthy();
       })
   );
+
+  it.live(
+    "lets the code go back to an IPv6 loopback, which no CSP host can name",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld;
+
+        const page = yield* world
+          .fetch(
+            new Request(
+              authorizeUrl("state-1", `http://[::1]:${port}/callback`)
+            )
+          )
+          .pipe(Effect.flatMap(read));
+
+        expect([
+          page.response.status,
+          page.response.headers.get("content-security-policy"),
+        ]).toStrictEqual([200, `${CSP} http:`]);
+      })
+  );
 });
 
 /** A request to `src/worker.ts`'s own handler, on the shim's fake env. */
@@ -531,6 +553,26 @@ describe("signing up", () => {
       expect(page.html).toContain("taken");
       expect(Option.isNone(codeOf(page.response))).toBeTruthy();
     })
+  );
+
+  it.live(
+    "says the operator's handle and a named session's are taken, in any case",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* signInWorld;
+
+        const pages = yield* Effect.forEach(
+          [fakeEnv().OPERATOR_HANDLE.toUpperCase(), namedPerson],
+          (handle) =>
+            signUp(world, handle, alicePassword).pipe(Effect.flatMap(read))
+        );
+
+        for (const page of pages) {
+          expect(page.response.status).toBe(409);
+          expect(page.html).toContain("taken");
+          expect(Option.isNone(codeOf(page.response))).toBeTruthy();
+        }
+      })
   );
 
   it.live.each([

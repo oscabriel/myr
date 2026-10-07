@@ -19,7 +19,7 @@ import type {
   OAuthAuthorizationServer,
 } from "@cloudflare/workers-oauth-provider";
 import { Brand } from "@repo/brand";
-import { Handle } from "@repo/protocol/ids";
+import { Handle, sameHandle } from "@repo/protocol/ids";
 import {
   Context,
   Data,
@@ -37,8 +37,19 @@ import { CLI_CLIENT_PATH, cliClientMetadata } from "./cli-client.ts";
 import { OAuthStore } from "./oauth-store.ts";
 import { problemPage, signInPage, signUpPage } from "./pages.ts";
 import type { Asker, PendingForm } from "./pages.ts";
-import { hashPassword, PasswordHash, verifyPassword } from "./password.ts";
-import { openState, sealState, SignInFailed, startAgain } from "./state.ts";
+import {
+  hashPassword,
+  PasswordHash,
+  PasswordPolicy,
+  verifyPassword,
+} from "./password.ts";
+import {
+  openState,
+  sealState,
+  SIGN_IN_LIFETIME,
+  SignInFailed,
+  startAgain,
+} from "./state.ts";
 import type { AuthRequest, PendingSignIn } from "./state.ts";
 
 /** Sign-in's secrets: `COOKIE_KEY` signs forms, `PASSWORD_PEPPER` peppers passwords. */
@@ -49,6 +60,16 @@ export class SignInKeys extends Context.Service<
     readonly pepper: Redacted.Redacted;
   }
 >()("platform/SignInKeys") {}
+
+/**
+ * The handles named sessions already hold: the operator's and each one in
+ * `SESSION_TOKENS` (spec §8 D9). Nobody signs up as one, or an account
+ * would call as that person.
+ */
+export class HeldHandles extends Context.Service<
+  HeldHandles,
+  { readonly handles: readonly Handle[] }
+>()("platform/HeldHandles") {}
 
 /** What the provider's env holds: only its store. */
 export interface OAuthEnv {
@@ -98,7 +119,7 @@ const AccountHandle = Handle.check(Schema.isMaxLength(39));
 
 const decodeHandle = Schema.decodeUnknownOption(AccountHandle);
 
-/** A password's length, in characters (code points), never its content. */
+/** A password's length, in characters as a person counts them (graphemes), never its content. */
 const PasswordLength = { max: 256, min: 12 } as const;
 
 /** What a person reads on a page, each a plain sentence. */
@@ -121,7 +142,7 @@ const Says = {
  * costs the same derivation as a wrong password and timing names nobody.
  */
 const STAND_IN_HASH = PasswordHash.make(
-  `pbkdf2-sha256$100000$${"A".repeat(22)}$${"A".repeat(43)}`
+  `pbkdf2-sha256$${PasswordPolicy.iterations}$${"A".repeat(22)}$${"A".repeat(43)}`
 );
 
 const CSRF_COOKIE = "__Host-sign-in";
@@ -137,18 +158,32 @@ const BASE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'";
 
 /**
+ * Where a form's redirect may go: the redirect URI's origin, or only its
+ * scheme when its host is an IPv6 literal (`http://[::1]:<port>`), which
+ * CSP's host grammar cannot name. The provider allows only https, and http
+ * on a loopback host.
+ */
+const redirectSource = (redirectUri: string) =>
+  Option.fromNullishOr(URL.parse(redirectUri)).pipe(
+    Option.filter(({ origin }) => origin !== "null"),
+    Option.map(({ hostname, origin, protocol }) =>
+      hostname.startsWith("[") ? protocol : origin
+    )
+  );
+
+/**
  * The page's CSP. A form's post is answered with a redirect to the client,
  * and browsers hold that redirect to `form-action` too, so a page with a
- * form also allows its (provider-validated) redirect URI's origin.
+ * form also allows its (provider-validated) redirect URI.
  */
-const contentSecurityPolicy = (redirectUri?: string) => {
-  const origin =
-    redirectUri === undefined ? undefined : URL.parse(redirectUri)?.origin;
-
-  return origin === undefined || origin === "null"
-    ? BASE_CSP
-    : `${BASE_CSP} ${origin}`;
-};
+const contentSecurityPolicy = (redirectUri?: string) =>
+  Option.match(
+    Option.flatMap(Option.fromUndefinedOr(redirectUri), redirectSource),
+    {
+      onNone: () => BASE_CSP,
+      onSome: (source) => `${BASE_CSP} ${source}`,
+    }
+  );
 
 /** An HTML page that loads nothing, cannot be framed and is never cached. */
 const htmlPage = (body: string, status: number, redirectUri?: string) =>
@@ -392,7 +427,7 @@ const showSignIn = (request: HttpServerRequest.HttpServerRequest) =>
     ).pipe(
       HttpServerResponse.setCookie(CSRF_COOKIE, csrf, {
         ...csrfCookie,
-        maxAge: "10 minutes",
+        maxAge: SIGN_IN_LIFETIME,
       }),
       Effect.orDie
     );
@@ -502,25 +537,41 @@ const showSignUp = Effect.gen(function* () {
   );
 });
 
-/** The handle a sign-up may take, or the plain reason it may not. */
-const signUpHandle = (form: PostedForm): Result.Result<Handle, string> =>
+/** Why a sign-up did not go through: the page's status and its plain sentence. */
+interface Refused {
+  readonly message: string;
+  readonly status: number;
+}
+
+/**
+ * The handle a sign-up may take, or why it may not. A handle a named
+ * session holds is taken, like an account's.
+ */
+const signUpHandle = (
+  form: PostedForm,
+  held: readonly Handle[]
+): Result.Result<Handle, Refused> =>
   Option.match(decodeHandle(form.handle), {
-    onNone: () => Result.fail(Says.handleSpelling),
+    onNone: () => Result.fail({ message: Says.handleSpelling, status: 400 }),
     onSome: (handle) => {
       if (RESERVED_HANDLES.has(handleKey(handle))) {
-        return Result.fail(Says.handleReserved);
+        return Result.fail({ message: Says.handleReserved, status: 400 });
+      }
+
+      if (held.some((holder) => sameHandle(holder, handle))) {
+        return Result.fail({ message: Says.handleTaken, status: 409 });
       }
 
       return passwordFits(form.password)
         ? Result.succeed(handle)
-        : Result.fail(Says.passwordLength);
+        : Result.fail({ message: Says.passwordLength, status: 400 });
     },
   });
 
 /**
  * `POST /signup`: a new account, then signed in at once. Sign-ups are
  * limited per address like sign-ins; a taken handle, in any case, is said
- * to be taken.
+ * to be taken, whether an account or a named session holds it.
  */
 const signUp = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
@@ -529,6 +580,8 @@ const signUp = (request: HttpServerRequest.HttpServerRequest) =>
     const accounts = yield* Accounts;
 
     const attempts = yield* SignInAttempts;
+
+    const { handles: held } = yield* HeldHandles;
 
     const { form, pending } = yield* postedSignIn(request);
 
@@ -552,10 +605,10 @@ const signUp = (request: HttpServerRequest.HttpServerRequest) =>
       return yield* again(429, Says.tooManySignUps);
     }
 
-    const checked = signUpHandle(form);
+    const checked = signUpHandle(form, held);
 
     if (Result.isFailure(checked)) {
-      return yield* again(400, checked.failure);
+      return yield* again(checked.failure.status, checked.failure.message);
     }
 
     const hash = yield* hashPassword(pepper, Redacted.make(form.password));
@@ -611,6 +664,7 @@ const failedPage = (failed: SignInFailed) =>
 /** What the routes run on, besides the request's own `Authorization`. */
 export type SignInServices =
   | Accounts
+  | HeldHandles
   | OAuthStore
   | SignInAttempts
   | SignInKeys;
@@ -622,6 +676,7 @@ export type SignInServices =
 export const signInRoutes = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const services = Context.make(Accounts, yield* Accounts).pipe(
+      Context.add(HeldHandles, yield* HeldHandles),
       Context.add(OAuthStore, yield* OAuthStore),
       Context.add(SignInAttempts, yield* SignInAttempts),
       Context.add(SignInKeys, yield* SignInKeys)
