@@ -98,7 +98,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `paths`: `readonly [string, ...Array<string>]`
-- Reason, for example: changes paths outside the ask's territory: src/a.ts
+- Reason, for example: changes paths outside the ask's territory: src/a.ts; put those files back, or flag the ask if the want needs them
 
 ### TouchedJudge
 
@@ -106,7 +106,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `paths`: `readonly [string, ...Array<string>]`
-- Reason, for example: changes files that decide what the checks do: src/a.ts
+- Reason, for example: changes files that decide what the checks do: src/a.ts; the checks are fixed for this ask, so put them back, or flag the ask if a check is wrong
 
 ### Weakened
 
@@ -114,7 +114,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `weakening`: `{ readonly "marker": string, readonly "reason"?: string } | { readonly "after": number, readonly "before": number, readonly "ratchet": string, readonly "territory": string }`
-- Reason, for example: adds it.skip, with the reason "flaky on CI"
+- Reason, for example: adds it.skip, with the reason "flaky on CI"; it waits for a decider because it raises this territory's escapes
 
 ### PrivatePathInPublicTree
 
@@ -122,7 +122,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Next: `myr check`
 - Fields:
   - `paths`: `readonly [string, ...Array<string>]`
-- Reason, for example: would put held-back paths in a public tree: src/a.ts
+- Reason, for example: would put held-back paths in a public tree: src/a.ts; those paths belong to a layer, so remove them from the answer
 
 ### ReachedInternals
 
@@ -131,7 +131,7 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Fields:
   - `from`: `string`
   - `to`: `string`
-- Reason, for example: src/a.ts reaches into @datekit/format/src/internal.ts, which its module does not export
+- Reason, for example: src/a.ts reaches into @datekit/format/src/internal.ts, which its module does not export; import it through that module's public exports instead
 
 ## Merge
 

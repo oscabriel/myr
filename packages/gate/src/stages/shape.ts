@@ -10,6 +10,7 @@ import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { RepoPath } from "@repo/protocol/ids";
 import {
+  groups,
   OutOfScope,
   PrivatePathInPublicTree,
   ReachedInternals,
@@ -19,9 +20,10 @@ import {
 import type { Refusal } from "@repo/protocol/refusal";
 import { Array, Effect, Option, Order } from "effect";
 
-import type { PushFacts } from "../facts.ts";
+import type { AddedLine, PushFacts } from "../facts.ts";
 import { matchAny } from "../glob.ts";
-import { findMarkers, markersOf } from "../markers.ts";
+import { importSpecifiers, reachedInternals as reachInto } from "../imports.ts";
+import { markersOf, scanMarkers } from "../markers.ts";
 import type { Stage } from "../stage.ts";
 
 /** The one JSON pointer the gate is told about: whether the scripts changed. */
@@ -107,12 +109,13 @@ const touchedJudge = (facts: PushFacts): readonly Refusal[] => {
   );
 };
 
-/** Every marker added with no reason; a reasoned one is the ratchet stage's. */
+/** Every marker added with no reason; a reasoned one is an escape, for `escapeDecisions`. */
 const weakened = (facts: PushFacts): readonly Refusal[] =>
-  findMarkers(markersOf(facts.policy), facts.addedLines).flatMap((hit) =>
-    Option.isNone(hit.reason)
-      ? [new Weakened({ at: hit.at, weakening: { marker: hit.marker } })]
-      : []
+  scanMarkers(facts.addedLines, markersOf(facts.policy)).flatMap(
+    ({ line, marker, path, reason }) =>
+      Option.isNone(reason)
+        ? [new Weakened({ at: { line, path }, weakening: { marker } })]
+        : []
   );
 
 /** Added or changed paths a layer holds: nothing from a layer enters a public tree. */
@@ -131,95 +134,95 @@ const privatePaths = (facts: PushFacts): readonly Refusal[] =>
     }
   );
 
-// A module specifier on an import or re-export line: `from "…"` (also the
-// last line of a multi-line import, `  pad } from "…"`), a bare
-// `import "…"`, or `import("…")`.
-const SPECIFIERS = [
-  /(?:^\s*(?:import|export)\b.*?|\}\s*)\bfrom\s*["'](?<specifier>[^"']+)["']/u,
-  /^\s*import\s*["'](?<specifier>[^"']+)["']/u,
-  /\bimport\s*\(\s*["'](?<specifier>[^"']+)["']\s*\)/u,
-];
+// The files whose imports are read: JavaScript and TypeScript sources.
+const SCRIPT = /\.[cm]?[jt]sx?$/u;
 
-const specifierIn = (text: string) =>
-  Array.findFirst(SPECIFIERS, (pattern) =>
-    Option.fromNullishOr(pattern.exec(text)?.groups?.specifier)
-  );
+/**
+ * Each run of consecutive added lines as one text, with the number of the
+ * line before it, so an import over several lines is read whole.
+ */
+const runsOf = (lines: readonly AddedLine[]) => {
+  // Consecutive lines keep the same difference from their place in order.
+  const placed = lines
+    .toSorted((one, other) => one.line - other.line)
+    .map((added, index) => ({ ...added, run: added.line - index }));
 
-/** `from`'s folder joined with a relative specifier, `.` and `..` resolved. */
-const resolve = (from: string, specifier: string) => {
-  const parts = from.split("/").slice(0, -1);
-
-  for (const part of specifier.split("/")) {
-    if (part === "..") {
-      parts.pop();
-    } else if (part !== "." && part !== "") {
-      parts.push(part);
-    }
-  }
-
-  return parts.join("/");
+  return Array.isReadonlyArrayNonEmpty(placed)
+    ? Array.groupWith(placed, (one, other) => one.run === other.run).map(
+        (run) => ({
+          offset: Array.headNonEmpty(run).line - 1,
+          text: run.map((added) => added.text).join("\n"),
+        })
+      )
+    : [];
 };
 
-/** A module file's path with its extension and a trailing `/index` dropped. */
-const bare = (path: string) =>
-  path.replace(/\.[cm]?[jt]sx?$/u, "").replace(/\/index$/u, "");
-
 /**
- * Whether `target` is a file of a module other than `own` that the module
- * does not export. A module that lists no public files is not judged.
- */
-const isInternal = (facts: PushFacts, own: string, target: string) =>
-  facts.policy.modules.some(
-    (module) =>
-      module.module !== own &&
-      module.publicFiles !== undefined &&
-      matchAny(module.paths, target) &&
-      !module.publicFiles.some((file) => bare(file) === bare(target))
-  );
-
-/**
- * Imports the answer adds, inside its territory, of another module's file
- * that the module does not export. W2's rule reads relative specifiers only.
+ * Imports the answer adds to a script inside its territory that reach into
+ * another module's internals, each on its line. A push that answers no ask
+ * (a decider's own landing) is not judged.
  */
 const reachedInternals = (facts: PushFacts): readonly Refusal[] =>
   Option.match(facts.ask, {
     onNone: () => [],
     onSome: ({ territory }) =>
       [...facts.addedLines]
-        .toSorted(([one], [other]) => Order.String(one, other))
-        .filter(([path]) => matchAny(territory.paths, path))
+        .filter(
+          ([path]) => SCRIPT.test(path) && matchAny(territory.paths, path)
+        )
         .flatMap(([from, lines]) =>
-          lines
-            .toSorted((one, other) => one.line - other.line)
-            .flatMap(({ line, text }) =>
-              Option.match(specifierIn(text), {
-                onNone: () => [],
-                onSome: (to) =>
-                  to.startsWith(".") &&
-                  isInternal(facts, territory.module, resolve(from, to))
-                    ? [
-                        new ReachedInternals({
-                          at: { line, path: from },
-                          from,
-                          to,
-                        }),
-                      ]
-                    : [],
-              })
+          runsOf(lines).flatMap(({ offset, text }) =>
+            importSpecifiers(text).flatMap(({ line, specifier }) =>
+              Option.match(
+                reachInto({
+                  from,
+                  modules: facts.policy.modules,
+                  specifier,
+                }),
+                {
+                  onNone: () => [],
+                  onSome: ({ to }) => [
+                    new ReachedInternals({
+                      at: { line: offset + line, path: from },
+                      from,
+                      to,
+                    }),
+                  ],
+                }
+              )
             )
+          )
         ),
   });
 
-/** Stage 1: every problem the push's changes have, in the union's Shape order. */
+// The Shape group's tags, in union order.
+const unionOrder: readonly string[] =
+  groups
+    .find((group) => group.name === "Shape")
+    ?.members.map((member) => member.identifier) ?? [];
+
+/** Union group order, then path, then line. */
+const byUnionOrder = Order.combineAll<Refusal>([
+  Order.mapInput(Order.Number, (refusal) => unionOrder.indexOf(refusal._tag)),
+  Order.mapInput(Order.String, (refusal) => refusal.at?.path ?? ""),
+  Order.mapInput(Order.Number, (refusal) => refusal.at?.line ?? 0),
+]);
+
+/**
+ * Stage 1: every problem the push's changes have, in the union's Shape
+ * order, then by path, then by line.
+ */
 export const scan: Stage<never> = {
   accumulate: true,
   name: "shape",
   run: (facts) =>
-    Effect.succeed([
-      ...outOfScope(facts),
-      ...touchedJudge(facts),
-      ...weakened(facts),
-      ...privatePaths(facts),
-      ...reachedInternals(facts),
-    ]),
+    Effect.succeed(
+      [
+        ...outOfScope(facts),
+        ...touchedJudge(facts),
+        ...weakened(facts),
+        ...privatePaths(facts),
+        ...reachedInternals(facts),
+      ].toSorted(byUnionOrder)
+    ),
 };

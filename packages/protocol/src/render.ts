@@ -11,7 +11,8 @@ const short = (sha: string) => sha.slice(0, 7);
 const list = (items: readonly string[]) => items.join(", ");
 
 // Reasons name only what the refusal's reader may see: held-back checks give
-// their area and suite, never a case or an input.
+// their area and suite, never a case or an input. A shape refusal's reason
+// ends with how to repair it, after its first clause; `next` stays the command.
 const reason = Match.typeTags<Refusal, string>()({
   AskBlocked: ({ ask, blockedBy }) =>
     `${ask} waits on ${list(blockedBy)} to land first`,
@@ -46,14 +47,14 @@ const reason = Match.typeTags<Refusal, string>()({
     `${key} is not @sensitive, so it holds no write-only value`,
   NotVouched: () => "no member of this project has vouched for you",
   OutOfScope: ({ paths }) =>
-    `changes paths outside the ask's territory: ${list(paths)}`,
+    `changes paths outside the ask's territory: ${list(paths)}; put those files back, or flag the ask if the want needs them`,
   PostureChange: ({ from, to }) =>
     `landing would change the posture from ${from} to ${to}, which takes a decider`,
   PrivatePathInPublicTree: ({ paths }) =>
-    `would put held-back paths in a public tree: ${list(paths)}`,
+    `would put held-back paths in a public tree: ${list(paths)}; those paths belong to a layer, so remove them from the answer`,
   ProjectExists: ({ project }) => `a project named ${project} already exists`,
   ReachedInternals: ({ from, to }) =>
-    `${from} reaches into ${to}, which its module does not export`,
+    `${from} reaches into ${to}, which its module does not export; import it through that module's public exports instead`,
   RepoBusy: () => "the repo was busy with another push",
   SecretInOutput: ({ item, where }) =>
     `the write-only value ${item} appeared in the ${where}`,
@@ -64,7 +65,7 @@ const reason = Match.typeTags<Refusal, string>()({
   StaleLayer: ({ layer }) =>
     `the ${layer} layer moved since this answer was checked; it will be checked again`,
   TouchedJudge: ({ paths }) =>
-    `changes files that decide what the checks do: ${list(paths)}`,
+    `changes files that decide what the checks do: ${list(paths)}; the checks are fixed for this ask, so put them back, or flag the ask if a check is wrong`,
   UnknownAsk: ({ ask }) => `this project has no ask named ${ask}`,
   UnknownCommit: ({ sha }) => `this project has no commit ${sha}`,
   UnknownDecision: ({ decision }) => `this project has no decision ${decision}`,
@@ -83,8 +84,8 @@ const reason = Match.typeTags<Refusal, string>()({
     }
 
     return weakening.reason === undefined
-      ? `adds ${weakening.marker} without a reason`
-      : `adds ${weakening.marker}, with the reason "${weakening.reason}"`;
+      ? `adds ${weakening.marker} without a reason; remove it, or give a reason after " -- " for a decider to weigh`
+      : `adds ${weakening.marker}, with the reason "${weakening.reason}"; it waits for a decider because it raises this territory's escapes`;
   },
 });
 

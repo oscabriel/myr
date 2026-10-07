@@ -247,7 +247,7 @@ describe("the gateway between git and its upstream", () => {
 
         expect(pushed.exitCode).toBe(1);
         expect(remoteLines(pushed.stderr)).toContain(
-          "remote: OutOfScope: changes paths outside the ask's territory: src/a.ts"
+          "remote: OutOfScope: changes paths outside the ask's territory: src/a.ts; put those files back, or flag the ask if the want needs them"
         );
         expect(pushed.stderr).toContain(
           " ! [remote rejected] HEAD -> answer (OutOfScope)"

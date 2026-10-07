@@ -12,7 +12,7 @@ import { Option } from "effect";
 
 import type { PushFacts } from "../facts.ts";
 import { matchAny } from "../glob.ts";
-import { findMarkers, markersOf } from "../markers.ts";
+import { markersOf, scanMarkers } from "../markers.ts";
 
 /** A territory's paths: a module's, by its name, or the territory read as a glob. */
 const pathsOf = (policy: Policy, territory: string): readonly string[] =>
@@ -28,7 +28,7 @@ export interface RatchetAnswer {
 
 /** Refuses each raised ratchet, or turns it into a `RaiseRatchet` decision. */
 export const ratchet = (facts: PushFacts): RatchetAnswer => {
-  const escapes = findMarkers(markersOf(facts.policy), facts.addedLines).filter(
+  const escapes = scanMarkers(facts.addedLines, markersOf(facts.policy)).filter(
     (hit) => Option.isSome(hit.reason)
   );
 
@@ -43,7 +43,7 @@ export const ratchet = (facts: PushFacts): RatchetAnswer => {
             explained:
               Option.isSome(facts.ask) &&
               escapes.some((hit) =>
-                matchAny(pathsOf(facts.policy, count.territory), hit.at.path)
+                matchAny(pathsOf(facts.policy, count.territory), hit.path)
               ),
             name,
           },

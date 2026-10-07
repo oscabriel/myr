@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
+import { Glob } from "@repo/protocol/domain/common";
+import { Territory } from "@repo/protocol/domain/territory";
 import { RepoPath } from "@repo/protocol/ids";
 import {
   groups,
@@ -9,7 +11,7 @@ import {
   Weakened,
 } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
-import { Array, Effect } from "effect";
+import { Array, Effect, Option, Schema } from "effect";
 
 import type { PushFacts } from "../src/facts.ts";
 import { scan } from "../src/stages/shape.ts";
@@ -58,6 +60,74 @@ const everyProblem = push(
   ],
   { layerPaths: new Set([RepoPath.make("docs/guide.md")]) }
 );
+
+// The language service reads its directive anywhere in a source file, so
+// the marker is joined at run time (spec §7.4).
+const effectDiagnostics = ["@effect", "-diagnostics"].join("");
+
+// Two modules, `a` and `b`; the ask's territory is `a`, and the judge
+// closure also holds the lint config.
+const [moduleA, moduleB] = Schema.decodeSync(
+  Schema.Tuple([Territory, Territory])
+)([
+  {
+    module: "a",
+    paths: ["packages/a/**"],
+    publicFiles: ["packages/a/src/index.ts"],
+  },
+  {
+    module: "b",
+    paths: ["packages/b/**"],
+    publicFiles: ["packages/b/src/index.ts"],
+  },
+]);
+
+const x = "packages/a/src/x.ts";
+
+const xTest = "packages/a/test/x.test.ts";
+
+/** A push answering an ask in module `a`. */
+const pushToA = (
+  files: readonly string[],
+  lines: readonly (readonly [string, number, string])[] = []
+) =>
+  push(files, lines, {
+    ask: Option.some({ ...ask, territory: moduleA }),
+    policy: {
+      ...policy,
+      judge: {
+        ...policy.judge,
+        paths: [...policy.judge.paths, Glob.make("oxlint.config.*")],
+      },
+      modules: [moduleA, moduleB],
+    },
+  });
+
+// Every default marker in spec §4.2, as a tool writes it on an added line.
+const markerLines: readonly (readonly [string, string])[] = [
+  [".skip(", '  it.skip("parses week 53", () => {'],
+  [".only(", '  describe.only("weeks", () => {'],
+  [".todo(", '  it.todo("parses week 54");'],
+  ["eslint-disable", "/* eslint-disable no-console */"],
+  ["oxlint-disable", "// oxlint-disable-next-line no-explicit-any"],
+  ["biome-ignore", "// biome-ignore lint/style: generated"],
+  ["@ts-ignore", "// @ts-ignore"],
+  ["@ts-expect-error", "// @ts-expect-error"],
+  ["@ts-nocheck", "// @ts-nocheck"],
+  [effectDiagnostics, `// ${effectDiagnostics} floatingEffect:off`],
+  ["# noqa", "import os  # noqa"],
+  ["# type: ignore", "x = parse(y)  # type: ignore"],
+  ["#[allow(", "#[allow(dead_code)]"],
+  ["//nolint", "func parse() { //nolint"],
+  ["istanbul ignore", "/* istanbul ignore next */"],
+  ["c8 ignore", "/* c8 ignore next */"],
+];
+
+const pad = "../../format/src/pad.ts";
+
+/** ReachedInternals for an import of `to` on line `line` of `week`. */
+const reachedFromWeek = (line: number, to: string) =>
+  new ReachedInternals({ at: at(week, line), from: RepoPath.make(week), to });
 
 // Each row is one push. Shape reports every problem the push has, in the
 // order of the refusal union's Shape group.
@@ -221,10 +291,126 @@ const rows: readonly {
       [
         [week, 1, 'import { pad } from "../../format/src/index.ts";'],
         [week, 2, 'import { lex } from "./lex.ts";'],
-        [week, 3, 'import { Array, Effect } from "effect";'],
+        [week, 3, 'import { Array, Effect, Option, Schema } from "effect";'],
       ]
     ),
     name: "imports of another module's public file, its own files and a package",
+    refusals: [],
+  },
+  {
+    facts: pushToA(
+      [x],
+      [[x, 12, `// ${effectDiagnostics} floatingEffect:off`]]
+    ),
+    name: "an added Effect diagnostics directive with no reason",
+    refusals: [
+      new Weakened({
+        at: at(x, 12),
+        weakening: { marker: effectDiagnostics },
+      }),
+    ],
+  },
+  {
+    facts: pushToA(
+      [x],
+      [
+        [
+          x,
+          12,
+          `// ${effectDiagnostics} floatingEffect:off -- the Worker's fetch is the one HTTP client`,
+        ],
+      ]
+    ),
+    name: "an added Effect diagnostics directive with a reason",
+    refusals: [],
+  },
+  {
+    facts: pushToA(
+      ["packages/b/src/y.ts", xTest, "oxlint.config.ts", x],
+      [
+        [xTest, 9, '  it.only("reads y", () => {'],
+        [x, 1, 'import { y } from "../../b/src/internal.ts";'],
+        [xTest, 3, '  it.skip("reads x", () => {'],
+      ]
+    ),
+    name: "a push out of scope, touching the judge, weakening twice and reaching into internals, all at once",
+    refusals: [
+      new OutOfScope({ paths: paths("packages/b/src/y.ts") }),
+      new TouchedJudge({ paths: paths("oxlint.config.ts") }),
+      new Weakened({ at: at(xTest, 3), weakening: { marker: ".skip(" } }),
+      new Weakened({ at: at(xTest, 9), weakening: { marker: ".only(" } }),
+      new ReachedInternals({
+        at: at(x, 1),
+        from: RepoPath.make(x),
+        to: "../../b/src/internal.ts",
+      }),
+    ],
+  },
+  ...markerLines.map(([marker, text]) => ({
+    facts: push([week], [[week, 5, text]]),
+    name: `the default marker ${marker}`,
+    refusals: [new Weakened({ at: at(week, 5), weakening: { marker } })],
+  })),
+  {
+    facts: push(
+      ["packages/parse/README.md"],
+      [["packages/parse/README.md", 40, 'Focus one test with `it.only("…")`.']]
+    ),
+    name: "a marker inside a string in a README",
+    refusals: [
+      new Weakened({
+        at: at("packages/parse/README.md", 40),
+        weakening: { marker: ".only(" },
+      }),
+    ],
+  },
+  {
+    facts: push(
+      [week],
+      [
+        [week, 2, `const pad = await import("${pad}");`],
+        [week, 6, `const { trim } = require("${pad}");`],
+      ]
+    ),
+    name: "a dynamic import and a require of another module's internal file",
+    refusals: [reachedFromWeek(2, pad), reachedFromWeek(6, pad)],
+  },
+  {
+    facts: push(
+      [week],
+      [
+        [
+          week,
+          1,
+          `import a from "../../format/src/a.ts"; import b from "${pad}";`,
+        ],
+      ]
+    ),
+    name: "two imports of internal files on one line",
+    refusals: [
+      reachedFromWeek(1, "../../format/src/a.ts"),
+      reachedFromWeek(1, pad),
+    ],
+  },
+  {
+    facts: push(
+      [week],
+      [[week, 1, 'import { pad } from "@datekit/format/src/pad";']]
+    ),
+    name: "a package subpath into another module's src folder",
+    refusals: [reachedFromWeek(1, "@datekit/format/src/pad")],
+  },
+  {
+    facts: push(
+      [week, "packages/parse/README.md"],
+      [
+        [week, 1, `// import { pad } from "${pad}";`],
+        [week, 2, 'import { pad } from "../../format";'],
+        [week, 3, 'import { trim } from "@datekit/format";'],
+        ["packages/parse/README.md", 1, `import { pad } from "${pad}";`],
+      ]
+    ),
+    name: "an import in a comment, of a module's root or package, or in prose",
     refusals: [],
   },
   {

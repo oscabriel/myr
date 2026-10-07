@@ -9,11 +9,14 @@ import {
   EnvKey,
   LandedSha,
   ProjectName,
+  RepoPath,
   RequestId,
 } from "../src/ids.ts";
 import {
   DirectPush,
   OutOfScope,
+  PrivatePathInPublicTree,
+  ReachedInternals,
   StaleBase,
   TouchedJudge,
   ValueTooShort,
@@ -60,21 +63,10 @@ describe(explain, () => {
         }),
       ])
     ).toStrictEqual([
-      "Weakened: adds it.skip without a reason",
+      'Weakened: adds it.skip without a reason; remove it, or give a reason after " -- " for a decider to weigh',
       "  at: src/a.ts:3",
       `  next: ${Brand.cli} check`,
       "  retryable: no",
-    ]);
-  });
-
-  it("lists every refusal, in order", () => {
-    expect(
-      explain([outOfScope, touchedJudge]).filter(
-        (line) => !line.startsWith(" ")
-      )
-    ).toStrictEqual([
-      "OutOfScope: changes paths outside the ask's territory: src/a.ts",
-      "TouchedJudge: changes files that decide what the checks do: src/a.ts",
     ]);
   });
 
@@ -92,6 +84,119 @@ describe(explain, () => {
       );
     }
   );
+
+  // Each shape refusal says how to repair it, after the reason's first clause.
+  it.each([
+    {
+      ends: "; put those files back, or flag the ask if the want needs them",
+      refusal: outOfScope,
+      starts: "OutOfScope: changes paths outside the ask's territory: src/a.ts",
+    },
+    {
+      ends: "; the checks are fixed for this ask, so put them back, or flag the ask if a check is wrong",
+      refusal: touchedJudge,
+      starts:
+        "TouchedJudge: changes files that decide what the checks do: src/a.ts",
+    },
+    {
+      ends: '; remove it, or give a reason after " -- " for a decider to weigh',
+      refusal: new Weakened({
+        at: { line: 3, path },
+        weakening: { marker: ".skip(" },
+      }),
+      starts: "Weakened: adds .skip( without a reason",
+    },
+    {
+      ends: "; it waits for a decider because it raises this territory's escapes",
+      refusal: new Weakened({
+        at: { line: 3, path },
+        weakening: { marker: "oxlint-disable", reason: "generated code" },
+      }),
+      starts: 'Weakened: adds oxlint-disable, with the reason "generated code"',
+    },
+    {
+      ends: "; import it through that module's public exports instead",
+      refusal: new ReachedInternals({
+        at: { line: 1, path },
+        from: path,
+        to: "../../b/src/internal.ts",
+      }),
+      starts:
+        "ReachedInternals: src/a.ts reaches into ../../b/src/internal.ts, which its module does not export",
+    },
+    {
+      ends: "; those paths belong to a layer, so remove them from the answer",
+      refusal: new PrivatePathInPublicTree({ paths: [path] }),
+      starts:
+        "PrivatePathInPublicTree: would put held-back paths in a public tree: src/a.ts",
+    },
+  ])(
+    "ends $refusal._tag's reason with how to repair it",
+    ({ ends, refusal, starts }) => {
+      expect(explain([refusal])[0]).toBe(`${starts}${ends}`);
+    }
+  );
+
+  it("explains every refusal of one push in the gate's order, each with its line", () => {
+    const a = RepoPath.make("packages/a/src/x.ts");
+    const test = RepoPath.make("packages/a/test/x.test.ts");
+
+    const refusals = [
+      new OutOfScope({ paths: [RepoPath.make("packages/b/src/y.ts")] }),
+      new TouchedJudge({ paths: [RepoPath.make("oxlint.config.ts")] }),
+      new Weakened({
+        at: { line: 3, path: test },
+        weakening: { marker: ".skip(" },
+      }),
+      new Weakened({
+        at: { line: 9, path: test },
+        weakening: { marker: ".only(" },
+      }),
+      new ReachedInternals({
+        at: { line: 1, path: a },
+        from: a,
+        to: "../../b/src/internal.ts",
+      }),
+    ] as const;
+
+    expect(explain(refusals)).toStrictEqual([
+      "OutOfScope: changes paths outside the ask's territory: packages/b/src/y.ts; put those files back, or flag the ask if the want needs them",
+      `  next: ${Brand.cli} check`,
+      "  retryable: no",
+      "TouchedJudge: changes files that decide what the checks do: oxlint.config.ts; the checks are fixed for this ask, so put them back, or flag the ask if a check is wrong",
+      `  next: ${Brand.cli} check`,
+      "  retryable: no",
+      'Weakened: adds .skip( without a reason; remove it, or give a reason after " -- " for a decider to weigh',
+      "  at: packages/a/test/x.test.ts:3",
+      `  next: ${Brand.cli} check`,
+      "  retryable: no",
+      'Weakened: adds .only( without a reason; remove it, or give a reason after " -- " for a decider to weigh',
+      "  at: packages/a/test/x.test.ts:9",
+      `  next: ${Brand.cli} check`,
+      "  retryable: no",
+      "ReachedInternals: packages/a/src/x.ts reaches into ../../b/src/internal.ts, which its module does not export; import it through that module's public exports instead",
+      "  at: packages/a/src/x.ts:1",
+      `  next: ${Brand.cli} check`,
+      "  retryable: no",
+    ]);
+  });
+
+  it("leaves a raised ratchet's reason as it was", () => {
+    expect(
+      explain([
+        new Weakened({
+          weakening: {
+            after: 4,
+            before: 3,
+            ratchet: "no-explicit-any",
+            territory: "parser",
+          },
+        }),
+      ])[0]
+    ).toBe(
+      "Weakened: raises the no-explicit-any ratchet in parser from 3 to 4"
+    );
+  });
 
   it("tells a direct push to main where answers go instead", () => {
     expect(explain([new DirectPush({ ref: "refs/heads/main" })])).toStrictEqual(
