@@ -9,7 +9,8 @@ import { Unwired } from "../src/ports.ts";
 import { serve, Stage } from "../src/surfaces.ts";
 import type { Services } from "../src/surfaces.ts";
 
-const origin = "http://localhost";
+/** Where every test request goes: the platform as `served` answers it. */
+export const origin = "http://localhost";
 
 // MCP's 2026-07-28 protocol is stateless: each request names its version and
 // client in `_meta` and repeats its method and target in headers.
@@ -148,11 +149,12 @@ export const served = Effect.fnUntraced(function* <E>(
 /**
  * A client of the contracts over HTTP at `/rpc`, as the CLI makes one: its
  * requests go to `handler`, each with `token` as its HTTP bearer, which the
- * RPC server reads into every call's headers.
+ * RPC server reads into every call's headers. Without a token it calls as
+ * anyone, as the web does before sign-in.
  */
 export const rpcClient = (
   handler: (request: Request) => Promise<Response>,
-  token: string
+  token?: string
 ) => {
   const fetch: typeof globalThis.fetch = (input, init) =>
     handler(new Request(input, init));
@@ -160,8 +162,10 @@ export const rpcClient = (
   return RpcClient.make(Contracts).pipe(
     Effect.provide(
       RpcClient.layerProtocolHttp({
-        transformClient: HttpClient.mapRequest(
-          HttpClientRequest.bearerToken(token)
+        transformClient: HttpClient.mapRequest((request) =>
+          token === undefined
+            ? request
+            : HttpClientRequest.bearerToken(request, token)
         ),
         url: `${origin}/rpc`,
       }).pipe(

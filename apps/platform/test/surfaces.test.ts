@@ -15,6 +15,7 @@ import { Effect, Layer, Ref } from "effect";
 import { MemorySessions } from "../src/sessions/memory.ts";
 import { Vacant } from "../src/vacant.ts";
 import {
+  origin,
   rpcClient,
   served,
   toolCall,
@@ -130,14 +131,25 @@ describe("the platform's MCP surface", () => {
           yield* fetch(toolCall("listAsks", { project }, "mallory-token")),
         ];
 
+        const metadata = `resource_metadata="${origin}/.well-known/oauth-protected-resource"`;
+
         expect(
           responses.map((response) => ({
             challenge: response.headers.get("www-authenticate"),
             status: response.status,
           }))
-        ).toStrictEqual(
-          responses.map(() => ({ challenge: "Bearer", status: 401 }))
-        );
+        ).toStrictEqual([
+          { challenge: `Bearer ${metadata}`, status: 401 },
+          {
+            challenge: `Bearer error="invalid_token", ${metadata}`,
+            status: 401,
+          },
+          { challenge: `Bearer ${metadata}`, status: 401 },
+          {
+            challenge: `Bearer error="invalid_token", ${metadata}`,
+            status: 401,
+          },
+        ]);
         expect(yield* Ref.get(calls)).toBe(0);
       })
   );
