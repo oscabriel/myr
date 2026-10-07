@@ -153,7 +153,7 @@ export const localCommandDocs: readonly CommandDoc[] = [
     summary: "Serve the platform's tools over MCP on stdio.",
   },
   {
-    flags: [],
+    flags: ["--json"],
     needsApproval: false,
     path: ["schema"],
     positional: ["command"],

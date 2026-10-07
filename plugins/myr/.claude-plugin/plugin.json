@@ -1,0 +1,4 @@
+{
+  "description": "The Myr CLI's skill, MCP server and hooks: the gate's scope guard before an edit, the claimed ask's brief at the start, and its verdict before you stop.",
+  "name": "myr"
+}

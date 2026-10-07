@@ -48,8 +48,13 @@ const entry = (kind: Kind, line: number) => ({
   path: "packages/x/src/a.ts",
 });
 
-const refusalsDoc = () =>
-  generate().find((file) => file.path === "docs/reference/refusals.md");
+const refusalsDoc = generate().pipe(
+  Effect.map(
+    (files) =>
+      files.find((file) => file.path === "docs/reference/refusals.md")
+        ?.content ?? ""
+  )
+);
 
 describe("verify", () => {
   it.live("runs every fence step, in order", () =>
@@ -213,23 +218,29 @@ describe("the lint config", () => {
 });
 
 describe("generation", () => {
-  it("writes a refusals reference with a section for every tag in the union", () => {
-    const headings = (refusalsDoc()?.content ?? "")
-      .split("\n")
-      .filter((line) => line.startsWith("### "));
+  it.effect(
+    "writes a refusals reference with a section for every tag in the union",
+    () =>
+      Effect.gen(function* () {
+        const headings = (yield* refusalsDoc)
+          .split("\n")
+          .filter((line) => line.startsWith("### "));
 
-    expect(headings).toStrictEqual(
-      Refusal.members.map((member) => `### ${member.identifier}`)
-    );
-  });
+        expect(headings).toStrictEqual(
+          Refusal.members.map((member) => `### ${member.identifier}`)
+        );
+      })
+  );
 
-  it("says whether retrying helps and what to run next", () => {
-    const content = refusalsDoc()?.content ?? "";
-    const staleBase = content.slice(content.indexOf("### StaleBase"));
+  it.effect("says whether retrying helps and what to run next", () =>
+    Effect.gen(function* () {
+      const content = yield* refusalsDoc;
+      const staleBase = content.slice(content.indexOf("### StaleBase"));
 
-    expect(staleBase).toContain("- Retryable: yes");
-    expect(staleBase).toContain("- Next: `git pull --rebase`");
-  });
+      expect(staleBase).toContain("- Retryable: yes");
+      expect(staleBase).toContain("- Next: `git pull --rebase`");
+    })
+  );
 
   it("tells stale, missing and extra files apart", () => {
     expect(

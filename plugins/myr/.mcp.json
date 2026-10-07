@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "myr": {
+      "args": [
+        "mcp"
+      ],
+      "command": "myr"
+    }
+  }
+}

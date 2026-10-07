@@ -90,7 +90,7 @@ const platformBody = (input: PlatformInput) =>
     "",
     "## Output",
     "",
-    "Every command prints Markdown; `--json` prints one versioned JSON envelope instead. A command that needs a person's approval runs only with `--yes`, and `--dry-run` prints what it would send.",
+    "A command whose flags list `--json` prints Markdown, or one versioned JSON envelope with `--json`. A command that needs a person's approval runs only with `--yes`, and `--dry-run` prints what it would send.",
     "",
     ...commandsSection(input.commands),
     ...mcpSection(input.platformUrl),
