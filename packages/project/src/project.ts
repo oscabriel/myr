@@ -299,11 +299,13 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   /**
    * The log a failing lane left, by the name its verdict gives it (spec
    * §2.3 `LaneResult.logRef`), for the project's deciders and the claimant
-   * of the answer the name points at; anyone else is `NotDecider`, whatever
-   * the name. A name that points at another project, or at no log kept, is
-   * `UnknownProject`. A log over 256 KiB comes back as its last 256 KiB,
-   * where a failure prints. The log is read from the `EvidenceStore` the
-   * call runs with (the stage's bucket), outside the project's lock.
+   * of the answer the name points at. A name `logRefOf` never makes, or one
+   * that points at another project, is `UnknownProject` for anyone; past
+   * that, anyone else is `NotDecider` whether or not a log is kept under the
+   * name, and a reader allowed in finds no log kept as `UnknownProject`
+   * too. A log over 256 KiB comes back as its last 256 KiB, where a
+   * failure prints. The log is read from the `EvidenceStore` the call runs
+   * with (the stage's bucket), outside the project's lock.
    */
   readonly evidence: (
     caller: Principal,

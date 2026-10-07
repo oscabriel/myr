@@ -195,7 +195,7 @@ const refused = Effect.gen(function* () {
 
   const logRef = verdict?.lanes.find(({ lane }) => lane === unit)?.logRef ?? "";
 
-  return { logRef, objects, pushed, verdict, world };
+  return { aliceGit, logRef, objects, pushed, verdict, work, world };
 });
 
 /** How a read ended, success or refusal, as JSON. */
@@ -342,7 +342,7 @@ describe("a failing lane's log, through the platform", () => {
         const cut = yield* world.rpc("dora").evidence(ref);
 
         expect({
-          bytes: cut.text.length,
+          bytes: new TextEncoder().encode(cut.text).length,
           isTail: long.endsWith(cut.text),
           truncated: cut.truncated,
         }).toStrictEqual({ bytes: 256 * 1024, isTail: true, truncated: true });
@@ -354,7 +354,24 @@ describe("a failing lane's log, through the platform", () => {
     "never puts the log in another /rpc response or in git's remote: lines",
     () =>
       Effect.gen(function* () {
-        const { pushed, world } = yield* refused;
+        const { aliceGit, pushed, work, world } = yield* refused;
+
+        // Read first: the refused answer is still alice's latest.
+        const read = [
+          ...(yield* everythingElse(world, "alice")),
+          ...(yield* everythingElse(world, "bob")),
+          ...(yield* everythingElse(world, "dora")),
+          ...(yield* everythingElse(world, "anonymous")),
+        ];
+
+        // Then alice tries again: this push's remote: lines are printed
+        // while the refused answer's log is kept, unlike her first push's.
+        yield* aliceGit.commit(work, "Read the year, trimmed", {
+          "src/parse.ts":
+            "export const parse = (iso: string) => ({ month: 0, year: Number(iso.slice(0, 4).trim()) });\n",
+        });
+
+        const again = yield* aliceGit.push(work);
 
         // The log whole, as JSON escapes it, and its one line no other
         // record of the run holds: the failure's signature.
@@ -364,17 +381,17 @@ describe("a failing lane's log, through the platform", () => {
           "unit: scripted failure",
         ];
 
-        const seen = [
-          pushed.stderr,
-          ...(yield* everythingElse(world, "alice")),
-          ...(yield* everythingElse(world, "bob")),
-          ...(yield* everythingElse(world, "dora")),
-          ...(yield* everythingElse(world, "anonymous")),
-        ];
+        const seen = [pushed.stderr, again.stderr, ...read];
 
-        expect(
-          seen.filter((text) => needles.some((needle) => text.includes(needle)))
-        ).toStrictEqual([]);
+        expect({
+          again: {
+            exitCode: again.exitCode,
+            reached: again.stderr.includes("remote:"),
+          },
+          leaks: seen.filter((text) =>
+            needles.some((needle) => text.includes(needle))
+          ),
+        }).toStrictEqual({ again: { exitCode: 0, reached: true }, leaks: [] });
       }),
     60_000
   );

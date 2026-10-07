@@ -257,15 +257,24 @@ describe("reading a failing lane's log", () => {
           requestId,
         });
 
+        // bob's own log's name, spelled as `logRefOf` never spells one.
+        const respelled = LogRef.make(bobsLog.replace(/#1$/u, "#01"));
+
         expect(
           yield* Effect.forEach(
             [
               api.evidence(alice, LogRef.make("not a log's name")),
+              api.evidence(carol, LogRef.make("not a log's name")),
+              api.evidence(alice, respelled),
+              api.evidence(carol, respelled),
               api.evidence(alice, passed),
             ],
             Effect.flip
           )
         ).toStrictEqual([
+          new UnknownProject({ project }),
+          new UnknownProject({ project }),
+          new UnknownProject({ project }),
           new UnknownProject({ project }),
           new UnknownProject({ project }),
         ]);
@@ -282,7 +291,7 @@ describe("reading a failing lane's log", () => {
         const read = yield* api.evidence(bob, bobsLog);
 
         expect({
-          bytes: read.text.length,
+          bytes: new TextEncoder().encode(read.text).length,
           endsWithFailure: read.text.endsWith(tail),
           isTail: long.endsWith(read.text),
           truncated: read.truncated,

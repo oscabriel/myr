@@ -45,17 +45,22 @@ const LogName = Schema.TemplateLiteralParser([
 
 /**
  * What a log's name points at: `logRefOf` read backwards, or `None` for a
- * name it never makes. None of its parts holds a `/` or a `#`.
+ * name it never makes. None of its parts holds a `/` or a `#`; the attempt
+ * reads as a number (`#01`, `#1.0` and `#+1` all read as 1), so a name is
+ * kept only when `logRefOf` spells it back the same.
  */
 export const logOfRef = (ref: string): Option.Option<Omit<LaneLog, "text">> =>
-  Option.map(
-    Schema.decodeUnknownOption(LogName)(ref),
-    ([project, , requestId, , lane, , attempt]) => ({
-      attempt,
-      lane,
-      project,
-      requestId,
-    })
+  Option.filter(
+    Option.map(
+      Schema.decodeUnknownOption(LogName)(ref),
+      ([project, , requestId, , lane, , attempt]) => ({
+        attempt,
+        lane,
+        project,
+        requestId,
+      })
+    ),
+    (log) => logRefOf(log) === ref
   );
 
 export class EvidenceStore extends Context.Service<
