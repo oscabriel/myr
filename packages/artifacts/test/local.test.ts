@@ -153,6 +153,20 @@ describe("importing onto local disk", () => {
     }).pipe(Effect.provide(freshStore))
   );
 
+  // A file URL that names another machine is no path on this one.
+  it.effect("refuses a file URL on another host, and makes no repo", () =>
+    Effect.gen(function* () {
+      const repos = yield* RepoHost;
+      const name = RepoName.make("elsewhere");
+      const url = "file://example.com/demo.git";
+
+      expect(yield* Effect.flip(repos.importFrom(name, { url }))).toStrictEqual(
+        new ImportRefused({ name, reason: `no repo at ${url}` })
+      );
+      expect(yield* repos.remove(name)).toBeFalsy();
+    }).pipe(Effect.provide(freshStore))
+  );
+
   it.effect("refuses a branch the remote lacks, and makes no repo", () =>
     Effect.gen(function* () {
       const repos = yield* RepoHost;
