@@ -21,6 +21,10 @@
     "./answer-runs/inline": "./src/answer-runs/inline.ts",
     "./projection": "./src/projection.ts",
     "./projection/memory": "./src/projection/memory.ts",
+    "./front-page": "./src/front-page.ts",
+    "./front-page/memory": "./src/front-page/memory.ts",
+    "./projection-d1/*": "./src/projection-d1/*.ts",
+    "./lander/wire": "./src/lander/wire.ts",
     "./attention/*": "./src/attention/*.ts",
     "./*": "./src/*.ts"
   },
@@ -29,6 +33,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@effect/sql-d1": "4.0.1",
     "@repo/artifacts": "workspace:*",
     "@repo/brand": "workspace:*",
     "@repo/checks": "workspace:*",

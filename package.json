@@ -31,6 +31,9 @@
     "bytes:check": "bun scripts/startup-budget.ts",
     "env:check": "varlock load --agent --path infra/",
     "ops": "varlock run --path infra/ -- cf",
+    "bootstrap": "varlock run --path infra/ -- bun infra/bootstrap.ts",
+    "deploy": "bun infra/deploy.ts",
+    "smoke": "bun scripts/smoke.ts",
     "verify": "bun run lockfile:check && bun run check && bun run typecheck && bun run test && bun run gen:check && bun run imports:check && bun run debt && bun run brand:check && bun run bytes:check"
   },
   "devDependencies": {

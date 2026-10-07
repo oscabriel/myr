@@ -1,0 +1,30 @@
+{
+  "name": "@repo/sandbox",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "types": "wrangler types --include-runtime=false --strict-vars=false",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@cloudflare/sandbox": "1.0.0",
+    "@repo/brand": "workspace:*",
+    "@repo/checks": "workspace:*",
+    "@repo/git": "workspace:*",
+    "@repo/project": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "@repo/rules": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261006.1",
+    "@effect/platform-node": "4.0.1",
+    "@effect/vitest": "catalog:",
+    "@repo/config": "workspace:*",
+    "@repo/testkit": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "4.147.0"
+  }
+}

@@ -15,7 +15,10 @@ const entryBudget = 900_000;
 const javascriptBudget = 2_500_000;
 
 /** Each Worker, and the file its `main` bundles to. */
-const workers = [{ dir: "apps/platform", entry: "worker.js" }] as const;
+const workers = [
+  { dir: "apps/platform", entry: "worker.js" },
+  { dir: "apps/sandbox", entry: "worker.js" },
+] as const;
 
 class BuildFailed extends Data.TaggedError("BuildFailed")<{
   readonly worker: string;

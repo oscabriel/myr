@@ -1,21 +1,211 @@
 {
-  // The platform Worker: the contracts over RPC at /rpc and MCP at /mcp.
-  // Deploy only through infra/deploy.ts, to an explicit stage.
+  // The platform Worker: the contracts over RPC at /rpc and MCP at /mcp, git
+  // smart HTTP for every project's repos, the Project Durable Object and the
+  // Answer and OnPush Workflows. Deploy only through infra/deploy.ts, to an
+  // explicit stage.
+  //
+  // The top level is stage `local`: it builds and types the Worker and is
+  // never deployed. Each stage under `env` repeats every binding, since
+  // wrangler does not inherit bindings into an environment. Resource names
+  // are jobs plus the stage (spec §4.4), never the brand. A `database_id` or
+  // KV `id` of zeros is a placeholder that infra/bootstrap.ts replaces with
+  // the id of the resource it made.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "platform",
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-05",
+  // isomorphic-git needs `Buffer` (the /isogit Lander).
+  "compatibility_flags": ["nodejs_compat"],
   // Rat Stack's byte limits are for a minified bundle (scripts/startup-budget.ts).
   "minify": true,
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Project"] }],
   "vars": {
-    // Until sign-in exists, one operator holds the only session.
+    // Until sign-in exists, one operator holds a session.
     "OPERATOR_HANDLE": "oscabriel",
+    "STAGE": "local",
+    // "container" (apps/sandbox) or "isogit" (in this Worker): spec §8 D6.
+    "LANDER_ADAPTER": "container",
   },
   "secrets": {
-    // Declared in .env.schema; the user sets the value.
+    // Declared in .env.schema; the user sets the values. SESSION_TOKENS and
+    // the GitHub and cookie keys are optional, so a stage deploys before H4.
     "required": ["OPERATOR_TOKEN"],
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
+  },
+  "workflows": [
+    { "name": "answer-local", "binding": "ANSWER", "class_name": "Answer" },
+    { "name": "on-push-local", "binding": "ON_PUSH", "class_name": "OnPush" },
+  ],
+  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "projects-local" }],
+  "d1_databases": [
+    {
+      "binding": "FRONT_PAGE",
+      "database_name": "front-page-local",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations",
+    },
+  ],
+  // KV namespace `oauth-local`.
+  "kv_namespaces": [
+    { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
+  ],
+  "r2_buckets": [{ "binding": "EVIDENCE", "bucket_name": "evidence-local" }],
+  "worker_loaders": [{ "binding": "LOADER" }],
+  "services": [{ "binding": "SANDBOX", "service": "sandbox" }],
+  // Namespace ids differ per stage, so one stage's counts never spend
+  // another's.
+  "ratelimits": [
+    {
+      "name": "CLAIM_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 10, "period": 60 },
+    },
+    {
+      "name": "PROPOSAL_LIMIT",
+      "namespace_id": "1002",
+      "simple": { "limit": 5, "period": 60 },
+    },
+  ],
+  "triggers": {
+    "events": [
+      {
+        "type": "cf.artifacts.repo.pushed",
+        "filter": { "namespace": "projects-local" },
+        "targets": [{ "type": "workflow", "workflow_name": "on-push-local" }],
+      },
+    ],
+  },
+  "env": {
+    "dev-oscabriel": {
+      "vars": {
+        "OPERATOR_HANDLE": "oscabriel",
+        "STAGE": "dev-oscabriel",
+        "LANDER_ADAPTER": "container",
+      },
+      "secrets": { "required": ["OPERATOR_TOKEN"] },
+      "durable_objects": {
+        "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
+      },
+      "workflows": [
+        {
+          "name": "answer-dev-oscabriel",
+          "binding": "ANSWER",
+          "class_name": "Answer",
+        },
+        {
+          "name": "on-push-dev-oscabriel",
+          "binding": "ON_PUSH",
+          "class_name": "OnPush",
+        },
+      ],
+      "artifacts": [
+        { "binding": "ARTIFACTS", "namespace": "projects-dev-oscabriel" },
+      ],
+      "d1_databases": [
+        {
+          "binding": "FRONT_PAGE",
+          "database_name": "front-page-dev-oscabriel",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations",
+        },
+      ],
+      // KV namespace `oauth-dev-oscabriel`.
+      "kv_namespaces": [
+        { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
+      ],
+      "r2_buckets": [
+        { "binding": "EVIDENCE", "bucket_name": "evidence-dev-oscabriel" },
+      ],
+      "worker_loaders": [{ "binding": "LOADER" }],
+      "services": [
+        { "binding": "SANDBOX", "service": "sandbox-dev-oscabriel" },
+      ],
+      "ratelimits": [
+        {
+          "name": "CLAIM_LIMIT",
+          "namespace_id": "1101",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "PROPOSAL_LIMIT",
+          "namespace_id": "1102",
+          "simple": { "limit": 5, "period": 60 },
+        },
+      ],
+      "triggers": {
+        "events": [
+          {
+            "type": "cf.artifacts.repo.pushed",
+            "filter": { "namespace": "projects-dev-oscabriel" },
+            "targets": [
+              { "type": "workflow", "workflow_name": "on-push-dev-oscabriel" },
+            ],
+          },
+        ],
+      },
+    },
+    "demo": {
+      "vars": {
+        "OPERATOR_HANDLE": "oscabriel",
+        "STAGE": "demo",
+        "LANDER_ADAPTER": "container",
+      },
+      "secrets": { "required": ["OPERATOR_TOKEN"] },
+      "durable_objects": {
+        "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
+      },
+      "workflows": [
+        { "name": "answer-demo", "binding": "ANSWER", "class_name": "Answer" },
+        {
+          "name": "on-push-demo",
+          "binding": "ON_PUSH",
+          "class_name": "OnPush",
+        },
+      ],
+      "artifacts": [{ "binding": "ARTIFACTS", "namespace": "projects-demo" }],
+      "d1_databases": [
+        {
+          "binding": "FRONT_PAGE",
+          "database_name": "front-page-demo",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations",
+        },
+      ],
+      // KV namespace `oauth-demo`.
+      "kv_namespaces": [
+        { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
+      ],
+      "r2_buckets": [{ "binding": "EVIDENCE", "bucket_name": "evidence-demo" }],
+      "worker_loaders": [{ "binding": "LOADER" }],
+      "services": [{ "binding": "SANDBOX", "service": "sandbox-demo" }],
+      "ratelimits": [
+        {
+          "name": "CLAIM_LIMIT",
+          "namespace_id": "1201",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "PROPOSAL_LIMIT",
+          "namespace_id": "1202",
+          "simple": { "limit": 5, "period": 60 },
+        },
+      ],
+      "triggers": {
+        "events": [
+          {
+            "type": "cf.artifacts.repo.pushed",
+            "filter": { "namespace": "projects-demo" },
+            "targets": [
+              { "type": "workflow", "workflow_name": "on-push-demo" },
+            ],
+          },
+        ],
+      },
+    },
   },
 }

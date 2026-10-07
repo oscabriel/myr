@@ -8,14 +8,27 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.1",
+    "@effect/sql-d1": "4.0.1",
+    "@effect/sql-sqlite-do": "4.0.1",
+    "@repo/artifacts": "workspace:*",
     "@repo/brand": "workspace:*",
+    "@repo/checks": "workspace:*",
+    "@repo/gate": "workspace:*",
+    "@repo/git": "workspace:*",
+    "@repo/project": "workspace:*",
     "@repo/protocol": "workspace:*",
+    "@repo/rules": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261006.1",
+    "@effect/platform-node": "4.0.1",
+    "@effect/sql-sqlite-node": "4.0.1",
     "@effect/vitest": "catalog:",
     "@repo/config": "workspace:*",
+    "@repo/testkit": "workspace:*",
+    "@varlock/cloudflare-integration": "1.6.0",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "4.147.0"

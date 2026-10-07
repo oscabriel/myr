@@ -5,6 +5,7 @@
   },
   "include": [
     "*.config.ts",
+    "infra/**/*.ts",
     "scripts/**/*.ts",
     "tools/oxlint/fence/**/*.ts",
     ".pi/extensions/**/*.ts"

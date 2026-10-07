@@ -1,0 +1,106 @@
+{
+  // The sandbox Worker: the Checker and the Lander, each a Durable Object
+  // with its own container, reached only through the platform's `SANDBOX`
+  // service binding (its default entrypoint's RPC). It has no Artifacts
+  // binding of any kind: tokens arrive in jobs, minted per job by the
+  // platform. Deploy only through infra/deploy.ts, to an explicit stage.
+  //
+  // The top level is stage `local`: it builds and types the Worker and is
+  // never deployed. Each stage under `env` repeats the containers and
+  // Durable Objects, since wrangler does not inherit them.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sandbox",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-05",
+  // The Sandbox SDK's `Files` needs it.
+  "compatibility_flags": ["nodejs_compat"],
+  "minify": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Checker", "Lander"] }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "CHECKER", "class_name": "Checker" },
+      { "name": "LANDER", "class_name": "Lander" },
+    ],
+  },
+  // Untrusted answer code runs in a Checker; the Lander runs only git and
+  // Bun. One container per Durable Object, which picks its instance size when
+  // it starts it (`ctx.container.start`).
+  "containers": [
+    {
+      "class_name": "Checker",
+      "scheduling_policy": "durable_object",
+      "images": { "check": { "dockerfile": "./images/check.Dockerfile" } },
+    },
+    {
+      "class_name": "Lander",
+      "scheduling_policy": "durable_object",
+      // The repo root, so the image can carry the sdk for `bundleRules`
+      // (land.Dockerfile.dockerignore admits only what it copies).
+      "images": {
+        "land": {
+          "dockerfile": "./images/land.Dockerfile",
+          "build_context": "../..",
+        },
+      },
+    },
+  ],
+  "env": {
+    "dev-oscabriel": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "CHECKER", "class_name": "Checker" },
+          { "name": "LANDER", "class_name": "Lander" },
+        ],
+      },
+      "containers": [
+        {
+          "class_name": "Checker",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "check": { "dockerfile": "./images/check.Dockerfile" },
+          },
+        },
+        {
+          "class_name": "Lander",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "land": {
+              "dockerfile": "./images/land.Dockerfile",
+              "build_context": "../..",
+            },
+          },
+        },
+      ],
+    },
+    "demo": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "CHECKER", "class_name": "Checker" },
+          { "name": "LANDER", "class_name": "Lander" },
+        ],
+      },
+      "containers": [
+        {
+          "class_name": "Checker",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "check": { "dockerfile": "./images/check.Dockerfile" },
+          },
+        },
+        {
+          "class_name": "Lander",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "land": {
+              "dockerfile": "./images/land.Dockerfile",
+              "build_context": "../..",
+            },
+          },
+        },
+      ],
+    },
+  },
+}

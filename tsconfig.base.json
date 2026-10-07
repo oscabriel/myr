@@ -84,15 +84,20 @@
             }
           },
           {
-            "include": ["packages/config/test/**/*.ts"],
+            "include": ["packages/config/test/**/*.ts", "infra/**/*.ts"],
             "options": {
-              "allowedUnstableApis": ["effect/process"]
+              "allowedUnstableApis": ["effect/http", "effect/process"]
             }
           },
           {
             "include": ["apps/platform/**/*.ts"],
             "options": {
-              "allowedUnstableApis": ["effect/ai", "effect/http", "effect/rpc"]
+              "allowedUnstableApis": [
+                "effect/ai",
+                "effect/http",
+                "effect/rpc",
+                "effect/sql"
+              ]
             }
           },
           {
@@ -104,6 +109,12 @@
                 "effect/http",
                 "effect/rpc"
               ]
+            }
+          },
+          {
+            "include": ["apps/sandbox/test/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": ["effect/process"]
             }
           },
           {

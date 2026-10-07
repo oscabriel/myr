@@ -143,6 +143,7 @@ export const Matrix = {
     "@repo/brand",
     "@repo/checks",
     "@repo/git",
+    "@repo/project",
     "@repo/protocol",
     "@repo/rules",
     "@repo/visibility",
@@ -181,6 +182,12 @@ export const ChecksPureSubpaths: readonly string[] = [
  */
 export const OnlySubpaths = {
   "@repo/gate": { "@repo/checks": ChecksPureSubpaths },
+  // Both sides of the platform's service binding decode the Lander's jobs
+  // with one schema; the sandbox takes nothing else of the project.
+  "@repo/sandbox": {
+    "@repo/project": ["lander/wire"],
+    "@repo/rules": ["rules-evaluator"],
+  },
   "@repo/sdk": { "@repo/protocol": ["domain/*"] },
 } as const satisfies Readonly<
   Record<string, Readonly<Record<string, readonly string[]>>>
