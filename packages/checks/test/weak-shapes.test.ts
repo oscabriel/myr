@@ -3,11 +3,15 @@ import { describe, expect, it } from "@effect/vitest";
 import { weaknessesOf } from "../src/weak-shapes.ts";
 
 // The check files are datekit's, held as text: the lint reads source, never
-// runs it.
-const territory = ["packages/week/src/**"];
+// runs it. The territory is what `territory.package` gives a workspace.
+const territory = ["packages/week/**"];
 
-const check = (imports: string, body: string) =>
-  `${imports}
+const check = (
+  imports: string,
+  body: string,
+  path = "packages/week/test/week.test.ts"
+) => ({
+  content: `${imports}
 import { describe, expect, it, vi } from "vitest";
 
 describe("parseWeek", () => {
@@ -15,7 +19,9 @@ describe("parseWeek", () => {
 ${body}
   });
 });
-`;
+`,
+  path,
+});
 
 const fromTerritory = `import { onWeek, parseWeek } from "../src/week.ts";`;
 
@@ -28,6 +34,32 @@ describe(weaknessesOf, () => {
           `expect(parseWeek("2026-W01")).toStrictEqual({ week: 1, year: 2026 });`
         ),
         territory
+      )
+    ).toStrictEqual([]);
+  });
+
+  it("passes a check beside the source it tests, in the same folder", () => {
+    expect(
+      weaknessesOf(
+        check(
+          `import { parseWeek } from "./week.ts";`,
+          `expect(parseWeek("2026-W01").week).toBe(1);`,
+          "packages/week/src/week.test.ts"
+        ),
+        territory
+      )
+    ).toStrictEqual([]);
+  });
+
+  it("passes a check that reaches a one-file territory through its folder's index", () => {
+    expect(
+      weaknessesOf(
+        check(
+          `import { parseISO } from "../../src/index.ts";`,
+          `expect(parseISO("2026-W41-3").getDay()).toBe(3);`,
+          "test/asks/parse-iso-week.test.ts"
+        ),
+        ["src/parse.ts"]
       )
     ).toStrictEqual([]);
   });
@@ -86,6 +118,15 @@ describe(weaknessesOf, () => {
     ).toStrictEqual(["constant pin"]);
   });
 
+  it("passes a literal held against the territory's result", () => {
+    expect(
+      weaknessesOf(
+        check(fromTerritory, `expect(1).toBe(parseWeek("2026-W01").week);`),
+        territory
+      )
+    ).toStrictEqual([]);
+  });
+
   it("flags absence-only: every expectation is that nothing happened", () => {
     expect(
       weaknessesOf(
@@ -141,6 +182,19 @@ import fixture from "./fixtures/first-week.json";`,
     ).toStrictEqual(["fixture-asserts-fixture"]);
   });
 
+  it("passes two fields of one computed result held against each other", () => {
+    expect(
+      weaknessesOf(
+        check(
+          fromTerritory,
+          `const week = parseWeek("2026-W01");
+    expect(week.start).toBeLessThan(week.end);`
+        ),
+        territory
+      )
+    ).toStrictEqual([]);
+  });
+
   it("ignores expectations inside comments and strings", () => {
     expect(
       weaknessesOf(
@@ -159,11 +213,14 @@ import fixture from "./fixtures/first-week.json";`,
   it("flags nothing in a file it cannot read: no expect calls", () => {
     expect(
       weaknessesOf(
-        `from datekit.week import parse_week
+        {
+          content: `from datekit.week import parse_week
 
 def test_first_week():
     assert parse_week("2026-W01") == (2026, 1)
 `,
+          path: "packages/week/test/test_week.py",
+        },
         territory
       )
     ).toStrictEqual([]);

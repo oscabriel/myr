@@ -56,6 +56,13 @@ const exit = (path: string, ms: string, address: string): RunExit => ({
   stdout: "",
 });
 
+// The same run as the /local runner sees it: output only, never a report.
+const withoutReport = ({ code, stderr, stdout }: RunExit): RunExit => ({
+  code,
+  stderr,
+  stdout,
+});
+
 describe(classifyRun, () => {
   describe("with vitest's JSON report", () => {
     it("is failed when a test fails on an assertion", () => {
@@ -68,6 +75,29 @@ describe(classifyRun, () => {
 
     it("is loadError when no test file is found", () => {
       expect(classifyRun(unit, vitestNoTests)).toBe("loadError");
+    });
+
+    it("is passed on exit 0, even when the report found no tests", () => {
+      expect(classifyRun(unit, { ...vitestNoTests, code: 0 })).toBe("passed");
+    });
+  });
+
+  // The /local runner never has a report: vitest's own output decides.
+  describe("from vitest's output, with the report left out", () => {
+    it("is failed on an assertion", () => {
+      expect(classifyRun(unit, withoutReport(vitestAssertion))).toBe("failed");
+      expect(failureSignature(withoutReport(vitestAssertion))).toStrictEqual(
+        Option.some(
+          "test/week.test.js > parseWeek > reads the first week of a year: AssertionError: expected { week: +0, year: 2026 } to strictly equal { week: 1, year: 2026 }"
+        )
+      );
+    });
+
+    it("is loadError when the test file fails to load, or none is found", () => {
+      expect(classifyRun(unit, withoutReport(vitestLoadError))).toBe(
+        "loadError"
+      );
+      expect(classifyRun(unit, withoutReport(vitestNoTests))).toBe("loadError");
     });
   });
 
@@ -178,9 +208,16 @@ describe(failureSignature, () => {
   });
 
   it("strips durations, absolute paths and addresses from the assertion line", () => {
+    const first = failureSignature(
+      exit("/home/ci/datekit", "12.5ms", "0xdeadbeef")
+    );
+
+    expect(first).toStrictEqual(
+      Option.some("parses: AssertionError: <path> took <duration> at <address>")
+    );
     expect(
-      failureSignature(exit("/home/ci/datekit", "12.5ms", "0xdeadbeef"))
-    ).toStrictEqual(failureSignature(exit("/work/datekit", "3ms", "0x7f00aa")));
+      failureSignature(exit("/work/datekit", "3ms", "0x7f00aa"))
+    ).toStrictEqual(first);
   });
 
   it("is none for a run that failed to load", () => {

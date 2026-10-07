@@ -5,7 +5,8 @@
  *
  * It reaches nothing a lane would not: no network of its own, no git config
  * from this machine (`GIT_CONFIG_GLOBAL=/dev/null`, as `@repo/testkit/git`
- * runs git), and a `HOME` in a temp dir it removes after the job. Placeholders
+ * runs git), no repo but the checkout (a hook's `GIT_DIR` is unset), and a
+ * `HOME` in a temp dir it removes after the job. Placeholders
  * and proxies are the Checker's; here a lane sees the user's own env. A sealed
  * suite runs only in the Checker, so a job with one is `VerifierBlocked`.
  */
@@ -33,19 +34,32 @@ const DEFAULT_TIMEOUT = Duration.minutes(10);
 const FORCE_KILL_AFTER = Duration.seconds(2);
 
 // Fixed identity and dates, English messages, no prompts, no colours, and no
-// git config from this machine.
+// git config from this machine. A git hook that runs the CLI exports where
+// its own repo is and any `git -c` config; those are unset (an `undefined`
+// value leaves a variable out), so a lane's git sees only the checkout.
 const fixedEnv = {
   CI: "1",
   FORCE_COLOR: "0",
+  GIT_ALTERNATE_OBJECT_DIRECTORIES: undefined,
   GIT_AUTHOR_DATE: "2026-10-06T12:00:00Z",
   GIT_AUTHOR_EMAIL: "answerer@example.com",
   GIT_AUTHOR_NAME: "Answerer",
   GIT_COMMITTER_DATE: "2026-10-06T12:00:00Z",
   GIT_COMMITTER_EMAIL: "answerer@example.com",
   GIT_COMMITTER_NAME: "Answerer",
+  GIT_COMMON_DIR: undefined,
+  GIT_CONFIG: undefined,
+  GIT_CONFIG_COUNT: undefined,
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_PARAMETERS: undefined,
+  GIT_DIR: undefined,
+  GIT_INDEX_FILE: undefined,
+  GIT_NAMESPACE: undefined,
+  GIT_OBJECT_DIRECTORY: undefined,
+  GIT_PREFIX: undefined,
   GIT_TERMINAL_PROMPT: "0",
+  GIT_WORK_TREE: undefined,
   LC_ALL: "C",
   NO_COLOR: "1",
 };

@@ -18,6 +18,15 @@ export type Weakness =
   | "mock-only"
   | "fixture-asserts-fixture";
 
+/**
+ * The check file as an ask carries it: its repo path, which places its
+ * relative imports, and its source.
+ */
+export interface CheckFile {
+  readonly path: string;
+  readonly content: string;
+}
+
 /** One `expect(subject).matcher(expected)` in the check, as source text. */
 interface Expectation {
   readonly subject: string;
@@ -155,39 +164,63 @@ const importsOf = ({ masked, text }: Source) =>
 
 const EXTENSION = /\.(?:[cm]?[jt]sx?|json)$/u;
 
-const segmentsOf = (path: string) =>
-  path
-    .replace(EXTENSION, "")
-    .split("/")
-    .filter((segment) => segment !== "" && segment !== "." && segment !== "..");
+const GLOB = /[*?[{]/u;
 
-/** A territory glob's fixed head: `packages/week/src/**` → `packages/week/src`. */
-const baseOf = (glob: string) =>
-  Array.takeWhile(segmentsOf(glob), (segment) => !segment.includes("*"));
+const segmentsOf = (path: string) =>
+  path.split("/").filter((segment) => segment !== "" && segment !== ".");
 
 /**
- * Whether an import reaches into the territory, without the check file's own
- * path: a relative import whose head overlaps the tail of a territory's base
- * (`../src/week.ts` against `packages/week/src/**`), or a package import
- * whose unscoped name is a folder of one (`@datekit/week`).
+ * The folder a territory glob covers: its fixed head (`packages/week/**` →
+ * `packages/week`), or, for a glob naming one file, that file's folder, since
+ * a check reaches a file through its folder's index too.
  */
-const reaches = (specifier: string, base: readonly string[]) => {
-  if (!specifier.startsWith(".")) {
-    const parts = specifier.split("/");
-    const name = specifier.startsWith("@") ? parts[1] : parts[0];
+const baseOf = (glob: string) => {
+  const segments = segmentsOf(glob);
+  const fixed = Array.takeWhile(segments, (segment) => !GLOB.test(segment));
 
-    return name !== undefined && base.includes(name);
+  const isFile =
+    fixed.length === segments.length && EXTENSION.test(fixed.at(-1) ?? "");
+
+  return isFile ? fixed.slice(0, -1) : fixed;
+};
+
+/** A relative import's repo path, resolved from the check file's folder. */
+const resolve = (checkPath: string, specifier: string) => {
+  const resolved = segmentsOf(checkPath).slice(0, -1);
+
+  for (const segment of segmentsOf(specifier)) {
+    if (segment === "..") {
+      resolved.pop();
+    } else {
+      resolved.push(segment);
+    }
   }
 
-  const head = segmentsOf(specifier);
-
-  return (
-    base.length === 0 ||
-    Array.range(1, Math.min(base.length, head.length)).some((overlap) =>
-      base.slice(-overlap).every((segment, index) => segment === head[index])
-    )
-  );
+  return resolved;
 };
+
+const startsWith = (path: readonly string[], head: readonly string[]) =>
+  head.every((segment, index) => path[index] === segment);
+
+/**
+ * Whether an import reaches into a territory's folder: a relative import
+ * that resolves inside it, or to a folder above it (`../src` reaching
+ * `src/week.ts` through `src/index.ts`), or a package import whose unscoped
+ * name is one of its folders (`@datekit/week` for `packages/week/**`).
+ */
+const reaches =
+  (checkPath: string) => (specifier: string, base: readonly string[]) => {
+    if (!specifier.startsWith(".")) {
+      const parts = specifier.split("/");
+      const name = specifier.startsWith("@") ? parts[1] : parts[0];
+
+      return name !== undefined && base.includes(name);
+    }
+
+    const path = resolve(checkPath, specifier);
+
+    return startsWith(path, base) || startsWith(base, path);
+  };
 
 // After strings, numbers and the literal keywords go, a literal has no
 // identifier left but its object keys, and no call or arrow.
@@ -238,26 +271,55 @@ const isOnMock = (mocks: ReadonlySet<string>) => (each: Expectation) =>
   /\b(?:vi|jest)\.fn\s*\(/u.test(each.subject) ||
   mocks.has(rootOf(each.subject) ?? "");
 
+/** The names the check binds to a call's result (`const range = weekRange(…)`). */
+const resultsOf = ({ text }: Source) =>
+  new Set(
+    Array.map(
+      [
+        ...text.matchAll(
+          /\b(?:const|let|var)\s+(?<name>[A-Za-z_$][\w$]*)\s*=\s*(?:await\s+)?[A-Za-z_$][\w$.]*\s*\(/gu
+        ),
+      ],
+      (match) => match.groups?.name ?? ""
+    )
+  );
+
 const squash = (text: string) => text.replaceAll(/\s+/gu, "");
 
 /**
  * Expected and actual from one source: the same expression twice, or the
- * subject read straight off the value the expected one comes from.
+ * subject read straight off the fixture the expected one comes from. A value
+ * the check computed is not a fixture: two of its fields may be compared
+ * (`expect(range.start).toBeLessThan(range.end)`).
  */
-const isFromOneFixture = ({ expected, subject }: Expectation) =>
-  !isLiteral(subject) &&
-  (squash(subject) === squash(expected) ||
-    (!subject.includes("(") &&
-      rootOf(subject) !== undefined &&
-      rootOf(subject) === rootOf(expected)));
+const isFromOneFixture =
+  (results: ReadonlySet<string>) =>
+  ({ expected, subject }: Expectation) => {
+    const root = rootOf(subject);
+
+    return (
+      !isLiteral(subject) &&
+      (squash(subject) === squash(expected) ||
+        (!subject.includes("(") &&
+          root !== undefined &&
+          !results.has(root) &&
+          root === rootOf(expected)))
+    );
+  };
+
+/** `expect(1).toBe(1)`: a literal held against a literal, or against nothing. */
+const isConstantPin = ({ expected, subject }: Expectation) =>
+  isLiteral(subject) && (expected === "" || isLiteral(expected));
 
 /**
  * The weak shapes a check file is in, given the territory's paths (globs).
  * A shape over expectations holds only when every expectation in the file
  * has it, so one real assertion among weak ones keeps the check:
  *
- * - `self-referential`: the check imports nothing from the territory;
- * - `constant pin`: every expectation is on a literal (`expect(1).toBe(1)`);
+ * - `self-referential`: the check imports nothing from the territory's
+ *   folders (its relative imports resolved from its own path);
+ * - `constant pin`: every expectation holds a literal against a literal
+ *   (`expect(1).toBe(1)`);
  * - `absence-only`: every expectation is `not.toThrow`, `toBeUndefined` or
  *   `toBeFalsy` (or a mirror);
  * - `mock-only`: every expectation is on a `vi.fn()` or a spy;
@@ -265,10 +327,10 @@ const isFromOneFixture = ({ expected, subject }: Expectation) =>
  *   from the same fixture, or computes both the same way.
  */
 export const weaknessesOf = (
-  checkFile: string,
+  checkFile: CheckFile,
   territoryPaths: readonly string[]
 ): readonly Weakness[] => {
-  const source = read(checkFile);
+  const source = read(checkFile.content);
   const expectations = expectationsOf(source);
 
   if (!Array.isReadonlyArrayNonEmpty(expectations)) {
@@ -276,6 +338,7 @@ export const weaknessesOf = (
   }
 
   const bases = territoryPaths.map(baseOf);
+  const intoTerritory = reaches(checkFile.path);
   const mocks = mocksOf(source);
 
   const every = (holds: (each: Expectation) => boolean) =>
@@ -285,13 +348,13 @@ export const weaknessesOf = (
     [
       "self-referential",
       !importsOf(source).some((specifier) =>
-        bases.some((base) => reaches(specifier, base))
+        bases.some((base) => intoTerritory(specifier, base))
       ),
     ],
-    ["constant pin", every(({ subject }) => isLiteral(subject))],
+    ["constant pin", every(isConstantPin)],
     ["absence-only", every(isAbsence)],
     ["mock-only", every(isOnMock(mocks))],
-    ["fixture-asserts-fixture", every(isFromOneFixture)],
+    ["fixture-asserts-fixture", every(isFromOneFixture(resultsOf(source)))],
   ];
 
   return found.flatMap(([weakness, holds]) => (holds ? [weakness] : []));

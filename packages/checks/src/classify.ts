@@ -149,10 +149,6 @@ const failedTestsOf = (lines: readonly string[]) =>
   );
 
 const fromOutput = (exit: RunExit): Diagnosis => {
-  if (exit.code === 0) {
-    return Diagnosis.Passed();
-  }
-
   const output = `${exit.stdout}\n${exit.stderr}`.replaceAll(ANSI, "");
   const lines = output.split("\n").map(String.trim);
   const assertion = assertionOf(lines);
@@ -214,7 +210,7 @@ const fromReport = (report: VitestReport, exit: RunExit): Diagnosis => {
     return Diagnosis.NoTests();
   }
 
-  return exit.code === 0 ? Diagnosis.Passed() : fromOutput(exit);
+  return fromOutput(exit);
 };
 
 // No exit code (a signal), "not executable" (126), "not found" (127), or
@@ -225,10 +221,17 @@ const neverRan = (code: number) =>
 /**
  * What one run says happened. A run stopped at its time limit, or one whose
  * command never ran, is `Blocked`: the verifier's trouble, not the answer's.
+ * Otherwise exit 0 is `Passed` whatever the report says (a run with
+ * `--passWithNoTests` found none and passed), and a failure is read from the
+ * report, or from the output when there is none.
  */
 export const diagnose = (exit: RunExit): Diagnosis => {
   if (exit.timedOut === true || neverRan(exit.code)) {
     return Diagnosis.Blocked();
+  }
+
+  if (exit.code === 0) {
+    return Diagnosis.Passed();
   }
 
   return Option.match(decodeReport(exit.report), {

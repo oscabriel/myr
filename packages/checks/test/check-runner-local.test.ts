@@ -1,5 +1,5 @@
 import { NodeServices } from "@effect/platform-node";
-import { describe, expect, it } from "@effect/vitest";
+import { describe, expect, it, vi } from "@effect/vitest";
 import {
   AreaName,
   CommitSha,
@@ -58,8 +58,19 @@ const world = Effect.gen(function* () {
     repo: RepoName.make("datekit"),
   });
 
-  return { checkout, job };
+  return { checkout, job, repo };
 });
+
+// What git exports to a hook that runs the CLI: its own repo, and the config
+// given with `git -c`. Restored when the test's scope closes.
+const inHook = (repo: string) =>
+  Effect.acquireRelease(
+    Effect.sync(() => {
+      vi.stubEnv("GIT_DIR", `${repo}/.git`);
+      vi.stubEnv("GIT_CONFIG_PARAMETERS", "'user.name'='Hook'");
+    }),
+    () => Effect.sync(() => vi.unstubAllEnvs())
+  );
 
 describe(CheckRunnerLocal.layer, () => {
   it.live("runs each lane as a process in a checkout, and classifies it", () =>
@@ -93,6 +104,53 @@ describe(CheckRunnerLocal.layer, () => {
       );
       expect(ran.evidence).toStrictEqual([{ lane: LaneName.make("test") }]);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live("gives a job a HOME of its own, and removes it after the job", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const { checkout, job } = yield* world;
+      const seen = yield* fs.makeTempDirectoryScoped({ prefix: "seen-" });
+
+      const ran = yield* Effect.flatMap(CheckRunner, (runner) =>
+        runner.run(job([lane("home", `printf %s "$HOME" > "${seen}/home"`)]))
+      ).pipe(Effect.provide(CheckRunnerLocal.layer({ checkout })));
+
+      const home = yield* fs.readFileString(`${seen}/home`);
+
+      expect(ran.lanes.map(({ result }) => result)).toStrictEqual(["passed"]);
+      expect(home).toContain("check-home-");
+      expect(yield* fs.exists(home)).toBeFalsy();
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "keeps the repo and git config of a hook that runs it away from a lane's git",
+    () =>
+      Effect.gen(function* () {
+        const { checkout, job, repo } = yield* world;
+
+        yield* inHook(repo);
+
+        const ran = yield* Effect.flatMap(CheckRunner, (runner) =>
+          runner.run(
+            job([
+              lane(
+                "own-repo",
+                `test "$(git rev-parse --absolute-git-dir)" = "$(pwd -P)/.git"`
+              ),
+              lane("no-hook-config", `test -z "$(git config --get user.name)"`),
+            ])
+          )
+        ).pipe(Effect.provide(CheckRunnerLocal.layer({ checkout })));
+
+        expect(
+          ran.lanes.map(({ lane: name, result }) => [name, result])
+        ).toStrictEqual([
+          ["own-repo", "passed"],
+          ["no-hook-config", "passed"],
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
   it.live("stops a lane at its time limit and calls it blocked", () =>
