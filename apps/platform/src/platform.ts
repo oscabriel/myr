@@ -49,33 +49,21 @@ export const StageName = Schema.String.check(
 /** Which Lander lands answers (spec §8 D6): the sandbox's container, or isomorphic-git here. */
 export const LanderAdapter = Schema.Literals(["container", "isogit"]);
 
-/** Who signs in with GitHub needs all three, or the stage runs without sign-in. */
-const signInKeys = [
-  "COOKIE_KEY",
-  "GITHUB_CLIENT_ID",
-  "GITHUB_CLIENT_SECRET",
-] as const;
-
 /**
  * Everything the platform reads from the Worker's env, decoded once
  * (principle 2): the bindings `wrangler.jsonc` declares, its vars, and the
- * secrets `.env.schema` declares, each redacted. Only `OPERATOR_TOKEN` is
- * required among the secrets; GitHub's two and the cookie key come together
- * or not at all.
+ * secrets `.env.schema` declares, each redacted. Every secret but
+ * `SESSION_TOKENS` is required: sign-in's cookie key and pepper too, since
+ * accounts are the platform's own.
  */
 export const PlatformEnv = Schema.Struct({
   ANSWER: binding<Env["ANSWER"]>("the Answer Workflow"),
   ARTIFACTS: binding<Env["ARTIFACTS"]>("an Artifacts namespace"),
   CLAIM_LIMIT: binding<Env["CLAIM_LIMIT"]>("a rate limit"),
-  COOKIE_KEY: Schema.optionalKey(Schema.RedactedFromValue(Token)),
+  /** Seals a sign-in in progress into its form (`auth/state.ts`). */
+  COOKIE_KEY: Schema.RedactedFromValue(Token),
   EVIDENCE: binding<Env["EVIDENCE"]>("an R2 bucket"),
   FRONT_PAGE: binding<Env["FRONT_PAGE"]>("a D1 database"),
-  GITHUB_CLIENT_ID: Schema.optionalKey(
-    Schema.RedactedFromValue(Schema.NonEmptyString)
-  ),
-  GITHUB_CLIENT_SECRET: Schema.optionalKey(
-    Schema.RedactedFromValue(Schema.NonEmptyString)
-  ),
   LANDER_ADAPTER: LanderAdapter.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed("container"))
   ),
@@ -84,28 +72,18 @@ export const PlatformEnv = Schema.Struct({
   ON_PUSH: binding<Env["ON_PUSH"]>("the OnPush Workflow"),
   OPERATOR_HANDLE: Handle,
   OPERATOR_TOKEN: Schema.RedactedFromValue(Token),
+  /** HMAC'd with every password before PBKDF2 (`auth/password.ts`). */
+  PASSWORD_PEPPER: Schema.RedactedFromValue(Token),
   PROJECT: binding<Env["PROJECT"]>("the Project Durable Object"),
   PROPOSAL_LIMIT: binding<Env["PROPOSAL_LIMIT"]>("a rate limit"),
   SANDBOX: binding<Env["SANDBOX"]>("the sandbox Worker"),
-  /** Named sessions until sign-in exists (spec §8 D9): JSON, token → handle. */
+  /** Named sessions beside accounts (spec §8 D9): JSON, token → handle. */
   SESSION_TOKENS: Schema.optionalKey(
     Schema.RedactedFromValue(Schema.fromJsonString(SessionTable))
   ),
+  SIGN_IN_LIMIT: binding<Env["SIGN_IN_LIMIT"]>("a rate limit"),
   STAGE: StageName,
-}).check(
-  Schema.makeFilter((env) => {
-    const missing = signInKeys.flatMap((key) =>
-      env[key] === undefined ? [key] : []
-    );
-
-    return missing.length === 0 || missing.length === signInKeys.length
-      ? true
-      : missing.map((key) => ({
-          issue: "set with the other sign-in keys, or none of them",
-          path: [key],
-        }));
-  })
-);
+});
 
 export type PlatformConfig = typeof PlatformEnv.Type;
 
@@ -154,20 +132,18 @@ const sessionsOf = (config: PlatformConfig) => {
 };
 
 /**
- * The surfaces' services from the Worker's env, decoded once: the contracts
- * (`Vacant` until 317 composes the handlers), sessions, the stage, and the
- * ports, which are stubs until 317 wires them.
+ * The surfaces' services from the decoded env: the contracts (`Vacant`
+ * until 317 composes the handlers), sessions, the stage, and the ports,
+ * which are stubs until 317 wires them.
  */
-export const platform = (env: Env): Layer.Layer<Services, InvalidEnv> =>
-  Layer.unwrap(
-    decodeEnv(env).pipe(
-      Effect.map((config) =>
-        Layer.mergeAll(
-          Vacant,
-          sessionsOf(config),
-          workerPorts(config),
-          Layer.succeed(Stage, Stage.of({ name: config.STAGE }))
-        )
-      )
-    )
+export const platformOf = (config: PlatformConfig): Layer.Layer<Services> =>
+  Layer.mergeAll(
+    Vacant,
+    sessionsOf(config),
+    workerPorts(config),
+    Layer.succeed(Stage, Stage.of({ name: config.STAGE }))
   );
+
+/** The surfaces' services from the Worker's env, decoded once. */
+export const platform = (env: Env): Layer.Layer<Services, InvalidEnv> =>
+  Layer.unwrap(decodeEnv(env).pipe(Effect.map(platformOf)));
