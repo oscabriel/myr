@@ -1,0 +1,24 @@
+{
+  "name": "@repo/artifacts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./repo-host": "./src/repo-host.ts",
+    "./repo-host/memory": "./src/repo-host/memory.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/protocol": "workspace:*",
+    "effect": "catalog:",
+    "isomorphic-git": "1.43.0"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@repo/config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

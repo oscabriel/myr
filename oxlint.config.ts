@@ -116,6 +116,9 @@ export default defineConfig({
       },
     ],
     "oxc/no-accumulating-spread": "error",
+    // Effect: its `asyncFunction` diagnostic bans `async`; promises appear only
+    // where a library takes them, as plain promise-returning functions.
+    "typescript/promise-function-async": "off",
     // Effect: `Effect.forEach(xs, f, { concurrency })` is not a `thisArg`.
     "unicorn/no-array-method-this-argument": "off",
     // Effect: `Schema.TaggedError<X>()(…)` returns a class, not an error.
