@@ -11,12 +11,13 @@ import type { Person, Principal } from "./principal.ts";
 
 /**
  * The credential in an `authorization: Bearer <token>` header, if it holds
- * one. A host's HTTP gate reads it with this too, so the gate and the server
- * side agree on what a credential is.
+ * one; the scheme matches in any case (RFC 7235 §2.1). A host's HTTP gate
+ * reads it with this too, so the gate and the server side agree on what a
+ * credential is.
  */
 export const bearerToken = (authorization: string | undefined) =>
   Option.fromNullishOr(
-    /^Bearer (?<token>\S+)$/u.exec(authorization ?? "")?.groups?.token
+    /^Bearer (?<token>\S+)$/iu.exec(authorization ?? "")?.groups?.token
   );
 
 /**

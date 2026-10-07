@@ -6,7 +6,7 @@ import { AlarmsMemory } from "@repo/project/alarms/memory";
 import { AnswerRuns } from "@repo/project/answer-runs";
 import { Lander } from "@repo/project/lander";
 import { projectService } from "@repo/project/project";
-import type { ProjectApi, PushReport } from "@repo/project/project";
+import type { ProjectApi } from "@repo/project/project";
 import { ProjectStore } from "@repo/project/project-store";
 import { ProjectStoreMemory } from "@repo/project/project-store/memory";
 import { ProjectionMemory } from "@repo/project/projection/memory";
@@ -18,7 +18,6 @@ import { Policy } from "@repo/protocol/domain/policy";
 import {
   AskId,
   CommitSha,
-  DecisionId,
   Handle,
   LandedSha,
   ProjectName,
@@ -148,8 +147,6 @@ const strayHead = sha("datekit:stray");
 const answerHead = sha("datekit:answer");
 
 const canonical = RepoKind.Canonical({ project: datekit });
-
-const canonicalRepo = RepoName.make(datekit);
 
 const bobsFork = RepoKind.ClaimFork({
   ask: parseIso,
@@ -386,72 +383,12 @@ const projectsOf = (api: ProjectApi) =>
     })
   );
 
-/**
- * `api` whose `recordPush` of a push to canonical `main` records the push
- * event and opens a `StrayPush` decision, default revert, in one commit, so
- * the same event recorded twice opens one decision. That is the DO's part
- * 313 needs (its issue's Comments): W2's service runs the gate over such a
- * push and opens nothing, so this test stands in for it, writing the
- * decision as `packages/project/test/deciders.test.ts` does.
- */
-const openingStrays = (api: ProjectApi) =>
-  Effect.gen(function* () {
-    const store = yield* ProjectStore;
-
-    const open = (report: PushReport) =>
-      Effect.gen(function* () {
-        const now = yield* DateTime.now;
-        const { decisions } = yield* store.load();
-        const number = String(decisions.length + 1).padStart(6, "0");
-
-        yield* store.commit({
-          decisions: [
-            {
-              deciders: [scenario.initializer],
-              default: "revert",
-              evidence: [],
-              expiresAt: DateTime.add(now, { days: 14 }),
-              id: DecisionId.make(`dec-${number}`),
-              openedAt: now,
-              project: datekit,
-              subject: DecisionSubject.cases.StrayPush.make({
-                after: report.after,
-                before: Option.getOrElse(report.before, () => ZeroSha),
-                ref: RefNameText.make(report.ref),
-              }),
-            },
-          ],
-          pushEvents: [
-            {
-              after: report.after,
-              at: now,
-              eventId: report.eventId,
-              ref: report.ref,
-              repo: report.repo,
-              ...Option.match(report.before, {
-                onNone: () => ({}),
-                onSome: (before) => ({ before }),
-              }),
-            },
-          ],
-        });
-
-        return [];
-      });
-
-    return {
-      ...api,
-      recordPush: (report: PushReport) =>
-        report.repo === canonicalRepo ? open(report) : api.recordPush(report),
-    } satisfies ProjectApi;
-  });
-
 /** datekit's service over its seeded store, and `Projects` holding it, at noon. */
 const world = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
   yield* seeded;
 
-  const api = yield* openingStrays(yield* projectService(datekit));
+  const api = yield* projectService(datekit);
 
   return { api, projects: projectsOf(api), store: yield* ProjectStore };
 }).pipe(Effect.provide(ports));

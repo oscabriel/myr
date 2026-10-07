@@ -10,7 +10,9 @@
  * Lander checks nothing out and runs nothing from the trees it handles.
  * Nothing here pushes with force, `--force-with-lease` or `--atomic` to
  * `main` (S1 #4, #6): a landing is a plain push, which git refuses when
- * `main` moved, and only a compose ref, never `main`, moves by a lease.
+ * `main` moved, and only a compose ref, never `main`, moves by a lease. A
+ * merge pushes one ref, to the answer's fork alone: the merged commit, for
+ * the Checker to fetch (W3 304 #1).
  */
 import { Brand } from "@repo/brand";
 import type { LandJob, Merged, MergeJob } from "@repo/project/lander/wire";
@@ -59,6 +61,13 @@ export const composeCopy = "refs/lander/compose";
 
 /** The canonical branch a landing moves. */
 export const mainRef = "refs/heads/main";
+
+/**
+ * Where a merged commit waits, in the answer's fork, for a Checker to fetch
+ * its tree: named by the tree, so a ref an answerer rewrote cannot change
+ * what is checked (at worst the Checker finds no such tree).
+ */
+export const mergeRef = (tree: string) => `${Brand.refsPrefix}merge/${tree}`;
 
 // Each git command: no hooks, no helper that could see a token, no redirect
 // a header could follow, and nothing running in the background.
@@ -189,7 +198,7 @@ export interface MergeScript {
   readonly changes: GitStep;
 }
 
-/** A merge, start to end. It writes nothing to either remote. */
+/** A merge's fetches and merge; it writes nothing to canonical. */
 export const mergeScript = (
   job: typeof MergeJob.Type,
   remotes: { readonly main: string; readonly fork: string }
@@ -211,7 +220,13 @@ export const mergeScript = (
 export const pushRef = (
   repo: RepoName,
   url: string,
-  update: { readonly to: string; readonly ref: string; readonly lease?: string }
+  update: {
+    readonly to: string;
+    readonly ref: string;
+    readonly lease?: string;
+    /** The remote it reaches: canonical, unless it is the fork. */
+    readonly remote?: RemoteName;
+  }
 ): GitStep => ({
   argv: git(
     repo,
@@ -225,7 +240,7 @@ export const pushRef = (
     `${update.to}:${update.ref}`
   ),
   expect: "push",
-  remote: "main",
+  remote: update.remote ?? "main",
 });
 
 /** The two pushes of a landing. */

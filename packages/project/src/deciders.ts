@@ -26,6 +26,7 @@ import { scan } from "@repo/gate/stages/shape";
 import { formatLanding } from "@repo/git/trailers";
 import type { AnswerReceipt, LandReceipt } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
+import { RefNameText } from "@repo/protocol/domain/common";
 import type { Evidence } from "@repo/protocol/domain/common";
 import type { Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
@@ -40,6 +41,7 @@ import type { RunBlock } from "@repo/protocol/domain/run";
 import type { Ledger } from "@repo/protocol/domain/visibility";
 import {
   AskId,
+  CommitSha,
   DecisionId,
   EnvKey,
   LandedSha,
@@ -50,7 +52,7 @@ import {
   TreeSha,
   sameHandle,
 } from "@repo/protocol/ids";
-import type { CommitSha, ProjectName, Handle } from "@repo/protocol/ids";
+import type { ProjectName, Handle } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import type { Principal } from "@repo/protocol/principal";
 import {
@@ -720,6 +722,45 @@ export const envItemsOf = (text: string): readonly EnvItem[] => {
   return items;
 };
 
+/** git's zero id: the `before` of a push that created its ref. */
+const zeroId = CommitSha.make("0".repeat(40));
+
+/**
+ * The decision a move of canonical `main` the platform did not make opens
+ * (W3 313, CM §4): `StrayPush`, whose default is revert, for the project's
+ * own deciders (`**`), else its initializer, with `before` as git's zero id
+ * when the push created `main`. The service mints the id; a `main` moved to
+ * a landing or to the landed SHA is the platform's, and opens none.
+ */
+export const strayDecision = (input: {
+  readonly after: CommitSha;
+  readonly before: Option.Option<CommitSha>;
+  readonly id: DecisionId;
+  readonly initializer: Handle;
+  readonly now: DateTime.Utc;
+  readonly policy: Policy;
+  readonly project: ProjectName;
+}): Decision =>
+  openDecision({
+    deciders: decidersOn(input.policy, [], input.initializer),
+    evidence: [],
+    expireDays: input.policy.budget.expireDays,
+    id: input.id,
+    now: input.now,
+    project: input.project,
+    subject: DecisionSubject.cases.StrayPush.make({
+      after: input.after,
+      before: Option.getOrElse(input.before, () => zeroId),
+      ref: RefNameText.make("refs/heads/main"),
+    }),
+  });
+
+/** The id a project's next decision takes, after the ones `h` and `writes` hold. */
+export const nextDecisionId = (
+  decisions: readonly Decision[],
+  written: ReadonlyMap<DecisionId, Decision>
+) => DecisionId.make(minted("dec", overlaid(decisions, written).length));
+
 /** The deadlines a project's proposals and decisions set its alarm to: each open one's expiry. */
 export const deciderDeadlines = (h: DeciderState): readonly DateTime.Utc[] => [
   ...h.proposals.flatMap(({ expiresAt, state }) =>
@@ -1158,6 +1199,16 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         return;
       }
 
+      // Putting a deleted main back is a ref update the Lander can't make
+      // yet (W3 313 #4); the landed SHA still names it.
+      if (after === zeroId) {
+        yield* Effect.logError(
+          `canonical ${ref} was deleted; put it back at ${before} by hand`
+        );
+
+        return;
+      }
+
       const commit = yield* kernel
         .withPorts(RepoHost.use((host) => host.readCommit(repo, before)))
         .pipe(Effect.orElseSucceed(() => Option.none()));
@@ -1243,6 +1294,12 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
     }
   ) => {
     const { after, before, ref } = input.stray;
+
+    if (after === zeroId) {
+      return Effect.logError(
+        `canonical ${ref} was deleted; a deleted ${ref} cannot be adopted, so the landed SHA stays`
+      );
+    }
 
     return ref === mainRef
       ? recordLanding(

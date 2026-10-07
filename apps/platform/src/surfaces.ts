@@ -94,21 +94,6 @@ export const protectedResourceMetadata = (origin: string) => ({
 });
 
 /**
- * The platform as an OAuth authorization server (RFC 8414), until W3 316's
- * provider answers this path itself: the endpoints it mounts, PKCE with
- * S256 only, and public clients.
- */
-const authorizationServerMetadata = (origin: string) => ({
-  authorization_endpoint: `${origin}/authorize`,
-  code_challenge_methods_supported: ["S256"],
-  grant_types_supported: ["authorization_code", "refresh_token"],
-  issuer: origin,
-  response_types_supported: ["code"],
-  token_endpoint: `${origin}/token`,
-  token_endpoint_auth_methods_supported: ["none"],
-});
-
-/**
  * A 401 for `request`: it asks for a bearer token and names where to learn
  * how to get one (RFC 9728 §5.1, which MCP's authorization requires). Its
  * `error` is `invalid_token` only for a bearer token the platform does not
@@ -288,26 +273,20 @@ const health = HttpRouter.use((router) =>
   })
 );
 
-/** The two OAuth discovery documents, each by its path. */
-const DISCOVERY_DOCUMENTS = [
-  [PROTECTED_RESOURCE_PATH, protectedResourceMetadata],
-  ["/.well-known/oauth-authorization-server", authorizationServerMetadata],
-] as const;
-
 /**
- * The two OAuth discovery documents, answered to anyone: where a client
- * learns that the platform is its own authorization server.
+ * The protected-resource document (RFC 9728), answered to anyone: where a
+ * client learns that the platform is its own authorization server. The
+ * authorization server's document is the sign-in provider's, which answers
+ * its path before the surfaces see it (`auth/provider.ts`, W3 316).
  */
 const discovery = HttpRouter.use((router) =>
-  Effect.gen(function* () {
-    for (const [path, document] of DISCOVERY_DOCUMENTS) {
-      yield* router.add("GET", path, (request) =>
-        Effect.succeed(
-          HttpServerResponse.jsonUnsafe(document(originOf(request)))
-        )
-      );
-    }
-  })
+  router.add("GET", PROTECTED_RESOURCE_PATH, (request) =>
+    Effect.succeed(
+      HttpServerResponse.jsonUnsafe(
+        protectedResourceMetadata(originOf(request))
+      )
+    )
+  )
 );
 
 /** A git request, as the gateway answers it; 404 for a path it does not serve. */

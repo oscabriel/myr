@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Option, Ref } from "effect";
 import { RpcTest } from "effect/rpc";
 
-import { authenticated } from "../src/authenticate.ts";
+import { authenticated, bearerToken } from "../src/authenticate.ts";
 import { Contracts } from "../src/contracts.ts";
 import { Handle, ProjectName } from "../src/ids.ts";
 import {
@@ -131,4 +131,26 @@ describe("the server side of Authenticated", () => {
       expect(yield* callers).toStrictEqual([alice, alice]);
     })
   );
+});
+
+describe(bearerToken, () => {
+  it("reads the token whatever the scheme's case, and nothing from another scheme", () => {
+    expect(
+      [
+        "Bearer alice-token",
+        "bearer alice-token",
+        "BEARER alice-token",
+        "Basic YWxpY2U6dG9rZW4=",
+        "Bearer",
+        undefined,
+      ].map(bearerToken)
+    ).toStrictEqual([
+      Option.some("alice-token"),
+      Option.some("alice-token"),
+      Option.some("alice-token"),
+      Option.none(),
+      Option.none(),
+      Option.none(),
+    ]);
+  });
 });

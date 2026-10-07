@@ -70,7 +70,8 @@ import type { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import type { LandingView } from "@repo/protocol/domain/landing";
-import type { Outcome, StageName } from "@repo/protocol/domain/outcome";
+import { Outcome } from "@repo/protocol/domain/outcome";
+import type { StageName } from "@repo/protocol/domain/outcome";
 import { Policy } from "@repo/protocol/domain/policy";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
@@ -145,7 +146,7 @@ import {
   ReportedCommand,
   Steps,
 } from "./answer-runs.ts";
-import type { AnswerQueue, AnswerRuns } from "./answer-runs.ts";
+import type { AnswerQueue, AnswerRuns, RunnableEffect } from "./answer-runs.ts";
 import { isStep } from "./answer-runs/steps.ts";
 import { recordOf } from "./attention/record.ts";
 import { mayClaim, standing } from "./attention/vouch.ts";
@@ -164,6 +165,8 @@ import {
   decidesOn,
   envSchemaMethod,
   isDecider,
+  nextDecisionId,
+  strayDecision,
 } from "./deciders.ts";
 import type { DeciderApi, Opening } from "./deciders.ts";
 import { askClosed, askOpened, judged, listingOf, numbered } from "./events.ts";
@@ -891,6 +894,17 @@ const byUpdated = Order.mapInput(
   ({ row }: Answered) => row.updatedAt
 );
 
+/**
+ * The verdict a landing carries: the one the checks gave, whose outcome
+ * was the answer's when it was judged (a stage still to pass), now `Landed`
+ * at the landing's SHA (W3 311 #9).
+ */
+const landedVerdict = (verdict: Option.Option<Verdict>, sha: LandedSha) =>
+  Option.map(verdict, (made): Verdict => ({
+    ...made,
+    outcome: Outcome.cases.Landed.make({ sha }),
+  }));
+
 /** A `Landed` event with the verdict the landing carries; any other event as it is. */
 const withVerdict = (
   event: ProjectEventInput,
@@ -899,13 +913,16 @@ const withVerdict = (
   Match.value(event).pipe(
     Match.tag("Landed", (landed): ProjectEventInput => ({
       ...landed,
-      landing: { ...landed.landing, ...field("verdict", verdict) },
+      landing: {
+        ...landed.landing,
+        ...field("verdict", landedVerdict(verdict, landed.landing.sha)),
+      },
     })),
     Match.orElse((other) => other)
   );
 
 /** Whether a landing's effect is for the answer's run: a step, or a retry to wait for. */
-const runnable = (effect: LandingEffect) =>
+const runnable = (effect: LandingEffect): effect is RunnableEffect =>
   isStep(effect) || LandingEffect.$is("Retry")(effect);
 
 const isTouchedJudge = (refusal: Refusal): refusal is TouchedJudge =>
@@ -1655,7 +1672,7 @@ export const projectService = (
           requestId: request.requestId,
           sha,
           ...field("ask", request.ask),
-          ...field("verdict", landed.verdict),
+          ...field("verdict", landedVerdict(landed.verdict, sha)),
         });
 
         if (Option.isSome(request.ask)) {
@@ -1942,6 +1959,24 @@ export const projectService = (
 
     // ------------------------------------------------------------ writes
 
+    /**
+     * The first adoption as a landing: the initializer's first push, or an
+     * import's tip. It answers no ask and has no parent; its row lets
+     * `landing` (and so OnPush) know the commit as the platform's own.
+     */
+    const adoption = (
+      author: Handle,
+      sha: LandedSha,
+      now: DateTime.Utc
+    ): LandingView => ({
+      assisted: [],
+      author,
+      credits: [],
+      landedAt: now,
+      project: name,
+      sha,
+    });
+
     const initBody =
       (
         caller: Person,
@@ -1977,6 +2012,7 @@ export const projectService = (
 
           const landed = yield* adopt(input.import);
 
+          writes.landings.push(adoption(caller.handle, landed, now));
           writes.project.set(
             "row",
             yield* withPolicyAt({ ...made, landed, state: "live" }, landed, now)
@@ -2005,6 +2041,7 @@ export const projectService = (
             return row.landed === landed ? { landed } : yield* refused;
           }
 
+          writes.landings.push(adoption(row.initializer, landed, now));
           writes.project.set(
             "row",
             yield* withPolicyAt({ ...row, landed, state: "live" }, landed, now)
@@ -2486,6 +2523,49 @@ export const projectService = (
       });
     };
 
+    /**
+     * Canonical `main` moved to a commit that is neither the landed SHA nor
+     * a landing, or deleted, opens a `StrayPush` decision, in the same
+     * commit as the push event's row, so an event reported again opens
+     * nothing (W3 313).
+     */
+    const strayOn = (
+      h: Hydrated,
+      writes: Writes,
+      input: { readonly landed: LandedSha; readonly push: PushReport },
+      now: DateTime.Utc
+    ) =>
+      Effect.gen(function* () {
+        const { after, before, ref } = input.push;
+        const row = Option.getOrUndefined(h.project);
+
+        if (
+          row === undefined ||
+          Option.isNone(h.policy) ||
+          input.push.repo !== repo ||
+          ref !== mainRef ||
+          after === input.landed
+        ) {
+          return;
+        }
+
+        if (Option.isSome(yield* store.landing(after))) {
+          return;
+        }
+
+        const decision = strayDecision({
+          after,
+          before,
+          id: nextDecisionId(h.decisions, writes.decisions),
+          initializer: row.initializer,
+          now,
+          policy: h.policy.value,
+          project: name,
+        });
+
+        writes.decisions.set(decision.id, decision);
+      });
+
     const pushBody =
       (input: PushReport) => (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
         Effect.gen(function* () {
@@ -2546,6 +2626,12 @@ export const projectService = (
           );
 
           yield* keepAlive(h, writes, { claimed, push: input }, now);
+          yield* strayOn(
+            h,
+            writes,
+            { landed: live.value.landed, push: input },
+            now
+          );
 
           writes.pushEvents.push({
             after: input.after,

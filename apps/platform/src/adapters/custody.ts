@@ -28,19 +28,17 @@
  * gate's later stages never run inside the push (spec D5).
  */
 import type { RepoName } from "@repo/artifacts/repo-host";
-import { Brand } from "@repo/brand";
 import { Custody } from "@repo/git/custody";
 import type { Command } from "@repo/git/custody";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
-import type { AnswerReceipt } from "@repo/protocol/domain/answer";
-import { Outcome } from "@repo/protocol/domain/outcome";
 import { RequestId, sameHandle } from "@repo/protocol/ids";
 import type { AskId, CommitSha, Handle, ProjectName } from "@repo/protocol/ids";
 import { Principal } from "@repo/protocol/principal";
 import type { Person } from "@repo/protocol/principal";
 import { ClaimLapsed, DirectPush, NotClaimed } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
+import { receiptLine } from "@repo/protocol/render";
 import { Array, Effect, Option, Result } from "effect";
 
 import { RepoKind } from "../repo-names.ts";
@@ -50,8 +48,6 @@ const mainRef = "refs/heads/main";
 
 /** Says a line to the pusher, as a `remote:` line of git's output. */
 export type Notice = (line: string) => Effect.Effect<void>;
-
-const short = (sha: string) => sha.slice(0, 7);
 
 /**
  * The request a push to a claim's fork answers with: it names the head and
@@ -76,31 +72,6 @@ const mainTip = (commands: readonly Command[]) =>
     (command) =>
       Option.map(command.to, (head) => ({ from: command.from, head }))
   );
-
-/** What the pusher reads of the answer the push offered, or the refusals it came to. */
-const receiptSays = (
-  receipt: AnswerReceipt
-): Result.Result<string, readonly Refusal[]> => {
-  const at = `${receipt.ask} at ${short(receipt.head)}`;
-  const follow = `follow with ${Brand.cli} status`;
-
-  return Outcome.match<Result.Result<string, readonly Refusal[]>>(
-    receipt.outcome,
-    {
-      AwaitingDecision: ({ decision }) =>
-        Result.succeed(`${at} waits on decision ${decision}; ${follow}`),
-      AwaitingFinish: () =>
-        Result.succeed(
-          `${at} passed and waits for a decider's finish; ${follow}`
-        ),
-      Checking: () => Result.succeed(`checking ${at}; ${follow}`),
-      Landed: ({ sha }) => Result.succeed(`${at} landed as ${short(sha)}`),
-      Refused: ({ refusals }) => Result.fail(refusals),
-      WaitingOnParent: ({ ask }) =>
-        Result.succeed(`${at} passed and waits for ${ask} to land; ${follow}`),
-    }
-  );
-};
 
 /** Runs `judge` against the project; a project never made refuses the push. */
 const against = (
@@ -242,7 +213,7 @@ const offer = (input: {
       return [submitted.failure];
     }
 
-    return yield* Result.match(receiptSays(submitted.success), {
+    return yield* Result.match(receiptLine(submitted.success), {
       onFailure: Effect.succeed,
       onSuccess: (line) => Effect.as(input.notice(line), []),
     });

@@ -167,16 +167,27 @@ export class SetAlarms extends Context.Service<
   { readonly all: Effect.Effect<readonly number[]> }
 >()("test/SetAlarms") {}
 
-/** Every `Answer` Workflow instance made, in order, and how many creates were tried. */
+/** How an `Answer` Workflow instance stands, as its `status()` reports it. */
+export type InstanceState = Awaited<
+  ReturnType<Awaited<ReturnType<AnswerWorkflow["get"]>>["status"]>
+>["status"];
+
+/**
+ * Every `Answer` Workflow instance made, in order, how many creates were
+ * tried, and every restart asked for; `end` moves an instance to a state
+ * the engine would (its run completed, errored or was terminated).
+ */
 export class Instances extends Context.Service<
   Instances,
   {
+    readonly end: (id: string, state: InstanceState) => Effect.Effect<void>;
     readonly made: Effect.Effect<
       readonly {
         readonly id: string;
         readonly params: typeof AnswerParams.Encoded;
       }[]
     >;
+    readonly restarts: Effect.Effect<readonly string[]>;
     readonly tries: Effect.Effect<number>;
   }
 >()("test/Instances") {}
@@ -275,11 +286,25 @@ const alarms = Layer.unwrap(
 
 /**
  * The `Answer` Workflow binding: an instance per id, made once. Like the
- * real one, `create` refuses an id it has, and `get` finds it.
+ * real one, `create` refuses an id it has, `get` finds it, an instance runs
+ * once made, and `restart` runs it again from its first step.
  */
 export const answerWorkflow = () => {
   const made = new Map<string, typeof AnswerParams.Encoded>();
+  const states = new Map<string, InstanceState>();
   const tries: string[] = [];
+  const restarts: string[] = [];
+
+  const instance = (id: string) => ({
+    id,
+    restart: () => {
+      restarts.push(id);
+      states.set(id, "running");
+
+      return Promise.resolve();
+    },
+    status: () => Promise.resolve({ status: states.get(id) ?? "running" }),
+  });
 
   const workflow: AnswerWorkflow = {
     create: ({ id, params }) => {
@@ -290,17 +315,23 @@ export const answerWorkflow = () => {
       }
 
       made.set(id, params);
+      states.set(id, "running");
 
       return Promise.resolve({ id });
     },
     get: (id) =>
       made.has(id)
-        ? Promise.resolve({ id })
+        ? Promise.resolve(instance(id))
         : Promise.reject(new Error(`no instance ${id}`)),
   };
 
   const instances = Instances.of({
+    end: (id, state) =>
+      Effect.sync(() => {
+        states.set(id, state);
+      }),
     made: Effect.sync(() => [...made].map(([id, params]) => ({ id, params }))),
+    restarts: Effect.sync(() => [...restarts]),
     tries: Effect.sync(() => tries.length),
   });
 

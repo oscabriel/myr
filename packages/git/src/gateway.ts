@@ -22,6 +22,22 @@ import type { Service } from "./upstream.ts";
 const ROUTE =
   /^\/(?<name>[A-Za-z0-9._-]+?)(?:\.git)?\/(?<endpoint>info\/refs|git-upload-pack|git-receive-pack)$/u;
 
+/** One of the three endpoints of git's smart HTTP. */
+export type GitEndpoint = "info/refs" | "git-upload-pack" | "git-receive-pack";
+
+/** The repo a smart HTTP path names, and the endpoint it asks for; `None` for any other path. */
+export const gitRoute = (
+  pathname: string
+): Option.Option<{ readonly endpoint: GitEndpoint; readonly name: string }> =>
+  Option.flatMap(Option.fromNullishOr(ROUTE.exec(pathname)?.groups), (route) =>
+    route.name === undefined ||
+    (route.endpoint !== "info/refs" &&
+      route.endpoint !== "git-upload-pack" &&
+      route.endpoint !== "git-receive-pack")
+      ? Option.none()
+      : Option.some({ endpoint: route.endpoint, name: route.name })
+  );
+
 const isService = (service: string | null): service is Service =>
   service === "git-upload-pack" || service === "git-receive-pack";
 
@@ -71,9 +87,14 @@ const bodyOf = (request: Request) =>
     ? Option.some(request.body.pipeThrough(bytes()))
     : Option.none();
 
-const plain = (status: number, text: string) =>
+/** A plain-text reply, which git prints as the reason a request failed. */
+export const plain = (
+  status: number,
+  text: string,
+  headers: Readonly<Record<string, string>> = {}
+) =>
   new Response(`${text}\n`, {
-    headers: { "content-type": "text/plain; charset=utf-8" },
+    headers: { "content-type": "text/plain; charset=utf-8", ...headers },
     status,
   });
 
@@ -316,12 +337,13 @@ export const gateway = (
 ): Effect.Effect<Response, never, Upstream | Custody> =>
   Effect.gen(function* () {
     const url = new URL(request.url);
-    const route = ROUTE.exec(url.pathname)?.groups;
+    const found = gitRoute(url.pathname);
 
-    if (route?.name === undefined) {
+    if (Option.isNone(found)) {
       return plain(404, "not a git endpoint");
     }
 
+    const route = found.value;
     const upstream = yield* Upstream;
     const repo = RepoName.make(route.name);
     const headers = forwarded(request.headers);

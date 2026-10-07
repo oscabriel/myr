@@ -13,7 +13,11 @@
  *
  * Refs and pushes use a token the adapter mints for the one call and revokes
  * after it; the token goes nowhere but the `Authorization` header of the
- * adapter's own requests. Every repo handle is disposed after use.
+ * adapter's own requests. The day-long write token a create, a fork or an
+ * import hands back is revoked at once: any write token can force-push
+ * `main` (S1 #4), and no caller needs it (W3 302 #4). A repo still being
+ * created or imported is asked for again, from 250 ms apart, up to eight
+ * times. Every repo handle is disposed after use.
  */
 import {
   Data,
@@ -25,6 +29,7 @@ import {
   Option,
   Predicate,
   Redacted,
+  Schedule,
   Schema,
 } from "effect";
 
@@ -189,6 +194,21 @@ const entriesOf = (entries: readonly ArtifactsTreeEntry[]) =>
     })
   ).pipe(Effect.orDie);
 
+/** Whether `get` found the repo still being created or imported. */
+const stillMaking = (thrown: Thrown) =>
+  threw("CREATE_IN_PROGRESS")(thrown) || threw("IMPORT_IN_PROGRESS")(thrown);
+
+/** A handle to `name`, asked for again while the repo is still being made. */
+const handleOf = (binding: Artifacts, name: RepoName) =>
+  attempt(() => binding.get(name)).pipe(
+    Effect.retry({
+      schedule: Schedule.exponential(Duration.millis(250)),
+      times: 7,
+      while: stillMaking,
+    }),
+    Effect.catchTag("Thrown", (thrown) => fromArtifactsError(name, thrown))
+  );
+
 /** `use` over a handle to `name`, disposed after, whatever `use` came to. */
 const withRepo = <A, E, R>(
   binding: Artifacts,
@@ -196,13 +216,33 @@ const withRepo = <A, E, R>(
   use: (repo: ArtifactsRepo) => Effect.Effect<A, E, R>
 ) =>
   Effect.scoped(
-    Effect.acquireRelease(
-      call(name, () => binding.get(name)),
-      (repo) =>
-        Effect.sync(() => {
-          repo[Symbol.dispose]();
-        })
+    Effect.acquireRelease(handleOf(binding, name), (repo) =>
+      Effect.sync(() => {
+        repo[Symbol.dispose]();
+      })
     ).pipe(Effect.flatMap(use))
+  );
+
+/**
+ * The repo `made` names, its initial write token revoked: nothing the
+ * adapter's callers do needs it. A revoke that fails is logged, never the
+ * call's failure: the repo was made, and the token went nowhere.
+ */
+const withoutToken = (
+  binding: Artifacts,
+  made: { readonly remote: string; readonly token: string },
+  name: RepoName
+) =>
+  withRepo(binding, name, (repo) =>
+    attempt(() => repo.revokeToken(made.token))
+  ).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logWarning("the initial write token was not revoked", {
+        cause: String(cause).replaceAll(made.token, "<token>"),
+        repo: name,
+      })
+    ),
+    Effect.as({ name, remote: made.remote })
   );
 
 /**
@@ -262,7 +302,6 @@ const confirmed = (binding: Artifacts, name: RepoName) =>
 const forkOnce = (binding: Artifacts, base: RepoName, name: RepoName) =>
   withRepo(binding, base, (repo) =>
     attempt(() => repo.fork(name)).pipe(
-      Effect.map(({ remote }) => ({ name, remote })),
       Effect.catchTag("Thrown", (thrown) =>
         Match.value(thrown).pipe(
           Match.when(threw("INTERNAL_ERROR"), () =>
@@ -275,7 +314,7 @@ const forkOnce = (binding: Artifacts, base: RepoName, name: RepoName) =>
         )
       )
     )
-  );
+  ).pipe(Effect.flatMap((made) => withoutToken(binding, made, name)));
 
 /**
  * Whether the repo holds `id` as a blob or a commit: `readBlob` answers
@@ -330,7 +369,6 @@ const importFrom = (
       target: { name },
     })
   ).pipe(
-    Effect.map(({ remote }) => ({ name, remote })),
     Effect.catchTag("Thrown", (thrown) =>
       Match.value(thrown).pipe(
         Match.when(threw("ALREADY_EXISTS"), () =>
@@ -344,7 +382,8 @@ const importFrom = (
         ),
         Match.orElse(asDefect)
       )
-    )
+    ),
+    Effect.flatMap((made) => withoutToken(binding, made, name))
   );
 
 const log = (
@@ -423,7 +462,7 @@ const make = (binding: Artifacts) =>
     return RepoHost.of({
       create: (name) =>
         call(name, () => binding.create(name)).pipe(
-          Effect.map(({ remote }) => ({ name, remote })),
+          Effect.flatMap((made) => withoutToken(binding, made, name)),
           Effect.catchTags({
             ForkInProgress: Effect.die,
             RepoNotFound: Effect.die,

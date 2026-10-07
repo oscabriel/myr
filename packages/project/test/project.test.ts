@@ -865,6 +865,9 @@ describe.each(["memory", "sqlite"] as const)(
             parent: opened.opened.landed,
             requestId: answered.requestId,
             sha: answered.landed,
+            verdict: {
+              outcome: Outcome.cases.Landed.make({ sha: answered.landed }),
+            },
           });
           expect(answered.listedAfter).toStrictEqual({ asks: [] });
         })

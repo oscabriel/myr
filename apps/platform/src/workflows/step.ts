@@ -39,8 +39,11 @@ export class StepRunner extends Context.Service<
     /**
      * Runs `effect` once per (instance, name); a replay returns the recorded
      * value, decoded with `schema`. A failure is retried per `retry` (the
-     * engine's default without one), records nothing, and, once the retries
-     * are spent, fails the step with the last failure.
+     * engine's default without one), records no value, and, once the
+     * retries are spent, fails the step with the last failure. A replay of
+     * a spent step dies: the engine keeps only an error, not the typed
+     * failure, so a program that must survive one records its outcome as a
+     * value in a step of its own (OnPush's `settle`).
      */
     readonly step: <A, I, E, R>(
       name: string,
@@ -110,9 +113,15 @@ const durableStep =
 export const workflowSteps = (steps: WorkflowSteps): Layer.Layer<StepRunner> =>
   Layer.succeed(StepRunner, StepRunner.of({ step: durableStep(steps) }));
 
+/** What the in-memory steps keep per name: a step's value, or its last failure. */
+interface MemoRecords {
+  readonly values: Ref.Ref<ReadonlyMap<string, Schema.Json>>;
+  readonly failures: Ref.Ref<ReadonlyMap<string, unknown>>;
+}
+
 /** One step over an in-memory record of steps, keyed by name. */
 const memoStep =
-  (records: Ref.Ref<ReadonlyMap<string, Schema.Json>>) =>
+  ({ failures, values }: MemoRecords) =>
   <A, I, E, R>(
     name: string,
     schema: Schema.Codec<A, I>,
@@ -121,27 +130,50 @@ const memoStep =
   ): Effect.Effect<A, E, R> =>
     Effect.gen(function* () {
       const json = Schema.toCodecJson(schema);
-      const kept = (yield* Ref.get(records)).get(name);
+      const kept = (yield* Ref.get(values)).get(name);
 
       if (kept !== undefined) {
         return yield* Effect.orDie(Schema.decodeEffect(json)(kept));
       }
 
-      const value = yield* Effect.retry(effect, { times: retry?.limit ?? 0 });
+      // The engine throws a spent step's kept failure again without running
+      // it, and no process in a replay saw the typed failure (W3 313 #8).
+      const spent = (yield* Ref.get(failures)).get(name);
+
+      if (spent !== undefined) {
+        return yield* Effect.die(spent);
+      }
+
+      const value = yield* Effect.retry(effect, {
+        times: retry?.limit ?? 0,
+      }).pipe(
+        Effect.tapError((failure) =>
+          Ref.update(failures, (all) => new Map(all).set(name, failure))
+        )
+      );
+
       const encoded = yield* Effect.orDie(Schema.encodeEffect(json)(value));
 
-      yield* Ref.update(records, (all) => new Map(all).set(name, encoded));
+      yield* Ref.update(values, (all) => new Map(all).set(name, encoded));
 
       return yield* Effect.orDie(Schema.decodeEffect(json)(encoded));
     });
 
 /**
- * Steps in memory, for tests: the layer keeps one record per step name for
- * as long as the returned layer lives, so running a program twice over it
- * replays the second time. A failed step records nothing and is retried up
- * to its limit, without waiting.
+ * Steps in memory, for tests, replaying as the engine does: the layer keeps
+ * one record per step name for as long as the returned layer lives, so
+ * running a program twice over it replays the second time. A failed step is
+ * retried up to its limit, without waiting; once its retries are spent it
+ * fails with its last failure, and a replay dies without running it, as a
+ * replay over `workflowSteps` does when the engine throws the failure it
+ * kept.
  */
 export const memoSteps = (): Effect.Effect<Layer.Layer<StepRunner>> =>
-  Effect.map(Ref.make<ReadonlyMap<string, Schema.Json>>(new Map()), (records) =>
-    Layer.succeed(StepRunner, StepRunner.of({ step: memoStep(records) }))
+  Effect.map(
+    Effect.all({
+      failures: Ref.make<ReadonlyMap<string, unknown>>(new Map()),
+      values: Ref.make<ReadonlyMap<string, Schema.Json>>(new Map()),
+    }),
+    (records) =>
+      Layer.succeed(StepRunner, StepRunner.of({ step: memoStep(records) }))
   );

@@ -97,7 +97,10 @@ export const BundleJob = Schema.Struct({
   repo: RepoName,
 }) satisfies Schema.Codec<BundleJobArgs, unknown, unknown, unknown>;
 
-/** A merge: read tokens on canonical and on the answer's fork. */
+/**
+ * A merge: a read token on canonical, and a write token on the answer's
+ * fork, where the merged commit waits for the Checker (W3 304 #1).
+ */
 export const MergeWire = Schema.Struct({
   fork: Remote,
   job: MergeJob,

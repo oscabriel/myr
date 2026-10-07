@@ -412,7 +412,7 @@ describe("the sandbox CheckRunner", () => {
 
 describe("the sandbox Lander", () => {
   it.effect(
-    "merges with read tokens on canonical and the fork, and nothing more",
+    "merges with a read token on canonical and a write token on the fork, for the merged commit's ref, and nothing more",
     () =>
       Effect.gen(function* () {
         const { host, lander, minted, seen } = yield* world();
@@ -422,7 +422,7 @@ describe("the sandbox Lander", () => {
         );
         expect(mintsOf(minted)).toStrictEqual([
           { repo: canonical, scope: "read" },
-          { repo: fork, scope: "read" },
+          { repo: fork, scope: "write" },
         ]);
         expect(
           seen.merge.map((wire) => ({

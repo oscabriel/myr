@@ -335,20 +335,23 @@ const claimant = (record: number): Claimant => ({
 describe("the Lander's git", () => {
   describe(merge, () => {
     it.live(
-      "merges a clean answer onto main: the tree git's own merge makes, the answer's changes, and nothing written to either repo",
+      "merges a clean answer onto main: the tree git's own merge makes, the answer's changes, nothing written to canonical, and the merged commit kept on the fork for the Checker",
       () =>
         Effect.gen(function* () {
           const repos = yield* world;
           const { base, head, main } = yield* diverged(repos);
-
-          const before = yield* Effect.all([
-            repos.stateOf(repos.canonical),
-            repos.stateOf(repos.fork),
-          ]);
+          const before = yield* repos.stateOf(repos.canonical);
 
           const merged = yield* merge(
             mergeWire(repos, { base, head, main })
           ).pipe(Effect.provide(box(repos.work)), Effect.exit);
+
+          const tree = yield* repos.mergedTree(main, head);
+
+          const kept = yield* repos.revision(
+            repos.fork,
+            `${Brand.refsPrefix}merge/${tree}`
+          );
 
           expect(merged).toStrictEqual(
             Exit.succeed({
@@ -365,15 +368,18 @@ describe("the Lander's git", () => {
                   status: "added",
                 },
               ],
-              tree: yield* repos.mergedTree(main, head),
+              tree,
             })
           );
+          expect(yield* repos.stateOf(repos.canonical)).toStrictEqual(before);
           expect(
-            yield* Effect.all([
-              repos.stateOf(repos.canonical),
-              repos.stateOf(repos.fork),
-            ])
-          ).toStrictEqual(before);
+            yield* Effect.forEach(Option.toArray(kept), (commit) =>
+              Effect.all([
+                gitOk(repos.fork, "rev-parse", `${commit}^{tree}`),
+                gitOk(repos.fork, "rev-parse", `${commit}^1`, `${commit}^2`),
+              ])
+            )
+          ).toStrictEqual([[tree, `${main}\n${head}`]]);
         }).pipe(Effect.scoped, Effect.provide(TestServices))
     );
 

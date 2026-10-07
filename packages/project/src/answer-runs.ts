@@ -142,9 +142,21 @@ export const AnswerReport = Schema.Struct({
 
 export type AnswerReport = typeof AnswerReport.Type;
 
-/** What one reported step changed: where the answer stands now, and the port calls to run next. */
+/** A landing effect the answer's run carries out: a port call, or a retry to wait for. */
+export type RunnableEffect = Extract<
+  LandingEffect,
+  { readonly _tag: NextStep["_tag"] }
+>;
+
+type NextStep = typeof NextStep.Type;
+
+/**
+ * What one reported step changed: where the answer stands now, and the port
+ * calls to run next. Only `NextStep`'s effects, so whatever the service
+ * returns here crosses the Project DO's boundary (W3 302 #3).
+ */
 export interface Advanced {
-  readonly effects: readonly LandingEffect[];
+  readonly effects: readonly RunnableEffect[];
   readonly outcome: Outcome;
 }
 

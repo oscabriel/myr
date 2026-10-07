@@ -101,26 +101,6 @@ describe("discovering how to sign in", () => {
   );
 
   it.effect(
-    "answers the authorization server's document from a placeholder until sign-in mounts its own",
-    () =>
-      Effect.gen(function* () {
-        const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
-
-        const response = yield* fetch(
-          new Request(`${origin}/.well-known/oauth-authorization-server`)
-        );
-
-        expect(response.status).toBe(200);
-        expect(yield* Effect.promise(() => response.json())).toMatchObject({
-          authorization_endpoint: `${origin}/authorize`,
-          code_challenge_methods_supported: ["S256"],
-          issuer: origin,
-          token_endpoint: `${origin}/token`,
-        });
-      })
-  );
-
-  it.effect(
     "never turns away /health or the sign-in paths, whatever credential they carry",
     () =>
       Effect.gen(function* () {

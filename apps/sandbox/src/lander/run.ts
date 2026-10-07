@@ -60,6 +60,7 @@ import {
   lsTree,
   mainCopy,
   mainRef,
+  mergeRef,
   mergeScript,
   mergeTree,
   notesCopy,
@@ -245,42 +246,6 @@ const runner = (tokens: Tokens) => {
   });
 };
 
-/**
- * The answer's head merged onto canonical `main` with its base as the merge
- * base: the merged tree and the answer's changes, or `StaleBase` with the
- * paths that conflict. Nothing is pushed.
- */
-export const merge = (wire: typeof MergeWire.Type) =>
-  Effect.gen(function* () {
-    const { job } = wire;
-
-    const { run } = yield* runner({
-      fork: wire.fork.token,
-      main: wire.main.token,
-    });
-
-    const script = mergeScript(job, {
-      fork: wire.fork.url,
-      main: wire.main.url,
-    });
-
-    yield* Effect.forEach(script.fetch, run, { discard: true });
-
-    const merged = readMerge((yield* run(script.merge)).stdout);
-
-    if (merged.conflicts.length > 0) {
-      return yield* new StaleBase({
-        base: job.base,
-        conflicts: merged.conflicts,
-        main: job.main,
-      });
-    }
-
-    const changes = readChanges((yield* run(script.changes)).stdout);
-
-    return { changes, tree: merged.tree };
-  });
-
 /** Clock time, in the whole seconds a git signature holds. */
 const seconds = Effect.map(Clock.currentTimeMillis, (millis) =>
   Math.floor(millis / 1000)
@@ -371,6 +336,93 @@ const committed = (
     );
 
     return CommitSha.make(ran.stdout.trim());
+  });
+
+/**
+ * The merged tree as a commit on `main` and the head, pushed to the fork's
+ * `mergeRef(tree)`, where a Checker's fetch of the fork's refs finds it
+ * (W3 304 #1). It is dated at the epoch, so merging the same sides again
+ * makes the same commit, and pushing it again changes nothing.
+ */
+const keptForChecks = (
+  job: Job,
+  sides: {
+    readonly head: CommitSha;
+    readonly main: LandedSha;
+    readonly tree: TreeSha;
+  }
+) =>
+  Effect.gen(function* () {
+    yield* prepared(job);
+
+    const commit = yield* committed(job, {
+      at: 0,
+      author: committerLine,
+      message: `Merge ${sides.head} onto ${sides.main}, for its checks\n`,
+      parents: [sides.main, sides.head],
+      tree: sides.tree,
+    });
+
+    const ref = mergeRef(sides.tree);
+
+    const push = pushRef(job.repo, job.url, {
+      ref,
+      remote: "fork",
+      to: commit,
+    });
+
+    const ran = yield* job.run(push);
+
+    return readPush(ran, ref) === "moved"
+      ? commit
+      : yield* job.blocked(push, printed(ran));
+  });
+
+/**
+ * The answer's head merged onto canonical `main` with its base as the merge
+ * base: the merged tree and the answer's changes, or `StaleBase` with the
+ * paths that conflict. Nothing is pushed.
+ */
+export const merge = (wire: typeof MergeWire.Type) =>
+  Effect.gen(function* () {
+    const { job } = wire;
+
+    const steps = yield* runner({
+      fork: wire.fork.token,
+      main: wire.main.token,
+    });
+
+    const { run } = steps;
+
+    const script = mergeScript(job, {
+      fork: wire.fork.url,
+      main: wire.main.url,
+    });
+
+    yield* Effect.forEach(script.fetch, run, { discard: true });
+
+    const merged = readMerge((yield* run(script.merge)).stdout);
+
+    if (merged.conflicts.length > 0) {
+      return yield* new StaleBase({
+        base: job.base,
+        conflicts: merged.conflicts,
+        main: job.main,
+      });
+    }
+
+    const changes = readChanges((yield* run(script.changes)).stdout);
+
+    yield* keptForChecks(
+      { ...steps, repo: job.repo, url: wire.fork.url },
+      {
+        head: job.head,
+        main: job.main,
+        tree: merged.tree,
+      }
+    );
+
+    return { changes, tree: merged.tree };
   });
 
 /** A path's folders and file name; one that cannot name a file is a defect upstream. */

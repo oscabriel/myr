@@ -141,32 +141,33 @@ describe(memoSteps, () => {
   );
 
   it.effect(
-    "records nothing for a step that failed, so the next run tries again",
+    "keeps a step that failed past its retries failed: a replay does not run it again, and dies as the engine's does",
     () =>
       Effect.gen(function* () {
         const steps = yield* memoSteps();
         const runs = yield* Ref.make(0);
         const stale = new StaleBase({ base: sha, conflicts: [], main: sha });
 
-        const failing = StepRunner.use(({ step }) =>
+        const run = StepRunner.use(({ step }) =>
           step(
             "land#1",
             Landing,
             Effect.andThen(
               Ref.update(runs, (n) => n + 1),
               Effect.fail(stale)
-            )
+            ),
+            { backoff: "constant", delayMs: 0, limit: 1 }
           )
-        ).pipe(Effect.provide(steps), Effect.flip);
+        ).pipe(
+          Effect.provide(steps),
+          Effect.flip,
+          Effect.catchDefect(() => Effect.succeed("died"))
+        );
 
-        expect(yield* failing).toStrictEqual(stale);
-
-        const landed = StepRunner.use(({ step }) =>
-          step("land#1", Landing, counted(runs))
-        ).pipe(Effect.provide(steps));
-
-        expect(yield* landed).toStrictEqual(landing);
-        expect(yield* Ref.get(runs)).toBe(2);
+        expect({
+          runs: [yield* run, yield* run],
+          tries: yield* Ref.get(runs),
+        }).toStrictEqual({ runs: [stale, "died"], tries: 2 });
       })
   );
 });

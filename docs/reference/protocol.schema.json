@@ -5201,7 +5201,6 @@
             "author",
             "credits",
             "landedAt",
-            "parent",
             "project",
             "sha"
           ],
@@ -9114,7 +9113,6 @@
               "author",
               "credits",
               "landedAt",
-              "parent",
               "project",
               "sha"
             ],
@@ -11103,7 +11101,6 @@
                 "author",
                 "credits",
                 "landedAt",
-                "parent",
                 "project",
                 "sha"
               ],

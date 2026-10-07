@@ -81,7 +81,14 @@ type Intercept = (request: Request) => Effect.Effect<Option.Option<Response>>;
  * recorded, so a test can check both came back.
  */
 const world = (
-  options: FakeOptions & { readonly wrap?: (host: HostLike) => HostLike } = {}
+  options: FakeOptions & {
+    readonly wrap?: (host: HostLike) => HostLike;
+    /** How many of the first `get`s answer that the repo is still being made, and how. */
+    readonly making?: {
+      readonly code: "CREATE_IN_PROGRESS" | "IMPORT_IN_PROGRESS";
+      readonly gets: number;
+    };
+  } = {}
 ) =>
   Effect.gen(function* () {
     const root = yield* temporaryRoot;
@@ -150,11 +157,22 @@ const world = (
     const run = yield* FiberSet.makeRuntimePromise();
     const counts = { disposed: 0, gets: 0 };
     const tokens: { id: string; plaintext: string }[] = [];
+    let making = options.making?.gets ?? 0;
 
     const binding: Artifacts = {
       ...fake,
-      get: (name) =>
-        run(
+      get: (name) => {
+        if (making > 0 && options.making !== undefined) {
+          making -= 1;
+
+          return Promise.reject(
+            Object.assign(new Error("the repo is still being made"), {
+              code: options.making.code,
+            })
+          );
+        }
+
+        return run(
           Effect.promise(() => fake.get(name)).pipe(
             Effect.map((repo): ArtifactsRepo => {
               counts.gets += 1;
@@ -176,7 +194,8 @@ const world = (
               };
             })
           )
-        ),
+        );
+      },
     };
 
     return {
@@ -534,6 +553,69 @@ describe("the Workers binding's surprises, typed", () => {
 });
 
 describe("tokens and handles the binding takes", () => {
+  it.live("leaves no live token on a repo it created, forked or imported", () =>
+    within(({ fake }) =>
+      Effect.gen(function* () {
+        const repos = yield* RepoHost;
+        const base = RepoName.make("kept");
+        const fork = RepoName.make("kept--fix--bob");
+        const imported = RepoName.make("imported");
+
+        yield* seeded(base);
+        yield* repos.fork(base, fork).pipe(Effect.orDie);
+        yield* repos
+          .importFrom(imported, {
+            url: yield* repos.remote(base).pipe(Effect.orDie),
+          })
+          .pipe(Effect.orDie);
+
+        const left = yield* Effect.forEach([base, fork, imported], (name) =>
+          Effect.acquireUseRelease(
+            Effect.promise(() => fake.get(name)),
+            (repo) =>
+              Effect.promise(() => repo.listTokens()).pipe(
+                Effect.map(
+                  ({ tokens: listed }) =>
+                    [
+                      name,
+                      listed.filter(({ state }) => state === "active").length,
+                    ] as const
+                )
+              ),
+            (repo) =>
+              Effect.sync(() => {
+                repo[Symbol.dispose]();
+              })
+          )
+        );
+
+        expect(left).toStrictEqual([
+          [base, 0],
+          [fork, 0],
+          [imported, 0],
+        ]);
+      })
+    )
+  );
+
+  it.live.each(["CREATE_IN_PROGRESS", "IMPORT_IN_PROGRESS"] as const)(
+    "waits out a repo still being made (%s) before it reads it",
+    (code) =>
+      within(
+        () =>
+          Effect.gen(function* () {
+            const repos = yield* RepoHost;
+            const name = RepoName.make("making");
+            const { first } = yield* seeded(name);
+
+            expect(yield* repos.refs(name).pipe(Effect.orDie)).toStrictEqual(
+              new Map([[main, first]])
+            );
+          }),
+        { making: { code, gets: 2 } }
+      )
+  );
+
   it.live(
     "sends each minted token only to the repo's own remote, then revokes it",
     () =>

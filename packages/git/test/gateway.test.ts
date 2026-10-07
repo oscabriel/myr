@@ -7,6 +7,7 @@ import { git, gitOk } from "@repo/testkit/git";
 import { Effect, Option, Ref } from "effect";
 
 import { Custody } from "../src/custody.ts";
+import { gitRoute } from "../src/gateway.ts";
 import { admitAll, commit, world } from "./world.ts";
 
 /** Custody that refuses, before forwarding, any push touching `ref`. */
@@ -337,4 +338,29 @@ describe("the gateway between git and its upstream", () => {
       }).pipe(Effect.provide(NodeServices.layer)),
     20_000
   );
+});
+
+describe(gitRoute, () => {
+  it("reads a repo and git's endpoint from a smart HTTP path, and nothing else", () => {
+    expect(
+      [
+        "/datekit.git/info/refs",
+        "/datekit/git-upload-pack",
+        "/datekit--parse-iso--alice.git/git-receive-pack",
+        "/datekit.git/HEAD",
+        "/org/datekit.git/info/refs",
+        "/rpc",
+      ].map(gitRoute)
+    ).toStrictEqual([
+      Option.some({ endpoint: "info/refs", name: "datekit" }),
+      Option.some({ endpoint: "git-upload-pack", name: "datekit" }),
+      Option.some({
+        endpoint: "git-receive-pack",
+        name: "datekit--parse-iso--alice",
+      }),
+      Option.none(),
+      Option.none(),
+      Option.none(),
+    ]);
+  });
 });

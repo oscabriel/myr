@@ -1,6 +1,9 @@
-import { DateTime, Match } from "effect";
+import { Brand } from "@repo/brand";
+import { DateTime, Match, Result } from "effect";
 import type { Array } from "effect";
 
+import type { AnswerReceipt } from "./domain/answer.ts";
+import { Outcome } from "./domain/outcome.ts";
 import type { Refusal } from "./refusal.ts";
 
 const short = (sha: string) => sha.slice(0, 7);
@@ -110,3 +113,33 @@ export const headline = (refusals: Array.NonEmptyReadonlyArray<Refusal>) => {
  */
 export const explain = (refusals: Array.NonEmptyReadonlyArray<Refusal>) =>
   refusals.flatMap(block);
+
+/**
+ * Where an answer's receipt stands, in one line for git's `remote:` output
+ * and the CLI's `submit` (W4 404): the answer is checking, waits on a
+ * decision, a finish or its parent ask, or landed. A refused answer gives
+ * its refusals back, for `explain`.
+ */
+export const receiptLine = (
+  receipt: AnswerReceipt
+): Result.Result<string, readonly Refusal[]> => {
+  const at = `${receipt.ask} at ${short(receipt.head)}`;
+  const follow = `follow with ${Brand.cli} status`;
+
+  return Outcome.match<Result.Result<string, readonly Refusal[]>>(
+    receipt.outcome,
+    {
+      AwaitingDecision: ({ decision }) =>
+        Result.succeed(`${at} waits on decision ${decision}; ${follow}`),
+      AwaitingFinish: () =>
+        Result.succeed(
+          `${at} passed and waits for a decider's finish; ${follow}`
+        ),
+      Checking: () => Result.succeed(`checking ${at}; ${follow}`),
+      Landed: ({ sha }) => Result.succeed(`${at} landed as ${short(sha)}`),
+      Refused: ({ refusals }) => Result.fail(refusals),
+      WaitingOnParent: ({ ask }) =>
+        Result.succeed(`${at} passed and waits for ${ask} to land; ${follow}`),
+    }
+  );
+};

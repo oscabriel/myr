@@ -185,6 +185,37 @@ describe("the Answer Workflow as AnswerRuns", () => {
   );
 
   it.effect(
+    "runs an instance again when its run has ended, and leaves a live one alone",
+    () =>
+      Effect.gen(function* () {
+        const { instances, workflow } = answerWorkflow();
+        const live = RequestId.make("req-live0001");
+
+        const ended = [
+          RequestId.make("req-done0001"),
+          RequestId.make("req-fail0001"),
+          RequestId.make("req-stop0001"),
+        ] as const;
+
+        const runs = yield* AnswerRuns.pipe(
+          Effect.provide(AnswerRunsWorkflow(workflow, project))
+        );
+
+        yield* Effect.forEach([live, ...ended], (id) => runs.start(id, queue));
+        yield* instances.end(live, "waiting");
+        yield* instances.end(ended[0], "complete");
+        yield* instances.end(ended[1], "errored");
+        yield* instances.end(ended[2], "terminated");
+        yield* Effect.forEach([live, ...ended], (id) => runs.start(id, queue));
+
+        expect({
+          made: (yield* instances.made).length,
+          restarts: yield* instances.restarts,
+        }).toStrictEqual({ made: 4, restarts: [...ended] });
+      })
+  );
+
+  it.effect(
     "dies when the Workflow can neither make nor find the instance",
     () =>
       Effect.gen(function* () {

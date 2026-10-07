@@ -1,8 +1,9 @@
 /**
  * `Lander` over the sandbox Worker (spec §4.3, D6): each job goes to the
  * trusted Lander container through the `SANDBOX` service binding, with the
- * fewest tokens it needs. Reads take read tokens: a merge on canonical and
- * the fork, a bundle on canonical. A write token on canonical goes only to
+ * fewest tokens it needs. Reads take read tokens: a merge on canonical, a
+ * bundle on canonical. A merge's write token is on the answer's fork alone,
+ * for the merged commit the Checker fetches. A write token on canonical goes only to
  * `land`, which moves `main` with a non-force compare-and-swap, and to
  * `compose`, which pushes its compose ref alone; never to a Checker, never
  * outside the platform's Workers (S1 change 2). The outcome comes back as
@@ -86,9 +87,11 @@ export const LanderSandbox = (
                 ),
             })
           ).pipe(Effect.provideService(RepoHost, host)),
+        // The merged commit goes to the fork, for the Checker: a write token
+        // there, never on canonical (W3 304 #1).
         merge: (job) =>
           withRemote("merge", read(job.repo), (main) =>
-            withRemote("merge", read(job.fork), (fork) =>
+            withRemote("merge", write(job.fork), (fork) =>
               sandboxJob({
                 exit: MergeExit,
                 job: { fork, job, main },

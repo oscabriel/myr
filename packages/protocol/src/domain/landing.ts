@@ -18,7 +18,8 @@ export const LandingView = Schema.Struct({
   /** `Held-back: <area> <passed>/<total> @ <suite>`, when held-back checks judged it. */
   heldBackTrailer: Schema.optionalKey(Schema.NonEmptyString),
   landedAt: Schema.DateTimeUtcFromString,
-  parent: LandedSha,
+  /** Main before it; absent for the first adoption (the initializer's first push, or an import's tip). */
+  parent: Schema.optionalKey(LandedSha),
   project: ProjectName,
   requestId: Schema.optionalKey(RequestId),
   sha: LandedSha,

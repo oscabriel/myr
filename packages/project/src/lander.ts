@@ -152,7 +152,10 @@ export class Lander extends Context.Service<
   {
     /**
      * The answer's head merged three ways onto `main` (its base the merge
-     * base), or `StaleBase` with the paths that conflict.
+     * base), or `StaleBase` with the paths that conflict. An adapter whose
+     * Checker fetches the tree keeps it where the Checker reaches: the
+     * sandbox Lander pushes a commit of it to the fork's
+     * `${Brand.refsPrefix}merge/<tree>` (W3 304 #1).
      */
     readonly merge: (
       job: MergeJob

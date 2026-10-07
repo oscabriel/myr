@@ -74,10 +74,19 @@ const run = (
       try: (signal) => container.exec([...argv], execOptions(options, signal)),
     });
 
+    // Effect aborts `exec`'s signal only while `exec` itself is pending;
+    // once the process runs, an interrupt (a lane's time limit) kills it,
+    // or it would run on beside the lanes after it (W3 315 #11).
     const output = yield* Effect.tryPromise({
       catch: failed("exec"),
       try: () => process.output(),
-    });
+    }).pipe(
+      Effect.onInterrupt(() =>
+        Effect.sync(() => {
+          process.kill();
+        })
+      )
+    );
 
     return {
       exitCode: output.exitCode,
@@ -97,7 +106,8 @@ export const SdkBox = {
           Effect.flatMap(started(container, start), (running) => {
             const command = run(running, argv, options);
 
-            // Interrupting the command aborts its signal, which stops it.
+            // Interrupting the command stops it: its signal while it starts,
+            // a kill once it runs.
             return options.timeoutMs === undefined
               ? command
               : Effect.timeoutOrElse(command, {

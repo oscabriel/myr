@@ -1,7 +1,16 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { Result } from "effect";
 
-import { EnvKey } from "../src/ids.ts";
+import { Outcome } from "../src/domain/outcome.ts";
+import {
+  AskId,
+  DecisionId,
+  EnvKey,
+  LandedSha,
+  ProjectName,
+  RequestId,
+} from "../src/ids.ts";
 import {
   DirectPush,
   OutOfScope,
@@ -10,8 +19,8 @@ import {
   ValueTooShort,
   Weakened,
 } from "../src/refusal.ts";
-import { explain, headline } from "../src/render.ts";
-import { base, examples, main, path } from "./examples.ts";
+import { explain, headline, receiptLine } from "../src/render.ts";
+import { ask, base, examples, main, path } from "./examples.ts";
 
 const outOfScope = new OutOfScope({ paths: [path] });
 
@@ -104,5 +113,53 @@ describe(explain, () => {
       `  next: ${Brand.cli} env set PAYMENTS_KEY --acknowledge-short`,
       "  retryable: no",
     ]);
+  });
+});
+
+/** A receipt for `ask` at `main`, where `outcome` says the answer stands. */
+const receiptAt = (outcome: Outcome) => ({
+  ask,
+  base,
+  head: main,
+  outcome,
+  project: ProjectName.make("datekit"),
+  requestId: RequestId.make("push-2222222"),
+});
+
+describe(receiptLine, () => {
+  const follow = `follow with ${Brand.cli} status`;
+
+  it("says where the push's answer stands, in one line", () => {
+    expect(
+      [
+        Outcome.cases.Checking.make({ stage: "merge" }),
+        Outcome.cases.AwaitingDecision.make({
+          decision: DecisionId.make("dec-000001"),
+        }),
+        Outcome.cases.AwaitingFinish.make({}),
+        Outcome.cases.WaitingOnParent.make({ ask: AskId.make("parse-iso") }),
+        Outcome.cases.Landed.make({ sha: LandedSha.make("3".repeat(40)) }),
+      ].map((outcome) => receiptLine(receiptAt(outcome)))
+    ).toStrictEqual([
+      Result.succeed(`checking fix-parser at 2222222; ${follow}`),
+      Result.succeed(
+        `fix-parser at 2222222 waits on decision dec-000001; ${follow}`
+      ),
+      Result.succeed(
+        `fix-parser at 2222222 passed and waits for a decider's finish; ${follow}`
+      ),
+      Result.succeed(
+        `fix-parser at 2222222 passed and waits for parse-iso to land; ${follow}`
+      ),
+      Result.succeed("fix-parser at 2222222 landed as 3333333"),
+    ]);
+  });
+
+  it("gives a refused answer's refusals back, for explain", () => {
+    expect(
+      receiptLine(
+        receiptAt(Outcome.cases.Refused.make({ refusals: [outOfScope] }))
+      )
+    ).toStrictEqual(Result.fail([outOfScope]));
   });
 });

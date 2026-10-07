@@ -9167,7 +9167,6 @@ Show one landing on a project's main: the ask it answered, the people it credits
         "author",
         "credits",
         "landedAt",
-        "parent",
         "project",
         "sha"
       ],
@@ -12610,7 +12609,6 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
           "author",
           "credits",
           "landedAt",
-          "parent",
           "project",
           "sha"
         ],

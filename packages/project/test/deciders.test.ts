@@ -6,11 +6,11 @@ import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { Glob, RefNameText } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
-import type { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   AskId,
+  CommitSha,
   DecisionId,
   EnvKey,
   Handle,
@@ -22,7 +22,6 @@ import {
   RepoPath,
   RequestId,
 } from "@repo/protocol/ids";
-import type { CommitSha } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
 import {
   CapReached,
@@ -50,6 +49,7 @@ import {
   Array,
   DateTime,
   Effect,
+  Exit,
   Layer,
   Option,
   Redacted,
@@ -1456,46 +1456,87 @@ describe("the env shape's minimal reading", () => {
   );
 });
 
+/** A commit pushed straight onto canonical main, past the platform. */
+const strayOnto = (first: CommitSha) =>
+  Pusher.use((pusher) =>
+    pusher.push(
+      repo,
+      Option.some(first),
+      changed(
+        start,
+        "packages/trim/src/trim.ts",
+        "export const trim = (s) => s.trimEnd();\n"
+      ),
+      "Stray"
+    )
+  );
+
+/** canonical main's move as OnPush reports it to the project: from nobody the platform knows. */
+const reported = (
+  api: ProjectApi,
+  eventId: string,
+  move: { readonly after: CommitSha; readonly before?: CommitSha }
+) =>
+  api.recordPush({
+    after: move.after,
+    before: Option.fromUndefinedOr(move.before),
+    eventId,
+    pusher: anyone,
+    ref: "refs/heads/main",
+    repo,
+  });
+
 /**
- * A push to canonical main the platform did not make, decided `revert` by
- * alice. W3's OnPush (313) opens such a decision; until then the test writes
- * it to the store, as that workflow will through the service.
+ * Canonical main's moves as OnPush reports them: the initializer's first
+ * push, an ask's landing, then a push the platform did not make, twice
+ * under one event id.
+ */
+const strayReported = Effect.gen(function* () {
+  const api = yield* begun;
+  const first = yield* mainTip;
+
+  yield* reported(api, "evt-first", { after: first });
+
+  const { landed } = yield* openRed(api, "parse-iso");
+
+  yield* reported(api, "evt-landed", { after: landed, before: first });
+
+  const stray = yield* strayOnto(landed);
+
+  yield* reported(api, "evt-stray", { after: stray, before: landed });
+  yield* reported(api, "evt-stray", { after: stray, before: landed });
+
+  return {
+    decisions: (yield* api.today(alice)).decisions.map(
+      ({ deciders, default: byDefault, expiresAt, subject }) => ({
+        byDefault,
+        deciders,
+        expiresAt,
+        subject,
+      })
+    ),
+    first,
+    firstLanding: Exit.map(
+      yield* Effect.exit(api.landing(alice, first)),
+      ({ landing }) => ({ ask: landing.ask, author: landing.author })
+    ),
+    landed,
+    stray,
+  };
+});
+
+/**
+ * A push to canonical main the platform did not make, reported by OnPush
+ * (313), which opens the decision, then decided by alice.
  */
 const strayDecided = (choice: "accept" | "decline") =>
   Effect.gen(function* () {
     const api = yield* begun;
     const host = yield* RepoHost;
     const first = yield* mainTip;
+    const stray = yield* strayOnto(first);
 
-    const stray = yield* Pusher.use((pusher) =>
-      pusher.push(
-        repo,
-        Option.some(first),
-        changed(
-          start,
-          "packages/trim/src/trim.ts",
-          "export const trim = (s) => s.trimEnd();\n"
-        ),
-        "Stray"
-      )
-    );
-
-    const decision: Decision = {
-      deciders: [alice.handle],
-      default: "revert",
-      evidence: [],
-      expiresAt: daysAfter(noon, 14),
-      id: firstDecision,
-      openedAt: noon,
-      project,
-      subject: DecisionSubject.cases.StrayPush.make({
-        after: stray,
-        before: first,
-        ref: RefNameText.make("refs/heads/main"),
-      }),
-    };
-
-    yield* ProjectStore.use((store) => store.commit({ decisions: [decision] }));
+    yield* reported(api, "evt-stray", { after: stray, before: first });
 
     const decided = yield* api.decide(alice, {
       choice,
@@ -1523,7 +1564,75 @@ const strayDecided = (choice: "accept" | "decline") =>
     };
   });
 
+/** canonical main deleted past the platform, as OnPush reports it, then decided by alice. */
+const deletedDecided = (choice: "accept" | "decline") =>
+  Effect.gen(function* () {
+    const api = yield* begun;
+    const first = yield* mainTip;
+
+    yield* reported(api, "evt-deleted", {
+      after: CommitSha.make("0".repeat(40)),
+      before: first,
+    });
+
+    const decided = yield* api.decide(alice, {
+      choice,
+      decision: firstDecision,
+    });
+
+    return {
+      decided: decided.decision.decided?.choice,
+      first,
+      landed: Option.flatMap((yield* stored).project, ({ landed }) =>
+        Option.fromUndefinedOr(landed)
+      ),
+      tip: yield* mainTip,
+    };
+  });
+
 describe("a stray push", () => {
+  it.effect.each(["accept", "decline"] as const)(
+    "that deleted main is put to the deciders, and decided %s moves neither main nor the landed SHA",
+    (choice) =>
+      Effect.map(
+        deletedDecided(choice).pipe(
+          Effect.provide(worldOf(scenario, "memory"))
+        ),
+        (seen) => {
+          expect([seen.decided, seen.tip, seen.landed]).toStrictEqual([
+            choice === "accept" ? "adopt" : "revert",
+            seen.first,
+            Option.some(seen.first),
+          ]);
+        }
+      )
+  );
+
+  it.effect(
+    "reported by OnPush opens one StrayPush decision, default revert, however often the event comes; main moved by the platform opens none",
+    () =>
+      Effect.map(
+        strayReported.pipe(Effect.provide(worldOf(scenario, "memory"))),
+        (seen) => {
+          expect(seen.decisions).toStrictEqual([
+            {
+              byDefault: "revert",
+              deciders: [alice.handle],
+              expiresAt: daysAfter(noon, 14),
+              subject: DecisionSubject.cases.StrayPush.make({
+                after: seen.stray,
+                before: seen.landed,
+                ref: RefNameText.make("refs/heads/main"),
+              }),
+            },
+          ]);
+          expect(seen.firstLanding).toStrictEqual(
+            Exit.succeed({ ask: undefined, author: alice.handle })
+          );
+        }
+      )
+  );
+
   it.effect(
     "decided revert lands a commit on top of it with the tree it replaced, and a Reverts trailer",
     () =>

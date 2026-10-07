@@ -14,7 +14,7 @@
  */
 import { Brand } from "@repo/brand";
 import { Custody } from "@repo/git/custody";
-import { gateway } from "@repo/git/gateway";
+import { gateway, gitRoute, plain } from "@repo/git/gateway";
 import { concat, packetAt, pkt, utf8 } from "@repo/git/pkt-line";
 import type { Upstream } from "@repo/git/upstream";
 import type { Projects } from "@repo/project/projects";
@@ -30,9 +30,6 @@ import { Sessions } from "./sessions.ts";
 /** What serving git needs: who is calling, their projects, and the git server behind. */
 export type GitServices = Sessions | Projects | Upstream;
 
-const ROUTE =
-  /^\/(?<name>[A-Za-z0-9._-]+?)(?:\.git)?\/(?<endpoint>info\/refs|git-upload-pack|git-receive-pack)$/u;
-
 /** A push reads `info/refs` for receive-pack, then posts to it; everything else reads. */
 const writes = (endpoint: string, url: URL) =>
   endpoint === "git-receive-pack" ||
@@ -40,16 +37,6 @@ const writes = (endpoint: string, url: URL) =>
     url.searchParams.get("service") === "git-receive-pack");
 
 const RESULT = "application/x-git-receive-pack-result";
-
-const plain = (
-  status: number,
-  text: string,
-  headers: Readonly<Record<string, string>> = {}
-) =>
-  new Response(`${text}\n`, {
-    headers: { "content-type": "text/plain; charset=utf-8", ...headers },
-    status,
-  });
 
 /**
  * git asks its credential helper for a password only after a 401 that names
@@ -168,13 +155,11 @@ const serve = (
 export const serveGit = (
   request: Request
 ): Option.Option<Effect.Effect<Response, never, GitServices>> =>
-  Option.map(
-    Option.fromNullishOr(ROUTE.exec(new URL(request.url).pathname)?.groups),
-    ({ endpoint = "", name = "" }) =>
-      Effect.flatMap(principalOf(request.headers), (principal) =>
-        Option.match(principal, {
-          onNone: () => Effect.succeed(signIn("that token is not one we know")),
-          onSome: (known) => serve(request, { endpoint, name }, known),
-        })
-      )
+  Option.map(gitRoute(new URL(request.url).pathname), ({ endpoint, name }) =>
+    Effect.flatMap(principalOf(request.headers), (principal) =>
+      Option.match(principal, {
+        onNone: () => Effect.succeed(signIn("that token is not one we know")),
+        onSome: (known) => serve(request, { endpoint, name }, known),
+      })
+    )
   );
