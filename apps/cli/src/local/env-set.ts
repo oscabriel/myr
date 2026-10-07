@@ -30,7 +30,7 @@ const command = "env set";
 const encodeSet = Schema.encodeEffect(SetEnv.successSchema);
 
 /** How a value is piped in, for the person who tried another way. */
-const pipeHint = (key: EnvKey) =>
+const pipeHint = (key: string) =>
   `printf '%s\\n' "$VALUE" | ${Brand.cli} ${command} ${key} --yes`;
 
 /**
@@ -87,6 +87,62 @@ const projectFor = (named: Option.Option<ProjectName>) =>
 
     return yield* projectOf(named, context);
   });
+
+/**
+ * Every spelling of a flag `env set` takes: its own, and effect/cli's
+ * built-in ones. A boolean's `--no-` form counts as its own spelling. A test
+ * holds this list to the flags `env set --help` names.
+ */
+const spellings: ReadonlySet<string> = new Set([
+  "--acknowledge-short",
+  "--completions",
+  "--dry-run",
+  "--help",
+  "--json",
+  "--log-level",
+  "--project",
+  "--version",
+  "--wizard",
+  "--yes",
+  "-h",
+  "-v",
+]);
+
+/** A word that reads as a flag, but as none `env set` takes. */
+const strangeFlag = (word: string) => {
+  const [flag = word] = word.split("=", 1);
+
+  return (
+    word.startsWith("-") &&
+    word !== "-" &&
+    !spellings.has(flag.replace(/^--no-/u, "--"))
+  );
+};
+
+/**
+ * Refuses `<cli> env set` with a word that reads as a flag it does not take,
+ * before effect/cli parses the words. The parser would print such a word
+ * back (`-abc` a letter per error), or act on a `-h` or `-v` inside it, and
+ * a value typed there by mistake must never show, so the line repeats none
+ * of it. `program` runs this first. Words after `--` reach the command,
+ * which refuses them as `not-the-value`.
+ */
+export const refuseStrangeFlags = (
+  argv: readonly string[]
+): Effect.Effect<void, never, Output> => {
+  const end = argv.indexOf("--");
+  const words = end === -1 ? argv : argv.slice(0, end);
+
+  const at = words.findIndex(
+    (word, index) => word === "env" && words[index + 1] === "set"
+  );
+
+  return at !== -1 && words.slice(at + 2).some(strangeFlag)
+    ? usage(
+        `${Brand.cli} ${command} was given a flag it does not take, not repeated here in case it holds the value; the value is read from stdin, never from arguments: ${pipeHint("<KEY>")}`
+      )
+    : Effect.void;
+};
 
 export const envSet = Command.make(
   "set",

@@ -31,6 +31,7 @@ import { RpcTest } from "effect/rpc";
 import type { Rpc } from "effect/rpc";
 import { TestConsole } from "effect/testing";
 
+import { refuseStrangeFlags } from "../../src/local/env-set.ts";
 import { program } from "../../src/main.ts";
 import { Output, OutputPlain } from "../../src/output.ts";
 import type { Mode } from "../../src/output.ts";
@@ -283,6 +284,111 @@ describe(`${Brand.cli} env set`, () => {
       }).pipe(Effect.provide(NodeServices.layer))
   );
 
+  it.live.each([
+    {
+      typed: `-${secret}`,
+      why: "a value that starts with a dash, holding a v that would read as --version",
+    },
+    {
+      typed: "-Zq8_w0rd5ecret",
+      why: "a value effect/cli would read as short flags and print back letter by letter",
+    },
+    { typed: `--${secret}`, why: "a value that reads as a long flag" },
+    { typed: `--token=${secret}`, why: "a value given to a flag it lacks" },
+  ])(
+    "refuses $why as a usage error, in one line that repeats none of it",
+    ({ typed }) =>
+      Effect.gen(function* () {
+        const ran = yield* run([key, typed, ...always, "--yes"]);
+
+        expect(ran.code).toBe(2);
+        expect(ran.calls).toStrictEqual([]);
+        expect(ran.out).toBe("");
+        expect(ran.err.split("\n")).toStrictEqual([
+          expect.stringContaining("stdin"),
+        ]);
+        expect(ran.err).not.toContain(typed.slice(1, 4));
+        neverShown(ran);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live.each([
+    { args: [key, "--project=datekit", "--yes"], shows: "set by alice" },
+    {
+      args: [key, ...always, "--yes", "--log-level", "debug"],
+      shows: "set by alice",
+    },
+    { args: [key, "-h"], shows: "--acknowledge-short" },
+    { args: [key, "--no-json", ...always, "--yes"], shows: "set by alice" },
+  ])("still takes its own flags and effect/cli's: $args", ({ args, shows }) =>
+    Effect.gen(function* () {
+      const ran = yield* run(args);
+
+      expect(ran.code).toBe(0);
+      expect(ran.out).toContain(shows);
+    }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live("screens out no flag that `env set --help` names", () =>
+    Effect.gen(function* () {
+      const help = yield* run(["--help"]);
+
+      const named = help.out.split("\n").flatMap((line) => {
+        const flags = /^\s+(?<flags>-[^\s,]+(?:, -[^\s,]+)*)/u.exec(line)
+          ?.groups?.flags;
+
+        return flags === undefined ? [] : flags.split(", ");
+      });
+
+      expect(named).toStrictEqual(
+        expect.arrayContaining(["--yes", "--project", "--help", "-h"])
+      );
+
+      const screened = yield* Effect.filter(named, (flag) =>
+        Effect.map(
+          Effect.exit(refuseStrangeFlags(["env", "set", key, flag])),
+          Exit.isFailure
+        )
+      );
+
+      expect(screened).toStrictEqual([]);
+    }).pipe(
+      Effect.provide([NodeServices.layer, OutputPlain, TestConsole.layer])
+    )
+  );
+
+  it.live.each([
+    { kept: `${secret}\n`, sent: `${secret}\n\n`, why: "only one newline" },
+    { kept: secret, sent: `${secret}\r\n`, why: "a CRLF as one newline" },
+    { kept: secret, sent: secret, why: "nothing from a value with no newline" },
+  ])("strips $why from the piped value", ({ kept, sent }) =>
+    Effect.gen(function* () {
+      const ran = yield* run([key, ...always, "--yes"], {
+        stdin: Stream.make(new TextEncoder().encode(sent)),
+      });
+
+      expect(ran.code).toBe(0);
+      expect(onlyCall(ran).value).toBe(kept);
+    }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live.each([
+    { sent: "", why: "nothing piped" },
+    { sent: "\n", why: "an empty line piped" },
+  ])(
+    "with $why, exits 2 telling how to pipe the value, and calls nothing",
+    ({ sent }) =>
+      Effect.gen(function* () {
+        const ran = yield* run([key, ...always, "--yes"], {
+          stdin: Stream.make(new TextEncoder().encode(sent)),
+        });
+
+        expect(ran.code).toBe(2);
+        expect(ran.calls).toStrictEqual([]);
+        expect(ran.err).toContain(`| ${Brand.cli} env set ${key}`);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
   it.live("without --yes, exits 2 naming it and calls nothing", () =>
     Effect.gen(function* () {
       const ran = yield* run([key, ...always]);
@@ -316,6 +422,18 @@ describe(`${Brand.cli} env set`, () => {
             method: "plan",
           },
         ]);
+        expect(yield* decodeEnvelope(ran.out)).toStrictEqual({
+          command: "env set",
+          data: {
+            dryRun: {
+              key: "SENTRY_AUTH_TOKEN",
+              project: "datekit",
+              value: "<redacted>",
+            },
+          },
+          ok: true,
+          v: 1,
+        });
         neverShown(ran);
       }).pipe(Effect.provide(NodeServices.layer))
   );

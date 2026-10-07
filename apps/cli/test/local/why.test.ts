@@ -376,6 +376,73 @@ describe(`${Brand.cli} why`, () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
+  it.live(
+    "from a folder inside the repo, takes the path from there and names it from the repo's root",
+    () =>
+      Effect.gen(function* () {
+        const { dir, second } = yield* aRepo;
+        const calls = yield* noCalls;
+
+        const ran = yield* run(
+          `${dir}/src`,
+          ["week.ts:3", "--project", "datekit", "--json"],
+          platformKnowing(Option.some(second), calls)
+        );
+
+        expect(ran.code).toBe(0);
+        expect(yield* decodeEnvelope(ran.out)).toMatchObject({
+          data: { line: 3, path: "src/week.ts", sha: second },
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "without --project, asks about the project the repo's platform remote names",
+    () =>
+      Effect.gen(function* () {
+        const { dir, second } = yield* aRepo;
+        const calls = yield* noCalls;
+
+        yield* gitOk(
+          dir,
+          "remote",
+          "add",
+          "origin",
+          `https://${Brand.domain}/datekit.git`
+        );
+
+        const ran = yield* run(
+          dir,
+          ["src/week.ts:3", "--json"],
+          platformKnowing(Option.some(second), calls)
+        );
+
+        expect(ran.code).toBe(0);
+        expect(yield* Ref.get(calls)).toStrictEqual([
+          { project: "datekit", sha: second },
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "without --project or a platform remote, exits 2 asking for --project, and asks nothing",
+    () =>
+      Effect.gen(function* () {
+        const { dir } = yield* aRepo;
+        const calls = yield* noCalls;
+
+        const ran = yield* run(
+          dir,
+          ["src/week.ts:3"],
+          platformKnowing(Option.none(), calls)
+        );
+
+        expect(ran.code).toBe(2);
+        expect(ran.err).toContain("--project");
+        expect(yield* Ref.get(calls)).toStrictEqual([]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
   it.live("adds the verdict a fetched note carries on that commit", () =>
     Effect.gen(function* () {
       const { dir, first, second } = yield* aRepo;

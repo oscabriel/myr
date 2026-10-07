@@ -11,6 +11,7 @@ import { CliError, Command } from "effect/cli";
 
 import { credential } from "./credential-helper.ts";
 import { hook } from "./hook.ts";
+import { refuseStrangeFlags } from "./local/env-set.ts";
 import { local } from "./local/index.ts";
 import { Output, Reported } from "./output.ts";
 import { mcp } from "./surfaces.ts";
@@ -81,10 +82,13 @@ const isReported = Schema.is(Reported);
  * time it ends as `Reported` (exit 1): a parse error by effect/cli, a
  * refusal by the command, anything else here, as a note. Help asked for, or
  * shown for a group run without a subcommand, is a success. A defect (a
- * stub's "not built") is not caught: the runtime prints it, loudly.
+ * stub's "not built") is not caught: the runtime prints it, loudly. `env
+ * set`'s words are screened before effect/cli parses them, so a value typed
+ * where a flag goes is never printed back.
  */
 export const program = (argv: readonly string[]) =>
-  Command.runWith(root, { version })(argv).pipe(
+  refuseStrangeFlags(argv).pipe(
+    Effect.andThen(Command.runWith(root, { version })(argv)),
     Effect.catchTag("ShowHelp", (help) =>
       help.errors.length === 0 ? Effect.void : Effect.fail(new Reported())
     ),
