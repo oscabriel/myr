@@ -1,0 +1,97 @@
+==> plugins/__SLUG__/plugin.json <==
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "description": "The __NAME__ CLI's skill and MCP server: find an ask, claim it, check your answer locally, push it, and read the verdict.",
+  "name": "__SLUG__"
+}
+
+==> plugins/__SLUG__/skills/__SLUG__/SKILL.md <==
+---
+name: __SLUG__
+description: "Contribute to projects on __NAME__ with the `__SLUG__` CLI: find an ask, claim it, check your answer locally, push it to your fork, and read the verdict. Use when a repo's remote is on __NAME__, or when a push was refused with a refusal such as OutOfScope or StaleBase."
+metadata:
+  managed-by: "__SLUG__"
+  content-hash: "sha256:8a8ea9eed71ff4e3bf0de80fce9b559d693e027826022b91151ba8aae2a375c1"
+---
+# __NAME__
+
+__NAME__ is a git platform where a change lands only by passing a typed gate. A project states each change it wants as an ask; you answer one with a commit pushed to your claim's fork, and the platform checks it and lands it, or answers with refusals that say what to do next.
+
+## The loop
+
+Find an ask with `__CLI__ asks`, then, in the project's repo:
+
+1. Read the ask, then claim it: `__CLI__ ask <ask>`, then `__CLI__ claim <ask>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
+2. Work inside the ask's territory until its check passes.
+3. Run `__CLI__ check`. It gives the refusals a push would get, then runs the ask's check and the project's lanes; fix everything it reports.
+4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused; follow the answer with `__CLI__ status`.
+5. Read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
+
+A project's own `<project>-contribute` skill and the block in its AGENTS.md give its territories, its run block and its ask kinds.
+
+## Output
+
+Every command prints Markdown; `--json` prints one versioned JSON envelope instead. A command that needs a person's approval runs only with `--yes`, and `--dry-run` prints what it would send.
+
+## Commands
+
+| Command | Flags | What it does |
+| --- | --- | --- |
+| `__CLI__ asks` | `--project` `--json` | List a project's open asks. Only reads. |
+| `__CLI__ check` | `--ask` `--project` `--base` `--json` | Run the gate's checks on your answer locally, before you push. Only reads. |
+| `__CLI__ claim <ask>` | `--project` `--json` `--dry-run` | Claim an ask: an exclusive, expiring right to answer it, with a fork to push to; claiming it again returns the same claim. |
+| `__CLI__ vouch` | `--project` `--handle` `--verdict` `--note` `--json` `--yes` `--dry-run` | Vouch for a person, or denounce them, by landing a line in the project's vouch file. Runs only with `--yes`. |
+
+## MCP
+
+`__CLI__ mcp` serves the platform's contracts as MCP tools over stdio, with your stored token.
+
+## Refusals
+
+Instead of landing an answer, the platform answers with refusals. Git prints them on its `remote:` lines, `__CLI__ check` and `__CLI__ status` print them, and the verdict note holds them as JSON. Each one has a `_tag`, `retryable` (whether trying the same thing again can help) and `next` (the command to run next). The refusals about an answer's files arrive together, so one push hears about all of them.
+
+| `_tag` | Retryable | `next` | What to do |
+| --- | --- | --- | --- |
+| `NotClaimed` | yes | `__CLI__ claim <ask>` | Claim the ask, then push again. |
+| `ClaimLapsed` | yes | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
+| `NotVouched` | no | `__CLI__ status` | Ask a member of the project to vouch for you. |
+| `CapReached` | yes | `__CLI__ status` | Release a claim you hold, or land one, before you take another. |
+| `AskFull` | yes | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
+| `NoAsk` | no | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
+| `RepoBusy` | yes | `git push` | Push again. |
+| `DirectPush` | no | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
+| `AskBlocked` | yes | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
+| `Denounced` | no | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `OutOfScope` | no | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
+| `TouchedJudge` | no | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
+| `Weakened` | no | `__CLI__ check` | Take the marker out, or give it a reason for a decider to weigh; never raise a ratchet. |
+| `PrivatePathInPublicTree` | no | `__CLI__ check` | Take the held-back paths it names out of your answer. |
+| `ReachedInternals` | no | `__CLI__ check` | Import the other module only through its public files. |
+| `StaleBase` | yes | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
+| `StaleLayer` | yes | `__CLI__ status` | Nothing: the answer is checked again. |
+| `ChecksFailed` | no | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
+| `HeldBackFailed` | no | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
+| `AttemptsExhausted` | yes | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
+| `Flake` | yes | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
+| `VerifierBlocked` | yes | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
+
+## No fence yet
+
+Norms that nothing checks yet. Keep them; the gate does not refuse an answer that breaks one.
+
+- Keep an answer to its ask's want. The gate holds the files you change to the territory, but nothing measures how much you change inside it.
+- Name the agent you work through. A landing carries an `Assisted-by:` trailer for the agent your harness's environment names; a harness that names none goes unnamed.
+
+==> plugins/__SLUG__/mcp.json <==
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "__SLUG__": {
+      "args": [
+        "mcp"
+      ],
+      "command": "__SLUG__",
+      "type": "stdio"
+    }
+  }
+}
