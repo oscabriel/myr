@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
+import type { Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice } from "@repo/protocol/domain/decision";
 import {
@@ -35,6 +36,7 @@ import {
   LandingState,
   maxRemerges,
   next as admitNext,
+  ProjectEventInput,
   Request,
   settle,
   transition,
@@ -51,6 +53,8 @@ const hex = (n: number) => n.toString(16).padStart(40, "0");
 const opened = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
 const alice = Handle.make("alice");
+
+const carol = Handle.make("carol");
 
 const ask = AskId.make("parse-dates");
 
@@ -112,12 +116,19 @@ const fresh = [
   "Blocked",
 ] as const;
 
+/** The longest history the model runs. */
+const longest = 60;
+
 /**
  * One move of a history. Half drive the request the way a service would (the
  * answer its state waits for); the rest say any command, repeat the last one,
- * or replay an earlier one. `pick` chooses among variants.
+ * or replay an earlier one. `pick` chooses among variants, and `back` which
+ * earlier command a replay delivers again, from anywhere in the history.
  */
 const Move = Schema.Struct({
+  back: Schema.Int.check(
+    Schema.isBetween({ maximum: longest - 1, minimum: 0 })
+  ),
   drive: Schema.Boolean,
   kind: Schema.Literals([...fresh, "Again", "Replay"]),
   pick: Schema.Int.check(Schema.isBetween({ maximum: 7, minimum: 0 })),
@@ -125,11 +136,13 @@ const Move = Schema.Struct({
 
 type Move = typeof Move.Type;
 
-const histories = Arbitrary.array(Arbitrary.schema(Move), { maxLength: 60 });
+const histories = Arbitrary.array(Arbitrary.schema(Move), {
+  maxLength: longest,
+});
 
 // Arbitrary grows arrays with `size` (10 by default): histories long enough
 // to land, wait, re-merge and replay need a larger one.
-const size = 60;
+const size = longest;
 
 interface Underway {
   readonly attempt: number;
@@ -242,6 +255,7 @@ const commands = {
   Checked: checked,
   Decided: ({ pick, state, step }) =>
     LandingCommand.Decided({
+      by: pick < 4 ? alice : carol,
       choice: choices[pick] ?? "accept",
       decision: Option.match(Array.get(waitingOn(state), pick % 2), {
         onNone: () => decisionAt(step, 0),
@@ -311,6 +325,8 @@ interface Model {
   readonly applied: readonly LandingCommand[];
   /** The tree the checks passed since the latest merge. */
   readonly cleared: Option.Option<TreeSha>;
+  /** Who the landing must credit: the request's credits, then each finish and accepted decision. */
+  readonly credits: readonly Credit[];
   readonly delivered: readonly LandingCommand[];
   /** A finish was given. */
   readonly finished: boolean;
@@ -339,6 +355,7 @@ interface Model {
 const begin: Model = {
   applied: [],
   cleared: Option.none(),
+  credits: request.credits,
   delivered: [],
   finishOwed: false,
   finished: false,
@@ -366,7 +383,7 @@ const commandFor = (move: Move, model: Model, step: number) => {
   if (move.kind === "Replay") {
     return Array.get(
       model.delivered,
-      move.pick % Math.max(model.delivered.length, 1)
+      move.back % Math.max(model.delivered.length, 1)
     );
   }
 
@@ -379,6 +396,15 @@ const tookEffect = (before: LandingState, { effects, state }: Step) =>
   effects.length > 0 || !Equal.equals(before, state);
 
 const approves = (choice: Choice) => choice === "accept" || choice === "adopt";
+
+const credited = (
+  credits: readonly Credit[],
+  role: Credit["role"],
+  handle: Handle
+): readonly Credit[] =>
+  credits.some((given) => given.role === role && given.handle === handle)
+    ? credits
+    : [...credits, { handle, role }];
 
 /**
  * Whether the request's state waits for this command, as the model sees it:
@@ -446,11 +472,17 @@ const advance = (model: Model, command: LandingCommand, step: Step): Model => {
                 finishOwed: finish === "required",
                 waiting: decisions.map(({ id }) => id),
               },
-        Decided: ({ choice, decision }) =>
+        Decided: ({ by, choice, decision }) =>
           approves(choice)
-            ? { waiting: model.waiting.filter((id) => id !== decision) }
+            ? {
+                credits: credited(model.credits, "Decided-by", by),
+                waiting: model.waiting.filter((id) => id !== decision),
+              }
             : {},
-        Finished: () => ({ finished: true }),
+        Finished: ({ by }) => ({
+          credits: credited(model.credits, "Finished-by", by),
+          finished: true,
+        }),
         LandedOk: () => ({}),
         MainMoved: () => ({ moved: true, remerges: model.remerges + 1 }),
         MergeConflict: () => ({}),
@@ -523,7 +555,7 @@ const broken = (
     ["a landed or refused answer moved", !isTerminal(model.state) || !changed],
     [
       "a command delivered again had an effect",
-      !model.applied.includes(command) || !changed,
+      !Array.contains(model.applied, command) || !changed,
     ],
     [
       "a report about another main, tree, attempt or decision, or one its state does not wait for, had an effect",
@@ -567,6 +599,15 @@ const broken = (
       "it waits for a finish nobody owes, or one already given",
       !LandingState.guards.AwaitingFinish(step.state) ||
         (after.finishOwed && !after.finished),
+    ],
+    [
+      "the landing does not credit, once each, everyone who finished it or accepted a decision it waited on",
+      step.effects.every(
+        (effect) =>
+          !LandingEffect.$is("Emit")(effect) ||
+          !ProjectEventInput.$is("Landed")(effect.event) ||
+          Equal.equals(effect.event.landing.credits, after.credits)
+      ),
     ],
     [
       "landed without landing",

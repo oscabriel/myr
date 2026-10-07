@@ -21,7 +21,7 @@ import {
   StaleBase,
   Weakened,
 } from "@repo/protocol/refusal";
-import { DateTime, Duration, Option } from "effect";
+import { DateTime, Duration, Option, Schema } from "effect";
 
 import {
   backoff,
@@ -149,7 +149,7 @@ const everyCommand = [
   LandingCommand.MergeConflict({ conflicts: [changed], main }),
   LandingCommand.Checked(clean),
   LandingCommand.Finished({ by: alice }),
-  LandingCommand.Decided({ choice: "accept", decision: decisionId }),
+  LandingCommand.Decided({ by: alice, choice: "accept", decision: decisionId }),
   LandingCommand.MainMoved({ from: main, main: movedMain }),
   LandingCommand.LandedOk({ sha: landed }),
   LandingCommand.Busy({ attempt: 0 }),
@@ -453,20 +453,35 @@ describe("a decision the answer waits on", () => {
       tree,
     });
 
-  it("lands the answer once accepted", () => {
+  it("lands the answer once accepted, and credits the decider who accepted it", () => {
     expect(
       transition(
         waiting(raise),
-        LandingCommand.Decided({ choice: "accept", decision: decisionId }),
+        LandingCommand.Decided({
+          by: alice,
+          choice: "accept",
+          decision: decisionId,
+        }),
         now
       )
     ).toStrictEqual({
       effects: [LandingEffect.Land({ main, tree })],
-      state: landing,
+      state: Landing.make({
+        ...underway,
+        request: Request.make({
+          ...request,
+          credits: [
+            { handle: alice, role: "Asked-by" },
+            { handle: bob, role: "Signed-off-by" },
+            { handle: alice, role: "Decided-by" },
+          ],
+        }),
+        tree,
+      }),
     });
   });
 
-  it("waits on the next decision, then on a required finish", () => {
+  it("waits on the next decision, then on a required finish, crediting its decider once", () => {
     const both = AwaitingDecision.make({
       ...underway,
       decisions: [
@@ -477,9 +492,18 @@ describe("a decision the answer waits on", () => {
       tree,
     });
 
+    const decided = Request.make({
+      ...request,
+      credits: [...request.credits, { handle: alice, role: "Decided-by" }],
+    });
+
     const first = transition(
       both,
-      LandingCommand.Decided({ choice: "accept", decision: decisionId }),
+      LandingCommand.Decided({
+        by: alice,
+        choice: "accept",
+        decision: decisionId,
+      }),
       now
     );
 
@@ -488,16 +512,23 @@ describe("a decision the answer waits on", () => {
         ...underway,
         decisions: [{ id: secondId, subject: waiver }],
         finish: "required",
+        request: decided,
         tree,
       })
     );
     expect(
       transition(
         first.state,
-        LandingCommand.Decided({ choice: "accept", decision: secondId }),
+        LandingCommand.Decided({
+          by: alice,
+          choice: "accept",
+          decision: secondId,
+        }),
         now
       ).state
-    ).toStrictEqual(AwaitingFinish.make({ ...underway, tree }));
+    ).toStrictEqual(
+      AwaitingFinish.make({ ...underway, request: decided, tree })
+    );
   });
 
   it("refuses the answer with the refusal it stands for when declined", () => {
@@ -530,7 +561,11 @@ describe("a decision the answer waits on", () => {
       expect(
         transition(
           waiting(subject),
-          LandingCommand.Decided({ choice: "decline", decision: decisionId }),
+          LandingCommand.Decided({
+            by: alice,
+            choice: "decline",
+            decision: decisionId,
+          }),
           now
         )
       ).toStrictEqual({
@@ -546,7 +581,11 @@ describe("a decision the answer waits on", () => {
     expect(
       transition(
         state,
-        LandingCommand.Decided({ choice: "decline", decision: secondId }),
+        LandingCommand.Decided({
+          by: alice,
+          choice: "decline",
+          decision: secondId,
+        }),
         now
       )
     ).toStrictEqual({ effects: [], state });
@@ -606,6 +645,71 @@ describe("the outcome a person reads", () => {
       Outcome.cases.Landed.make({ sha: landed }),
       Outcome.cases.Refused.make({ refusals: [failed] }),
     ]);
+  });
+});
+
+describe("a landing the store keeps", () => {
+  const states = [
+    Queued.make({ request }),
+    WaitingOnParent.make({ parent: ask, request }),
+    merging,
+    checking,
+    AwaitingDecision.make({
+      ...underway,
+      decisions: [{ id: decisionId, subject: raise }],
+      finish: "required",
+      tree,
+    }),
+    AwaitingFinish.make({ ...underway, tree }),
+    landing,
+    // A decider's own landing answers no ask.
+    Landed.make({
+      request: Request.make({ ...request, ask: Option.none() }),
+      sha: landed,
+    }),
+    Refused.make({ refusals: [failed], request }),
+  ];
+
+  it("comes back from its stored JSON as it was, in every state", () => {
+    const Stored = Schema.fromJsonString(LandingState);
+
+    expect(
+      states.map((state) =>
+        Schema.decodeSync(Stored)(Schema.encodeSync(Stored)(state))
+      )
+    ).toStrictEqual(states);
+  });
+
+  it("names, after a hydrate, the port call it waits on", () => {
+    expect(states.map(pendingEffects)).toStrictEqual([
+      [],
+      [],
+      [LandingEffect.Merge({ base, fork, head, main })],
+      [LandingEffect.RunChecks({ tree })],
+      [],
+      [],
+      [LandingEffect.Land({ main, tree })],
+      [],
+      [],
+    ]);
+  });
+
+  it("keeps its queue as JSON too", () => {
+    const Stored = Schema.fromJsonString(LandingQueue);
+
+    const queues = [
+      LandingQueue.make({ active: Option.none(), order: [] }),
+      LandingQueue.make({
+        active: Option.some(requestId),
+        order: [RequestId.make("push-0002")],
+      }),
+    ];
+
+    expect(
+      queues.map((queue) =>
+        Schema.decodeSync(Stored)(Schema.encodeSync(Stored)(queue))
+      )
+    ).toStrictEqual(queues);
   });
 });
 

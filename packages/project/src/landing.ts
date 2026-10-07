@@ -6,6 +6,7 @@
  * converges (principle 8).
  */
 import { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
+import type { CreditRole } from "@repo/protocol/domain/credit";
 import type { Choice } from "@repo/protocol/domain/decision";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
@@ -59,7 +60,10 @@ export const Request = Schema.Struct({
   ask: Schema.OptionFromOptionalKey(AskId),
   assisted: Schema.Array(AgentTrailer),
   base: CommitSha,
-  /** The credit trailers the landing carries; a finish adds `Finished-by`. */
+  /**
+   * The credit trailers the landing carries; a finish adds `Finished-by`, and
+   * an accepted decision `Decided-by`.
+   */
   credits: Schema.Array(Credit),
   fork: RepoName,
   head: CommitSha,
@@ -153,8 +157,12 @@ export type LandingCommand = Data.TaggedEnum<{
   };
   /** A decider finished the answer. */
   Finished: { readonly by: Handle };
-  /** A decider decided one of the decisions the answer waits on. */
-  Decided: { readonly choice: Choice; readonly decision: DecisionId };
+  /** Decider `by` decided one of the decisions the answer waits on. */
+  Decided: {
+    readonly by: Handle;
+    readonly choice: Choice;
+    readonly decision: DecisionId;
+  };
   /** Landing found main moved from `from`, the main it landed against, to `main`. */
   MainMoved: { readonly from: LandedSha; readonly main: LandedSha };
   /** The landing is on main at `sha`. */
@@ -291,6 +299,14 @@ const retry = (
 const isFinished = (request: Request) =>
   request.credits.some(({ role }) => role === "Finished-by");
 
+// The landing credits a person once in each role, however often they act in it.
+const credit = (request: Request, role: CreditRole, handle: Handle): Request =>
+  request.credits.some(
+    (given) => given.role === role && given.handle === handle
+  )
+    ? request
+    : { ...request, credits: [...request.credits, { handle, role }] };
+
 // Every stage passed but the human one: wait on each decision first, then on
 // a finish the kind requires and nobody gave yet, then land.
 const human = (
@@ -332,10 +348,7 @@ const approves = {
 
 const decide = (
   state: typeof AwaitingDecision.Type,
-  {
-    choice,
-    decision,
-  }: { readonly choice: Choice; readonly decision: DecisionId }
+  { by, choice, decision }: Data.TaggedEnum.Value<LandingCommand, "Decided">
 ): Step =>
   Option.match(
     Array.findFirst(state.decisions, ({ id }) => id === decision),
@@ -344,7 +357,7 @@ const decide = (
       onSome: ({ subject }) =>
         approves[choice]
           ? human(
-              state,
+              { ...state, request: credit(state.request, "Decided-by", by) },
               state.decisions.filter(({ id }) => id !== decision),
               state.finish
             )
@@ -356,13 +369,7 @@ const finished = (state: typeof AwaitingFinish.Type, by: Handle): Step =>
   enter(
     Landing.make({
       ...passedOf(state),
-      request: {
-        ...state.request,
-        credits: [
-          ...state.request.credits,
-          { handle: by, role: "Finished-by" },
-        ],
-      },
+      request: credit(state.request, "Finished-by", by),
     })
   );
 
