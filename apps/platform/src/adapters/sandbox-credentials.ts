@@ -4,9 +4,11 @@
  * Artifacts binding, so each job takes a token the platform minted for it
  * alone, on one repo (tokens are per repo, S1 #10), with the narrowest scope
  * the job needs and a lifetime of minutes, revoked as soon as the job ends
- * (S1 change 2). A token never appears in a result, a refusal or a log: the
- * wire redacts it, refusals carry no free text (principle 3), and what a
- * failure log says is scrubbed of every token the job carried.
+ * (S1 change 2). A token never appears in a result, a refusal or a log: it
+ * crosses the binding in plain text, as the far side needs it, but decodes to
+ * a `Redacted` on either side; refusals carry no free text (principle 3); and
+ * what any failure log says, a failed revoke's included, is scrubbed of every
+ * token the job carried.
  *
  * A job is encoded with the wire schemas both sides share, and its outcome
  * comes back as a JSON `Exit` decoded here (principle 2): a typed refusal
@@ -98,8 +100,9 @@ const unknownRepo =
 /**
  * Mints a `need.scope` token on `need.repo` for one job, hands `use` its
  * remote, and revokes the token once `use` ends, however it ends. A revoke
- * that fails is logged, never raised: the token dies with its lifetime. A
- * repo the store does not know is `VerifierBlocked` for `method`.
+ * that fails, or dies, is logged with the token scrubbed, never raised: the
+ * token dies with its lifetime. A repo the store does not know is
+ * `VerifierBlocked` for `method`.
  */
 export const withRemote = <A, E, R>(
   method: SandboxMethod,
@@ -114,16 +117,20 @@ export const withRemote = <A, E, R>(
       .pipe(Effect.catchTag("RepoNotFound", unknownRepo(method)));
 
     return yield* Effect.acquireUseRelease(
-      host
-        .mintToken(need.repo, need.scope, jobTokenTtl)
-        .pipe(Effect.catchTag("RepoNotFound", unknownRepo(method))),
-      ({ secret }) => use({ token: secret, url }),
-      ({ id }) =>
+      host.mintToken(need.repo, need.scope, jobTokenTtl).pipe(
+        Effect.map(({ id, secret }) => ({
+          id,
+          remote: { token: secret, url } satisfies Remote,
+        })),
+        Effect.catchTag("RepoNotFound", unknownRepo(method))
+      ),
+      ({ remote }) => use(remote),
+      ({ id, remote }) =>
         host.revokeToken(need.repo, id).pipe(
           Effect.catchCause((cause) =>
             Effect.logWarning("sandbox job token not revoked").pipe(
               Effect.annotateLogs({
-                cause: Cause.pretty(cause),
+                cause: scrub(Cause.pretty(cause), [remote]),
                 method,
                 repo: need.repo,
                 tokenId: id,

@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import { RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
+import { RepoHost } from "@repo/artifacts/repo-host";
 import type { TokenScope } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { Brand } from "@repo/brand";
@@ -144,7 +144,8 @@ interface Minted {
 /**
  * The memory store with the canonical repo and a claim's fork, recording
  * every token it mints and every revoke it is asked for; with `failRevoke`,
- * every revoke fails after it is recorded.
+ * every revoke dies after it is recorded, its error echoing the token's
+ * secret.
  */
 const recordingRepoHost = (failRevoke: boolean) =>
   Effect.gen(function* () {
@@ -175,7 +176,11 @@ const recordingRepoHost = (failRevoke: boolean) =>
         Effect.sync(() => revoked.push({ id, repo })).pipe(
           Effect.andThen(
             failRevoke
-              ? Effect.fail(new RepoNotFound({ name: repo }))
+              ? Effect.die(
+                  new Error(
+                    `cannot revoke ${minted.find((token) => token.id === id)?.secret}`
+                  )
+                )
               : store.revokeToken(repo, id)
           )
         ),
@@ -671,18 +676,35 @@ describe("a sandbox job's tokens", () => {
     })
   );
 
-  it.effect("fail no job when they cannot be revoked", () =>
-    Effect.gen(function* () {
-      const { lander, minted, revoked } = yield* world({ failRevoke: true });
+  it.effect(
+    "fail no job when they cannot be revoked, and are warned of by repo and id alone",
+    () =>
+      Effect.gen(function* () {
+        const { lander, minted, revoked } = yield* world({ failRevoke: true });
 
-      const { exit, lines } = yield* withLogs(lander.land(landMerge));
+        const { exit, lines } = yield* withLogs(lander.land(landMerge));
 
-      expect(exit).toStrictEqual(Exit.succeed({ pending: [], sha: landed }));
-      expect(revoked.map(({ id }) => id)).toStrictEqual(
-        minted.map(({ id }) => id).toReversed()
-      );
-      expect(lines.map(({ level }) => level)).toStrictEqual(["WARN", "WARN"]);
-    })
+        expect(exit).toStrictEqual(Exit.succeed({ pending: [], sha: landed }));
+        expect(revoked.map(({ id }) => id)).toStrictEqual(
+          minted.map(({ id }) => id).toReversed()
+        );
+        expect(
+          lines.map(({ annotations, level }) => ({
+            level,
+            method: annotations.method,
+            repo: annotations.repo,
+            tokenId: annotations.tokenId,
+          }))
+        ).toStrictEqual(
+          minted.toReversed().map(({ id, repo }) => ({
+            level: "WARN",
+            method: "land",
+            repo,
+            tokenId: id,
+          }))
+        );
+        expect(leaked(JSON.stringify(lines), minted)).toStrictEqual([]);
+      })
   );
 
   it.effect("appear in no result, refusal or log line", () =>
