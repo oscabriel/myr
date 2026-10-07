@@ -160,16 +160,21 @@ describe("the CLI's releases, served by the platform", () => {
           headers: { "if-none-match": `"${darwinSha}", W/"${linuxSha}"` },
         });
 
+        const heldAny = yield* send(path, {
+          headers: { "if-none-match": "*" },
+        });
+
         const stale = yield* send(path, {
           headers: { "if-none-match": `"${oldLinuxSha}"` },
         });
 
         expect(
-          [held, heldWeakly, stale].map((each) => ({
+          [held, heldWeakly, heldAny, stale].map((each) => ({
             etag: each.headers.get("etag"),
             status: each.status,
           }))
         ).toStrictEqual([
+          { etag: `"${linuxSha}"`, status: 304 },
           { etag: `"${linuxSha}"`, status: 304 },
           { etag: `"${linuxSha}"`, status: 304 },
           { etag: `"${linuxSha}"`, status: 200 },
@@ -244,6 +249,49 @@ describe("the CLI's releases, served by the platform", () => {
         expect(yield* textOf(sums)).toBe(
           `${darwinSha}  ${darwin}\n${linuxSha}  ${linux}\n`
         );
+      })
+  );
+
+  it.effect(
+    "makes a version's checksums from its manifest, even when the manifest lists an uploaded SHA256SUMS",
+    () =>
+      Effect.gen(function* () {
+        // 715 may list the SHA256SUMS it uploaded among a version's files:
+        // the served file is still made from the manifest, without a line
+        // for itself, and the uploaded copy is never read.
+        const listingSums = {
+          ...manifest,
+          versions: {
+            ...manifest.versions,
+            "0.1.0": {
+              assets: {
+                ...manifest.versions["0.1.0"].assets,
+                SHA256SUMS: { bytes: 9, sha256: oldLinuxSha },
+              },
+            },
+          },
+        };
+
+        const { reads, send } = yield* releasesServed({
+          ...files,
+          "releases/0.1.0/SHA256SUMS": "uploaded\n",
+          "releases/manifest.json": JSON.stringify(listingSums),
+        });
+
+        const sums = yield* send("/releases/0.1.0/SHA256SUMS");
+
+        expect({
+          body: yield* textOf(sums),
+          etag: sums.headers.get("etag"),
+          status: sums.status,
+          type: sums.headers.get("content-type"),
+        }).toStrictEqual({
+          body: `${darwinSha}  ${darwin}\n${linuxSha}  ${linux}\n`,
+          etag: null,
+          status: 200,
+          type: "text/plain; charset=utf-8",
+        });
+        expect(yield* reads).toStrictEqual(["releases/manifest.json"]);
       })
   );
 

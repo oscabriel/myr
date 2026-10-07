@@ -17,7 +17,7 @@ import { tokenReader } from "./auth/provider.ts";
 import { Handlers } from "./handlers.ts";
 import { workerPorts } from "./ports.ts";
 import type { WorkerPorts } from "./ports.ts";
-import { ReleaseStoreR2 } from "./releases/r2.ts";
+import { ReleaseStoreBinding } from "./releases/binding.ts";
 import { Sessions } from "./sessions.ts";
 import { firstOf } from "./sessions/first-of.ts";
 import { sessionTable } from "./sessions/table.ts";
@@ -192,7 +192,7 @@ export const platformOn = (
   Layer.mergeAll(
     Handlers,
     sessionsOf(config),
-    ReleaseStoreR2(config.RELEASES),
+    ReleaseStoreBinding(config.RELEASES),
     Layer.succeed(Stage, Stage.of({ name: config.STAGE }))
   ).pipe(Layer.provideMerge(ports));
 

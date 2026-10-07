@@ -27,8 +27,9 @@ export interface ReleaseFile {
 }
 
 /**
- * Where releases are kept: the stage's `RELEASES` bucket (`releases/r2.ts`),
- * or memory (`releases/memory.ts`). Read-only: W7 715 uploads.
+ * Where releases are kept: the stage's `RELEASES` bucket
+ * (`releases/binding.ts`), or memory (`releases/memory.ts`). Read-only:
+ * W7 715 uploads.
  */
 export class ReleaseStore extends Context.Service<
   ReleaseStore,
@@ -133,7 +134,7 @@ const FOREVER = "public, max-age=31536000, immutable";
 /** How long a reply that changes with the next release may be kept. */
 const BRIEFLY = "public, max-age=300";
 
-/** Neither a reply about a missing or broken release nor a refusal is kept. */
+/** Neither a reply about a missing or broken release nor a 405 is kept. */
 const NO_STORE = "no-store";
 
 const notFound = HttpServerResponse.empty({
@@ -226,9 +227,17 @@ const holds = (header: string | undefined, tag: string) =>
     .map((each) => each.trim())
     .some((each) => each === "*" || each.replace(/^W\//u, "") === tag);
 
-/** A version's checksum file: one line per file, as `sha256sum` prints it. */
+/**
+ * A version's checksum file, made from its manifest entry: one line per
+ * file, as `sha256sum` prints it, and none for a `SHA256SUMS` the manifest
+ * lists, since this file is never that one.
+ */
 const checksumsOf = (assets: Release["assets"]) =>
-  Array.sortWith(Object.entries(assets), ([name]) => name, Order.String)
+  Array.sortWith(
+    Object.entries(assets).filter(([name]) => name !== CHECKSUMS),
+    ([name]) => name,
+    Order.String
+  )
     .map(([name, { sha256 }]) => `${sha256}  ${name}\n`)
     .join("");
 
@@ -277,14 +286,18 @@ const versioned = (
 
     const release = Record.get(manifest.versions, named);
 
-    const listed = Option.flatMap(release, ({ assets }) =>
-      Record.get(assets, asset)
-    );
+    if (Option.isNone(release)) {
+      return notFound;
+    }
 
-    if (
-      Option.isNone(release) ||
-      (asset !== CHECKSUMS && Option.isNone(listed))
-    ) {
+    const { assets } = release.value;
+
+    // The checksums are made for every listed version; a binary is served
+    // only where the version lists it.
+    const listed =
+      asset === CHECKSUMS ? Option.none() : Record.get(assets, asset);
+
+    if (asset !== CHECKSUMS && Option.isNone(listed)) {
       return notFound;
     }
 
@@ -297,7 +310,7 @@ const versioned = (
     return yield* Option.match(listed, {
       onNone: () =>
         Effect.succeed(
-          HttpServerResponse.text(checksumsOf(release.value.assets), {
+          HttpServerResponse.text(checksumsOf(assets), {
             contentType: "text/plain; charset=utf-8",
             headers: { "cache-control": FOREVER },
           })
@@ -317,13 +330,13 @@ const manifestReply = (store: ReleaseStore["Service"]) =>
   );
 
 /**
- * `answer` for GET and HEAD (the router serves HEAD as GET, without the
+ * `reply` for GET and HEAD (the router serves HEAD as GET, without the
  * body), and 405 for any other method; a release that failed to load is
  * not found when there is none yet, and unavailable when its manifest is
  * broken.
  */
 const download = <R>(
-  answer: (
+  reply: (
     request: HttpServerRequest.HttpServerRequest
   ) => Effect.Effect<
     HttpServerResponse.HttpServerResponse,
@@ -336,7 +349,7 @@ const download = <R>(
       return readOnly;
     }
 
-    return yield* answer(request).pipe(
+    return yield* reply(request).pipe(
       Effect.catchTags({
         ManifestUnusable: () => Effect.succeed(unavailable),
         NoReleases: () => Effect.succeed(notFound),

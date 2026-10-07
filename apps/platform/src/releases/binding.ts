@@ -19,7 +19,7 @@ export interface ReleaseBucket {
  * binding's failure is here: the request answers 500 and nothing is
  * served.
  */
-export const ReleaseStoreR2 = (
+export const ReleaseStoreBinding = (
   bucket: ReleaseBucket
 ): Layer.Layer<ReleaseStore> =>
   Layer.succeed(
