@@ -6,6 +6,7 @@
  * env, each over a fake of the binding it is built on.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { Fetch } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { FrontPage } from "@repo/project/front-page";
@@ -32,6 +33,7 @@ import { vi } from "vitest";
 import type { SandboxBinding } from "../src/adapters/check-runner-sandbox.ts";
 import { AccountsMemory } from "../src/auth/accounts/memory.ts";
 import { SignInAttemptsMemory } from "../src/auth/attempts/memory.ts";
+import { IdentitiesMemory } from "../src/auth/identities/memory.ts";
 import { OAuthStore } from "../src/auth/oauth-store.ts";
 import { OAuthStoreMemory } from "../src/auth/oauth-store/memory.ts";
 import { oauthProvider, signInSettings } from "../src/auth/provider.ts";
@@ -340,6 +342,9 @@ const signedUp = (handle: string, password: string) =>
       Layer.mergeAll(
         AccountsMemory.layer,
         Layer.succeed(OAuthStore, store),
+        // No Google client in the fake env: Google sign-in touches neither (W4 419).
+        IdentitiesMemory.layer,
+        Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch")),
         SignInAttemptsMemory.layer,
         signInSettings(config)
       ),

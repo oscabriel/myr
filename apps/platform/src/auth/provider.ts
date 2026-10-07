@@ -2,8 +2,10 @@
  * The platform as its own OAuth authorization server, in front of the rest
  * of the platform: `@cloudflare/workers-oauth-provider` 1.2.1 answers its
  * metadata and `/token`, storing grants in `OAUTH_KV`; sign-in's pages
- * answer `/authorize`, `/signup` and the CLI's client metadata document;
- * every other request goes to the platform's own fetch untouched.
+ * answer `/authorize`, `/signup` and the CLI's client metadata document,
+ * and Google sign-in's answer `/oauth/google/*` when the platform has a
+ * Google OAuth client (issue 419); every other request goes to the
+ * platform's own fetch untouched.
  *
  * The provider's role-based `OAuthAuthorizationServer` is used, not its
  * combined `OAuthProvider`: that one requires an `apiRoute` whose bearer
@@ -16,19 +18,25 @@ import { Context, Layer, Option, Redacted } from "effect";
 import { HttpRouter } from "effect/http";
 
 import { AccountsD1 } from "../adapters/accounts-d1.ts";
+import { WorkerFetch } from "../adapters/fetch.ts";
+import { IdentitiesD1 } from "../adapters/identities-d1.ts";
 import type { TokenReader } from "../adapters/sessions-oauth.ts";
 import type { PlatformConfig } from "../platform.ts";
 import { SignInAttemptsBinding } from "./attempts/binding.ts";
+import { GOOGLE_ACCOUNTS, GoogleClient, googleRoutes } from "./google.ts";
+import type { GoogleServices } from "./google.ts";
 import { OAuthStore } from "./oauth-store.ts";
+import { GOOGLE_PATHS } from "./pages.ts";
 import {
   Authorization,
   AUTHORIZATION_SERVER_PATHS,
   HeldHandles,
   SIGN_IN_PATHS,
   SignInKeys,
+  SignInOffers,
   signInRoutes,
 } from "./sign-in.ts";
-import type { OAuthEnv, SignInServices } from "./sign-in.ts";
+import type { OAuthEnv } from "./sign-in.ts";
 
 /**
  * The authorization server for one origin: the origin is its issuer and
@@ -46,11 +54,17 @@ const authorizationServerFor = (origin: string) =>
     tokenEndpoint: "/token",
   });
 
-/** Whether the provider or sign-in's pages answer `path`. */
+/**
+ * Whether the provider or sign-in's pages answer `path`. Google's paths
+ * are sign-in's whether or not Google is offered: without a Google client
+ * no route serves them, and they answer 404.
+ */
 const answersHere = (path: string) =>
-  [...AUTHORIZATION_SERVER_PATHS, ...SIGN_IN_PATHS].some(
-    (owned) => owned === path
-  );
+  [
+    ...AUTHORIZATION_SERVER_PATHS,
+    ...SIGN_IN_PATHS,
+    ...Object.values(GOOGLE_PATHS),
+  ].some((owned) => owned === path);
 
 /** What the platform answers everything else with. */
 export type PlatformFetch = (
@@ -67,11 +81,11 @@ export type PlatformFetch = (
  * reached only on its own hostnames).
  */
 export const oauthProvider = <E>(
-  services: Layer.Layer<SignInServices, E>,
+  services: Layer.Layer<GoogleServices, E>,
   platformFetch: PlatformFetch
 ) => {
   const { dispose, handler } = HttpRouter.toWebHandler(
-    signInRoutes.pipe(Layer.provide(services)),
+    Layer.mergeAll(signInRoutes, googleRoutes).pipe(Layer.provide(services)),
     { disableLogger: true }
   );
 
@@ -122,12 +136,30 @@ export const tokenReader = (store: OAuthStore["Service"]): TokenReader => {
   return { unwrapToken: (token) => api.unwrapToken(token) };
 };
 
+/** Google's OAuth client from the decoded env: both halves, or none. */
+const googleClientOf = (config: PlatformConfig) =>
+  Option.all({
+    id: Option.fromUndefinedOr(config.GOOGLE_CLIENT_ID),
+    secret: Option.fromUndefinedOr(config.GOOGLE_CLIENT_SECRET),
+  });
+
 /**
- * Sign-in's settings from the decoded env: its two secrets, and the handles
- * the operator and `SESSION_TOKENS` already hold, which nobody signs up as.
+ * Sign-in's settings from the decoded env: its two secrets, the handles
+ * the operator and `SESSION_TOKENS` already hold, which nobody signs up as,
+ * and Google's OAuth client, offered on the sign-in page when it is set.
  */
 export const signInSettings = (config: PlatformConfig) =>
   Layer.mergeAll(
+    Layer.succeed(
+      GoogleClient,
+      GoogleClient.of({ client: googleClientOf(config) })
+    ),
+    Layer.succeed(
+      SignInOffers,
+      SignInOffers.of({
+        google: Option.as(googleClientOf(config), GOOGLE_ACCOUNTS),
+      })
+    ),
     Layer.succeed(
       SignInKeys,
       SignInKeys.of({
@@ -150,19 +182,22 @@ export const signInSettings = (config: PlatformConfig) =>
   );
 
 /**
- * Sign-in's services on Cloudflare: the settings from the decoded env, accounts
- * in the `FRONT_PAGE` D1 database (`migrations/0002_accounts.sql`), attempts
- * counted by `SIGN_IN_LIMIT`, grants in `OAUTH_KV`.
+ * Sign-in's services on Cloudflare: the settings from the decoded env,
+ * accounts and Google links in the `FRONT_PAGE` D1 database
+ * (`migrations/0002_accounts.sql`, `0003_identities.sql`), attempts counted
+ * by `SIGN_IN_LIMIT`, grants in `OAUTH_KV`, and Google reached through the
+ * Worker's `fetch`.
  */
 export const signInServices = (
   config: PlatformConfig
-): Layer.Layer<SignInServices> =>
+): Layer.Layer<GoogleServices> =>
   Layer.mergeAll(
     signInSettings(config),
-    AccountsD1.pipe(
+    Layer.mergeAll(AccountsD1, IdentitiesD1).pipe(
       Layer.provide(D1Client.layer({ db: config.FRONT_PAGE })),
       Layer.orDie
     ),
     SignInAttemptsBinding(config.SIGN_IN_LIMIT),
-    Layer.succeed(OAuthStore, config.OAUTH_KV)
+    Layer.succeed(OAuthStore, config.OAUTH_KV),
+    WorkerFetch
   );

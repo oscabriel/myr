@@ -39,20 +39,6 @@ export type PendingSignIn = typeof PendingSignIn.Type;
 /** How long a sign-in form stays good. */
 export const SIGN_IN_LIFETIME = Duration.minutes(10);
 
-const Sealed = Schema.Struct({
-  ...PendingSignIn.fields,
-  expiresAt: Schema.Int,
-});
-
-/** The sealed payload's text: JSON, then base64url. */
-const Payload = Schema.StringFromBase64Url.pipe(
-  Schema.decodeTo(Schema.fromJsonString(Sealed))
-);
-
-const encodePayload = Schema.encodeEffect(Payload);
-
-const decodePayload = Schema.decodeEffect(Payload);
-
 const Signature = Schema.Uint8ArrayFromBase64Url;
 
 const encodeSignature = Schema.encodeEffect(Signature);
@@ -92,61 +78,99 @@ const hmacKey = (key: Redacted.Redacted) =>
     )
   );
 
+/**
+ * Seals and opens one kind of value carried through the browser: as
+ * `<payload>.<signature>`, the payload base64url JSON of the value and when
+ * it stops being good (ten minutes on), signed under `COOKIE_KEY` together
+ * with `purpose`. A value this platform did not seal, sealed for another
+ * purpose (however its shape fits: a schema ignores extra keys), or sealed
+ * too long ago, opens to `startAgain`.
+ */
+export const sealing = <A, I>(purpose: string, schema: Schema.Codec<A, I>) => {
+  /** What the signature covers: the purpose, then the payload. */
+  const signed = (payload: string) => utf8(`${purpose}.${payload}`);
+
+  const Payload = Schema.StringFromBase64Url.pipe(
+    Schema.decodeTo(
+      Schema.fromJsonString(
+        Schema.Struct({ expiresAt: Schema.Int, value: schema })
+      )
+    )
+  );
+
+  const encodePayload = Schema.encodeEffect(Payload);
+
+  const decodePayload = Schema.decodeEffect(Payload);
+
+  /** `value`, good for ten minutes from now. */
+  const seal = (key: Redacted.Redacted, value: A) =>
+    Effect.gen(function* () {
+      const now = yield* Clock.currentTimeMillis;
+
+      const payload = yield* encodePayload({
+        expiresAt: now + Duration.toMillis(SIGN_IN_LIFETIME),
+        value,
+      }).pipe(Effect.orDie);
+
+      const hmac = yield* hmacKey(key);
+
+      const signature = yield* Effect.promise(() =>
+        crypto.subtle.sign("HMAC", hmac, signed(payload))
+      );
+
+      return `${payload}.${yield* encodeSignature(new Uint8Array(signature)).pipe(Effect.orDie)}`;
+    });
+
+  /**
+   * What `sealed` carries, if this platform sealed it with `key` (checked
+   * in constant time by WebCrypto) and its ten minutes have not passed.
+   */
+  const open = (key: Redacted.Redacted, sealed: string) =>
+    Effect.gen(function* () {
+      const [payload = "", encoded = ""] = sealed.split(".");
+
+      const signature = yield* decodeSignature(encoded).pipe(
+        Effect.mapError(() => startAgain)
+      );
+
+      const hmac = yield* hmacKey(key);
+
+      const genuine = yield* Effect.promise(() =>
+        crypto.subtle.verify(
+          "HMAC",
+          hmac,
+          new Uint8Array(signature),
+          signed(payload)
+        )
+      );
+
+      if (!genuine) {
+        return yield* startAgain;
+      }
+
+      const { expiresAt, value } = yield* decodePayload(payload).pipe(
+        Effect.mapError(() => startAgain)
+      );
+
+      const now = yield* Clock.currentTimeMillis;
+
+      if (now >= expiresAt) {
+        return yield* startAgain;
+      }
+
+      return value;
+    });
+
+  return { open, seal };
+};
+
+const pendingSignIns = sealing("sign-in", PendingSignIn);
+
 /** `pending`, good for ten minutes from now, as `<payload>.<signature>`. */
-export const sealState = (key: Redacted.Redacted, pending: PendingSignIn) =>
-  Effect.gen(function* () {
-    const now = yield* Clock.currentTimeMillis;
-
-    const payload = yield* encodePayload({
-      ...pending,
-      expiresAt: now + Duration.toMillis(SIGN_IN_LIFETIME),
-    }).pipe(Effect.orDie);
-
-    const hmac = yield* hmacKey(key);
-
-    const signature = yield* Effect.promise(() =>
-      crypto.subtle.sign("HMAC", hmac, utf8(payload))
-    );
-
-    return `${payload}.${yield* encodeSignature(new Uint8Array(signature)).pipe(Effect.orDie)}`;
-  });
+export const sealState = pendingSignIns.seal;
 
 /**
  * What `sealed` carries, if this platform sealed it with `key` (checked in
  * constant time by WebCrypto) and its ten minutes have not passed.
  */
-export const openState = (key: Redacted.Redacted, sealed: string) =>
-  Effect.gen(function* () {
-    const [payload = "", encoded = ""] = sealed.split(".");
-
-    const signature = yield* decodeSignature(encoded).pipe(
-      Effect.mapError(() => startAgain)
-    );
-
-    const hmac = yield* hmacKey(key);
-
-    const genuine = yield* Effect.promise(() =>
-      crypto.subtle.verify(
-        "HMAC",
-        hmac,
-        new Uint8Array(signature),
-        utf8(payload)
-      )
-    );
-
-    if (!genuine) {
-      return yield* startAgain;
-    }
-
-    const { expiresAt, ...pending } = yield* decodePayload(payload).pipe(
-      Effect.mapError(() => startAgain)
-    );
-
-    const now = yield* Clock.currentTimeMillis;
-
-    if (now >= expiresAt) {
-      return yield* startAgain;
-    }
-
-    return pending;
-  });
+export const openState = pendingSignIns.open;

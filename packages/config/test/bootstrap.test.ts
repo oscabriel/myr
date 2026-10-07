@@ -458,6 +458,8 @@ describe("secrets, by name only", () => {
         { name: "SESSION_TOKENS", required: false },
         { name: "COOKIE_KEY", required: true },
         { name: "PASSWORD_PEPPER", required: true },
+        { name: "GOOGLE_CLIENT_ID", required: false },
+        { name: "GOOGLE_CLIENT_SECRET", required: false },
       ]);
     })
   );

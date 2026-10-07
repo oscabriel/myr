@@ -95,14 +95,24 @@ export const PlatformVars = Schema.Struct({
 });
 
 /**
- * The secrets `.env.schema` declares, each redacted. Every one but
- * `SESSION_TOKENS` is required (`wrangler.jsonc`'s `secrets.required`):
- * sign-in's cookie key and pepper too, since accounts are the platform's
- * own.
+ * The secrets `.env.schema` declares, each redacted but Google's client id.
+ * Every one but `SESSION_TOKENS` and Google's pair is required
+ * (`wrangler.jsonc`'s `secrets.required`): sign-in's cookie key and pepper
+ * too, since accounts are the platform's own.
  */
 export const PlatformSecrets = Schema.Struct({
   /** Seals a sign-in in progress into its form (`auth/state.ts`). */
   COOKIE_KEY: Schema.RedactedFromValue(Token),
+  /**
+   * Google sign-in's OAuth client (issue 419; human step H4), set with
+   * `GOOGLE_CLIENT_SECRET` or not at all. Not secret: Google shows it to
+   * everyone who signs in.
+   */
+  GOOGLE_CLIENT_ID: Schema.optionalKey(Schema.NonEmptyString),
+  /** The secret of Google sign-in's OAuth client, set with its id. */
+  GOOGLE_CLIENT_SECRET: Schema.optionalKey(
+    Schema.RedactedFromValue(Schema.NonEmptyString)
+  ),
   OPERATOR_TOKEN: Schema.RedactedFromValue(Token),
   /** HMAC'd with every password before PBKDF2 (`auth/password.ts`). */
   PASSWORD_PEPPER: Schema.RedactedFromValue(Token),
@@ -113,6 +123,30 @@ export const PlatformSecrets = Schema.Struct({
 });
 
 /**
+ * Google's client id and secret come as a pair: one without the other
+ * names the missing key, so Google sign-in is either whole or off.
+ */
+const googlePair = Schema.makeFilter(
+  (env: {
+    readonly GOOGLE_CLIENT_ID?: string;
+    readonly GOOGLE_CLIENT_SECRET?: Redacted.Redacted;
+  }) => {
+    const id = env.GOOGLE_CLIENT_ID !== undefined;
+
+    const secret = env.GOOGLE_CLIENT_SECRET !== undefined;
+
+    if (id === secret) {
+      return true;
+    }
+
+    return {
+      issue: "Google's client id and secret are set together or not at all",
+      path: [id ? "GOOGLE_CLIENT_SECRET" : "GOOGLE_CLIENT_ID"],
+    };
+  }
+);
+
+/**
  * Everything the platform reads from the Worker's env, decoded once
  * (principle 2): its bindings, its vars and its secrets.
  */
@@ -120,7 +154,7 @@ export const PlatformEnv = Schema.Struct({
   ...PlatformBindings.fields,
   ...PlatformVars.fields,
   ...PlatformSecrets.fields,
-});
+}).check(googlePair);
 
 export type PlatformConfig = typeof PlatformEnv.Type;
 

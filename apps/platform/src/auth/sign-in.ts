@@ -9,6 +9,10 @@
  * A sign-in in progress travels in the form, sealed with `COOKIE_KEY`
  * (`state.ts`), and its CSRF token in a `__Host-` cookie. Sign-in never says
  * whether a handle exists; sign-up must say a handle is taken.
+ *
+ * Google sign-in (`google.ts`, issue 419) is offered on the same page when
+ * the platform has a Google OAuth client, and reuses these pages, rules and
+ * the code's completion; this module knows of it only as `SignInOffers`.
  */
 import {
   AuthorizationError,
@@ -60,6 +64,16 @@ export class SignInKeys extends Context.Service<
     readonly pepper: Redacted.Redacted;
   }
 >()("platform/SignInKeys") {}
+
+/**
+ * What the sign-in page offers besides a password: Google's sign-in when
+ * the platform has a Google OAuth client (issue 419), named by the origin
+ * its forms may then send a person on to (`form-action`).
+ */
+export class SignInOffers extends Context.Service<
+  SignInOffers,
+  { readonly google: Option.Option<string> }
+>()("platform/SignInOffers") {}
 
 /**
  * The handles named sessions already hold: the operator's and each one in
@@ -123,7 +137,7 @@ const decodeHandle = Schema.decodeUnknownOption(AccountHandle);
 const PasswordLength = { max: 256, min: 12 } as const;
 
 /** What a person reads on a page, each a plain sentence. */
-const Says = {
+export const Says = {
   handleReserved: "That handle is reserved. Choose another.",
   handleSpelling:
     "A handle is 1 to 39 letters, digits and dashes, starting with a letter or digit.",
@@ -145,9 +159,10 @@ const STAND_IN_HASH = PasswordHash.make(
   `pbkdf2-sha256$${PasswordPolicy.iterations}$${"A".repeat(22)}$${"A".repeat(43)}`
 );
 
-const CSRF_COOKIE = "__Host-sign-in";
+/** The cookie a sign-in form's CSRF token is kept in: this site's own requests only. */
+export const CSRF_COOKIE = "__Host-sign-in";
 
-const csrfCookie = {
+export const csrfCookie = {
   httpOnly: true,
   path: "/",
   sameSite: "strict",
@@ -174,24 +189,36 @@ const redirectSource = (redirectUri: string) =>
 /**
  * The page's CSP. A form's post is answered with a redirect to the client,
  * and browsers hold that redirect to `form-action` too, so a page with a
- * form also allows its (provider-validated) redirect URI.
+ * form also allows its (provider-validated) redirect URI, and any other
+ * place its forms may send a person on to (`formActions`: Google's sign-in).
  */
-const contentSecurityPolicy = (redirectUri?: string) =>
-  Option.match(
-    Option.flatMap(Option.fromUndefinedOr(redirectUri), redirectSource),
-    {
-      onNone: () => BASE_CSP,
-      onSome: (source) => `${BASE_CSP} ${source}`,
-    }
-  );
+const contentSecurityPolicy = (
+  redirectUri?: string,
+  formActions: readonly string[] = []
+) =>
+  [
+    BASE_CSP,
+    ...Option.toArray(
+      Option.flatMap(Option.fromUndefinedOr(redirectUri), redirectSource)
+    ),
+    ...formActions,
+  ].join(" ");
 
 /** An HTML page that loads nothing, cannot be framed and is never cached. */
-const htmlPage = (body: string, status: number, redirectUri?: string) =>
+export const htmlPage = (
+  body: string,
+  status: number,
+  redirectUri?: string,
+  formActions: readonly string[] = []
+) =>
   HttpServerResponse.text(body, {
     contentType: "text/html; charset=utf-8",
     headers: {
       "cache-control": "no-store",
-      "content-security-policy": contentSecurityPolicy(redirectUri),
+      "content-security-policy": contentSecurityPolicy(
+        redirectUri,
+        formActions
+      ),
       "referrer-policy": "no-referrer",
       "x-frame-options": "DENY",
     },
@@ -270,7 +297,7 @@ const forProvider = (request: AuthRequest) => {
 };
 
 /** Who asks, as the provider describes the client (its name may be the client's own claim). */
-const askerOf = (request: AuthRequest) =>
+export const askerOf = (request: AuthRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
 
@@ -289,7 +316,7 @@ const askerOf = (request: AuthRequest) =>
   });
 
 /** Where signing in starts for `request`: `/authorize` with its own parameters. */
-const authorizeHref = (request: AuthRequest) => {
+export const authorizeHref = (request: AuthRequest) => {
   const query = new URLSearchParams({
     client_id: request.clientId,
     redirect_uri: request.redirectUri,
@@ -316,7 +343,7 @@ const authorizeHref = (request: AuthRequest) => {
 const encodeToken = Schema.encodeEffect(Schema.Uint8ArrayFromBase64Url);
 
 /** A fresh CSRF token each time it runs: 32 random bytes, base64url. */
-const freshCsrf = Effect.sync(() =>
+export const freshCsrf = Effect.sync(() =>
   crypto.getRandomValues(new Uint8Array(32))
 ).pipe(Effect.flatMap(encodeToken), Effect.orDie);
 
@@ -355,7 +382,7 @@ const postedSignIn = (request: HttpServerRequest.HttpServerRequest) =>
   });
 
 /** The client's address, as Cloudflare saw it. */
-const addressOf = (request: HttpServerRequest.HttpServerRequest) =>
+export const addressOf = (request: HttpServerRequest.HttpServerRequest) =>
   request.headers["cf-connecting-ip"] ?? "unknown";
 
 const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
@@ -372,7 +399,7 @@ const passwordFits = (password: string) =>
  * to the client with it. The token's props carry only `{ handle }`; the
  * grant's user is the handle's key, so a grant is one account's in any case.
  */
-const completed = (handle: Handle, request: AuthRequest) =>
+export const completed = (handle: Handle, request: AuthRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
 
@@ -401,30 +428,57 @@ const completed = (handle: Handle, request: AuthRequest) =>
     );
   });
 
-/** `GET /authorize`: the provider validates the client's request; the sign-in form. */
-const showSignIn = (request: HttpServerRequest.HttpServerRequest) =>
+/**
+ * The sign-in page for `request` with `form`, and the ways to sign in on
+ * offer: Google's too, and its origin among the places the forms may send
+ * a person on to, when the platform offers it.
+ */
+const offeredSignIn = (
+  request: AuthRequest,
+  form: PendingForm,
+  status: number,
+  message?: string
+) =>
+  Effect.gen(function* () {
+    const { google } = yield* SignInOffers;
+
+    const asker = yield* askerOf(request);
+
+    return htmlPage(
+      signInPage(asker, form, { google: Option.isSome(google) }, message),
+      status,
+      request.redirectUri,
+      Option.toArray(google)
+    );
+  });
+
+/**
+ * The sign-in form for `request`, afresh: a new CSRF token, sealed with the
+ * request into the form and set as this browser's cookie, and why the
+ * person is here again (`message`), if they are.
+ */
+export const signInPageFor = (
+  request: AuthRequest,
+  status: number,
+  message?: string
+) =>
   Effect.gen(function* () {
     const { cookieKey } = yield* SignInKeys;
 
-    const api = yield* oauthApi;
-
-    const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.orDie);
-
-    const parsed = yield* provider(() => api.parseAuthRequest(web));
-
     const csrf = yield* freshCsrf;
 
-    const pending: PendingSignIn = { csrf, request: parsed };
+    const pending: PendingSignIn = { csrf, request };
 
     const sealed = yield* sealState(cookieKey, pending);
 
-    const asker = yield* askerOf(parsed);
+    const page = yield* offeredSignIn(
+      request,
+      { csrf, request: sealed },
+      status,
+      message
+    );
 
-    return yield* htmlPage(
-      signInPage(asker, { csrf, request: sealed }),
-      200,
-      parsed.redirectUri
-    ).pipe(
+    return yield* page.pipe(
       HttpServerResponse.setCookie(CSRF_COOKIE, csrf, {
         ...csrfCookie,
         maxAge: SIGN_IN_LIFETIME,
@@ -433,30 +487,41 @@ const showSignIn = (request: HttpServerRequest.HttpServerRequest) =>
     );
   });
 
+/** `GET /authorize`: the provider validates the client's request; the sign-in form. */
+const showSignIn = (request: HttpServerRequest.HttpServerRequest) =>
+  Effect.gen(function* () {
+    const api = yield* oauthApi;
+
+    const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.orDie);
+
+    const parsed = yield* provider(() => api.parseAuthRequest(web));
+
+    return yield* signInPageFor(parsed, 200);
+  });
+
 /** The sign-in form again, with why it did not go through. */
 const signInAgain = (
   pending: PendingSignIn,
   form: PendingForm,
   status: number,
   message: string
-) =>
-  askerOf(pending.request).pipe(
-    Effect.map((asker) =>
-      htmlPage(
-        signInPage(asker, form, message),
-        status,
-        pending.request.redirectUri
-      )
-    )
-  );
+) => offeredSignIn(pending.request, form, status, message);
 
 /**
- * `POST /authorize`: the sixth attempt in a minute for one handle, or from
- * one address, is refused before any password is checked; a wrong handle
- * and a wrong password read the same; a hash made with fewer iterations
- * than today's is replaced.
+ * A posted sign-in form, by handle and password, then `signedIn` with the
+ * person's handle and the sign-in it continues. The sixth attempt in a
+ * minute for one handle, or from one address, is refused before any
+ * password is checked; a wrong handle and a wrong password read the same,
+ * and show the sign-in form again; a hash made with fewer iterations than
+ * today's is replaced.
  */
-const signIn = (request: HttpServerRequest.HttpServerRequest) =>
+export const byPassword = <E, R>(
+  request: HttpServerRequest.HttpServerRequest,
+  signedIn: (
+    handle: Handle,
+    pending: PendingSignIn
+  ) => Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>
+) =>
   Effect.gen(function* () {
     const { pepper } = yield* SignInKeys;
 
@@ -511,8 +576,12 @@ const signIn = (request: HttpServerRequest.HttpServerRequest) =>
       );
     }
 
-    return yield* completed(account.value.handle, pending.request);
+    return yield* signedIn(account.value.handle, pending);
   });
+
+/** `POST /authorize`: signed in by handle and password, back to the client with a code. */
+const signIn = (request: HttpServerRequest.HttpServerRequest) =>
+  byPassword(request, (handle, pending) => completed(handle, pending.request));
 
 /** `GET /signup?request=<sealed>`: the sign-up form for a sign-in in progress. */
 const showSignUp = Effect.gen(function* () {
@@ -538,35 +607,45 @@ const showSignUp = Effect.gen(function* () {
 });
 
 /** Why a sign-up did not go through: the page's status and its plain sentence. */
-interface Refused {
+export interface Refused {
   readonly message: string;
   readonly status: number;
 }
 
 /**
- * The handle a sign-up may take, or why it may not. A handle a named
- * session holds is taken, like an account's.
+ * The handle a new account may take, or why it may not: its spelling, the
+ * platform's reserved words, and the handles named sessions hold (taken,
+ * like an account's). Sign-up and Google's first sign-in both use it.
  */
+export const chosenHandle = (
+  handle: string,
+  held: readonly Handle[]
+): Result.Result<Handle, Refused> =>
+  Option.match(decodeHandle(handle), {
+    onNone: () => Result.fail({ message: Says.handleSpelling, status: 400 }),
+    onSome: (chosen) => {
+      if (RESERVED_HANDLES.has(handleKey(chosen))) {
+        return Result.fail({ message: Says.handleReserved, status: 400 });
+      }
+
+      if (held.some((holder) => sameHandle(holder, chosen))) {
+        return Result.fail({ message: Says.handleTaken, status: 409 });
+      }
+
+      return Result.succeed(chosen);
+    },
+  });
+
+/** The handle a sign-up may take, or why it may not: `chosenHandle`'s rules, and the password's length. */
 const signUpHandle = (
   form: PostedForm,
   held: readonly Handle[]
 ): Result.Result<Handle, Refused> =>
-  Option.match(decodeHandle(form.handle), {
-    onNone: () => Result.fail({ message: Says.handleSpelling, status: 400 }),
-    onSome: (handle) => {
-      if (RESERVED_HANDLES.has(handleKey(handle))) {
-        return Result.fail({ message: Says.handleReserved, status: 400 });
-      }
-
-      if (held.some((holder) => sameHandle(holder, handle))) {
-        return Result.fail({ message: Says.handleTaken, status: 409 });
-      }
-
-      return passwordFits(form.password)
-        ? Result.succeed(handle)
-        : Result.fail({ message: Says.passwordLength, status: 400 });
-    },
-  });
+  Result.flatMap(chosenHandle(form.handle, held), (handle) =>
+    passwordFits(form.password)
+      ? Result.succeed(handle)
+      : Result.fail({ message: Says.passwordLength, status: 400 })
+  );
 
 /**
  * `POST /signup`: a new account, then signed in at once. Sign-ups are
@@ -651,7 +730,7 @@ const authorizationServer = (request: HttpServerRequest.HttpServerRequest) =>
   });
 
 /** A failed sign-in: the client's own error redirect, or a page to start again from. */
-const failedPage = (failed: SignInFailed) =>
+export const failedPage = (failed: SignInFailed) =>
   Effect.succeed(
     failed.redirectTo === undefined
       ? htmlPage(problemPage(failed.reason), 400)
@@ -667,7 +746,8 @@ export type SignInServices =
   | HeldHandles
   | OAuthStore
   | SignInAttempts
-  | SignInKeys;
+  | SignInKeys
+  | SignInOffers;
 
 /**
  * Sign-in's routes, each run with the services taken once when the router
@@ -679,7 +759,8 @@ export const signInRoutes = HttpRouter.use((router) =>
       Context.add(HeldHandles, yield* HeldHandles),
       Context.add(OAuthStore, yield* OAuthStore),
       Context.add(SignInAttempts, yield* SignInAttempts),
-      Context.add(SignInKeys, yield* SignInKeys)
+      Context.add(SignInKeys, yield* SignInKeys),
+      Context.add(SignInOffers, yield* SignInOffers)
     );
 
     /** Adds a route, its failures shown as pages and the services provided. */
