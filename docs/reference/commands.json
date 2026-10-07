@@ -14,7 +14,7 @@
         "additionalProperties": true,
         "properties": {
           "project": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           }
         },
@@ -47,7 +47,17 @@
         "additionalProperties": true,
         "properties": {
           "ask": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           },
           "base": {

@@ -36,7 +36,7 @@ export const platform = (env: Env) =>
         Layer.mergeAll(
           Vacant,
           MemorySessions.layer({
-            [Redacted.value(OPERATOR_TOKEN)]: { handle: OPERATOR_HANDLE },
+            [Redacted.value(OPERATOR_TOKEN)]: OPERATOR_HANDLE,
           })
         )
       )

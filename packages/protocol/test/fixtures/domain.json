@@ -1,0 +1,1792 @@
+{
+  "$comment": "Encoded values, as a client sends them or reads them back. domain.test.ts decodes each roundTrip example and encodes it back unchanged, and expects each refused value to fail to decode as its schema. Paths say config/ where a project's config folder would be, and commands say cli, since only packages/brand spells the name.",
+  "refused": {
+    "a policy whose run block is still the FromCI marker": {
+      "schema": "Policy",
+      "value": {
+        "agents": "trailer",
+        "asks": [
+          {
+            "askedBy": "alice",
+            "blockedBy": [],
+            "brief": {
+              "context": ["ISO 8601 weeks start on Monday."],
+              "current": "Week 1 of 2027 parses as week 53 of 2026.",
+              "outOfScope": ["Locale-specific weeks"],
+              "terms": ["ISO week"],
+              "want": "An ISO week date parses to the Monday of that week."
+            },
+            "check": {
+              "_tag": "RedThenGreen",
+              "path": "packages/parse/test/iso-week.test.ts"
+            },
+            "file": "config/asks/iso-week.ask.ts",
+            "id": "iso-week",
+            "kind": "fix",
+            "mentor": "bob",
+            "reserve": "newcomers",
+            "territory": {
+              "module": "@datekit/parse",
+              "paths": ["packages/parse/**"],
+              "publicFiles": ["packages/parse/src/index.ts"]
+            },
+            "openedAt": "2026-10-07T12:00:00.000Z",
+            "openedIn": "4444444444444444444444444444444444444444",
+            "parent": "drop-moment",
+            "project": "datekit",
+            "state": "open"
+          }
+        ],
+        "at": "4444444444444444444444444444444444444444",
+        "budget": {
+          "decisionsPerDay": 5,
+          "expireDays": 14
+        },
+        "caps": {
+          "claimsPerPerson": 3,
+          "proposalsPerPerson": 2
+        },
+        "claims": {
+          "lapseAfterMs": 86400000,
+          "warnAfterMs": 7200000
+        },
+        "deciders": [
+          {
+            "handles": ["alice"],
+            "paths": "**"
+          }
+        ],
+        "functions": {
+          "admit": false,
+          "opensAlone": true
+        },
+        "judge": {
+          "paths": ["config/**", ".env.schema"],
+          "pointers": ["package.json#/scripts"]
+        },
+        "kinds": [
+          {
+            "checkKind": "redThenGreen",
+            "claimers": "vouched",
+            "finish": "optional",
+            "name": "fix",
+            "oneWay": false,
+            "race": 1,
+            "requires": ["want", "check", "territory"],
+            "strength": "assertion"
+          }
+        ],
+        "modules": [
+          {
+            "module": "@datekit/parse",
+            "paths": ["packages/parse/**"],
+            "publicFiles": ["packages/parse/src/index.ts"]
+          }
+        ],
+        "ratchets": [
+          {
+            "measure": {
+              "_tag": "Metric",
+              "command": "bun run size",
+              "path": "/total"
+            },
+            "name": "bundleSize"
+          }
+        ],
+        "record": {
+          "countsAfterDays": 30,
+          "windowDays": 365
+        },
+        "run": {
+          "_tag": "FromCI"
+        },
+        "source": "config",
+        "vouch": {
+          "file": "config/vouched.td",
+          "mode": "forCode"
+        },
+        "vouches": [
+          {
+            "denounced": false,
+            "handle": "alice"
+          },
+          {
+            "denounced": true,
+            "handle": "mallory",
+            "note": "spam"
+          }
+        ],
+        "weakening": {
+          "markers": [".skip(", "@ts-ignore"]
+        }
+      }
+    },
+    "a policy whose deciders are still the owners marker": {
+      "schema": "Policy",
+      "value": {
+        "agents": "trailer",
+        "asks": [
+          {
+            "askedBy": "alice",
+            "blockedBy": [],
+            "brief": {
+              "context": ["ISO 8601 weeks start on Monday."],
+              "current": "Week 1 of 2027 parses as week 53 of 2026.",
+              "outOfScope": ["Locale-specific weeks"],
+              "terms": ["ISO week"],
+              "want": "An ISO week date parses to the Monday of that week."
+            },
+            "check": {
+              "_tag": "RedThenGreen",
+              "path": "packages/parse/test/iso-week.test.ts"
+            },
+            "file": "config/asks/iso-week.ask.ts",
+            "id": "iso-week",
+            "kind": "fix",
+            "mentor": "bob",
+            "reserve": "newcomers",
+            "territory": {
+              "module": "@datekit/parse",
+              "paths": ["packages/parse/**"],
+              "publicFiles": ["packages/parse/src/index.ts"]
+            },
+            "openedAt": "2026-10-07T12:00:00.000Z",
+            "openedIn": "4444444444444444444444444444444444444444",
+            "parent": "drop-moment",
+            "project": "datekit",
+            "state": "open"
+          }
+        ],
+        "at": "4444444444444444444444444444444444444444",
+        "budget": {
+          "decisionsPerDay": 5,
+          "expireDays": 14
+        },
+        "caps": {
+          "claimsPerPerson": 3,
+          "proposalsPerPerson": 2
+        },
+        "claims": {
+          "lapseAfterMs": 86400000,
+          "warnAfterMs": 7200000
+        },
+        "deciders": [
+          {
+            "handles": "owners",
+            "paths": "**"
+          }
+        ],
+        "functions": {
+          "admit": false,
+          "opensAlone": true
+        },
+        "judge": {
+          "paths": ["config/**", ".env.schema"],
+          "pointers": ["package.json#/scripts"]
+        },
+        "kinds": [
+          {
+            "checkKind": "redThenGreen",
+            "claimers": "vouched",
+            "finish": "optional",
+            "name": "fix",
+            "oneWay": false,
+            "race": 1,
+            "requires": ["want", "check", "territory"],
+            "strength": "assertion"
+          }
+        ],
+        "modules": [
+          {
+            "module": "@datekit/parse",
+            "paths": ["packages/parse/**"],
+            "publicFiles": ["packages/parse/src/index.ts"]
+          }
+        ],
+        "ratchets": [
+          {
+            "measure": {
+              "_tag": "Metric",
+              "command": "bun run size",
+              "path": "/total"
+            },
+            "name": "bundleSize"
+          }
+        ],
+        "record": {
+          "countsAfterDays": 30,
+          "windowDays": 365
+        },
+        "run": {
+          "checks": {
+            "lint": "bun run lint",
+            "types": "bun run typecheck",
+            "unit": "bun run test"
+          },
+          "doctor": "bun run doctor",
+          "image": "checker:default",
+          "setup": "bun install --frozen-lockfile --ignore-scripts",
+          "setupEgress": ["registry.npmjs.org"],
+          "test": "bun test {path}"
+        },
+        "source": "config",
+        "vouch": {
+          "file": "config/vouched.td",
+          "mode": "forCode"
+        },
+        "vouches": [
+          {
+            "denounced": false,
+            "handle": "alice"
+          },
+          {
+            "denounced": true,
+            "handle": "mallory",
+            "note": "spam"
+          }
+        ],
+        "weakening": {
+          "markers": [".skip(", "@ts-ignore"]
+        }
+      }
+    },
+    "a caller named by an untagged handle": {
+      "schema": "Principal",
+      "value": {
+        "handle": "alice"
+      }
+    },
+    "an envelope of a version the CLI does not know": {
+      "schema": "Envelope",
+      "value": {
+        "command": "asks",
+        "data": {
+          "asks": []
+        },
+        "ok": true,
+        "v": 2
+      }
+    },
+    "an ok envelope without its data": {
+      "schema": "Envelope",
+      "value": {
+        "command": "asks",
+        "ok": true,
+        "v": 1
+      }
+    }
+  },
+  "roundTrip": {
+    "AgentTrailer": [
+      {
+        "harness": "pi",
+        "verified": false
+      }
+    ],
+    "AnswerReceipt": [
+      {
+        "ask": "iso-week",
+        "base": "1111111111111111111111111111111111111111",
+        "head": "3333333333333333333333333333333333333333",
+        "outcome": {
+          "_tag": "Checking",
+          "stage": "merge"
+        },
+        "project": "datekit",
+        "requestId": "push-33333333"
+      }
+    ],
+    "AnswerView": [
+      {
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "head": "3333333333333333333333333333333333333333",
+        "outcome": {
+          "_tag": "Checking",
+          "stage": "checks"
+        },
+        "requestId": "push-33333333"
+      }
+    ],
+    "Ask": [
+      {
+        "askedBy": "alice",
+        "blockedBy": [],
+        "brief": {
+          "context": ["ISO 8601 weeks start on Monday."],
+          "current": "Week 1 of 2027 parses as week 53 of 2026.",
+          "outOfScope": ["Locale-specific weeks"],
+          "terms": ["ISO week"],
+          "want": "An ISO week date parses to the Monday of that week."
+        },
+        "check": {
+          "_tag": "RedThenGreen",
+          "path": "packages/parse/test/iso-week.test.ts"
+        },
+        "file": "config/asks/iso-week.ask.ts",
+        "id": "iso-week",
+        "kind": "fix",
+        "mentor": "bob",
+        "reserve": "newcomers",
+        "territory": {
+          "module": "@datekit/parse",
+          "paths": ["packages/parse/**"],
+          "publicFiles": ["packages/parse/src/index.ts"]
+        },
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "openedIn": "4444444444444444444444444444444444444444",
+        "parent": "drop-moment",
+        "project": "datekit",
+        "state": "open"
+      }
+    ],
+    "AskInput": [
+      {
+        "askedBy": "alice",
+        "blockedBy": [],
+        "brief": {
+          "context": ["ISO 8601 weeks start on Monday."],
+          "current": "Week 1 of 2027 parses as week 53 of 2026.",
+          "outOfScope": ["Locale-specific weeks"],
+          "terms": ["ISO week"],
+          "want": "An ISO week date parses to the Monday of that week."
+        },
+        "check": {
+          "_tag": "RedThenGreen",
+          "path": "packages/parse/test/iso-week.test.ts"
+        },
+        "file": "config/asks/iso-week.ask.ts",
+        "id": "iso-week",
+        "kind": "fix",
+        "mentor": "bob",
+        "reserve": "newcomers",
+        "territory": {
+          "module": "@datekit/parse",
+          "paths": ["packages/parse/**"],
+          "publicFiles": ["packages/parse/src/index.ts"]
+        }
+      }
+    ],
+    "AskKind": [
+      {
+        "checkKind": "redThenGreen",
+        "claimers": "vouched",
+        "finish": "optional",
+        "name": "fix",
+        "oneWay": false,
+        "race": 1,
+        "requires": ["want", "check", "territory"],
+        "strength": "assertion"
+      },
+      {
+        "checkKind": "redThenGreen",
+        "claimers": {
+          "record": {
+            "area": "parse",
+            "atLeast": 2
+          }
+        },
+        "finish": "optional",
+        "name": "fix",
+        "oneWay": false,
+        "race": 1,
+        "requires": ["want", "check", "territory"],
+        "strength": "assertion"
+      },
+      {
+        "checkKind": "redThenGreen",
+        "claimers": {
+          "newcomer": {
+            "mentor": "bob"
+          }
+        },
+        "finish": "optional",
+        "name": "fix",
+        "oneWay": false,
+        "race": 1,
+        "requires": ["want", "check", "territory"],
+        "strength": "assertion"
+      }
+    ],
+    "AskListing": [
+      {
+        "ask": "iso-week",
+        "blockedBy": ["drop-moment"],
+        "claimed": false,
+        "kind": "fix",
+        "reserve": "newcomers",
+        "territory": "@datekit/parse",
+        "want": "An ISO week date parses to the Monday of that week."
+      }
+    ],
+    "Brief": [
+      {
+        "context": ["ISO 8601 weeks start on Monday."],
+        "current": "Week 1 of 2027 parses as week 53 of 2026.",
+        "outOfScope": ["Locale-specific weeks"],
+        "terms": ["ISO week"],
+        "want": "An ISO week date parses to the Monday of that week."
+      }
+    ],
+    "CheckSpec": [
+      {
+        "_tag": "RedThenGreen",
+        "path": "packages/parse/test/iso-week.test.ts"
+      },
+      {
+        "_tag": "LintToZero",
+        "command": "bunx oxlint --format json",
+        "rule": "no-explicit-any",
+        "territory": "@datekit/parse"
+      },
+      {
+        "_tag": "Ratchet",
+        "ratchet": "anyCount"
+      },
+      {
+        "_tag": "Migrate",
+        "count": "bun scripts/count.ts",
+        "from": "parseDate",
+        "to": "parse"
+      },
+      {
+        "_tag": "SymbolAbsent",
+        "count": "bun scripts/count.ts",
+        "symbol": "parseDate"
+      }
+    ],
+    "ClaimView": [
+      {
+        "ask": "iso-week",
+        "base": "1111111111111111111111111111111111111111",
+        "checkCommand": "cli check",
+        "claimant": "alice",
+        "fork": "datekit--iso-week--alice",
+        "lapsesAt": "2026-10-08T12:00:00.000Z",
+        "lastPushAt": "2026-10-07T12:00:00.000Z",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "remote": "https://example.com/git/datekit--iso-week--alice",
+        "state": "live",
+        "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "warnsAt": "2026-10-07T14:00:00.000Z"
+      }
+    ],
+    "Credit": [
+      {
+        "handle": "alice",
+        "role": "Asked-by"
+      }
+    ],
+    "CreditSummary": [
+      {
+        "area": "@datekit/parse",
+        "count": 4,
+        "project": "datekit",
+        "role": "Signed-off-by"
+      }
+    ],
+    "Decision": [
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "OpenProposal",
+          "proposal": "prop-000001"
+        }
+      },
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "Finish",
+          "ask": "iso-week",
+          "head": "3333333333333333333333333333333333333333"
+        }
+      },
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "RaiseRatchet",
+          "after": 12,
+          "ask": "iso-week",
+          "before": 10,
+          "ratchet": "anyCount",
+          "territory": "@datekit/parse"
+        }
+      },
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "Waiver",
+          "ask": "iso-week",
+          "at": {
+            "line": 3,
+            "path": "packages/parse/test/a.test.ts"
+          },
+          "marker": ".skip(",
+          "reason": "Waits on the upstream fix."
+        }
+      },
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "StrayPush",
+          "after": "3333333333333333333333333333333333333333",
+          "before": "1111111111111111111111111111111111111111",
+          "ref": "refs/heads/main"
+        }
+      },
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "PostureChange",
+          "from": "open",
+          "to": "openWithSealedEvidence"
+        }
+      },
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "Vouch",
+          "handle": "dave"
+        }
+      },
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "SecretInTree",
+          "ask": "iso-week",
+          "item": "PAYMENTS_KEY"
+        }
+      },
+      {
+        "decided": {
+          "at": "2026-10-07T14:00:00.000Z",
+          "by": "alice",
+          "choice": "accept",
+          "note": "Worth it."
+        },
+        "deciders": ["alice"],
+        "default": "decline",
+        "evidence": [
+          {
+            "href": "https://example.com/7",
+            "label": "lanes",
+            "value": "3/3"
+          }
+        ],
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "id": "dec-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "subject": {
+          "_tag": "ProxyWidened",
+          "hosts": ["api.stripe.com"],
+          "item": "PAYMENTS_KEY"
+        }
+      }
+    ],
+    "EnvSchemaView": [
+      {
+        "at": "4444444444444444444444444444444444444444",
+        "currentEnvKey": "APP_ENV",
+        "file": ".env.schema",
+        "imports": ["./.env.shared.schema"],
+        "items": [
+          {
+            "deprecated": false,
+            "description": "The payment provider's key.",
+            "docs": "https://example.com/docs/keys",
+            "key": "PAYMENTS_KEY",
+            "placeholder": "pk_placeholder",
+            "proxy": {
+              "block": false,
+              "domains": ["api.stripe.com"],
+              "method": "POST",
+              "path": "/v1/*"
+            },
+            "required": true,
+            "sensitive": true,
+            "tags": ["payments"],
+            "type": "string(startsWith=sk_)",
+            "value": {
+              "setAt": "2026-10-07T12:00:00.000Z",
+              "setBy": "alice"
+            }
+          },
+          {
+            "key": "APP_ENV",
+            "required": "depends",
+            "sensitive": false,
+            "tags": []
+          }
+        ],
+        "project": "datekit"
+      }
+    ],
+    "Envelope": [
+      {
+        "command": "asks",
+        "data": {
+          "asks": [
+            {
+              "ask": "iso-week",
+              "blockedBy": ["drop-moment"],
+              "claimed": false,
+              "kind": "fix",
+              "reserve": "newcomers",
+              "territory": "@datekit/parse",
+              "want": "An ISO week date parses to the Monday of that week."
+            }
+          ]
+        },
+        "ok": true,
+        "v": 1
+      },
+      {
+        "command": "claim",
+        "ok": false,
+        "refusals": [
+          {
+            "_tag": "NotClaimed",
+            "ask": "iso-week",
+            "next": "cli claim iso-week",
+            "retryable": true
+          }
+        ],
+        "v": 1
+      }
+    ],
+    "Evidence": [
+      {
+        "label": "lanes",
+        "value": "3/3"
+      }
+    ],
+    "FrontPageEntry": [
+      {
+        "ask": {
+          "ask": "iso-week",
+          "blockedBy": ["drop-moment"],
+          "claimed": false,
+          "kind": "fix",
+          "reserve": "newcomers",
+          "territory": "@datekit/parse",
+          "want": "An ISO week date parses to the Monday of that week."
+        },
+        "posture": "open",
+        "project": "datekit",
+        "takeable": true
+      }
+    ],
+    "LandingView": [
+      {
+        "ask": "iso-week",
+        "assisted": [
+          {
+            "harness": "claude-code",
+            "model": "haiku",
+            "verified": true
+          }
+        ],
+        "author": "carol",
+        "credits": [
+          {
+            "handle": "alice",
+            "role": "Asked-by"
+          },
+          {
+            "handle": "carol",
+            "role": "Signed-off-by"
+          }
+        ],
+        "heldBackTrailer": "Held-back: parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "landedAt": "2026-10-07T12:00:00.000Z",
+        "parent": "1111111111111111111111111111111111111111",
+        "project": "datekit",
+        "requestId": "push-33333333",
+        "sha": "4444444444444444444444444444444444444444",
+        "verdict": {
+          "ask": "iso-week",
+          "at": "2026-10-07T12:00:00.000Z",
+          "base": "1111111111111111111111111111111111111111",
+          "checkVersion": "redThenGreen@0.0.0+abc123",
+          "head": "3333333333333333333333333333333333333333",
+          "heldBack": [
+            {
+              "area": "parse",
+              "passed": 7,
+              "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+              "total": 7
+            }
+          ],
+          "lanes": [
+            {
+              "command": "bun run lint",
+              "durationMs": 1200,
+              "lane": "lint",
+              "result": "passed"
+            },
+            {
+              "command": "bun run test",
+              "durationMs": 3400,
+              "lane": "unit",
+              "logRef": "logs/datekit/7",
+              "result": "failed"
+            }
+          ],
+          "outcome": {
+            "_tag": "Landed",
+            "sha": "4444444444444444444444444444444444444444"
+          },
+          "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
+          "project": "datekit",
+          "stage": "checks",
+          "tree": "5555555555555555555555555555555555555555",
+          "verifier": "platform"
+        }
+      }
+    ],
+    "Ledger": [
+      {
+        "entries": [
+          {
+            "_tag": "LayerDeclared",
+            "at": "2026-10-07T12:00:00.000Z",
+            "disclose": "sealed",
+            "kinds": ["checks"],
+            "layer": "maintainers",
+            "seq": 1
+          },
+          {
+            "_tag": "CountChanged",
+            "area": "parse",
+            "at": "2026-10-07T12:00:00.000Z",
+            "count": 7,
+            "layer": "maintainers",
+            "seq": 2
+          },
+          {
+            "_tag": "CommitmentPublished",
+            "area": "parse",
+            "at": "2026-10-07T12:00:00.000Z",
+            "authors": 2,
+            "checks": 7,
+            "seq": 3,
+            "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          {
+            "_tag": "Admitted",
+            "area": "parse",
+            "at": "2026-10-07T12:00:00.000Z",
+            "knownBadCaught": 1,
+            "mainRuns": 3,
+            "seq": 4,
+            "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777"
+          },
+          {
+            "_tag": "Released",
+            "at": "2026-10-07T12:00:00.000Z",
+            "by": "alice",
+            "landing": "4444444444444444444444444444444444444444",
+            "layer": "maintainers",
+            "paths": 2,
+            "seq": 5
+          },
+          {
+            "_tag": "PostureChanged",
+            "at": "2026-10-07T12:00:00.000Z",
+            "decision": "dec-000001",
+            "from": "open",
+            "seq": 6,
+            "to": "openWithSealedEvidence"
+          },
+          {
+            "_tag": "ValueSet",
+            "at": "2026-10-07T12:00:00.000Z",
+            "by": "alice",
+            "key": "PAYMENTS_KEY",
+            "seq": 7
+          }
+        ],
+        "layers": [
+          {
+            "audience": "maintainers",
+            "disclose": "sealed",
+            "holds": ["checks"],
+            "maxDays": 365,
+            "name": "maintainers",
+            "reason": "Held-back checks for the parser.",
+            "repo": "datekit--maintainers",
+            "sunsetDays": 90
+          }
+        ],
+        "posture": "openWithSealedEvidence",
+        "postureLabel": "Open with sealed evidence",
+        "project": "datekit"
+      }
+    ],
+    "Outcome": [
+      {
+        "_tag": "Checking",
+        "stage": "merge"
+      },
+      {
+        "_tag": "Landed",
+        "sha": "4444444444444444444444444444444444444444"
+      },
+      {
+        "_tag": "WaitingOnParent",
+        "ask": "drop-moment"
+      },
+      {
+        "_tag": "AwaitingFinish",
+        "decider": "alice"
+      },
+      {
+        "_tag": "AwaitingDecision",
+        "decision": "dec-000001"
+      },
+      {
+        "_tag": "Refused",
+        "refusals": [
+          {
+            "_tag": "NotClaimed",
+            "ask": "iso-week",
+            "next": "cli claim iso-week",
+            "retryable": true
+          }
+        ]
+      }
+    ],
+    "Policy": [
+      {
+        "agents": "trailer",
+        "asks": [
+          {
+            "askedBy": "alice",
+            "blockedBy": [],
+            "brief": {
+              "context": ["ISO 8601 weeks start on Monday."],
+              "current": "Week 1 of 2027 parses as week 53 of 2026.",
+              "outOfScope": ["Locale-specific weeks"],
+              "terms": ["ISO week"],
+              "want": "An ISO week date parses to the Monday of that week."
+            },
+            "check": {
+              "_tag": "RedThenGreen",
+              "path": "packages/parse/test/iso-week.test.ts"
+            },
+            "file": "config/asks/iso-week.ask.ts",
+            "id": "iso-week",
+            "kind": "fix",
+            "mentor": "bob",
+            "reserve": "newcomers",
+            "territory": {
+              "module": "@datekit/parse",
+              "paths": ["packages/parse/**"],
+              "publicFiles": ["packages/parse/src/index.ts"]
+            },
+            "openedAt": "2026-10-07T12:00:00.000Z",
+            "openedIn": "4444444444444444444444444444444444444444",
+            "parent": "drop-moment",
+            "project": "datekit",
+            "state": "open"
+          }
+        ],
+        "at": "4444444444444444444444444444444444444444",
+        "budget": {
+          "decisionsPerDay": 5,
+          "expireDays": 14
+        },
+        "caps": {
+          "claimsPerPerson": 3,
+          "proposalsPerPerson": 2
+        },
+        "claims": {
+          "lapseAfterMs": 86400000,
+          "warnAfterMs": 7200000
+        },
+        "deciders": [
+          {
+            "handles": ["alice"],
+            "paths": "**"
+          }
+        ],
+        "functions": {
+          "admit": false,
+          "opensAlone": true
+        },
+        "judge": {
+          "paths": ["config/**", ".env.schema"],
+          "pointers": ["package.json#/scripts"]
+        },
+        "kinds": [
+          {
+            "checkKind": "redThenGreen",
+            "claimers": "vouched",
+            "finish": "optional",
+            "name": "fix",
+            "oneWay": false,
+            "race": 1,
+            "requires": ["want", "check", "territory"],
+            "strength": "assertion"
+          }
+        ],
+        "modules": [
+          {
+            "module": "@datekit/parse",
+            "paths": ["packages/parse/**"],
+            "publicFiles": ["packages/parse/src/index.ts"]
+          }
+        ],
+        "ratchets": [
+          {
+            "measure": {
+              "_tag": "Metric",
+              "command": "bun run size",
+              "path": "/total"
+            },
+            "name": "bundleSize"
+          }
+        ],
+        "record": {
+          "countsAfterDays": 30,
+          "windowDays": 365
+        },
+        "run": {
+          "checks": {
+            "lint": "bun run lint",
+            "types": "bun run typecheck",
+            "unit": "bun run test"
+          },
+          "doctor": "bun run doctor",
+          "image": "checker:default",
+          "setup": "bun install --frozen-lockfile --ignore-scripts",
+          "setupEgress": ["registry.npmjs.org"],
+          "test": "bun test {path}"
+        },
+        "source": "config",
+        "vouch": {
+          "file": "config/vouched.td",
+          "mode": "forCode"
+        },
+        "vouches": [
+          {
+            "denounced": false,
+            "handle": "alice"
+          },
+          {
+            "denounced": true,
+            "handle": "mallory",
+            "note": "spam"
+          }
+        ],
+        "weakening": {
+          "markers": [".skip(", "@ts-ignore"]
+        }
+      }
+    ],
+    "PolicyInput": [
+      {
+        "agents": "trailer",
+        "asks": [
+          {
+            "askedBy": "alice",
+            "blockedBy": [],
+            "brief": {
+              "context": ["ISO 8601 weeks start on Monday."],
+              "current": "Week 1 of 2027 parses as week 53 of 2026.",
+              "outOfScope": ["Locale-specific weeks"],
+              "terms": ["ISO week"],
+              "want": "An ISO week date parses to the Monday of that week."
+            },
+            "check": {
+              "_tag": "RedThenGreen",
+              "path": "packages/parse/test/iso-week.test.ts"
+            },
+            "file": "config/asks/iso-week.ask.ts",
+            "id": "iso-week",
+            "kind": "fix",
+            "mentor": "bob",
+            "reserve": "newcomers",
+            "territory": {
+              "module": "@datekit/parse",
+              "paths": ["packages/parse/**"],
+              "publicFiles": ["packages/parse/src/index.ts"]
+            }
+          }
+        ],
+        "budget": {
+          "decisionsPerDay": 5,
+          "expireDays": 14
+        },
+        "caps": {
+          "claimsPerPerson": 3,
+          "proposalsPerPerson": 2
+        },
+        "claims": {
+          "lapseAfterMs": 86400000,
+          "warnAfterMs": 7200000
+        },
+        "deciders": [
+          {
+            "handles": "owners",
+            "paths": "**"
+          }
+        ],
+        "functions": {
+          "admit": false,
+          "opensAlone": true
+        },
+        "kinds": [
+          {
+            "checkKind": "redThenGreen",
+            "claimers": "vouched",
+            "finish": "optional",
+            "name": "fix",
+            "oneWay": false,
+            "race": 1,
+            "requires": ["want", "check", "territory"],
+            "strength": "assertion"
+          }
+        ],
+        "ratchets": [
+          {
+            "measure": {
+              "_tag": "Metric",
+              "command": "bun run size",
+              "path": "/total"
+            },
+            "name": "bundleSize"
+          }
+        ],
+        "record": {
+          "countsAfterDays": 30,
+          "windowDays": 365
+        },
+        "run": {
+          "_tag": "FromCI"
+        },
+        "source": "config",
+        "vouch": {
+          "file": "config/vouched.td",
+          "mode": "forCode"
+        },
+        "weakening": {
+          "markers": [".skip(", "@ts-ignore"]
+        }
+      },
+      {
+        "agents": "trailer",
+        "asks": [
+          {
+            "askedBy": "alice",
+            "blockedBy": [],
+            "brief": {
+              "context": ["ISO 8601 weeks start on Monday."],
+              "current": "Week 1 of 2027 parses as week 53 of 2026.",
+              "outOfScope": ["Locale-specific weeks"],
+              "terms": ["ISO week"],
+              "want": "An ISO week date parses to the Monday of that week."
+            },
+            "check": {
+              "_tag": "RedThenGreen",
+              "path": "packages/parse/test/iso-week.test.ts"
+            },
+            "file": "config/asks/iso-week.ask.ts",
+            "id": "iso-week",
+            "kind": "fix",
+            "mentor": "bob",
+            "reserve": "newcomers",
+            "territory": {
+              "module": "@datekit/parse",
+              "paths": ["packages/parse/**"],
+              "publicFiles": ["packages/parse/src/index.ts"]
+            }
+          }
+        ],
+        "budget": {
+          "decisionsPerDay": 5,
+          "expireDays": 14
+        },
+        "caps": {
+          "claimsPerPerson": 3,
+          "proposalsPerPerson": 2
+        },
+        "claims": {
+          "lapseAfterMs": 86400000,
+          "warnAfterMs": 7200000
+        },
+        "deciders": [
+          {
+            "handles": ["alice", "bob"],
+            "paths": "packages/parse/**"
+          }
+        ],
+        "functions": {
+          "admit": false,
+          "opensAlone": true
+        },
+        "kinds": [
+          {
+            "checkKind": "redThenGreen",
+            "claimers": "vouched",
+            "finish": "optional",
+            "name": "fix",
+            "oneWay": false,
+            "race": 1,
+            "requires": ["want", "check", "territory"],
+            "strength": "assertion"
+          }
+        ],
+        "ratchets": [
+          {
+            "measure": {
+              "_tag": "Metric",
+              "command": "bun run size",
+              "path": "/total"
+            },
+            "name": "bundleSize"
+          }
+        ],
+        "record": {
+          "countsAfterDays": 30,
+          "windowDays": 365
+        },
+        "run": {
+          "checks": {
+            "lint": "bun run lint",
+            "types": "bun run typecheck",
+            "unit": "bun run test"
+          },
+          "doctor": "bun run doctor",
+          "image": "checker:default",
+          "setup": "bun install --frozen-lockfile --ignore-scripts",
+          "setupEgress": ["registry.npmjs.org"],
+          "test": "bun test {path}"
+        },
+        "source": "config",
+        "vouch": {
+          "file": "config/vouched.td",
+          "mode": "forCode"
+        },
+        "weakening": {
+          "markers": [".skip(", "@ts-ignore"]
+        }
+      }
+    ],
+    "Principal": [
+      {
+        "_tag": "Person",
+        "handle": "alice"
+      },
+      {
+        "_tag": "Anonymous"
+      }
+    ],
+    "ProjectEvent": [
+      {
+        "_tag": "AskOpened",
+        "ask": {
+          "ask": "iso-week",
+          "blockedBy": ["drop-moment"],
+          "claimed": false,
+          "kind": "fix",
+          "reserve": "newcomers",
+          "territory": "@datekit/parse",
+          "want": "An ISO week date parses to the Monday of that week."
+        },
+        "at": "2026-10-07T12:00:00.000Z",
+        "seq": 1
+      },
+      {
+        "_tag": "AskClosed",
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "landing": "4444444444444444444444444444444444444444",
+        "seq": 2
+      },
+      {
+        "_tag": "Claimed",
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "claimant": "alice",
+        "seq": 3
+      },
+      {
+        "_tag": "Released",
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "seq": 4
+      },
+      {
+        "_tag": "Warned",
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "seq": 5
+      },
+      {
+        "_tag": "Lapsed",
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "seq": 6
+      },
+      {
+        "_tag": "Pushed",
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "head": "3333333333333333333333333333333333333333",
+        "seq": 7
+      },
+      {
+        "_tag": "Judged",
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "head": "3333333333333333333333333333333333333333",
+        "outcome": {
+          "_tag": "Refused",
+          "refusals": [
+            {
+              "_tag": "NotClaimed",
+              "ask": "iso-week",
+              "next": "cli claim iso-week",
+              "retryable": true
+            }
+          ]
+        },
+        "seq": 8
+      },
+      {
+        "_tag": "Landed",
+        "at": "2026-10-07T12:00:00.000Z",
+        "landing": {
+          "ask": "iso-week",
+          "assisted": [
+            {
+              "harness": "claude-code",
+              "model": "haiku",
+              "verified": true
+            }
+          ],
+          "author": "carol",
+          "credits": [
+            {
+              "handle": "alice",
+              "role": "Asked-by"
+            },
+            {
+              "handle": "carol",
+              "role": "Signed-off-by"
+            }
+          ],
+          "heldBackTrailer": "Held-back: parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
+          "landedAt": "2026-10-07T12:00:00.000Z",
+          "parent": "1111111111111111111111111111111111111111",
+          "project": "datekit",
+          "requestId": "push-33333333",
+          "sha": "4444444444444444444444444444444444444444",
+          "verdict": {
+            "ask": "iso-week",
+            "at": "2026-10-07T12:00:00.000Z",
+            "base": "1111111111111111111111111111111111111111",
+            "checkVersion": "redThenGreen@0.0.0+abc123",
+            "head": "3333333333333333333333333333333333333333",
+            "heldBack": [
+              {
+                "area": "parse",
+                "passed": 7,
+                "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+                "total": 7
+              }
+            ],
+            "lanes": [
+              {
+                "command": "bun run lint",
+                "durationMs": 1200,
+                "lane": "lint",
+                "result": "passed"
+              },
+              {
+                "command": "bun run test",
+                "durationMs": 3400,
+                "lane": "unit",
+                "logRef": "logs/datekit/7",
+                "result": "failed"
+              }
+            ],
+            "outcome": {
+              "_tag": "Landed",
+              "sha": "4444444444444444444444444444444444444444"
+            },
+            "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
+            "project": "datekit",
+            "stage": "checks",
+            "tree": "5555555555555555555555555555555555555555",
+            "verifier": "platform"
+          }
+        },
+        "seq": 9
+      },
+      {
+        "_tag": "ProposalOpened",
+        "at": "2026-10-07T12:00:00.000Z",
+        "proposal": "prop-000001",
+        "seq": 10
+      },
+      {
+        "_tag": "Decided",
+        "at": "2026-10-07T12:00:00.000Z",
+        "choice": "accept",
+        "decision": "dec-000001",
+        "seq": 11
+      },
+      {
+        "_tag": "LedgerAppended",
+        "at": "2026-10-07T12:00:00.000Z",
+        "entry": {
+          "_tag": "ValueSet",
+          "at": "2026-10-07T12:00:00.000Z",
+          "by": "alice",
+          "key": "PAYMENTS_KEY",
+          "seq": 7
+        },
+        "seq": 12
+      }
+    ],
+    "ProjectListing": [
+      {
+        "landedAt": "2026-10-07T12:00:00.000Z",
+        "openAsks": 3,
+        "posture": "open",
+        "project": "datekit"
+      },
+      {
+        "openAsks": 0,
+        "posture": "open",
+        "project": "burrow"
+      }
+    ],
+    "Proposal": [
+      {
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "files": ["config/asks/iso-week.ask.ts"],
+        "flags": "drop-moment",
+        "id": "prop-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "proposer": "dave",
+        "sealed": {
+          "fork": "datekit--me--dave",
+          "head": "3333333333333333333333333333333333333333"
+        },
+        "state": "open",
+        "territory": "@datekit/parse",
+        "want": "An ISO week date parses to the Monday of that week."
+      }
+    ],
+    "RatchetSpec": [
+      {
+        "measure": {
+          "_tag": "Count",
+          "command": "bunx oxlint --format json",
+          "rule": "no-explicit-any"
+        },
+        "name": "anyCount",
+        "territory": "@datekit/parse"
+      }
+    ],
+    "RunBlock": [
+      {
+        "checks": {
+          "lint": "bun run lint",
+          "types": "bun run typecheck",
+          "unit": "bun run test"
+        },
+        "doctor": "bun run doctor",
+        "image": "checker:default",
+        "setup": "bun install --frozen-lockfile --ignore-scripts",
+        "setupEgress": ["registry.npmjs.org"],
+        "test": "bun test {path}"
+      },
+      {
+        "checks": {},
+        "test": "npm test"
+      }
+    ],
+    "Territory": [
+      {
+        "module": "@datekit/parse",
+        "paths": ["packages/parse/**"],
+        "publicFiles": ["packages/parse/src/index.ts"]
+      }
+    ],
+    "Today": [
+      {
+        "budget": {
+          "finishes": 1,
+          "total": 5,
+          "used": 2
+        },
+        "decider": "alice",
+        "decisions": [
+          {
+            "decided": {
+              "at": "2026-10-07T14:00:00.000Z",
+              "by": "alice",
+              "choice": "accept",
+              "note": "Worth it."
+            },
+            "deciders": ["alice"],
+            "default": "decline",
+            "evidence": [
+              {
+                "href": "https://example.com/7",
+                "label": "lanes",
+                "value": "3/3"
+              }
+            ],
+            "expiresAt": "2026-10-21T12:00:00.000Z",
+            "id": "dec-000001",
+            "openedAt": "2026-10-07T12:00:00.000Z",
+            "project": "datekit",
+            "subject": {
+              "_tag": "OpenProposal",
+              "proposal": "prop-000001"
+            }
+          }
+        ],
+        "expiringSoon": ["dec-000001"],
+        "newcomers": ["dave"],
+        "overflow": 0,
+        "unattended": [
+          {
+            "ask": "iso-week",
+            "assisted": [
+              {
+                "harness": "claude-code",
+                "model": "haiku",
+                "verified": true
+              }
+            ],
+            "author": "carol",
+            "credits": [
+              {
+                "handle": "alice",
+                "role": "Asked-by"
+              },
+              {
+                "handle": "carol",
+                "role": "Signed-off-by"
+              }
+            ],
+            "heldBackTrailer": "Held-back: parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "landedAt": "2026-10-07T12:00:00.000Z",
+            "parent": "1111111111111111111111111111111111111111",
+            "project": "datekit",
+            "requestId": "push-33333333",
+            "sha": "4444444444444444444444444444444444444444",
+            "verdict": {
+              "ask": "iso-week",
+              "at": "2026-10-07T12:00:00.000Z",
+              "base": "1111111111111111111111111111111111111111",
+              "checkVersion": "redThenGreen@0.0.0+abc123",
+              "head": "3333333333333333333333333333333333333333",
+              "heldBack": [
+                {
+                  "area": "parse",
+                  "passed": 7,
+                  "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+                  "total": 7
+                }
+              ],
+              "lanes": [
+                {
+                  "command": "bun run lint",
+                  "durationMs": 1200,
+                  "lane": "lint",
+                  "result": "passed"
+                },
+                {
+                  "command": "bun run test",
+                  "durationMs": 3400,
+                  "lane": "unit",
+                  "logRef": "logs/datekit/7",
+                  "result": "failed"
+                }
+              ],
+              "outcome": {
+                "_tag": "Landed",
+                "sha": "4444444444444444444444444444444444444444"
+              },
+              "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
+              "project": "datekit",
+              "stage": "checks",
+              "tree": "5555555555555555555555555555555555555555",
+              "verifier": "platform"
+            }
+          }
+        ]
+      }
+    ],
+    "Verdict": [
+      {
+        "ask": "iso-week",
+        "at": "2026-10-07T12:00:00.000Z",
+        "base": "1111111111111111111111111111111111111111",
+        "checkVersion": "redThenGreen@0.0.0+abc123",
+        "head": "3333333333333333333333333333333333333333",
+        "heldBack": [
+          {
+            "area": "parse",
+            "passed": 7,
+            "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "total": 7
+          }
+        ],
+        "lanes": [
+          {
+            "command": "bun run lint",
+            "durationMs": 1200,
+            "lane": "lint",
+            "result": "passed"
+          },
+          {
+            "command": "bun run test",
+            "durationMs": 3400,
+            "lane": "unit",
+            "logRef": "logs/datekit/7",
+            "result": "failed"
+          }
+        ],
+        "outcome": {
+          "_tag": "Refused",
+          "refusals": [
+            {
+              "_tag": "NotClaimed",
+              "ask": "iso-week",
+              "next": "cli claim iso-week",
+              "retryable": true
+            }
+          ]
+        },
+        "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
+        "project": "datekit",
+        "stage": "checks",
+        "tree": "5555555555555555555555555555555555555555",
+        "verifier": "platform"
+      }
+    ]
+  },
+  "withoutDefaults": {
+    "asks": [
+      {
+        "askedBy": "alice",
+        "blockedBy": [],
+        "brief": {
+          "context": ["ISO 8601 weeks start on Monday."],
+          "current": "Week 1 of 2027 parses as week 53 of 2026.",
+          "outOfScope": ["Locale-specific weeks"],
+          "terms": ["ISO week"],
+          "want": "An ISO week date parses to the Monday of that week."
+        },
+        "check": {
+          "_tag": "RedThenGreen",
+          "path": "packages/parse/test/iso-week.test.ts"
+        },
+        "file": "config/asks/iso-week.ask.ts",
+        "id": "iso-week",
+        "kind": "fix",
+        "mentor": "bob",
+        "reserve": "newcomers",
+        "territory": {
+          "module": "@datekit/parse",
+          "paths": ["packages/parse/**"],
+          "publicFiles": ["packages/parse/src/index.ts"]
+        }
+      }
+    ],
+    "deciders": [
+      {
+        "handles": "owners",
+        "paths": "**"
+      }
+    ],
+    "functions": {
+      "admit": false,
+      "opensAlone": true
+    },
+    "kinds": [
+      {
+        "checkKind": "redThenGreen",
+        "claimers": "vouched",
+        "finish": "optional",
+        "name": "fix",
+        "oneWay": false,
+        "race": 1,
+        "requires": ["want", "check", "territory"],
+        "strength": "assertion"
+      }
+    ],
+    "ratchets": [
+      {
+        "measure": {
+          "_tag": "Metric",
+          "command": "bun run size",
+          "path": "/total"
+        },
+        "name": "bundleSize"
+      }
+    ],
+    "run": {
+      "_tag": "FromCI"
+    },
+    "source": "config",
+    "weakening": {
+      "markers": [".skip(", "@ts-ignore"]
+    }
+  }
+}

@@ -66,6 +66,30 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
 - Fields: none
 - Reason, for example: the repo was busy with another push
 
+### DirectPush
+
+- Retryable: no
+- Next: `myr asks`
+- Fields:
+  - `ref`: `string`
+- Reason, for example: main moves only by a landing, so refs/heads/main takes no direct push; push your answer to your claim's fork
+
+### AskBlocked
+
+- Retryable: yes
+- Next: `myr asks`
+- Fields:
+  - `ask`: `string`
+  - `blockedBy`: `readonly [string, ...Array<string>]`
+- Reason, for example: fix-parser waits on drop-moment to land first
+
+### Denounced
+
+- Retryable: no
+- Next: `myr status`
+- Fields: none
+- Reason, for example: this project's vouch file denounces you, so it takes no claims or proposals from you
+
 ## Shape
 
 ### OutOfScope
@@ -100,6 +124,15 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
   - `paths`: `readonly [string, ...Array<string>]`
 - Reason, for example: would put held-back paths in a public tree: src/a.ts
 
+### ReachedInternals
+
+- Retryable: no
+- Next: `myr check`
+- Fields:
+  - `from`: `string`
+  - `to`: `string`
+- Reason, for example: src/a.ts reaches into @datekit/format/src/internal.ts, which its module does not export
+
 ## Merge
 
 ### StaleBase
@@ -111,6 +144,14 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
   - `conflicts`: `ReadonlyArray<string>`
   - `main`: `string`
 - Reason, for example: main moved to 2222222, past your base 1111111; conflicts in src/a.ts
+
+### StaleLayer
+
+- Retryable: yes
+- Next: `myr status`
+- Fields:
+  - `layer`: `string`
+- Reason, for example: the maintainers layer moved since this answer was checked; it will be checked again
 
 ## Checks
 
@@ -202,6 +243,14 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
   - `where`: `"output" | "tree"`
 - Reason, for example: the write-only value PAYMENTS_KEY appeared in the output
 
+### UnstatedRequirement
+
+- Retryable: no
+- Next: `myr check`
+- Fields:
+  - `area`: `string`
+- Reason, for example: a held-back check in parser enforces something no public clause states
+
 ## Decision
 
 ### PostureChange
@@ -212,3 +261,97 @@ No refusal has a message. Shape refusals accumulate, so one push hears about eve
   - `from`: `"open" | "openWithSealedEvidence" | "openOnSchedule" | "openCore" | "sourceAvailable"`
   - `to`: `"open" | "openWithSealedEvidence" | "openOnSchedule" | "openCore" | "sourceAvailable"`
 - Reason, for example: landing would change the posture from open to openCore, which takes a decider
+
+### NotDecider
+
+- Retryable: no
+- Next: `myr status`
+- Fields: none
+- Reason, for example: only one of this project's deciders may do this
+
+### DecisionClosed
+
+- Retryable: no
+- Next: `myr today`
+- Fields:
+  - `decision`: `string`
+- Reason, for example: dec-000001 was already decided, or expired to its default
+
+## Lookup
+
+### UnknownProject
+
+- Retryable: no
+- Next: `myr asks`
+- Fields:
+  - `project`: `string`
+- Reason, for example: no project is named datekit
+
+### UnknownAsk
+
+- Retryable: no
+- Next: `myr asks`
+- Fields:
+  - `ask`: `string`
+- Reason, for example: this project has no ask named fix-parser
+
+### UnknownCommit
+
+- Retryable: no
+- Next: `git fetch`
+- Fields:
+  - `sha`: `string`
+- Reason, for example: this project has no commit 2222222222222222222222222222222222222222
+
+### UnknownDecision
+
+- Retryable: no
+- Next: `myr today`
+- Fields:
+  - `decision`: `string`
+- Reason, for example: this project has no decision dec-000001
+
+## Setup
+
+### ProjectExists
+
+- Retryable: no
+- Next: `myr asks`
+- Fields:
+  - `project`: `string`
+- Reason, for example: a project named datekit already exists
+
+### ImportFailed
+
+- Retryable: yes
+- Next: `myr init`
+- Fields:
+  - `reason`: `string`
+- Reason, for example: the import failed: the repo needs a sign-in to read
+
+## Env
+
+### UnknownEnvItem
+
+- Retryable: no
+- Next: `myr env shape`
+- Fields:
+  - `key`: `string`
+- Reason, for example: the env shape has no item PAYMENTS_KEY
+
+### NotSensitive
+
+- Retryable: no
+- Next: `myr env shape`
+- Fields:
+  - `key`: `string`
+- Reason, for example: PAYMENTS_KEY is not @sensitive, so it holds no write-only value
+
+### ValueTooShort
+
+- Retryable: no
+- Next: set when it is raised
+- Fields:
+  - `key`: `string`
+  - `minimum`: `number`
+- Reason, for example: the value for PAYMENTS_KEY is shorter than the 32 characters it needs

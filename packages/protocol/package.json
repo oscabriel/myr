@@ -5,6 +5,8 @@
   "exports": {
     "./cli": "./src/cli.ts",
     "./contracts": "./src/contracts.ts",
+    "./domain/*": "./src/domain/*.ts",
+    "./envelope": "./src/envelope.ts",
     "./ids": "./src/ids.ts",
     "./mcp": "./src/mcp.ts",
     "./posture": "./src/posture.ts",

@@ -1,10 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 
+import { EnvKey } from "../src/ids.ts";
 import {
+  DirectPush,
   OutOfScope,
   StaleBase,
   TouchedJudge,
+  ValueTooShort,
   Weakened,
 } from "../src/refusal.ts";
 import { explain, headline } from "../src/render.ts";
@@ -70,5 +73,36 @@ describe(explain, () => {
     expect(explain([refusal])[0]).toMatch(
       new RegExp(`^${refusal._tag}: \\S`, "u")
     );
+  });
+
+  it.each(examples)(
+    "explains $_tag with every field it names filled in",
+    (refusal) => {
+      expect(explain([refusal]).join("\n")).not.toMatch(
+        /undefined|null|\[object Object\]/u
+      );
+    }
+  );
+
+  it("tells a direct push to main where answers go instead", () => {
+    expect(explain([new DirectPush({ ref: "refs/heads/main" })])).toStrictEqual(
+      [
+        "DirectPush: main moves only by a landing, so refs/heads/main takes no direct push; push your answer to your claim's fork",
+        `  next: ${Brand.cli} asks`,
+        "  retryable: no",
+      ]
+    );
+  });
+
+  // The refusal never holds the value, so no reader learns it, or its length,
+  // from the reason.
+  it("says a value is too short by the minimum alone", () => {
+    expect(
+      explain([ValueTooShort.of(EnvKey.make("PAYMENTS_KEY"), 32)])
+    ).toStrictEqual([
+      "ValueTooShort: the value for PAYMENTS_KEY is shorter than the 32 characters it needs",
+      `  next: ${Brand.cli} env set PAYMENTS_KEY --acknowledge-short`,
+      "  retryable: no",
+    ]);
   });
 });

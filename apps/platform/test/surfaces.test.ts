@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Contracts } from "@repo/protocol/contracts";
 import { AskId, CommitSha, Handle } from "@repo/protocol/ids";
-import { CurrentPrincipal } from "@repo/protocol/principal";
+import { CurrentPrincipal, Principal } from "@repo/protocol/principal";
 import { NotClaimed } from "@repo/protocol/refusal";
 import { Effect, Layer, Ref } from "effect";
 
@@ -17,8 +17,8 @@ const main = CommitSha.make("2222222222222222222222222222222222222222");
 const head = CommitSha.make("3333333333333333333333333333333333333333");
 
 const sessions = MemorySessions.layer({
-  "alice-token": { handle: Handle.make("alice") },
-  "bob-token": { handle: Handle.make("bob") },
+  "alice-token": Handle.make("alice"),
+  "bob-token": Handle.make("bob"),
 });
 
 /** Contracts where only `holder` holds the ask's claim. */
@@ -27,9 +27,12 @@ const claimHeldBy = (holder: string) =>
     listAsks: () => Effect.succeed({ asks: [] }),
     submitAnswer: (payload) =>
       Effect.gen(function* () {
-        const { handle } = yield* CurrentPrincipal;
+        const holds = Principal.match(yield* CurrentPrincipal, {
+          Anonymous: () => false,
+          Person: ({ handle }) => handle === holder,
+        });
 
-        if (handle !== holder) {
+        if (!holds) {
           return yield* NotClaimed.of(payload.ask);
         }
 

@@ -8,7 +8,7 @@ import { TestConsole } from "effect/testing";
 
 import { toCommand } from "../src/cli.ts";
 import { Client, Contracts, ListAsks, SubmitAnswer } from "../src/contracts.ts";
-import { CommitSha } from "../src/ids.ts";
+import { CommitSha, KindName } from "../src/ids.ts";
 import { StaleBase } from "../src/refusal.ts";
 import { asTester } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
@@ -20,7 +20,14 @@ const quiet = Contracts.toLayer({
   listAsks: ({ project }) =>
     Effect.succeed({
       asks: [
-        { ask, claimed: false, territory: project, want: "Parse a comma" },
+        {
+          ask,
+          blockedBy: [],
+          claimed: false,
+          kind: KindName.make("fix"),
+          territory: project,
+          want: "Parse a comma",
+        },
       ],
     }),
   submitAnswer: () => Effect.succeed({ main }),
@@ -80,7 +87,9 @@ describe("the contracts as CLI commands", () => {
         asks: [
           {
             ask: "fix-parser",
+            blockedBy: [],
             claimed: false,
+            kind: "fix",
             territory: "demo",
             want: "Parse a comma",
           },

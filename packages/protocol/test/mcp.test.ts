@@ -5,7 +5,7 @@ import { Rpc, RpcGroup } from "effect/rpc";
 
 import { Description, NeedsApproval } from "../src/annotations.ts";
 import { Client, Contracts, ListAsks, SubmitAnswer } from "../src/contracts.ts";
-import { AskId, CommitSha, ProjectName } from "../src/ids.ts";
+import { AskId, CommitSha, KindName, ProjectName } from "../src/ids.ts";
 import { listTools, toJsonSchema, toToolkit } from "../src/mcp.ts";
 import { StaleBase } from "../src/refusal.ts";
 import { ask, base, main, path } from "./examples.ts";
@@ -220,7 +220,9 @@ describe("the contracts as MCP tools", () => {
               asks: [
                 {
                   ask: AskId.make("fix-parser"),
+                  blockedBy: [],
                   claimed: false,
+                  kind: KindName.make("fix"),
                   territory: "packages/parser",
                   want: "Parse a trailing comma",
                 },
@@ -245,7 +247,9 @@ describe("the contracts as MCP tools", () => {
           asks: [
             {
               ask: "fix-parser",
+              blockedBy: [],
               claimed: false,
+              kind: "fix",
               territory: "packages/parser",
               want: "Parse a trailing comma",
             },

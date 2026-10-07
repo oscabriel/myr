@@ -16,32 +16,56 @@ import {
   SurfaceName,
   Surfaces,
 } from "@repo/protocol/contracts";
-import { AskId, CommitSha, RepoPath } from "@repo/protocol/ids";
+import {
+  AskId,
+  CommitSha,
+  DecisionId,
+  EnvKey,
+  ProjectName,
+  RepoPath,
+} from "@repo/protocol/ids";
 import { listTools, toJsonSchema, toToolkit } from "@repo/protocol/mcp";
 import type { ToolListing } from "@repo/protocol/mcp";
 import {
+  AskBlocked,
   AskFull,
   AttemptsExhausted,
   CapReached,
   ChecksFailed,
   ClaimLapsed,
+  DecisionClosed,
+  Denounced,
+  DirectPush,
   Flake,
   groups,
   HeldBackFailed,
+  ImportFailed,
   IncompleteBrief,
   LayerContentInPublicTree,
   NoAsk,
   NotClaimed,
+  NotDecider,
   NotRedFirst,
+  NotSensitive,
   NotVouched,
   OutOfScope,
   PostureChange,
   PrivatePathInPublicTree,
+  ProjectExists,
+  ReachedInternals,
   Refusal,
   RepoBusy,
   SecretInOutput,
   StaleBase,
+  StaleLayer,
   TouchedJudge,
+  UnknownAsk,
+  UnknownCommit,
+  UnknownDecision,
+  UnknownEnvItem,
+  UnknownProject,
+  UnstatedRequirement,
+  ValueTooShort,
   VerifierBlocked,
   WeakCheck,
   Weakened,
@@ -182,11 +206,18 @@ const main = CommitSha.make("2222222222222222222222222222222222222222");
 
 const path = RepoPath.make("src/a.ts");
 
+const project = ProjectName.make("datekit");
+
+const decision = DecisionId.make("dec-000001");
+
+const key = EnvKey.make("PAYMENTS_KEY");
+
 /**
  * One example of every refusal, for the reason each section quotes. Keyed by
  * tag, so a refusal added to the union fails the typecheck until it has one.
  */
 const examples = {
+  AskBlocked: AskBlocked.of(ask, [AskId.make("drop-moment")]),
   AskFull: new AskFull({ ask }),
   AttemptsExhausted: new AttemptsExhausted({
     area: "parser",
@@ -199,21 +230,42 @@ const examples = {
     next: "bun test src/a.test.ts",
   }),
   ClaimLapsed: ClaimLapsed.of(ask),
+  DecisionClosed: new DecisionClosed({ decision }),
+  Denounced: new Denounced({}),
+  DirectPush: new DirectPush({ ref: "refs/heads/main" }),
   Flake: new Flake({ lane: "test" }),
   HeldBackFailed: new HeldBackFailed({ area: "parser", suite: "edge-cases" }),
+  ImportFailed: new ImportFailed({
+    reason: "the repo needs a sign-in to read",
+  }),
   IncompleteBrief: new IncompleteBrief({ missing: ["territory"] }),
   LayerContentInPublicTree: new LayerContentInPublicTree({ paths: [path] }),
   NoAsk: new NoAsk({}),
   NotClaimed: NotClaimed.of(ask),
+  NotDecider: new NotDecider({}),
   NotRedFirst: new NotRedFirst({}),
+  NotSensitive: new NotSensitive({ key }),
   NotVouched: new NotVouched({}),
   OutOfScope: new OutOfScope({ paths: [path] }),
   PostureChange: new PostureChange({ from: "open", to: "openCore" }),
   PrivatePathInPublicTree: new PrivatePathInPublicTree({ paths: [path] }),
+  ProjectExists: new ProjectExists({ project }),
+  ReachedInternals: new ReachedInternals({
+    from: path,
+    to: "@datekit/format/src/internal.ts",
+  }),
   RepoBusy: new RepoBusy({}),
   SecretInOutput: new SecretInOutput({ item: "PAYMENTS_KEY", where: "output" }),
   StaleBase: new StaleBase({ base, conflicts: [path], main }),
+  StaleLayer: new StaleLayer({ layer: "maintainers" }),
   TouchedJudge: new TouchedJudge({ paths: [path] }),
+  UnknownAsk: new UnknownAsk({ ask }),
+  UnknownCommit: new UnknownCommit({ sha: main }),
+  UnknownDecision: new UnknownDecision({ decision }),
+  UnknownEnvItem: new UnknownEnvItem({ key }),
+  UnknownProject: new UnknownProject({ project }),
+  UnstatedRequirement: new UnstatedRequirement({ area: "parser" }),
+  ValueTooShort: ValueTooShort.of(key, 32),
   VerifierBlocked: new VerifierBlocked({}),
   WeakCheck: new WeakCheck({ weakness: "no assertion" }),
   Weakened: new Weakened({

@@ -10,6 +10,7 @@ import {
   Idempotent,
   ReadOnly,
 } from "./annotations.ts";
+import { AskListing } from "./domain/ask.ts";
 import { AskId, CommitSha, ProjectName } from "./ids.ts";
 import { Authenticated } from "./principal.ts";
 import { ClaimLapsed, NotClaimed, RepoBusy, StaleBase } from "./refusal.ts";
@@ -27,14 +28,6 @@ export {
   Surfaces,
   Visibility,
 } from "./annotations.ts";
-
-/** One open ask, as a list of asks shows it. */
-export const AskListing = Schema.Struct({
-  ask: AskId,
-  claimed: Schema.Boolean,
-  territory: Schema.NonEmptyString,
-  want: Schema.NonEmptyString,
-});
 
 export class ListAsks extends Rpc.make("listAsks", {
   payload: { project: ProjectName },

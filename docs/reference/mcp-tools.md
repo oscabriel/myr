@@ -24,7 +24,7 @@ List a project's open asks.
   "additionalProperties": true,
   "properties": {
     "project": {
-      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
   },
@@ -46,11 +46,49 @@ List a project's open asks.
         "additionalProperties": true,
         "properties": {
           "ask": {
-            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "me",
+                    "layer"
+                  ]
+                }
+              }
+            ],
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
+          },
+          "blockedBy": {
+            "items": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "me",
+                      "layer"
+                    ]
+                  }
+                }
+              ],
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "type": "string"
+            },
+            "type": "array"
           },
           "claimed": {
             "type": "boolean"
+          },
+          "kind": {
+            "pattern": "^[a-z][a-zA-Z0-9-]*$",
+            "type": "string"
+          },
+          "reserve": {
+            "enum": [
+              "newcomers",
+              "people"
+            ],
+            "type": "string"
           },
           "territory": {
             "minLength": 1,
@@ -63,7 +101,9 @@ List a project's open asks.
         },
         "required": [
           "ask",
+          "blockedBy",
           "claimed",
+          "kind",
           "territory",
           "want"
         ],
@@ -97,7 +137,17 @@ Offer the commit `head`, built on `base`, as an answer to an ask; once it lands,
   "additionalProperties": true,
   "properties": {
     "ask": {
-      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "me",
+              "layer"
+            ]
+          }
+        }
+      ],
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
     "base": {

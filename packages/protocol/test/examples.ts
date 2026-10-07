@@ -1,27 +1,51 @@
 import { DateTime } from "effect";
 
-import { AskId, CommitSha, RepoPath } from "../src/ids.ts";
 import {
+  AskId,
+  CommitSha,
+  DecisionId,
+  EnvKey,
+  ProjectName,
+  RepoPath,
+} from "../src/ids.ts";
+import {
+  AskBlocked,
   AskFull,
   AttemptsExhausted,
   CapReached,
   ChecksFailed,
   ClaimLapsed,
+  DecisionClosed,
+  Denounced,
+  DirectPush,
   Flake,
   HeldBackFailed,
+  ImportFailed,
   IncompleteBrief,
   LayerContentInPublicTree,
   NoAsk,
   NotClaimed,
+  NotDecider,
   NotRedFirst,
+  NotSensitive,
   NotVouched,
   OutOfScope,
   PostureChange,
   PrivatePathInPublicTree,
+  ProjectExists,
+  ReachedInternals,
   RepoBusy,
   SecretInOutput,
   StaleBase,
+  StaleLayer,
   TouchedJudge,
+  UnknownAsk,
+  UnknownCommit,
+  UnknownDecision,
+  UnknownEnvItem,
+  UnknownProject,
+  UnstatedRequirement,
+  ValueTooShort,
   VerifierBlocked,
   WeakCheck,
   Weakened,
@@ -36,6 +60,12 @@ export const main = CommitSha.make("2222222222222222222222222222222222222222");
 
 export const path = RepoPath.make("src/a.ts");
 
+const project = ProjectName.make("datekit");
+
+const decision = DecisionId.make("dec-000001");
+
+const key = EnvKey.make("PAYMENTS_KEY");
+
 // One of each member, in the union's order.
 export const examples: readonly Refusal[] = [
   NotClaimed.of(ask),
@@ -45,6 +75,9 @@ export const examples: readonly Refusal[] = [
   new AskFull({ ask }),
   new NoAsk({}),
   new RepoBusy({}),
+  new DirectPush({ ref: "refs/heads/main" }),
+  AskBlocked.of(ask, [AskId.make("drop-moment")]),
+  new Denounced({}),
   new OutOfScope({ paths: [path] }),
   new TouchedJudge({ paths: [path] }),
   new Weakened({
@@ -52,7 +85,13 @@ export const examples: readonly Refusal[] = [
     weakening: { marker: "it.skip", reason: "flaky on CI" },
   }),
   new PrivatePathInPublicTree({ paths: [path] }),
+  new ReachedInternals({
+    at: { line: 1, path },
+    from: path,
+    to: "@datekit/format/src/internal.ts",
+  }),
   new StaleBase({ base, conflicts: [path], main }),
+  new StaleLayer({ layer: "maintainers" }),
   new ChecksFailed({
     lane: "test",
     logRef: "logs/7",
@@ -70,5 +109,17 @@ export const examples: readonly Refusal[] = [
   new IncompleteBrief({ missing: ["territory"] }),
   new LayerContentInPublicTree({ paths: [path] }),
   new SecretInOutput({ item: "PAYMENTS_KEY", where: "output" }),
+  new UnstatedRequirement({ area: "parser" }),
   new PostureChange({ from: "open", to: "openCore" }),
+  new NotDecider({}),
+  new DecisionClosed({ decision }),
+  new UnknownProject({ project }),
+  new UnknownAsk({ ask }),
+  new UnknownCommit({ sha: main }),
+  new UnknownDecision({ decision }),
+  new ProjectExists({ project }),
+  new ImportFailed({ reason: "the repo needs a sign-in to read" }),
+  new UnknownEnvItem({ key }),
+  new NotSensitive({ key }),
+  ValueTooShort.of(key, 32),
 ];

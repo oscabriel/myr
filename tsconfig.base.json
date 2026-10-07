@@ -113,6 +113,12 @@
             }
           },
           {
+            "include": ["packages/protocol/src/domain/**/*.ts"],
+            "options": {
+              "allowedUnstableApis": []
+            }
+          },
+          {
             "include": ["packages/protocol/test/**/*.ts"],
             "options": {
               "allowedUnstableApis": [

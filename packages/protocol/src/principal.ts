@@ -3,8 +3,23 @@ import { RpcMiddleware } from "effect/rpc";
 
 import { Handle } from "./ids.ts";
 
-/** Who is calling: the person a verified credential names. */
-export const Principal = Schema.Struct({ handle: Handle });
+/** A caller a verified credential names. */
+export const Person = Schema.TaggedStruct("Person", { handle: Handle });
+
+export type Person = typeof Person.Type;
+
+/**
+ * A caller with no credential. Only contracts anyone may call serve one: a
+ * public read, such as the front page.
+ */
+export const Anonymous = Schema.TaggedStruct("Anonymous", {});
+
+export type Anonymous = typeof Anonymous.Type;
+
+/** Who is calling: a person, or anyone at all. Branch on it with `Principal.match`. */
+export const Principal = Schema.Union([Person, Anonymous]).pipe(
+  Schema.toTaggedUnion("_tag")
+);
 
 export type Principal = typeof Principal.Type;
 

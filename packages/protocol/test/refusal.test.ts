@@ -55,6 +55,75 @@ describe("the refusal union", () => {
     ).toStrictEqual(Refusal.members.map((member) => member.identifier));
   });
 
+  it("lists all forty tags in union order, group by group", () => {
+    expect(Refusal.members.map((member) => member.identifier)).toStrictEqual([
+      // Push and claim
+      "NotClaimed",
+      "ClaimLapsed",
+      "NotVouched",
+      "CapReached",
+      "AskFull",
+      "NoAsk",
+      "RepoBusy",
+      "DirectPush",
+      "AskBlocked",
+      "Denounced",
+      // Shape
+      "OutOfScope",
+      "TouchedJudge",
+      "Weakened",
+      "PrivatePathInPublicTree",
+      "ReachedInternals",
+      // Merge
+      "StaleBase",
+      "StaleLayer",
+      // Checks
+      "ChecksFailed",
+      "HeldBackFailed",
+      "AttemptsExhausted",
+      // Never counted against the answerer
+      "Flake",
+      "VerifierBlocked",
+      // At ask open
+      "NotRedFirst",
+      "WeakCheck",
+      "IncompleteBrief",
+      // Maintainers only
+      "LayerContentInPublicTree",
+      "SecretInOutput",
+      "UnstatedRequirement",
+      // Decision
+      "PostureChange",
+      "NotDecider",
+      "DecisionClosed",
+      // Lookup
+      "UnknownProject",
+      "UnknownAsk",
+      "UnknownCommit",
+      "UnknownDecision",
+      // Setup
+      "ProjectExists",
+      "ImportFailed",
+      // Env
+      "UnknownEnvItem",
+      "NotSensitive",
+      "ValueTooShort",
+    ]);
+    expect(groups.map((group) => group.name)).toStrictEqual([
+      "Push and claim",
+      "Shape",
+      "Merge",
+      "Checks",
+      "Never counted against the answerer",
+      "At ask open",
+      "Maintainers only",
+      "Decision",
+      "Lookup",
+      "Setup",
+      "Env",
+    ]);
+  });
+
   // A failure here means a tag was added, removed or renamed, or a refusal
   // changed whether retrying helps. Both are public contract: rename a tag only
   // with an alias, and update the reference docs.
@@ -67,26 +136,43 @@ describe("the refusal union", () => {
         examples.map((refusal) => [refusal._tag, refusal.retryable])
       )
     ).toStrictEqual({
+      AskBlocked: true,
       AskFull: true,
       AttemptsExhausted: true,
       CapReached: true,
       ChecksFailed: false,
       ClaimLapsed: true,
+      DecisionClosed: false,
+      Denounced: false,
+      DirectPush: false,
       Flake: true,
       HeldBackFailed: false,
+      ImportFailed: true,
       IncompleteBrief: false,
       LayerContentInPublicTree: false,
       NoAsk: false,
       NotClaimed: true,
+      NotDecider: false,
       NotRedFirst: false,
+      NotSensitive: false,
       NotVouched: false,
       OutOfScope: false,
       PostureChange: false,
       PrivatePathInPublicTree: false,
+      ProjectExists: false,
+      ReachedInternals: false,
       RepoBusy: true,
       SecretInOutput: false,
       StaleBase: true,
+      StaleLayer: true,
       TouchedJudge: false,
+      UnknownAsk: false,
+      UnknownCommit: false,
+      UnknownDecision: false,
+      UnknownEnvItem: false,
+      UnknownProject: false,
+      UnstatedRequirement: false,
+      ValueTooShort: false,
       VerifierBlocked: true,
       WeakCheck: false,
       Weakened: false,

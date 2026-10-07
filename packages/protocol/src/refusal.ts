@@ -1,20 +1,25 @@
 import { Brand } from "@repo/brand";
 import { Effect, Schema } from "effect";
 
-import { AskId, CommitSha, RepoPath } from "./ids.ts";
+import { At } from "./domain/common.ts";
+import {
+  AskId,
+  CommitSha,
+  DecisionId,
+  EnvKey,
+  ProjectName,
+  RepoPath,
+} from "./ids.ts";
 import { Posture } from "./posture.ts";
+
+/** Where in the tree a refusal points, when it points at one line. */
+export { At } from "./domain/common.ts";
 
 const cli = (...args: readonly string[]) => [Brand.cli, ...args].join(" ");
 
 const Label = Schema.NonEmptyString;
 
 const Paths = Schema.NonEmptyArray(RepoPath);
-
-/** Where in the tree a refusal points, when it points at one line. */
-const At = Schema.Struct({
-  line: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
-  path: RepoPath,
-});
 
 // Every refusal carries `retryable`, fixed per tag, and `next`, the command to
 // run next. Both are fields, not statics: Effect's MCP server sends only what
@@ -89,6 +94,35 @@ export class RepoBusy extends Schema.TaggedError<RepoBusy>()("RepoBusy", {
   ...nextIs("git push"),
 }) {}
 
+/**
+ * The push tried to move a canonical ref directly. Main moves only by a
+ * landing; an answer goes to the claim's fork.
+ */
+export class DirectPush extends Schema.TaggedError<DirectPush>()("DirectPush", {
+  ...Final,
+  ...nextIs(cli("asks")),
+  ref: Label,
+}) {}
+
+/** The ask waits on other asks to land first, as the delete step of a migrate does. */
+export class AskBlocked extends Schema.TaggedError<AskBlocked>()("AskBlocked", {
+  ...Retryable,
+  ...nextIs(cli("asks")),
+  ask: AskId,
+  blockedBy: Schema.NonEmptyArray(AskId),
+}) {
+  static readonly of = (
+    ask: AskId,
+    blockedBy: readonly [AskId, ...(readonly AskId[])]
+  ) => new AskBlocked({ ask, blockedBy });
+}
+
+/** The project's vouch file denounces the caller, so it takes no claims or proposals from them. */
+export class Denounced extends Schema.TaggedError<Denounced>()("Denounced", {
+  ...Final,
+  ...nextIs(cli("status")),
+}) {}
+
 // Shape: these accumulate, so one push hears about every one at once
 
 /** The answer changes paths outside the ask's territory. */
@@ -129,6 +163,15 @@ export class PrivatePathInPublicTree extends Schema.TaggedError<PrivatePathInPub
   { ...Final, ...nextIs(cli("check")), paths: Paths }
 ) {}
 
+/**
+ * The answer imports another module's internals: a file that module does not
+ * export. `to` is what the import names.
+ */
+export class ReachedInternals extends Schema.TaggedError<ReachedInternals>()(
+  "ReachedInternals",
+  { ...Final, ...nextIs(cli("check")), from: RepoPath, to: Label }
+) {}
+
 // Merge
 
 /** Main moved past the answer's base; git's `fetch first` and `stale ref` land here too. */
@@ -138,6 +181,16 @@ export class StaleBase extends Schema.TaggedError<StaleBase>()("StaleBase", {
   base: CommitSha,
   conflicts: Schema.Array(RepoPath),
   main: CommitSha,
+}) {}
+
+/**
+ * A layer the answer was checked with moved since; the answer is checked
+ * again against it, as a moved main is.
+ */
+export class StaleLayer extends Schema.TaggedError<StaleLayer>()("StaleLayer", {
+  ...Retryable,
+  ...nextIs(cli("status")),
+  layer: Label,
 }) {}
 
 // Checks
@@ -227,6 +280,15 @@ export class SecretInOutput extends Schema.TaggedError<SecretInOutput>()(
   }
 ) {}
 
+/**
+ * A held-back check in this area enforces something no public clause states,
+ * so it cannot enter the suite: a sealed check must cite what it holds.
+ */
+export class UnstatedRequirement extends Schema.TaggedError<UnstatedRequirement>()(
+  "UnstatedRequirement",
+  { ...Final, ...nextIs(cli("check")), area: Label }
+) {}
+
 // Decision
 
 /** Landing would change the project's posture, which takes a decider. */
@@ -234,6 +296,89 @@ export class PostureChange extends Schema.TaggedError<PostureChange>()(
   "PostureChange",
   { ...Final, ...nextIs(cli("today")), from: Posture, to: Posture }
 ) {}
+
+/** Only one of the project's deciders may do this. */
+export class NotDecider extends Schema.TaggedError<NotDecider>()("NotDecider", {
+  ...Final,
+  ...nextIs(cli("status")),
+}) {}
+
+/** The decision was already taken, or expired to its default. */
+export class DecisionClosed extends Schema.TaggedError<DecisionClosed>()(
+  "DecisionClosed",
+  { ...Final, ...nextIs(cli("today")), decision: DecisionId }
+) {}
+
+// Lookup
+
+/** No project has this name. */
+export class UnknownProject extends Schema.TaggedError<UnknownProject>()(
+  "UnknownProject",
+  { ...Final, ...nextIs(cli("asks")), project: ProjectName }
+) {}
+
+/** The project has no ask with this name. */
+export class UnknownAsk extends Schema.TaggedError<UnknownAsk>()("UnknownAsk", {
+  ...Final,
+  ...nextIs(cli("asks")),
+  ask: AskId,
+}) {}
+
+/** The project has no commit with this id. */
+export class UnknownCommit extends Schema.TaggedError<UnknownCommit>()(
+  "UnknownCommit",
+  { ...Final, ...nextIs("git fetch"), sha: CommitSha }
+) {}
+
+/** The project has no decision with this id. */
+export class UnknownDecision extends Schema.TaggedError<UnknownDecision>()(
+  "UnknownDecision",
+  { ...Final, ...nextIs(cli("today")), decision: DecisionId }
+) {}
+
+// Setup
+
+/** A project with this name already exists. */
+export class ProjectExists extends Schema.TaggedError<ProjectExists>()(
+  "ProjectExists",
+  { ...Final, ...nextIs(cli("asks")), project: ProjectName }
+) {}
+
+/** The repo to import could not be read; `reason` says what went wrong. */
+export class ImportFailed extends Schema.TaggedError<ImportFailed>()(
+  "ImportFailed",
+  { ...Retryable, ...nextIs(cli("init")), reason: Label }
+) {}
+
+// Env
+
+/** The project's env shape has no item with this key. */
+export class UnknownEnvItem extends Schema.TaggedError<UnknownEnvItem>()(
+  "UnknownEnvItem",
+  { ...Final, ...nextIs(cli("env", "shape")), key: EnvKey }
+) {}
+
+/** Only an `@sensitive` env item holds a write-only value, and this one is not. */
+export class NotSensitive extends Schema.TaggedError<NotSensitive>()(
+  "NotSensitive",
+  { ...Final, ...nextIs(cli("env", "shape")), key: EnvKey }
+) {}
+
+/**
+ * The value is shorter than the item asks for. The refusal names the minimum
+ * only: never the value, and never its length.
+ */
+export class ValueTooShort extends Schema.TaggedError<ValueTooShort>()(
+  "ValueTooShort",
+  { ...Final, key: EnvKey, minimum: Schema.Int }
+) {
+  static readonly of = (key: EnvKey, minimum: number) =>
+    new ValueTooShort({
+      key,
+      minimum,
+      next: cli("env", "set", key, "--acknowledge-short"),
+    });
+}
 
 const pushAndClaim = [
   NotClaimed,
@@ -243,6 +388,9 @@ const pushAndClaim = [
   AskFull,
   NoAsk,
   RepoBusy,
+  DirectPush,
+  AskBlocked,
+  Denounced,
 ] as const;
 
 // These accumulate, so one push hears about every one at once.
@@ -251,9 +399,10 @@ const accumulating = [
   TouchedJudge,
   Weakened,
   PrivatePathInPublicTree,
+  ReachedInternals,
 ] as const;
 
-const merge = [StaleBase] as const;
+const merge = [StaleBase, StaleLayer] as const;
 
 const checks = [ChecksFailed, HeldBackFailed, AttemptsExhausted] as const;
 
@@ -261,9 +410,24 @@ const neverCounted = [Flake, VerifierBlocked] as const;
 
 const atAskOpen = [NotRedFirst, WeakCheck, IncompleteBrief] as const;
 
-const maintainersOnly = [LayerContentInPublicTree, SecretInOutput] as const;
+const maintainersOnly = [
+  LayerContentInPublicTree,
+  SecretInOutput,
+  UnstatedRequirement,
+] as const;
 
-const decision = [PostureChange] as const;
+const decision = [PostureChange, NotDecider, DecisionClosed] as const;
+
+const lookup = [
+  UnknownProject,
+  UnknownAsk,
+  UnknownCommit,
+  UnknownDecision,
+] as const;
+
+const setup = [ProjectExists, ImportFailed] as const;
+
+const env = [UnknownEnvItem, NotSensitive, ValueTooShort] as const;
 
 /**
  * The union's members by group, in union order. The reference docs file each
@@ -278,6 +442,9 @@ export const groups = [
   { members: atAskOpen, name: "At ask open" },
   { members: maintainersOnly, name: "Maintainers only" },
   { members: decision, name: "Decision" },
+  { members: lookup, name: "Lookup" },
+  { members: setup, name: "Setup" },
+  { members: env, name: "Env" },
 ] as const;
 
 /** The closed union. Each member's tag is public: rename one only with an alias. */
@@ -290,6 +457,9 @@ export const Refusal = Schema.Union([
   ...atAskOpen,
   ...maintainersOnly,
   ...decision,
+  ...lookup,
+  ...setup,
+  ...env,
 ]);
 
 export type Refusal = typeof Refusal.Type;
