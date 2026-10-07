@@ -17,6 +17,7 @@ import { tokenReader } from "./auth/provider.ts";
 import { Handlers } from "./handlers.ts";
 import { workerPorts } from "./ports.ts";
 import type { WorkerPorts } from "./ports.ts";
+import { ReleaseStoreR2 } from "./releases/r2.ts";
 import { Sessions } from "./sessions.ts";
 import { firstOf } from "./sessions/first-of.ts";
 import { sessionTable } from "./sessions/table.ts";
@@ -177,11 +178,12 @@ const sessionsOf = (config: PlatformConfig) =>
   );
 
 /**
- * The surfaces' services over `ports`: every contract's handler, sessions
- * and the stage from the decoded env, and the ports beside them (git's
- * routes take the same `Projects` and `Upstream` the handlers do). The
- * Worker runs them over `workerPorts(config)`; the core-loop test runs the
- * same composition over its own adapters of the same ports.
+ * The surfaces' services over `ports`: every contract's handler, sessions,
+ * the CLI's releases (over `RELEASES`) and the stage from the decoded env,
+ * and the ports beside them (git's routes take the same `Projects` and
+ * `Upstream` the handlers do). The Worker runs them over
+ * `workerPorts(config)`; the core-loop test runs the same composition over
+ * its own adapters of the same ports.
  */
 export const platformOn = (
   config: PlatformConfig,
@@ -190,6 +192,7 @@ export const platformOn = (
   Layer.mergeAll(
     Handlers,
     sessionsOf(config),
+    ReleaseStoreR2(config.RELEASES),
     Layer.succeed(Stage, Stage.of({ name: config.STAGE }))
   ).pipe(Layer.provideMerge(ports));
 

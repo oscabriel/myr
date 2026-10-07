@@ -9,6 +9,7 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 
 import { MemoryRateLimits, WorkerCaps } from "../src/adapters/rate-limits.ts";
 import { Handlers } from "../src/handlers.ts";
+import { ReleaseStore } from "../src/releases.ts";
 import { serve, Stage } from "../src/surfaces.ts";
 import type { Services } from "../src/surfaces.ts";
 
@@ -127,8 +128,9 @@ const unused = (port: string) => () =>
   Effect.die(`a surfaces test called ${port}, which it never sets up`);
 
 /**
- * What a surfaces test may leave out: git's ports, unused (no test here
- * pushes), and the stage, `local`.
+ * What a surfaces test may leave out: git's ports and the release store,
+ * unused (no test here pushes, and only the releases test downloads), and
+ * the stage, `local`.
  */
 const defaults = Layer.mergeAll(
   Layer.succeed(
@@ -136,6 +138,7 @@ const defaults = Layer.mergeAll(
     Projects.of({ create: unused("Projects"), get: unused("Projects") })
   ),
   Layer.succeed(Upstream, Upstream.of({ exchange: unused("Upstream") })),
+  Layer.succeed(ReleaseStore, ReleaseStore.of({ get: unused("ReleaseStore") })),
   Layer.succeed(Stage, Stage.of({ name: "local" }))
 );
 
@@ -163,7 +166,10 @@ export const noProjects = Handlers.pipe(
  * an Effect, and as the plain function a fetch client calls.
  */
 export const served = Effect.fnUntraced(function* <E>(
-  services: Layer.Layer<Exclude<Services, Projects | Upstream | Stage>, E>
+  services: Layer.Layer<
+    Exclude<Services, Projects | ReleaseStore | Upstream | Stage>,
+    E
+  >
 ) {
   const { dispose, handler } = serve(Layer.merge(defaults, services));
 
