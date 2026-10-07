@@ -206,7 +206,9 @@ const typed = (argv: readonly string[]) =>
         return '""';
       }
 
-      return /^[\w./:@=-]+$/u.test(arg) ? arg : `'${arg}'`;
+      return /^[\w./:@=-]+$/u.test(arg)
+        ? arg
+        : `'${arg.replaceAll("'", String.raw`'\''`)}'`;
     })
     .join(" ");
 
@@ -262,9 +264,15 @@ const originOf = (given: string) =>
     }
   );
 
-/** The platform to log in to: `--url`, else `<SLUG>_URL`, else the profile's own. */
+/**
+ * The platform to log in to: `--url`, else `<SLUG>_URL`, else the profile's
+ * own. `Credentials` reads back only the current profile, so another
+ * profile named by `--profile` needs `--url`: it is never logged in to the
+ * current profile's platform by default.
+ */
 const platformOf = (
   flag: Option.Option<string>,
+  profile: Option.Option<string>,
   env: Readonly<Record<string, string>>
 ) =>
   Effect.gen(function* () {
@@ -276,14 +284,19 @@ const platformOf = (
       return yield* originOf(named.value);
     }
 
-    const current = yield* (yield* Credentials).current;
+    const name = profileName(profile, env);
+
+    const current =
+      name === profileName(Option.none(), env)
+        ? yield* (yield* Credentials).current
+        : Option.none<Profile>();
 
     if (Option.isSome(current)) {
       return yield* originOf(current.value.url);
     }
 
     return yield* new LoginUsage({
-      reason: `no platform to log in to: run ${Brand.cli} login --url https://<platform host>`,
+      reason: `no platform to log in to for profile ${name}: run ${Brand.cli} login --url https://<platform host>${Option.isSome(profile) ? ` --profile ${name}` : ""}`,
     });
   });
 
@@ -575,7 +588,7 @@ export const login = Command.make(
       const credentials = yield* Credentials;
       const env = yield* currentEnv;
       const name = profileName(given.profile, env);
-      const url = yield* platformOf(given.url, env);
+      const url = yield* platformOf(given.url, given.profile, env);
 
       const token = given.tokenStdin
         ? yield* tokenFromStdin
@@ -610,7 +623,9 @@ export const login = Command.make(
       yield* output.success({
         command: "login",
         data: {
-          gitConfig: given.noGitConfig ? [] : commands,
+          // The lines, set or not: under --no-git-config they are what to run.
+          gitConfig: commands,
+          gitConfigSet: !given.noGitConfig,
           ...Option.match(handle, {
             onNone: () => ({}),
             onSome: (known) => ({ handle: known }),
@@ -636,7 +651,7 @@ export const login = Command.make(
 /** The `git config --global` lines that undo `gitHelperConfig(url)`; exit 5 means already gone. */
 const gitHelperUnset = (url: string): readonly (readonly string[])[] => [
   ["git", "config", "--global", "--unset-all", `credential.${url}.helper`],
-  ["git", "config", "--global", "--unset", `credential.${url}.useHttpPath`],
+  ["git", "config", "--global", "--unset-all", `credential.${url}.useHttpPath`],
 ];
 
 const HELPER_KEY = /^credential\.(?<url>.+)\.helper$/u;

@@ -29,7 +29,7 @@ import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 import type { ChildProcessSpawner } from "effect/process";
 import { TestConsole } from "effect/testing";
 
-import { credentialHelper } from "../../src/credential-helper.ts";
+import { credentialHelper, currentEnv } from "../../src/credential-helper.ts";
 import { Credentials, CredentialsFile } from "../../src/credentials.ts";
 import type { Profile } from "../../src/credentials.ts";
 import { program } from "../../src/main.ts";
@@ -210,6 +210,38 @@ describe(`${Brand.cli} credential, git's credential helper`, () => {
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
+  it.live(
+    "under a named profile, answers only as that person, never with another profile's token on the host",
+    () =>
+      Effect.gen(function* () {
+        const bob: Profile = {
+          token: Redacted.make("bob-token-0123456789abcdefghijklmnopqrstuv"),
+          url: "https://elsewhere.test",
+        };
+
+        const env = yield* storedIn({ alice: platform, bob });
+
+        const asBob = yield* helper("get", input(asked("platform.test")), {
+          ...env,
+          [`${SLUG}_PROFILE`]: "bob",
+        });
+
+        const asCarol = yield* helper("get", input(asked("platform.test")), {
+          ...env,
+          [`${SLUG}_PROFILE`]: "carol",
+        });
+
+        expect({ asBob, asCarol: asCarol.stdout }).toStrictEqual({
+          asBob: { ok: true, stderr: [], stdout: "" },
+          asCarol: "",
+        });
+        expect(asCarol.stderr).toHaveLength(1);
+        expect(asCarol.stderr[0]).toContain(
+          `${Brand.cli} login --profile carol`
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
   it.live.each(["store", "erase"])(
     "%s reads what git sends, prints nothing and keeps the stored token",
     (op) =>
@@ -284,6 +316,34 @@ describe(credentialHelper, () => {
 
         expect(stdout).toBe(`username=audit;\npassword=${token}\n`);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+});
+
+describe("the env the CLI sees", () => {
+  it.effect(
+    "reads the env in a bounded walk, even with a huge number in a name",
+    () =>
+      Effect.gen(function* () {
+        const source = ConfigProvider.fromEnv({
+          env: { AI_AGENT: "pi", RUN_0: "first", RUN_100000: "far" },
+        });
+
+        const reads = yield* Ref.make(0);
+
+        const counted = ConfigProvider.make((at) =>
+          Effect.andThen(
+            Ref.update(reads, (n) => n + 1),
+            source.load(at)
+          )
+        );
+
+        const read = yield* currentEnv.pipe(
+          Effect.provideService(ConfigProvider.ConfigProvider, counted)
+        );
+
+        expect(read).toStrictEqual({ AI_AGENT: "pi", RUN_0: "first" });
+        expect(yield* Ref.get(reads)).toBeLessThan(2000);
+      })
   );
 });
 

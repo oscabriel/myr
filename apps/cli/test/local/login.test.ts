@@ -57,6 +57,13 @@ const helperLines = (at: string) => [
   `git config --global credential.${at}.useHttpPath true`,
 ];
 
+/** The same three, as the argv lists `--json` carries. */
+const helperArgv = (at: string) => [
+  ["git", "config", "--global", "--replace-all", `credential.${at}.helper`, ""],
+  ["git", "config", "--global", "--add", `credential.${at}.helper`, Brand.slug],
+  ["git", "config", "--global", `credential.${at}.useHttpPath`, "true"],
+];
+
 /** A temp HOME with its own global git config: a person's shell, for the CLI and git. */
 const home = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
@@ -358,31 +365,8 @@ describe(`${Brand.cli} login --token-stdin`, () => {
         expect(JSON.parse(text)).toStrictEqual({
           command: "login",
           data: {
-            gitConfig: [
-              [
-                "git",
-                "config",
-                "--global",
-                "--replace-all",
-                `credential.${url}.helper`,
-                "",
-              ],
-              [
-                "git",
-                "config",
-                "--global",
-                "--add",
-                `credential.${url}.helper`,
-                Brand.slug,
-              ],
-              [
-                "git",
-                "config",
-                "--global",
-                `credential.${url}.useHttpPath`,
-                "true",
-              ],
-            ],
+            gitConfig: helperArgv(url),
+            gitConfigSet: true,
             handle: "alice",
             profile: "default",
             url,
@@ -390,6 +374,57 @@ describe(`${Brand.cli} login --token-stdin`, () => {
           ok: true,
           v: 1,
         });
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+
+  it.live(
+    "with --no-git-config, leaves git's config alone and hands back the lines to set, in --json too",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const platform = yield* seams(signedInAs("alice"));
+
+        const exit = yield* cli(
+          ["login", "--url", url, "--token-stdin", "--no-git-config", "--json"],
+          { env, seams: platform.layer, stdin: `${given}\n` }
+        );
+
+        expect(Exit.isSuccess(exit)).toBeTruthy();
+        expect(
+          (yield* gitConfig(env, "--get-all", `credential.${url}.helper`))
+            .exitCode
+        ).toBe(1);
+
+        expect(JSON.parse((yield* printed).stdout.join("\n"))).toMatchObject({
+          data: { gitConfig: helperArgv(url), gitConfigSet: false },
+          ok: true,
+        });
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+
+  it.live(
+    "prints each git config line so a shell takes it as it was run, quotes and all",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const platform = yield* seams(signedInAs("alice"));
+        const odd = "https://o'brien.test";
+
+        yield* cli(["login", "--url", odd, "--token-stdin"], {
+          env,
+          seams: platform.layer,
+          stdin: `${given}\n`,
+        });
+
+        expect(
+          (yield* printed).stdout.map((line) => line.trim())
+        ).toStrictEqual(
+          expect.arrayContaining([
+            String.raw`git config --global --add 'credential.https://o'\''brien.test.helper' ${Brand.slug}`,
+          ])
+        );
       }).pipe(Effect.scoped, Effect.provide(testServices)),
     30_000
   );
@@ -437,6 +472,39 @@ describe(`${Brand.cli} login --token-stdin`, () => {
         expect(Exit.isFailure(exit)).toBeTruthy();
         expect(yield* platform.connected).toStrictEqual([]);
         expect((yield* printed).stderr.join("\n")).toContain("https://");
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+
+  it.live(
+    "without --url, logs the current profile in again on its platform, but asks for --url for another profile",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const platform = yield* seams(signedInAs("alice"));
+        const run = { env, seams: platform.layer, stdin: `${given}\n` };
+
+        yield* cli(["login", "--url", url, "--token-stdin"], run);
+
+        const again = yield* cli(["login", "--token-stdin"], run);
+
+        const other = yield* cli(
+          ["login", "--token-stdin", "--profile", "bob"],
+          run
+        );
+
+        expect({
+          again: Exit.isSuccess(again),
+          bob: yield* stored(env, "bob"),
+          checked: (yield* platform.connected).map(({ url: at }) => at),
+          other: Exit.isSuccess(other),
+        }).toStrictEqual({
+          again: true,
+          bob: Option.none(),
+          checked: [url, url],
+          other: false,
+        });
+        expect((yield* printed).stderr.join("\n")).toContain("--url");
       }).pipe(Effect.scoped, Effect.provide(testServices)),
     30_000
   );
@@ -592,9 +660,9 @@ describe(`${Brand.cli} login in the browser (PKCE)`, () => {
 
         const shown = yield* signInUrl(server.origin);
 
-        expect(yield* platform.opened).toStrictEqual([shown]);
         expect(yield* visit(shown)).toBe(200);
         expect(Exit.isSuccess(yield* Fiber.join(fiber))).toBeTruthy();
+        expect(yield* platform.opened).toStrictEqual([shown]);
       }).pipe(Effect.scoped, Effect.provide(testServices)),
     30_000
   );
@@ -686,6 +754,28 @@ describe(`${Brand.cli} logout`, () => {
         ).toBe(1);
         expect(
           (yield* gitConfig(env, "--get", `credential.${url}.useHttpPath`))
+            .exitCode
+        ).toBe(1);
+      }).pipe(Effect.scoped, Effect.provide(testServices)),
+    30_000
+  );
+
+  it.live(
+    "removes useHttpPath even when git's config holds it twice",
+    () =>
+      Effect.gen(function* () {
+        const env = yield* home;
+        const platform = yield* seams(signedInAs("alice"));
+        const run = { env, seams: platform.layer, stdin: `${given}\n` };
+
+        yield* cli(["login", "--url", url, "--token-stdin"], run);
+        yield* gitConfig(env, "--add", `credential.${url}.useHttpPath`, "true");
+
+        const exit = yield* cli(["logout"], run);
+
+        expect(Exit.isSuccess(exit)).toBeTruthy();
+        expect(
+          (yield* gitConfig(env, "--get-all", `credential.${url}.useHttpPath`))
             .exitCode
         ).toBe(1);
       }).pipe(Effect.scoped, Effect.provide(testServices)),

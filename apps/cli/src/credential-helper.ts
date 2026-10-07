@@ -37,6 +37,15 @@ const operations = [
 /** The env, by name: what `detectHarness` reads. */
 export type Env = Readonly<Record<string, string | undefined>>;
 
+/**
+ * The most indices the walk reads under one name. The config provider tells
+ * an all-numeric level only its largest index, so a name like
+ * `RUN_4294967294` would have the walk count to four billion on every git
+ * call; names with an index past this are not read. No harness marker ends
+ * in a number, and the binary's git child gets the process env whole.
+ */
+const INDEX_LIMIT = 1024;
+
 /** The env-name parts below `path` and their values, from the CLI's config provider. */
 const namesBelow = (
   provider: ConfigProvider.ConfigProvider,
@@ -56,7 +65,9 @@ const namesBelow = (
 
           const children = Match.valueTags(node, {
             Array: ({ length }) =>
-              Array.from({ length }, (_, at) => String(at)),
+              Array.from({ length: Math.min(length, INDEX_LIMIT) }, (_, at) =>
+                String(at)
+              ),
             Record: ({ keys }) => [...keys],
             Value: () => [],
           });
@@ -103,10 +114,15 @@ const requestOf = (input: string) => {
   return fields;
 };
 
-/** `url`'s scheme without its colon, if it is a URL. */
-const schemeOf = Option.liftThrowable((url: string) =>
-  new URL(url).protocol.replace(/:$/u, "")
-);
+/** The env names the CLI reads, spelled from the brand: `<SLUG>_PROFILE`. */
+const SLUG = Brand.slug.toUpperCase();
+
+/** `url`'s scheme without its colon, and its `host[:port]` in lowercase, if it is a URL. */
+const placeOf = Option.liftThrowable((url: string) => {
+  const { host, protocol } = new URL(url);
+
+  return { host: host.toLowerCase(), scheme: protocol.replace(/:$/u, "") };
+});
 
 /** A value git's credential protocol can carry: one line, no NUL. */
 const fitsOneLine = (value: string) => !/[\n\r\0]/u.test(value);
@@ -121,9 +137,12 @@ const silent: Answer = { note: Option.none(), stdout: "" };
 
 /**
  * The helper's answer to `op` with git's `input`. `get` answers only for a
- * host a profile is on, over that profile's scheme; with no login at all it
- * also says, once, how to log in. `store` and `erase` do nothing: the stored
- * token changes only through `login` and `logout`.
+ * host a profile is on, over that profile's scheme. Under `<SLUG>_PROFILE`
+ * only that profile may answer: it names the person git acts for, so the
+ * helper never hands over another person's token for the same host. With no
+ * login for the profile in use, it also says, once, how to log in. `store`
+ * and `erase` do nothing: the stored token changes only through `login`
+ * and `logout`.
  */
 const answer = (op: Operation, input: string, env: Env) =>
   Effect.gen(function* () {
@@ -141,11 +160,22 @@ const answer = (op: Operation, input: string, env: Env) =>
 
     const credentials = yield* Credentials;
 
+    const named = Option.filter(
+      Option.fromNullishOr(env[`${SLUG}_PROFILE`]),
+      (name) => name !== ""
+    );
+
+    const candidate = Option.isSome(named)
+      ? yield* credentials.current
+      : yield* credentials.forHost(host);
+
     const profile = Option.filter(
-      yield* credentials.forHost(host),
+      candidate,
       ({ token, url }) =>
-        Option.contains(schemeOf(url), protocol) &&
-        fitsOneLine(Redacted.value(token))
+        Option.exists(
+          placeOf(url),
+          (at) => at.scheme === protocol && at.host === host.toLowerCase()
+        ) && fitsOneLine(Redacted.value(token))
     );
 
     if (Option.isSome(profile)) {
@@ -155,10 +185,15 @@ const answer = (op: Operation, input: string, env: Env) =>
       } satisfies Answer;
     }
 
+    const flag = Option.match(named, {
+      onNone: () => "",
+      onSome: (name) => ` --profile ${name}`,
+    });
+
     return Option.isNone(yield* credentials.current)
       ? {
           note: Option.some(
-            `no ${Brand.cli} login for ${host}: run ${Brand.cli} login --url ${protocol}://${host}`
+            `no ${Brand.cli} login for ${host}: run ${Brand.cli} login${flag} --url ${protocol}://${host}`
           ),
           stdout: "",
         }
