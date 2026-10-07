@@ -14,12 +14,15 @@
  *
  * One call is one atomic write: a D1 batch when the `SqlClient` is D1's
  * (D1 has no interactive transactions), and a transaction anywhere else,
- * such as sqlite-node in tests. A failed write applies nothing.
+ * such as sqlite-node in tests. The client itself says which it is, so the
+ * layer needs nothing but the `SqlClient`. A failed write applies nothing.
  */
-import { D1Client } from "@effect/sql-d1/D1Client";
+import { TypeId } from "@effect/sql-d1/D1Client";
+import type { D1Client } from "@effect/sql-d1/D1Client";
 import { ProjectEvent } from "@repo/protocol/domain/event";
-import type { ProjectName } from "@repo/protocol/ids";
-import { Array, DateTime, Effect, Layer, Option, Order, Schema } from "effect";
+import { ProjectName } from "@repo/protocol/ids";
+import type { AskId } from "@repo/protocol/ids";
+import { Array, DateTime, Effect, Layer, Order, Schema } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 import type { SqlError } from "effect/sql/SqlError";
 import type { Statement } from "effect/sql/Statement";
@@ -32,10 +35,17 @@ const decodeProjected = Schema.decodeUnknownEffect(
 );
 
 const Cursors = Schema.Array(
-  Schema.Struct({ project: Schema.String, seq: Schema.Int })
+  Schema.Struct({ project: ProjectName, seq: Schema.Int })
 );
 
 const decodeCursors = Schema.decodeUnknownEffect(Cursors);
+
+/**
+ * Whether the client is D1's: every client `@effect/sql-d1` makes carries
+ * its `TypeId`, and only its `batch` writes several statements atomically
+ * there (its `withTransaction` dies).
+ */
+const isD1 = (client: SqlClient): client is D1Client => TypeId in client;
 
 const bySeq = Order.mapInput(
   Order.Tuple([Order.String, Order.Number]),
@@ -51,17 +61,14 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
     Projection,
     Effect.gen(function* () {
       const sql = yield* SqlClient;
-      const d1 = yield* Effect.serviceOption(D1Client);
 
       /** The statements in order, all or none. */
       const atomically = (
         statements: readonly Statement<object>[]
       ): Effect.Effect<readonly (readonly object[])[], SqlError> =>
-        Option.match(d1, {
-          onNone: () =>
-            sql.withTransaction(Effect.forEach(statements, (each) => each)),
-          onSome: (client) => client.batch(statements),
-        });
+        isD1(sql)
+          ? sql.batch(statements)
+          : sql.withTransaction(Effect.all(statements));
 
       /** Whether the project's cursor stands just before event `seq`. */
       const isNext = (project: ProjectName, seq: number) =>
@@ -71,7 +78,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
       const writes = ({ event, project }: ProjectedEvent) => {
         const next = isNext(project, event.seq);
 
-        const claims = (ask: string, change: number) =>
+        const claims = (ask: AskId, change: number) =>
           sql`UPDATE front_page SET claimed = MAX(claimed + ${change}, 0)
             WHERE project = ${project} AND ask = ${ask} AND ${next}`;
 

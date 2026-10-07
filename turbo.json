@@ -13,6 +13,12 @@
       "env": ["UPDATE_GOLDEN"],
       "outputs": []
     },
+    "@repo/project#test": {
+      "dependsOn": ["types", "^types"],
+      "env": ["UPDATE_GOLDEN"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/platform/migrations/**"],
+      "outputs": []
+    },
     "@repo/config#test": {
       "cache": false,
       "dependsOn": ["types", "^types"],
