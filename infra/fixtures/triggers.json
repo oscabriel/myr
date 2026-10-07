@@ -1,0 +1,49 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": {
+    "script_name": "platform-dev-oscabriel",
+    "triggers": [
+      {
+        "type": "cf.artifacts.repo.forked",
+        "filter": {
+          "namespace": "layers-dev-oscabriel"
+        },
+        "targets": [
+          {
+            "type": "workflow",
+            "script_name": "platform-dev-oscabriel",
+            "workflow_name": "on-push-dev-oscabriel"
+          }
+        ]
+      },
+      {
+        "type": "cf.artifacts.repo.pushed",
+        "filter": {
+          "namespace": "layers-dev-oscabriel"
+        },
+        "targets": [
+          {
+            "type": "workflow",
+            "script_name": "platform-dev-oscabriel",
+            "workflow_name": "on-push-dev-oscabriel"
+          }
+        ]
+      },
+      {
+        "type": "cf.artifacts.repo.pushed",
+        "filter": {
+          "namespace": "projects-dev-oscabriel"
+        },
+        "targets": [
+          {
+            "type": "workflow",
+            "script_name": "platform-dev-oscabriel",
+            "workflow_name": "on-push-dev-oscabriel"
+          }
+        ]
+      }
+    ]
+  }
+}
