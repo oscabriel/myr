@@ -16,7 +16,7 @@ import { DurableObject } from "cloudflare:workers";
 import { Effect, Exit, Layer, Schema } from "effect";
 
 import { SdkBox } from "./box/sdk.ts";
-import { CheckLogs } from "./checker/logs.ts";
+import { WorkerCheckLogs } from "./checker/logs/worker.ts";
 import { blocked, check } from "./checker/run.ts";
 import { hasGateways, SdkChecker } from "./checker/sdk.ts";
 import { CheckerWire } from "./checker/wire.ts";
@@ -83,7 +83,7 @@ export class Checker extends DurableObject<Env> {
             forget: (key) => index.forgetSnapshot(key),
             keep: (key, id) => index.keepSnapshot(key, id),
           }),
-          CheckLogs.logged
+          WorkerCheckLogs.layer
         )
       )
     );

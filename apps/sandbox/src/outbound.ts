@@ -43,8 +43,8 @@ const forward = (request: Request): Promise<Response> =>
 /**
  * The request the clone gateway sends for one from the container: a read of
  * the job's repo (`git-upload-pack`, as a clone or fetch makes) at the clone
- * host, sent to the remote with the token added. Anything else, a push
- * included, is none.
+ * host, exactly as git asks for one, sent to the remote with the token
+ * added. Anything else, a push or a query git never sends included, is none.
  */
 const cloneRequestFor = (
   request: Request,
@@ -58,7 +58,9 @@ const cloneRequestFor = (
     (request.method === "GET" &&
       url.pathname === `${repo}/info/refs` &&
       url.search === "?service=git-upload-pack") ||
-    (request.method === "POST" && url.pathname === `${repo}/git-upload-pack`);
+    (request.method === "POST" &&
+      url.pathname === `${repo}/git-upload-pack` &&
+      url.search === "");
 
   if (url.hostname !== CLONE_HOST || !reads) {
     return Option.none();

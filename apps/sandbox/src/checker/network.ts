@@ -3,8 +3,8 @@
  * route its clone takes. The container starts with the internet off, so a
  * request leaves it only through an outbound entrypoint of this Worker
  * (`outbound.ts`): the clone route adds the job's read token on the Worker's
- * side, and every other host is refused unless the current allow-list names
- * it. Adapters: `checker/sdk.ts` over the container's outbound intercepts;
+ * side and closes once setup starts, and every other host is refused unless
+ * the current allow-list names it. Adapters: `checker/sdk.ts` over the container's outbound intercepts;
  * tests record the calls (`test/fake-box.ts`).
  */
 import { Context } from "effect";
@@ -81,11 +81,15 @@ export interface CloneRoute {
 export class Network extends Context.Service<
   Network,
   {
-    /** Routes the clone's host to the clone gateway for this job's remote. */
+    /**
+     * Routes the clone's host to the clone gateway for this job's remote,
+     * until the first `allow`.
+     */
     readonly routeClone: (route: CloneRoute) => Effect.Effect<void>;
     /**
-     * Lets out requests to `hosts` and refuses every other; `[]` turns the
-     * network off, the clone route included.
+     * Lets out requests to `hosts` and refuses every other, the clone host
+     * included: the clone is done before setup starts, so its route closes
+     * here. `[]` turns the network off.
      */
     readonly allow: (hosts: readonly string[]) => Effect.Effect<void>;
   }

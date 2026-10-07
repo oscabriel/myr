@@ -8,7 +8,8 @@
  *   the clone host goes to `CloneGateway`, registered first so it keeps its
  *   requests, and every other host, HTTPS (`*`) and HTTP, to `EgressGateway`,
  *   whose props say what it lets out. Registering a target again replaces its
- *   handler, which is how the allow-list changes and how egress goes off.
+ *   handler, which is how the allow-list changes, how the clone route closes
+ *   once setup starts, and how egress goes off.
  * - a snapshot is a Container snapshot (public beta) of the whole root
  *   filesystem, its id kept in an index the project's checks share; a
  *   restore starts the container again from it, so the intercepts are
@@ -59,8 +60,11 @@ export interface SnapshotIndex {
 interface Routes {
   readonly clone: Option.Option<CloneRoute>;
   readonly allow: readonly string[];
-  /** Egress is off: nothing leaves, the clone route included. */
-  readonly off: boolean;
+  /**
+   * The clone is done: the first `allow` closes its route, so setup and the
+   * lanes reach the clone host only as a host they are refused.
+   */
+  readonly cloned: boolean;
 }
 
 /** The name every setup snapshot carries; its index key tells them apart. */
@@ -80,18 +84,17 @@ const intercept = (register: () => Promise<void>) => Effect.promise(register);
 
 /**
  * Points the container's intercepts where `routes` says: the clone host to
- * the clone gateway (or, with egress off, to a gateway that refuses it), and
- * every other host, HTTPS and HTTP, to an egress gateway allowing `allow`.
+ * the clone gateway (or, once the clone is done, to the egress gateway, which
+ * refuses it), and every other host, HTTPS and HTTP, to an egress gateway
+ * allowing `allow`.
  */
 const install = (
   container: Container,
   gateways: Gateways,
-  { allow, clone, off }: Routes
+  { allow, clone, cloned }: Routes
 ) =>
   Effect.gen(function* () {
-    const egress = gateways.EgressGateway({
-      props: { allow: off ? [] : allow },
-    });
+    const egress = gateways.EgressGateway({ props: { allow } });
 
     if (Option.isSome(clone)) {
       const route = clone.value;
@@ -99,7 +102,7 @@ const install = (
       yield* intercept(() =>
         container.interceptOutboundHttps(
           route.host,
-          off
+          cloned
             ? egress
             : gateways.CloneGateway({
                 props: {
@@ -148,7 +151,7 @@ export const SdkChecker = {
         const routes = yield* Ref.make<Routes>({
           allow: [],
           clone: Option.none(),
-          off: false,
+          cloned: false,
         });
 
         const reinstall = (change: (now: Routes) => Routes) =>
@@ -158,11 +161,7 @@ export const SdkChecker = {
 
         const network = Network.of({
           allow: (hosts) =>
-            reinstall((now) => ({
-              ...now,
-              allow: [...hosts],
-              off: hosts.length === 0,
-            })),
+            reinstall((now) => ({ ...now, allow: [...hosts], cloned: true })),
           routeClone: (route) =>
             reinstall((now) => ({ ...now, clone: Option.some(route) })),
         });

@@ -252,12 +252,11 @@ describe("the Checker", () => {
           `https://${CLONE_HOST}/git/public/datekit.git`
         );
 
-        // Everything the container was handed: commands, their env and
-        // working directories, files. The route stays on the Worker's side.
+        // Everything the container was handed (commands, their env and
+        // working directories, files) and everything logged or reported:
+        // only the route, on the Worker's side, holds the token.
         const seen = JSON.stringify(
-          fake.calls.filter(
-            (call) => call.kind !== "route" && call.kind !== "log"
-          )
+          fake.calls.filter((call) => call.kind !== "route")
         );
 
         expect(seen).not.toContain("read-only-secret");
@@ -573,7 +572,7 @@ describe("the clone gateway", () => {
   );
 
   it.effect(
-    "refuses a push, another repo's path, and another host, sending nothing on",
+    "refuses a push, a query git never sends, another repo's path, and another host, sending nothing on",
     () =>
       Effect.gen(function* () {
         const sent = yield* outboundRecorded;
@@ -586,6 +585,10 @@ describe("the clone gateway", () => {
             ),
             new Request(
               `https://${CLONE_HOST}/git/public/datekit.git/git-receive-pack`,
+              { body: "0000", method: "POST" }
+            ),
+            new Request(
+              `https://${CLONE_HOST}/git/public/datekit.git/git-upload-pack?service=git-receive-pack`,
               { body: "0000", method: "POST" }
             ),
             new Request(
@@ -602,7 +605,7 @@ describe("the clone gateway", () => {
             )
         );
 
-        expect(refused).toStrictEqual([403, 403, 403, 403]);
+        expect(refused).toStrictEqual([403, 403, 403, 403, 403]);
         expect(sent).toStrictEqual([]);
       })
   );
@@ -795,7 +798,7 @@ describe(runCheck, () => {
   );
 
   it.effect(
-    "routes the clone host to the clone gateway, the rest to the egress gateway, and closes every route once egress is off",
+    "routes the clone host to the clone gateway until setup starts, the rest to the egress gateway, and closes every route once egress is off",
     () =>
       Effect.gen(function* () {
         const { boxes } = yield* twoJobs;
@@ -805,7 +808,8 @@ describe(runCheck, () => {
           `${CLONE_HOST} → clone ${REMOTE} ${TOKEN}`,
           "* → egress []",
           "http:* → egress []",
-          `${CLONE_HOST} → clone ${REMOTE} ${TOKEN}`,
+          // Setup reaches the registries and its own hosts, not the repo.
+          `${CLONE_HOST} → egress [${setupHosts}]`,
           `* → egress [${setupHosts}]`,
           `http:* → egress [${setupHosts}]`,
           `${CLONE_HOST} → egress []`,

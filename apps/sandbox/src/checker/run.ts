@@ -191,8 +191,10 @@ const keep = (kept: Kept, log: PhaseLog) =>
 
 /**
  * One command, to its end or `limit` (none when it ran out of time), its
- * output kept in its phase's log. At the limit the command is interrupted,
- * which stops it in the container.
+ * output kept in its phase's log. At the limit the Checker stops waiting for
+ * it; the process itself ends only when the container is destroyed (the
+ * `Box` adapter aborts an `exec` that is still starting, not one already
+ * running: W3 315 Comments, for 399).
  */
 const exec = (
   kept: Kept,
@@ -355,10 +357,10 @@ const setup = (
       return yield* Effect.void;
     }
 
-    const refused = refusedIn(`${done.value.stdout}\n${done.value.stderr}`, [
-      ...allowed,
-      CLONE_HOST,
-    ]);
+    const refused = refusedIn(
+      `${done.value.stdout}\n${done.value.stderr}`,
+      allowed
+    );
 
     if (refused.length > 0) {
       yield* keep(job.kept, {
