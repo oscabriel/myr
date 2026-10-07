@@ -1,8 +1,6 @@
-import type { PolicyInput } from "@repo/protocol/domain/policy";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer } from "effect";
 
-import { fromPolicyJson } from "../config-folder.ts";
-import { defaultPolicyInput } from "../defaults.ts";
+import { statedWithoutCode } from "../config-folder.ts";
 import { Finishers, finishPolicy } from "../finish.ts";
 import { RulesEvaluator } from "../rules-evaluator.ts";
 
@@ -20,10 +18,7 @@ export const RulesEvaluatorJson = Layer.effect(
       call: () => Effect.succeed(false),
       evaluate: ({ at, facts, modules }) =>
         Effect.gen(function* () {
-          const policy = Option.getOrElse(
-            yield* fromPolicyJson(modules),
-            (): PolicyInput => defaultPolicyInput
-          );
+          const policy = yield* statedWithoutCode(modules);
 
           return yield* finishPolicy({ at, facts, finishers, policy });
         }),

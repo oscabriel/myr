@@ -2,6 +2,7 @@ import { AskInput, PolicyInput } from "@repo/protocol/domain/policy";
 import { AskId, Handle, RepoPath } from "@repo/protocol/ids";
 import { Effect, Option, Schema, Struct } from "effect";
 
+import { defaultPolicyInput } from "./defaults.ts";
 import { RulesFailed } from "./rules-evaluator.ts";
 import type { ConfigBundle } from "./rules-evaluator.ts";
 
@@ -58,7 +59,7 @@ const noDefault = (path: string, what: string) =>
  * The policy a committed `policy.json` states, when the bundle has one. It
  * carries its asks inline.
  */
-export const fromPolicyJson = (
+const fromPolicyJson = (
   bundle: ConfigBundle
 ): Effect.Effect<Option.Option<PolicyInput>, RulesFailed> => {
   const path = policyJsonOf(bundle);
@@ -73,6 +74,24 @@ export const fromPolicyJson = (
         Effect.mapError(failedAt(path))
       );
 };
+
+/**
+ * The policy input a bundle states without running code: its `policy.json`,
+ * or else the defaults. Its source is the config folder whenever there is
+ * one, and the defaults only when there is none (spec §2.5), so every
+ * adapter gives one bundle the same source.
+ */
+export const statedWithoutCode = (
+  bundle: ConfigBundle
+): Effect.Effect<PolicyInput, RulesFailed> =>
+  Effect.map(
+    fromPolicyJson(bundle),
+    Option.getOrElse((): PolicyInput =>
+      Object.keys(bundle.modules).length === 0
+        ? defaultPolicyInput
+        : { ...defaultPolicyInput, source: "config" }
+    )
+  );
 
 /** What the config folder's modules exported, as data, read back from the sandbox. */
 export const Collected = Schema.Struct({

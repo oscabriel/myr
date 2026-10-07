@@ -37,6 +37,12 @@ function FrozenDate(...args) {
   return Reflect.construct(RealDate, args.length === 0 ? [frozen] : args, new.target);
 }
 FrozenDate.prototype = RealDate.prototype;
+// A date's own constructor must not lead back to the wall clock.
+Object.defineProperty(RealDate.prototype, "constructor", {
+  configurable: true,
+  value: FrozenDate,
+  writable: true,
+});
 FrozenDate.now = () => frozen;
 FrozenDate.parse = RealDate.parse;
 FrozenDate.UTC = RealDate.UTC;

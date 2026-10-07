@@ -1,4 +1,3 @@
-import type { PolicyInput } from "@repo/protocol/domain/policy";
 import {
   Config,
   DateTime,
@@ -6,7 +5,6 @@ import {
   Effect,
   FileSystem,
   Layer,
-  Option,
   Path,
   Schema,
   Stream,
@@ -18,8 +16,8 @@ import {
   Collected,
   askModules,
   fromCollected,
-  fromPolicyJson,
   projectModule,
+  statedWithoutCode,
 } from "../config-folder.ts";
 import { defaultPolicyInput } from "../defaults.ts";
 import { Finishers, finishPolicy } from "../finish.ts";
@@ -100,8 +98,27 @@ const surprised = (output: Output) =>
 const fromFailed = ({ detail, reason }: Extract<Output, { _tag: "Failed" }>) =>
   new RulesFailed({ detail, reason });
 
-const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
-  bytes.pipe(Stream.decodeText(), Stream.mkString);
+// The most of the subprocess's output the host keeps, from the end: config
+// code may print without end, the result is stdout's last line, and what
+// broke is told at the end of stderr.
+const resultLimit = 16 * 1024 * 1024;
+
+const logLimit = 64 * 1024;
+
+/** The last `limit` characters a stream prints; the rest is read and dropped. */
+const tailOf = <E>(bytes: Stream.Stream<Uint8Array, E>, limit: number) =>
+  bytes.pipe(
+    Stream.decodeText(),
+    // Cut at twice the limit, so each character is copied only a few times.
+    Stream.runFold(
+      () => "",
+      (kept: string, chunk: string) =>
+        kept.length + chunk.length > 2 * limit
+          ? `${kept}${chunk}`.slice(-limit)
+          : `${kept}${chunk}`
+    ),
+    Effect.map((kept) => kept.slice(-limit))
+  );
 
 /** The project module and ask files, as the main imports them. */
 const modulesOf = (
@@ -120,20 +137,6 @@ const modulesOf = (
     ? { asks: asksWritten }
     : { asks: asksWritten, project: at(project) };
 };
-
-/**
- * The policy input a bundle states without running code: its `policy.json`,
- * or the defaults (from the config folder when there is one).
- */
-const withoutCode = (bundle: ConfigBundle) =>
-  Effect.map(
-    fromPolicyJson(bundle),
-    Option.getOrElse((): PolicyInput =>
-      Object.keys(bundle.modules).length === 0
-        ? defaultPolicyInput
-        : { ...defaultPolicyInput, source: "config" }
-    )
-  );
 
 /**
  * `RulesEvaluator` over a `bun` subprocess. Each evaluation writes the
@@ -248,7 +251,11 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
             );
 
           const [stdout, stderr, exitCode] = yield* Effect.all(
-            [text(child.stdout), text(child.stderr), child.exitCode],
+            [
+              tailOf(child.stdout, resultLimit),
+              tailOf(child.stderr, logLimit),
+              child.exitCode,
+            ],
             { concurrency: "unbounded" }
           ).pipe(Effect.mapError((failure) => loadFailed(failure.message)));
 
@@ -340,7 +347,7 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
             // base the ask files join; with one, it is never read.
             const fallback =
               project === undefined
-                ? yield* withoutCode(modules)
+                ? yield* statedWithoutCode(modules)
                 : defaultPolicyInput;
 
             const policy =

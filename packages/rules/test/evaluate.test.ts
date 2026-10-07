@@ -399,6 +399,41 @@ describe("the /bun adapter", () => {
     )
   );
 
+  it.live("runs config code with no env beyond PATH, and no fetch", () =>
+    Effect.gen(function* () {
+      const base = yield* baseProject;
+
+      const project = [
+        base.replace("export default ", "const base = "),
+        "const seen = [...Object.keys(process.env).toSorted(), typeof fetch];",
+        "export default { ...base, weakening: { markers: seen } };",
+      ].join("\n");
+
+      const policy = yield* evaluated(bundleOf({ "project.ts": project }));
+
+      expect(policy.weakening).toStrictEqual({
+        markers: ["PATH", "undefined"],
+      });
+    }).pipe(Effect.provide(bunEvaluator()))
+  );
+
+  it.live("keeps only the end of a config's endless output", () =>
+    Effect.gen(function* () {
+      const failure = yield* failed(
+        bundleOf({
+          "project.ts": [
+            'const flood = "x".repeat(8 * 1024 * 1024) + "the end";',
+            "await new Promise((done) => process.stderr.write(flood, done));",
+            "process.exit(3);",
+          ].join("\n"),
+        })
+      );
+
+      expect(failure.detail.length).toBeLessThanOrEqual(64 * 1024);
+      expect(failure.detail).toMatch(/x+the end$/u);
+    }).pipe(Effect.provide(bunEvaluator()))
+  );
+
   it.live("calls a function-valued rule with the facts it is given", () =>
     Effect.gen(function* () {
       const evaluator = yield* RulesEvaluator;
@@ -428,11 +463,34 @@ describe("the /json adapter", () => {
     }).pipe(Effect.provide(jsonEvaluator))
   );
 
-  it.live("gives the defaults when there is no policy.json", () =>
+  it.live(
+    "gives the defaults, from the folder, when there is no policy.json",
+    () =>
+      Effect.gen(function* () {
+        expect(yield* evaluated(yield* folder("cm"))).toStrictEqual({
+          ...defaultsEncoded,
+          source: "config",
+        });
+      }).pipe(Effect.provide(jsonEvaluator))
+  );
+
+  it.live("gives the defaults to a project with no config folder", () =>
     Effect.gen(function* () {
-      expect(yield* evaluated(yield* folder("cm"))).toStrictEqual(
-        defaultsEncoded
+      expect(yield* evaluated(bundleOf({}))).toStrictEqual(defaultsEncoded);
+    }).pipe(Effect.provide(jsonEvaluator))
+  );
+
+  it.live("agrees with /bun on a folder that holds no policy", () =>
+    Effect.gen(function* () {
+      const modules = bundleOf({ "vouched.td": "priya\n" });
+      const fromJson = yield* evaluated(modules);
+
+      const fromBun = yield* evaluated(modules).pipe(
+        Effect.provide(bunEvaluator())
       );
+
+      expect(fromJson).toStrictEqual({ ...defaultsEncoded, source: "config" });
+      expect(fromBun).toStrictEqual(fromJson);
     }).pipe(Effect.provide(jsonEvaluator))
   );
 

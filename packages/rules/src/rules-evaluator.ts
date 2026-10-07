@@ -39,7 +39,11 @@ const Workspace = Schema.Struct({
  * always give the same policy (principle 8).
  */
 export const EvaluationFacts = Schema.Struct({
-  /** The project's CI and hook files, where a `run: fromCI` block is found. */
+  /**
+   * The files `checks`' finder and judge closure read, where a `run: fromCI`
+   * block is found: CI workflows, hook configs, `package.json`s and the
+   * configs that decide what the checks do.
+   */
   ci: Schema.Array(Schema.Struct({ content: Schema.String, path: RepoPath })),
   /** The person who made the project; `owners` resolves to them (spec D20). */
   initializer: Handle,

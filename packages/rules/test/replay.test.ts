@@ -27,7 +27,9 @@ const evaluated = (modules: ConfigBundle, with_: EvaluationFacts = facts) =>
 /**
  * A config whose `project.ts` reads the clock and randomness while it loads,
  * and puts what it read into an ask's context: the wall clock, a dated
- * `new Date()`, a `Math.random()`, and a `new Date(0)` that names its time.
+ * `new Date()`, the clock reached through a date's own constructor, a
+ * `new Date(0)` that names its time, then `Math.random()`,
+ * `crypto.getRandomValues()` and `crypto.randomUUID()`.
  */
 const readsTheClock = Effect.map(baseProject, (base) =>
   bundleOf({
@@ -45,8 +47,11 @@ const readsTheClock = Effect.map(baseProject, (base) =>
       "export const stamp = [",
       "  String(Date.now()),",
       "  new Date().toISOString(),",
-      "  String(Math.random()),",
+      "  String(new Date().constructor.now()),",
       "  new Date(0).toISOString(),",
+      "  String(Math.random()),",
+      '  crypto.getRandomValues(new Uint32Array(2)).join(","),',
+      "  crypto.randomUUID(),",
       "];",
       base,
     ].join("\n"),
@@ -60,11 +65,12 @@ const stampOf = (policy: typeof Policy.Encoded) =>
 describe("evaluating a config folder twice", () => {
   it.live("gives equal policies for equal facts", () =>
     Effect.gen(function* () {
-      const modules = yield* folder("cm");
-      const first = yield* evaluated(modules);
-      const second = yield* evaluated(modules);
+      for (const modules of [yield* folder("cm"), yield* readsTheClock]) {
+        const first = yield* evaluated(modules);
+        const second = yield* evaluated(modules);
 
-      expect(second).toStrictEqual(first);
+        expect(second).toStrictEqual(first);
+      }
     }).pipe(Effect.provide(bunEvaluator()))
   );
 
@@ -80,11 +86,12 @@ describe("evaluating a config folder twice", () => {
         })
       );
 
-      expect(first?.slice(0, 2)).toStrictEqual([nowMs, now]);
+      expect(first?.slice(0, 3)).toStrictEqual([nowMs, now, nowMs]);
 
-      expect(later?.slice(0, 2)).toStrictEqual([
+      expect(later?.slice(0, 3)).toStrictEqual([
         "1798761600000",
         "2027-01-01T00:00:00.000Z",
+        "1798761600000",
       ]);
 
       // A date that names its own time is left alone.
@@ -96,18 +103,26 @@ describe("evaluating a config folder twice", () => {
     Effect.gen(function* () {
       const modules = yield* readsTheClock;
 
+      // Math.random(), crypto.getRandomValues() and crypto.randomUUID().
       const randomWith = (seed: number) =>
         Effect.map(
           evaluated(modules, { ...facts, seed }),
-          (policy) => stampOf(policy)?.[2]
+          (policy) => stampOf(policy)?.slice(4) ?? []
         );
 
       const first = yield* randomWith(7);
+      const other = yield* randomWith(8);
 
-      expect(yield* randomWith(7)).toBe(first);
-      expect(yield* randomWith(8)).not.toBe(first);
-      expect(Number(first)).toBeGreaterThanOrEqual(0);
-      expect(Number(first)).toBeLessThan(1);
+      // The same seed gives the same three values; another seed changes each.
+      expect({
+        again: yield* randomWith(7),
+        changed: other.map((value, index) => value !== first[index]),
+      }).toStrictEqual({ again: first, changed: [true, true, true] });
+      expect(Number(first[0])).toBeGreaterThanOrEqual(0);
+      expect(Number(first[0])).toBeLessThan(1);
+      expect(first[2]).toMatch(
+        /^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/u
+      );
     }).pipe(Effect.provide(bunEvaluator()))
   );
 });
