@@ -194,7 +194,7 @@ describe("the core loop, through the platform's fetch handler with real git", ()
 
         // 2. dora opens two asks over the same file; each check fails
         // twice on main the same way, and each lands as a platform commit
-        // dora asked.
+        // dora asked, the first on her first push.
         yield* world.script(
           CheckAt.cases.Commit.make({
             commit: yield* world.composed(project, isoFiles),
@@ -235,10 +235,11 @@ describe("the core loop, through the platform's fetch handler with real git", ()
             iso.landed
           ),
           main: yield* doraGit.ok(home, "rev-parse", "origin/main"),
+          // parse-month's parent, then parse-iso's.
           parents: yield* doraGit.ok(
             home,
             "log",
-            "-1",
+            "-2",
             "--format=%P",
             month.landed
           ),
@@ -253,7 +254,7 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           askedBy: "dora",
           files: isoFiles.map(({ path }) => path).join("\n"),
           main: month.landed,
-          parents: iso.landed,
+          parents: [iso.landed, first].join("\n"),
           trailer: credited("dora"),
         });
 

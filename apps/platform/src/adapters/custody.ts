@@ -5,10 +5,9 @@
  * `admit` is stage 0, before anything reaches the upstream: what the pusher
  * may move, from the project's own record through `ProjectApi`. A canonical
  * repo takes no push (`DirectPush`, spec D1) but its initializer's first
- * (`firstPusher`);
- * a claim's fork takes its claimant's pushes while the claim is live, and a
- * decider's commits on top when they finish its answer; a working fork takes
- * its owner's. `ProjectApi` has no read of the push facts the gate's parse
+ * (`firstPusher`); a claim's fork takes its claimant's pushes while the claim
+ * is live, and a decider's commits on top when they finish its answer; a
+ * working fork takes its owner's. `ProjectApi` has no read of the push facts the gate's parse
  * stage takes (the policy, the ask, the claim), so `admit` asks the
  * claimant's own `status` and leaves the full parse to `review`, where
  * `recordPush` runs it (303's Comments).

@@ -242,8 +242,10 @@ const parseIso = AskId.make("parse-iso");
 /** Steps 1 and 2: the project made, and its first ask opened. */
 const opening = (api: ProjectApi) =>
   Effect.gen(function* () {
+    const unmade = yield* api.firstPusher();
     const made = yield* Effect.exit(api.initProject(alice, {}));
     const awaiting = yield* projectState;
+    const awaitedFrom = yield* api.firstPusher();
 
     const first = yield* Pusher.use((pusher) =>
       pusher.push(repo, Option.none(), start, "Start")
@@ -251,6 +253,7 @@ const opening = (api: ProjectApi) =>
 
     const notHers = yield* api.recordFirstPush(bob, first).pipe(Effect.flip);
     const recorded = yield* api.recordFirstPush(alice, first);
+    const firstPushers = [unmade, awaitedFrom, yield* api.firstPusher()];
     const evaluated = yield* Evaluated.use(({ shas }) => shas);
     const opened = yield* openRed(api, "parse-iso");
     const greenFiles = askFiles("parse-green");
@@ -270,6 +273,7 @@ const opening = (api: ProjectApi) =>
       bobRefused,
       evaluated,
       first,
+      firstPushers,
       greenRefused,
       listed: yield* api.listAsks(anyone),
       made,
@@ -639,6 +643,18 @@ describe.each(["memory", "sqlite"] as const)(
           );
           expect(opened.recorded).toStrictEqual({ landed: opened.first });
           expect(opened.evaluated).toStrictEqual([opened.first]);
+        })
+    );
+
+    it.effect(
+      "1. its first push is awaited from alice from when she makes it until she pushes it, and from no one before or after",
+      () =>
+        Effect.map(seen, ({ opened }) => {
+          expect(opened.firstPushers).toStrictEqual([
+            Option.none(),
+            Option.some(alice.handle),
+            Option.none(),
+          ]);
         })
     );
 
@@ -1014,6 +1030,7 @@ const importing = Effect.gen(function* () {
 
   return {
     evaluated: yield* Evaluated.use(({ shas }) => shas),
+    firstPusher: yield* api.firstPusher(),
     made,
     main: yield* mainTip,
     refused,
@@ -1198,7 +1215,7 @@ describe("projects", () => {
   );
 
   it.effect(
-    "adopt an imported repo's tip as their first landing, and refuse a repo they can't read",
+    "adopt an imported repo's tip as their first landing, awaiting no first push, and refuse a repo they can't read",
     () =>
       Effect.map(
         importing.pipe(Effect.provide(worldOf(scenario, "memory"))),
@@ -1208,9 +1225,10 @@ describe("projects", () => {
             project,
             remote: remoteOf(project),
           });
-          expect([seen.main, seen.evaluated]).toStrictEqual([
+          expect([seen.main, seen.evaluated, seen.firstPusher]).toStrictEqual([
             seen.tip,
             [seen.tip],
+            Option.none(),
           ]);
           expect(seen.refused).toStrictEqual(
             new ImportFailed({ reason: "no repo at memory://none.git" })

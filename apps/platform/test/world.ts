@@ -43,29 +43,14 @@ import { Contracts } from "@repo/protocol/contracts";
 import type { Client } from "@repo/protocol/contracts";
 import type { LaneOutcome, LaneResult } from "@repo/protocol/domain/answer";
 import type { ConfigFile } from "@repo/protocol/domain/common";
-import {
-  CommitSha,
-  LandedSha,
-  ProjectName,
-  RepoName,
-} from "@repo/protocol/ids";
-import type { LaneName } from "@repo/protocol/ids";
+import { CommitSha, LandedSha, RepoName } from "@repo/protocol/ids";
+import type { LaneName, ProjectName } from "@repo/protocol/ids";
 import { RulesEvaluatorBun } from "@repo/rules/rules-evaluator/bun";
-import { git } from "@repo/testkit/git";
+import { git, gitOk } from "@repo/testkit/git";
 import type { Ran } from "@repo/testkit/git";
 import { httpBackend } from "@repo/testkit/http-backend";
-import { untouchable } from "@repo/testkit/untouchable";
 import type { Scope } from "effect";
-import {
-  Array,
-  Context,
-  Effect,
-  FileSystem,
-  Layer,
-  Option,
-  Ref,
-  SynchronizedRef,
-} from "effect";
+import { Array, Context, Effect, FileSystem, Layer, Option, Ref } from "effect";
 import {
   FetchHttpClient,
   HttpClient,
@@ -77,17 +62,16 @@ import {
 import { RpcClient, RpcSerialization } from "effect/rpc";
 
 import { DoProjects } from "../src/adapters/do-projects.ts";
-import type { ProjectNamespace } from "../src/adapters/do-projects.ts";
 import { WorkerFetch } from "../src/adapters/fetch.ts";
 import { MemoryRateLimits, WorkerCaps } from "../src/adapters/rate-limits.ts";
 import type { AnswerParams } from "../src/answer-runs.ts";
 import { decodeEnv, platformOn } from "../src/platform.ts";
 import { projectShell } from "../src/project-shell.ts";
-import type { ProjectShell } from "../src/project-shell.ts";
 import { serve } from "../src/surfaces.ts";
 import { runAnswer } from "../src/workflows/answer/program.ts";
 import { memoSteps } from "../src/workflows/step.ts";
 import { fakeEnv } from "./fake-env.ts";
+import { inProcessNamespace } from "./project-namespace.ts";
 
 /** The people the world knows: one decider and two contributors. */
 export type Someone = "dora" | "alice" | "bob";
@@ -236,7 +220,7 @@ export const coreLoopWorld = (): Effect.Effect<
           })
         ),
         Layer.provideMerge(WorkerFetch),
-        Layer.provide(NodeServices.layer)
+        Layer.provide(Layer.succeedContext(node))
       )
     );
 
@@ -254,54 +238,20 @@ export const coreLoopWorld = (): Effect.Effect<
         })
       );
 
-    // What each DO's calls run with: the world's scope, which its shell lives in.
-    const runtime = yield* Effect.context<Scope.Scope>();
-
-    const shells = yield* SynchronizedRef.make<
-      ReadonlyMap<string, ProjectShell>
-    >(new Map());
-
-    /** A project's DO, made on its first call: a shell over a database of its own. */
-    const shellOf = (name: string) =>
-      SynchronizedRef.modifyEffect(shells, (all) =>
-        Option.match(Option.fromUndefinedOr(all.get(name)), {
-          onNone: () =>
-            Effect.map(
-              projectShell({
-                name: ProjectName.make(name),
-                ports: Layer.mergeAll(
-                  Layer.succeedContext(base),
-                  AlarmsMemory,
-                  runsOf(ProjectName.make(name))
-                ),
-                sql: SqliteClient.layer({ filename: ":memory:" }).pipe(
-                  Layer.orDie
-                ),
-              }),
-              (shell) => [shell, new Map(all).set(name, shell)] as const
-            ),
-          onSome: (shell) => Effect.succeed([shell, all] as const),
-        })
-      );
-
-    // The `PROJECT` namespace in process: a name is one DO, reached by its
-    // stub's `call`, which runs on the world's own runtime.
-    const namespace: ProjectNamespace = {
-      get: (id) => ({
-        call: (request) =>
-          Effect.runPromiseWith(runtime)(
-            Effect.flatMap(shellOf(id.toString()), (shell) =>
-              shell.call(request)
-            )
-          ),
-      }),
-      idFromName: (name) =>
-        untouchable<DurableObjectId>("DurableObjectId", {
-          equals: (other) => other.toString() === name,
-          name,
-          toString: () => name,
-        }),
-    };
+    // The `PROJECT` namespace in process: a name is one DO, made on its
+    // first call, a shell over a database of its own, living in the world's
+    // scope.
+    const { namespace } = yield* inProcessNamespace((name) =>
+      projectShell({
+        name,
+        ports: Layer.mergeAll(
+          Layer.succeedContext(base),
+          AlarmsMemory,
+          runsOf(name)
+        ),
+        sql: SqliteClient.layer({ filename: ":memory:" }).pipe(Layer.orDie),
+      })
+    );
 
     const ports = base.pipe(
       Context.merge(yield* Layer.build(DoProjects(namespace)))
@@ -378,12 +328,8 @@ export const coreLoopWorld = (): Effect.Effect<
           );
 
         const ok = (cwd: string, ...args: readonly string[]) =>
-          Effect.flatMap(run(cwd, ...args), (ran) =>
-            ran.exitCode === 0
-              ? Effect.succeed(ran.stdout.trim())
-              : Effect.die(
-                  `${as}: git ${args.join(" ")} exited ${ran.exitCode}: ${ran.stderr}`
-                )
+          gitOk(cwd, "-c", `credential.helper=${helper}`, ...args).pipe(
+            Effect.provideContext(node)
           );
 
         return {
