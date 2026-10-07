@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, FileSystem, Path, Schema } from "effect";
+import { Effect, FileSystem, Path, Random, Schema } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { noManualEffectRuntimeInTests } from "../../../tools/oxlint/fence/rules/no-manual-effect-runtime-in-tests.ts";
@@ -100,15 +100,20 @@ const manualRunnerAt = (file: string, line: number) => ({
 
 describe("fence/no-module-level-mutable-state", () => {
   it.live(
-    "flags module-level let and var in src/, and nothing in functions, Layers or tests",
+    "flags module-level let and var in src/, and nothing ambient, in functions, in Layers or in tests",
     () =>
       Effect.gen(function* () {
-        const { findings } = yield* lint(`${fixtures}/oxlint.json`, fixtures, [
-          "packages/demo/src/bad-state.ts",
-          "packages/demo/src/good-state.ts",
-          "packages/demo/test/state.test.ts",
-        ]);
+        const { files, findings } = yield* lint(
+          `${fixtures}/oxlint.json`,
+          fixtures,
+          [
+            "packages/demo/src/bad-state.ts",
+            "packages/demo/src/good-state.ts",
+            "packages/demo/test/state.test.ts",
+          ]
+        );
 
+        expect(files).toBe(3);
         expect(findings).toStrictEqual([
           moduleStateAt("packages/demo/src/bad-state.ts", 3),
           moduleStateAt("packages/demo/src/bad-state.ts", 6),
@@ -119,14 +124,20 @@ describe("fence/no-module-level-mutable-state", () => {
 
 describe("fence/no-manual-effect-runtime-in-tests", () => {
   it.live(
-    "flags Effect.runPromise and ManagedRuntime.make in a test, and passes it.effect",
+    "flags Effect.runPromise and ManagedRuntime.make in a test, and passes it.effect and a runner in src/",
     () =>
       Effect.gen(function* () {
-        const { findings } = yield* lint(`${fixtures}/oxlint.json`, fixtures, [
-          "packages/demo/test/bad-runtime.test.ts",
-          "packages/demo/test/good-runtime.test.ts",
-        ]);
+        const { files, findings } = yield* lint(
+          `${fixtures}/oxlint.json`,
+          fixtures,
+          [
+            "packages/demo/test/bad-runtime.test.ts",
+            "packages/demo/test/good-runtime.test.ts",
+            "packages/demo/src/good-state.ts",
+          ]
+        );
 
+        expect(files).toBe(3);
         expect(findings).toStrictEqual([
           manualRunnerAt("packages/demo/test/bad-runtime.test.ts", 5),
           manualRunnerAt("packages/demo/test/bad-runtime.test.ts", 9),
@@ -155,47 +166,44 @@ describe("the root lint config", () => {
         const path = yield* Path.Path;
         const root = yield* repoRoot;
 
-        // The copy sits under the repo root so the root config's globs see it
-        // as they see real files. `*.log` is gitignored, so `git status` and a
-        // tree-wide `check` both skip it; oxlint 1.87 still lints a path named
-        // on its command line. The Scope removes it.
-        const temporary = yield* fs.makeTempDirectoryScoped({
-          directory: root,
-          prefix: "oxlint-fence-",
-        });
+        // The copy is a package of its own, `packages/<x>/{src,test}`, so the
+        // root config resolves it as it resolves a real package, anchored
+        // globs (`packages/*/src/**`) included. Its name ends in `.log`, which
+        // is gitignored: `git status` and a tree-wide `check` skip it, while
+        // oxlint 1.87 still lints a path named on its command line. The random
+        // part keeps two runs apart; the Scope removes it.
+        const id = yield* Random.nextIntBetween(0, 2 ** 32);
+        const workspace = `packages/oxlint-fence-${id.toString(36)}.log`;
+        const directory = path.join(root, workspace);
 
-        const base = path.join(temporary, "copy.log");
+        yield* Effect.acquireRelease(fs.makeDirectory(directory), () =>
+          Effect.orDie(fs.remove(directory, { recursive: true }))
+        );
 
         const copies = [
-          ["packages/demo/src/bad-state.ts", "packages/demo/src/state.ts"],
-          [
-            "packages/demo/test/bad-runtime.test.ts",
-            "packages/demo/test/runtime.test.ts",
-          ],
+          ["packages/demo/src/bad-state.ts", "src/state.ts"],
+          ["packages/demo/test/bad-runtime.test.ts", "test/runtime.test.ts"],
         ] as const;
 
         for (const [fixture, copy] of copies) {
-          yield* fs.makeDirectory(path.dirname(path.join(base, copy)), {
-            recursive: true,
-          });
-          yield* fs.copyFile(
-            path.join(root, fixtures, fixture),
-            path.join(base, copy)
-          );
+          const target = path.join(directory, copy);
+
+          yield* fs.makeDirectory(path.dirname(target), { recursive: true });
+          yield* fs.copyFile(path.join(root, fixtures, fixture), target);
         }
 
         const { files, findings } = yield* lint(
           "oxlint.config.ts",
-          path.relative(root, base),
+          workspace,
           copies.map(([, copy]) => copy)
         );
 
         expect(files).toBe(2);
         expect(findings).toStrictEqual([
-          moduleStateAt("packages/demo/src/state.ts", 3),
-          moduleStateAt("packages/demo/src/state.ts", 6),
-          manualRunnerAt("packages/demo/test/runtime.test.ts", 5),
-          manualRunnerAt("packages/demo/test/runtime.test.ts", 9),
+          moduleStateAt("src/state.ts", 3),
+          moduleStateAt("src/state.ts", 6),
+          manualRunnerAt("test/runtime.test.ts", 5),
+          manualRunnerAt("test/runtime.test.ts", 9),
         ]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
