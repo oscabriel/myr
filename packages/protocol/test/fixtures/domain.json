@@ -274,6 +274,389 @@
         "ok": true,
         "v": 1
       }
+    },
+    "a layer for an audience the platform does not know": {
+      "schema": "VisibilityPolicy",
+      "value": {
+        "checks": {
+          "admit": {
+            "greenOnMainRuns": 3,
+            "redOnKnownBadAtLeast": 1
+          },
+          "areas": {
+            "export": "src/export/**",
+            "parser": "src/parser/**"
+          },
+          "attempts": {
+            "perClaim": 3,
+            "perPersonPerAreaPerWeek": 10
+          },
+          "canary": true,
+          "commit": "salted-sha256-merkle",
+          "layer": "maintainers",
+          "pin": "claim",
+          "result": "area-bit"
+        },
+        "env": {
+          "setters": "deciders"
+        },
+        "flows": {
+          "noWriteDown": true,
+          "release": "deciders"
+        },
+        "layers": [
+          {
+            "audience": "everyone",
+            "disclose": "sealed",
+            "holds": ["checks", "agent-config", "notes", "experiment"],
+            "name": "maintainers",
+            "readers": "deciders",
+            "reason": "Held-back checks for parser and export; maintainers' review rubrics",
+            "writers": "deciders"
+          },
+          {
+            "audience": "security",
+            "disclose": "counted",
+            "holds": ["fix"],
+            "maxDays": 14,
+            "name": "security",
+            "readers": ["alice", "bob"],
+            "reason": "Embargoed fixes, released with their advisory",
+            "writers": "deciders"
+          }
+        ],
+        "notice": {
+          "narrowingDays": 7
+        }
+      }
+    },
+    "sealed checks a claim may attempt a negative number of times": {
+      "schema": "VisibilityPolicy",
+      "value": {
+        "checks": {
+          "admit": {
+            "greenOnMainRuns": 3,
+            "redOnKnownBadAtLeast": 1
+          },
+          "areas": {
+            "export": "src/export/**",
+            "parser": "src/parser/**"
+          },
+          "attempts": {
+            "perClaim": -1,
+            "perPersonPerAreaPerWeek": 10
+          },
+          "canary": true,
+          "commit": "salted-sha256-merkle",
+          "layer": "maintainers",
+          "pin": "claim",
+          "result": "area-bit"
+        },
+        "env": {
+          "setters": "deciders"
+        },
+        "flows": {
+          "noWriteDown": true,
+          "release": "deciders"
+        },
+        "layers": [
+          {
+            "audience": "maintainers",
+            "disclose": "sealed",
+            "holds": ["checks", "agent-config", "notes", "experiment"],
+            "name": "maintainers",
+            "readers": "deciders",
+            "reason": "Held-back checks for parser and export; maintainers' review rubrics",
+            "writers": "deciders"
+          },
+          {
+            "audience": "security",
+            "disclose": "counted",
+            "holds": ["fix"],
+            "maxDays": 14,
+            "name": "security",
+            "readers": ["alice", "bob"],
+            "reason": "Embargoed fixes, released with their advisory",
+            "writers": "deciders"
+          }
+        ],
+        "notice": {
+          "narrowingDays": 7
+        }
+      }
+    },
+    "a sealed area with no glob": {
+      "schema": "VisibilityPolicy",
+      "value": {
+        "checks": {
+          "admit": {
+            "greenOnMainRuns": 3,
+            "redOnKnownBadAtLeast": 1
+          },
+          "areas": {
+            "export": "src/export/**",
+            "parser": ""
+          },
+          "attempts": {
+            "perClaim": 3,
+            "perPersonPerAreaPerWeek": 10
+          },
+          "canary": true,
+          "commit": "salted-sha256-merkle",
+          "layer": "maintainers",
+          "pin": "claim",
+          "result": "area-bit"
+        },
+        "env": {
+          "setters": "deciders"
+        },
+        "flows": {
+          "noWriteDown": true,
+          "release": "deciders"
+        },
+        "layers": [
+          {
+            "audience": "maintainers",
+            "disclose": "sealed",
+            "holds": ["checks", "agent-config", "notes", "experiment"],
+            "name": "maintainers",
+            "readers": "deciders",
+            "reason": "Held-back checks for parser and export; maintainers' review rubrics",
+            "writers": "deciders"
+          },
+          {
+            "audience": "security",
+            "disclose": "counted",
+            "holds": ["fix"],
+            "maxDays": 14,
+            "name": "security",
+            "readers": ["alice", "bob"],
+            "reason": "Embargoed fixes, released with their advisory",
+            "writers": "deciders"
+          }
+        ],
+        "notice": {
+          "narrowingDays": 7
+        }
+      }
+    },
+    "a sealed area whose name is not an area name": {
+      "schema": "VisibilityPolicy",
+      "value": {
+        "checks": {
+          "admit": {
+            "greenOnMainRuns": 3,
+            "redOnKnownBadAtLeast": 1
+          },
+          "areas": {
+            "Parser": "src/parser/**",
+            "export": "src/export/**"
+          },
+          "attempts": {
+            "perClaim": 3,
+            "perPersonPerAreaPerWeek": 10
+          },
+          "canary": true,
+          "commit": "salted-sha256-merkle",
+          "layer": "maintainers",
+          "pin": "claim",
+          "result": "area-bit"
+        },
+        "env": {
+          "setters": "deciders"
+        },
+        "flows": {
+          "noWriteDown": true,
+          "release": "deciders"
+        },
+        "layers": [
+          {
+            "audience": "maintainers",
+            "disclose": "sealed",
+            "holds": ["checks", "agent-config", "notes", "experiment"],
+            "name": "maintainers",
+            "readers": "deciders",
+            "reason": "Held-back checks for parser and export; maintainers' review rubrics",
+            "writers": "deciders"
+          },
+          {
+            "audience": "security",
+            "disclose": "counted",
+            "holds": ["fix"],
+            "maxDays": 14,
+            "name": "security",
+            "readers": ["alice", "bob"],
+            "reason": "Embargoed fixes, released with their advisory",
+            "writers": "deciders"
+          }
+        ],
+        "notice": {
+          "narrowingDays": 7
+        }
+      }
+    },
+    "a layer nobody may read": {
+      "schema": "VisibilityPolicy",
+      "value": {
+        "checks": {
+          "admit": {
+            "greenOnMainRuns": 3,
+            "redOnKnownBadAtLeast": 1
+          },
+          "areas": {
+            "export": "src/export/**",
+            "parser": "src/parser/**"
+          },
+          "attempts": {
+            "perClaim": 3,
+            "perPersonPerAreaPerWeek": 10
+          },
+          "canary": true,
+          "commit": "salted-sha256-merkle",
+          "layer": "maintainers",
+          "pin": "claim",
+          "result": "area-bit"
+        },
+        "env": {
+          "setters": "deciders"
+        },
+        "flows": {
+          "noWriteDown": true,
+          "release": "deciders"
+        },
+        "layers": [
+          {
+            "audience": "maintainers",
+            "disclose": "sealed",
+            "holds": ["checks", "agent-config", "notes", "experiment"],
+            "name": "maintainers",
+            "readers": "deciders",
+            "reason": "Held-back checks for parser and export; maintainers' review rubrics",
+            "writers": "deciders"
+          },
+          {
+            "audience": "security",
+            "disclose": "counted",
+            "holds": ["fix"],
+            "maxDays": 14,
+            "name": "security",
+            "readers": [],
+            "reason": "Embargoed fixes, released with their advisory",
+            "writers": "deciders"
+          }
+        ],
+        "notice": {
+          "narrowingDays": 7
+        }
+      }
+    },
+    "a narrowing that waits a negative number of days": {
+      "schema": "VisibilityPolicy",
+      "value": {
+        "checks": {
+          "admit": {
+            "greenOnMainRuns": 3,
+            "redOnKnownBadAtLeast": 1
+          },
+          "areas": {
+            "export": "src/export/**",
+            "parser": "src/parser/**"
+          },
+          "attempts": {
+            "perClaim": 3,
+            "perPersonPerAreaPerWeek": 10
+          },
+          "canary": true,
+          "commit": "salted-sha256-merkle",
+          "layer": "maintainers",
+          "pin": "claim",
+          "result": "area-bit"
+        },
+        "env": {
+          "setters": "deciders"
+        },
+        "flows": {
+          "noWriteDown": true,
+          "release": "deciders"
+        },
+        "layers": [
+          {
+            "audience": "maintainers",
+            "disclose": "sealed",
+            "holds": ["checks", "agent-config", "notes", "experiment"],
+            "name": "maintainers",
+            "readers": "deciders",
+            "reason": "Held-back checks for parser and export; maintainers' review rubrics",
+            "writers": "deciders"
+          },
+          {
+            "audience": "security",
+            "disclose": "counted",
+            "holds": ["fix"],
+            "maxDays": 14,
+            "name": "security",
+            "readers": ["alice", "bob"],
+            "reason": "Embargoed fixes, released with their advisory",
+            "writers": "deciders"
+          }
+        ],
+        "notice": {
+          "narrowingDays": -7
+        }
+      }
+    },
+    "a sealed check that cites no clause": {
+      "schema": "LayerManifest",
+      "value": {
+        "checks": [
+          {
+            "area": "export",
+            "author": "alice",
+            "path": "checks/export/escapes-titles.test.ts"
+          },
+          {
+            "area": "parser",
+            "author": "bob",
+            "clause": {
+              "quote": "Week 1 is the week with the year's first Thursday.",
+              "ref": "docs/parsing.md#iso-weeks",
+              "source": "doc"
+            },
+            "path": "checks/parser/iso-week-boundaries.test.ts"
+          }
+        ],
+        "knownBad": ["8888888888888888888888888888888888888888"],
+        "layer": "maintainers"
+      }
+    },
+    "a clause from neither an ask nor a doc": {
+      "schema": "LayerManifest",
+      "value": {
+        "checks": [
+          {
+            "area": "export",
+            "author": "alice",
+            "clause": {
+              "quote": "Every export format escapes a title it writes.",
+              "ref": "export-escapes-titles",
+              "source": "ask"
+            },
+            "path": "checks/export/escapes-titles.test.ts"
+          },
+          {
+            "area": "parser",
+            "author": "bob",
+            "clause": {
+              "quote": "Week 1 is the week with the year's first Thursday.",
+              "ref": "docs/parsing.md#iso-weeks",
+              "source": "chat"
+            },
+            "path": "checks/parser/iso-week-boundaries.test.ts"
+          }
+        ],
+        "knownBad": ["8888888888888888888888888888888888888888"],
+        "layer": "maintainers"
+      }
     }
   },
   "roundTrip": {
@@ -961,7 +1344,9 @@
             "name": "maintainers",
             "reason": "Held-back checks for the parser.",
             "repo": "datekit--maintainers",
-            "sunsetDays": 90
+            "sunsetDays": 90,
+            "readers": "deciders",
+            "writers": "deciders"
           }
         ],
         "posture": "openWithSealedEvidence",
@@ -1718,6 +2103,111 @@
         "stage": "checks",
         "tree": "5555555555555555555555555555555555555555",
         "verifier": "platform"
+      }
+    ],
+    "VisibilityPolicy": [
+      {
+        "checks": {
+          "admit": {
+            "greenOnMainRuns": 3,
+            "redOnKnownBadAtLeast": 1
+          },
+          "areas": {
+            "export": "src/export/**",
+            "parser": "src/parser/**"
+          },
+          "attempts": {
+            "perClaim": 3,
+            "perPersonPerAreaPerWeek": 10
+          },
+          "canary": true,
+          "commit": "salted-sha256-merkle",
+          "layer": "maintainers",
+          "pin": "claim",
+          "result": "area-bit"
+        },
+        "env": {
+          "setters": "deciders"
+        },
+        "flows": {
+          "noWriteDown": true,
+          "release": "deciders"
+        },
+        "layers": [
+          {
+            "audience": "maintainers",
+            "disclose": "sealed",
+            "holds": ["checks", "agent-config", "notes", "experiment"],
+            "name": "maintainers",
+            "readers": "deciders",
+            "reason": "Held-back checks for parser and export; maintainers' review rubrics",
+            "writers": "deciders"
+          },
+          {
+            "audience": "security",
+            "disclose": "counted",
+            "holds": ["fix"],
+            "maxDays": 14,
+            "name": "security",
+            "readers": ["alice", "bob"],
+            "reason": "Embargoed fixes, released with their advisory",
+            "writers": "deciders"
+          }
+        ],
+        "notice": {
+          "narrowingDays": 7
+        }
+      },
+      {
+        "env": {
+          "setters": ["alice"]
+        },
+        "flows": {
+          "noWriteDown": true,
+          "release": ["alice"]
+        },
+        "layers": [
+          {
+            "audience": "team",
+            "disclose": "declared",
+            "holds": ["source"],
+            "name": "team",
+            "readers": ["alice", "bob"],
+            "reason": "The billing adapter ships closed",
+            "writers": ["alice"]
+          }
+        ],
+        "notice": {
+          "narrowingDays": 7
+        }
+      }
+    ],
+    "LayerManifest": [
+      {
+        "checks": [
+          {
+            "area": "export",
+            "author": "alice",
+            "clause": {
+              "quote": "Every export format escapes a title it writes.",
+              "ref": "export-escapes-titles",
+              "source": "ask"
+            },
+            "path": "checks/export/escapes-titles.test.ts"
+          },
+          {
+            "area": "parser",
+            "author": "bob",
+            "clause": {
+              "quote": "Week 1 is the week with the year's first Thursday.",
+              "ref": "docs/parsing.md#iso-weeks",
+              "source": "doc"
+            },
+            "path": "checks/parser/iso-week-boundaries.test.ts"
+          }
+        ],
+        "knownBad": ["8888888888888888888888888888888888888888"],
+        "layer": "maintainers"
       }
     ]
   },

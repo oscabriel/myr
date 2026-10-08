@@ -11,6 +11,7 @@ import {
   MissingSecrets,
   missingSecrets,
   plan,
+  planLines,
   secretNames,
   Step,
   TriggerMismatch,
@@ -35,7 +36,9 @@ const rootText = (file: string) =>
 
 /** What this test reads of a stage's block in the platform's `wrangler.jsonc`. */
 const PlatformStage = Schema.Struct({
-  artifacts: Schema.Tuple([Schema.Struct({ namespace: Schema.String })]),
+  artifacts: Schema.Array(
+    Schema.Struct({ binding: Schema.String, namespace: Schema.String })
+  ),
   d1_databases: Schema.Tuple([
     Schema.Struct({ binding: Schema.String, database_name: Schema.String }),
   ]),
@@ -92,7 +95,12 @@ const everything: Existing = {
     { id: "33333333333333333333333333333333", title: "oauth-dev-oscabriel" },
     { id: "44444444444444444444444444444444", title: "oauth-demo" },
   ],
-  namespaces: ["projects-dev-oscabriel", "projects-demo"],
+  namespaces: [
+    "projects-dev-oscabriel",
+    "layers-dev-oscabriel",
+    "projects-demo",
+    "layers-demo",
+  ],
   r2: [
     "evidence-dev-oscabriel",
     "evidence-demo",
@@ -117,6 +125,8 @@ describe("the stage table", () => {
 
           return {
             frontPage: names.frontPage,
+            // The public namespace, then the private one the layers live in.
+            namespaces: [names.projects, names.layers],
             onPush: [names.onPush, names.onPush],
             platform: names.platform,
             projects: [names.projects, names.projects],
@@ -131,6 +141,7 @@ describe("the stage table", () => {
 
           return {
             frontPage: block?.d1_databases[0].database_name,
+            namespaces: block?.artifacts.map(({ namespace }) => namespace),
             onPush: [
               block?.triggers.events[0].targets[0].workflow_name,
               block?.workflows.find(({ binding }) => binding === "ON_PUSH")
@@ -139,7 +150,8 @@ describe("the stage table", () => {
             // Wrangler names a stage's Worker `<name>-<env>`.
             platform: `${platform.name}-${stage}`,
             projects: [
-              block?.artifacts[0].namespace,
+              block?.artifacts.find(({ binding }) => binding === "ARTIFACTS")
+                ?.namespace,
               block?.triggers.events[0].filter.namespace,
             ],
             sandbox: block?.services[0].service,
@@ -180,6 +192,7 @@ describe("the bootstrap plan", () => {
   it("creates every resource of a stage that has none", () => {
     expect(plan("dev-oscabriel", nothing)).toStrictEqual([
       Step.CreateNamespace({ name: "projects-dev-oscabriel" }),
+      Step.CreateNamespace({ name: "layers-dev-oscabriel" }),
       Step.CreateD1({ name: "front-page-dev-oscabriel" }),
       Step.CreateKv({ title: "oauth-dev-oscabriel" }),
       Step.CreateR2({ name: "evidence-dev-oscabriel" }),
@@ -203,7 +216,7 @@ describe("the bootstrap plan", () => {
           title: "oauth-dev-oscabriel",
         },
       ],
-      namespaces: ["projects-demo"],
+      namespaces: ["projects-demo", "layers-demo", "layers-dev-oscabriel"],
       r2: ["evidence-dev-oscabriel", "releases-demo"],
     };
 
@@ -211,6 +224,23 @@ describe("the bootstrap plan", () => {
       Step.CreateNamespace({ name: "projects-dev-oscabriel" }),
       Step.CreateD1({ name: "front-page-dev-oscabriel" }),
       Step.CreateR2({ name: "releases-dev-oscabriel" }),
+    ]);
+  });
+});
+
+describe("a dry run", () => {
+  it("lists each step the plan would take, the private namespace among them, and says nothing changed", () => {
+    expect(planLines("demo", plan("demo", nothing))).toStrictEqual([
+      "bootstrap demo (dry run): create Artifacts namespace projects-demo",
+      "bootstrap demo (dry run): create Artifacts namespace layers-demo",
+      "bootstrap demo (dry run): create D1 front-page-demo",
+      "bootstrap demo (dry run): create KV oauth-demo",
+      "bootstrap demo (dry run): create R2 evidence-demo",
+      "bootstrap demo (dry run): create R2 releases-demo",
+      "bootstrap demo (dry run): would create 6; nothing was changed",
+    ]);
+    expect(planLines("demo", [])).toStrictEqual([
+      "bootstrap demo (dry run): would create 0; nothing was changed",
     ]);
   });
 });
@@ -460,6 +490,7 @@ describe("secrets, by name only", () => {
         { name: "PASSWORD_PEPPER", required: true },
         { name: "GOOGLE_CLIENT_ID", required: false },
         { name: "GOOGLE_CLIENT_SECRET", required: false },
+        { name: "MASTER_KEY", required: true },
       ]);
     })
   );

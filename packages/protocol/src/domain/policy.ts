@@ -8,6 +8,7 @@ import { AtLeastOne, Glob, NoneOrMore } from "./common.ts";
 import { AskKind } from "./kind.ts";
 import { RunBlock } from "./run.ts";
 import { Territory } from "./territory.ts";
+import { VisibilityPolicy } from "./visibility.ts";
 
 /** Where a policy came from: the config folder, or the defaults when there is none. */
 const Source = Schema.Literals(["config", "defaults"]);
@@ -92,6 +93,8 @@ export const Policy = Schema.Struct({
   record: RecordWindow,
   run: RunBlock,
   source: Source,
+  /** The project's layers and held-back checks; absent, it is Open. */
+  visibility: Schema.optionalKey(VisibilityPolicy),
   vouch: Vouch,
   /** The vouch file's lines, parsed. */
   vouches: Schema.Array(

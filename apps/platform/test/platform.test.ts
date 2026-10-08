@@ -1,9 +1,15 @@
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectName } from "@repo/protocol/ids";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Redacted } from "effect";
 
 import { decodeEnv, InvalidEnv, platform } from "../src/platform.ts";
-import { emptyFrontPage, fakeEnv, operatorToken, without } from "./fake-env.ts";
+import {
+  emptyFrontPage,
+  fakeEnv,
+  masterKey,
+  operatorToken,
+  without,
+} from "./fake-env.ts";
 import { rpcClient, served, toolCall } from "./harness.ts";
 
 const project = ProjectName.make("datekit");
@@ -61,6 +67,58 @@ describe("the platform Worker's env", () => {
       const failure = yield* failureOf(without(fakeEnv(), "ARTIFACTS"));
 
       expect(failure).toStrictEqual(new InvalidEnv({ keys: ["ARTIFACTS"] }));
+    })
+  );
+
+  // OSR §5.1: layer repos live in a namespace of their own, which only
+  // this Worker binds.
+  it.effect("fails to start without the private namespace", () =>
+    Effect.gen(function* () {
+      const failure = yield* failureOf(without(fakeEnv(), "ARTIFACTS_PRIVATE"));
+
+      expect(failure).toStrictEqual(
+        new InvalidEnv({ keys: ["ARTIFACTS_PRIVATE"] })
+      );
+    })
+  );
+
+  it.effect(
+    "fails to start without a master key of 64 hex characters, naming the key only",
+    () =>
+      Effect.gen(function* () {
+        const missing = yield* failureOf(without(fakeEnv(), "MASTER_KEY"));
+
+        const short = yield* failureOf({
+          ...fakeEnv(),
+          MASTER_KEY: masterKey.slice(2),
+        });
+
+        const notHex = yield* failureOf({
+          ...fakeEnv(),
+          MASTER_KEY: `${masterKey.slice(2)}zz`,
+        });
+
+        expect([missing, short, notHex]).toStrictEqual([
+          new InvalidEnv({ keys: ["MASTER_KEY"] }),
+          new InvalidEnv({ keys: ["MASTER_KEY"] }),
+          new InvalidEnv({ keys: ["MASTER_KEY"] }),
+        ]);
+        expect(JSON.stringify([short, notHex])).not.toContain(
+          masterKey.slice(2)
+        );
+      })
+  );
+
+  it.effect("keeps the master key redacted once decoded", () =>
+    Effect.gen(function* () {
+      const { MASTER_KEY } = yield* decodeEnv(fakeEnv());
+
+      expect(Redacted.isRedacted(MASTER_KEY)).toBeTruthy();
+      // A redacted value prints as its `toString`, never as the value.
+      expect(JSON.stringify({ MASTER_KEY })).toBe(
+        '{"MASTER_KEY":"<redacted>"}'
+      );
+      expect(Redacted.value(MASTER_KEY)).toBe(masterKey);
     })
   );
 

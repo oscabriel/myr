@@ -1,6 +1,6 @@
 # Stages
 
-A stage is one full copy of the platform on Cloudflare: its own Workers, Workflows, Artifacts namespace, database, KV namespace and bucket. `infra/stages.ts` is the one table of stage names and resource names. Every other file, both `wrangler.jsonc` files included, matches it, and `packages/config/test/bootstrap.test.ts` checks that they do.
+A stage is one full copy of the platform on Cloudflare: its own Workers, Workflows, Artifacts namespaces (public and private), database, KV namespace and buckets. `infra/stages.ts` is the one table of stage names and resource names. Every other file, both `wrangler.jsonc` files included, matches it, and `packages/config/test/bootstrap.test.ts` checks that they do.
 
 | Stage | What it is for |
 | --- | --- |
@@ -18,6 +18,7 @@ Every name is a job name plus the stage, never the brand. For stage `<s>`:
 | Workers | `platform-<s>`, `sandbox-<s>`, `web-<s>` (once `apps/web` exists) | deploy |
 | Workflows | `answer-<s>`, `on-push-<s>` | deploy (they live in `platform-<s>`) |
 | Artifacts namespace (public) | `projects-<s>` | bootstrap |
+| Artifacts namespace (private: every project's layer repos, bound only by the platform) | `layers-<s>` | bootstrap |
 | D1 database (the front page) | `front-page-<s>` | bootstrap |
 | KV namespace (OAuth grants) | `oauth-<s>` | bootstrap |
 | R2 bucket (lane evidence) | `evidence-<s>` | bootstrap |
@@ -40,7 +41,7 @@ bun run bootstrap -- --stage dev-oscabriel
 
 It refuses a stage that `stages.ts` doesn't declare. Then it:
 
-1. reads what exists: the stage's Artifacts namespace over REST, and the account's D1 databases, KV namespaces and R2 buckets through Wrangler;
+1. reads what exists: the stage's two Artifacts namespaces (`projects-<s>` and `layers-<s>`) over REST, and the account's D1 databases, KV namespaces and R2 buckets through Wrangler;
 2. creates only what is missing, so a second run creates nothing;
 3. writes the new D1 and KV ids into the stage's block of `apps/platform/wrangler.jsonc`, touching nothing else in the file (commit that change);
 4. applies the front page's migrations (`wrangler d1 migrations apply front-page-<s> --remote --env <s>`), once `apps/platform/migrations/` exists;
@@ -48,6 +49,8 @@ It refuses a stage that `stages.ts` doesn't declare. Then it:
 6. checks by name that the deployed platform holds every secret its `.env.schema` requires. Before the first deploy there is no Worker to hold them, so it says which ones that deploy has to carry.
 
 It never deletes anything and never prints or reads a secret's value.
+
+`bun run bootstrap -- --stage <s> --dry-run` does only the first step and lists what the run would create. It creates nothing and writes no file.
 
 ## Secrets
 
@@ -59,6 +62,7 @@ It never deletes anything and never prints or reads a secret's value.
 | `SESSION_TOKENS` | Optional. A JSON object from token to handle, for the demo's named people (spec §8 D9). |
 | `COOKIE_KEY` | Always. Seals a sign-in in progress into its form (HMAC-SHA-256), at least 32 characters. |
 | `PASSWORD_PEPPER` | Always. Every password is HMAC'd with it before PBKDF2, at least 32 characters. Changing it makes every stored password fail to verify. |
+| `MASTER_KEY` | Always (W6). 64 hex characters: the 256-bit key that wraps every write-only env value. Losing it loses every stored value, so keep a copy outside the machine. |
 
 To set them for a stage, do one of these:
 
@@ -113,7 +117,7 @@ Smoke only reads, from the platform and then the web. Every probe runs even when
 None of this is automated: the scripts never delete, and nobody runs `wrangler delete` or cf's `delete` without the user's OK (`wrangler delete` auto-confirms in a non-interactive shell). Tear down only what this build created, which means only names from the table above, and never `witness`. A person runs these in their own terminal. Wrangler's commands run from the app's folder with that app's `node_modules/.bin/wrangler`.
 
 1. The Workers: `wrangler delete --env <s>` in `apps/web` (if deployed), then `apps/platform`, then `apps/sandbox`. Then `wrangler workflows delete answer-<s>` and `wrangler workflows delete on-push-<s>`, if they remain.
-2. The Artifacts repos, then the namespace. List the repos with `bun run ops -- artifacts namespaces repos list --namespace projects-<s>`, delete each one with `bun run ops -- artifacts namespaces repos delete <repo> --namespace projects-<s> --force`, then `bun run ops -- artifacts namespaces delete --namespace projects-<s>`. A namespace has to be empty before it can be deleted.
+2. The Artifacts repos, then the namespaces, `projects-<s>` and `layers-<s>` alike. List a namespace's repos with `bun run ops -- artifacts namespaces repos list --namespace <namespace>`, delete each one with `bun run ops -- artifacts namespaces repos delete <repo> --namespace <namespace> --force`, then `bun run ops -- artifacts namespaces delete --namespace <namespace>`. A namespace has to be empty before it can be deleted.
 3. The database: `wrangler d1 delete front-page-<s>`.
 4. The KV namespace: `wrangler kv namespace delete --namespace-id <id>`. The id is in the stage's block of `apps/platform/wrangler.jsonc`.
 5. The buckets: empty `evidence-<s>` and `releases-<s>`, then run `wrangler r2 bucket delete evidence-<s>` and `wrangler r2 bucket delete releases-<s>`.

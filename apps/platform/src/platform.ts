@@ -36,6 +36,9 @@ const binding = <T>(kind: string) =>
 /** A bearer token: long enough that guessing one is hopeless. */
 const Token = Schema.String.check(Schema.isMinLength(32));
 
+/** A 256-bit key, written as 64 hex characters. */
+const HexKey = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/iu));
+
 /**
  * Named sessions: token → handle. A record with a refined key would drop a
  * short token silently, so the whole table is checked instead.
@@ -65,6 +68,14 @@ export const LanderAdapter = Schema.Literals(["container", "isogit"]);
 export const PlatformBindings = Schema.Struct({
   ANSWER: binding<Env["ANSWER"]>("the Answer Workflow"),
   ARTIFACTS: binding<Env["ARTIFACTS"]>("an Artifacts namespace"),
+  /**
+   * The private namespace that holds every project's layer repos (W6; OSR
+   * §5.1). Only this Worker binds it: the Workers that serve public pages
+   * bind no namespace at all (principle 7).
+   */
+  ARTIFACTS_PRIVATE: binding<Env["ARTIFACTS_PRIVATE"]>(
+    "the private Artifacts namespace"
+  ),
   CLAIM_LIMIT: binding<Env["CLAIM_LIMIT"]>("a rate limit"),
   EVIDENCE: binding<Env["EVIDENCE"]>("an R2 bucket"),
   FRONT_PAGE: binding<Env["FRONT_PAGE"]>("a D1 database"),
@@ -99,7 +110,7 @@ export const PlatformVars = Schema.Struct({
  * The secrets `.env.schema` declares, each redacted but Google's client id.
  * Every one but `SESSION_TOKENS` and Google's pair is required
  * (`wrangler.jsonc`'s `secrets.required`): sign-in's cookie key and pepper
- * too, since accounts are the platform's own.
+ * too, since accounts are the platform's own, and the master key.
  */
 export const PlatformSecrets = Schema.Struct({
   /** Seals a sign-in in progress into its form (`auth/state.ts`). */
@@ -114,6 +125,11 @@ export const PlatformSecrets = Schema.Struct({
   GOOGLE_CLIENT_SECRET: Schema.optionalKey(
     Schema.RedactedFromValue(Schema.NonEmptyString)
   ),
+  /**
+   * Wraps the data key of every write-only env value (W6; VL §9). Losing it
+   * loses every value stored under it.
+   */
+  MASTER_KEY: Schema.RedactedFromValue(HexKey),
   OPERATOR_TOKEN: Schema.RedactedFromValue(Token),
   /** HMAC'd with every password before PBKDF2 (`auth/password.ts`). */
   PASSWORD_PEPPER: Schema.RedactedFromValue(Token),

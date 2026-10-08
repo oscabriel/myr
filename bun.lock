@@ -337,6 +337,26 @@
         "vitest": "catalog:",
       },
     },
+    "packages/visibility": {
+      "name": "@repo/visibility",
+      "dependencies": {
+        "@env-spec/parser": "0.6.1",
+        "@repo/artifacts": "workspace:*",
+        "@repo/brand": "workspace:*",
+        "@repo/checks": "workspace:*",
+        "@repo/git": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "5.20261006.1",
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "@repo/testkit": "workspace:*",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
   },
   "catalog": {
     "@effect/platform-bun": "4.0.1",
@@ -537,6 +557,8 @@
     "@effect/vitest": ["@effect/vitest@4.0.1", "", { "peerDependencies": { "effect": "^4.0.1", "vitest": ">=5.0.0 <6.0.0" } }, "sha512-DbY9kf/018zBxRIX7rJwBnPVPzSarnUpcshm0vfYPFiDkSa7AFrXTh2BlDNUbrdrmqcIOBhVZ7GkEtxf8WiQrg=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.11.3", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA=="],
+
+    "@env-spec/parser": ["@env-spec/parser@0.6.1", "", {}, "sha512-eEo2e45H5+UqkjpzT5Uf+rJWRn2OvZxQ4TUfDTOZx+W2QH+jEGjgU8145T9/eOvfd7uUCqP5xUAqvz+E6FOHSA=="],
 
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.28.1", "", { "os": "aix", "cpu": "ppc64" }, "sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ=="],
 
@@ -847,6 +869,8 @@
     "@repo/sdk": ["@repo/sdk@workspace:packages/sdk"],
 
     "@repo/testkit": ["@repo/testkit@workspace:packages/testkit"],
+
+    "@repo/visibility": ["@repo/visibility@workspace:packages/visibility"],
 
     "@repo/web": ["@repo/web@workspace:apps/web"],
 

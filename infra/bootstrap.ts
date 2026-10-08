@@ -3,11 +3,11 @@
  * Cloudflare resources once, and is safe to run again: a second run creates
  * nothing (spec §4.4).
  *
- * 1. Reads what exists: the stage's public Artifacts namespace (over REST,
- *    with the infra token `varlock run --path infra/` provides), and the
- *    account's D1 databases, KV namespaces and R2 buckets (with Wrangler's
- *    own login: the infra token can't write them, so Wrangler never sees
- *    it).
+ * 1. Reads what exists: the stage's two Artifacts namespaces, the public
+ *    one and the private one the layers live in (over REST, with the infra
+ *    token `varlock run --path infra/` provides), and the account's D1
+ *    databases, KV namespaces and R2 buckets (with Wrangler's own login: the
+ *    infra token can't write them, so Wrangler never sees it).
  * 2. `plan`s and creates only what is missing.
  * 3. Writes the D1 and KV ids into the stage's block of
  *    `apps/platform/wrangler.jsonc` (`writeIds`, comments untouched).
@@ -18,6 +18,9 @@
  * 6. Checks, by name only, that the deployed platform has every secret its
  *    `.env.schema` requires. Before the first deploy there is no Worker to
  *    hold them: that deploy must carry them through varlock.
+ *
+ * `--dry-run` does only the first step and prints the plan: it creates
+ * nothing and writes no file.
  *
  * `--check-triggers` does only the last step a deploy needs: it reads the
  * platform's triggers back (`GET /triggers/platform-<s>`) and compares them
@@ -84,9 +87,9 @@ export const plan = (stage: Stage, existing: Existing): readonly Step[] => {
   const names = resources(stage);
 
   return [
-    ...(existing.namespaces.includes(names.projects)
-      ? []
-      : [Step.CreateNamespace({ name: names.projects })]),
+    ...[names.projects, names.layers].flatMap((name) =>
+      existing.namespaces.includes(name) ? [] : [Step.CreateNamespace({ name })]
+    ),
     ...(existing.d1.some(({ name }) => name === names.frontPage)
       ? []
       : [Step.CreateD1({ name: names.frontPage })]),
@@ -469,11 +472,10 @@ const wrangler = (root: string, args: readonly string[]) =>
 /** What exists of `stage`'s resources on the account. */
 const readExisting = (root: string, credentials: Credentials, stage: Stage) =>
   Effect.gen(function* () {
-    const { projects } = resources(stage);
+    const { layers, projects } = resources(stage);
 
-    const namespace = yield* exists(
-      credentials,
-      `/artifacts/namespaces/${projects}`
+    const namespaces = yield* Effect.filter([projects, layers], (name) =>
+      exists(credentials, `/artifacts/namespaces/${name}`)
     );
 
     return {
@@ -483,7 +485,7 @@ const readExisting = (root: string, credentials: Credentials, stage: Stage) =>
       kv: yield* wrangler(root, ["kv", "namespace", "list"]).pipe(
         Effect.flatMap(kvFrom)
       ),
-      namespaces: namespace ? [projects] : [],
+      namespaces,
       r2: bucketsFrom(yield* wrangler(root, ["r2", "bucket", "list"])),
     } satisfies Existing;
   });
@@ -496,6 +498,15 @@ const describe = (step: Step) =>
     CreateNamespace: ({ name }) => `create Artifacts namespace ${name}`,
     CreateR2: ({ name }) => `create R2 ${name}`,
   });
+
+/** What a dry run of `stage` prints for `steps`: each step, then that nothing changed. */
+export const planLines = (
+  stage: Stage,
+  steps: readonly Step[]
+): readonly string[] => [
+  ...steps.map((step) => `bootstrap ${stage} (dry run): ${describe(step)}`),
+  `bootstrap ${stage} (dry run): would create ${steps.length}; nothing was changed`,
+];
 
 /**
  * Wrangler's create commands offer to add the binding to `wrangler.jsonc`
@@ -620,6 +631,14 @@ const secrets = (root: string, credentials: Credentials, stage: Stage) =>
       : Effect.fail(new MissingSecrets({ names: missing, stage }));
   });
 
+/** Reads what exists of `stage` and prints what `make` would create, creating and writing nothing. */
+const dryRun = (root: string, credentials: Credentials, stage: Stage) =>
+  Effect.gen(function* () {
+    const steps = plan(stage, yield* readExisting(root, credentials, stage));
+
+    yield* Console.log(planLines(stage, steps).join("\n"));
+  });
+
 /** Makes what `stage` lacks, writes its ids and checks its secrets. */
 const make = (root: string, credentials: Credentials, stage: Stage) =>
   Effect.gen(function* () {
@@ -685,7 +704,8 @@ const make = (root: string, credentials: Credentials, stage: Stage) =>
 
 /**
  * Bootstraps the stage `argv`'s `--stage` names; with `--check-triggers`,
- * only reads its push-event trigger back.
+ * only reads its push-event trigger back; with `--dry-run`, only reads what
+ * exists and lists what it would create.
  */
 export const bootstrap = (argv: readonly string[]) =>
   Effect.gen(function* () {
@@ -693,8 +713,12 @@ export const bootstrap = (argv: readonly string[]) =>
     const credentials = yield* Credentials;
     const root = yield* repoRoot;
 
-    return yield* argv.includes("--check-triggers")
-      ? triggers(credentials, stage)
+    if (argv.includes("--check-triggers")) {
+      return yield* triggers(credentials, stage);
+    }
+
+    return yield* argv.includes("--dry-run")
+      ? dryRun(root, credentials, stage)
       : make(root, credentials, stage);
   });
 

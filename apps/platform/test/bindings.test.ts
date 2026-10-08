@@ -306,9 +306,16 @@ describe("the platform Worker's bindings", () => {
     >();
   });
 
-  it("have no private namespace yet (principle 7; W6 adds it deliberately)", () => {
-    expectTypeOf<Env>().not.toHaveProperty("ARTIFACTS_PRIVATE");
-    expectTypeOf<PlatformConfig>().not.toHaveProperty("ARTIFACTS_PRIVATE");
+  // Principle 7: this Worker binds the private namespace deliberately (W6);
+  // the web's `test/env.test-d.ts` holds that no public-serving Worker does.
+  it("hold the private namespace, decoded as the public one is", () => {
+    expectTypeOf<Env>().toHaveProperty("ARTIFACTS_PRIVATE");
+    expectTypeOf<PlatformConfig["ARTIFACTS_PRIVATE"]>().toEqualTypeOf<
+      Env["ARTIFACTS_PRIVATE"]
+    >();
+    expectTypeOf<Env["ARTIFACTS_PRIVATE"]>().toExtend<
+      Parameters<(typeof RepoHostBinding)["layer"]>[0]
+    >();
   });
 
   it("are each taken by its port's factory as Env types it, without a cast", () => {

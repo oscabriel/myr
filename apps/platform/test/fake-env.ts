@@ -47,6 +47,12 @@ export const cookieKey = "cookie-key-0123456789abcdef0123456789";
 
 export const passwordPepper = "pepper-0123456789abcdef0123456789abcdef";
 
+/**
+ * The master key in every fake env (W6): 64 hex characters, the 256-bit key
+ * that wraps write-only values. A test value, never a stage's.
+ */
+export const masterKey = "0123456789abcdef".repeat(4);
+
 /** One call a fake Project DO was sent: the DO's name, the method, and who called. */
 export interface ProjectCallSeen {
   readonly project: string;
@@ -135,7 +141,7 @@ export const fakeProjects = (made: readonly string[] = []): Env["PROJECT"] => {
 
 /**
  * The platform Worker's env at stage `local`, as `wrangler.jsonc` declares
- * it: every var and the required secret set, every binding a fake that
+ * it: every var and every required secret set, every binding a fake that
  * throws if touched, so a test proves what building the platform touches.
  * `PROJECT` is the exception: its DOs hold no project and answer calls on
  * one with `UnknownProject`, each noted (`callsTo`). The optional secrets
@@ -144,12 +150,14 @@ export const fakeProjects = (made: readonly string[] = []): Env["PROJECT"] => {
 export const fakeEnv = (): Env => ({
   ANSWER: untouchable("ANSWER"),
   ARTIFACTS: untouchable("ARTIFACTS"),
+  ARTIFACTS_PRIVATE: untouchable("ARTIFACTS_PRIVATE"),
   CLAIM_LIMIT: untouchable("CLAIM_LIMIT"),
   COOKIE_KEY: cookieKey,
   EVIDENCE: untouchable("EVIDENCE"),
   FRONT_PAGE: untouchable("FRONT_PAGE"),
   LANDER_ADAPTER: "container",
   LOADER: untouchable("LOADER"),
+  MASTER_KEY: masterKey,
   OAUTH_KV: untouchable("OAUTH_KV"),
   ON_PUSH: untouchable("ON_PUSH"),
   OPERATOR_HANDLE: "oscabriel",

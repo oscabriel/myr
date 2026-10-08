@@ -20,7 +20,11 @@ import { Proposal } from "../src/domain/proposal.ts";
 import { CreditSummary } from "../src/domain/record.ts";
 import { RunBlock } from "../src/domain/run.ts";
 import { Territory } from "../src/domain/territory.ts";
-import { Ledger } from "../src/domain/visibility.ts";
+import {
+  LayerManifest,
+  Ledger,
+  VisibilityPolicy,
+} from "../src/domain/visibility.ts";
 import { Envelope } from "../src/envelope.ts";
 import {
   AreaName,
@@ -83,6 +87,7 @@ const schemas = {
   Evidence,
   FrontPageEntry,
   LandingView,
+  LayerManifest,
   Ledger,
   Outcome,
   Policy,
@@ -96,6 +101,7 @@ const schemas = {
   Territory,
   Today,
   Verdict,
+  VisibilityPolicy,
 } as const;
 
 const schemaNamed = new Map<string, Schema.Codec<unknown, unknown>>(
@@ -154,6 +160,8 @@ describe("the domain schemas", () => {
     ["Verdict", Verdict],
     ["Outcome", Outcome],
     ["ProjectEvent", ProjectEvent],
+    ["VisibilityPolicy", VisibilityPolicy],
+    ["LayerManifest", LayerManifest],
   ] as const)(
     "%s has a JSON Schema with no non-finite numbers and no nulls",
     (_name, schema) => {
@@ -210,6 +218,30 @@ describe("the domain schemas", () => {
         record: { countsAfterDays: 0, windowDays: 1 },
       })
     ).toBeFalsy();
+  });
+});
+
+describe("a project's visibility", () => {
+  // OSR §4.1's `visibility.ts`, as the data the sdk writes for it.
+  const [stated] = wire.roundTrip.VisibilityPolicy;
+
+  const [policy] = wire.roundTrip.Policy;
+
+  it("rides on the policy at a landed commit", () => {
+    const withVisibility = { ...policy, visibility: stated };
+
+    expect(
+      Schema.encodeSync(Policy)(
+        Schema.decodeUnknownSync(Policy)(withVisibility)
+      )
+    ).toStrictEqual(withVisibility);
+  });
+
+  // No `visibility.ts` means no layers and the posture Open (OSR §4.1).
+  it("is absent from a policy whose config folder declares none", () => {
+    expect(Schema.decodeUnknownSync(Policy)(policy)).not.toHaveProperty(
+      "visibility"
+    );
   });
 });
 

@@ -41,6 +41,8 @@ export interface Resources {
   readonly web: string;
   /** The public Artifacts namespace. */
   readonly projects: string;
+  /** The private Artifacts namespace: every project's layer repos (W6). */
+  readonly layers: string;
   /** The D1 database behind the front page. */
   readonly frontPage: string;
   /** The KV namespace that holds OAuth grants. */
@@ -60,6 +62,7 @@ export const resources = (stage: Stage): Resources => ({
   answer: `answer-${stage}`,
   evidence: `evidence-${stage}`,
   frontPage: `front-page-${stage}`,
+  layers: `layers-${stage}`,
   oauth: `oauth-${stage}`,
   onPush: `on-push-${stage}`,
   platform: `platform-${stage}`,

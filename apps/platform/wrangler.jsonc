@@ -35,8 +35,14 @@
   "secrets": {
     // Declared in .env.schema; the user sets the values. SESSION_TOKENS is
     // optional; sign-in's cookie key and pepper are not, since accounts are
-    // the platform's own and need no third party.
-    "required": ["OPERATOR_TOKEN", "COOKIE_KEY", "PASSWORD_PEPPER"],
+    // the platform's own and need no third party. MASTER_KEY wraps every
+    // write-only env value (W6): without it none can be stored or opened.
+    "required": [
+      "OPERATOR_TOKEN",
+      "COOKIE_KEY",
+      "PASSWORD_PEPPER",
+      "MASTER_KEY",
+    ],
   },
   "durable_objects": {
     "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
@@ -45,7 +51,13 @@
     { "name": "answer-local", "binding": "ANSWER", "class_name": "Answer" },
     { "name": "on-push-local", "binding": "ON_PUSH", "class_name": "OnPush" },
   ],
-  "artifacts": [{ "binding": "ARTIFACTS", "namespace": "projects-local" }],
+  // The public namespace, and the private one that holds every project's
+  // layer repos (W6). Only this Worker binds the private one: the Workers
+  // that serve public pages bind neither (principle 7).
+  "artifacts": [
+    { "binding": "ARTIFACTS", "namespace": "projects-local" },
+    { "binding": "ARTIFACTS_PRIVATE", "namespace": "layers-local" },
+  ],
   "d1_databases": [
     {
       "binding": "FRONT_PAGE",
@@ -103,7 +115,12 @@
         "LANDER_ADAPTER": "container",
       },
       "secrets": {
-        "required": ["OPERATOR_TOKEN", "COOKIE_KEY", "PASSWORD_PEPPER"],
+        "required": [
+          "OPERATOR_TOKEN",
+          "COOKIE_KEY",
+          "PASSWORD_PEPPER",
+          "MASTER_KEY",
+        ],
       },
       "durable_objects": {
         "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
@@ -122,6 +139,7 @@
       ],
       "artifacts": [
         { "binding": "ARTIFACTS", "namespace": "projects-dev-oscabriel" },
+        { "binding": "ARTIFACTS_PRIVATE", "namespace": "layers-dev-oscabriel" },
       ],
       "d1_databases": [
         {
@@ -179,7 +197,12 @@
         "LANDER_ADAPTER": "container",
       },
       "secrets": {
-        "required": ["OPERATOR_TOKEN", "COOKIE_KEY", "PASSWORD_PEPPER"],
+        "required": [
+          "OPERATOR_TOKEN",
+          "COOKIE_KEY",
+          "PASSWORD_PEPPER",
+          "MASTER_KEY",
+        ],
       },
       "durable_objects": {
         "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
@@ -192,7 +215,10 @@
           "class_name": "OnPush",
         },
       ],
-      "artifacts": [{ "binding": "ARTIFACTS", "namespace": "projects-demo" }],
+      "artifacts": [
+        { "binding": "ARTIFACTS", "namespace": "projects-demo" },
+        { "binding": "ARTIFACTS_PRIVATE", "namespace": "layers-demo" },
+      ],
       "d1_databases": [
         {
           "binding": "FRONT_PAGE",
