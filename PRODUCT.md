@@ -2,74 +2,110 @@
 
 <!-- impeccable:product-schema 1 -->
 
-What the web of Myr is for, and what it never does. Words follow `GLOSSARY.md`: ask, answer, check, refusal, decider, Today, landing. Written in W5 (issue 511) before the pages were built, and checked against what shipped by W5's integration (issue 599); W7 (issue 713) revises it. Facts marked ASSUMPTION were inferred from the build plan, not confirmed by the maintainer.
+What Myr is for, whom it serves, what it promises and what it declines. Any agent working on the web, the CLI's words or the docs starts here; [`DESIGN.md`](DESIGN.md) holds the web's look. Words follow [`GLOSSARY.md`](GLOSSARY.md). Facts marked ASSUMPTION are inferred from the build, not confirmed by the maintainer.
 
 ## Platform
 
 web
 
+The web is one of four surfaces over one contract: git, the CLI, MCP and the web all serve the same contracts and render the same refusals.
+
 ## Users
 
-Four readers, in the order the web serves them:
+Three kinds of people, and the agents that work for them. The words below are product words; inside the domain a contributor answering an ask is an **answerer** and a maintainer taking decisions is a **decider**.
 
-1. **A newcomer looking for a first ask.** They arrive from a link or the front page, often on a phone, and want to know what a project wants, whether they may take it, and the three commands that start it. They have no account yet and may never need one: git and the CLI do the work.
-2. **A contributor checking an answer.** They pushed from a terminal (or their agent did) and open the answer's page to see where it stands: which stage of the gate it reached, which checks ran, and, if it was refused, the same refusal `git push` printed, with its `next` command.
-3. **A decider spending a daily budget.** They open Today, often on a phone between other work, and take a handful of decisions, each with its evidence and its safe default, in one tap each. A decider who does nothing lets nothing in.
-4. **Agents fetching Markdown.** A harness reads an ask as Markdown (`Accept: text/markdown` or `.md`), `llms.txt`, and the well-known MCP and skill documents. The HTML pages are for people; the same facts in Markdown are for agents.
+1. **Maintainers** keep a project. Their jobs:
+   - say what the project wants, as asks: a file on main with a want, a territory and a check that fails on main, which opens only when the check is red first;
+   - set how the project takes changes, as typed code in its config folder on main (deciders, ask kinds, budgets, vouches, ratchets, the run block, visibility), read from the platform's last landing;
+   - spend a daily budget of decisions on Today: open or decline a proposal, waive an escape, accept a posture change, finish a passing answer; doing nothing lets nothing in;
+   - vouch for the people who may claim, and denounce those who may not propose;
+   - keep checks of their own in a layer only they read, and set write-only env values from a terminal;
+   - land their own changes through the same gate as anyone else.
+2. **Contributors** answer asks, often a newcomer looking for a first one. Their jobs:
+   - find an ask they may take, on the front page, with `asks` or with `front`, each saying what done means before they start; some asks are held for newcomers, with a mentor named;
+   - claim it, which gives them a fork and an exclusive slot kept alive by pushing;
+   - answer with plain git in that fork, run the gate's checks locally with `check`, push, and read the verdict where they already look (git's own output, `status`, the verdict note, the answer's page);
+   - propose an ask nobody wrote yet, as a proposal that expires unless a decider accepts it;
+   - own what lands: their name is on the commit, and their record is built from those commits.
+3. **Their harnesses**, the coding agents a person works through (Claude Code, OpenCode, Amp, pi, others). Their jobs: read the project's AGENTS.md block or skill, an ask as Markdown, `llms.txt` and the MCP tools; act only through their person's token; read refusals as typed JSON and run each one's `next`. An agent holds no account and no credit: the person's claim carries identity, and a landing discloses the agent apart (`Assisted-by`).
+
+Contributors meet four nouns, and only four: **ask**, **answer**, **check** and **refusal**. Everything else (decider, budget, layer, ledger, posture, ratchet) is maintainer or platform vocabulary.
 
 ## Product Purpose
 
-Myr is a whole Git platform on Cloudflare: everything a project ships is public, the contribution process is typed code on main, and a change lands only by passing a typed gate. The terminal and git are where work happens. The web is where people look: at what a project wants, where an answer stands, who is credited for a landing, and what a decider owes today.
+Myr is a git platform where everything a project ships is public, the contribution process is typed code on main, and a change lands only by passing a typed gate. It turns the front door around: the project says what it wants, anyone (a person, or an agent working for one) may answer, an answer that passes its check lands with credit for every person involved, and work nobody asked for has nowhere to go. It is a prototype, entered in a competition that closes on Oct 14.
 
-Success: a newcomer goes from the front page to a running `claim` in under a minute; a contributor reads a refusal on the web exactly as git printed it; a decider clears Today on a phone.
+The terminal and git are where work happens. The web is where people look: at what a project wants, where an answer stands, who is credited for a landing, and what a decider owes today.
+
+Success: a newcomer goes from the front page to a running `claim` in under a minute; a stock harness with nothing installed claims, is refused, fixes and lands from git's own output; a contributor reads a refusal on the web exactly as git printed it; a decider clears Today on a phone.
 
 ## Positioning
 
-A refusal is a typed value with a reason, a place, a next command and whether retrying can help; credit is a set of git trailers on the landing commit; a posture is computed from the project's config. The web renders those values as they are. It never re-words a refusal, never invents a score, and never shows a diff to someone who does not decide.
+The mechanism is the claim, not the feature count. What it promises:
+
+- **main moves only by a landing.** A landing is the platform's commit of a checked tree; a direct push to main is refused. Deciders' own changes go through the same gate.
+- **An answer cannot change what judges it.** The judge is read from the last landing, and its closure (check files, test and lint config, CI and hook configs, scripts, the config folder, `.env.schema`) is out of every answer's reach. An answer that edits them, or adds a disable comment with no reason, is refused; a reasoned one counts against the territory's escapes, and waits for a decider when it would raise them.
+- **Every refusal is a typed value**, from a closed union: a tag, a reason, where it points, the command to run next, and whether retrying can help. It reads the same in `git push` output, the CLI, MCP and the web, and accumulates at the cheap stages, so one push hears every independent problem.
+- **Credit is git trailers on the landing commit** (`Asked-by`, `Signed-off-by`, `Decided-by`, `Mentored-by`, `Finished-by`, `Advised-by`). Agents are disclosed, never credited.
+- **Held-back checks disclose one bit per area.** A layer's files never enter a public tree; a contributor learns which area failed, never a check's name or output, with a few attempts a week. A landing judged by them says "checked against N sealed checks" in its `Held-back:` trailer.
+- **Write-only values stay write-only.** A decider sets a sensitive env value from a terminal; nobody reads it back, and an unlanded answer's code sees a placeholder.
+- **Export is `git clone`.** Code, asks and credit trailers leave with a clone; verdict notes take one more fetch of `refs/notes/*`.
+
+What it declines:
+
+- **No inbound or two-way GitHub sync.** It would be a second way onto main that skips the gate. Sign-in uses the platform's own accounts, with Google as an option.
+- **No model's opinion in the gate.** Checks are commands with exit statuses and counts; an answer is judged by them, and taste is a decider's finish.
+- **No scores.** A person appears by handle and role; their record serves trust rules only and is never shown as a number, rank or leaderboard.
+- **No overclaiming.** Held-back checks are hidden from people and agents, not from the code under test, so they are no security boundary. Myr is a prototype, not a whole forge; it makes no claim about speed or scale beyond measured, dated numbers.
+- **No second way to land.** The web adds no form for what git or the CLI does, and shows a diff only to the decider finishing an answer.
 
 ## Operating Context
 
-- Work happens in git and the CLI (`Brand.cli` in code). Every page that suggests an action shows the command, copyable, rather than a web form for it. Signing in is only for deciders (Today, decisions, finishing an answer).
-- Pages per job:
-  - **Front page** (`/`): open asks across projects a viewer may take, filtered by kind and by asks held for newcomers.
-  - **Project** (`/$project`): its asks, its posture, its recent landings with their credit trailers, and how to take part (clone, `asks`, `claim`, `check`).
-  - **Ask** (`/$project/asks/$ask`): the want, the territory, the check, who may claim, and the commands; also served as Markdown (by `Accept: text/markdown`, or at `/$project/asks/$ask.md`).
-  - **Answer** (`/$project/answers/$ask`): the verdict stage by stage, the lanes, held-back results as one bit per area, or the refusal.
+- Work happens in git and the CLI (`Brand.cli` in code; the name lives only in `packages/brand`). The CLI is a single binary served by the platform itself (`/install.sh`, `/releases/…`), with a versioned `--json` envelope on every command, `--dry-run` and `--yes` where a command writes, and `mcp` to serve the platform's tools over stdio. Every web page that suggests an action shows its command, copyable.
+- Harnesses plug in without installing anything: the project's AGENTS.md block and skill, `/llms.txt`, an ask as Markdown, and `/.well-known/mcp.json`. The CLI also answers harness hooks (`hook`), and pi users can load a user-level adapter.
+- Pages per job on the web:
+  - **Front page** (`/`): open asks across projects a viewer may take, filtered by kind and by asks held for newcomers, and the projects with their posture.
+  - **Project** (`/$project`): its asks, its posture, its recent landings with their credit trailers, links to its ledger and env shape, and how to take part (clone, `asks`, `claim`, `check`).
+  - **Ask** (`/$project/asks/$ask`): the want, the territory, the check, who may claim, and the commands; the same as Markdown by `Accept: text/markdown` or at `/$project/asks/$ask.md`.
+  - **Answer** (`/$project/answers/$ask`): the outcome, the gate's stages, the lanes, held-back results as one line per area, the refusal, and the landing's trailers.
   - **Person** (`/people/$handle`): their credits by role and area, never a score.
-  - **Today** (`/today`): a decider's decisions with evidence, defaults and expiry, against the budget; each decision has its own page (`/$project/decisions/$decision`), and a finish shows the answer's diff there. ASSUMPTION until the platform opens `Finish` decisions (it does not yet): the finish view is built and tested, but no live decision reaches it.
+  - **Today** (`/today`): a decider's decisions, each with its evidence, safe default and expiry, against the budget, with newcomers to welcome and a sample of landings that needed nobody; each decision has its own page (`/$project/decisions/$decision`), where a finish shows the answer's diff. ASSUMPTION until the platform opens finish decisions (it does not yet): the finish view is built and tested, but no live decision reaches it.
+  - **Ledger** (`/$project/ledger`): the posture label, each declared layer with its reason, each sealed area's count, authors, committed root and admission, and every entry, newest first.
+  - **Env shape** (`/$project/env`): every item the project's committed `.env.schema` declares, parsed at the landed commit and never resolved; for a sensitive item, who set its value and when. Never a value.
   - **Sign-in** (`/auth/signin`): through the platform's own accounts; the session lives in an HttpOnly cookie the browser cannot read.
-  - **For agents**: `/llms.txt` and each project's `/$project/llms.txt`, `/.well-known/mcp.json`, and the skills at `/.well-known/agent-skills/` (the platform serves those, through the web).
-  - **Ledger and env shape** (W6): the public record of layers, commitments and posture changes; the env shape with no values.
+  - **For agents**: `/llms.txt`, each project's `/$project/llms.txt`, `/.well-known/mcp.json` and the skills under `/.well-known/agent-skills/`.
 - The project and answer pages update live while open (the project's `watch` stream), and fall back to reading again every 5 s when the stream cannot be held.
 - A project may not take a name the web uses for its own pages (`today`, `people`, `auth`, `rpc`, `releases`, `icons`, `assets`).
-- Phone width is a first-class target (Today installs as a PWA). ASSUMPTION: deciders use Today mostly on a phone and the other pages mostly on a laptop beside a terminal.
+- Phone width is a first-class target (Today installs as a PWA). ASSUMPTION: deciders use Today mostly on a phone, and the other pages mostly on a laptop beside a terminal.
 
 ## Capabilities and Constraints
 
-- The web Worker holds no storage binding and no secrets; every read goes through `/rpc` to the platform (AGENTS.md principle 7). It cannot show what the platform does not return.
+- The web Worker holds no storage binding and no secrets; every read goes through `/rpc` to the platform, and no public-serving Worker can reach the private namespace (AGENTS.md principle 7). It cannot show what the platform does not return.
 - Refusal text comes only from `@repo/protocol/render` (`explain`, `headline`), the one renderer for git, the CLI, MCP and the web (principle 3).
-- The web never: shows a diff to anyone but a decider finishing an answer; shows a score, rank or count of a person as a measure of quality (a record is for trust rules only); reads a write-only value back; names a held-back path or case to someone outside its layer.
-- Undecided: whether the web gets a light or dark default per page (it follows the system setting); a custom domain (H1).
+- The web never: shows a diff to anyone but a decider finishing an answer; shows a score, rank or count of a person as a measure of quality; reads a write-only value back, or shows the placeholder an answer sees (it reads like a value); names a held-back path, check or case to someone outside its layer.
+- Undecided: a light or dark default per page (it follows the system setting); a custom domain.
 
 ## Brand Commitments
 
-- The name lives only in `packages/brand`: code takes it from `Brand.name` and the command from `Brand.cli`.
-- Tone: plain, factual, git-native. Sentences say what happened and what to run next. No exclamation marks, no celebration copy, no gamification, no "PR", "issue" (for an ask), "reputation" or "review".
-- Credit trailers read as they do on the commit (`Asked-by: ines`), in one order; `Assisted-by` is shown apart because it is a disclosure, never credit.
+- The name lives only in `packages/brand`: code takes it from `Brand.name` and the command from `Brand.cli`. Prose may name it: Myr, said "meer".
+- **Voice: plain, factual, git-native, no hype.** Sentences say what happened and what to run next. No exclamation marks, no celebration copy, no gamification, no superlatives, no "revolutionary", "seamless" or "effortless". Avoid "PR", "issue" (for an ask), "lease", "reputation", "review" and "approver"; GLOSSARY.md lists each term's words to avoid.
+- Other projects are described by mechanism, neutrally, never by name in comparison. What the product builds on is credited in the README and in each ported file's own header.
+- Credit trailers read as they do on the commit (`Asked-by: ines-v`), in one order; `Assisted-by` is shown apart, because it is a disclosure, never credit.
 
 ## Evidence on Hand
 
-- The examples `examples/datekit` and `examples/burrow` are fictional projects with fictional people (`ines-v`, `okonkwo`, `okafor`, `lin-h`); pages showing them must not pass them off as real users.
-- Measured numbers come only from a recorded live run on a stage (smoke's timings, a live check's log). No testimonials, customers or adoption figures exist; none may be invented.
+- The examples `examples/datekit` (a date library with a maintainers layer of sealed checks and an `.env.schema`) and `examples/burrow` (six services with a lint ratchet and a migrate ask split six ways) are fictional projects with fictional people (`ines-v`, `okonkwo`, `bram`, `okafor`, `lin-h`, and burrow's vouched contributors). Pages and the video show them as examples, never as real users.
+- The demo is planned in `docs/demo/`: a narration script, a shot list, the swarm scenario and a rehearsal checklist. What it stages is labelled there.
+- Measured numbers come only from recorded live runs on a stage, each with its date (the README's Numbers table). No testimonials, customers or adoption figures exist; none may be invented.
 
 ## Product Principles
 
-1. **The terminal is the workplace; the web is the window.** Every action shows its command; the web adds no second way to land.
-2. **Render the typed value, not a paraphrase.** Refusals, credits, postures and outcomes look the same on every page because one component draws each.
+1. **The terminal is the workplace; the web is the window.** Every action shows its command; nothing adds a second way to land.
+2. **Render the typed value, not a paraphrase.** Refusals, credits, postures and outcomes read the same on every surface, because one renderer and one component draw each.
 3. **Waiting is not refusing.** Checking, waiting on a parent ask, a finish or a decision each read as waiting, never as an error.
-4. **No scores.** People appear by handle and role; nothing ranks them.
+4. **Credit people, disclose agents, score no one.**
 5. **Decisions fit a phone.** Today's density is set by a decider clearing it in a few minutes on a small screen.
 
 ## Accessibility & Inclusion
 
-WCAG 2.2 AA: text contrast at least 4.5:1, visible focus on every control, every state carried by a word as well as a colour, `prefers-reduced-motion` honoured, and usable at 360 px wide with no horizontal scroll.
+WCAG 2.2 AA: text contrast at least 4.5:1 (every state colour measures at least 5:1 in both themes), visible focus on every control, every state carried by a word and a mark as well as a colour, `prefers-reduced-motion` honoured, and usable at 360 px wide with no horizontal scroll.
