@@ -24,3 +24,12 @@ apps/web/src/routeTree.gen.ts
 # a scrubbed copy). A worktree holds only tracked files, so every agent reads
 # them by absolute path in the main checkout.
 .scratch/build/
+
+# The swarm's per-run scratch: each agent's clone, CLI shims, harness sessions
+# and config, and the run's `agents.json` summary. A live run records what it
+# shows in its own notes, never here.
+.swarm/
+
+# The CLI's release: the two single-file binaries and `install.sh`, uploaded
+# to a stage's releases bucket, never committed.
+apps/cli/release/

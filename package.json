@@ -30,6 +30,9 @@
     "bootstrap": "varlock run --path infra/ -- bun infra/bootstrap.ts",
     "deploy": "bun infra/deploy.ts",
     "smoke": "bun scripts/smoke.ts",
+    "seed": "bun scripts/seed.ts",
+    "swarm": "bun scripts/swarm.ts",
+    "release": "bun scripts/release.ts",
     "verify": "bun run lockfile:check && bun run check && bun run typecheck && bun run test && bun run brand:check && bun run bytes:check"
   },
   "devDependencies": {

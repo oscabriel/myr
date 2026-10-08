@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@effect/platform-bun": "catalog:",
+    "@opentui/core": "0.5.14",
+    "@opentui/react": "0.5.14",
     "@repo/agent-kit": "workspace:*",
     "@repo/artifacts": "workspace:*",
     "@repo/brand": "workspace:*",
