@@ -37,6 +37,11 @@ const inSet = (layerPaths: ReadonlySet<RepoPath>) => {
  * pusher who cannot read the layer it names every path they added or
  * modified, all of them their own; only a reader hears exactly which ones
  * collide.
+ *
+ * `pusherCanRead` vouches for every layer whose paths are in `layerPaths`.
+ * Paired with the paths of several layers, it is true only when the pusher
+ * reads all of them: reading one layer must not name another's paths. Call
+ * it once per layer, or with the union and `false`, when they read some.
  */
 export const privatePaths = (input: {
   readonly changes: readonly Change[];
@@ -60,6 +65,10 @@ export const privatePaths = (input: {
  * layer. It runs only for someone who can read the layer, the only people
  * who could have copied from it; on anyone else it would be an oracle for
  * the layer's content, so it says nothing.
+ *
+ * `layerBlobs` holds the blobs of layers the answerer reads, and only
+ * those: a blob of a layer they cannot read would make this the oracle it
+ * refuses to be.
  */
 export const writeDown = (input: {
   readonly changes: readonly Change[];

@@ -11,7 +11,7 @@ import { Array, Option, Order } from "effect";
  * their `-only`, `-or-later` or `+` suffix. A licence off this list is read
  * as not OSI-approved: the label errs towards closed, never towards open.
  */
-const OSI = new Set([
+const OSI: ReadonlySet<string> = new Set([
   "agpl-3.0",
   "apache-2.0",
   "bsd-2-clause",
@@ -33,16 +33,42 @@ const isOsi = (id: string) =>
       .replace(/-(?:only|or-later)$/u, "")
   );
 
+/**
+ * Exceptions on SPDX's list that the platform knows to add permissions only
+ * (linking, runtime, syscall and build-tool exceptions). Any other addition
+ * after `WITH` may take a freedom away (`Commons-Clause`, which SPDX does not
+ * list as an exception, forbids selling the code), so it closes the licence:
+ * the same lean towards closed as the licence list.
+ */
+const PERMISSIVE_EXCEPTIONS: ReadonlySet<string> = new Set([
+  "autoconf-exception-3.0",
+  "bison-exception-2.2",
+  "classpath-exception-2.0",
+  "font-exception-2.0",
+  "gcc-exception-2.0",
+  "gcc-exception-3.1",
+  "gpl-3.0-linking-exception",
+  "lgpl-3.0-linking-exception",
+  "libtool-exception",
+  "linux-syscall-note",
+  "llvm-exception",
+  "ocaml-lgpl-linking-exception",
+  "qt-gpl-exception-1.0",
+  "qt-lgpl-exception-1.1",
+  "universal-foss-exception-1.0",
+  "wxwindows-exception-3.1",
+]);
+
 // An open licence and the token after the expression read so far.
 type Step = Option.Option<readonly [open: boolean, next: number]>;
 
-const OPERATORS = new Set(["(", ")", "AND", "OR", "WITH"]);
+const OPERATORS: ReadonlySet<string> = new Set(["(", ")", "AND", "OR", "WITH"]);
 
 /**
  * Whether an SPDX licence expression leaves the code open: a choice (`OR`)
  * is open when any side is, a conjunction (`AND`) when every side is, and
- * an exception (`WITH`) never closes a licence. An expression that does not
- * parse is not open.
+ * an exception (`WITH`) only when it is one known to add permissions. An
+ * expression that does not parse is not open.
  */
 const isOpen = (expression: string): boolean => {
   const tokens = expression.match(/[()]|[^\s()]+/gu) ?? [];
@@ -91,7 +117,13 @@ const isOpen = (expression: string): boolean => {
         return Option.some([open, at + 1]);
       }
 
-      return isId(at + 2) ? Option.some([open, at + 3]) : Option.none();
+      return isId(at + 2)
+        ? Option.some([
+            open &&
+              PERMISSIVE_EXCEPTIONS.has(tokens[at + 2]?.toLowerCase() ?? ""),
+            at + 3,
+          ])
+        : Option.none();
     };
 
   // Choices (`OR`) of conjunctions (`AND`) of licences, from `from`.

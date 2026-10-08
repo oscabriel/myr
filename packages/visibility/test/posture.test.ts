@@ -46,7 +46,12 @@ const enterprise = {
 };
 
 const sealedChecks = {
-  areas: { export: "src/export/**", parser: "src/parse/**" },
+  // Declared out of order (an object literal's keys would be sorted by
+  // lint), so the label's order is the posture's own sort.
+  areas: Object.fromEntries([
+    ["parser", "src/parse/**"],
+    ["export", "src/export/**"],
+  ]),
   attempts: { perClaim: 3, perPersonPerAreaPerWeek: 10 },
   canary: true,
   commit: "salted-sha256-merkle",
@@ -207,6 +212,19 @@ describe("a project's posture", () => {
     expect(postureUnder("GPL-2.0-only WITH Classpath-exception-2.0")).toBe(
       "open"
     );
+    expect(postureUnder("Apache-2.0 WITH LLVM-exception")).toBe("open");
+  });
+
+  // SPDX lists exceptions that only add permissions. `Commons-Clause` is not
+  // one of them: it forbids selling the code, so the code is source available.
+  it("reads an exception it does not know as closing the licence", () => {
+    expect(postureUnder("Apache-2.0 WITH Commons-Clause")).toBe(
+      "sourceAvailable"
+    );
+    expect(postureUnder("MIT WITH AdditionRef-no-resale")).toBe(
+      "sourceAvailable"
+    );
+    expect(postureUnder("Apache-2.0 WITH Commons-Clause OR MIT")).toBe("open");
   });
 
   it("reads an SPDX expression as closed when one part of a conjunction is, or it does not parse", () => {
