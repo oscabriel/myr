@@ -3,8 +3,9 @@
  * Worker's env, and the production backend forwards it to the platform over
  * `PLATFORM`, at the platform's own URL (so the remotes the platform names,
  * read from the request's origin, are its own; W3 312 #2), keeping method,
- * headers and body and adding no credential. A server route's own calls go
- * through the same backend, in process.
+ * headers and body, but never the browser's cookies (the session cookie
+ * becomes a bearer there: `session.test.ts`, issue 513). A server route's
+ * own calls go through the same backend, in process.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Client } from "@repo/protocol/contracts";
@@ -103,7 +104,7 @@ describe("the /rpc route's handler", () => {
 
 describe("the production backend", () => {
   it.effect(
-    "forwards to PLATFORM at the platform's URL, keeping method, headers and body",
+    "forwards to PLATFORM at the platform's URL, keeping method, headers and body, but not the browser's cookies",
     () =>
       Effect.gen(function* () {
         const platform = recorder(() => new Response("from the platform"));
@@ -120,7 +121,7 @@ describe("the production backend", () => {
             authorization: null,
             body: LIST_ASKS,
             contentType: "application/json",
-            cookie: "theme=dark",
+            cookie: null,
             method: "POST",
             url: `${PLATFORM_URL}/rpc`,
           },
