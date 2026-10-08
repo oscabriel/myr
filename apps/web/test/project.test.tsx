@@ -1,0 +1,307 @@
+/**
+ * A project's page, rendered to HTML with `react-dom/server` from fixtures
+ * decoded with the protocol's own schemas: its posture label, how to take
+ * part, its open asks (a blocked one names what it waits on) and its recent
+ * landings, each with its author and its credit trailers as the commit
+ * carries them.
+ */
+import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
+import { AskListing } from "@repo/protocol/domain/ask";
+import { ProjectEvent } from "@repo/protocol/domain/event";
+import { ProjectListing } from "@repo/protocol/domain/front-page";
+import { LandingView } from "@repo/protocol/domain/landing";
+import { AskId, Handle, LandedSha } from "@repo/protocol/ids";
+import { DateTime, Schema } from "effect";
+import type { ReactElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { recentLandings } from "../src/client/project.ts";
+import { ProjectView } from "../src/features/project/project-page.tsx";
+import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
+
+const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
+
+/** What a reader sees: the markup without its tags, entities decoded. */
+const textOf = (element: ReactElement) =>
+  markupOf(element)
+    .replaceAll(/<[^>]+>/gu, "")
+    .replaceAll("&#x27;", "'")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+
+/** The markup of the row for `ask`: from its `<li>` to the next ask's row. */
+const rowOf = (markup: string, ask: string) => {
+  const start = markup.indexOf(`data-ask="${ask}"`);
+  const next = markup.indexOf("data-ask=", start + 1);
+
+  return start === -1
+    ? ""
+    : markup.slice(start, next === -1 ? undefined : next);
+};
+
+const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
+
+const platformUrl = "https://platform-test.example.workers.dev";
+
+const listing = Schema.decodeSync(ProjectListing)({
+  landedAt: "2026-10-06T09:00:00.000Z",
+  openAsks: 2,
+  posture: "openWithSealedEvidence",
+  project: "datekit",
+});
+
+const asks = Schema.decodeSync(Schema.Array(AskListing))([
+  {
+    ask: "fix-week-start",
+    blockedBy: [],
+    claimed: false,
+    kind: "bug",
+    territory: "core",
+    want: "A week starts on the locale's first day, not always on Sunday.",
+  },
+  {
+    ask: "drop-legacy-parse",
+    blockedBy: ["split-core", "split-format"],
+    claimed: false,
+    kind: "migrate",
+    territory: "parse",
+    want: "Nothing calls the legacy parser any more.",
+  },
+]);
+
+const landings = Schema.decodeSync(Schema.Array(LandingView))([
+  {
+    ask: "parse-iso-week",
+    assisted: [{ harness: "claude-code", verified: true }],
+    author: "bram",
+    credits: [
+      { handle: "bram", role: "Signed-off-by" },
+      { handle: "ines-v", role: "Asked-by" },
+    ],
+    landedAt: "2026-10-06T09:00:00.000Z",
+    parent: "1111111111111111111111111111111111111111",
+    project: "datekit",
+    sha: "9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c",
+  },
+  {
+    ask: "format-era",
+    assisted: [],
+    author: "okonkwo",
+    credits: [
+      { handle: "okonkwo", role: "Signed-off-by" },
+      { handle: "lin-h", role: "Asked-by" },
+    ],
+    landedAt: "2026-10-04T09:00:00.000Z",
+    parent: "2222222222222222222222222222222222222222",
+    project: "datekit",
+    sha: "1111111111111111111111111111111111111111",
+  },
+]);
+
+const page = (
+  <ProjectView
+    asks={asks}
+    landings={landings}
+    listing={listing}
+    now={now}
+    platformUrl={platformUrl}
+  />
+);
+
+describe(ProjectView, () => {
+  it("shows each landing's subject line and links its author to their page", () => {
+    const text = textOf(page);
+    const markup = markupOf(page);
+
+    expect(text).toContain("Answer parse-iso-week");
+    expect(text).toContain("Answer format-era");
+    expect(markup).toMatch(/<a\b[^>]*href="\/people\/bram"[^>]*>bram<\/a>/u);
+    expect(markup).toMatch(
+      /<a\b[^>]*href="\/people\/okonkwo"[^>]*>okonkwo<\/a>/u
+    );
+  });
+
+  it("shows each landing's credit trailers as the commit carries them, Assisted-by apart", () => {
+    const text = textOf(page);
+
+    const at = [
+      "Asked-by: ines-v",
+      "Signed-off-by: bram",
+      "not credit",
+      "Assisted-by: claude-code (verified)",
+      "Asked-by: lin-h",
+      "Signed-off-by: okonkwo",
+    ].map((part) => text.indexOf(part));
+
+    // Each landing's credit in trailer order, then its agents, apart.
+    expect(at.every((position) => position >= 0)).toBeTruthy();
+    expect(at.toSorted((one, other) => one - other)).toStrictEqual(at);
+  });
+
+  it("shows a blocked ask as blocked, linking every ask it waits on", () => {
+    const markup = markupOf(page);
+    const row = rowOf(markup, "drop-legacy-parse");
+
+    expect(row).toMatch(/Blocked/u);
+    expect(row).toContain('href="/datekit/asks/split-core"');
+    expect(row).toContain('href="/datekit/asks/split-format"');
+  });
+
+  it("lists every open ask with its want, kind and territory", () => {
+    const row = rowOf(markupOf(page), "fix-week-start");
+
+    expect(row).toContain('href="/datekit/asks/fix-week-start"');
+    expect(row).toContain(
+      "A week starts on the locale&#x27;s first day, not always on Sunday."
+    );
+    expect(row).toMatch(/>Kind<\/dt><dd\b[^>]*>bug<\/dd>/u);
+    expect(row).toMatch(/>Territory<\/dt><dd\b[^>]*>core<\/dd>/u);
+  });
+
+  it("shows the posture label of the project as it is listed", () => {
+    const markup = markupOf(page);
+
+    expect(markup).toContain('data-posture="openWithSealedEvidence"');
+    expect(textOf(page)).toContain("Open with sealed evidence");
+  });
+
+  it("shows how to take part: clone over plain git, then the CLI's asks, claim and check", () => {
+    const text = textOf(page);
+
+    expect(text).toContain(`git clone ${platformUrl}/datekit.git`);
+    expect(text).toContain(`${Brand.cli} asks --project datekit`);
+    expect(text).toContain(`${Brand.cli} claim <ask>`);
+    expect(text).toContain(`${Brand.cli} check`);
+  });
+
+  it("says an empty project is empty, with the commands that would fill it", () => {
+    const { landedAt: _landed, ...unlanded } = listing;
+
+    const text = textOf(
+      <ProjectView
+        asks={[]}
+        landings={[]}
+        listing={{ ...unlanded, openAsks: 0 }}
+        now={now}
+        platformUrl={platformUrl}
+      />
+    );
+
+    expect(text).toContain("No open asks");
+    expect(text).toContain(`${Brand.cli} ask open`);
+    expect(text).toContain("Nothing has landed");
+    // The project exists, so `init` would refuse it: its first push lands main.
+    expect(text).toContain(`git push ${platformUrl}/datekit.git HEAD:main`);
+    expect(text).not.toContain(`${Brand.cli} init`);
+  });
+
+  it("never says nothing has landed on a project whose main has landed", () => {
+    const text = textOf(
+      <ProjectView
+        asks={asks}
+        landings={[]}
+        listing={listing}
+        now={now}
+        platformUrl={platformUrl}
+      />
+    );
+
+    expect(text).toContain("Last landed");
+    expect(text).not.toContain("Nothing has landed");
+    expect(text).not.toContain("git push");
+  });
+});
+
+describe(UnknownProjectView, () => {
+  it("shows the platform's UnknownProject refusal for a name that could be a project", () => {
+    const markup = markupOf(<UnknownProjectView name="no-such-project" />);
+
+    expect(markup).toContain('data-refusal="UnknownProject"');
+    expect(markup).toContain("no-such-project");
+  });
+
+  it("says in a sentence that an address naming no possible project names none", () => {
+    const markup = markupOf(<UnknownProjectView name="Not_A_Project" />);
+
+    expect(markup).not.toContain("data-refusal");
+    expect(textOf(<UnknownProjectView name="Not_A_Project" />)).toContain(
+      "No such project"
+    );
+  });
+});
+
+/** The 40-hex sha of the `n`th landing. */
+const shaOf = (n: number) => LandedSha.make(n.toString(16).padStart(40, "0"));
+
+describe(recentLandings, () => {
+  const at = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
+
+  const one = Schema.decodeSync(LandingView)({
+    assisted: [],
+    author: "bram",
+    credits: [{ handle: "bram", role: "Signed-off-by" }],
+    landedAt: "2026-10-07T12:00:00.000Z",
+    project: "datekit",
+    sha: "0000000000000000000000000000000000000000",
+  });
+
+  const landed = (seq: number) =>
+    ProjectEvent.cases.Landed.make({
+      at,
+      landing: { ...one, sha: shaOf(seq) },
+      seq,
+    });
+
+  it("keeps only the landings among a project's events, newest first", () => {
+    const events = [
+      landed(1),
+      ProjectEvent.cases.Claimed.make({
+        ask: AskId.make("fix-week-start"),
+        at,
+        claimant: Handle.make("bram"),
+        seq: 2,
+      }),
+      landed(3),
+    ];
+
+    expect(recentLandings(events).map(({ sha }) => sha)).toStrictEqual([
+      shaOf(3),
+      shaOf(1),
+    ]);
+  });
+
+  it("keeps at most the twenty newest", () => {
+    const events = Array.from({ length: 25 }, (_, index) => landed(index + 1));
+
+    const shown = recentLandings(events).map(({ sha }) => sha);
+
+    expect(shown).toHaveLength(20);
+    expect(shown.at(0)).toBe(shaOf(25));
+    expect(shown.at(-1)).toBe(shaOf(6));
+  });
+});
+
+describe("the project, front page and people views", () => {
+  // Views only: props in, markup out. A view that fetched would tie its page
+  // to one transport (src/surfaces.ts); the atoms live in src/client/.
+  const sources: Readonly<Record<string, string>> = import.meta.glob(
+    "../src/features/{front,project,people}/**/*.{ts,tsx}",
+    { eager: true, import: "default", query: "?raw" }
+  );
+
+  const transport =
+    /from\s+["'](?:@repo\/protocol\/contracts|effect\/(?:rpc|http|reactivity)|#backend|[./]+\/(?:surfaces|client\/[^"']*|server\/[^"']*)(?:\.tsx?)?)["']/u;
+
+  it("import no transport", () => {
+    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(3);
+
+    const reaching = Object.entries(sources).flatMap(([path, source]) =>
+      transport.test(source) ? [path] : []
+    );
+
+    expect(reaching).toStrictEqual([]);
+  });
+});
