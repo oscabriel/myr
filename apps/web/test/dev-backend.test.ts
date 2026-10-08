@@ -220,4 +220,19 @@ describe("the dev seed", seededWorlds, () => {
       ).toStrictEqual(["Asked-by: ines-v", "Signed-off-by: bram"]);
     })
   );
+
+  it.live(
+    "discloses the harness bram pushed through as Assisted-by, credited to nobody",
+    () =>
+      Effect.gen(function* () {
+        const { landing } = yield* landedAnswer;
+
+        expect(landing.assisted).toStrictEqual([
+          { harness: "claude-code", model: "haiku", verified: false },
+        ]);
+        expect(landing.credits.map(({ handle }) => handle)).not.toContain(
+          "claude-code"
+        );
+      })
+  );
 });

@@ -4,8 +4,9 @@
  * own methods, in the order people would act. The seed plays the people and
  * the platform's other parts: the initializer's first push and the gateway
  * that reports it, a decider opening asks, a contributor claiming one,
- * pushing an answer to the claim's fork and offering it as custody does
- * (it lands, through the answer's run, in the same call), people proposing
+ * pushing an answer to the claim's fork through a harness and offering it
+ * as custody does (it lands, through the answer's run, in the same call,
+ * with the harness disclosed as `Assisted-by:`), people proposing
  * and flagging, the decider declining two, and someone pushing straight to
  * `main`, reported as the push event would be.
  *
@@ -15,13 +16,13 @@
  * step's minute.
  *
  * What the service can't be brought to through its methods is left out
- * (502's `## Comments`): a `Finish` decision (nothing opens one yet), an
- * answer refused `OutOfScope` (a refused answer is never recorded) and an
- * `Assisted-by:` trailer (no answer carries one yet, 515).
+ * (502's `## Comments`): a `Finish` decision (nothing opens one yet) and an
+ * answer refused `OutOfScope` (a refused answer is never recorded).
  */
 import { RefName, RefOutcome, RepoHost } from "@repo/artifacts/repo-host";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
+import type { HarnessAudit } from "@repo/protocol/audit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import { AskId, Handle, RepoName, RequestId } from "@repo/protocol/ids";
@@ -57,6 +58,15 @@ export const devPeople: readonly Handle[] = [
 ];
 
 const as = (handle: Handle) => Person.make({ handle });
+
+/**
+ * The harness bram answers through, as the CLI's credential helper names it
+ * to the gateway and custody reports it: audit metadata, never a credit.
+ */
+const bramsHarness = {
+  harness: "claude-code",
+  model: "haiku",
+} as const satisfies HarnessAudit;
 
 /** A commit of `files` on `parent` (or a first commit), by `author`, at the world's time. */
 const commitOf = (input: {
@@ -159,14 +169,16 @@ const opened = (
 
 /**
  * An answer to `ask` from `answerer`, who holds its claim: a commit of
- * `files` on the claim's base, pushed to the claim's fork, reported as the
- * gateway's custody reports it, then offered as the answer.
+ * `files` on the claim's base, pushed to the claim's fork through `audit`'s
+ * harness, reported as the gateway's custody reports it, then offered as
+ * the answer.
  */
 const answered = (
   api: ProjectApi,
   answerer: Handle,
   input: {
     readonly ask: AskId;
+    readonly audit: HarnessAudit;
     readonly files: Files;
     readonly message: string;
   }
@@ -189,6 +201,7 @@ const answered = (
 
     const refusals = yield* api.recordPush({
       after: head,
+      audit: input.audit,
       before: Option.some(claim.base),
       eventId: `${claim.fork}@${head}`,
       pusher: as(answerer),
@@ -238,7 +251,10 @@ const seedDatekit = Effect.gen(function* () {
   yield* api.claim(as(contributor), datekit.answer.ask);
 
   yield* at(7);
-  yield* answered(api, contributor, datekit.answer);
+  yield* answered(api, contributor, {
+    ...datekit.answer,
+    audit: bramsHarness,
+  });
 
   yield* at(8);
   yield* api.claim(as(contributor), AskId.make("parse-iso-week"));
