@@ -252,6 +252,10 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
         })
     );
 
+    // While `src/dev/backend.ts` only re-exports the server backend, a build
+    // that resolved `#backend` to it would name no module of its own in the
+    // maps, so `devBackend` bites once issue 502 gives the dev world code;
+    // the forward to PLATFORM bites now.
     it.effect("resolves #backend to the forward to PLATFORM", () =>
       Effect.gen(function* () {
         const output = yield* Built;

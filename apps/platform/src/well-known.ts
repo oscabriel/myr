@@ -15,6 +15,7 @@
  * its own landings (spec D22), or `main` for a project whose only landing
  * is its initializer's first push, which writes no mirror.
  */
+import { describedIn } from "@repo/agent-kit/generated-file";
 import {
   contributeDescription,
   contributeSkillName,
@@ -90,30 +91,6 @@ const landedSkill = (
 
     return Option.flatMap(bytes, textOf);
   }).pipe(Effect.catchTag("RepoNotFound", () => Effect.succeedNone));
-
-const decodeQuoted = Schema.decodeUnknownOption(
-  Schema.fromJsonString(Schema.String)
-);
-
-/**
- * The `description` a skill's frontmatter gives, as agent-kit writes it (a
- * JSON-quoted string) or as a plain scalar; none without one.
- */
-const describedIn = (file: string) => {
-  const head = /^---\n(?<head>[\s\S]*?)\n---\n/u.exec(file)?.groups?.head;
-
-  const line = (head ?? "")
-    .split("\n")
-    .find((each) => each.startsWith("description: "));
-
-  const raw = line?.slice("description: ".length).trim() ?? "";
-
-  if (raw === "") {
-    return Option.none<string>();
-  }
-
-  return raw.startsWith('"') ? decodeQuoted(raw) : Option.some(raw);
-};
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 

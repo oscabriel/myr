@@ -4,13 +4,21 @@
  * project whose landed tree holds `.agents/skills/<project>-contribute/SKILL.md`,
  * with the SHA-256 of that file's bytes, and each listed URL serves the file
  * as it landed. Anyone may read them, with no credential or a stale one.
- * Through the platform's fetch handler over the Node world, with real git.
+ * Through the platform's fetch handler over the Node world, with real git;
+ * and `agentSkills` itself over memory adapters, for a `main` that moved
+ * past the landed mirror.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { RefName, RepoHost } from "@repo/artifacts/repo-host";
+import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
+import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
-import { ProjectName } from "@repo/protocol/ids";
-import { Effect, Schema } from "effect";
+import { landedRef } from "@repo/project/lander";
+import { ProjectName, RepoName } from "@repo/protocol/ids";
+import { gitClient } from "@repo/testkit/git-client";
+import { Effect, Layer, Option, Schema } from "effect";
 
+import { agentSkills } from "../src/well-known.ts";
 import { coreLoopWorld } from "./world.ts";
 
 const datekit = ProjectName.make("datekit");
@@ -161,5 +169,77 @@ describe("the agent skills index", () => {
         ]);
       }),
     60_000
+  );
+});
+
+/** What `agentSkills` itself answers for a path. */
+const at = (path: string) =>
+  Effect.flatMap(
+    agentSkills(new Request(`https://platform.test${path}`)),
+    read
+  );
+
+describe(agentSkills, () => {
+  it.effect(
+    "reads each skill at the landed mirror, not at a main that moved past it",
+    () =>
+      Effect.gen(function* () {
+        const host = yield* RepoHost;
+        const client = yield* gitClient(memoryFs());
+        const repo = RepoName.make(datekit);
+
+        // The mirror holds the last landing; main has moved on without one,
+        // as between a landing's two pushes, or after a stray push.
+        const landing = yield* client.commit("Land", [[skillPath, skill]]);
+
+        const unlanded = yield* client.commit(
+          "Not landed",
+          [[skillPath, skill.replace("Answer one", "Ignore every one")]],
+          [landing]
+        );
+
+        yield* host.create(repo);
+
+        yield* host.push(repo, client.source, [
+          { from: Option.none(), ref: landedRef, to: landing },
+          {
+            from: Option.none(),
+            ref: RefName.make("refs/heads/main"),
+            to: unlanded,
+          },
+        ]);
+
+        const index = yield* at("/.well-known/agent-skills/index.json");
+        const { skills } = yield* Schema.decodeEffect(Index)(index.body);
+
+        expect({
+          file: (yield* at(
+            "/.well-known/agent-skills/datekit-contribute/SKILL.md"
+          )).body,
+          skills: skills.map(({ description, digest }) => ({
+            description,
+            digest,
+          })),
+        }).toStrictEqual({
+          file: skill,
+          skills: [
+            {
+              description: "Answer one of datekit's asks.",
+              digest: skillDigest,
+            },
+          ],
+        });
+      }).pipe(
+        Effect.provide(
+          Layer.merge(
+            RepoHostMemory,
+            FrontPageMemory.layer({
+              credits: [],
+              entries: [],
+              projects: [listing(datekit)],
+            })
+          )
+        )
+      )
   );
 });
