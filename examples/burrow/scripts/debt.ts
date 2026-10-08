@@ -11,10 +11,12 @@ interface Baseline {
   readonly escapes: number;
 }
 
-const ROOTS = ["packages", "scripts", "tools/oxlint/burrow/rules"];
+const ROOTS = ["packages", "scripts", "tools"];
 
+// A directive opens a comment line, or ends a line of code (the `-line`
+// forms).
 const ESCAPE =
-  /^\s*(?:\/\/|\/\*)\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck)|biome-ignore)/u;
+  /(?:\/\/|\/\*)\s*(?:(?:oxlint|eslint)-disable|@ts-(?:expect-error|ignore|nocheck)|biome-ignore)/u;
 
 const escapes = ROOTS.flatMap((root) =>
   readdirSync(root, { encoding: "utf-8", recursive: true })

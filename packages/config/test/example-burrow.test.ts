@@ -1,10 +1,11 @@
 /**
  * The fence-shaped example (issue 508; spec D21): `examples/burrow` is a Bun
  * project of its own, and these cases run its own commands in its folder, as
- * its maintainers would. Its lint reports exactly the six module-level `let`s
- * the ratchet starts from, one in each package's `src/`, as warnings; its
- * caller count finds `legacyFetch` in all six packages, in the JSON a migrate
- * ask's count command prints; and its lint rule's own fixture test passes.
+ * its maintainers would. Its lint, run as its ratchet runs it, reports
+ * exactly the six module-level `let`s the ratchet starts from, one in each
+ * package's `src/`, as warnings; its caller count finds `legacyFetch` in all
+ * six packages, in the JSON a migrate ask's count command prints; its other
+ * lanes pass on main; and its lint rule's own fixture test passes.
  *
  * Each case installs first (`--frozen-lockfile`: burrow's devDependencies are
  * pinned to the root's, so Bun's cache serves them). The manifest's presence
@@ -113,13 +114,8 @@ describe("examples/burrow", () => {
       Effect.gen(function* () {
         yield* install();
 
-        const lint = yield* run("bun", [
-          "run",
-          "lint",
-          "--",
-          "--format",
-          "json",
-        ]);
+        // The command burrow's ratchet runs (its config folder's `project.ts`).
+        const lint = yield* run("bun", ["run", "lint", "--format", "json"]);
 
         const report = yield* Schema.decodeEffect(
           Schema.fromJsonString(OxlintReport)
@@ -166,18 +162,35 @@ describe("examples/burrow", () => {
           Schema.fromJsonString(CallerCount)
         )(count.stdout);
 
-        expect(Object.keys(counts.byModule).toSorted()).toStrictEqual(
-          PACKAGES.map((name) => `@burrow/${name}`)
-        );
+        // Every package has a caller, so the family has six children; the
+        // calls in each package's src/, counted by hand.
+        expect(counts).toStrictEqual({
+          byModule: {
+            "@burrow/auth": 2,
+            "@burrow/billing": 2,
+            "@burrow/catalog": 2,
+            "@burrow/kit": 1,
+            "@burrow/notify": 1,
+            "@burrow/search": 1,
+          },
+          total: 9,
+        });
+      }).pipe(Effect.provide(NodeServices.layer)),
+    TIMEOUT
+  );
 
-        // No package is left out of the family: each has a caller.
-        expect(
-          Object.entries(counts.byModule).filter(([, callers]) => callers < 1)
-        ).toStrictEqual([]);
+  it.live(
+    "passes its other lanes on main, the typecheck and the tests its hooks run",
+    () =>
+      Effect.gen(function* () {
+        yield* install();
 
-        expect(counts.total).toBe(
-          Object.values(counts.byModule).reduce((sum, n) => sum + n, 0)
-        );
+        // A lane red on main blocks every answer (VerifierBlocked), so both
+        // hold here, by the commands the finder reads from lefthook.yml.
+        expect(yield* run("bun", ["run", "typecheck"])).toMatchObject({
+          code: 0,
+        });
+        expect(yield* run("bun", ["test"])).toMatchObject({ code: 0 });
       }).pipe(Effect.provide(NodeServices.layer)),
     TIMEOUT
   );
