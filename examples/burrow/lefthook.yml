@@ -1,0 +1,13 @@
+# Git hooks for burrow (https://lefthook.dev). Run `lefthook install` once.
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      run: bun run lint
+    typecheck:
+      run: bun run typecheck
+
+pre-push:
+  commands:
+    test:
+      run: bun test

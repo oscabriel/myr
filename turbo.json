@@ -36,12 +36,26 @@
       ],
       "outputs": []
     },
+    "@repo/checks#test": {
+      "dependsOn": ["types", "^types"],
+      "env": ["UPDATE_GOLDEN"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/examples/*/*",
+        "$TURBO_ROOT$/examples/*/.*/**",
+        "$TURBO_ROOT$/examples/*/packages/*/package.json",
+        "!$TURBO_ROOT$/examples/*/.env*"
+      ],
+      "outputs": []
+    },
     "@repo/rules#test": {
       "dependsOn": ["types", "^types"],
       "env": ["UPDATE_GOLDEN"],
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/examples/*/*",
         "$TURBO_ROOT$/examples/*/.*/**",
+        "$TURBO_ROOT$/examples/*/packages/*/package.json",
         "!$TURBO_ROOT$/examples/*/.env*"
       ],
       "outputs": []

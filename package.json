@@ -19,8 +19,8 @@
   "scripts": {
     "prepare": "effect-tsgo patch --typescript",
     "lockfile:check": "bun install --frozen-lockfile --dry-run",
-    "check": "bun run --cwd apps/web routes && oxlint --report-unused-disable-directives-severity=error && oxfmt --check .",
-    "fix": "bun run --cwd apps/web routes && oxlint --fix && oxfmt .",
+    "check": "bun run --cwd apps/web routes && oxlint --disable-nested-config --report-unused-disable-directives-severity=error && oxfmt --check .",
+    "fix": "bun run --cwd apps/web routes && oxlint --disable-nested-config --fix && oxfmt .",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "test": "turbo run test",
     "gen": "bun scripts/gen.ts",
