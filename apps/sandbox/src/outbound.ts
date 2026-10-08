@@ -26,7 +26,8 @@ export interface EgressProps {
   readonly allow: readonly string[];
 }
 
-const refused = (text: string) =>
+/** A 403 whose plain-text body says why; `text` ends with its own newline. */
+export const refused = (text: string) =>
   new Response(text, {
     headers: { "content-type": "text/plain; charset=utf-8" },
     status: 403,
@@ -36,9 +37,26 @@ const refused = (text: string) =>
  * Sends a request on to the internet. Redirects come back to the container,
  * so the request that follows one goes through a gateway too.
  */
-const forward = (request: Request): Promise<Response> =>
+export const forward = (request: Request): Promise<Response> =>
   // @effect-diagnostics-next-line globalFetch:off -- an outbound entrypoint is the Worker's own network edge: workerd hands it a Request and takes back a Response, and its only way to the internet is the runtime's fetch; sandbox code may not use effect/http (spec §7.3).
   fetch(request, { redirect: "manual" });
+
+/**
+ * `request` as a new request to `url` with `headers`: its method, and its
+ * body streamed through as it comes.
+ */
+export const resent = (url: string, request: Request, headers: Headers) => {
+  // Node sends a streamed body only with `duplex: "half"`; the Workers types
+  // lack the key, and workerd ignores it.
+  const init = {
+    body: request.body,
+    duplex: "half",
+    headers,
+    method: request.method,
+  };
+
+  return new Request(url, init);
+};
 
 /**
  * The request the clone gateway sends for one from the container: a read of
@@ -70,17 +88,8 @@ const cloneRequestFor = (
 
   headers.set("authorization", `Bearer ${props.token}`);
 
-  // Node sends a streamed body only with `duplex: "half"`; the Workers types
-  // lack the key, and workerd ignores it.
-  const init = {
-    body: request.body,
-    duplex: "half",
-    headers,
-    method: request.method,
-  };
-
   return Option.some(
-    new Request(`${remote.origin}${url.pathname}${url.search}`, init)
+    resent(`${remote.origin}${url.pathname}${url.search}`, request, headers)
   );
 };
 

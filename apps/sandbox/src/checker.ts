@@ -12,9 +12,10 @@ import type { CheckRun } from "@repo/checks/check-runner";
 import { CheckExit, CheckWire } from "@repo/checks/check-runner/wire";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { DurableObject } from "cloudflare:workers";
-import { Effect, Exit, Layer, Schema } from "effect";
+import { Effect, Exit, Layer, Option, Schema } from "effect";
 
 import { SdkBox } from "./box/sdk.ts";
+import { envPlanOf } from "./checker/env.ts";
 import { WorkerCheckLogs } from "./checker/logs/worker.ts";
 import { blocked, check } from "./checker/run.ts";
 import { hasGateways, SdkChecker } from "./checker/sdk.ts";
@@ -76,11 +77,21 @@ export class Checker extends DurableObject<Env> {
       Effect.provide(
         Layer.mergeAll(
           SdkBox.layer(container, { enableInternet: false, image }),
-          SdkChecker.layer(container, exports, {
-            find: (key) => index.snapshotOf(key),
-            forget: (key) => index.forgetSnapshot(key),
-            keep: (key, id) => index.keepSnapshot(key, id),
-          }),
+          SdkChecker.layer(
+            container,
+            exports,
+            {
+              find: (key) => index.snapshotOf(key),
+              forget: (key) => index.forgetSnapshot(key),
+              keep: (key, id) => index.keepSnapshot(key, id),
+            },
+            // The hosts its env route may open, reserved ahead of the
+            // catch-all intercept.
+            Option.match(envPlanOf(wire.job).route, {
+              onNone: () => [],
+              onSome: ({ hosts }) => hosts,
+            })
+          ),
           WorkerCheckLogs.layer
         )
       )

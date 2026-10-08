@@ -27,8 +27,10 @@ export { Lander } from "./lander.ts";
 
 // The Checker's container reaches out only through these, and its Durable
 // Object finds them in `ctx.exports`, which holds a loopback for each export
-// of this module alone (outbound.ts).
+// of this module alone (outbound.ts, env-gateway.ts).
 export { CloneGateway, EgressGateway } from "./outbound.ts";
+
+export { EnvGateway } from "./env-gateway.ts";
 
 export default class Sandbox extends WorkerEntrypoint<Env> {
   check(wire: typeof CheckWire.Encoded): Promise<typeof CheckExit.Encoded> {

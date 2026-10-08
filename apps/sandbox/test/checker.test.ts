@@ -99,6 +99,8 @@ const phaseOf = Match.type<Call>().pipe(
 
       return isShell(call, SETUP) ? ["setup"] : ["run"];
     },
+    // The env gateway's routes open as egress goes off.
+    intercept: () => ["egressOff"],
     // Log lines are no phase of their own.
     log: () => [],
     report: () => ["report"],

@@ -188,6 +188,8 @@ const phaseOf = Match.type<Call>().pipe(
         },
       });
     },
+    // The env gateway's routes open as egress goes off.
+    intercept: () => ["egressOff"],
     log: () => [],
     report: () => ["report"],
     restore: () => ["setup"],

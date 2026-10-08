@@ -6,7 +6,6 @@
  * checkout, for the CLI's `check`); the Checker's lives in `apps/platform`.
  */
 import { HeldBackResult, LaneResult } from "@repo/protocol/domain/answer";
-import { EnvItem } from "@repo/protocol/domain/env";
 import { RunBlock } from "@repo/protocol/domain/run";
 import {
   AreaName,
@@ -101,17 +100,67 @@ export const HeldBackPart = Schema.Struct({
 
 export type HeldBackPart = typeof HeldBackPart.Type;
 
-/** A request to run lanes on one tree of one project's repo. */
+/**
+ * What a run sees in place of one write-only value: its item's key, set in
+ * every command's env to the placeholder (W6; VL §8.4). The platform makes
+ * the placeholder (`@repo/visibility/proxy`'s `placeholderFor`); the sandbox
+ * only sets it.
+ */
+export const EnvPlaceholder = Schema.Struct({
+  key: EnvKey,
+  placeholder: Schema.NonEmptyString,
+});
+
+export type EnvPlaceholder = typeof EnvPlaceholder.Type;
+
+/**
+ * One outbound host of a `@proxy` item, as `@repo/visibility/proxy`'s
+ * `ProxyRule` crosses the wire (VL §8.5): HTTPS requests to `host` (a glob
+ * stays one) go through the Checker's env gateway, which lets out only those
+ * whose path matches `path` and whose method is `method` (any, when absent),
+ * none when `block`, and, in a run of landed code alone, swaps `placeholder`
+ * for the value of `key` in the request's headers.
+ */
+export const EnvProxy = Schema.Struct({
+  block: Schema.Boolean,
+  host: Schema.NonEmptyString,
+  key: EnvKey,
+  method: Schema.optionalKey(Schema.NonEmptyString),
+  path: Schema.optionalKey(Schema.NonEmptyString),
+  placeholder: Schema.NonEmptyString,
+});
+
+export type EnvProxy = typeof EnvProxy.Type;
+
+/**
+ * One write-only value, opened by the platform for a run of landed code
+ * (`ProjectEnv.runEnv(…, landed: true)`). Redacted wherever it is printed;
+ * the sandbox hands it only to its env gateway, never to the container.
+ */
+export const EnvValue = Schema.Struct({
+  key: EnvKey,
+  value: Schema.RedactedFromValue(Schema.NonEmptyString),
+});
+
+export type EnvValue = typeof EnvValue.Type;
+
+/**
+ * A request to run lanes on one tree of one project's repo. Only a job of
+ * landed code carries values: a job that is not `landed` and carries any
+ * does not decode, nor encode.
+ */
 export const CheckJob = Schema.Struct({
   at: CheckAt,
   /** The sealed suite, from the layer at its pinned commit (W6). */
   heldBack: Schema.optionalKey(HeldBackPart),
+  /** Whether the job runs landed code. Absent, it does not. */
+  landed: Schema.optionalKey(Schema.Boolean),
   lanes: Schema.Array(CheckLane),
-  /** Env items whose values the run sees only as placeholders. */
-  placeholders: Schema.Array(EnvKey),
+  /** What the run sees, in place of each write-only value. */
+  placeholders: Schema.Array(EnvPlaceholder),
   project: ProjectName,
-  /** Env items whose outbound hosts go through the platform's gateway. */
-  proxies: Schema.Array(EnvItem),
+  /** The outbound hosts whose requests go through the platform's env gateway. */
+  proxies: Schema.Array(EnvProxy),
   repo: RepoName,
   /**
    * The project's run block at the policy the job was made under: how the
@@ -119,7 +168,15 @@ export const CheckJob = Schema.Struct({
    * guesses a project's setup.
    */
   run: RunBlock,
-});
+  /** The values the env gateway swaps in, for a job of landed code only. */
+  values: Schema.optionalKey(Schema.Array(EnvValue)),
+}).check(
+  Schema.makeFilter(({ landed, values }) =>
+    values === undefined || landed === true
+      ? true
+      : "only a job of landed code carries values"
+  )
+);
 
 export type CheckJob = typeof CheckJob.Type;
 

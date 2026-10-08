@@ -7,6 +7,8 @@
  * the current allow-list names it. Adapters: `checker/sdk.ts` over the container's outbound intercepts;
  * tests record the calls (`test/fake-box.ts`).
  */
+import type { EnvProxy } from "@repo/checks/check-runner";
+import type { EnvKey } from "@repo/protocol/ids";
 import { Context } from "effect";
 import type { Effect, Redacted } from "effect";
 
@@ -78,6 +80,25 @@ export interface CloneRoute {
   readonly token: Redacted.Redacted;
 }
 
+/** A value the env gateway may swap in, with the placeholder it stands for. */
+export interface EnvSwap {
+  readonly key: EnvKey;
+  readonly placeholder: string;
+  readonly value: Redacted.Redacted;
+}
+
+/**
+ * Where a job's `@proxy` hosts go (W6; VL §8.5): each of `hosts` to the env
+ * gateway, which lets out only the requests `rules` allow and swaps a
+ * placeholder for its value only when `values` holds it, which only a job of
+ * landed code fills. Every host is HTTPS and named once.
+ */
+export interface EnvRoute {
+  readonly hosts: readonly string[];
+  readonly rules: readonly EnvProxy[];
+  readonly values: readonly EnvSwap[];
+}
+
 export class Network extends Context.Service<
   Network,
   {
@@ -92,5 +113,11 @@ export class Network extends Context.Service<
      * here. `[]` turns the network off.
      */
     readonly allow: (hosts: readonly string[]) => Effect.Effect<void>;
+    /**
+     * Routes each of `route.hosts` to the env gateway for the rest of the
+     * job, in place of the egress gateway; every other host stays as
+     * `allow` left it.
+     */
+    readonly routeEnv: (route: EnvRoute) => Effect.Effect<void>;
   }
 >()("sandbox/Network") {}
