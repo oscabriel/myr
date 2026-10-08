@@ -22,10 +22,11 @@ import {
   SuiteRoot,
 } from "@repo/protocol/ids";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Effect, Exit, Redacted, Schema } from "effect";
+import { Effect, Exit, Option, Redacted, Schema } from "effect";
 import { vi } from "vitest";
 
 import { Checker } from "../src/checker.ts";
+import { envPlanOf } from "../src/checker/env.ts";
 import { CLONE_HOST, REGISTRIES } from "../src/checker/network.ts";
 import { check } from "../src/checker/run.ts";
 import { EnvGateway } from "../src/env-gateway.ts";
@@ -592,6 +593,30 @@ describe("the Checker's container", () => {
 });
 
 describe("a check job's env part", () => {
+  it("intercepts at most 60 proxy hosts, under the container's 64 intercept targets, and logs the rest", () => {
+    const hosts = Array.from({ length: 61 }, (_, n) => `api${n}.example.com`);
+
+    const plan = envPlanOf(
+      jobWith({
+        proxies: hosts.map((host) => ({ ...sentryRule, host })),
+      }).job
+    );
+
+    expect({
+      intercepted: Option.map(plan.route, (route) => route.hosts.length),
+      skipped: plan.skipped,
+    }).toStrictEqual({
+      intercepted: Option.some(60),
+      skipped: [
+        {
+          host: "api60.example.com",
+          reason:
+            "the container intercepts at most 60 proxy hosts beside the clone route and the catch-all",
+        },
+      ],
+    });
+  });
+
   it.effect(
     "carries values only for landed code: an unlanded job with one neither encodes nor decodes, and the error holds no value",
     () =>

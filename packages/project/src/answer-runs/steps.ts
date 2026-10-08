@@ -121,13 +121,17 @@ const checks = (
 
     const block = yield* runBlockOf(run);
 
+    // The merged tree lives in the answer's fork, where the Lander's merge
+    // leaves it (its merge ref), and main in the project's own repo: a
+    // Checker fetches the repo a job names, so each job names the one that
+    // holds its commit, as the `Answer` Workflow's jobs do.
     const job = (at: CheckAt, lanes: readonly CheckLane[]) =>
       runner.run({
         ...(run.env ?? noRunEnv),
         at,
         lanes,
         project: request.project,
-        repo: run.repo,
+        repo: CheckAt.guards.Tree(at) ? request.fork : run.repo,
         run: block,
       });
 

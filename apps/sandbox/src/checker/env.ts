@@ -31,6 +31,15 @@ export interface EnvPlan {
 const HTTPS = "https://";
 
 /**
+ * The most proxy hosts the container intercepts: its intercept table holds
+ * 64 hostname targets, and the clone route and the catch-all take two
+ * (`sdk.ts`); a few stay spare. Hosts past it are left out, with a reason.
+ */
+const MAX_PROXY_HOSTS = 60;
+
+const TOO_MANY = `the container intercepts at most ${MAX_PROXY_HOSTS} proxy hosts beside the clone route and the catch-all`;
+
+/**
  * The host the container's HTTPS intercept takes for a rule's `host`, as
  * the schema writes it: a bare host or glob (`sentry.io`, `*.example.com`,
  * `api.example.com:8443`), or one with `https://` before it, which is
@@ -116,13 +125,23 @@ export const envPlanOf = (job: CheckJob): EnvPlan => {
     })
   );
 
-  const hosts = Array.dedupe(rules.map(({ host }) => host));
+  const all = Array.dedupe(rules.map(({ host }) => host));
+  const hosts = all.slice(0, MAX_PROXY_HOSTS);
+  const routed = rules.filter(({ host }) => hosts.includes(host));
+
+  const crowded = all
+    .slice(MAX_PROXY_HOSTS)
+    .map((host): Skipped => ({ host, reason: TOO_MANY }));
 
   return {
     route:
       hosts.length > 0
-        ? Option.some({ hosts, rules, values: swapsOf(job, rules) })
+        ? Option.some({
+            hosts,
+            rules: routed,
+            values: swapsOf(job, routed),
+          })
         : Option.none(),
-    skipped,
+    skipped: [...skipped, ...crowded],
   };
 };

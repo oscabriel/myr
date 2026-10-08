@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost, Revision } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
+import { shaOf } from "@repo/checks/check-runner";
 import { authorLine, committerLine, parseTrailers } from "@repo/git/trailers";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -918,7 +919,9 @@ const landingOwn = (api: ProjectApi) =>
       daveForks,
       forkMain,
       forked,
+      jobs: yield* CheckScript.use(({ jobs }) => jobs),
       landed,
+      merged,
       receipt,
       replay: yield* api.land(alice, request),
       view: (yield* api.landing(anyone, landed)).landing,
@@ -980,6 +983,18 @@ describe("a decider's own change", () => {
           requestId: RequestId.make("land-alice-01"),
           sha: run.landed,
         });
+      })
+  );
+
+  it.effect(
+    "checks its merged tree in the decider's working fork, where the Lander's merge leaves it",
+    () =>
+      Effect.map(seen, (run) => {
+        expect(
+          run.jobs
+            .filter(({ at }) => shaOf(at) === shaOf(run.merged))
+            .map((job) => job.repo)
+        ).toStrictEqual([run.forked.fork]);
       })
   );
 
