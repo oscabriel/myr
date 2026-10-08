@@ -124,11 +124,18 @@ test.describe("the deployed web", () => {
     "WEB_URL is not set: point it at a deployed web's origin to run this check"
   );
 
+  // The heading renders before the platform answers, so each list page also
+  // waits for a row only the platform's answer holds: until then the page
+  // shows placeholders, and "did not answer" can't have appeared yet.
   test("the front page lists the open asks", ({ page: browser }) =>
-    Effect.runPromise(page(browser, "/", "front-page", ["Open asks"])));
+    Effect.runPromise(
+      page(browser, "/", "front-page", ["Open asks", project])
+    ));
 
   test(`${project}'s page shows the project`, ({ page: browser }) =>
-    Effect.runPromise(page(browser, `/${project}`, "project-page", [project])));
+    Effect.runPromise(
+      page(browser, `/${project}`, "project-page", [project, ask])
+    ));
 
   test(`${project}/${ask}'s page shows the ask`, ({ page: browser }) =>
     Effect.runPromise(

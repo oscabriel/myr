@@ -11,14 +11,14 @@ This file has six parts, then how to run a stage:
 5. [Human steps status](#5-human-steps-status)
 6. [URLs](#6-urls)
 
-Sections 1 to 6 hold the state as of 2026-10-08, 15:00 UTC, read from the account with read-only calls.
+Sections 1 to 6 hold the state as of 2026-10-08, 16:00 UTC, read from the account with read-only calls.
 
 ## 1. Stages
 
 | Stage | What it is for | State on 2026-10-08 |
 | --- | --- | --- |
 | `dev-oscabriel` | One person's iteration. Deploy it as often as you like. | Bootstrapped 2026-10-07 and deployed (platform, sandbox, web). Re-checked 2026-10-08: bootstrap created nothing, and the platform holds every required secret. The feature-frozen build was deployed at 14:51 UTC on 2026-10-08, and the whole core loop (`bun scripts/smoke.ts --stage dev-oscabriel --loop`) passed on it twice in a row. |
-| `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). | Bootstrapped 2026-10-08: six resources created, migrations `0001` to `0004` applied, and a second run created nothing. Its secrets are set. Its Workers aren't deployed yet. |
+| `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). | Bootstrapped 2026-10-08: six resources created, migrations `0001` to `0004` applied, and a second run created nothing. Its secrets are set. Deployed at 15:39 UTC on 2026-10-08 (the build the dev stage proved), and smoke passed. Seeded at 15:44 UTC with `datekit` (its maintainers layer and both sealed suites admitted) and `burrow` (the `drop-legacy-fetch` family), nothing claimed. Each later deploy is listed, with its reason, in [Deploys of demo](#deploys-of-demo). |
 
 There is no `prod` stage before the deadline. The top level of each `wrangler.jsonc` is stage `local`, for tests and `wrangler dev`, and it is never deployed. A new person's stage is added to `stages` in `stages.ts` and gets an `env` block in each `wrangler.jsonc`, in the same change.
 
@@ -71,9 +71,14 @@ Every resource in the two tables below belongs to its stage. The times are the a
 | KV | `oauth-demo` | bootstrap | 2026-10-08 13:57 (the run) | keep (needs the user to delete) |
 | R2 | `evidence-demo` | bootstrap | 2026-10-08 13:57 | keep (needs the user to delete) |
 | R2 | `releases-demo` | bootstrap | 2026-10-08 13:57 | keep (needs the user to delete) |
-| Worker | `platform-demo`: a placeholder with no code and no workers.dev route, made by the first `wrangler secret put` to hold the secrets. The first deploy replaces its code. | `wrangler secret put` | 2026-10-08 13:58 | keep (needs the user to delete) |
-| Secrets on `platform-demo` | `OPERATOR_TOKEN`, `SESSION_TOKENS`, `COOKIE_KEY`, `PASSWORD_PEPPER`, `MASTER_KEY` | generated, set with `wrangler secret put` (see [Secrets](#secrets)) | 2026-10-08 13:58 | keep (needs the user to delete); rotate before going public |
-| Workers, Workflows and trigger | `sandbox-demo`, `web-demo`, `answer-demo`, `on-push-demo`, the push-event trigger | deploy | not yet: the demo's first deploy | keep (needs the user to delete) |
+| Worker | `platform-demo`: made by the first `wrangler secret put` as a placeholder to hold the secrets; the first deploy gave it its code and its workers.dev route. | `wrangler secret put`, then deploy | 2026-10-08 13:58 (code 15:39) | keep (needs the user to delete) |
+| Secrets on `platform-demo` | `OPERATOR_TOKEN`, `SESSION_TOKENS`, `COOKIE_KEY`, `PASSWORD_PEPPER`, `MASTER_KEY` | generated, set with `wrangler secret put` and carried by deploy (see [Secrets](#secrets)) | 2026-10-08 13:58 | keep (needs the user to delete); rotate before going public |
+| Worker | `sandbox-demo` | deploy | 2026-10-08 15:39 | keep (needs the user to delete) |
+| Container applications | `sandbox-checker-demo` (started on `standard-3`) and `sandbox-lander-demo` (`standard-2`), with their images `sandbox-demo-checker-check` and `sandbox-demo-lander-land` in the account's container registry | deploy | 2026-10-08 15:39 | keep (needs the user to delete) |
+| Worker | `web-demo` | deploy | 2026-10-08 15:39 | keep (needs the user to delete) |
+| Workflow | `answer-demo`, `on-push-demo` | deploy | 2026-10-08 15:39 | keep (needs the user to delete) |
+| Push-event trigger | `projects-demo` → `on-push-demo` | deploy (read back by bootstrap) | 2026-10-08 15:39 | keep (needs the user to delete) |
+| Seeded projects | `datekit` (with its `datekit--maintainers` layer repo in `layers-demo`) and `burrow` in `projects-demo` | seed | 2026-10-08 15:40 to 15:44 | keep: the recording takes them. Don't reseed over them; a fresh copy is `seed --as`. |
 
 ## 3. Throwaway ledger summary
 
@@ -116,8 +121,8 @@ As of 2026-10-08, after the demo's bootstrap. "Agent" is the build's agent.
 | H4: a Google OAuth client | Not done, and optional. Sign-in works with platform accounts (a handle and a password). | The redirect URIs are in [section 6](#6-urls). Migrations `0003_identities.sql` and later are applied on both stages. | Only if Google sign-in is wanted: create a Web client with the stage's redirect URI, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` together, then redeploy. |
 | H5: secret values | Done by the agent on both stages, under a recorded decision that extends generated secrets to `demo` (see [Secrets](#secrets)). Not blocking. | Five values per stage, generated and kept only in that stage's secrets file outside the repo (mode 600), never printed or committed. `SESSION_TOKENS` on `demo` holds bram, ines-v, okafor, okonkwo, lin-h and the swarm's six (wren, tamsin, ivo, marisol, dagny, pell). | **Rotate both stages' generated secrets before the repo goes public**, and keep a copy of each stage's `MASTER_KEY` somewhere other than this machine. Rotating `PASSWORD_PEPPER` breaks every stored password, rotating `MASTER_KEY` loses every stored env value unless they are re-wrapped first, and rotating `SESSION_TOKENS` means each CLI profile logs in again. |
 | H6: Workers Paid | Confirmed. | The account's subscriptions, read again on 2026-10-08, list `workers_paid` as Paid. The sandbox (containers) and both Workflows have run on `dev-oscabriel` since 2026-10-07. | Nothing. |
-| H7: the recording | Open (Oct 13). | `docs/demo/` holds the script, the shot list and the rehearsal checklist. The demo stage is bootstrapped; its deploy, seed and rehearsal come next. The recording lock exists: while `infra/.recording` is there, `infra/deploy.ts` refuses every deploy. | Run `bun infra/recording.ts on` before the first take and `bun infra/recording.ts off` after the last (the rehearsal checklist says when). |
-| H8: submitting | Open, due Oct 14 by noon PDT. | Nothing yet. The demo URL comes after the demo's deploy (section 6). | Submit the repo URL, the video and the demo URL. |
+| H7: the recording | Open (Oct 13). | `docs/demo/` holds the script, the shot list and the rehearsal checklist. The demo stage is deployed and seeded (2026-10-08, 15:44 UTC), with nothing claimed; the rehearsal comes next. The recording lock exists: while `infra/.recording` is there, `infra/deploy.ts` refuses every deploy. | Run `bun infra/recording.ts on` before the first take and `bun infra/recording.ts off` after the last (the rehearsal checklist says when). |
+| H8: submitting | Open, due Oct 14 by noon PDT. | The demo URL is `https://web-demo.oscargabriel.workers.dev` (section 6). | Submit the repo URL, the video and the demo URL. |
 | H9: `docker login` | Not needed so far. No image pull has been rate-limited. | Nothing. | Only if a deploy's image pull is rate-limited: run `docker login` in your own terminal. |
 | OpenCode Zen key for the swarm's pell | Open. | pell is planned on `opencode/gemini-3.8-flash`. The fallback, a one-line swap to `opencode-go/qwen3.8-flash`, is recorded. | Add OpenCode Zen's key to pi, or accept the fallback. |
 | Deleting the throwaways | Open, after the rehearsal. | The teardown plan (section 4). | Read the teardown script and run it in your own terminal. |
@@ -133,11 +138,11 @@ The account's workers.dev subdomain is in `infra/workers-dev.json`. The demo's r
 | `dev-oscabriel` | CLI install | `https://platform-dev-oscabriel.oscargabriel.workers.dev/install.sh` | served from `releases-dev-oscabriel` |
 | `dev-oscabriel` | Google redirect URI (H4) | `https://platform-dev-oscabriel.oscargabriel.workers.dev/oauth/google/callback` | not registered |
 | `dev-oscabriel` | sandbox | none: it has no workers.dev route, and only the platform reaches it | deployed; the Checker's containers start on `standard-3` (2 vCPU, 8 GiB), the Lander's on `standard-2` |
-| `demo` | platform | `https://platform-demo.oscargabriel.workers.dev` | not deployed: a placeholder that holds the secrets, with no route (404) |
-| `demo` | web | `https://web-demo.oscargabriel.workers.dev` | not deployed |
-| `demo` | CLI install | `https://platform-demo.oscargabriel.workers.dev/install.sh` | after the deploy and a `release --upload --stage demo` |
-| `demo` | Google redirect URI (H4) | `https://platform-demo.oscargabriel.workers.dev/oauth/google/callback` | not registered |
-| `demo` | sandbox | none: it has no workers.dev route | not deployed |
+| `demo` | platform | `https://platform-demo.oscargabriel.workers.dev` | deployed 2026-10-08 15:39 (`/health` answers 200), and smoke passed; seeded with `datekit` and `burrow`. An anonymous `git clone <platform>/datekit.git` works, and a contributor's token gets 403 on `datekit--maintainers.git`. |
+| `demo` | web | `https://web-demo.oscargabriel.workers.dev` | deployed (`/` answers 200); the Playwright check of the deployed web passes |
+| `demo` | CLI install | `https://platform-demo.oscargabriel.workers.dev/install.sh` | served from `releases-demo`: release `0.1.0-demo.802` (`bun run release -- --build --upload --stage demo --version 0.1.0-demo.802`, 2026-10-08 15:51), which installs and reads the demo |
+| `demo` | Google redirect URI (H4) | `https://platform-demo.oscargabriel.workers.dev/oauth/google/callback` | not registered; the demo's deploy printed it |
+| `demo` | sandbox | none: it has no workers.dev route | deployed; the Checker's containers start on `standard-3` (2 vCPU, 8 GiB), the Lander's on `standard-2` |
 
 ## Running a stage
 
@@ -204,6 +209,16 @@ Without `--stage`, or with a stage `stages.ts` doesn't declare, it refuses befor
 Then it prints the redirect URI a Google OAuth client registers for the stage (`<platform origin>/oauth/google/callback`, H4). Google sign-in stays off until `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, and `migrations/0003_identities.sql` must be applied before they are.
 
 Every command runs with `WRANGLER_SEND_METRICS=false`, and with its own folder's `node_modules/.bin` first on `PATH`, so each app deploys with its pinned Wrangler. The first failing step stops the deploy and names that step.
+
+A stage's first deploy can stop in the `sandbox` step with Wrangler's "Timed out while preparing the container image on Cloudflare's network." Before it uploads the Worker, Wrangler asks Cloudflare to prepare each image that is new to the stage's registry repository, and it waits at most 15 minutes. When it stops there, nothing of the Worker has been uploaded: run the same deploy again. The image is already pushed, and its preparation goes on at Cloudflare between runs.
+
+### Deploys of demo
+
+`demo` is deployed only with a reason written here first, and never during a take (H7).
+
+| When (UTC) | Build | Why |
+| --- | --- | --- |
+| 2026-10-08 15:39 | `c7b68ff`, the build that passed the core loop live on `dev-oscabriel` | The first deploy. It took three runs: twice (15:04 to 15:19 and 15:20 to 15:35) Cloudflare kept the new `sandbox-demo-lander-land` image's preparation pending past Wrangler's limit, though the same digest had been prepared for `dev-oscabriel` in about 30 s; the third run found it ready. |
 
 ### Smoke-test a stage
 
