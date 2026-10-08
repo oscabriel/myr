@@ -18,5 +18,7 @@ export default defineConfig({
     "docs/reference/**",
     "plugins/**",
     "skills/**",
+    // Each example formats with its own config (spec D21).
+    "examples/**",
   ],
 });

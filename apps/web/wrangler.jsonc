@@ -1,0 +1,45 @@
+{
+  // The web Worker: TanStack Start's pages, and a same-origin /rpc that
+  // forwards to the platform over the PLATFORM service binding. It holds no
+  // storage binding of any kind (no Artifacts, D1, KV, R2, Durable Object or
+  // Worker Loader), in any stage, so a bug in a public page cannot reach a
+  // repo (AGENTS.md principle 7; packages/config/test/web-wiring.test.ts).
+  // No secrets either: public values are vars. Deploy only through
+  // infra/deploy.ts, to an explicit stage.
+  //
+  // The top level is stage `local`: `vite dev` and the type generation read
+  // it, and it is never deployed. Each stage under `env` repeats the binding
+  // and the vars, since wrangler does not inherit them into an environment.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "web",
+  // TanStack Start's own server entry (the Cloudflare framework guide); the
+  // Cloudflare Vite plugin builds it.
+  "main": "@tanstack/react-start/server-entry",
+  "compatibility_date": "2026-10-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "services": [{ "binding": "PLATFORM", "service": "platform" }],
+  "vars": {
+    // Where a browser reaches the platform itself: its sign-in pages and
+    // git remotes. /rpc never needs it; that goes through PLATFORM.
+    "PUBLIC_PLATFORM_URL": "http://localhost:8787",
+  },
+  "env": {
+    "dev-oscabriel": {
+      "services": [
+        { "binding": "PLATFORM", "service": "platform-dev-oscabriel" },
+      ],
+      "vars": {
+        "PUBLIC_PLATFORM_URL": "https://platform-dev-oscabriel.oscargabriel.workers.dev",
+      },
+    },
+    "demo": {
+      "services": [{ "binding": "PLATFORM", "service": "platform-demo" }],
+      "vars": {
+        "PUBLIC_PLATFORM_URL": "https://platform-demo.oscargabriel.workers.dev",
+      },
+    },
+  },
+}

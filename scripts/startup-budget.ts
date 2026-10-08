@@ -15,6 +15,12 @@
  * build has no code splitting and inlines it (checked in W3 399), so moving
  * a dependency off the entry takes a module of its own (`find_additional_modules`)
  * or a Worker of its own.
+ *
+ * The web Worker is built by Vite first (`vite build`, through the
+ * Cloudflare plugin, which writes the deploy config under `dist/`); its dry
+ * run then bundles nothing more and copies Vite's modules. Its first
+ * measurement (W5 501) was an entry of 723,418 bytes, unminified, under the
+ * same limits.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, Path, pipe } from "effect";
@@ -24,11 +30,21 @@ const entryBudget = 1_665_000;
 
 const javascriptBudget = 2_500_000;
 
-/** Each Worker, and the file its `main` bundles to. */
-const workers = [
+/**
+ * Each Worker, the file its `main` bundles to, and the build a dry run needs
+ * first, if any: a command in the Worker's own `node_modules/.bin`.
+ */
+export const workers: readonly Worker[] = [
   { dir: "apps/platform", entry: "worker.js" },
   { dir: "apps/sandbox", entry: "worker.js" },
-] as const;
+  { build: ["vite", "build"], dir: "apps/web", entry: "index.js" },
+];
+
+interface Worker {
+  readonly dir: string;
+  readonly entry: string;
+  readonly build?: readonly [string, ...string[]];
+}
 
 class BuildFailed extends Data.TaggedError("BuildFailed")<{
   readonly worker: string;
@@ -42,11 +58,43 @@ class OverBudget extends Data.TaggedError("OverBudget")<{
   readonly budget: number;
 }> {}
 
-const measure = Effect.fnUntraced(function* (worker: (typeof workers)[number]) {
+const env = { WRANGLER_LOG: "error", WRANGLER_SEND_METRICS: "false" };
+
+/** Runs a Worker's build in its folder, from its own `node_modules/.bin`. */
+const runBuild = (
+  dir: string,
+  [command, ...args]: readonly [string, ...string[]]
+) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
+    const exitCode = yield* spawner.exitCode(
+      ChildProcess.make(path.resolve(dir, "node_modules/.bin", command), args, {
+        cwd: dir,
+        // A production build, whatever the shell says: the development
+        // condition would measure the web's dev backend instead.
+        env: { ...env, NODE_ENV: "production" },
+        extendEnv: true,
+        stderr: "inherit",
+        stdout: "ignore",
+      })
+    );
+
+    return exitCode === 0
+      ? undefined
+      : yield* new BuildFailed({ exitCode, worker: dir });
+  });
+
+const measure = Effect.fnUntraced(function* (worker: Worker) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const outdir = yield* fs.makeTempDirectoryScoped();
+
+  if (worker.build !== undefined) {
+    yield* runBuild(worker.dir, worker.build);
+  }
 
   const exitCode = yield* spawner.exitCode(
     ChildProcess.make(
@@ -54,7 +102,7 @@ const measure = Effect.fnUntraced(function* (worker: (typeof workers)[number]) {
       ["deploy", "--dry-run", "--outdir", outdir],
       {
         cwd: worker.dir,
-        env: { WRANGLER_LOG: "error", WRANGLER_SEND_METRICS: "false" },
+        env,
         extendEnv: true,
         stderr: "inherit",
         stdout: "ignore",
@@ -107,8 +155,10 @@ const measure = Effect.fnUntraced(function* (worker: (typeof workers)[number]) {
   return { entry, total };
 }, Effect.scoped);
 
-BunRuntime.runMain(
-  Effect.forEach(workers, measure, { discard: true }).pipe(
-    Effect.provide(BunServices.layer)
-  )
-);
+if (import.meta.main) {
+  BunRuntime.runMain(
+    Effect.forEach(workers, measure, { discard: true }).pipe(
+      Effect.provide(BunServices.layer)
+    )
+  );
+}

@@ -122,16 +122,18 @@ const stepsOf = (
     env: options.platformEnv,
     name: "platform",
   },
-  // ASSUMPTION for W5 (501, 599): the web app builds with the Vite plugin,
-  // which picks the stage from CLOUDFLARE_ENV, and Wrangler deploys the
-  // build's own config for that stage.
+  // The web builds with the Cloudflare Vite plugin, which takes the stage
+  // from CLOUDFLARE_ENV and writes that stage's deploy config under `dist/`;
+  // Wrangler deploys that build, and refuses an --env other than the one it
+  // was built for (checked in W5 501). NODE_ENV keeps a shell's own value
+  // from making it a development build, whose `#backend` is the dev world.
   ...(options.web
     ? [
         {
           args: ["run", "build"],
           command: "bun",
           cwd: "apps/web",
-          env: { CLOUDFLARE_ENV: stage },
+          env: { CLOUDFLARE_ENV: stage, NODE_ENV: "production" },
           name: "web build",
         },
         {

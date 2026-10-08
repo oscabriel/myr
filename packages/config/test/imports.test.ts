@@ -61,7 +61,17 @@ const workspaces: readonly Workspace[] = [
     "@repo/checks",
     "@repo/protocol",
   ]),
-  workspace("@repo/web", "apps/web", ["@repo/brand", "@repo/protocol"]),
+  // The dev backend's packages are declared (as dev dependencies), so only
+  // the matrix can refuse them outside `src/dev/`.
+  workspace("@repo/web", "apps/web", [
+    "@repo/artifacts",
+    "@repo/brand",
+    "@repo/checks",
+    "@repo/git",
+    "@repo/project",
+    "@repo/protocol",
+    "@repo/rules",
+  ]),
   workspace("@repo/cli", "apps/cli", [
     "@repo/artifacts",
     "@repo/checks",
@@ -168,6 +178,24 @@ const clean: readonly SourceFile[] = [
     "packages/config/test/imports.test.ts",
     'import { findViolations } from "../../../scripts/lib/imports.ts";',
     'import oxlintConfig from "../../../oxlint.config.ts";'
+  ),
+  // The web's dev backend: the project service over memory adapters.
+  file(
+    "apps/web/src/dev/world.ts",
+    'import { ProjectsMemory } from "@repo/project/projects/memory";',
+    'import type { Projects } from "@repo/project/projects";',
+    'import { projectService } from "@repo/project/project";',
+    'import { AnswerRunsInline } from "@repo/project/answer-runs/inline";',
+    'import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";',
+    'import { CheckRunnerMemory } from "@repo/checks/check-runner/memory";',
+    'import { RulesEvaluatorJson } from "@repo/rules/rules-evaluator/json";',
+    'import { defaults } from "@repo/rules/defaults";',
+    'import { Contracts } from "@repo/protocol/contracts";'
+  ),
+  file(
+    "apps/web/src/surfaces.ts",
+    'import { surfaced } from "@repo/protocol/contracts";',
+    'import { Brand } from "@repo/brand";'
   ),
   file("scripts/gen.ts", 'import { groups } from "@repo/protocol/refusal";'),
   file("infra/deploy.ts", 'import alchemy from "alchemy";'),
@@ -325,6 +353,51 @@ describe("import direction", () => {
         'import { RepoHostBinding } from "@repo/artifacts/repo-host/binding";'
       ),
       "@repo/artifacts/repo-host/binding"
+    ),
+    refused(
+      "web code outside src/dev imports a memory adapter",
+      "matrix",
+      file(
+        "apps/web/src/client/x.ts",
+        'import { ProjectsMemory } from "@repo/project/projects/memory";'
+      ),
+      "@repo/project/projects/memory"
+    ),
+    refused(
+      "a web route imports the project service",
+      "matrix",
+      file(
+        "apps/web/src/routes/x.ts",
+        'import { projectService } from "@repo/project/project";'
+      ),
+      "@repo/project/project"
+    ),
+    refused(
+      "the web's dev backend imports a real Artifacts adapter",
+      "matrix",
+      file(
+        "apps/web/src/dev/x.ts",
+        'import { RepoHostBinding } from "@repo/artifacts/repo-host/binding";'
+      ),
+      "@repo/artifacts/repo-host/binding"
+    ),
+    refused(
+      "the web's dev backend imports the D1 projection",
+      "matrix",
+      file(
+        "apps/web/src/dev/x.ts",
+        'import { FrontPageD1 } from "@repo/project/projection-d1/front-page";'
+      ),
+      "@repo/project/projection-d1/front-page"
+    ),
+    refused(
+      "the web's dev backend imports the local check runner, which runs processes",
+      "matrix",
+      file(
+        "apps/web/src/dev/x.ts",
+        'import { CheckRunnerLocal } from "@repo/checks/check-runner/local";'
+      ),
+      "@repo/checks/check-runner/local"
     ),
     refused(
       "a package's src imports the test config",

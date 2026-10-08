@@ -1,5 +1,7 @@
 import { defineConfig } from "oxlint";
 import core from "ultracite/oxlint/core";
+import react from "ultracite/oxlint/react";
+import tanstack from "ultracite/oxlint/tanstack";
 import vitest from "ultracite/oxlint/vitest";
 
 const V3_OR_HOST_BOUND =
@@ -26,6 +28,12 @@ export default defineConfig({
     "skills/**",
     // Each example lints with its own config (spec D21).
     "examples/**",
+    // shadcn's generated components (issue 511), as the user's other repos
+    // ignore them.
+    "apps/web/src/components/ui/**",
+    // TanStack Router's generated route tree (`**/*.gen.*` in Ultracite's
+    // list too); never committed.
+    "apps/web/src/routeTree.gen.ts",
   ],
   jsPlugins: [
     { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
@@ -41,6 +49,26 @@ export default defineConfig({
     typeAware: true,
   },
   overrides: [
+    {
+      // The web app: Ultracite's React preset (react, react-perf, jsx-a11y)
+      // and its TanStack settings, for apps/web only. An override's plugins
+      // add to the base's, and it declares them so its rule options stick
+      // (as the vitest override below). The TanStack preset turns
+      // `sort-keys` off here: its option objects infer types in source
+      // order. shadcn's own lint (`@shadcn/lint`) is not installed.
+      files: ["apps/web/**/*.{ts,tsx}"],
+      plugins: react.plugins ?? [],
+      rules: {
+        ...react.rules,
+        ...tanstack.rules,
+      },
+    },
+    // TanStack's file routes: names that encode URLs, and a `Route` whose
+    // component reads `Route` back (see the preset).
+    ...(tanstack.overrides ?? []).map((override) => ({
+      ...override,
+      files: override.files.map((glob) => `apps/web/${glob}`),
+    })),
     {
       // Ultracite sets the vitest rules in an override for these files, which
       // beats top-level rules. Without `plugins` here, oxlint 1.87 keeps

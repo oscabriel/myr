@@ -114,6 +114,16 @@
             }
           },
           {
+            "include": ["apps/web/**/*.ts", "apps/web/**/*.tsx"],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/http",
+                "effect/reactivity",
+                "effect/rpc"
+              ]
+            }
+          },
+          {
             "include": ["apps/cli/**/*.ts"],
             "options": {
               "allowedUnstableApis": [

@@ -141,17 +141,18 @@ describe("a deploy without a known stage", () => {
 
 describe("a deploy to dev-oscabriel", () => {
   it.live(
-    "verifies, deploys sandbox then platform, checks the trigger, then smoke-tests the stage",
+    "verifies, deploys sandbox, platform and web, checks the trigger, then smoke-tests the stage",
     () =>
       Effect.gen(function* () {
         const { result, spawned } = yield* run(["--stage", "dev-oscabriel"]);
 
         expect(Result.isSuccess(result)).toBeTruthy();
-        // apps/web does not exist yet, so nothing deploys it.
         expect(spawned.map(line)).toStrictEqual([
           ".$ bun run verify",
           "apps/sandbox$ wrangler deploy --env dev-oscabriel",
           "apps/platform$ varlock-wrangler deploy --env dev-oscabriel",
+          "apps/web$ bun run build",
+          "apps/web$ wrangler deploy --env dev-oscabriel",
           ".$ bun run bootstrap --stage dev-oscabriel --check-triggers",
           ".$ bun scripts/smoke.ts --stage dev-oscabriel",
         ]);
@@ -188,7 +189,7 @@ describe("a deploy to dev-oscabriel", () => {
       const { result, spawned } = yield* run(["--stage=dev-oscabriel"]);
 
       expect(Result.isSuccess(result)).toBeTruthy();
-      expect(spawned).toHaveLength(5);
+      expect(spawned).toHaveLength(7);
     })
   );
 
@@ -227,7 +228,7 @@ describe("a deploy to dev-oscabriel", () => {
       expect(result).toStrictEqual(
         Result.fail(new StepFailed({ exitCode: 1, step: "smoke" }))
       );
-      expect(spawned).toHaveLength(5);
+      expect(spawned).toHaveLength(7);
     })
   );
 
@@ -235,11 +236,44 @@ describe("a deploy to dev-oscabriel", () => {
     Effect.gen(function* () {
       const { spawned } = yield* run(["--stage", "dev-oscabriel"]);
 
-      // One per step: verify, sandbox, platform, triggers, smoke.
+      // One per step: verify, sandbox, platform, web build, web, triggers,
+      // smoke.
       expect(spawned.map(({ env }) => env.WRANGLER_SEND_METRICS)).toStrictEqual(
-        ["false", "false", "false", "false", "false"]
+        ["false", "false", "false", "false", "false", "false", "false"]
       );
     })
+  );
+
+  it.live(
+    "builds the web for the stage, as production, before Wrangler deploys that build",
+    () =>
+      Effect.gen(function* () {
+        const { spawned } = yield* run(["--stage", "dev-oscabriel"]);
+
+        const web = spawned.filter(({ cwd }) => cwd === "apps/web");
+
+        // The Vite plugin writes the stage's deploy config at build time, and
+        // Wrangler refuses an --env other than the one the build was for. A
+        // production build never carries the `development` #backend.
+        expect(
+          web.map(({ args, env }) => ({
+            args,
+            stage: env.CLOUDFLARE_ENV,
+            vite: env.NODE_ENV,
+          }))
+        ).toStrictEqual([
+          {
+            args: ["run", "build"],
+            stage: "dev-oscabriel",
+            vite: "production",
+          },
+          {
+            args: ["deploy", "--env", "dev-oscabriel"],
+            stage: undefined,
+            vite: undefined,
+          },
+        ]);
+      })
   );
 
   it.live(
@@ -308,6 +342,8 @@ describe("a deploy to dev-oscabriel", () => {
           [],
           [],
           ["OPERATOR_TOKEN", "SESSION_TOKENS"],
+          ["CLOUDFLARE_ENV", "NODE_ENV"],
+          [],
           [],
           [],
         ]);

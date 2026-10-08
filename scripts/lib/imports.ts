@@ -9,7 +9,8 @@
  * 2. `undeclared`: a workspace imports only the `@repo/*` packages its
  *    `package.json` lists. The root's `scripts/` and `infra/` are the root's.
  * 3. `matrix`: a workspace imports only the packages its `Matrix` row names
- *    (and only the subpaths `OnlySubpaths` names, where it names any).
+ *    (and only the subpaths `OnlySubpaths` names, where it names any), and
+ *    a folder `FolderSubpaths` names also the subpaths it lists.
  * 4. `adapter-through-port`: a port file never imports or re-exports its own
  *    adapters, and nothing reaches into another workspace by a relative path
  *    (the root's files only from config's tests).
@@ -91,8 +92,8 @@ const EVERY_PACKAGE: readonly string[] = [
  * may also import `@repo/config`. Where `@repo/testkit` may appear is the
  * `test-only` rule's to say.
  *
- * Narrower than a row: `OnlySubpaths`. `@repo/web`'s dev backend (the
- * artifacts and project memory adapters) is added there when 501 builds it.
+ * Narrower than a row: `OnlySubpaths`. Wider, for one folder:
+ * `FolderSubpaths` (the web's dev backend).
  */
 export const Matrix = {
   "@repo/agent-kit": ["@repo/brand", "@repo/checks", "@repo/protocol"],
@@ -206,6 +207,52 @@ export const OnlySubpaths = {
   Record<string, Readonly<Record<string, readonly string[]>>>
 >;
 
+/**
+ * What the web's dev backend may import of the packages that run the project
+ * service: the memory and JSON adapters, the in-process answer runner, the
+ * rules' defaults, the ports those adapters fill, and the project service
+ * itself. Never a real adapter: no binding, REST, isogit, SQLite, D1, Worker
+ * Loader, R2, local-disk or Bun one.
+ */
+const DEV_WORLD: readonly string[] = [
+  "*/inline",
+  "*/json",
+  "*/memory",
+  "alarms",
+  "answer-runs",
+  "check-runner",
+  "defaults",
+  "evidence-store",
+  "front-page",
+  "lander",
+  "project",
+  "project-store",
+  "projection",
+  "projects",
+  "repo-host",
+  "rules-evaluator",
+];
+
+/**
+ * Wider than a row, for one folder: the packages its files may import
+ * besides their workspace's row, each with the only subpaths allowed, by
+ * folder, then package. The web's dev backend (`#backend` under the
+ * `development` condition, spec §4.1) runs the project service in process
+ * over memory adapters; nothing else in the web imports them, and the
+ * production build carries none of it (W5 505).
+ */
+export const FolderSubpaths = {
+  "apps/web/src/dev/": {
+    "@repo/artifacts": DEV_WORLD,
+    "@repo/checks": DEV_WORLD,
+    "@repo/git": DEV_WORLD,
+    "@repo/project": DEV_WORLD,
+    "@repo/rules": DEV_WORLD,
+  },
+} as const satisfies Readonly<
+  Record<string, Readonly<Record<string, readonly string[]>>>
+>;
+
 /** The folders whose files run in a Worker. */
 export const WorkerRoots: readonly string[] = [
   "apps/platform/src/",
@@ -285,7 +332,7 @@ export const RuleHints: Readonly<Record<ImportRule, string>> = {
     "apps import packages only; move what both need into a package.",
   "infra-only": "alchemy stays in infra/.",
   matrix:
-    "this workspace may not import that package or subpath; Matrix and OnlySubpaths in scripts/lib/imports.ts are the allow-list.",
+    "this workspace (or this folder) may not import that package or subpath; Matrix, OnlySubpaths and FolderSubpaths in scripts/lib/imports.ts are the allow-list.",
   "test-only":
     "@repo/testkit and @repo/protocol/testing are imported only from test/ directories.",
   undeclared:
@@ -835,6 +882,17 @@ const NARROWED = new Map(
   ])
 );
 
+const FOLDERS = Object.entries(FolderSubpaths).map(
+  ([folder, edges]) =>
+    [folder, new Map<string, readonly string[]>(Object.entries(edges))] as const
+);
+
+/** The subpaths of `name` the folder holding `path` allows, when one names it. */
+const folderSubpaths = (path: string, name: string) =>
+  FOLDERS.find(
+    ([folder, edges]) => path.startsWith(folder) && edges.has(name)
+  )?.[1].get(name);
+
 const isApp = (workspace: Workspace | undefined) =>
   workspace?.dir.startsWith("apps/") === true;
 
@@ -894,11 +952,16 @@ const allows = (
     (name === CONFIG && !inSrc) ||
     (ROWS.get(from.name) ?? []).includes(name);
 
-  return (
+  const byRow =
     listed &&
     (only === undefined ||
-      only.some((pattern) => matchesPattern(pattern, subpath)))
+      only.some((pattern) => matchesPattern(pattern, subpath)));
+
+  const byFolder = (folderSubpaths(path, name) ?? []).some((pattern) =>
+    matchesPattern(pattern, subpath)
   );
+
+  return byRow || byFolder;
 };
 
 // The root is tooling, with no row: `undeclared` holds it.
