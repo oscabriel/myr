@@ -10,19 +10,32 @@
  * The merged tree is checked in the answer's fork, where `Lander.merge`
  * keeps it (under `${Brand.refsPrefix}merge/<tree>`), so a merge needs no
  * write token on the canonical repo; main is checked in the canonical repo.
+ *
+ * The cheap stage also counts the policy's ratchets on the merged tree, one
+ * count lane per command (`measure`); the project judges the counts against
+ * its baselines when the checks report. A `lintToZero` ask's own lane is a
+ * count too: green at zero in its territory, whatever its lint exits with.
  */
-import { CheckAt, CheckLane, CheckRunner } from "@repo/checks/check-runner";
+import {
+  CheckAt,
+  CheckLane,
+  CheckRunner,
+  outputOf,
+} from "@repo/checks/check-runner";
 import type { CheckRun, LaneEvidence } from "@repo/checks/check-runner";
 import { EvidenceStore } from "@repo/checks/evidence-store";
+import { measure } from "@repo/checks/kinds/ratchet";
 import { classifyFailure } from "@repo/gate/classify";
-import { runBlockOf } from "@repo/project/answer-runs";
+import { MeasuredCount, runBlockOf } from "@repo/project/answer-runs";
 import type { AnswerRun } from "@repo/project/answer-runs";
 import { LandingState } from "@repo/project/landing";
+import { lintCountOf } from "@repo/project/project";
 import {
   HeldBackResult,
   LaneOutcome,
   LaneResult,
 } from "@repo/protocol/domain/answer";
+import { CheckSpec } from "@repo/protocol/domain/check";
 import { AskKind } from "@repo/protocol/domain/kind";
 import { RunBlock } from "@repo/protocol/domain/run";
 import {
@@ -30,6 +43,7 @@ import {
   LandedSha,
   LaneName,
   ProjectName,
+  RatchetName,
   RepoName,
   RepoPath,
   RequestId,
@@ -41,12 +55,12 @@ import type {
   StaleBase,
   VerifierBlocked,
 } from "@repo/protocol/refusal";
-import { Array, Effect, Option, Order, Schema } from "effect";
+import { Array, Effect, Option, Order, Result, Schema } from "effect";
 
 /**
  * The lanes the cheap stage runs before the costlier checks: the static
  * ones, under the names the run block finder gives them (`checks/finder`).
- * Ratchet counts join them in W4 (417).
+ * The ratchets' counts run beside them (`countRatchets`).
  */
 export const cheapLanes = ["format", "lint", "types"] as const;
 
@@ -113,8 +127,12 @@ export const StageRun = Schema.TaggedUnion({
   Moved: {},
   Ran: {
     checked: Checked,
+    /** The cheap stage's: each ratchet's count on the merged tree, per territory. */
+    counts: Schema.optionalKey(Schema.Array(MeasuredCount)),
     heldBack: Schema.Array(HeldBackResult),
     lanes: Schema.Array(LaneRun),
+    /** The cheap stage's: a ratchet whose command printed no count the platform can read. */
+    uncounted: Schema.optionalKey(RatchetName),
   },
 });
 
@@ -283,11 +301,142 @@ const checkedOf = (run: AnswerRun, tree: TreeSha): Option.Option<Checked> => {
   );
 };
 
+/** A job's run with one lane's result, and its evidence, put in place of what it was. */
+const withLane = (
+  ran: CheckRun,
+  result: LaneResult,
+  evidence: Option.Option<LaneEvidence>
+): CheckRun => ({
+  ...ran,
+  evidence: [
+    ...ran.evidence.filter(({ lane }) => lane !== result.lane),
+    ...Option.toArray(evidence),
+  ],
+  lanes: ran.lanes.map((each) => (each.lane === result.lane ? result : each)),
+});
+
+/**
+ * The run with a `lintToZero` ask's lane as its count decides it: passed
+ * at zero in its territory, failed above it (its signature says how many,
+ * so two runs compare), and a load error when its lint printed no count. A
+ * lint the Checker never got going stays as it ran, for its fresh run; its
+ * exit code says nothing, since a lint with findings anywhere exits 1.
+ */
+const countedAskLane = (
+  run: AnswerRun,
+  ran: CheckRun
+): Effect.Effect<CheckRun> => {
+  const { ask, askLane } = run;
+
+  const result = ran.lanes.find(({ lane }) => lane === askLane);
+
+  if (
+    ask === undefined ||
+    askLane === undefined ||
+    !CheckSpec.guards.LintToZero(ask.check) ||
+    result === undefined ||
+    isTrouble(result.result)
+  ) {
+    return Effect.succeed(ran);
+  }
+
+  const { check } = ask;
+
+  return Effect.fromOption(outputOf(ran, askLane)).pipe(
+    Effect.flatMap((stdout) =>
+      lintCountOf({ ask, check, modules: run.counts?.modules ?? [], stdout })
+    ),
+    Effect.map((count) =>
+      count === 0
+        ? withLane(ran, { ...result, result: "passed" }, Option.none())
+        : withLane(
+            ran,
+            { ...result, result: "failed" },
+            Option.some({
+              lane: askLane,
+              signature: `${check.rule}: ${count} in ${check.territory ?? ask.territory.module}`,
+            })
+          )
+    ),
+    Effect.orElseSucceed(() =>
+      withLane(
+        ran,
+        { ...result, result: "loadError" },
+        Option.some({ lane: askLane })
+      )
+    )
+  );
+};
+
+/** What the cheap stage counted: each ratchet per territory, or the one whose count it could not read. */
+interface Counted {
+  readonly counts: readonly MeasuredCount[];
+  readonly uncounted: Option.Option<RatchetName>;
+}
+
+/**
+ * The policy's ratchets counted on the merged tree: one count lane per
+ * command (named for the first ratchet that runs it), each output read for
+ * every ratchet it serves and split by the project's modules (`measure`).
+ */
+const countRatchets = <E, R>(
+  run: AnswerRun,
+  job: (lanes: readonly CheckLane[]) => Effect.Effect<CheckRun, E, R>
+): Effect.Effect<Counted, E, R> =>
+  Effect.gen(function* () {
+    const specs = run.counts?.ratchets ?? [];
+
+    if (!Array.isReadonlyArrayNonEmpty(specs)) {
+      return { counts: [], uncounted: Option.none() };
+    }
+
+    const lanes = Array.dedupeWith(
+      specs,
+      (one, other) => one.measure.command === other.measure.command
+    ).map(({ measure: { command }, name }) =>
+      CheckLane.make({ command, lane: LaneName.make(name), output: "stdout" })
+    );
+
+    const ran = yield* job(lanes);
+
+    const printed = (command: string) =>
+      Option.getOrElse(
+        Option.flatMap(
+          Option.fromUndefinedOr(
+            lanes.find((lane) => lane.command === command)
+          ),
+          ({ lane }) => outputOf(ran, lane)
+        ),
+        () => ""
+      );
+
+    const counts = yield* Effect.forEach(specs, (spec) =>
+      measure(
+        spec,
+        (command) => Effect.succeed({ code: 0, stdout: printed(command) }),
+        run.counts?.modules ?? []
+      ).pipe(Effect.mapError(() => spec.name))
+    ).pipe(Effect.result);
+
+    return Result.match(counts, {
+      onFailure: (name) => ({ counts: [], uncounted: Option.some(name) }),
+      onSuccess: (all) => ({ counts: all.flat(), uncounted: Option.none() }),
+    });
+  });
+
+/** What a stage run says of the counts: them, and the ratchet whose count it could not read. */
+const countFields = (counted: Counted): Pick<Ran, "counts" | "uncounted"> =>
+  Option.match(counted.uncounted, {
+    onNone: () => ({ counts: counted.counts }),
+    onSome: (uncounted) => ({ counts: counted.counts, uncounted }),
+  });
+
 /**
  * One stage's lanes on the merged tree `tree`: run, a troubled lane run
  * once more, and each lane that did not pass at first logged. The log's
  * name counts the answer's merges (`#1` on its first main), so a replayed
  * step keeps its log under the same name and a re-merge gets a new one.
+ * The cheap stage counts the ratchets too.
  */
 export const runStage = (
   run: AnswerRun,
@@ -306,22 +455,39 @@ export const runStage = (
           ? run.state.remerges
           : 0;
 
-        if (!Array.isReadonlyArrayNonEmpty(lanes)) {
+        const counting = stage === "cheap" && run.counts !== undefined;
+
+        if (!Array.isReadonlyArrayNonEmpty(lanes) && !counting) {
           return StageRun.cases.Ran.make({ checked, heldBack: [], lanes: [] });
         }
 
         const block = yield* runBlockOf(checked);
 
         const job = (each: readonly CheckLane[]) =>
-          runner.run({
-            at: CheckAt.cases.Tree.make({ tree }),
-            lanes: each,
-            placeholders: [],
-            project: checked.project,
-            proxies: [],
-            repo: checked.fork,
-            run: block,
+          runner
+            .run({
+              at: CheckAt.cases.Tree.make({ tree }),
+              lanes: each,
+              placeholders: [],
+              project: checked.project,
+              proxies: [],
+              repo: checked.fork,
+              run: block,
+            })
+            .pipe(Effect.flatMap((ran) => countedAskLane(run, ran)));
+
+        const counts = counting
+          ? countFields(yield* countRatchets(run, job))
+          : {};
+
+        if (!Array.isReadonlyArrayNonEmpty(lanes)) {
+          return StageRun.cases.Ran.make({
+            checked,
+            heldBack: [],
+            lanes: [],
+            ...counts,
           });
+        }
 
         const firstRun = yield* job(lanes);
         const first = byLane(firstRun);
@@ -358,6 +524,7 @@ export const runStage = (
           checked,
           heldBack: firstRun.heldBack,
           lanes: laneRuns,
+          ...counts,
         });
       }).pipe(
         Effect.catchTag("VerifierBlocked", () =>

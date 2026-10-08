@@ -43,10 +43,16 @@ export const shaOf = (at: CheckAt): string =>
     Tree: ({ tree }): string => tree,
   });
 
-/** One lane to run: its name, the project's command for it, and its time limit. */
+/**
+ * One lane to run: its name, the project's command for it, and its time
+ * limit. A lane with `output: "stdout"` is a count (a lint rule's or a
+ * ratchet's), read from what its command prints: the run hands its stdout
+ * back in `CheckRun.outputs`, to the platform alone, never to an answerer.
+ */
 export const CheckLane = Schema.Struct({
   command: Schema.NonEmptyString,
   lane: LaneName,
+  output: Schema.optionalKey(Schema.Literal("stdout")),
   timeoutMs: Schema.optionalKey(
     Schema.Int.pipe(Schema.check(Schema.isGreaterThan(0)))
   ),
@@ -110,19 +116,40 @@ export const evidenceFrom = (lane: LaneName, exit: RunExit): LaneEvidence =>
     Passed: () => ({ lane }),
   });
 
+/** What a count lane printed: the stdout its count is read from. */
+export const LaneOutput = Schema.Struct({
+  lane: LaneName,
+  stdout: Schema.String,
+});
+
+export type LaneOutput = typeof LaneOutput.Type;
+
 /**
  * One job's result: each lane, the held-back areas' bits, the whole run's
  * time, and the evidence of every lane that did not pass. Logs never travel
- * here; a lane's `logRef` names where the platform keeps its log.
+ * here; a lane's `logRef` names where the platform keeps its log. A count
+ * lane's stdout does, in `outputs` (one per lane that asked for it), since
+ * its count is read from it.
  */
 export const CheckRun = Schema.Struct({
   durationMs: Schema.Int,
   evidence: Schema.Array(LaneEvidence),
   heldBack: Schema.Array(HeldBackResult),
   lanes: Schema.Array(LaneResult),
+  outputs: Schema.optionalKey(Schema.Array(LaneOutput)),
 });
 
 export type CheckRun = typeof CheckRun.Type;
+
+/** What a count lane of `run` printed; none when the lane did not ask for it, or did not run. */
+export const outputOf = (
+  run: CheckRun,
+  lane: LaneName
+): Option.Option<string> =>
+  Option.map(
+    Option.fromUndefinedOr(run.outputs?.find((each) => each.lane === lane)),
+    ({ stdout }) => stdout
+  );
 
 /**
  * Runs a job's lanes. `VerifierBlocked` means the run could not happen at all

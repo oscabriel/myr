@@ -23,6 +23,10 @@
  * `alice` and `bob`, each a `SESSION_TOKENS` entry: git sends a person's
  * token as the Basic password its credential helper gives, and the RPC
  * client as a bearer token.
+ *
+ * Every log line the Worker's handler writes is kept beside its usual
+ * printing, with its annotations (`logged`), and each Project DO's SQLite
+ * stays reachable (`ratchets` reads its `ratchets` rows through the store).
  */
 import { NodeHttpServer, NodeServices } from "@effect/platform-node";
 import { SqliteClient } from "@effect/sql-sqlite-node";
@@ -39,6 +43,9 @@ import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { Lander } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
 import { FinishersFromChecks } from "@repo/project/project";
+import { ProjectStore } from "@repo/project/project-store";
+import type { RatchetRow } from "@repo/project/project-store/rows";
+import { ProjectStoreSqlite } from "@repo/project/project-store/sqlite";
 import { ProjectionMemory } from "@repo/project/projection/memory";
 import { Contracts } from "@repo/protocol/contracts";
 import type { Client } from "@repo/protocol/contracts";
@@ -51,7 +58,17 @@ import { git, gitOk } from "@repo/testkit/git";
 import type { Ran } from "@repo/testkit/git";
 import { httpBackend } from "@repo/testkit/http-backend";
 import type { Scope } from "effect";
-import { Array, Context, Effect, FileSystem, Layer, Option, Ref } from "effect";
+import {
+  Array,
+  Context,
+  Effect,
+  FileSystem,
+  Layer,
+  Logger,
+  Option,
+  Ref,
+  References,
+} from "effect";
 import {
   FetchHttpClient,
   HttpClient,
@@ -61,6 +78,7 @@ import {
   HttpServerResponse,
 } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
+import type { SqlClient } from "effect/sql/SqlClient";
 
 import { DoProjects } from "../src/adapters/do-projects.ts";
 import { WorkerFetch } from "../src/adapters/fetch.ts";
@@ -105,6 +123,12 @@ export interface GitClient {
   ) => Effect.Effect<CommitSha>;
 }
 
+/** One line the Worker's handler logged, with its annotations as text. */
+export interface Logged {
+  readonly message: string;
+  readonly annotations: ReadonlyMap<string, string>;
+}
+
 /** The world a core-loop test drives. */
 export interface CoreLoopWorld {
   /** The platform's fetch handler, composed as the Worker's is. */
@@ -112,6 +136,21 @@ export interface CoreLoopWorld {
   /** Where the handler is served, on a local port, so git can reach it. */
   readonly origin: string;
   readonly git: (as: Someone) => GitClient;
+  /**
+   * That person's git, whose credential helper gives `username` beside
+   * their token, as the CLI's helper gives a harness's audit username. One
+   * such git per person in a world: its clones share a home.
+   */
+  readonly gitWithUsername: (
+    as: Someone,
+    username: string
+  ) => Effect.Effect<GitClient>;
+  /** Every line the Worker's handler logged so far, in order. */
+  readonly logged: Effect.Effect<readonly Logged[]>;
+  /** A project's ratchet baselines, as its Durable Object's store keeps them. */
+  readonly ratchets: (
+    project: ProjectName
+  ) => Effect.Effect<readonly RatchetRow[]>;
   /** A client of the contracts over HTTP at `/rpc`, as that person (or as anyone). */
   readonly rpc: (as: Someone | "anonymous") => Client["Service"];
   /** Runs every queued answer run to its end, and any run those start. */
@@ -121,6 +160,12 @@ export interface CoreLoopWorld {
     at: CheckAt,
     lane: LaneName,
     results: readonly LaneOutcome[]
+  ) => Effect.Effect<void>;
+  /** What a count lane prints at a commit or tree: a linter's JSON, as recorded. */
+  readonly print: (
+    at: CheckAt,
+    lane: LaneName,
+    stdout: string
   ) => Effect.Effect<void>;
   /**
    * The commit the Lander composes from `files` on `project`'s main, which
@@ -166,13 +211,14 @@ const listen = (handle: (request: Request) => Effect.Effect<Response>) =>
 
 /**
  * A credential helper as git runs one: asked for a credential, it answers
- * with the person's handle and their platform token as the password.
+ * with a username (the person's handle, unless told another) and their
+ * platform token as the password.
  */
-const helperScript = (as: Someone) =>
+const helperScript = (as: Someone, username: string = as) =>
   [
     "#!/bin/sh",
     'test "$1" = get || exit 0',
-    `echo username=${as}`,
+    `echo 'username=${username}'`,
     `echo password=${tokens[as]}`,
     "",
   ].join("\n");
@@ -202,7 +248,21 @@ export const coreLoopWorld = (
 
     // The Checker reads its script when it runs, so the test may add to it.
     const script = new Map<string, readonly LaneResult[]>();
+    const printed = new Map<string, string>();
     const queued = yield* Ref.make<readonly AnswerParams[]>([]);
+    // Each line the handler logs, kept with its annotations as it is written.
+    const logs: Logged[] = [];
+
+    const keeper = Logger.make(({ fiber, message }) => {
+      logs.push({
+        annotations: new Map(
+          Object.entries(fiber.getRef(References.CurrentLogAnnotations)).map(
+            ([key, value]) => [key, String(value)]
+          )
+        ),
+        message: String(message),
+      });
+    });
 
     // Every port but `Projects`, built once: the Worker's, its Project DOs'
     // and the answer runs' alike.
@@ -210,7 +270,7 @@ export const coreLoopWorld = (
       Layer.mergeAll(
         UpstreamRepoHost,
         LanderIsogit,
-        CheckRunnerMemory.layer(script),
+        CheckRunnerMemory.layer(script, printed),
         RulesEvaluatorBun.pipe(Layer.provide(FinishersFromChecks)),
         options.evidence ?? EvidenceStoreMemory,
         FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
@@ -242,23 +302,39 @@ export const coreLoopWorld = (
         })
       );
 
+    // Each DO's database, kept so a test can read its rows back.
+    const databases = new Map<string, Context.Context<SqlClient>>();
+
     // The `PROJECT` namespace in process: a name is one DO, made on its
     // first call, a shell over a database of its own, living in the world's
     // scope.
     const { namespace } = yield* inProcessNamespace((name) =>
-      projectShell({
-        name,
-        ports: Layer.mergeAll(
-          Layer.succeedContext(base),
-          AlarmsMemory,
-          runsOf(name)
-        ),
-        sql: SqliteClient.layer({ filename: ":memory:" }).pipe(Layer.orDie),
+      Effect.gen(function* () {
+        const sql = yield* Layer.build(
+          SqliteClient.layer({ filename: ":memory:" }).pipe(Layer.orDie)
+        );
+
+        databases.set(name, sql);
+
+        return yield* projectShell({
+          name,
+          ports: Layer.mergeAll(
+            Layer.succeedContext(base),
+            AlarmsMemory,
+            runsOf(name)
+          ),
+          sql: Layer.succeedContext(sql),
+        });
       })
     );
 
     const ports = base.pipe(
       Context.merge(yield* Layer.build(DoProjects(namespace)))
+    );
+
+    // Every request the handler serves logs through the keeper too.
+    const logging = yield* Layer.build(
+      Logger.layer([keeper], { mergeWithExisting: true })
     );
 
     // The stage's env as the Worker decodes it, with the people's tokens.
@@ -280,7 +356,7 @@ export const coreLoopWorld = (
     yield* Effect.addFinalizer(() => Effect.promise(dispose));
 
     const origin = yield* listen((request) =>
-      Effect.promise(() => handler(request))
+      Effect.promise(() => handler(request, logging))
     );
 
     // One client per person, over HTTP to the served origin.
@@ -313,14 +389,18 @@ export const coreLoopWorld = (
 
     yield* fs.makeDirectory(helpers, { recursive: true }).pipe(Effect.orDie);
 
-    const gitOf = (as: Someone): Effect.Effect<GitClient> =>
+    const gitOf = (
+      as: Someone,
+      username: string = as
+    ): Effect.Effect<GitClient> =>
       Effect.gen(function* () {
-        const helper = `${helpers}/${as}`;
-        const home = `${root}/people/${as}`;
+        const named = username === as ? as : `${as}-named`;
+        const helper = `${helpers}/${named}`;
+        const home = `${root}/people/${named}`;
 
         yield* Effect.orDie(
           Effect.all([
-            fs.writeFileString(helper, helperScript(as)),
+            fs.writeFileString(helper, helperScript(as, username)),
             fs.chmod(helper, 0o700),
             fs.makeDirectory(home, { recursive: true }),
           ])
@@ -432,9 +512,28 @@ export const coreLoopWorld = (
 
           return commit;
         }).pipe(Effect.orDie),
-      fetch: (request) => Effect.promise(() => handler(request)),
+      fetch: (request) => Effect.promise(() => handler(request, logging)),
       git: (as) => gits[as],
+      gitWithUsername: gitOf,
+      logged: Effect.sync(() => [...logs]),
       origin,
+      print: (at, lane, stdout) =>
+        Effect.sync(() => {
+          printed.set(scriptKey(at, lane), stdout);
+        }),
+      ratchets: (project) =>
+        Option.match(Option.fromUndefinedOr(databases.get(project)), {
+          onNone: () => Effect.succeed([]),
+          onSome: (sql) =>
+            ProjectStore.use((store) => store.load()).pipe(
+              Effect.map(({ ratchets }) => ratchets),
+              Effect.provide(
+                ProjectStoreSqlite.pipe(
+                  Layer.provide(Layer.succeedContext(sql))
+                )
+              )
+            ),
+        }),
       rpc: (as) => clients[as],
       script: (at, lane, results) =>
         Effect.sync(() => {

@@ -48,6 +48,7 @@ import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Outcome } from "@repo/protocol/domain/outcome";
 import { CommitSha } from "@repo/protocol/ids";
 import type { LaneName, ProjectName, RequestId } from "@repo/protocol/ids";
+import { VerifierBlocked } from "@repo/protocol/refusal";
 import {
   Array,
   Cause,
@@ -262,9 +263,27 @@ const stage = (
   });
 
 /**
- * The checks on the exact merged tree: the cheap stage, then, if it passed,
- * the ask's own check and every other project lane. The first stage that
- * refuses ends them, with its refusals and its lanes.
+ * The refusals of the cheap stage's counts: a ratchet whose command printed
+ * no count the platform can read is the gate's trouble, never the answer's
+ * (`VerifierBlocked`), and the project hears which one in its log.
+ */
+const uncountedRefusals = (cheap: StageRun) =>
+  StageRun.guards.Ran(cheap) && cheap.uncounted !== undefined
+    ? Effect.as(
+        Effect.logWarning(
+          `the ratchet ${cheap.uncounted} printed no count on ${cheap.checked.tree}`
+        ),
+        [new VerifierBlocked({})]
+      )
+    : Effect.succeed([]);
+
+/**
+ * The checks on the exact merged tree: the cheap stage (its lanes, and the
+ * ratchets' counts), then, if it passed, the ask's own check and every
+ * other project lane. The first stage that refuses ends them, with its
+ * refusals and its lanes. The counts go to the project with the report,
+ * which judges them against its baselines (spec §5 step 7 (b)) and opens
+ * the decisions a reasoned escape asks for (step 7 (e)).
  */
 const checks = (
   params: AnswerParams,
@@ -272,16 +291,23 @@ const checks = (
   attempt: number
 ): Effect.Effect<Option.Option<Reported>, never, AnswerPorts> =>
   Effect.gen(function* () {
-    const cheap = yield* stage(params, call.tree, "cheap", attempt);
+    const ran = yield* stage(params, call.tree, "cheap", attempt);
 
-    // W4 417: the cheap stage's ratchet counts, and the decisions a reasoned
-    // escape asks for, join here.
+    const cheap = {
+      ...ran,
+      refusals: [...ran.refusals, ...(yield* uncountedRefusals(ran.ran))],
+    };
+
     const judged =
       StageRun.guards.Ran(cheap.ran) && cheap.refusals.length === 0
         ? yield* stage(params, call.tree, "checks", attempt)
         : undefined;
 
     const last = judged ?? cheap;
+
+    const counts = StageRun.guards.Ran(cheap.ran)
+      ? Option.fromUndefinedOr(cheap.ran.counts)
+      : Option.none();
 
     return StageRun.match(last.ran, {
       Blocked: ({ attempt: at }) =>
@@ -303,6 +329,10 @@ const checks = (
                 : []),
               ...lanes,
             ].map(({ result }) => result),
+            ...Option.match(counts, {
+              onNone: () => ({}),
+              onSome: (ratchets) => ({ ratchets }),
+            }),
           }
         ),
     });
