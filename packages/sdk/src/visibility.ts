@@ -57,7 +57,10 @@ export interface LayerConfig<Holds extends LayerHolds = LayerHolds> {
   readonly readers?: MembersInput;
   /** Why it exists, in public. */
   readonly reason: string;
-  /** How long each kind it holds may stay unreleased: `{ experiment: "30 days" }`. */
+  /**
+   * How long each kind it holds may stay unreleased: `{ experiment: "30 days" }`.
+   * The protocol keeps one sunset a layer, so the layer takes the soonest.
+   */
   readonly sunset?: Readonly<Partial<Record<Holds[number], Days>>>;
   /** Who may push to it. */
   readonly writers?: MembersInput;
@@ -257,14 +260,16 @@ export const visibility = <Area extends string = never>(
     },
   };
 
-  // Checked whole, then the held-back checks given back as stated, so
-  // their areas keep the names `AreaOf` reads.
-  const stated = Struct.omit(
-    policyOf(checks === undefined ? policy : { ...policy, checks }),
-    ["checks"]
+  // Checked whole, so a key the schema doesn't name (a check's path) is
+  // dropped. The held-back checks' areas, checked with the rest, come back
+  // as the file wrote them, so they keep the names `AreaOf` reads.
+  const { checks: suite, ...stated } = policyOf(
+    checks === undefined ? policy : { ...policy, checks }
   );
 
-  return checks === undefined ? stated : { ...stated, checks };
+  return checks === undefined || suite === undefined
+    ? stated
+    : { ...stated, checks: { ...suite, areas: checks.areas } };
 };
 
 /**

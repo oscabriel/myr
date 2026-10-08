@@ -145,6 +145,100 @@ describe("the config folder's visibility file", () => {
     expect(definition).toStrictEqual(osrPolicy);
   });
 
+  it("keeps every value the file states over its default", () => {
+    const definition = visibility({
+      checks: sealedChecks({
+        admit: { greenOnMainRuns: 5, redOnKnownBadAtLeast: 2 },
+        areas: { parser: "src/parser/**" },
+        attempts: { perClaim: 2, perPersonPerAreaPerWeek: 6 },
+        layer: "evidence",
+      }),
+      env: { setters: ["alice"] },
+      flows: flows.noWriteDown({ release: ["bob"] }),
+      layers: {
+        evidence: layer({
+          audience: "team",
+          disclose: "declared",
+          holds: ["checks", "experiment", "notes"],
+          readers: ["alice", "carol"],
+          reason: "The team's checks, experiments and notes",
+          sunset: { experiment: "2 weeks", notes: "90 days" },
+          writers: ["alice"],
+        }),
+        security: embargo({
+          disclose: "counted",
+          maxDays: 30,
+          readers: ["dave"],
+        }),
+      },
+      notice: { narrowing: "2 weeks" },
+    });
+
+    const expected = {
+      checks: {
+        admit: { greenOnMainRuns: 5, redOnKnownBadAtLeast: 2 },
+        areas: { parser: "src/parser/**" },
+        attempts: { perClaim: 2, perPersonPerAreaPerWeek: 6 },
+        canary: false,
+        commit: "salted-sha256-merkle",
+        layer: "evidence",
+        pin: "claim",
+        result: "area-bit",
+      },
+      env: { setters: ["alice"] },
+      flows: { noWriteDown: true, release: ["bob"] },
+      layers: [
+        {
+          audience: "team",
+          disclose: "declared",
+          holds: ["checks", "experiment", "notes"],
+          name: "evidence",
+          readers: ["alice", "carol"],
+          reason: "The team's checks, experiments and notes",
+          // The protocol keeps one sunset a layer: the soonest stated.
+          sunsetDays: 14,
+          writers: ["alice"],
+        },
+        {
+          audience: "security",
+          disclose: "counted",
+          holds: ["fix"],
+          maxDays: 30,
+          name: "security",
+          readers: ["dave"],
+          reason: "Embargoed fixes, released with their advisory",
+          writers: "deciders",
+        },
+      ],
+      notice: { narrowingDays: 14 },
+    };
+
+    expect(definition).toStrictEqual(expected);
+    expect(decodePolicy(definition)).toStrictEqual(expected);
+  });
+
+  it("gives back only what the policy names: a check path stated beside the areas never reaches it", () => {
+    const stated = {
+      ...sealedChecks({ areas: { export: "src/export/**" } }),
+      paths: ["checks/export/escapes-titles.test.ts"],
+    };
+
+    const definition = visibility({
+      checks: stated,
+      layers: {
+        maintainers: layer({
+          disclose: "sealed",
+          holds: ["checks"],
+          reason: "Held-back checks for export",
+        }),
+      },
+    });
+
+    expect(definition.checks).toStrictEqual(
+      sealedChecks({ areas: { export: "src/export/**" } })
+    );
+  });
+
   it("declares an embargo and the personal layer as config alone: no repo, no held-back checks", () => {
     const definition = visibility({
       layers: {
