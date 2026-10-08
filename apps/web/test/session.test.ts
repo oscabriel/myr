@@ -608,6 +608,21 @@ describe("the callback", () => {
       })
   );
 
+  it.effect(
+    "answers 400 and sets no session when the token is not one the session cookie can carry back",
+    () =>
+      Effect.gen(function* () {
+        const { response } = yield* signInAndBack("/auth/signin", "c0de", () =>
+          Response.json({ ...TOKEN_ANSWER, access_token: "two words" })
+        );
+
+        expect(response.status).toBe(400);
+        expect(
+          cookiesOf(response).filter(({ name }) => name === SESSION_COOKIE)
+        ).toStrictEqual([]);
+      })
+  );
+
   it.effect("goes back only to a path on the web itself", () =>
     Effect.gen(function* () {
       expect(

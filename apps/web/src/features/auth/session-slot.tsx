@@ -39,11 +39,19 @@ export const SessionView = ({
     ),
     onSome: (signedIn) => (
       <div className="flex items-center gap-3">
-        <p className="min-w-0 truncate">
-          <span className="text-muted-foreground sr-only sm:not-sr-only">
-            Signed in as{" "}
+        <p className="flex min-w-0 items-baseline gap-1">
+          <span className="text-muted-foreground sr-only shrink-0 sm:not-sr-only">
+            Signed in as
           </span>
-          <HandleLink handle={signedIn} />
+          {/* The header's row never shrinks below its content, so a long
+              handle is capped (a quarter of a phone's width) for `truncate`
+              to take hold and keep "Sign out" on screen; its title is whole. */}
+          <span
+            className="max-w-[25vw] min-w-0 truncate sm:max-w-xs"
+            title={signedIn}
+          >
+            <HandleLink handle={signedIn} />
+          </span>
         </p>
         <span aria-hidden className="bg-rule h-4 w-px" />
         <form action="/auth/signout" className="flex" method="post">

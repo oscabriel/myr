@@ -40,13 +40,11 @@ const SIGN_IN_SECONDS = 600;
  */
 const SESSION_MARGIN_SECONDS = 60;
 
-/** The web's own sign-in paths. */
-export const AUTH_PATHS = {
+/** The web's own sign-in paths that this module names in what it answers. */
+const AUTH_PATHS = {
   callback: "/auth/callback",
   client: "/auth/client",
   signIn: "/auth/signin",
-  signOut: "/auth/signout",
-  whoami: "/auth/whoami",
 } as const;
 
 /** What a route's server handler is handed, of what it uses. */
@@ -56,17 +54,18 @@ export interface Handled {
 
 // --- The cookie -------------------------------------------------------------
 
-/** A cookie's value as a credential: a token has no space, quote, comma, semicolon or backslash. */
-const CREDENTIAL = /^[^\s",;\\]+$/u;
+/**
+ * A platform token as the session cookie carries it: no space, quote,
+ * comma, semicolon or backslash. The callback keeps only such a token and
+ * `credentialFrom` reads back only such a token, so a cookie is never set
+ * that no later request could be signed in with.
+ */
+const Token = Schema.NonEmptyString.check(Schema.isPattern(/^[^\s",;\\]+$/u));
+
+const isToken = Schema.is(Token);
 
 /** A cookie value as it was set, if it decodes. */
-const decodedValue = (value: string) => {
-  try {
-    return Option.some(decodeURIComponent(value));
-  } catch {
-    return Option.none();
-  }
-};
+const decodedValue = Option.liftThrowable(decodeURIComponent);
 
 /** The value of the cookie `name` the request carries, if it carries one. */
 const cookieValue = (request: Request, name: string) =>
@@ -85,9 +84,7 @@ const cookieValue = (request: Request, name: string) =>
 
 /** The session cookie's value: the platform token this browser signed in with. */
 export const credentialFrom = (request: Request): Option.Option<string> =>
-  cookieValue(request, SESSION_COOKIE).pipe(
-    Option.filter((token) => CREDENTIAL.test(token))
-  );
+  cookieValue(request, SESSION_COOKIE).pipe(Option.filter(isToken));
 
 /**
  * `request` as the platform should see it: without the browser's cookies
@@ -122,6 +119,20 @@ export const sessionCookie = (token: string, maxAgeSeconds: number) =>
 export const clearedCookie = () => lockedCookie(SESSION_COOKIE, "", 0);
 
 const clearedSignIn = () => lockedCookie(SIGN_IN_COOKIE, "", 0);
+
+/** `headers`, also setting each of `cookies` (each its own `Set-Cookie` line). */
+export const settingCookies = (
+  headers: HeadersInit,
+  cookies: readonly string[]
+) => {
+  const all = new Headers(headers);
+
+  for (const cookie of cookies) {
+    all.append("set-cookie", cookie);
+  }
+
+  return all;
+};
 
 // --- PKCE -------------------------------------------------------------------
 
@@ -179,19 +190,18 @@ export const returnPath = (origin: string, wanted: string | null) =>
   );
 
 /** A 302 to `location` that sets `cookies` and is never cached. */
-export const redirect = (location: string, cookies: readonly string[]) => {
-  const headers = new Headers({
-    "cache-control": "no-store",
-    location,
-    "referrer-policy": "no-referrer",
+export const redirect = (location: string, cookies: readonly string[]) =>
+  new Response(null, {
+    headers: settingCookies(
+      {
+        "cache-control": "no-store",
+        location,
+        "referrer-policy": "no-referrer",
+      },
+      cookies
+    ),
+    status: 302,
   });
-
-  for (const cookie of cookies) {
-    headers.append("set-cookie", cookie);
-  }
-
-  return new Response(null, { headers, status: 302 });
-};
 
 /** A short page that says why signing in stopped, and how to start again. */
 const stoppedPage = (
@@ -199,14 +209,13 @@ const stoppedPage = (
   reason: string,
   cookies: readonly string[]
 ) => {
-  const headers = new Headers({
-    "cache-control": "no-store",
-    "content-type": "text/html; charset=utf-8",
-  });
-
-  for (const cookie of cookies) {
-    headers.append("set-cookie", cookie);
-  }
+  const headers = settingCookies(
+    {
+      "cache-control": "no-store",
+      "content-type": "text/html; charset=utf-8",
+    },
+    cookies
+  );
 
   return new Response(
     `<!doctype html><meta charset="utf-8"><title>Sign-in stopped · ${Brand.name}</title><p>${reason}</p><p><a href="${AUTH_PATHS.signIn}">Sign in again</a> or go to <a href="/">the front page</a>.</p>`,
@@ -293,7 +302,7 @@ const unreachablePlatform = new SignInStopped({
 
 /** What the platform's `/token` answers a good code with, of what the web keeps. */
 const TokenAnswer = Schema.Struct({
-  access_token: Schema.RedactedFromValue(Schema.NonEmptyString),
+  access_token: Schema.RedactedFromValue(Token),
   expires_in: Schema.Int.check(Schema.isGreaterThan(0)),
   token_type: Schema.String,
 });
@@ -410,15 +419,10 @@ export const signOutHandler = (_handled: Handled): Response =>
 const whoAnswer = (
   who: { readonly handle?: Handle },
   cookies: readonly string[] = []
-) => {
-  const headers = new Headers({ "cache-control": "no-store" });
-
-  for (const cookie of cookies) {
-    headers.append("set-cookie", cookie);
-  }
-
-  return Response.json(who, { headers });
-};
+) =>
+  Response.json(who, {
+    headers: settingCookies({ "cache-control": "no-store" }, cookies),
+  });
 
 /**
  * `GET /auth/whoami`: `{ handle }` as the platform's `status` names the

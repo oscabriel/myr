@@ -18,7 +18,12 @@
 import { Effect, Option } from "effect";
 
 import type { Backend } from "./rpc.ts";
-import { clearedCookie, credentialFrom, withCredential } from "./session.ts";
+import {
+  clearedCookie,
+  credentialFrom,
+  settingCookies,
+  withCredential,
+} from "./session.ts";
 
 /** `request` as the platform's own: the same path and query on its origin. */
 const onPlatform = (request: Request, platformUrl: string) => {
@@ -28,17 +33,12 @@ const onPlatform = (request: Request, platformUrl: string) => {
 };
 
 /** `response` as it came, also expiring the session cookie. */
-const expiringSession = (response: Response) => {
-  const headers = new Headers(response.headers);
-
-  headers.append("set-cookie", clearedCookie());
-
-  return new Response(response.body, {
-    headers,
+const expiringSession = (response: Response) =>
+  new Response(response.body, {
+    headers: settingCookies(response.headers, [clearedCookie()]),
     status: response.status,
     statusText: response.statusText,
   });
-};
 
 const send = (env: Env, request: Request) =>
   Effect.promise(() => env.PLATFORM.fetch(request));
