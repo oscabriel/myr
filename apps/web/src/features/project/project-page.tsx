@@ -11,6 +11,8 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 
+import { envPath } from "../env/path.ts";
+import { ledgerPath } from "../ledger/path.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
@@ -122,6 +124,23 @@ export const ProjectView = ({
             </>
           )}
         </span>
+        <nav
+          aria-label={`${project}: what it holds back, and its env`}
+          className="flex flex-wrap gap-x-4 gap-y-2"
+        >
+          <a
+            className="decoration-rule text-foreground underline hover:decoration-current"
+            href={ledgerPath(project)}
+          >
+            Ledger
+          </a>
+          <a
+            className="decoration-rule text-foreground underline hover:decoration-current"
+            href={envPath(project)}
+          >
+            Env shape
+          </a>
+        </nav>
       </div>
       <div className="grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section
