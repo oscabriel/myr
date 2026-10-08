@@ -36,7 +36,7 @@ const refused = (text: string) =>
  * Sends a request on to the internet. Redirects come back to the container,
  * so the request that follows one goes through a gateway too.
  */
-const forward = (request: Request): Promise<Response> =>
+export const forward = (request: Request): Promise<Response> =>
   // @effect-diagnostics-next-line globalFetch:off -- an outbound entrypoint is the Worker's own network edge: workerd hands it a Request and takes back a Response, and its only way to the internet is the runtime's fetch; sandbox code may not use effect/http (spec §7.3).
   fetch(request, { redirect: "manual" });
 

@@ -13,6 +13,7 @@ import { CheckLogs } from "../src/checker/logs.ts";
 import type { PhaseLog } from "../src/checker/logs.ts";
 import { Network } from "../src/checker/network.ts";
 import { Snapshots } from "../src/checker/snapshots.ts";
+import type { EnvGatewayProps } from "../src/env-gateway.ts";
 import type { CloneProps, EgressProps } from "../src/outbound.ts";
 
 /** What the container could reach at one moment. */
@@ -39,6 +40,12 @@ export type Call =
       readonly token: string;
     }
   | { readonly kind: "allow"; readonly hosts: readonly string[] }
+  | {
+      readonly kind: "intercept";
+      readonly host: string;
+      /** How many values the env gateway holds for the job; never which. */
+      readonly values: number;
+    }
   | { readonly kind: "save"; readonly key: string }
   | { readonly kind: "restore"; readonly key: string; readonly hit: boolean }
   | { readonly kind: "report"; readonly logs: readonly PhaseLog[] }
@@ -150,6 +157,12 @@ export const fakeChecker = (options: FakeOptions = {}) => {
             token: Redacted.value(token),
           })
         ),
+      routeEnv: ({ hosts, values }) =>
+        Effect.sync(() => {
+          for (const host of hosts) {
+            calls.push({ host, kind: "intercept", values: values.length });
+          }
+        }),
     })
   );
 
@@ -305,6 +318,11 @@ export const fakeContainer = () => {
       gateway(`clone ${props.remote} ${props.token}`),
     EgressGateway: ({ props }: { readonly props: EgressProps }) =>
       gateway(`egress [${props.allow.join(" ")}]`),
+    // Says how many values the props hold, never which.
+    EnvGateway: ({ props }: { readonly props: EnvGatewayProps }) =>
+      gateway(
+        `env [${props.rules.map(({ host }) => host).join(" ")}] ${props.values.length} values`
+      ),
   };
 
   return { calls, container, exports };

@@ -28,6 +28,7 @@
 import { CheckAt, evidenceFrom } from "@repo/checks/check-runner";
 import type {
   CheckRun,
+  EnvPlaceholder,
   HeldBackCheck,
   HeldBackPart,
   LaneEvidence,
@@ -48,6 +49,7 @@ import { Duration, Effect, Option, Ref } from "effect";
 
 import { Box } from "../box.ts";
 import type { ExecOptions, Executed } from "../box.ts";
+import { envPlanOf } from "./env.ts";
 import { CheckLogs } from "./logs.ts";
 import type { PhaseLog } from "./logs.ts";
 import {
@@ -109,6 +111,20 @@ const ENV = {
   NO_COLOR: "1",
   PATH,
 };
+
+/**
+ * The env every command of the project runs with (setup, the lanes, each
+ * sealed check): each write-only value's placeholder (VL §8.4: a process
+ * env beats any resolver, so an unchanged `.env.schema` still loads), under
+ * the Checker's own env, which no item's key displaces (an item named
+ * `PATH` or `NODE_EXTRA_CA_CERTS` keeps the Checker's). Never a value.
+ */
+const commandEnv = (placeholders: readonly EnvPlaceholder[]) => ({
+  ...Object.fromEntries(
+    placeholders.map(({ key, placeholder }) => [key, placeholder])
+  ),
+  ...ENV,
+});
 
 /** The identity of the commit a checked tree is checked out as. */
 const GIT_ENV = {
@@ -329,6 +345,8 @@ const checkout = (kept: Kept, url: string, at: CheckAt) =>
 interface Job {
   readonly wire: CheckWire;
   readonly kept: Kept;
+  /** The env the project's commands run with: placeholders, never values. */
+  readonly env: Readonly<Record<string, string>>;
   /** The URL the container clones from: the clone host, no token. */
   readonly url: string;
   /** Whether setup was skipped for a snapshot of an earlier one. */
@@ -381,7 +399,7 @@ const setup = (
     const done = yield* exec(
       keeping(job.kept, { name: "setup", phase: "setup" }),
       ["sh", "-c", command],
-      { cwd: REPO, env: ENV },
+      { cwd: REPO, env: job.env },
       SETUP_LIMIT
     ).pipe(
       Effect.catchTag("BoxFailed", ({ reason }) =>
@@ -483,7 +501,7 @@ const runLane = (job: Job, { command, lane }: PlannedLane) =>
     return yield* exec(
       beside ? dropping : keeping(job.kept, { name: lane, phase: "lane" }),
       ["sh", "-c", command],
-      { cwd: REPO, env: ENV },
+      { cwd: REPO, env: job.env },
       limit
     ).pipe(
       Effect.map(
@@ -636,11 +654,11 @@ const writeHeldBack = (job: Job, { files }: HeldBackPart) =>
  * different answer would be one more bit about the suite, and one an
  * answer could ask for without spending an attempt.
  */
-const runSealed = ({ area, command }: HeldBackCheck) =>
+const runSealed = (job: Job, { area, command }: HeldBackCheck) =>
   exec(
     dropping,
     ["sh", "-c", command],
-    { cwd: REPO, env: ENV },
+    { cwd: REPO, env: job.env },
     LANE_LIMIT
   ).pipe(
     Effect.map(
@@ -658,6 +676,30 @@ const runSealed = ({ area, command }: HeldBackCheck) =>
     )
   );
 
+/**
+ * Routes the job's `@proxy` hosts to the env gateway (`checker/env.ts`),
+ * logging each host it leaves out with the reason. A host comes from the
+ * project's own `.env.schema`, which is public; no value is logged.
+ */
+const openEnvRoute = (wire: CheckWire) =>
+  Effect.gen(function* () {
+    const network = yield* Network;
+    const { route, skipped } = envPlanOf(wire.job);
+
+    yield* Effect.forEach(
+      skipped,
+      ({ host, reason }) =>
+        Effect.logWarning("a proxy host is not intercepted").pipe(
+          Effect.annotateLogs({ host, phase: "EgressOff", reason })
+        ),
+      { discard: true }
+    );
+
+    if (Option.isSome(route)) {
+      yield* network.routeEnv(route.value);
+    }
+  });
+
 /** The phases, from the clone to the last lane, with the logs kept as they go. */
 const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
   Effect.gen(function* () {
@@ -668,6 +710,7 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
     const heldBack = Option.fromNullishOr(wire.job.heldBack);
 
     const job: Job = {
+      env: commandEnv(wire.job.placeholders),
       exits: yield* Ref.make<readonly HeldBackExit[]>([]),
       kept,
       restored: yield* Ref.make(false),
@@ -692,7 +735,7 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
       heldBack: Option.map(heldBack, ({ areas }) => ({ areas })),
       lanes: wire.job.lanes.map(({ command, lane }) => ({ command, lane })),
       lockfileHash,
-      placeholders: wire.job.placeholders,
+      placeholders: wire.job.placeholders.map(({ key }) => key),
       run,
     });
 
@@ -705,7 +748,13 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
         Effect.annotateLogs({ phase: phase._tag }),
         Effect.andThen(
           Phase.$match(phase, {
-            EgressOff: () => Effect.as(network.allow([]), []),
+            // Off for every host but the env gateway's, which open here
+            // (the plan's "leaving only the platform's handlers").
+            EgressOff: () =>
+              Effect.as(
+                Effect.andThen(network.allow([]), openEnvRoute(wire)),
+                []
+              ),
             Report: () => Effect.succeed([]),
             // The public lanes, then each sealed check, all with egress off.
             Run: ({ lanes }) =>
@@ -715,8 +764,9 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
                   Option.match(heldBack, {
                     onNone: () => Effect.void,
                     onSome: ({ runs }) =>
-                      Effect.flatMap(Effect.forEach(runs, runSealed), (exits) =>
-                        Ref.set(job.exits, exits)
+                      Effect.flatMap(
+                        Effect.forEach(runs, (each) => runSealed(job, each)),
+                        (exits) => Ref.set(job.exits, exits)
                       ),
                   })
               ),
