@@ -19,8 +19,10 @@
  */
 import { HeldBackResult } from "@repo/protocol/domain/answer";
 import type { ClaimView } from "@repo/protocol/domain/claim";
+import { AtLeastOne } from "@repo/protocol/domain/common";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Policy } from "@repo/protocol/domain/policy";
+import { RunBlock } from "@repo/protocol/domain/run";
 import type { Ledger } from "@repo/protocol/domain/visibility";
 import {
   AreaName,
@@ -126,11 +128,20 @@ export const AdmissionRun = Schema.TaggedUnion({
 
 export type AdmissionRun = typeof AdmissionRun.Type;
 
-/** The runs that admit a layer push, against the main they run on. */
+/**
+ * The runs that admit a layer push, against the main they run on: what
+ * admits an area (the policy's counts), and the run block each job runs
+ * its checks by.
+ */
 export const AdmissionPlan = Schema.Struct({
+  admit: Schema.Struct({
+    greenOnMainRuns: AtLeastOne,
+    redOnKnownBadAtLeast: AtLeastOne,
+  }),
   head: CommitSha,
   layer: LayerName,
   main: LandedSha,
+  run: RunBlock,
   runs: Schema.Array(AdmissionRun),
 });
 
@@ -236,11 +247,11 @@ export interface VisibilityPort {
     input: { readonly head: CommitSha; readonly layer: LayerName },
     snapshot: ProjectSnapshot
   ) => Effect.Effect<Option.Option<AdmissionPlan>>;
-  /** An admission's results, judged: the layer's landed SHA moves, or stays. */
+  /** An admission's results, judged: the layer's landed SHA moves (under a fresh commitment), or stays. */
   readonly onAdmission: (
     input: AdmissionReport & { readonly now: DateTime.Utc },
     snapshot: ProjectSnapshot
-  ) => VisibilityPlan;
+  ) => Effect.Effect<VisibilityPlan>;
   /** A read of a layer through the gateway, for the read log. */
   readonly recordRead: (input: {
     readonly at: DateTime.Utc;
@@ -268,7 +279,7 @@ export const noVisibility: VisibilityPort = {
     postureLabel: "Open",
     project,
   }),
-  onAdmission: () => noPlan,
+  onAdmission: () => Effect.succeed(noPlan),
   onLayerPush: () => Effect.succeed(noPlan),
   onPolicy: () => Effect.succeed(noPlan),
   pinSuite: () => Option.none(),

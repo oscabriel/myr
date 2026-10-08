@@ -5014,9 +5014,7 @@ export const projectService = (
           write(
             api,
             planned((snapshot, now) =>
-              Effect.succeed(
-                visibility.onAdmission({ ...input, now }, snapshot)
-              )
+              visibility.onAdmission({ ...input, now }, snapshot)
             )
           )
         ),

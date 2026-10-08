@@ -15,7 +15,10 @@
  *   committed to under a fresh salt, which the DO's store alone keeps, and
  *   each area's root, check count and author count are published
  *   (`CommitmentPublished`). With admission on, the head waits for
- *   `./admission.ts`'s judgement.
+ *   `./admission.ts`'s judgement of its runs (the `Answer` Workflow's
+ *   admission steps run them), then lands the same way, each admitted
+ *   area's `Admitted` entry after its commitment; a push that changes no
+ *   held-back check lands at once.
  * - A claim opened while a sealed suite is in effect is pinned to its root
  *   and layer commit; its answers are judged by that suite, read back at
  *   that commit, and their failures counted per claim and per person, area
@@ -32,7 +35,7 @@ import { CheckSpec } from "@repo/protocol/domain/check";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import type { Policy } from "@repo/protocol/domain/policy";
-import { LayerManifest, LedgerEntry } from "@repo/protocol/domain/visibility";
+import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type {
   Layer as LayerDeclaration,
   Members,
@@ -80,13 +83,15 @@ import type { ProjectSnapshot, ProjectWrites } from "../project-store.ts";
 import type { LayerRow } from "../project-store/rows.ts";
 import { noPlan, policyIn, ProjectVisibility } from "../visibility-port.ts";
 import type {
+  AdmissionPlan,
   HeldBackJob,
   LayerAccess,
   VisibilityEffect,
   VisibilityPlan,
   VisibilityPort,
 } from "../visibility-port.ts";
-import { judgeAdmission, planAdmission } from "./admission.ts";
+import { judgeAdmission, planAdmission, PushedManifest } from "./admission.ts";
+import type { LayerFile, OverlayFile } from "./admission.ts";
 import { judgeAttempts } from "./claims.ts";
 import {
   appended,
@@ -144,8 +149,10 @@ const encodePlanned = Schema.encodeEffect(PlannedJson);
 
 const decodePlanned = Schema.decodeUnknownEffect(PlannedJson);
 
+// A pushed manifest may leave a check's clause out: admission refuses it
+// (`UnstatedRequirement`, Q17) rather than read the manifest as none.
 const decodeManifest = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(LayerManifest)
+  Schema.fromJsonString(PushedManifest)
 );
 
 /** The repo a declared layer keeps in the private namespace. */
@@ -473,69 +480,6 @@ const onPolicy: VisibilityPort["onPolicy"] = (input, snapshot) =>
     );
   });
 
-/**
- * An admission's results, judged by `./admission.ts`: the proposed head
- * lands under the root its runs were given, and the admitted areas are
- * appended, when every area that ran was admitted. The port is
- * synchronous, so no fresh salt is drawn and no commitment published
- * here (612 Comments, for 615).
- */
-const onAdmission: VisibilityPort["onAdmission"] = (input, snapshot) => {
-  const project = projectOf(snapshot);
-
-  const main = Option.flatMap(snapshot.project, ({ landed }) =>
-    Option.fromUndefinedOr(landed)
-  );
-
-  const row = Arr.findFirst(
-    snapshot.layers,
-    ({ name, proposed }) => name === input.layer && proposed === input.head
-  );
-
-  if (Option.isNone(project) || Option.isNone(main) || Option.isNone(row)) {
-    return noPlan;
-  }
-
-  const runs = input.results.map(({ run }) => run);
-
-  const judged = judgeAdmission(
-    { head: input.head, layer: input.layer, main: main.value, runs },
-    input.results
-  );
-
-  // Every run of one plan carries the root of the suite it would admit.
-  const suites = Arr.dedupe(runs.map(({ job }) => job.suite));
-
-  if (
-    judged.refused.length > 0 ||
-    judged.admitted.length === 0 ||
-    !Arr.isReadonlyArrayNonEmpty(suites) ||
-    suites.length > 1
-  ) {
-    return noPlan;
-  }
-
-  const owed = caughtUp(snapshot, visibilityIn(snapshot), input.now);
-  const seq = nextSeq(snapshot.ledger) + owed.length;
-
-  const admitted = judged.admitted.map((entry, index) => ({
-    ...entry,
-    seq: seq + index,
-  }));
-
-  return planOf({
-    ...appended([...owed, ...admitted]),
-    layers: [
-      {
-        ...Struct.omit(row.value, ["proposed", "saltRef"]),
-        admittedAt: input.now,
-        landedSha: input.head,
-        suiteRoot: suites[0],
-      },
-    ],
-  });
-};
-
 const live = Effect.gen(function* () {
   const repos = yield* LayerRepos;
   const salts = yield* SaltSource;
@@ -597,7 +541,7 @@ const live = Effect.gen(function* () {
       );
 
       if (Option.isNone(bytes)) {
-        return Option.none<LayerManifest>();
+        return Option.none<PushedManifest>();
       }
 
       const manifest = Option.filter(
@@ -832,13 +776,65 @@ const live = Effect.gen(function* () {
       });
     });
 
-  /** The runs that would admit `head` to `layer`: none without a manifest, or a check that cites no clause. */
+  /** A blob the layer repo must hold: one its tree named. */
+  const contentOf = (repo: RepoName, blob: ObjectId) =>
+    Effect.flatMap(Effect.orDie(repos.readBlob(repo, blob)), (content) =>
+      Option.match(content, {
+        onNone: () =>
+          Effect.die(`the layer repo ${repo} lost a blob its tree names`),
+        onSome: Effect.succeed,
+      })
+    );
+
+  /**
+   * A known-bad commit the layer repo holds, as the files it lays over
+   * main for its run: every file it holds that the pushed head does not
+   * (so neither the checks nor the manifest), the public code it breaks at
+   * main's paths. None when the repo holds no such commit.
+   */
+  const overlayAt = (
+    repo: RepoName,
+    at: CommitSha,
+    head: ReadonlyMap<string, ObjectId>
+  ) =>
+    Effect.gen(function* () {
+      const found = yield* Effect.orDie(repos.readCommit(repo, at));
+
+      if (Option.isNone(found)) {
+        yield* Effect.logWarning(
+          `the layer repo ${repo} holds no known-bad commit ${at}`
+        );
+
+        return Option.none<readonly OverlayFile[]>();
+      }
+
+      const blobs = [...(yield* blobsAt(repo, at))].filter(
+        ([path]) => !head.has(path)
+      );
+
+      return Option.some(
+        yield* Effect.forEach(blobs, ([path, blob]) =>
+          Effect.map(contentOf(repo, blob), (content): OverlayFile => ({
+            content,
+            path: RepoPath.make(path),
+          }))
+        )
+      );
+    });
+
+  /**
+   * The runs that would admit `head` to `layer` (`./admission.ts`), against
+   * main as it stands: none without a manifest, or for a check that cites no
+   * clause. The runs carry the root of the suite they test under a salt
+   * drawn for them and kept nowhere: the landing draws its own.
+   */
   const admissionOf = (
     input: { readonly head: CommitSha; readonly layer: LayerName },
     snapshot: ProjectSnapshot
   ) =>
     Effect.gen(function* () {
       const project = projectOf(snapshot);
+      const policy = policyIn(snapshot);
       const checks = checksIn(visibilityIn(snapshot), input.layer);
 
       const main = Option.flatMap(snapshot.project, ({ landed }) =>
@@ -847,30 +843,85 @@ const live = Effect.gen(function* () {
 
       if (
         Option.isNone(project) ||
+        Option.isNone(policy) ||
         Option.isNone(checks) ||
         Option.isNone(main)
       ) {
-        return Option.none();
+        return Option.none<AdmissionPlan>();
       }
 
       const row = rowFor(snapshot, project.value, input.layer);
       const manifest = yield* manifestAt(row.repo, row.name, input.head);
 
       if (Option.isNone(manifest)) {
-        return Option.none();
+        return Option.none<AdmissionPlan>();
       }
+
+      const head = yield* blobsAt(row.repo, input.head);
+
+      const landed =
+        row.landedSha === undefined
+          ? new Map<string, ObjectId>()
+          : yield* blobsAt(row.repo, row.landedSha);
 
       const previous =
         row.landedSha === undefined
-          ? Option.none<LayerManifest>()
+          ? Option.none<PushedManifest>()
           : yield* manifestAt(row.repo, row.name, row.landedSha);
 
+      // The bytes of each check the manifest lists and the head holds.
+      const files = new Map(
+        yield* Effect.forEach(
+          manifest.value.checks.flatMap(({ path }) =>
+            Option.match(Option.fromUndefinedOr(head.get(path)), {
+              onNone: () => [],
+              onSome: (blob) => [[path, blob] as const],
+            })
+          ),
+          ([path, blob]) =>
+            Effect.map(
+              contentOf(row.repo, blob),
+              (content): readonly [string, LayerFile] => [
+                path,
+                { blob: BlobSha.make(blob), content },
+              ]
+            )
+        )
+      );
+
+      const knownBad = new Map(
+        Arr.getSomes(
+          yield* Effect.forEach(Arr.dedupe(manifest.value.knownBad), (tree) =>
+            Effect.map(overlayAt(row.repo, tree, head), (overlay) =>
+              Option.map(overlay, (laid) => [tree, laid] as const)
+            )
+          )
+        )
+      );
+
+      const sealed = manifest.value.checks.flatMap(({ area, path }) =>
+        Option.match(Option.fromUndefinedOr(files.get(path)), {
+          onNone: () => [],
+          onSome: ({ blob }) =>
+            Object.hasOwn(checks.value.areas, area)
+              ? [{ area, blob, path }]
+              : [],
+        })
+      );
+
       const plan = planAdmission({
+        files,
         head: input.head,
+        knownBad,
+        landed: new Map(
+          [...landed].map(([path, blob]) => [path, BlobSha.make(blob)])
+        ),
         main: main.value,
         manifest: manifest.value,
         policy: checks.value,
         previous,
+        run: policy.value.run,
+        suite: yield* suiteRoot(yield* salts.next, sealed),
       });
 
       if (Result.isFailure(plan)) {
@@ -879,7 +930,7 @@ const live = Effect.gen(function* () {
           plan.failure
         );
 
-        return Option.none();
+        return Option.none<AdmissionPlan>();
       }
 
       return Option.some(plan.success);
@@ -918,7 +969,13 @@ const live = Effect.gen(function* () {
       const checks = checksIn(visibility, input.layer);
       const admits = Option.exists(checks, ({ admit }) => admit !== undefined);
 
-      if (!admits) {
+      // Admission decides (615): the head waits, proposed, for its runs. A
+      // push that changes no held-back check has none, and lands at once.
+      const planned = admits
+        ? yield* admissionOf({ head: input.head, layer: input.layer }, snapshot)
+        : Option.none<AdmissionPlan>();
+
+      if (!admits || Option.exists(planned, ({ runs }) => runs.length === 0)) {
         const landed = yield* landLayer({
           checks,
           head: input.head,
@@ -932,12 +989,6 @@ const live = Effect.gen(function* () {
           ...appended([...owed, ...(landed.ledger ?? [])]),
         });
       }
-
-      // Admission decides (615): the head waits, proposed, for its runs.
-      const planned = yield* admissionOf(
-        { head: input.head, layer: input.layer },
-        snapshot
-      );
 
       const start = Option.isSome(planned)
         ? [
@@ -969,6 +1020,80 @@ const live = Effect.gen(function* () {
         )
       )
     );
+
+  /**
+   * An admission's results, judged by `./admission.ts` against the plan the
+   * project makes again now (a reported run it did not plan counts for
+   * nothing). When every area the push changes is admitted, the head lands
+   * as a push with admission off does, under a fresh salt with each area's
+   * commitment published, then each admitted area's `Admitted` entry,
+   * rooted at its new commitment. Otherwise the landed SHA stays where it
+   * was, and the head stays proposed.
+   */
+  const onAdmission: VisibilityPort["onAdmission"] = (input, snapshot) =>
+    Effect.gen(function* () {
+      const row = Arr.findFirst(
+        snapshot.layers,
+        ({ name, proposed }) => name === input.layer && proposed === input.head
+      );
+
+      const planned = Option.isNone(row)
+        ? Option.none<AdmissionPlan>()
+        : yield* admissionOf(
+            { head: input.head, layer: input.layer },
+            snapshot
+          );
+
+      if (Option.isNone(row) || Option.isNone(planned)) {
+        return noPlan;
+      }
+
+      const judged = judgeAdmission(planned.value, input.results, input.now);
+      const areas = Arr.dedupe(planned.value.runs.map(({ area }) => area));
+
+      // Every area the push changes admitted, or nothing lands.
+      if (judged.admitted.length < areas.length) {
+        yield* Effect.logWarning(
+          `the push of ${input.head} to ${input.layer} was not admitted`,
+          judged.refused
+        );
+
+        return noPlan;
+      }
+
+      const visibility = visibilityIn(snapshot);
+      const owed = caughtUp(snapshot, visibility, input.now);
+      const seq = nextSeq(snapshot.ledger) + owed.length;
+
+      const landed = yield* landLayer({
+        checks: checksIn(visibility, input.layer),
+        head: input.head,
+        now: input.now,
+        row: row.value,
+        seq,
+      });
+
+      const published = landed.ledger ?? [];
+
+      const roots = new Map(
+        published.flatMap((entry) =>
+          LedgerEntry.guards.CommitmentPublished(entry)
+            ? [[entry.area, entry.suite] as const]
+            : []
+        )
+      );
+
+      const admitted = judged.admitted.map((entry, index) => ({
+        ...entry,
+        seq: seq + published.length + index,
+        suite: roots.get(entry.area) ?? entry.suite,
+      }));
+
+      return planOf({
+        ...landed,
+        ...appended([...owed, ...published, ...admitted]),
+      });
+    });
 
   /** One planned effect, run: a repo made (or found made), an admission started. */
   const run = (planned: Planned) =>

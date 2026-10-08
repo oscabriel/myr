@@ -26,7 +26,7 @@ import { Array, Effect, Option, Order } from "effect";
 
 import { drive } from "../../src/answer-runs/steps.ts";
 import { ProjectStore } from "../../src/project-store.ts";
-import { ProjectVisibility } from "../../src/visibility-port.ts";
+import { AdmissionRun, ProjectVisibility } from "../../src/visibility-port.ts";
 import {
   bob,
   countersigned,
@@ -552,7 +552,7 @@ const admitting = {
 
 describe("a push to the maintainers layer, with admission on", () => {
   it.effect(
-    "stays proposed, starts its admission once, and lands nothing on an admission that admits nothing",
+    "stays proposed, starts its admission once, and lands nothing on an admission whose runs are unreported",
     () =>
       Effect.gen(function* () {
         const { api } = yield* sealedByInes;
@@ -577,13 +577,31 @@ describe("a push to the maintainers layer, with admission on", () => {
           plan: Option.map(plan, ({ head: planned, layer, runs }) => [
             planned,
             layer,
-            runs,
+            runs.map((each) =>
+              AdmissionRun.match(each, {
+                OnKnownBad: ({ area, tree }) => `${area} on ${tree}`,
+                OnMain: ({ area, attempt }) => `${area} on main #${attempt}`,
+              })
+            ),
           ]),
           row: [row.landedSha, row.proposed, row.suiteRoot],
           suite: claim.suite,
         }).toStrictEqual({
           admissions: [{ head, layer: maintainers, project }],
-          plan: Option.some([head, maintainers, []]),
+          // The layer's first push: each area on main three times, and
+          // its manifest names no known-bad commit.
+          plan: Option.some([
+            head,
+            maintainers,
+            [
+              "export on main #1",
+              "export on main #2",
+              "export on main #3",
+              "parser on main #1",
+              "parser on main #2",
+              "parser on main #3",
+            ],
+          ]),
           row: [undefined, head, undefined],
           suite: undefined,
         });
