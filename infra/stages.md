@@ -84,13 +84,16 @@ Every resource in the two tables below belongs to its stage. The times are the a
 
 A throwaway is something a smoke run, a swarm run or a `seed --as` copy makes on a stage, beside the stage's own resources. Each run appends one JSON line for each throwaway to `infra/created.jsonl` (`infra/created.ts`), and teardown acts only on those lines.
 
-On 2026-10-08 at 15:00 UTC the ledger holds 16 entries, all on `dev-oscabriel`, and each still exists:
+On 2026-10-08 at 17:00 UTC the ledger holds 57 entries, all on `dev-oscabriel`, and each still exists:
 
 | When (UTC) | By | Kind | Name | Where |
 | --- | --- | --- | --- | --- |
 | 2026-10-08 12:37 | swarm | repo | `burrow--drop-legacy-fetch-burrow-auth--wren` (a released claim's fork) | `projects-dev-oscabriel` |
 | 2026-10-08 14:40 to 14:58 | smoke | project, repo, repo | four core-loop runs, `smoke-20261008-143944`, `smoke-20261008-144139`, `smoke-20261008-145551` and `smoke-20261008-145715`: each one's project, its repo, and its claim's fork `<project>--parse-year--bram` | `projects-dev-oscabriel` |
 | 2026-10-08 14:52 to 14:54 | seed | project, repo, repo | `burrow-lint-807`, a `seed --as` copy of burrow that proved the Checker runs burrow's lint lane, with its repo and wren's claim fork `burrow-lint-807--drop-legacy-fetch-burrow-auth--wren` | `projects-dev-oscabriel` |
+| 2026-10-08 16:07 to 16:21 | seed, swarm | 2 projects, 8 repos | the harness checks' copies: `datekit-803` (its repo, its layer repo `datekit-803--maintainers`, and bram's claim forks `--parse-iso-week--bram`, `--format-ordinal--bram` and `--add-months-clamp--bram`) and `burrow-803` (its repo, and tamsin's and ivo's claim forks) | `projects-dev-oscabriel`, the layer in `layers-dev-oscabriel` |
+| 2026-10-08 16:29 to 16:41 | seed, swarm | 2 projects, 14 repos | the swarm's two live runs: `burrow-swarm-1` and `burrow-swarm-2`, each a `seed --as` copy of burrow with its repo and the six contributors' claim forks `<project>--drop-legacy-fetch-burrow-<package>--<handle>` | `projects-dev-oscabriel` |
+| 2026-10-08 16:49 to 16:57 | smoke | 5 projects, 10 repos | five core-loop runs, `smoke-20261008-164858`, `smoke-20261008-165040`, `smoke-20261008-165218`, `smoke-20261008-165400` and `smoke-20261008-165645`, each with its repo and its claim's fork `<project>--parse-year--bram` | `projects-dev-oscabriel` |
 
 The live runs before the ledger existed left throwaways that it doesn't hold, all on `dev-oscabriel`. Teardown lists them separately and checks each one still exists before it deletes anything:
 

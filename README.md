@@ -159,7 +159,45 @@ A harness needs nothing of ours to read a refusal: it arrives in `git push` outp
 ## Numbers
 
 <!-- numbers:begin -->
-Filled from the live runs on the demo stage (804).
+Every number below was measured live on the `dev-oscabriel` stage on 2026-10-08 (UTC), on the Workers deployed from commit `c7b68ff`. The runs started from commits `25a727e` and `6730a0e`, which change only the swarm's own scripts. The bars are the platform's own: a check of a small repo in under 60 s (S3), and a landing in under 5 s (S6). A number that misses its bar says so.
+
+**The core loop** (`dev-oscabriel`, 2026-10-08, 16:48 to 16:59 UTC): five runs of `bun scripts/smoke.ts --stage dev-oscabriel --loop`, and all five passed. Each run makes a throwaway project, opens an ask red first, claims it, pushes outside the ask's territory and is refused with `OutOfScope` in git's output, then pushes the fixed answer, sees it land, and reads its verdict note.
+
+| Step | Median | Worst | Bar |
+| --- | --- | --- | --- |
+| people: who each token names | 2.6 s | 2.9 s | none |
+| init: the project made and its first commit pushed | 23.4 s | 24.5 s | none |
+| open-ask: the ask's check red twice on main | 21.9 s | 23.5 s | S3 (60 s): met |
+| claim | 4.4 s | 9.9 s | none |
+| out-of-scope: the push refused in git's output | 6.6 s | 10.6 s | none |
+| answer: the fixed push taken | 5.1 s | 5.5 s | none |
+| landing: from the push taken to main moved | 32.9 s | 91.9 s | S6 (5 s): **missed**; see the next table |
+| verdict-note | 2.1 s | 2.6 s | none |
+| the whole loop | 99.6 s | 162.6 s | none |
+
+The landing step holds the whole asynchronous verdict: the Answer workflow merges the answer onto main (7 to 14 s), runs its checks (2 to 4 s, under S3's bar) and has the Lander land it. In the run that took 91.9 s, the workflow started 66 s after the push was taken. The Lander's own step, read from the Answer workflow's steps in whole seconds:
+
+| The Lander's land step (`dev-oscabriel`, 2026-10-08) | Median | Worst | Bar |
+| --- | --- | --- | --- |
+| the core loop's 5 landings | 6 s | 9 s | S6 (5 s): **missed** in 4 of 5 |
+| the swarm's 10 landings | 5.5 s | 12 s | S6 (5 s): **missed** in 5 of 10 |
+
+**The six-agent swarm** (`dev-oscabriel`, 2026-10-08): `bun run swarm -- --stage dev-oscabriel --project burrow-swarm-<n> --scenario video`, six contributors on four harnesses, each on one child of a fresh copy of burrow's split family. Run 1 started at 16:31 UTC; 4 of 6 landed, the last 3 min 42 s after the start. Run 2, the one retry, started at 16:40 UTC after a fix to the swarm's clone; 6 of 6 landed, the last 7 min 41 s after the start. Time is from the contributor's claim to the end of their run. Refusals counts what the contributor's `myr status` shows. A push refused in git's own output is not an answer there, so it is not counted: in run 2, tamsin also met one `OutOfScope` in git, after rebasing onto the new main.
+
+| Run | Contributor | Harness and model | Outcome | Attempts | Refusals | Time |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | wren | Claude Code, claude-opus-5-5 | landed | 1 | none | 93 s |
+| 1 | tamsin | OpenCode, openai/gpt-5.5 | **failed**: the ChatGPT account's usage limit | 1 | none | 5 s |
+| 1 | ivo | Amp, medium | **failed**: cloned its fork before the platform had made it | 0 | none | 6 s |
+| 1 | marisol | pi, opencode-go/kimi-k3 | landed | 1 | none | 198 s |
+| 1 | dagny | pi, opencode-go/glm-5.3 | landed | 1 | none | 234 s |
+| 1 | pell | pi with the adapter, opencode-go/qwen3.8-flash | landed | 1 | none | 228 s |
+| 2 | wren | Claude Code, claude-opus-5-5 | landed | 1 | none | 86 s |
+| 2 | tamsin | OpenCode, opencode-go/gpt-6-luna | landed | 2 | `StaleBase` ×1 | 466 s |
+| 2 | ivo | Amp, medium | landed | 1 | `ChecksFailed` ×1 | 154 s |
+| 2 | marisol | pi, opencode-go/kimi-k3 | landed | 1 | none | 209 s |
+| 2 | dagny | pi, opencode-go/glm-5.3 | landed | 1 | none | 257 s |
+| 2 | pell | pi with the adapter, opencode-go/qwen3.8-flash | landed | 1 | none | 307 s |
 <!-- numbers:end -->
 
 ## What it promises and how to check
