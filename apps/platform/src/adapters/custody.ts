@@ -37,7 +37,6 @@ import { Custody } from "@repo/git/custody";
 import type { Command } from "@repo/git/custody";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
-import { parseAuditUser } from "@repo/protocol/audit";
 import type { HarnessAudit } from "@repo/protocol/audit";
 import { RequestId, sameHandle } from "@repo/protocol/ids";
 import type { AskId, CommitSha, Handle, ProjectName } from "@repo/protocol/ids";
@@ -46,7 +45,7 @@ import type { Person } from "@repo/protocol/principal";
 import { ClaimLapsed, DirectPush, NotClaimed } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
 import { receiptLine } from "@repo/protocol/render";
-import { Array, Effect, Option, Result, Schema } from "effect";
+import { Array, Effect, Option, Result } from "effect";
 
 import { RepoKind } from "../repo-names.ts";
 
@@ -270,24 +269,6 @@ const claimFork = (
     );
   });
 
-const BASIC = /^Basic (?<encoded>\S+)$/iu;
-
-const fromBase64 = Schema.decodeOption(Schema.StringFromBase64);
-
-/**
- * The harness a push came through, as its credential helper's basic-auth
- * username says (`audit;harness=pi&model=kimi-k3`); none for any other
- * username, or a bearer token. Audit metadata, never identity.
- */
-export const auditOf = (headers: Headers): Option.Option<HarnessAudit> =>
-  Option.fromNullishOr(
-    BASIC.exec(headers.get("authorization") ?? "")?.groups?.encoded
-  ).pipe(
-    Option.flatMap(fromBase64),
-    Option.map((pair) => pair.slice(0, Math.max(pair.indexOf(":"), 0))),
-    Option.flatMap(parseAuditUser)
-  );
-
 /** What a push's log lines and span carry: who pushes, to which kind of repo, through which harness. */
 type PushAnnotations = HarnessAudit & {
   readonly pusher: string;
@@ -336,9 +317,9 @@ export const refuseAll = custodyOf(directPushes, (_repo, commands) =>
 /**
  * Custody of one push by `pusher` to the repo `kind` names. `notice` says a
  * line to the pusher once the push went through: what became of the answer
- * it offered. `audit` is the harness the push came through (`auditOf`), if
- * its username named one: logged with the push, never who pushes. Only a
- * signed-in person pushes anywhere.
+ * it offered. `audit` is the harness the push came through (`auditOf` in
+ * `credential.ts`), if its username named one: logged with the push, never
+ * who pushes. Only a signed-in person pushes anywhere.
  */
 export const custodyFor = (
   pusher: Principal,

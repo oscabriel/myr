@@ -34,17 +34,21 @@ import { EvidenceStore, LogRef, logOfRef } from "@repo/checks/evidence-store";
 import { findRunBlock } from "@repo/checks/finder";
 import { judgeClosure } from "@repo/checks/judge";
 import { checkVersion, commandFor } from "@repo/checks/kinds";
-import type { CountUnreadable } from "@repo/checks/kinds/lint-count";
+import { lintToZeroCount } from "@repo/checks/kinds/lint-to-zero";
+import type { LintToZeroCheck } from "@repo/checks/kinds/lint-to-zero";
 import { measure } from "@repo/checks/kinds/ratchet";
 import type { RatchetCount } from "@repo/checks/kinds/ratchet";
 import { redFirstOfRuns } from "@repo/checks/red-first";
 import { weaknessesOf } from "@repo/checks/weak-shapes";
-import { escapeDecisions, escapeRatchet } from "@repo/gate/escapes";
+import {
+  escapeDecisions,
+  escapeRatchet,
+  territoryOf,
+} from "@repo/gate/escapes";
 import type { Waiver } from "@repo/gate/escapes";
 import { PushTarget } from "@repo/gate/facts";
 import type { PushFacts } from "@repo/gate/facts";
 import { pushStages, runGate } from "@repo/gate/gate";
-import { matchAny } from "@repo/gate/glob";
 import { scan } from "@repo/gate/stages/shape";
 import { verdictOf } from "@repo/gate/verdict";
 import { patchId } from "@repo/git/patch-id";
@@ -81,14 +85,13 @@ import type {
   LaneResult,
 } from "@repo/protocol/domain/answer";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
-import { CheckSpec, RatchetMeasure } from "@repo/protocol/domain/check";
-import type { RatchetSpec } from "@repo/protocol/domain/check";
+import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { RefNameText } from "@repo/protocol/domain/common";
 import type { Evidence } from "@repo/protocol/domain/common";
 import type { Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
-import type { Decision } from "@repo/protocol/domain/decision";
+import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import type { LandingView } from "@repo/protocol/domain/landing";
@@ -96,13 +99,11 @@ import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
 import { Policy } from "@repo/protocol/domain/policy";
 import type { Proposal } from "@repo/protocol/domain/proposal";
-import type { Territory } from "@repo/protocol/domain/territory";
 import {
   AskId,
   CommitSha,
   Handle,
   LandedSha,
-  RatchetName,
   RepoName,
   RepoPath,
   RequestId,
@@ -176,7 +177,7 @@ import {
 } from "./answer-runs.ts";
 import type { AnswerQueue, AnswerRuns, RunnableEffect } from "./answer-runs.ts";
 import { isStep } from "./answer-runs/steps.ts";
-import { decidersFor, openDecision } from "./attention/decisions.ts";
+import { openDecision } from "./attention/decisions.ts";
 import { recordOf } from "./attention/record.ts";
 import { mayClaim, standing } from "./attention/vouch.ts";
 import {
@@ -191,6 +192,7 @@ import type { ClaimStep, Live } from "./claim.ts";
 import {
   deciderDeadlines,
   deciders,
+  decidersOn,
   decidesOn,
   envSchemaMethod,
   isDecider,
@@ -245,7 +247,11 @@ import type {
 import type { Projection } from "./projection.ts";
 import { askToLand, holdsSlot, leave, queueOf, storedQueue } from "./queue.ts";
 import { afterLanding, decideRaise, judgeRatchets } from "./ratchets.ts";
-import type { RaiseRequest, RatchetBaseline } from "./ratchets.ts";
+import type {
+  RaiseRatchet,
+  RaiseRequest,
+  RatchetBaseline,
+} from "./ratchets.ts";
 
 /** Every port one project's service runs on. */
 export type ProjectPorts =
@@ -647,13 +653,16 @@ export type Measured = typeof Measured.Type;
 /**
  * Where one answer stands, as its row keeps it: the landing lifecycle's
  * state, the receipt its request was first given (a replay gets it again),
- * the verdict on its last checked tree, and what that tree counted.
+ * the verdict on its last checked tree, what that tree counted, and each
+ * `Waiver` a decider accepted for this answer (checked again after main
+ * moved, it is not asked again; another answer to the ask is).
  */
 export const AnswerRecord = Schema.Struct({
   landing: LandingState,
   measured: Schema.optionalKey(Measured),
   receipt: AnswerReceipt,
   verdict: Schema.optionalKey(Verdict),
+  waived: Schema.optionalKey(Schema.Array(DecisionSubject.cases.Waiver)),
 });
 
 export type AnswerRecord = typeof AnswerRecord.Type;
@@ -921,48 +930,6 @@ const lanesOf = (
   ),
 ];
 
-/** A `lintToZero` check. */
-export type LintToZeroCheck = Extract<
-  CheckSpec,
-  { readonly _tag: "LintToZero" }
->;
-
-/** The name a `lintToZero` check's count goes by in `measure`. */
-const lintCountName = RatchetName.make("lint-to-zero");
-
-/**
- * What a `lintToZero` ask's check counts in what its lint printed: the
- * rule's findings in the check's territory (a module by its name, else the
- * name read as a glob), or in the ask's own territory when the check names
- * none. Read by `@repo/checks/kinds/ratchet`'s `measure`, as a ratchet's
- * count is, so the two never read a lint differently.
- */
-export const lintCountOf = (input: {
-  readonly ask: Ask;
-  readonly check: LintToZeroCheck;
-  readonly modules: readonly Territory[];
-  readonly stdout: string;
-}): Effect.Effect<number, CountUnreadable> => {
-  const { ask, check } = input;
-
-  const spec: RatchetSpec = {
-    measure: RatchetMeasure.cases.Count.make({
-      command: check.command,
-      rule: check.rule,
-    }),
-    name: lintCountName,
-    territory: check.territory ?? ask.territory.module,
-  };
-
-  return Effect.map(
-    measure(spec, () => Effect.succeed({ code: 0, stdout: input.stdout }), [
-      ask.territory,
-      ...input.modules,
-    ]),
-    (counts) => counts.reduce((total, { count }) => total + count, 0)
-  );
-};
-
 /**
  * The policy's ratchets that `command` counts, read from what it printed:
  * one count per ratchet and territory. A ratchet whose count can't be read
@@ -1016,34 +983,54 @@ const isEscapeRow = (row: {
   readonly territory: string;
 }) => row.ratchet === escapeRatchet(row.territory);
 
-/** The module holding `path`, or the ask's for a path no module holds (as `escapeDecisions` reads it). */
-const territoryOfPath = (policy: Policy, ask: Ask, path: string) =>
-  policy.modules.find((module) => matchAny(module.paths, path))?.module ??
-  ask.territory.module;
-
-/** Whether two `Waiver`s are about one escape: one ask, one marker, one line. */
-const sameEscape = (one: Waiver, other: DecisionSubject) =>
-  DecisionSubject.guards.Waiver(other) &&
+/** Whether two `Waiver`s are about one escape: one ask, one marker and reason, one line. */
+const sameEscape = (one: Waiver) => (other: Waiver) =>
   other.ask === one.ask &&
   other.marker === one.marker &&
+  other.reason === one.reason &&
   other.at.path === one.at.path &&
   other.at.line === one.at.line;
 
-/** The deciders of `paths`, or the initializer when no glob of the policy's names them. */
-const decidersOfPaths = (
-  policy: Policy,
-  paths: readonly RepoPath[],
-  initializer: Handle
-): Array.NonEmptyReadonlyArray<Handle> =>
-  Array.match(decidersFor(policy, paths), {
-    onEmpty: () => Array.of(initializer),
-    onNonEmpty: (named) => named,
-  });
+/** What a decider just decided for an answer waiting on it: the subject, and the choice in its words. */
+interface DecidedOn {
+  readonly choice: Choice;
+  readonly subject: PendingDecision["subject"];
+}
+
+/** The decision `command` takes, when it is one the answer waiting in `before` waits on. */
+const decidedOn = (
+  before: LandingState,
+  command: LandingCommand
+): Option.Option<DecidedOn> =>
+  LandingCommand.$is("Decided")(command) &&
+  LandingState.guards.AwaitingDecision(before)
+    ? Option.map(
+        Option.fromUndefinedOr(
+          before.decisions.find(({ id }) => id === command.decision)
+        ),
+        ({ subject }) => ({ choice: command.choice, subject })
+      )
+    : Option.none();
+
+/** The `Waiver`s a decider accepted for an answer: those it had, and the one just accepted. */
+const waivedAfter = (
+  waived: readonly Waiver[],
+  decided: Option.Option<DecidedOn>
+): readonly Waiver[] => [
+  ...waived,
+  ...Option.toArray(
+    Option.flatMap(decided, ({ choice, subject }) =>
+      choice === "accept" && DecisionSubject.guards.Waiver(subject)
+        ? Option.some(subject)
+        : Option.none()
+    )
+  ),
+];
 
 /** What a decider weighs for one subject an answer waits on. */
 const evidenceFor = (
   request: Request,
-  subject: Waiver | ReturnType<typeof judgeRatchets>["decisions"][number]
+  subject: Waiver | RaiseRatchet
 ): readonly Evidence[] => [
   {
     label: "answer",
@@ -1080,7 +1067,12 @@ const redByCount = (input: {
       Effect.fromOption(outputOf(run, input.lane)).pipe(
         Effect.flatMap((stdout) =>
           Effect.map(
-            lintCountOf({ ask, check, modules: policy.modules, stdout }),
+            lintToZeroCount({
+              asked: ask.territory,
+              check,
+              modules: policy.modules,
+              stdout,
+            }),
             (count) => ({ count, stdout })
           )
         ),
@@ -2416,10 +2408,12 @@ export const projectService = (
      * `Weakened{ratchet}`, unless a reasoned escape the answer adds in its
      * territory asks to raise it (`RaiseRatchet`); each reasoned escape over
      * its territory's escape baseline waits on a `Waiver`, unless a decider
-     * already accepted that line for the ask (a re-check after main moved
-     * asks nothing twice). Nothing waits once something refused; the
-     * decisions open with their subject's default, `decline`. What the tree
-     * counted is kept for the answer's landing.
+     * already accepted it for this answer (`waived`: a re-check after main
+     * moved asks nothing twice). Nothing waits once something refused; the
+     * decisions open with their subject's default, `decline`. The answer's
+     * lines unread are the gate's trouble (`VerifierBlocked`): no escape
+     * lands unweighed. What the tree counted is kept for the answer's
+     * landing.
      */
     const ratchetJudged = (input: {
       readonly checking: Checking;
@@ -2427,6 +2421,7 @@ export const projectService = (
       readonly h: Hydrated;
       readonly now: DateTime.Utc;
       readonly report: AnswerReport | undefined;
+      readonly waived: readonly Waiver[];
       readonly writes: Writes;
     }) =>
       Effect.gen(function* () {
@@ -2462,31 +2457,33 @@ export const projectService = (
             ref: mainRef,
             repo: request.fork,
           })
-        ).pipe(Effect.option);
+        ).pipe(
+          Effect.tapError((unread) =>
+            Effect.logWarning(
+              `the lines of answer ${request.requestId} could not be read for its escapes`,
+              unread
+            )
+          ),
+          Effect.result
+        );
 
-        const waivers = Option.match(facts, {
-          onNone: (): readonly Waiver[] => [],
-          onSome: (found) =>
+        const waivers = Result.match(facts, {
+          onFailure: (): readonly Waiver[] => [],
+          onSuccess: (found) =>
             escapeDecisions({ ...found, ratchetBaselines: escapeBaselines }),
         });
 
-        const accepted = [
-          ...h.decisions.filter(({ id }) => !writes.decisions.has(id)),
-          ...writes.decisions.values(),
-        ].filter(
-          ({ decided }) =>
-            decided?.choice === "accept" || decided?.choice === "adopt"
-        );
+        const unread = Result.isFailure(facts) ? [new VerifierBlocked({})] : [];
 
-        const territoryOf = (waiver: Waiver) =>
-          territoryOfPath(policy, asked, waiver.at.path);
+        const territoryIn = (waiver: Waiver) =>
+          territoryOf(policy, asked, waiver.at.path);
 
         // A reasoned escape in a territory explains a raise there.
         const raises = waivers.flatMap((waiver): readonly RaiseRequest[] =>
           policy.ratchets.map(({ name: ratchet }) => ({
             ratchet,
             reason: waiver.reason,
-            territory: territoryOf(waiver),
+            territory: territoryIn(waiver),
           }))
         );
 
@@ -2499,14 +2496,14 @@ export const projectService = (
           raises,
         });
 
-        const escapes = Array.dedupe(waivers.map(territoryOf)).map(
+        const escapes = Array.dedupe(waivers.map(territoryIn)).map(
           (territory): MeasuredCount => {
             const ratchet = escapeRatchet(territory);
 
             return {
               count:
                 (escapeBaselines.get(ratchet) ?? 0) +
-                waivers.filter((waiver) => territoryOf(waiver) === territory)
+                waivers.filter((waiver) => territoryIn(waiver) === territory)
                   .length,
               ratchet,
               territory,
@@ -2514,13 +2511,16 @@ export const projectService = (
           }
         );
 
-        const refusals = [...command.refusals, ...judgement.refusals];
+        const refusals = [
+          ...command.refusals,
+          ...unread,
+          ...judgement.refusals,
+        ];
 
         const asking = Array.isReadonlyArrayEmpty(refusals)
           ? [
               ...waivers.filter(
-                (waiver) =>
-                  !accepted.some(({ subject }) => sameEscape(waiver, subject))
+                (waiver) => !input.waived.some(sameEscape(waiver))
               ),
               ...judgement.decisions,
             ]
@@ -2530,7 +2530,7 @@ export const projectService = (
 
         const pending = asking.map((subject): PendingDecision => {
           const decision = openDecision({
-            deciders: decidersOfPaths(
+            deciders: decidersOn(
               policy,
               DecisionSubject.guards.Waiver(subject)
                 ? [subject.at.path]
@@ -2564,34 +2564,24 @@ export const projectService = (
     const raiseOnDecision = (
       h: Hydrated,
       writes: Writes,
-      before: LandingState,
-      command: LandingCommand
+      decided: Option.Option<DecidedOn>
     ) => {
       const live = liveRow(h);
 
-      if (
-        !LandingCommand.$is("Decided")(command) ||
-        !LandingState.guards.AwaitingDecision(before) ||
-        Option.isNone(live)
-      ) {
+      if (Option.isNone(decided) || Option.isNone(live)) {
         return;
       }
 
-      const pending = before.decisions.find(
-        ({ id }) => id === command.decision
-      );
+      const { choice, subject } = decided.value;
 
-      if (
-        pending !== undefined &&
-        DecisionSubject.guards.RaiseRatchet(pending.subject)
-      ) {
+      if (DecisionSubject.guards.RaiseRatchet(subject)) {
         putRatchets(
           h,
           writes,
           decideRaise(
             baselinesNow(h, writes),
-            pending.subject,
-            command.choice,
+            subject,
+            choice,
             live.value.landed
           )
         );
@@ -2651,6 +2641,7 @@ export const projectService = (
                   h,
                   now,
                   report,
+                  waived: record.waived ?? [],
                   writes,
                 })
               : { command: reported, measured: Option.none<Measured>() };
@@ -2663,7 +2654,10 @@ export const projectService = (
             Option.fromUndefinedOr(record.measured)
           );
 
-          raiseOnDecision(h, writes, before, command);
+          const decided = decidedOn(before, command);
+          const waived = waivedAfter(record.waived ?? [], decided);
+
+          raiseOnDecision(h, writes, decided);
 
           if (
             LandingState.guards.Landed(state) &&
@@ -2737,6 +2731,10 @@ export const projectService = (
                   landing: state,
                   ...field("verdict", verdict),
                   ...field("measured", measured),
+                  ...field(
+                    "waived",
+                    Option.liftPredicate(waived, Array.isReadonlyArrayNonEmpty)
+                  ),
                 })
               ),
               updatedAt: now,

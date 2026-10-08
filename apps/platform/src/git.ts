@@ -22,8 +22,8 @@ import { RepoName } from "@repo/protocol/ids";
 import { Anonymous, Principal } from "@repo/protocol/principal";
 import { Effect, Option, Ref } from "effect";
 
-import { auditOf, custodyFor, refuseAll } from "./adapters/custody.ts";
-import { credentialOf } from "./credential.ts";
+import { custodyFor, refuseAll } from "./adapters/custody.ts";
+import { auditOf, credentialOf } from "./credential.ts";
 import { repoKind, RepoKind } from "./repo-names.ts";
 import { Sessions } from "./sessions.ts";
 

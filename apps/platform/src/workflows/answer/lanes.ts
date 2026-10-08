@@ -24,12 +24,12 @@ import {
 } from "@repo/checks/check-runner";
 import type { CheckRun, LaneEvidence } from "@repo/checks/check-runner";
 import { EvidenceStore } from "@repo/checks/evidence-store";
+import { lintToZeroCount } from "@repo/checks/kinds/lint-to-zero";
 import { measure } from "@repo/checks/kinds/ratchet";
 import { classifyFailure } from "@repo/gate/classify";
 import { MeasuredCount, runBlockOf } from "@repo/project/answer-runs";
 import type { AnswerRun } from "@repo/project/answer-runs";
 import { LandingState } from "@repo/project/landing";
-import { lintCountOf } from "@repo/project/project";
 import {
   HeldBackResult,
   LaneOutcome,
@@ -344,7 +344,12 @@ const countedAskLane = (
 
   return Effect.fromOption(outputOf(ran, askLane)).pipe(
     Effect.flatMap((stdout) =>
-      lintCountOf({ ask, check, modules: run.counts?.modules ?? [], stdout })
+      lintToZeroCount({
+        asked: ask.territory,
+        check,
+        modules: run.counts?.modules ?? [],
+        stdout,
+      })
     ),
     Effect.map((count) =>
       count === 0

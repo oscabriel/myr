@@ -7,8 +7,8 @@
  * marker it adds there, instead of landing or being refused.
  *
  * This is a pure function beside the stages, not a stage: a waiting answer
- * is not refused, so the caller (the Answer workflow, 417) opens the
- * decisions.
+ * is not refused, so the caller (the Project DO, when an answer's checks
+ * report; 417) opens the decisions.
  */
 import type { Ask } from "@repo/protocol/domain/ask";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
@@ -62,7 +62,7 @@ const escapesIn = (
  * ask's territory for a path no module holds (a root manifest the ask may
  * change).
  */
-const territoryOf = (policy: Policy, ask: Ask, path: RepoPath) =>
+export const territoryOf = (policy: Policy, ask: Ask, path: RepoPath) =>
   policy.modules.find((module) => matchAny(module.paths, path))?.module ??
   ask.territory.module;
 

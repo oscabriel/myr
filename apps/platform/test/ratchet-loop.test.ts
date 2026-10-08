@@ -506,6 +506,157 @@ const raiseStory = (world: CoreLoopWorld) =>
     };
   });
 
+/**
+ * alice answers decode-raw with a raise and a reasoned escape; dora accepts
+ * the `Waiver` and declines the `RaiseRatchet`, so the answer is refused.
+ * alice pushes again on the same claim: the same escape on the same line,
+ * and no raise.
+ */
+const againStory = (world: CoreLoopWorld) =>
+  Effect.gen(function* () {
+    const aliceGit = world.git("alice");
+    const escape = "// @ts-expect-error -- the codec boundary erases types";
+
+    const first = yield* answer(world, "alice", aliceGit, {
+      ask: decodeRaw,
+      files: {
+        [codecPath]: [
+          escape,
+          "export const decode = (raw: any) => raw;",
+          "",
+        ].join("\n"),
+      },
+    });
+
+    yield* scriptAnswer(world, first.tree, {
+      askLane: redThenGreen,
+      askResult: "passed",
+      findings: [...formatOnly, [codecPath, 2]],
+    });
+    yield* world.settle();
+
+    const dora = world.rpc("dora");
+
+    for (const { id, subject } of (yield* dora.today({ project })).decisions) {
+      yield* dora.decide({
+        choice: DecisionSubject.guards.Waiver(subject) ? "accept" : "decline",
+        decision: id,
+        project,
+      });
+    }
+
+    yield* world.settle();
+
+    const head = yield* aliceGit.commit(first.work, "Type decode", {
+      [codecPath]: [
+        escape,
+        "export const decode = (raw: unknown) => raw;",
+        "",
+      ].join("\n"),
+    });
+
+    yield* aliceGit.push(first.work);
+
+    yield* scriptAnswer(world, yield* treeOf(aliceGit, first.work, head), {
+      askLane: redThenGreen,
+      askResult: "passed",
+      findings: formatOnly,
+    });
+    yield* world.settle();
+
+    return {
+      answers: (yield* world.rpc("alice").status({ project })).answers,
+      baselines: yield* baselines(world),
+      today: (yield* dora.today({ project })).decisions,
+    };
+  });
+
+/**
+ * alice's reasoned escape waits on a `Waiver` while bob's clean answer to
+ * format-iso lands; dora then accepts it, alice's land finds main moved,
+ * and her answer is merged and checked again on the new main.
+ */
+const movedStory = (world: CoreLoopWorld, widened: { readonly work: string }) =>
+  Effect.gen(function* () {
+    const aliceGit = world.git("alice");
+    const bobGit = world.git("bob");
+
+    const escaped = yield* answer(world, "alice", aliceGit, {
+      ask: decodeRaw,
+      files: {
+        [codecPath]: [
+          "// oxlint-disable-next-line no-explicit-any -- the codec boundary erases types",
+          "export const decode = (raw: any) => raw;",
+          "",
+        ].join("\n"),
+      },
+    });
+
+    yield* scriptAnswer(world, escaped.tree, {
+      askLane: redThenGreen,
+      askResult: "passed",
+      findings: formatOnly,
+    });
+    yield* world.settle();
+
+    // bob's answer, typed this time, lands while alice's waits.
+    const typed = yield* bobGit.commit(widened.work, "Type format", {
+      [formatPath]:
+        "export const format = (d: Date) => d.toISOString().slice(0, 10);\n",
+    });
+
+    yield* bobGit.push(widened.work);
+    yield* scriptAnswer(world, yield* treeOf(bobGit, widened.work, typed), {
+      askLane: redThenGreen,
+      askResult: "passed",
+      findings: [],
+    });
+    yield* world.settle();
+
+    // alice's answer merged onto the new main, as the Lander will merge it.
+    yield* aliceGit.ok(
+      escaped.work,
+      "fetch",
+      "--quiet",
+      `${world.origin}/${project}.git`,
+      "main"
+    );
+
+    const remerged = CheckAt.cases.Tree.make({
+      tree: TreeSha.make(
+        yield* aliceGit.ok(
+          escaped.work,
+          "merge-tree",
+          "--write-tree",
+          "FETCH_HEAD",
+          escaped.head
+        )
+      ),
+    });
+
+    yield* scriptAnswer(world, remerged, {
+      askLane: redThenGreen,
+      askResult: "passed",
+      findings: [],
+    });
+
+    const dora = world.rpc("dora");
+    const asked = (yield* dora.today({ project })).decisions;
+
+    for (const { id } of asked) {
+      yield* dora.decide({ choice: "accept", decision: id, project });
+    }
+
+    yield* world.settle();
+
+    return {
+      answers: (yield* world.rpc("alice").status({ project })).answers,
+      asked: asked.map(({ subject }) => subject._tag),
+      baselines: yield* baselines(world),
+      today: (yield* dora.today({ project })).decisions,
+    };
+  });
+
 const parserZero: Baseline = [ratchet, "parser", 0];
 
 const formatTwo: Baseline = [ratchet, "format", 2];
@@ -689,6 +840,61 @@ describe("ratchets and lint-to-zero asks, through the platform's fetch handler w
               territory: "parser",
             }),
           ],
+        });
+      }),
+    60_000
+  );
+
+  it.live(
+    "a Waiver accepted for one answer is asked again of the next answer to the same ask",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* coreLoopWorld();
+        yield* ratchetStory(world);
+        const seen = yield* againStory(world);
+
+        expect({
+          answers: seen.answers.map(({ outcome }) => outcome._tag),
+          baselines: seen.baselines,
+          today: seen.today.map(({ subject }) => subject),
+        }).toStrictEqual({
+          answers: ["Landed", "Refused", "AwaitingDecision"],
+          baselines: [formatTwo, parserZero],
+          today: [
+            DecisionSubject.cases.Waiver.make({
+              ask: decodeRaw,
+              at: { line: 1, path: RepoPath.make(codecPath) },
+              marker: "@ts-expect-error",
+              reason: "the codec boundary erases types",
+            }),
+          ],
+        });
+      }),
+    60_000
+  );
+
+  it.live(
+    "an accepted Waiver is not asked again when its answer is checked again after main moved",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* coreLoopWorld();
+        const { widened } = yield* ratchetStory(world);
+        const seen = yield* movedStory(world, widened);
+
+        expect({
+          answers: seen.answers.map(({ outcome }) => outcome._tag),
+          asked: seen.asked,
+          baselines: seen.baselines,
+          today: seen.today,
+        }).toStrictEqual({
+          answers: ["Landed", "Landed"],
+          asked: ["Waiver"],
+          baselines: [
+            [RatchetName.make("escapes-parser"), "parser", 1],
+            [ratchet, "format", 0],
+            parserZero,
+          ],
+          today: [],
         });
       }),
     60_000
