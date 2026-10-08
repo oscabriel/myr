@@ -124,6 +124,17 @@
             }
           },
           {
+            "include": ["apps/web/test/production-bundle.test.ts"],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/http",
+                "effect/process",
+                "effect/reactivity",
+                "effect/rpc"
+              ]
+            }
+          },
+          {
             "include": ["apps/cli/**/*.ts"],
             "options": {
               "allowedUnstableApis": [

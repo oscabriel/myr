@@ -1,0 +1,5 @@
+# Every page is public. /rpc carries the contracts for the pages and is
+# not a page itself.
+User-agent: *
+Allow: /
+Disallow: /rpc

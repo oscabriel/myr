@@ -39,6 +39,7 @@ import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import { AlarmsMemory } from "@repo/project/alarms/memory";
 import { AnswerRuns } from "@repo/project/answer-runs";
+import type { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { Lander } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
@@ -223,9 +224,13 @@ const helperScript = (as: Someone, username: string = as) =>
     "",
   ].join("\n");
 
-/** What a test may set in its world: where lane logs are kept, in memory by default. */
+/**
+ * What a test may set in its world: where lane logs are kept, in memory by
+ * default, and the front page, which lists no project by default.
+ */
 export interface WorldOptions {
   readonly evidence?: Layer.Layer<EvidenceStore>;
+  readonly frontPage?: Layer.Layer<FrontPage>;
 }
 
 export const coreLoopWorld = (
@@ -273,7 +278,8 @@ export const coreLoopWorld = (
         CheckRunnerMemory.layer(script, printed),
         RulesEvaluatorBun.pipe(Layer.provide(FinishersFromChecks)),
         options.evidence ?? EvidenceStoreMemory,
-        FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
+        options.frontPage ??
+          FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
         ProjectionMemory,
         MemoryRateLimits(WorkerCaps)
       ).pipe(

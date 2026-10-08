@@ -197,6 +197,12 @@ const clean: readonly SourceFile[] = [
     'import { surfaced } from "@repo/protocol/contracts";',
     'import { Brand } from "@repo/brand";'
   ),
+  // The reference data `bun run gen` writes, read as JSON by any workspace:
+  // the web's llms.txt lists the CLI's commands from it.
+  file(
+    "apps/web/src/features/agents/catalog.ts",
+    'import commandCatalog from "../../../../../docs/reference/commands.json";'
+  ),
   file("scripts/gen.ts", 'import { groups } from "@repo/protocol/refusal";'),
   file("infra/deploy.ts", 'import alchemy from "alchemy";'),
 ];
@@ -308,6 +314,33 @@ describe("import direction", () => {
         'import { findViolations } from "../../../scripts/lib/imports.ts";'
       ),
       "../../../scripts/lib/imports.ts"
+    ),
+    refused(
+      "a workspace reads a generated reference that is not data",
+      "adapter-through-port",
+      file(
+        "apps/web/src/x.ts",
+        'import cli from "../../../docs/reference/cli.md?raw";'
+      ),
+      "../../../docs/reference/cli.md?raw"
+    ),
+    refused(
+      "a workspace reaches root JSON outside the generated reference",
+      "adapter-through-port",
+      file(
+        "apps/web/src/x.ts",
+        'import manifest from "../../../package.json";'
+      ),
+      "../../../package.json"
+    ),
+    refused(
+      "a workspace climbs out of the generated reference",
+      "adapter-through-port",
+      file(
+        "apps/web/src/x.ts",
+        'import x from "../../../docs/reference/../../scripts/x.json";'
+      ),
+      "../../../docs/reference/../../scripts/x.json"
     ),
     refused(
       "a file reaches into another package by a relative path",

@@ -1,9 +1,12 @@
+import { RepoHost } from "@repo/artifacts/repo-host";
 import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
 import { Upstream } from "@repo/git/upstream";
+import type { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
 import { UnknownProject } from "@repo/protocol/refusal";
+import { untouchable } from "@repo/testkit/untouchable";
 import { Effect, Layer, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
@@ -130,8 +133,9 @@ const unused = (port: string) => () =>
 
 /**
  * What a surfaces test may leave out: git's ports and the release store,
- * unused (no test here pushes, and only the releases test downloads), and
- * the stage, `local`.
+ * unused (no test here pushes, and only the releases test downloads), a
+ * front page that lists no project and the repos behind it, unused (so the
+ * skills index is empty), and the stage, `local`.
  */
 const defaults = Layer.mergeAll(
   Layer.succeed(
@@ -140,6 +144,8 @@ const defaults = Layer.mergeAll(
   ),
   Layer.succeed(Upstream, Upstream.of({ exchange: unused("Upstream") })),
   Layer.succeed(ReleaseStore, ReleaseStore.of({ get: unused("ReleaseStore") })),
+  FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
+  Layer.succeed(RepoHost, untouchable<RepoHost["Service"]>("RepoHost")),
   Layer.succeed(Stage, Stage.of({ name: "local" }))
 );
 
@@ -170,7 +176,10 @@ export const noProjects = Handlers.pipe(
  */
 export const served = Effect.fnUntraced(function* <E>(
   services: Layer.Layer<
-    Exclude<Services, Projects | ReleaseStore | Upstream | Stage>,
+    Exclude<
+      Services,
+      Projects | ReleaseStore | Upstream | FrontPage | RepoHost | Stage
+    >,
     E
   >
 ) {
