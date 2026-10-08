@@ -64,6 +64,28 @@ export {
   type TerritoryInput,
 } from "./territory.ts";
 
+export {
+  type AreaOf,
+  deciders,
+  embargo,
+  flows,
+  type FlowsDefinition,
+  layer,
+  type LayerConfig,
+  type LayerDefinition,
+  type LayerHolds,
+  layerManifest,
+  type LayerManifestDefinition,
+  type MembersInput,
+  personal,
+  type SealedCheckInput,
+  sealedChecks,
+  type SealedChecksDefinition,
+  visibility,
+  type VisibilityConfig,
+  type VisibilityDefinition,
+} from "./visibility.ts";
+
 /**
  * The version of these rules, part of every check version
  * (`redThenGreen@0.0.0+<hash>`): a verdict is reused only under the same one.
