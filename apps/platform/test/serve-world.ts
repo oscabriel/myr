@@ -13,6 +13,10 @@
  *   red first, or not, by what it really does.
  * - Beside dora, alice and bob, the people in `WORLD_SESSIONS` (a JSON
  *   object from token to handle, as `SESSION_TOKENS` is) may call.
+ * - Every answer run a push queues is carried a moment later, for as long
+ *   as the world serves, as the `Answer` Workflow carries it on a stage:
+ *   an answer pushed over git lands with nobody calling `settle` (W8 806's
+ *   `smoke --loop` runs against this world).
  * - Every cartridge the platform plugs in (`cartridges.ts`) is plugged in
  *   here too, as `ports.ts` plugs them into the Worker, for a stage whose
  *   private namespace is the world's second store of bare repos: so a
@@ -36,7 +40,15 @@ import { Projects } from "@repo/project/projects";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { git } from "@repo/testkit/git";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Console, Effect, FileSystem, Layer, Stdio, Stream } from "effect";
+import {
+  Console,
+  Duration,
+  Effect,
+  FileSystem,
+  Layer,
+  Stdio,
+  Stream,
+} from "effect";
 
 import type * as Cartridges from "../src/cartridges.ts";
 import type { Cartridge } from "../src/cartridges.ts";
@@ -157,6 +169,9 @@ const cartridgesOver =
     };
   };
 
+/** How long after the last round the world carries queued answer runs again. */
+const CARRY_EVERY = Duration.millis(250);
+
 const serve = Effect.gen(function* () {
   yield* shimWorkers;
 
@@ -177,6 +192,18 @@ const serve = Effect.gen(function* () {
     plugIn: cartridgesOver(cartridges, decodeEnv),
     sessions,
   });
+
+  // The Answer Workflow's stand-in: the queued runs, carried every
+  // `CARRY_EVERY` while the world serves. A run that dies is logged, and
+  // the next round carries on.
+  yield* world.settle().pipe(
+    Effect.catchCause((cause) =>
+      Effect.logWarning("the world's answer runs failed", cause)
+    ),
+    Effect.andThen(Effect.sleep(CARRY_EVERY)),
+    Effect.forever,
+    Effect.forkScoped
+  );
 
   yield* Console.log(JSON.stringify({ origin: world.origin }));
 

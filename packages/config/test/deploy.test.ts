@@ -20,6 +20,7 @@ import {
   StepFailed,
   UnknownStage,
 } from "../../../infra/deploy.ts";
+import { LockFile } from "../../../infra/recording.ts";
 import { repoRoot } from "./root.ts";
 
 /** One command the deploy spawned, with its folder relative to the repo root. */
@@ -86,10 +87,21 @@ const run = (
   } = {}
 ) =>
   Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
     const fake = yield* recording(options.exitOf ?? (() => 0));
+
+    // A lock nobody wrote, so a take being recorded on this machine
+    // (`infra/.recording`) never decides these tests; recording.test.ts
+    // holds the lock itself.
+    const unlocked = path.join(
+      yield* fs.makeTempDirectoryScoped({ prefix: "deploy-unlocked-" }),
+      ".recording"
+    );
 
     const result = yield* deploy(argv).pipe(
       Effect.provide(fake.layer),
+      Effect.provideService(LockFile, unlocked),
       // Only what the test sets, whatever the shell running the tests has.
       Effect.provideService(
         ConfigProvider.ConfigProvider,
@@ -99,7 +111,7 @@ const run = (
     );
 
     return { result, spawned: yield* fake.spawned };
-  }).pipe(Effect.provide(NodeServices.layer));
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
 /** A spawned command as one line: `apps/sandbox$ wrangler deploy --env x`. */
 const line = ({ args, command, cwd }: Spawned) =>

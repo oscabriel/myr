@@ -33,3 +33,11 @@ apps/web/src/routeTree.gen.ts
 # The CLI's release: the two single-file binaries and `install.sh`, uploaded
 # to a stage's releases bucket, never committed.
 apps/cli/release/
+
+# The deploy lock for recording days (`bun infra/recording.ts on`): a
+# machine's own state while a take runs, never committed.
+infra/.recording
+
+# The Playwright check of a deployed web: one screenshot per page, for the
+# shot list.
+apps/web/e2e/out/

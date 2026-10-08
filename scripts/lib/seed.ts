@@ -38,7 +38,7 @@ import {
   RepoPath,
   sameHandle,
 } from "@repo/protocol/ids";
-import { Refusal } from "@repo/protocol/refusal";
+import { ProjectExists, Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import {
   Array,
@@ -140,6 +140,11 @@ export interface SeedPlan {
   readonly ratchets: readonly string[];
   /** The layers the example keeps beside its public tree, pushed by the decider. */
   readonly layers: readonly LayerStep[];
+  /**
+   * The example this plan copies under another name (`seed --as`), when it
+   * is a copy: a copy is made fresh, so a name some project has is refused.
+   */
+  readonly copyOf?: ProjectName;
 }
 
 /** Where the asks live in an example: the config folder's `asks/`. */
@@ -382,6 +387,10 @@ const knownBadOf = (input: {
     })
   );
 
+/** A layer's repo in the private namespace: `<project>--<layer>` (spec §4.5). */
+const layerRepo = (project: ProjectName, layer: LayerName) =>
+  RepoName.make(`${project}--${layer}`);
+
 const decodeManifest = Schema.decodeEffect(
   Schema.fromJsonString(LayerManifest)
 );
@@ -486,7 +495,7 @@ const layersOf = (input: {
           files,
           knownBad,
           layer,
-          repo: RepoName.make(`${input.project}--${layer}`),
+          repo: layerRepo(input.project, layer),
         } satisfies LayerStep;
       })
     );
@@ -623,6 +632,22 @@ export const planSeed = (dir: string) =>
     } satisfies SeedPlan;
   });
 
+/**
+ * `plan` as a fresh copy named `as` (`seed --as`): the project, and each
+ * layer's repo, which is named for it, take the new name; the files, the
+ * asks and the decider stay the example's. A copy of a copy is still a copy
+ * of the example.
+ */
+export const renameSeedPlan = (plan: SeedPlan, as: ProjectName): SeedPlan => ({
+  ...plan,
+  copyOf: plan.copyOf ?? plan.project,
+  layers: plan.layers.map((layer) => ({
+    ...layer,
+    repo: layerRepo(as, layer.layer),
+  })),
+  project: as,
+});
+
 /** Whether a run did a step, or found it done before. */
 export const StepResult = Schema.Literals(["done", "already"]);
 
@@ -703,6 +728,8 @@ export class SeedTarget extends Context.Service<
 >()("seed/SeedTarget") {}
 
 const isRefusal = Schema.is(Refusal);
+
+const isProjectExists = Schema.is(ProjectExists);
 
 /** What a call to the platform fails with: a refusal, or the transport's own error. */
 interface CallFailure {
@@ -865,14 +892,14 @@ const seedLayer = (
   });
 
 /**
- * Seeds one project: makes it and pushes main's first commit as the
- * operator, then opens each ask and pushes each layer as the decider. Both
- * sessions are checked before the first step, so a missing one stops the
- * seed before it starts.
+ * `runSeed`, with `made` run once the platform has made the project and
+ * before anything else is put on it: `seed --as` writes a copy to the
+ * throwaway ledger there, so a run that fails later still leaves it there.
  */
-export const runSeed = (
-  plan: SeedPlan
-): Effect.Effect<readonly SeedStep[], SeedFailed, SeedTarget> =>
+export const runSeedWith = <R>(
+  plan: SeedPlan,
+  made: (plan: SeedPlan) => Effect.Effect<void, SeedFailed, R>
+): Effect.Effect<readonly SeedStep[], SeedFailed, SeedTarget | R> =>
   Effect.scoped(
     Effect.gen(function* () {
       const target = yield* SeedTarget;
@@ -892,11 +919,24 @@ export const runSeed = (
 
       const init = yield* operator.initProject({ project }).pipe(
         Effect.as<StepResult>("done"),
-        Effect.catchTag("ProjectExists", () =>
-          Effect.succeed<StepResult>("already")
+        Effect.catchTag("ProjectExists", (exists) =>
+          plan.copyOf === undefined
+            ? Effect.succeed<StepResult>("already")
+            : Effect.fail(exists)
         ),
-        Effect.mapError(failedCall(`initProject ${project}`))
+        Effect.mapError((error) =>
+          isProjectExists(error) && plan.copyOf !== undefined
+            ? new SeedFailed({
+                reason: `${project} is taken: --as makes a fresh copy of ${plan.copyOf}, so name a project nobody has`,
+                refusals: [error],
+              })
+            : failedCall(`initProject ${project}`)(error)
+        )
       );
+
+      if (init === "done") {
+        yield* made(plan);
+      }
 
       const landed = (yield* target.refsOf(project)).has(MAIN_REF);
 
@@ -934,6 +974,20 @@ export const runSeed = (
       ];
     })
   );
+
+/**
+ * Seeds one project: makes it and pushes main's first commit as the
+ * operator, then opens each ask and pushes each layer as the decider. Both
+ * sessions are checked before the first step, so a missing one stops the
+ * seed before it starts.
+ *
+ * A copy (`renameSeedPlan`) is made fresh: a name some project has is
+ * refused with its `ProjectExists`, before anything is pushed.
+ */
+export const runSeed = (
+  plan: SeedPlan
+): Effect.Effect<readonly SeedStep[], SeedFailed, SeedTarget> =>
+  runSeedWith(plan, () => Effect.void);
 
 // ------------------------------------------------------------ the platform
 
@@ -1221,7 +1275,7 @@ const worldToken = (handle: Handle) =>
  * own for as long as the scope lasts, with a session for each person in
  * `sessions`; gives where it serves.
  */
-const servedWorld = (sessions: ReadonlyMap<Handle, Redacted.Redacted>) =>
+export const servedWorld = (sessions: ReadonlyMap<Handle, Redacted.Redacted>) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const root = yield* repoRoot;

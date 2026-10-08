@@ -1,6 +1,6 @@
 # Rehearsal
 
-**No deploys during takes.** Nothing deploys between the first take and the last: a deploy restarts the platform's Durable Objects mid-take. Turn on the deploy recording lock before the first take and off after the last; while it is on, `infra/deploy.ts` refuses every deploy. Until that lock exists in `infra/`, hold the rule by hand: nobody runs `bun run deploy` while anyone records.
+**No deploys during takes.** Nothing deploys between the first take and the last: a deploy restarts the platform's Durable Objects mid-take. Turn on the deploy recording lock before the first take and off after the last; while it is on, `infra/deploy.ts` refuses every deploy with `RecordingInProgress`. No flag or environment variable lifts it: only `bun infra/recording.ts off`, run by a person once the last take is done.
 
 This checklist is walked once on the live stages before the recording: the read-only shots on `demo`, the shots that consume asks on `dev-oscabriel` (on a fresh copy of each example, so demo's asks stay open for the take), with the same commands [`shot-list.md`](shot-list.md) gives. Mark each line as it is walked:
 
@@ -42,7 +42,13 @@ Every box is ticked when the walk is done, passed or failed.
 
 On the morning of the take, in this order.
 
-- [ ] The recording lock is on (until it exists, everyone who can deploy knows a take is running), and nobody plans a deploy until the last take is done.
+- [ ] The recording lock is on, and nobody plans a deploy until the last take is done:
+
+  ```sh
+  bun infra/recording.ts on
+  bun infra/recording.ts status
+  ```
+
 - [ ] Smoke passes on demo:
 
   ```sh
@@ -99,6 +105,14 @@ On the morning of the take, in this order.
 - [ ] Panes laid out: one terminal (or herdr's six plus the counter for S12) beside one browser window at 1280 px; one colour scheme for every take; terminal font large enough to read at 1080p.
 - [ ] Notifications off: system do-not-disturb, chat apps closed, the browser's notifications blocked.
 - [ ] The recording order in `shot-list.md` is printed beside the screen.
+
+## After the last take
+
+- [ ] The recording lock is off, so deploys run again:
+
+  ```sh
+  bun infra/recording.ts off
+  ```
 
 ## Beat timings
 

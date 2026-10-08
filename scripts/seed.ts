@@ -14,6 +14,13 @@
  * on it (spec §1.5 H7). `--only <project>` seeds one example; `--json`
  * prints the versioned envelope.
  *
+ * `--only <example> --as <name>` seeds a fresh copy of that example under
+ * another project name (`--only burrow --as burrow-swarm-2`), so a live run
+ * can take a family nobody has touched while the example itself stays fresh
+ * for the recording. A name some project has is refused. A copy on a stage
+ * is written to the throwaway ledger (`infra/created.ts`, by `seed`) as soon
+ * as the platform has made it, with its repo and each layer's repo.
+ *
  * Each project is made, and main's first commit pushed, as the operator;
  * each ask is opened as the decider the project's config names, red first
  * on the platform's own Checker; then each layer the example keeps under
@@ -24,12 +31,24 @@
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Envelope } from "@repo/protocol/envelope";
 import { Handle, ProjectName } from "@repo/protocol/ids";
-import { Array, Console, Effect, Option, Path, Schema, Stdio } from "effect";
+import {
+  Array,
+  Console,
+  DateTime,
+  Effect,
+  Option,
+  Path,
+  Schema,
+  Stdio,
+} from "effect";
 
+import { recordCreated } from "../infra/created.ts";
+import type { Created } from "../infra/created.ts";
 import {
   flagValue,
   platformOrigin,
   recordedSubdomain,
+  resources,
   Stage,
   stageOf,
   subdomainFile,
@@ -38,7 +57,8 @@ import {
   MAIN_REF,
   planSeed,
   ready,
-  runSeed,
+  renameSeedPlan,
+  runSeedWith,
   SeedFailed,
   seeded,
   SeedStep,
@@ -68,12 +88,15 @@ export interface SeedOptions {
   readonly where: SeedWhere;
   /** The one project to seed, when not both. */
   readonly only?: string;
+  /** The name to seed `only`'s example under, as a fresh copy (`--as`). */
+  readonly as?: ProjectName;
   /** Print the versioned envelope instead of lines. */
   readonly json: boolean;
 }
 
 /** The flags the command takes; any other is a typo, refused. */
 const FLAGS = new Set([
+  "--as",
   "--json",
   "--only",
   "--operator-env",
@@ -85,7 +108,7 @@ const FLAGS = new Set([
 ]);
 
 const USAGE =
-  "bun scripts/seed.ts --world node | --stage <dev-…|demo> [--url <origin>] [--tokens-env SESSION_TOKENS] [--operator-env OPERATOR_TOKEN] [--only <project>] [--json] [--yes]";
+  "bun scripts/seed.ts --world node | --stage <dev-…|demo> [--url <origin>] [--tokens-env SESSION_TOKENS] [--operator-env OPERATOR_TOKEN] [--only <project> [--as <copy>]] [--json] [--yes]";
 
 const failed = (reason: string) => new SeedFailed({ reason });
 
@@ -125,6 +148,33 @@ const stageFrom = (argv: readonly string[]) =>
     });
   });
 
+/**
+ * `--as`'s name, for a copy of the example `--only` names: a project name,
+ * and not the example's own.
+ */
+const copyName = (name: string, only: Option.Option<string>) =>
+  Effect.gen(function* () {
+    if (Option.isNone(only)) {
+      return yield* failed(
+        `--as ${name} names one copy: add --only <example> to say which example it copies`
+      );
+    }
+
+    const copy = yield* Schema.decodeEffect(ProjectName)(name).pipe(
+      Effect.mapError(() =>
+        failed(
+          `--as ${name} is no project name: use lowercase words joined by dashes`
+        )
+      )
+    );
+
+    return copy === only.value
+      ? yield* failed(
+          `--as ${name} is the example's own name: a copy needs a name of its own`
+        )
+      : copy;
+  });
+
 /** The command's flags, read; a seed of `demo` needs `--yes` (H7: the user records on it). */
 export const optionsOf = (
   argv: readonly string[]
@@ -160,12 +210,53 @@ export const optionsOf = (
         });
 
     const json = argv.includes("--json");
+    const only = flagValue(argv, "--only");
 
-    return Option.match(flagValue(argv, "--only"), {
-      onNone: () => ({ json, where }),
-      onSome: (only) => ({ json, only, where }),
+    const as = yield* Option.match(flagValue(argv, "--as"), {
+      onNone: () => Effect.succeedNone,
+      onSome: (name) => Effect.asSome(copyName(name, only)),
     });
+
+    return {
+      json,
+      where,
+      ...Option.match(only, {
+        onNone: () => ({}),
+        onSome: (one) => ({ only: one }),
+      }),
+      ...Option.match(as, {
+        onNone: () => ({}),
+        onSome: (copy) => ({ as: copy }),
+      }),
+    };
   });
+
+/**
+ * Writes a copy on `stage` to the throwaway ledger, by the seed: the
+ * project, its repo in the public namespace, and each layer's repo in the
+ * private one, which the platform makes when main lands declaring it.
+ */
+export const recordCopy = (stage: Stage, plan: SeedPlan, at: DateTime.Utc) => {
+  const { layers, projects } = resources(stage);
+  const by = "seed";
+
+  const entries: readonly Created[] = [
+    { at, by, kind: "project", name: plan.project, stage },
+    { at, by, kind: "repo", name: plan.project, namespace: projects, stage },
+    ...plan.layers.map(({ repo }): Created => ({
+      at,
+      by,
+      kind: "repo",
+      name: repo,
+      namespace: layers,
+      stage,
+    })),
+  ];
+
+  return Effect.forEach(entries, recordCreated, { discard: true }).pipe(
+    Effect.mapError(({ message }) => failed(`the throwaway ledger: ${message}`))
+  );
+};
 
 /** What `--json` prints for one seeded project. */
 const SeededSummary = Schema.Struct({
@@ -284,21 +375,40 @@ export const main = (argv: readonly string[]) =>
       );
     }
 
-    const plans = yield* Effect.forEach(folders, planSeed);
+    const plans = yield* Effect.forEach(folders, (folder) =>
+      Effect.map(planSeed(folder), (plan): SeedPlan =>
+        options.as === undefined ? plan : renameSeedPlan(plan, options.as)
+      )
+    );
+
     const { label, target } = yield* targetFor(options.where, plans);
 
     const say = (line: string) =>
       options.json ? Effect.void : Console.log(line);
 
+    // A copy on a stage goes to the throwaway ledger once it is made.
+    const made = (plan: SeedPlan) =>
+      SeedWhere.match(options.where, {
+        Stage: ({ stage }) =>
+          plan.copyOf === undefined
+            ? Effect.void
+            : Effect.flatMap(DateTime.now, (at) => recordCopy(stage, plan, at)),
+        World: () => Effect.void,
+      });
+
     yield* say(
-      `seed: ${plans.map(({ project }) => project).join(", ")} on ${label}`
+      `seed: ${plans
+        .map(({ copyOf, project }) =>
+          copyOf === undefined ? project : `${project} (a copy of ${copyOf})`
+        )
+        .join(", ")} on ${label}`
     );
 
     const run = Effect.gen(function* () {
       yield* ready(plans);
 
       const steps = yield* Effect.forEach(plans, (plan) =>
-        Effect.tap(runSeed(plan), (done) =>
+        Effect.tap(runSeedWith(plan, made), (done) =>
           Effect.forEach(done, (each) => say(stepLine(each)), {
             discard: true,
           })

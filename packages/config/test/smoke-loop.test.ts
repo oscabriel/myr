@@ -1,0 +1,264 @@
+/**
+ * smoke's core loop (issue 806): `bun scripts/smoke.ts --stage <s> --loop`
+ * makes a throwaway project, opens an ask red first, claims it, pushes an
+ * answer that reaches outside the ask's territory and hears `OutOfScope`
+ * in git's own output, pushes the fix, and reads back its landing and its
+ * verdict note, all through the CLI and git as a person would. Here it runs
+ * against the Node world (`apps/platform/test/serve-world.ts`), reached
+ * over HTTP and git as a stage is.
+ */
+import { NodeServices } from "@effect/platform-node";
+import { describe, expect, it } from "@effect/vitest";
+import {
+  Effect,
+  FileSystem,
+  Layer,
+  Path,
+  Redacted,
+  Ref,
+  Result,
+  Sink,
+  Stream,
+} from "effect";
+import { FetchHttpClient } from "effect/http";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
+
+import { LedgerFile, readLedger } from "../../../infra/created.ts";
+import { servedWorld } from "../../../scripts/lib/seed.ts";
+import {
+  DemoStageRefused,
+  smokeLoop,
+} from "../../../scripts/lib/smoke/loop.ts";
+import { main } from "../../../scripts/smoke.ts";
+import { Brand } from "../../brand/src/index.ts";
+import { Handle } from "../../protocol/src/ids.ts";
+
+const decider = Handle.make("ines-v");
+
+const answerer = Handle.make("bram");
+
+/** Each person's token in the world: no secret, it never leaves this machine. */
+const tokens = {
+  answerer: Redacted.make("bram-smoke-loop-world-token-0123456789abcdef"),
+  decider: Redacted.make("ines-v-smoke-loop-world-token-0123456789abcd"),
+};
+
+/** A person in a trailer: their handle and the address the platform gives them. */
+const credited = (handle: string) =>
+  `${handle} <${handle}@users.${Brand.domain}>`;
+
+/** All a byte stream says, as text. */
+const textOf = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
+  bytes.pipe(Stream.decodeText(), Stream.mkString);
+
+/** `git ls-remote <remote> <ref>` as anyone, with no credential at all. */
+const anonymousTip = (remote: string, ref: string) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+
+      const child = yield* spawner.spawn(
+        ChildProcess.make("git", ["ls-remote", remote, ref], {
+          env: {
+            GIT_CONFIG_GLOBAL: "/dev/null",
+            GIT_CONFIG_NOSYSTEM: "1",
+            GIT_TERMINAL_PROMPT: "0",
+          },
+          extendEnv: true,
+        })
+      );
+
+      const [listed] = yield* Effect.all(
+        [textOf(child.stdout), child.exitCode],
+        { concurrency: "unbounded" }
+      );
+
+      return listed.split("\t")[0] ?? "";
+    })
+  );
+
+describe("smokeLoop, against the Node world", () => {
+  it.live(
+    "opens an ask red first, hears OutOfScope from git, lands the fix with its author, committer and trailers, finds the verdict note, and writes its throwaways to the ledger",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "smoke-806-" });
+        const ledger = path.join(dir, "created.jsonl");
+
+        const { main: tip, report } = yield* Effect.scoped(
+          Effect.gen(function* () {
+            const origin = yield* servedWorld(
+              new Map([
+                [decider, tokens.decider],
+                [answerer, tokens.answerer],
+              ])
+            );
+
+            const ran = yield* smokeLoop({
+              answerer: tokens.answerer,
+              decider: tokens.decider,
+              origin,
+              run: "r1",
+              stage: "node",
+            });
+
+            return {
+              main: yield* anonymousTip(
+                `${origin}/${ran.project}.git`,
+                "refs/heads/main"
+              ),
+              report: ran,
+            };
+          })
+        ).pipe(Effect.provideService(LedgerFile, ledger));
+
+        expect({
+          author: report.author,
+          committer: report.committer,
+          landed: report.landed,
+          noteFound: report.noteFound,
+          project: report.project,
+          refusedWith: report.refusedWith,
+          steps: report.timings.map(({ step }) => step),
+          timed: report.timings.every(({ ms }) => ms >= 0),
+          trailers: report.trailers.filter((trailer) =>
+            /^(?:Asked-by|Signed-off-by):/u.test(trailer)
+          ),
+        }).toStrictEqual({
+          author: "bram",
+          committer: Brand.name,
+          landed: tip,
+          noteFound: true,
+          project: "smoke-r1",
+          refusedWith: ["OutOfScope"],
+          steps: [
+            "people",
+            "init",
+            "open-ask",
+            "claim",
+            "out-of-scope",
+            "answer",
+            "landing",
+            "verdict-note",
+          ],
+          timed: true,
+          trailers: [
+            `Asked-by: ${credited("ines-v")}`,
+            `Signed-off-by: ${credited("bram")}`,
+          ],
+        });
+
+        expect(
+          (yield* readLedger.pipe(
+            Effect.provideService(LedgerFile, ledger)
+          )).map(({ by, kind, name, stage }) => ({ by, kind, name, stage }))
+        ).toStrictEqual([
+          { by: "smoke", kind: "project", name: "smoke-r1", stage: "node" },
+          { by: "smoke", kind: "repo", name: "smoke-r1", stage: "node" },
+          {
+            by: "smoke",
+            kind: "repo",
+            name: "smoke-r1--parse-year--bram",
+            stage: "node",
+          },
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    240_000
+  );
+});
+
+/**
+ * A spawner that runs nothing: each command it was asked for, by name. Any
+ * command fails, so a run that reached one could not pass by accident.
+ */
+const refusing = Effect.gen(function* () {
+  const asked = yield* Ref.make<readonly string[]>([]);
+
+  const spawner = ChildProcessSpawner.make((command) =>
+    Effect.gen(function* () {
+      yield* Ref.update(asked, (all) => [
+        ...all,
+        ChildProcess.isStandardCommand(command) ? command.command : "a pipe",
+      ]);
+
+      return ChildProcessSpawner.makeHandle({
+        all: Stream.empty,
+        exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(1)),
+        getInputFd: () => Sink.drain,
+        getOutputFd: () => Stream.empty,
+        isRunning: Effect.succeed(false),
+        kill: () => Effect.void,
+        pid: ChildProcessSpawner.ProcessId(1),
+        stderr: Stream.empty,
+        stdin: Sink.drain,
+        stdout: Stream.empty,
+        unref: Effect.succeed(Effect.void),
+      });
+    })
+  );
+
+  return {
+    asked: Ref.get(asked),
+    layer: Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner),
+  };
+});
+
+describe("smoke --loop on demo", () => {
+  it.live(
+    "is refused with DemoStageRefused before any request or process: a throwaway project would show on demo's front page",
+    () =>
+      Effect.gen(function* () {
+        const fetched: string[] = [];
+        const spawner = yield* refusing;
+
+        const result = yield* main(["--stage", "demo", "--loop"]).pipe(
+          Effect.provide(spawner.layer),
+          Effect.provideService(FetchHttpClient.Fetch, (input) => {
+            fetched.push(new Request(input).url);
+
+            return Promise.reject(new Error("smoke --loop on demo fetched"));
+          }),
+          Effect.result
+        );
+
+        expect({
+          fetched,
+          result,
+          spawned: yield* spawner.asked,
+        }).toStrictEqual({
+          fetched: [],
+          result: Result.fail(new DemoStageRefused({ stage: "demo" })),
+          spawned: [],
+        });
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live("is refused by smokeLoop itself, whoever calls it", () =>
+    Effect.gen(function* () {
+      const spawner = yield* refusing;
+
+      const failure = yield* Effect.flip(
+        smokeLoop({
+          answerer: tokens.answerer,
+          decider: tokens.decider,
+          origin: "https://platform-demo.example.workers.dev",
+          run: "r1",
+          stage: "demo",
+        })
+      ).pipe(Effect.provide(spawner.layer));
+
+      expect({
+        failure,
+        message: failure.message,
+        spawned: yield* spawner.asked,
+      }).toStrictEqual({
+        failure: new DemoStageRefused({ stage: "demo" }),
+        message:
+          "--loop makes a throwaway project, which would show on demo's front page: run it on a dev stage",
+        spawned: [],
+      });
+    }).pipe(Effect.provide(NodeServices.layer))
+  );
+});

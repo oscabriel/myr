@@ -14,8 +14,11 @@
  * 7. the redirect URI a Google OAuth client registers for the stage (H4),
  *    printed for a person to copy; Google sign-in stays off without one.
  *
- * Without `--stage`, or with a stage `stages.ts` doesn't declare, it refuses
- * before it spawns anything. It takes no other flag: verify always runs.
+ * While a take is being recorded (`infra/.recording`, which
+ * `bun infra/recording.ts on` writes), it refuses every deploy with
+ * `RecordingInProgress` before it reads a flag or spawns anything; only
+ * `bun infra/recording.ts off` lifts that. Without `--stage`, or with a stage
+ * `stages.ts` doesn't declare, it refuses before it spawns anything. It takes no other flag: verify always runs.
  * Every command runs with `WRANGLER_SEND_METRICS=false`; Wrangler deploys
  * with its own login, never the read-mostly infra token.
  *
@@ -43,6 +46,8 @@ import {
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { schemaItems } from "./env-schema.ts";
+import { notRecording } from "./recording.ts";
+import type { RecordingInProgress } from "./recording.ts";
 import {
   platformOrigin,
   repoRoot,
@@ -51,6 +56,8 @@ import {
   WorkersDev,
 } from "./stages.ts";
 import type { NoStage, Stage, UnknownStage } from "./stages.ts";
+
+export { RecordingInProgress } from "./recording.ts";
 
 export { NoStage, UnknownStage } from "./stages.ts";
 
@@ -263,15 +270,24 @@ const googleRedirectLine = (root: string, stage: Stage) =>
     });
   });
 
-/** Deploys the stage `argv`'s `--stage` names, then smoke-tests it. */
+/**
+ * Deploys the stage `argv`'s `--stage` names, then smoke-tests it; refused
+ * outright while a take is being recorded.
+ */
 export const deploy = (
   argv: readonly string[]
 ): Effect.Effect<
   void,
-  NoStage | UnknownStage | StepFailed | SecretsFileUnreadable,
+  | RecordingInProgress
+  | NoStage
+  | UnknownStage
+  | StepFailed
+  | SecretsFileUnreadable,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
 > =>
   Effect.gen(function* () {
+    yield* notRecording;
+
     const stage = yield* stageOf(argv);
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;

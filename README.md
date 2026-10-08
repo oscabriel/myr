@@ -125,6 +125,12 @@ Wrangler deploys the three Workers; cf is our ops CLI. Cloudflare's cf can't dep
    bun scripts/smoke.ts --stage dev-<you>
    ```
 
+8. Run the whole core loop on a dev stage, through the CLI and git: a throwaway project `smoke-<run>`, an ask opened red first, an answer refused `OutOfScope`, then the fix landed with its trailers and its verdict note. It makes the project as the operator and answers as `bram` (`--as` names another), so it needs both tokens; it refuses `demo`, whose front page the video shows:
+
+   ```sh
+   ./node_modules/.bin/varlock run --path apps/platform/ -- bun scripts/smoke.ts --stage dev-<you> --loop
+   ```
+
 `infra/stages.md` lists every resource a stage owns, the secrets, and how a person tears a stage down by hand; no script deletes anything.
 
 ### Install the CLI
@@ -178,7 +184,7 @@ Each promise names the check that holds it, and `bun run verify` runs every one.
 | The web's production build carries none of the dev world. | `apps/web/test/production-bundle.test.ts` |
 | Visibility plugs in by one marked line, and nothing else reaches into it. | `packages/config/test/cartridge.test.ts` |
 | Each Worker's bundle stays under its byte budget. | `bun run bytes:check` |
-| A deploy names its stage, runs `verify` first and smoke after. | `packages/config/test/deploy.test.ts` |
+| A deploy names its stage, runs `verify` first and smoke after, and none runs while a take is recorded (`bun infra/recording.ts on`). | `packages/config/test/deploy.test.ts`, `packages/config/test/recording.test.ts` |
 | Every path and command in this README exists. | `packages/config/test/readme.test.ts` |
 
 What it does not promise:
@@ -231,7 +237,7 @@ packages/
   testkit/      scenario builders, golden git transcripts, process fakes
   brand/        the name, and every identifier made from it
   config/       the vitest preset and the repo's own tests
-infra/          bootstrap, deploy, the stage table, smoke's probes
+infra/          bootstrap, deploy, the recording lock, the stage table, smoke's probes
 scripts/        brand and byte checks, seed, smoke, swarm, release
 examples/       datekit and burrow, fictional projects for the demo
 tools/oxlint/   the vendored anti-slop lint plugins
