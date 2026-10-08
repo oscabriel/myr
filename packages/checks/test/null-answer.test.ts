@@ -68,6 +68,75 @@ describe("the null answer", () => {
       })
   );
 
+  it.effect(
+    "reads each source file a subpath pattern of its exports leads to",
+    () =>
+      Effect.gen(function* () {
+        const manifest = {
+          content: '{ "exports": { "./*": "./src/*.ts" } }\n',
+          path: "package.json",
+        };
+
+        const tree = yield* nullAnswer(
+          [
+            manifest,
+            {
+              content: "export const add = (a: number, b: number) => a + b;\n",
+              path: "src/add.ts",
+            },
+            {
+              content:
+                "export function half(n: number) {\n  return n / 2;\n}\n",
+              path: "src/math/half.ts",
+            },
+          ],
+          { paths: ["src/**"] }
+        );
+
+        expect(tree).toStrictEqual([
+          manifest,
+          {
+            content:
+              "export const add = (a: number, b: number) => undefined as never;\n",
+            path: "src/add.ts",
+          },
+          {
+            content:
+              "export function half(n: number) { return undefined as never; }\n",
+            path: "src/math/half.ts",
+          },
+        ]);
+      })
+  );
+
+  it.effect("reads the main file of a package that has no exports", () =>
+    Effect.gen(function* () {
+      const manifest = {
+        content: '{ "main": "./src/index.ts" }\n',
+        path: "package.json",
+      };
+
+      const tree = yield* nullAnswer(
+        [
+          manifest,
+          {
+            content: "export const twice = (n: number) => n * 2;\n",
+            path: "src/index.ts",
+          },
+        ],
+        { paths: ["src/**"] }
+      );
+
+      expect(tree).toStrictEqual([
+        manifest,
+        {
+          content: "export const twice = (n: number) => undefined as never;\n",
+          path: "src/index.ts",
+        },
+      ]);
+    })
+  );
+
   it.effect("stubs nothing outside the territory", () =>
     Effect.gen(function* () {
       const tree = yield* nullAnswer(datesRepo, {
@@ -360,24 +429,36 @@ describe("a check written before its subject", () => {
 
 describe("where ts-morph is reached from", () => {
   it.effect(
-    "only the null answer imports it, so no other entry of @repo/checks bundles the compiler",
+    "only the null answer imports it, and no other module of @repo/checks imports the null answer, so no other entry bundles the compiler",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const sources = yield* fs.readDirectory("src", { recursive: true });
 
-        const importers: string[] = [];
+        // Any quoted specifier counts: a static, dynamic or re-exporting import.
+        const tsMorph: string[] = [];
+        const theNullAnswer: string[] = [];
 
         for (const file of sources.filter((each) => each.endsWith(".ts"))) {
           const source = yield* fs.readFileString(path.join("src", file));
 
-          if (/from\s+["']ts-morph["']/u.test(source)) {
-            importers.push(file);
+          if (/["']ts-morph["']/u.test(source)) {
+            tsMorph.push(file);
+          }
+
+          if (
+            file !== "null-answer.ts" &&
+            /["'][^"'\n]*null-answer(?:\.ts)?["']/u.test(source)
+          ) {
+            theNullAnswer.push(file);
           }
         }
 
-        expect(importers).toStrictEqual(["null-answer.ts"]);
+        expect({ theNullAnswer, tsMorph }).toStrictEqual({
+          theNullAnswer: [],
+          tsMorph: ["null-answer.ts"],
+        });
       }).pipe(Effect.provide(NodeServices.layer))
   );
 });

@@ -83,7 +83,10 @@ const COMPILER_OPTIONS: ts.CompilerOptions = {
 };
 
 const Manifest = Schema.fromJsonString(
-  Schema.Struct({ exports: Schema.optionalKey(Schema.Json) })
+  Schema.Struct({
+    exports: Schema.optionalKey(Schema.Json),
+    main: Schema.optionalKey(Schema.Json),
+  })
 );
 
 const decodeManifest = Schema.decodeUnknownOption(Manifest);
@@ -111,6 +114,43 @@ const exportTargets = (value: Schema.Json | undefined): readonly string[] => {
   return isJsonObject(value) ? Object.values(value).flatMap(exportTargets) : [];
 };
 
+/** What a manifest exports: its `exports`, or its `main` when it has none, as Node reads a package. */
+const targetsOf = ({
+  exports,
+  main,
+}: typeof Manifest.Type): readonly string[] =>
+  exports === undefined
+    ? [main].filter(Predicate.isString)
+    : exportTargets(exports);
+
+const PATTERN = "*";
+
+/**
+ * The repo paths one target names: the target itself, or, for a subpath
+ * pattern (`./src/*.ts`), each of `paths` its `*` matches, any run of
+ * characters with `/` included, as Node reads one.
+ */
+const targetPaths = (
+  target: string,
+  paths: readonly string[]
+): readonly string[] => {
+  const star = target.indexOf(PATTERN);
+
+  if (star === -1) {
+    return [target];
+  }
+
+  const head = target.slice(0, star);
+  const tail = target.slice(star + PATTERN.length);
+
+  return paths.filter(
+    (path) =>
+      path.length > head.length + tail.length &&
+      path.startsWith(head) &&
+      path.endsWith(tail)
+  );
+};
+
 const folderOf = (path: string) => {
   const slash = path.lastIndexOf("/");
 
@@ -135,14 +175,15 @@ const foldersAbove = (path: string): readonly string[] => {
 
 /**
  * The module's entry points when the territory names no public files: the
- * source files the `exports` of the `package.json` nearest each territory
- * file lead to.
+ * source files the `exports` (or else the `main`) of the `package.json`
+ * nearest each territory file lead to, a subpath pattern's included.
  */
 const manifestEntries = (
   files: readonly RepoFile[],
   territory: NullAnswerTerritory
 ): readonly string[] => {
   const texts = new Map(files.map(({ content, path }) => [path, content]));
+  const paths = [...texts.keys()];
 
   const manifests = pipe(
     files,
@@ -165,9 +206,12 @@ const manifestEntries = (
         Option.flatMap(decodeManifest),
         Option.match({
           onNone: () => [],
-          onSome: ({ exports }) =>
-            exportTargets(exports).map((target) =>
-              joined(folder, target.replace(/^(?:\.\/)+/u, ""))
+          onSome: (manifest) =>
+            targetsOf(manifest).flatMap((target) =>
+              targetPaths(
+                joined(folder, target.replace(/^(?:\.\/)+/u, "")),
+                paths
+              )
             ),
         })
       )
@@ -487,8 +531,9 @@ const stubbedContents = (
  * method and getter of each class it exports. Constructors, setters, values,
  * types and every other file stay as they were. Entry points are the
  * territory's `publicFiles`, or else the source files its `package.json`
- * `exports` lead to; a territory file is stubbed when an entry point lies in
- * it or exports something it declares, through any number of re-exports.
+ * `exports` (or `main`) lead to; a territory file is stubbed when an entry
+ * point lies in it or exports something it declares, through any number of
+ * re-exports.
  *
  * A check written before its subject imports what main lacks: each value
  * name the tree imports from a territory file that the file does not export
