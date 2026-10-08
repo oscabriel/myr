@@ -922,7 +922,7 @@ const askLaneOf = (policy: Policy, ask: Ask) =>
 /** A check judged by what its command prints: a lint's count, or a migrate's callers. */
 const isCounted = CheckSpec.isAnyOf(["LintToZero", "Migrate", "SymbolAbsent"]);
 
-/** A check that counts a name's callers: a migrate, or its delete step. */
+/** A check that counts a name's callers: a migrate, or its delete child. */
 const countsCallers = CheckSpec.isAnyOf(["Migrate", "SymbolAbsent"]);
 
 /**
@@ -2211,9 +2211,9 @@ export const projectService = (
       new Map([...h.asks, ...writes.asks]);
 
     /**
-     * A migrate family once its step `landed` closed (CAA §2.F): each step
-     * waiting on its siblings opens when the last of them lands, and the
-     * parent closes on the landing that closes its last step.
+     * A migrate family once its child `landed` closed (CAA §2.F): each
+     * child waiting on its siblings opens when the last of them lands, and
+     * the parent closes on the landing that closes its last child.
      */
     const familyAfter = (
       h: Hydrated,
@@ -2231,15 +2231,15 @@ export const projectService = (
 
       const before = asksNow(h, writes);
 
-      for (const step of before.values()) {
+      for (const child of before.values()) {
         if (
-          step.parent === parent.value &&
-          step.state === "waitingOnParent" &&
-          remainingBlockers(step, before).length === 0
+          child.parent === parent.value &&
+          child.state === "waitingOnParent" &&
+          remainingBlockers(child, before).length === 0
         ) {
-          const opened: Ask = { ...step, state: "open" };
+          const opened: Ask = { ...child, state: "open" };
 
-          writes.asks.set(step.id, opened);
+          writes.asks.set(child.id, opened);
           writes.events.push(askOpened(opened, at.now));
         }
       }
@@ -2572,7 +2572,7 @@ export const projectService = (
 
         // A tree merged onto a main that has moved on since is not judged:
         // its counts still hold what later landings removed (a sibling
-        // step's callers), which against the baselines those landings
+        // child's callers), which against the baselines those landings
         // lowered would read as a raise. It cannot land as it is: its land
         // finds main moved, and it is merged and checked again first.
         const current = Option.exists(
@@ -3148,7 +3148,7 @@ export const projectService = (
         const { ask, composed, files, policy } = input;
         const counts = yield* callersTwice(policy, ask, composed.commit);
 
-        const counted: readonly RatchetCount[] = CheckSpec.guards.Migrate(
+        const callers: readonly RatchetCount[] = CheckSpec.guards.Migrate(
           ask.check
         )
           ? [
@@ -3170,9 +3170,10 @@ export const projectService = (
         if (Option.isNone(family)) {
           return {
             asks: Array.make(ask),
-            counted,
+            callers,
+            children: [],
+            counted: [],
             files,
-            steps: [],
             tree: composed.tree,
           };
         }
@@ -3195,27 +3196,28 @@ export const projectService = (
 
         return {
           asks: Array.make(parent, ...children, deleteChild),
-          counted,
+          callers,
+          children: [...children, deleteChild].map(({ id }) => id),
+          counted: [],
           files: all,
-          steps: [...children, deleteChild].map(({ id }) => id),
           tree,
         };
       });
 
     /**
      * The landing that opens an ask: its files on main, authored by its
-     * asker. A migrate ask's landing names the steps it opened with it.
+     * asker. A migrate ask's landing names the children it opened with it.
      */
     const landAsk = (input: {
       readonly ask: Ask;
+      readonly children: readonly AskId[];
       readonly credits: readonly Credit[];
       readonly files: Array.NonEmptyReadonlyArray<ComposedFile>;
       readonly main: LandedSha;
-      readonly steps: readonly AskId[];
       readonly tree: Checking["tree"];
     }) => {
       const requestId = RequestId.make(`open-${input.tree}`);
-      const { credits, steps } = input;
+      const { children, credits } = input;
 
       const landing = lander
         .land({
@@ -3225,13 +3227,13 @@ export const projectService = (
             ask: { ask: input.ask.id, project: name },
             assisted: [],
             body:
-              steps.length === 0
+              children.length === 0
                 ? input.ask.brief.want
                 : [
                     input.ask.brief.want,
                     "",
-                    "Its steps, the last waiting on the rest:",
-                    ...steps.map((step) => `- ${step}`),
+                    "Its child asks, the last waiting on the rest:",
+                    ...children.map((child) => `- ${child}`),
                   ].join("\n"),
             credits,
             requestId,
@@ -3355,18 +3357,19 @@ export const projectService = (
             })
           : {
               asks: Array.make(ask),
+              callers: [],
+              children: [],
               counted: yield* redTwice(policy, ask, composed.commit),
               files,
-              steps: [],
               tree: composed.tree,
             };
 
         const landed = yield* landAsk({
           ask,
+          children: opens.children,
           credits: opening.credits,
           files: opens.files,
           main,
-          steps: opens.steps,
           tree: opens.tree,
         });
 
@@ -3378,7 +3381,7 @@ export const projectService = (
         for (const each of opened) {
           writes.asks.set(each.id, each);
 
-          // A step that waits on others opens when they land.
+          // A child that waits on others opens when they land.
           if (each.state === "open") {
             writes.events.push(askOpened(each, now));
           }
@@ -3399,13 +3402,22 @@ export const projectService = (
           yield* withPolicyAt({ ...row, landed: landed.sha }, landed.sha, now)
         );
 
-        // The opening landing records the baselines its check's count read.
-        putRatchets(
-          h,
-          writes,
-          afterLanding(baselinesNow(h, writes), opens.counted, landed.sha)
-            .baselines
-        );
+        // The opening landing records the baselines its check's count read,
+        // and sets a migrate ask's callers ratchet at its count: a lower
+        // baseline a closed migrate ask of the same name left counted
+        // nothing since, and while one is open no answer can raise it.
+        putRatchets(h, writes, [
+          ...afterLanding(baselinesNow(h, writes), opens.counted, landed.sha)
+            .baselines,
+          ...opens.callers.map(
+            ({ count, ratchet, territory }): RatchetBaseline => ({
+              count,
+              ratchet,
+              setAt: landed.sha,
+              territory,
+            })
+          ),
+        ]);
 
         return { ask: Array.headNonEmpty(opened), landed: landed.sha };
       });

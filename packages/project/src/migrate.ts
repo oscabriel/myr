@@ -1,12 +1,12 @@
 /**
  * A migrate ask's family (CAA §2.F): one ask that moves every use of a name
  * to another opens, when its callers sit in two or more of the project's
- * modules, as one step per module with callers, each with that module as
- * its territory and "no callers in this module" as its check, and a delete
- * step that waits on every step and checks the name is gone. The steps'
- * territories are disjoint, so their claims never overlap and their answers
- * re-merge cleanly through the serial landing queue; the parent closes when
- * its last step lands.
+ * modules, as one child ask per module with callers, each with that module
+ * as its territory and "no callers in this module" as its check, and a
+ * delete child that waits on every child and checks the name is gone. The
+ * children's territories are disjoint, so their claims never overlap and
+ * their answers re-merge cleanly through the serial landing queue; the
+ * parent closes when its last child lands.
  *
  * Pure: the callers are counted by the project's own command (its stdout is
  * `CallerCount`), never by a scan here, and the service lands the family and
@@ -60,13 +60,13 @@ export interface FamilyFile {
 
 /** A migrate ask split into its family, and what its opening lands. */
 export interface MigrateFamily {
-  /** The migrate ask, blocked by every step and the delete step. */
+  /** The migrate ask, blocked by every child and the delete child. */
   readonly parent: Ask;
-  /** One step per module with callers, in the policy's module order. */
+  /** One child per module with callers, in the policy's module order. */
   readonly children: Array.NonEmptyReadonlyArray<Ask>;
-  /** The last step: the name is gone. Blocked by every step until they land. */
+  /** The last child: the name is gone. Blocked by every child until they land. */
   readonly deleteChild: Ask;
-  /** The steps' and the delete step's ask files, in that order. */
+  /** The children's and the delete child's ask files, in that order. */
   readonly files: Array.NonEmptyReadonlyArray<FamilyFile>;
   /** The callers ratchet the opening records, at the counted total. */
   readonly ratchet: {
@@ -83,13 +83,13 @@ const slug = (name: string) =>
     .replaceAll(/^-+|-+$/gu, "");
 
 /**
- * The id of a family's step in `module`: `drop-legacy-fetch-p1`. It never
+ * The id of a family's child in `module`: `drop-legacy-fetch-p1`. It never
  * holds `--`, which repo names keep as their separator (spec §4.5).
  */
 export const childId = (parent: AskId, module: string): AskId =>
   AskId.make(`${parent}-${slug(module) || "root"}`);
 
-/** The id of a family's delete step: `drop-legacy-fetch-delete`. */
+/** The id of a family's delete child: `drop-legacy-fetch-delete`. */
 export const deleteChildId = (parent: AskId): AskId =>
   AskId.make(`${parent}-delete`);
 
@@ -104,7 +104,7 @@ export const remainingBlockers = (
 ): readonly AskId[] =>
   ask.blockedBy.filter((blocker) => asks.get(blocker)?.state !== "closed");
 
-/** Whether a family is done: it has steps, and every one has closed. */
+/** Whether a family is done: it has children, and every one has closed. */
 export const familyClosed = (
   parent: AskId,
   asks: ReadonlyMap<AskId, Ask>
@@ -133,16 +133,23 @@ export const modulesWithin = (
 
 /**
  * The callers an ask's own check counts: in its module, when its territory
- * names one; everywhere, when it spans the repo.
+ * names one; in the modules it spans, when it spans some but not all;
+ * everywhere, when it spans them all or none (a repo with no modules).
  */
 export const callersIn = (
   territory: Territory,
   counts: CallerCount,
   modules: readonly Territory[]
-): number =>
-  modules.some(({ module }) => module === territory.module)
-    ? (counts.byModule[territory.module] ?? 0)
-    : counts.total;
+): number => {
+  const within = modulesWithin(territory, modules);
+
+  return within.length === 0 || within.length === modules.length
+    ? counts.total
+    : within.reduce(
+        (sum, { module }) => sum + (counts.byModule[module] ?? 0),
+        0
+      );
+};
 
 /**
  * The ratchet a migrate ask's callers are counted by on every answer while
@@ -170,7 +177,7 @@ export const callersSpecs = (asks: Iterable<Ask>): readonly RatchetSpec[] =>
 const quoted = (text: string) => JSON.stringify(text);
 
 const header = (parent: AskId) =>
-  `// A step of the migrate ask ${parent}, written by ${Brand.name} when it opened.`;
+  `// A child of the migrate ask ${parent}, written by ${Brand.name} when it opened.`;
 
 const sdk = quoted(`${Brand.cliPackage}/rules`);
 
@@ -179,14 +186,14 @@ const fields = (entries: readonly (readonly [string, string])[]) =>
   entries.map(([key, value]) => `  ${key}: ${value},`);
 
 /**
- * A step's file, through the sdk's `kinds.migrate` when the parent is of
+ * A child's file, through the sdk's `kinds.migrate` when the parent is of
  * that kind, else through a kind of the parent's name made in the file.
  */
-const stepFile = (step: Ask, check: MigrateCheck, parent: AskId) => {
+const childFile = (child: Ask, check: MigrateCheck, parent: AskId) => {
   const stated: (readonly [string, string])[] = [
     ["parent", quoted(parent)],
-    ["territory", `territory.package(${quoted(step.territory.module)})`],
-    ["want", quoted(step.brief.want)],
+    ["territory", `territory.package(${quoted(child.territory.module)})`],
+    ["want", quoted(child.brief.want)],
   ];
 
   const args: (readonly [string, string])[] = [
@@ -195,7 +202,7 @@ const stepFile = (step: Ask, check: MigrateCheck, parent: AskId) => {
     ...(check.to === undefined ? [] : [["to", quoted(check.to)] as const]),
   ];
 
-  if (step.kind === "migrate") {
+  if (child.kind === "migrate") {
     return [
       header(parent),
       `import { kinds, territory } from ${sdk};`,
@@ -213,14 +220,14 @@ const stepFile = (step: Ask, check: MigrateCheck, parent: AskId) => {
     header(parent),
     `import { check, kind, territory } from ${sdk};`,
     "",
-    "const step = kind({",
+    "const own = kind({",
     "  args: {},",
     `  check: () => check.migrate({ ${args.map(([key, value]) => `${key}: ${value}`).join(", ")} }),`,
     `  checkKind: "migrate",`,
-    `  name: ${quoted(step.kind)},`,
+    `  name: ${quoted(child.kind)},`,
     "});",
     "",
-    "export default step.ask({",
+    "export default own.ask({",
     ...fields(stated),
     "});",
     "",
@@ -228,27 +235,27 @@ const stepFile = (step: Ask, check: MigrateCheck, parent: AskId) => {
 };
 
 /**
- * The delete step's file: the sdk has no `symbolAbsent` builder, so the
+ * The delete child's file: the sdk has no `symbolAbsent` builder, so the
  * file makes a kind of the parent's name whose check is the name gone.
  */
-const deleteFile = (step: Ask, check: MigrateCheck, parent: AskId) =>
+const deleteFile = (child: Ask, check: MigrateCheck, parent: AskId) =>
   [
     header(parent),
     `import { kind } from ${sdk};`,
     "",
-    "const step = kind({",
+    "const own = kind({",
     "  args: {},",
     `  check: () => ({ _tag: "SymbolAbsent", count: ${quoted(check.count)}, symbol: ${quoted(check.from)} }),`,
     `  checkKind: "symbolAbsent",`,
-    `  name: ${quoted(step.kind)},`,
+    `  name: ${quoted(child.kind)},`,
     "});",
     "",
-    "export default step.ask({",
+    "export default own.ask({",
     ...fields([
-      ["blockedBy", JSON.stringify(step.blockedBy)],
+      ["blockedBy", JSON.stringify(child.blockedBy)],
       ["parent", quoted(parent)],
-      ["territory", JSON.stringify(step.territory)],
-      ["want", quoted(step.brief.want)],
+      ["territory", JSON.stringify(child.territory)],
+      ["want", quoted(child.brief.want)],
     ]),
     "});",
     "",
@@ -257,16 +264,16 @@ const deleteFile = (step: Ask, check: MigrateCheck, parent: AskId) =>
 const callersOf = (count: number) =>
   count === 1 ? "1 caller" : `${count} callers`;
 
-/** A step's want: `p1: 5 callers of legacyFetch → http.get`. */
-const stepWant = (module: string, count: number, check: MigrateCheck) =>
+/** A child's want: `p1: 5 callers of legacyFetch → http.get`. */
+const childWant = (module: string, count: number, check: MigrateCheck) =>
   check.to === undefined
     ? `${module}: ${callersOf(count)} of ${check.from} to remove`
     : `${module}: ${callersOf(count)} of ${check.from} → ${check.to}`;
 
 /**
- * Splits a migrate ask into its family: a step for each module of its
+ * Splits a migrate ask into its family: a child for each module of its
  * territory that has callers, in the policy's module order, and a delete
- * step blocked by all of them, each asked by the parent's asker and held
+ * child blocked by all of them, each asked by the parent's asker and held
  * as the parent is held. `None` when the ask is no migrate ask, or fewer
  * than two of its modules have callers: a split of one is the ask itself.
  */
@@ -286,7 +293,7 @@ export const splitFamily = (input: {
   const fileOf = (id: AskId) =>
     RepoPath.make(`${input.configDir}/asks/${id}.ask.ts`);
 
-  const step = (
+  const member = (
     id: AskId,
     own: Pick<Ask, "blockedBy" | "brief" | "check" | "state" | "territory">
   ): Ask => ({
@@ -297,15 +304,15 @@ export const splitFamily = (input: {
     parent: parent.id,
   });
 
-  const children = modulesWithin(parent.territory, input.modules).flatMap(
+  const called = modulesWithin(parent.territory, input.modules).flatMap(
     (module) => {
       const count = counts.byModule[module.module] ?? 0;
 
       return count > 0
         ? [
-            step(childId(parent.id, module.module), {
+            member(childId(parent.id, module.module), {
               blockedBy: [],
-              brief: { want: stepWant(module.module, count, check) },
+              brief: { want: childWant(module.module, count, check) },
               check,
               state: "open",
               territory: module,
@@ -315,18 +322,18 @@ export const splitFamily = (input: {
     }
   );
 
-  const [first, second, ...rest] = children;
+  const [first, second, ...rest] = called;
 
   if (first === undefined || second === undefined) {
     return Option.none();
   }
 
-  const steps = Array.make(first, second, ...rest);
-  const stepIds = steps.map(({ id }) => id);
+  const children = Array.make(first, second, ...rest);
+  const childIds = children.map(({ id }) => id);
   const deleteId = deleteChildId(parent.id);
 
-  const deleteChild = step(deleteId, {
-    blockedBy: stepIds,
+  const deleteChild = member(deleteId, {
+    blockedBy: childIds,
     brief: { want: `Delete ${check.from}: nothing calls it any more` },
     check: CheckSpec.cases.SymbolAbsent.make({
       count: check.count satisfies Command,
@@ -337,11 +344,11 @@ export const splitFamily = (input: {
   });
 
   return Option.some({
-    children: steps,
+    children,
     deleteChild,
     files: Array.append(
-      Array.map(steps, (each) => ({
-        content: stepFile(each, check, parent.id),
+      Array.map(children, (each) => ({
+        content: childFile(each, check, parent.id),
         path: each.file,
       })),
       {
@@ -351,7 +358,7 @@ export const splitFamily = (input: {
     ),
     parent: {
       ...parent,
-      blockedBy: Array.dedupe([...parent.blockedBy, ...stepIds, deleteId]),
+      blockedBy: Array.dedupe([...parent.blockedBy, ...childIds, deleteId]),
     },
     ratchet: { baseline: counts.total, name: callersRatchet(check.from) },
   });
