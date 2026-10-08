@@ -7,9 +7,10 @@
  * The model ids are what this machine's harnesses list and run (2026-10-08):
  * `opencode models` for OpenCode's GPT model, `pi --offline --list-models`
  * for pi's (its ready provider is `opencode-go`), `amp --help` for Amp's
- * modes. OpenCode signed in with a ChatGPT account refuses
- * `openai/gpt-6.1-sol` ("not supported when using Codex with a ChatGPT
- * account"), so tamsin runs `openai/gpt-5.5`, which ran headless.
+ * modes. tamsin ran `openai/gpt-5.5` on OpenCode's ChatGPT sign-in until
+ * that account's usage limit ran out in the swarm's live rehearsal (804,
+ * not back before Oct 16); OpenCode Go's `gpt-6-luna` ran headless in its
+ * place, and putting the ChatGPT model back is tamsin's one line.
  */
 import { Handle } from "@repo/protocol/ids";
 import { Schema } from "effect";
@@ -24,8 +25,8 @@ export const Contributor = Schema.Struct({
   handle: Handle,
   harness: Harness,
   /**
-   * Claude Code: an Anthropic model id. OpenCode: `openai/<gpt id>`. Amp: its
-   * mode. pi: `<provider>/<id>`.
+   * Claude Code: an Anthropic model id. OpenCode: `<provider>/<gpt id>`.
+   * Amp: its mode. pi: `<provider>/<id>`.
    */
   model: Schema.NonEmptyString,
 });
@@ -55,7 +56,7 @@ export const roster: readonly [
     adapter: false,
     handle: Handle.make("tamsin"),
     harness: "opencode",
-    model: "openai/gpt-5.5",
+    model: "opencode-go/gpt-6-luna",
   },
   {
     adapter: false,

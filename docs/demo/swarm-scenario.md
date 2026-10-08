@@ -11,13 +11,13 @@ Six of the people burrow's `.myr/vouched.td` vouches for, each with one harness 
 | # | Contributor | Harness | Model | Adapter | Child (when all six are open) |
 | --- | --- | --- | --- | --- | --- |
 | 1 | wren | Claude Code, as it ships | `claude-opus-5-5` | none | `drop-legacy-fetch-burrow-auth` |
-| 2 | tamsin | OpenCode | `openai/gpt-5.5` | none | `drop-legacy-fetch-burrow-billing` |
+| 2 | tamsin | OpenCode | `opencode-go/gpt-6-luna` | none | `drop-legacy-fetch-burrow-billing` |
 | 3 | ivo | Amp | `medium` (one of its modes) | none | `drop-legacy-fetch-burrow-catalog` |
 | 4 | marisol | pi | `opencode-go/kimi-k3` | none | `drop-legacy-fetch-burrow-kit` |
 | 5 | dagny | pi | `opencode-go/glm-5.3` | none | `drop-legacy-fetch-burrow-notify` |
 | 6 | pell | pi | `opencode-go/qwen3.8-flash` | the pi adapter (`-e`): the brief, the scope guard and a verdict gate | `drop-legacy-fetch-burrow-search` |
 
-Each handle and model id is the one `scripts/lib/swarm/roster.ts` holds, word for word; the plan prints them (S09), and that printout is what the video shows. pell ran OpenCode Zen's Gemini flash (`opencode/gemini-3.8-flash`) until 2026-10-08, when the swarm's live rehearsal swapped it for `opencode-go/qwen3.8-flash`: pi on this machine has no OpenCode Zen key, and the qwen flash runs headless with the adapter. Putting Gemini back is the one-line swap in the roster, once the key is in pi on the machine that runs the take.
+Each handle and model id is the one `scripts/lib/swarm/roster.ts` holds, word for word; the plan prints them (S09), and that printout is what the video shows. Two models changed in the swarm's live rehearsal on 2026-10-08, each a one-line swap back in the roster. tamsin ran `openai/gpt-5.5` on OpenCode's ChatGPT sign-in until that account's usage limit ran out (ChatGPT says it is back on Oct 16, after the deadline); OpenCode Go's `opencode-go/gpt-6-luna` runs headless in its place. pell ran OpenCode Zen's Gemini flash (`opencode/gemini-3.8-flash`), which pi on this machine cannot reach without OpenCode Zen's key; `opencode-go/qwen3.8-flash` runs headless with the adapter.
 
 Every agent gets the same zero-install brief: the ask as its page says it, the fork's remote, and the loop the project's AGENTS.md gives (claim, work inside the territory, `myr check`, push, read the verdict). Nothing about the gate's internals.
 

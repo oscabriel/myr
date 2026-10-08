@@ -15,6 +15,7 @@ import {
   Array,
   ConfigProvider,
   Console,
+  Duration,
   Effect,
   FileSystem,
   Layer,
@@ -46,7 +47,10 @@ import {
 import { roster } from "../../../scripts/lib/swarm/roster.ts";
 import type { Contributor } from "../../../scripts/lib/swarm/roster.ts";
 import { nudges } from "../../../scripts/lib/swarm/scenario.ts";
-import { prepareWorkspace } from "../../../scripts/lib/swarm/workspace.ts";
+import {
+  ForkWait,
+  prepareWorkspace,
+} from "../../../scripts/lib/swarm/workspace.ts";
 import { main } from "../../../scripts/swarm.ts";
 import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
@@ -361,7 +365,7 @@ describe("the roster", () => {
         // An Anthropic id, OpenCode's GPT, an Amp mode, then pi's three.
         const models = [
           /^claude-/u,
-          /^openai\/gpt-/u,
+          /^opencode-go\/gpt-/u,
           /^(?:low|medium|high|ultra)$/u,
           /\/kimi-k3$/u,
           /\/glm-5\.3$/u,
@@ -477,11 +481,16 @@ interface Spawned {
 /**
  * A `ChildProcessSpawner` that runs nothing: it records each command and
  * answers with what `answer` gives it (exit 0 and no output by default).
+ * `answer` also gets how many commands came before this one.
  */
 const fakeSpawner = (
-  answer: (spawned: Spawned) => {
+  answer: (
+    spawned: Spawned,
+    before: number
+  ) => {
     readonly code?: number;
     readonly stdout?: string;
+    readonly stderr?: string;
   } = () => ({})
 ) =>
   Effect.gen(function* () {
@@ -500,10 +509,14 @@ const fakeSpawner = (
           env: command.options.env ?? {},
         };
 
-        yield* Ref.update(spawned, (calls) => [...calls, call]);
+        const before = (yield* Ref.getAndUpdate(spawned, (calls) => [
+          ...calls,
+          call,
+        ])).length;
 
-        const { code = 0, stdout = "" } = answer(call);
+        const { code = 0, stderr = "", stdout = "" } = answer(call, before);
         const out = Stream.make(new TextEncoder().encode(stdout));
+        const err = Stream.make(new TextEncoder().encode(stderr));
 
         return ChildProcessSpawner.makeHandle({
           all: out,
@@ -513,7 +526,7 @@ const fakeSpawner = (
           isRunning: Effect.succeed(false),
           kill: () => Effect.void,
           pid: ChildProcessSpawner.ProcessId(1),
-          stderr: Stream.empty,
+          stderr: err,
           stdin: Sink.drain,
           stdout: out,
           unref: Effect.succeed(Effect.void),
@@ -549,12 +562,27 @@ const wrensClaim = Schema.decodeSync(ClaimView)({
 
 const wrensToken = "wren-token-0123456789abcdef0123456789abcdef";
 
-/** wren's workspace for run `r1`, below a temp dir, over a fake spawner. */
-const wrensWorkspace = (code = 0) =>
+/** What git prints when the gateway answers 404 for the fork: it is not made yet. */
+const forkNotMade = `remote: no repo ${wrensClaim.fork}
+fatal: repository '${wrensClaim.remote}/' not found
+`;
+
+/**
+ * wren's workspace for run `r1`, below a temp dir, over a fake spawner
+ * whose every clone exits `code`, or answers as `clone` says (given how
+ * many clones came before it).
+ */
+const wrensWorkspace = (
+  code = 0,
+  clone: (before: number) => {
+    readonly code?: number;
+    readonly stderr?: string;
+  } = () => ({ code })
+) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const swarm = yield* fs.makeTempDirectoryScoped();
-    const fake = yield* fakeSpawner(() => ({ code }));
+    const fake = yield* fakeSpawner((_, before) => clone(before));
 
     const [wren] = roster;
 
@@ -679,6 +707,66 @@ describe("a contributor's workspace", () => {
         expect(reason).toContain(wrensClaim.remote);
         expect(reason).not.toContain(wrensToken);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "clones again while the fork is not made yet, since the claim returns before its outbox makes the fork",
+    () =>
+      Effect.gen(function* () {
+        // Found live (804): one of six claims at once came back before
+        // Artifacts had its fork, and the clone answered 404.
+        const { spawned, workspace } = yield* wrensWorkspace(0, (before) =>
+          before < 2 ? { code: 128, stderr: forkNotMade } : { code: 0 }
+        );
+
+        expect({
+          clones: spawned.map(({ args }) => args[0]),
+          made: Result.isSuccess(workspace),
+        }).toStrictEqual({
+          clones: ["clone", "clone", "clone"],
+          made: true,
+        });
+      }).pipe(
+        Effect.scoped,
+        Effect.provideService(ForkWait, Duration.millis(1)),
+        Effect.provide(NodeServices.layer)
+      )
+  );
+
+  it.live(
+    "stops waiting for the fork after 30 more tries, and never clones again for any other failure",
+    () =>
+      Effect.gen(function* () {
+        const waited = yield* wrensWorkspace(0, () => ({
+          code: 128,
+          stderr: forkNotMade,
+        }));
+
+        const once = yield* wrensWorkspace(0, () => ({
+          code: 128,
+          stderr:
+            "remote: wren may not read it\nfatal: unable to access it: The requested URL returned error: 403\n",
+        }));
+
+        expect({
+          neverMade: Option.map(
+            Result.getFailure(waited.workspace),
+            ({ reason }) => reason.includes("not found")
+          ),
+          neverMadeClones: waited.spawned.length,
+          refusedClones: once.spawned.length,
+          refusedFailed: Result.isFailure(once.workspace),
+        }).toStrictEqual({
+          neverMade: Option.some(true),
+          neverMadeClones: 31,
+          refusedClones: 1,
+          refusedFailed: true,
+        });
+      }).pipe(
+        Effect.scoped,
+        Effect.provideService(ForkWait, Duration.millis(1)),
+        Effect.provide(NodeServices.layer)
+      )
   );
 });
 
@@ -971,7 +1059,7 @@ describe("the dry run", () => {
           [
             "tamsin",
             "opencode",
-            "openai/gpt-5.5",
+            "opencode-go/gpt-6-luna",
             children[1],
             "@burrow/billing",
           ],

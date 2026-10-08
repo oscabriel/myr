@@ -8,7 +8,17 @@
  */
 import { Brand } from "@repo/brand";
 import type { ClaimView } from "@repo/protocol/domain/claim";
-import { Config, Effect, FileSystem, Redacted, Schema, Stream } from "effect";
+import {
+  Config,
+  Context,
+  Duration,
+  Effect,
+  FileSystem,
+  Redacted,
+  Schedule,
+  Schema,
+  Stream,
+} from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { runDir } from "./results.ts";
@@ -163,6 +173,27 @@ export const run = (input: {
   );
 
 /**
+ * How long a clone waits for the claim's fork: one try every `ForkWait`
+ * (2 s unless a test says otherwise) after the first, `FORK_TRIES` more at
+ * most, so about a minute. A claim returns before its outbox has made the
+ * fork, and an Artifacts fork that failed under load is made again only at
+ * the Project's next alarm, with backoff. Found live (804): one of six
+ * claims made at once was cloned too soon.
+ */
+export const ForkWait = Context.Reference<Duration.Duration>("swarm/ForkWait", {
+  defaultValue: () => Duration.seconds(2),
+});
+
+export const FORK_TRIES = 30;
+
+/** git's words when the gateway answers 404: the repo is not there (yet). */
+const NOT_FOUND = /^fatal: repository '.*' not found$/mu;
+
+/** A clone that failed only because the fork is not made yet. */
+const forkNotMadeYet = (ran: Ran) =>
+  ran.code !== 0 && NOT_FOUND.test(ran.stderr);
+
+/**
  * Makes one contributor's workspace for their claim, below `<swarm>/<run>/`:
  *
  * - `bin/<cli>` and `bin/git-credential-<slug>`, shims that run this repo's
@@ -172,7 +203,8 @@ export const run = (input: {
  *   harnesses' own sign-ins live there);
  * - `clone/`, the claim's fork, cloned with the helper in its config for
  *   the platform (after an empty helper that drops any other, as `login`
- *   sets it globally), and the person as its author;
+ *   sets it globally), and the person as its author; while the fork is not
+ *   made yet, the clone is tried again (`ForkWait`, `FORK_TRIES`);
  * - the env: `PATH`, git's non-interactive settings, `XDG_CONFIG_HOME`, and
  *   the person's token and platform as `<SLUG>_TOKEN` and `<SLUG>_URL`.
  */
@@ -244,6 +276,7 @@ export const prepareWorkspace = (input: {
     };
 
     const credential = `credential.${input.platformUrl}`;
+    const forkWait = yield* ForkWait;
 
     const cloned = yield* run({
       args: [
@@ -263,7 +296,13 @@ export const prepareWorkspace = (input: {
       command: "git",
       cwd: dir,
       env,
-    });
+    }).pipe(
+      Effect.repeat({
+        schedule: Schedule.spaced(forkWait),
+        times: FORK_TRIES,
+        while: forkNotMadeYet,
+      })
+    );
 
     if (cloned.code !== 0) {
       return yield* new SwarmFailed({
