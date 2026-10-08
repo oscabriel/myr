@@ -3,8 +3,10 @@ import {
   localCommandDocs,
 } from "@repo/agent-kit/command-doc";
 import { platformSkill } from "@repo/agent-kit/platform";
+import type { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { Upstream } from "@repo/git/upstream";
+import type { FrontPage } from "@repo/project/front-page";
 import { Projects } from "@repo/project/projects";
 import { authenticated, bearerToken } from "@repo/protocol/authenticate";
 import { Client, Contracts, surfaced } from "@repo/protocol/contracts";
@@ -37,6 +39,7 @@ import type { GitServices } from "./git.ts";
 import { releaseRoutes } from "./releases.ts";
 import type { ReleaseStore } from "./releases.ts";
 import { Sessions } from "./sessions.ts";
+import { agentSkillRoutes } from "./well-known.ts";
 
 /** Which stage this Worker serves: `/health` says so. */
 export class Stage extends Context.Service<Stage, { readonly name: string }>()(
@@ -45,13 +48,16 @@ export class Stage extends Context.Service<Stage, { readonly name: string }>()(
 
 /**
  * What the surfaces need from the platform: the contracts' handlers,
- * sessions, what git's paths need, the CLI's releases, and the stage.
+ * sessions, what git's paths need, the CLI's releases, the front page and
+ * the repos the projects' skills are read from, and the stage.
  */
 export type Services =
   | Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>
   | Sessions
   | GitServices
   | ReleaseStore
+  | FrontPage
+  | RepoHost
   | Stage;
 
 /** git's smart-HTTP paths: `/<repo>(.git)/info/refs` and the two services. */
@@ -79,19 +85,27 @@ const RELEASE_PATH =
   /^\/(?:install\.sh|releases\/(?:manifest\.json|[^/]+\/[^/]+))$/u;
 
 /**
+ * The projects' contribute skills and their index (issue 505,
+ * `well-known.ts`), public as every landed tree is.
+ */
+const SKILLS_PATH = /^\/\.well-known\/agent-skills\/.+$/u;
+
+/**
  * Paths no credential is asked for and none is checked on, so none answers
  * 401: `/health`; git's, whose gateway decides who may read and push (and
  * answers an unknown credential with its own 401); the paths that tell a
  * client how to sign in, or sign it in, which may carry a stale token or an
- * OAuth client's own credential; and the CLI's downloads, which anyone may
- * fetch, with whatever credential an installer happens to carry.
+ * OAuth client's own credential; the CLI's downloads, which anyone may
+ * fetch, with whatever credential an installer happens to carry; and the
+ * projects' skills, which an agent fetches the same way.
  */
 const isExempt = (path: string) =>
   path === "/health" ||
   GIT_PATH.test(path) ||
   DISCOVERY_PATH.test(path) ||
   SIGN_IN_PATH.test(path) ||
-  RELEASE_PATH.test(path);
+  RELEASE_PATH.test(path) ||
+  SKILLS_PATH.test(path);
 
 /** Where the platform describes itself as an OAuth protected resource. */
 const PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource";
@@ -380,6 +394,7 @@ export const serve = <E>(services: Layer.Layer<Services, E>) =>
       mcp,
       rpc,
       releaseRoutes,
+      agentSkillRoutes,
       identifyCaller
     ).pipe(Layer.provide(services)),
     { disableLogger: true }

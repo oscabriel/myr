@@ -978,6 +978,22 @@ const matrix: Rule = (site) => {
   );
 };
 
+/**
+ * What any workspace may read from the root by a relative path: the
+ * reference data `bun run gen` writes from the one schema (AGENTS.md
+ * principle 4), as JSON, which `gen:check` keeps current. The web's
+ * `llms.txt` lists the CLI's commands from `docs/reference/commands.json`
+ * (W5 505) rather than a copy.
+ */
+const GENERATED_REFERENCE = /^docs\/reference\/[^/]+\.json$/u;
+
+/** Whether a relative import resolves to generated reference data. */
+const readsReference = (site: Site) => {
+  const resolved = normalize(`${dirname(site.path)}${site.specifier}`);
+
+  return resolved !== undefined && GENERATED_REFERENCE.test(resolved);
+};
+
 const adapterThroughPort: Rule = (site, tree) => {
   const reachesOwnAdapter =
     PACKAGE_SRC.test(site.path) &&
@@ -992,7 +1008,8 @@ const adapterThroughPort: Rule = (site, tree) => {
   const reachesAcross =
     to !== undefined &&
     to !== site.from &&
-    (to.dir !== "" || !site.path.startsWith(FENCE_TESTS));
+    (to.dir !== "" ||
+      !(site.path.startsWith(FENCE_TESTS) || readsReference(site)));
 
   return breaks("adapter-through-port", reachesOwnAdapter || reachesAcross);
 };

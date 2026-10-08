@@ -11,6 +11,7 @@ import { env } from "cloudflare:workers";
 import type { ReactNode } from "react";
 
 import { TooltipProvider } from "../components/ui/tooltip.tsx";
+import { MANIFEST_PATH } from "../features/agents/manifest.ts";
 import { SessionSlot } from "../features/auth/session-slot.tsx";
 import { SiteFooter, SiteHeader } from "../features/shared/layout.tsx";
 import { themeColors } from "../features/shared/theme.ts";
@@ -63,8 +64,8 @@ export const Route = createRootRoute({
   head: () => ({
     links: [
       { href: styles, rel: "stylesheet" },
-      // Served by issue 505 (`public/manifest.webmanifest`).
-      { href: "/manifest.webmanifest", rel: "manifest" },
+      // Written from `Brand.name` at each build by `vite.config.ts` (issue 505).
+      { href: MANIFEST_PATH, rel: "manifest" },
     ],
     meta: [
       { charSet: "utf-8" },

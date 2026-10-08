@@ -112,22 +112,54 @@ const metadataOf = (head: string) => {
 
 const decodeLanded = Schema.decodeUnknownOption(LandedSha);
 
-/**
- * What a file this platform manages says about itself: none for a file
- * without the frontmatter, or one someone else manages.
- */
-export const readManaged = (file: string): Option.Option<Managed> => {
+/** A Markdown file's frontmatter and the body after it; none without one. */
+const sections = (file: string) => {
   if (!file.startsWith(OPEN)) {
     return Option.none();
   }
 
   const close = file.indexOf(CLOSE, OPEN.length - 1);
 
-  if (close === -1) {
+  return close === -1
+    ? Option.none()
+    : Option.some({
+        body: file.slice(close + CLOSE.length),
+        head: file.slice(OPEN.length, close),
+      });
+};
+
+const DESCRIPTION = "description: ";
+
+/**
+ * The `description` a skill's frontmatter gives, quoted as `frontmatter`
+ * writes it or plain as a hand-written skill may: none without the
+ * frontmatter, or without a description in it. The skills index lists a
+ * landed skill by it (issue 505).
+ */
+export const describedIn = (file: string): Option.Option<string> =>
+  Option.flatMap(sections(file), ({ head }) =>
+    Arr.findFirst(head.split("\n"), (line) =>
+      line.startsWith(DESCRIPTION)
+    ).pipe(
+      Option.map((line) => line.slice(DESCRIPTION.length).trim()),
+      Option.filter((raw) => raw !== ""),
+      Option.flatMap(valueOf)
+    )
+  );
+
+/**
+ * What a file this platform manages says about itself: none for a file
+ * without the frontmatter, or one someone else manages.
+ */
+export const readManaged = (file: string): Option.Option<Managed> => {
+  const split = sections(file);
+
+  if (Option.isNone(split)) {
     return Option.none();
   }
 
-  const metadata = metadataOf(file.slice(OPEN.length, close));
+  const { body, head } = split.value;
+  const metadata = metadataOf(head);
   const hash = metadata.get("content-hash");
 
   if (metadata.get("managed-by") !== Brand.slug || hash === undefined) {
@@ -135,7 +167,7 @@ export const readManaged = (file: string): Option.Option<Managed> => {
   }
 
   return Option.some({
-    body: file.slice(close + CLOSE.length),
+    body,
     hash,
     landed: Option.fromNullishOr(metadata.get("landed")).pipe(
       Option.flatMap(decodeLanded)

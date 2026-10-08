@@ -2,7 +2,12 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Effect, Option } from "effect";
 
-import { frontmatter, isStale, readManaged } from "../src/generated-file.ts";
+import {
+  describedIn,
+  frontmatter,
+  isStale,
+  readManaged,
+} from "../src/generated-file.ts";
 import { projectSkill } from "../src/project-skill.ts";
 import {
   landed,
@@ -113,6 +118,39 @@ describe(readManaged, () => {
     ].join("\n");
 
     expect(readManaged(file)).toStrictEqual(Option.none());
+  });
+});
+
+describe(describedIn, () => {
+  it.effect(
+    "reads back the description frontmatter wrote, quotes and colons kept",
+    () =>
+      Effect.gen(function* () {
+        const description = 'Answer one of datekit\'s asks: say "hello".';
+
+        const file = yield* frontmatter({
+          body: "hello\n",
+          description,
+          landed: Option.some(landed),
+          name: "hello",
+        });
+
+        expect(describedIn(file)).toStrictEqual(Option.some(description));
+      })
+  );
+
+  it("reads a plain description, as a hand-written skill gives one", () => {
+    expect(
+      describedIn("---\nname: hello\ndescription: Say hello.\n---\nhello\n")
+    ).toStrictEqual(Option.some("Say hello."));
+  });
+
+  it("is None without the frontmatter, or without a description in it", () => {
+    expect([
+      describedIn("description: Say hello.\n\nhello\n"),
+      describedIn("---\nname: hello\n---\ndescription: Say hello.\n"),
+      describedIn("---\nname: hello\ndescription: \n---\nhello\n"),
+    ]).toStrictEqual([Option.none(), Option.none(), Option.none()]);
   });
 });
 
