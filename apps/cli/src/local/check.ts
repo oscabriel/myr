@@ -48,6 +48,7 @@ import {
   DateTime,
   Duration,
   Effect,
+  Exit,
   FileSystem,
   Option,
   Path,
@@ -62,7 +63,7 @@ import { Credentials } from "../credentials.ts";
 import { Output, Reported } from "../output.ts";
 import { repoContext } from "../repo-context.ts";
 import type { RepoContext } from "../repo-context.ts";
-import { localFacts, outsideAnyHook, runGit } from "./facts.ts";
+import { commitOf, localFacts, outsideAnyHook, runGit } from "./facts.ts";
 import {
   ConfigBundler,
   ConfigBundlerBun,
@@ -228,6 +229,42 @@ const claimsOn = (project: ProjectName, json: boolean) =>
             )
       )
     );
+  });
+
+/**
+ * Where the diff starts: `--base` when given; else the live claim's base,
+ * which is what the gateway diffs a push to the claim's fork from (so an
+ * answer committed on the clone's own main is still seen), when this repo
+ * holds that commit; else `main`.
+ */
+const baseOf = (
+  root: string,
+  given: Option.Option<string>,
+  claim: Option.Option<ClaimView>
+) =>
+  Effect.gen(function* () {
+    if (Option.isSome(given)) {
+      return given.value;
+    }
+
+    if (Option.isNone(claim)) {
+      return "main";
+    }
+
+    const { base } = claim.value;
+    const held = yield* Effect.exit(commitOf(root, base));
+
+    if (Exit.isSuccess(held)) {
+      return base;
+    }
+
+    yield* Output.use((output) =>
+      output.note(
+        `Your claim was made at ${base}, which this repo doesn't have, so the diff starts at main; fetch the project's main, or pass --base.`
+      )
+    );
+
+    return "main";
   });
 
 /**
@@ -416,9 +453,9 @@ export const check = Command.make(
       )
     ),
     base: Flag.String("base").pipe(
-      Flag.withDefault("main"),
+      Flag.optional,
       Flag.withDescription(
-        "Main as you have it: the policy is read here, and the diff starts at its merge base with HEAD"
+        "Main as you have it: the policy is read here, and the diff starts at its merge base with HEAD. Defaults to your live claim's base, as the gateway diffs, else main"
       )
     ),
     dir: Flag.Directory("dir", { mustExist: true }).pipe(
@@ -488,9 +525,11 @@ export const check = Command.make(
         () => SOMEONE
       );
 
+      const base = yield* baseOf(context.root, flags.base, claim);
+
       const bundler = yield* Effect.serviceOption(ConfigBundler);
 
-      const policy = yield* localPolicy(context.root, flags.base, {
+      const policy = yield* localPolicy(context.root, base, {
         initializer: handle,
         project,
       }).pipe(
@@ -500,7 +539,7 @@ export const check = Command.make(
         }),
         Effect.catchTag("RulesFailed", (failure) =>
           stop(
-            `The policy at ${flags.base} did not evaluate (${failure.reason}): ${failure.detail}`
+            `The policy at ${base} did not evaluate (${failure.reason}): ${failure.detail}`
           )
         )
       );
@@ -530,7 +569,7 @@ export const check = Command.make(
 
       const facts = yield* localFacts({
         ask,
-        base: flags.base,
+        base,
         claim: flags.offline
           ? Option.some(
               yield* syntheticClaim({

@@ -9,6 +9,7 @@ import type { PushFacts } from "@repo/gate/facts";
 import { pushStages, runGate } from "@repo/gate/gate";
 import { addedLines, treeDiff } from "@repo/git/tree-diff";
 import { Client, Contracts } from "@repo/protocol/contracts";
+import { ClaimView } from "@repo/protocol/domain/claim";
 import { RefNameText } from "@repo/protocol/domain/common";
 import { Envelope } from "@repo/protocol/envelope";
 import {
@@ -79,6 +80,43 @@ const noClaims = Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
     asTester,
   ])
 );
+
+const claimView = Schema.decodeUnknownSync(ClaimView);
+
+/**
+ * A platform that says the caller holds a live claim on the ask, made when
+ * main stood at `base`, and answers nothing else.
+ */
+const claimedAt = (base: string) =>
+  Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
+    Layer.provide([
+      Layer.mergeAll(
+        unanswered,
+        Contracts.toLayerHandler("status", () =>
+          Effect.succeed({
+            answers: [],
+            claims: [
+              claimView({
+                ask,
+                base,
+                checkCommand: `true ${checkFile}`,
+                claimant: handle,
+                fork: `${project}--${ask}--${handle}`,
+                lapsesAt: "2099-01-02T00:00:00.000Z",
+                openedAt: "2026-10-07T12:00:00.000Z",
+                project,
+                remote: `https://platform.example.dev/${project}--${ask}--${handle}.git`,
+                state: "live",
+                warnsAt: "2099-01-01T00:00:00.000Z",
+              }),
+            ],
+            handle: Handle.make(handle),
+          })
+        )
+      ),
+      asTester,
+    ])
+  );
 
 /** A platform no offline run may call. */
 const unreachable = Layer.mock(Client)({});
@@ -445,6 +483,40 @@ describe(`${Brand.cli} check`, () => {
           v: 1,
         });
         expect(printed.err.join("\n")).not.toContain("made up");
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "diffs from the claim's base, as the gateway does, even when the answer is committed on main",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* aCheckRepo;
+
+        // What the gateway says of the answer pushed onto the claim's base.
+        const expected = yield* gateSays(repo, repo.straying);
+
+        // A contributor who clones the project and commits the answer on
+        // its main, as the zero-install flow does: main...HEAD is empty.
+        yield* gitOk(repo.root, "checkout", "--quiet", "main");
+        yield* gitOk(repo.root, "reset", "--quiet", "--hard", repo.straying);
+
+        const printed = yield* run([
+          "check",
+          "--dir",
+          repo.root,
+          "--ask",
+          ask,
+          "--shape-only",
+          "--json",
+        ]).pipe(Effect.provide(services(claimedAt(repo.main))));
+
+        expect(Exit.isFailure(printed.exit)).toBeTruthy();
+        expect(yield* envelopeOf(printed.out)).toStrictEqual({
+          command: "check",
+          ok: false,
+          refusals: expected.encoded,
+          v: 1,
+        });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 

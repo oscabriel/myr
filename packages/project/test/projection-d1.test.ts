@@ -408,14 +408,29 @@ describe("the front page's D1 projection", () => {
     })
   );
 
-  it.effect("reads no projects and no credits until their tables exist", () =>
-    Effect.gen(function* () {
-      yield* apply(rows(datekit, 1, [opened(parseIsoAsk, 1)]));
+  // Until W5 514's projects table, the projects are those the projection
+  // has applied events of, so a call without a project (`status`, `today`)
+  // reaches each of them.
+  it.effect(
+    "lists every project it has heard from, with its open asks, and reads no credits",
+    () =>
+      Effect.gen(function* () {
+        yield* apply(
+          rows(datekit, 1, [
+            opened(parseIsoAsk, 1),
+            opened(weekStartAsk, 2),
+            closedBy(weekStart),
+          ])
+        );
+        yield* apply(rows(burrow, 1, [opened(noAnyAsk, 3), closedBy(noAny)]));
 
-      const front = yield* FrontPage;
+        const front = yield* FrontPage;
 
-      expect(yield* front.projects()).toStrictEqual([]);
-      expect(yield* front.credits(Handle.make("bram"))).toStrictEqual([]);
-    }).pipe(Effect.provide(world))
+        expect(yield* front.projects()).toStrictEqual([
+          { openAsks: 0, posture: "open", project: burrow },
+          { openAsks: 1, posture: "open", project: datekit },
+        ]);
+        expect(yield* front.credits(Handle.make("bram"))).toStrictEqual([]);
+      }).pipe(Effect.provide(world))
   );
 });
