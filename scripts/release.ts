@@ -20,9 +20,10 @@
  * and `<origin>/releases/…` (issue 420). Nothing goes to GitHub.
  *
  * `--publish` runs `npm publish` only when a person runs it: under any
- * agent's env (`@repo/protocol/audit`'s table) it does nothing, prints the
- * command for a person to run, and exits 0 (H2). The release's core lives
- * in `lib/release.ts`, its steps in `lib/release/steps.ts`.
+ * agent's env (`@repo/protocol/audit`'s table) the run still does every
+ * other step it names, checks the staged package as a publish would, prints
+ * the command for a person to run, and exits 0 (H2). The release's core
+ * lives in `lib/release.ts`, its steps in `lib/release/steps.ts`.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
@@ -45,10 +46,11 @@ import {
   WorkersDev,
 } from "../infra/stages.ts";
 import type { Stage } from "../infra/stages.ts";
-import { releasePlan, releaseVersion } from "./lib/release.ts";
+import { releaseRun, releaseVersion } from "./lib/release.ts";
 import {
   layoutOf,
   missingFromPackage,
+  publishable,
   publishCommand,
   ReleaseFailed,
   runStep,
@@ -194,33 +196,41 @@ const report = (layout: Layout, version: string) =>
   });
 
 /**
- * Under an agent, `--publish` does nothing but say what a person runs
- * (H2), and the run ends well: the agent has done all it may.
+ * Under an agent, the publish is a person's (H2): once the staged package
+ * is whole and of this version, say what they run, and end well, since the
+ * agent has done all it may.
  */
-const handOver = (markers: readonly string[]) =>
+const handOver = (
+  layout: Layout,
+  release: Release,
+  markers: readonly string[]
+) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
-    const layout = yield* layoutOf(yield* repoRoot);
+
+    yield* publishable(layout, release);
 
     yield* Console.log(
       [
-        `release: an agent runs this (${markers.join(", ")}), so it publishes nothing (H2).`,
-        "A person publishes the staged package, after `npm login`, from the repo root:",
+        `release: an agent runs this (${markers.join(", ")}), so it doesn't publish (H2).`,
+        `A person publishes the staged package (${release.version}), after \`npm login\`, from the repo root:`,
         "",
         `  ${publishCommand(layout, path)}`,
       ].join("\n")
     );
   });
 
-export const main = (argv: readonly string[]) =>
+export const main = (
+  argv: readonly string[],
+  env: Readonly<Record<string, string | undefined>>
+) =>
   Effect.gen(function* () {
     const options = yield* optionsOf(argv);
     const root = yield* repoRoot;
     const layout = yield* layoutOf(root);
 
-    // The env as this process got it: an agent's harness marks it there.
-    const steps = yield* Effect.fromResult(
-      releasePlan({ ...options, env: process.env })
+    const { handOver: markers, steps } = yield* Effect.fromResult(
+      releaseRun({ ...options, env })
     );
 
     const version = yield* Effect.fromResult(releaseVersion(options));
@@ -239,8 +249,13 @@ export const main = (argv: readonly string[]) =>
 
     const release: Release = { origin, stage, version };
 
+    const planned = [
+      ...steps,
+      ...(markers.length > 0 ? ["publish (by a person)"] : []),
+    ];
+
     yield* Console.log(
-      `release ${version}: ${steps.join(", ")} (the install script fetches from ${origin})`
+      `release ${version}: ${planned.join(", ")} (the install script fetches from ${origin})`
     );
 
     for (const step of steps) {
@@ -249,8 +264,11 @@ export const main = (argv: readonly string[]) =>
     }
 
     yield* report(layout, version);
+
+    if (markers.length > 0) {
+      yield* handOver(layout, release, markers);
+    }
   }).pipe(
-    Effect.catchTag("PublishNeedsAPerson", ({ markers }) => handOver(markers)),
     Effect.tapError((failure) => Console.error(`release: ${failure.message}`)),
     Effect.mapError(() => new Reported())
   );
@@ -260,7 +278,8 @@ if (import.meta.main) {
     Effect.gen(function* () {
       const args = yield* (yield* Stdio.Stdio).args;
 
-      return yield* main(args);
+      // The env as this process got it: an agent's harness marks it there.
+      return yield* main(args, process.env);
     }).pipe(Effect.provide(BunServices.layer))
   );
 }

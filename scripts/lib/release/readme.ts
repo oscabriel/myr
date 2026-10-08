@@ -35,9 +35,9 @@ export const packageReadme = (input: {
     "",
     ...fence([
       `${brand.cli} login --url <platform>`,
-      `${brand.cli} asks      # list the open asks you could take`,
-      `${brand.cli} claim     # take one; you get a fork to push your answer to`,
-      `${brand.cli} check     # run the gate's checks locally before you push`,
+      `${brand.cli} asks          # list the open asks you could take`,
+      `${brand.cli} claim <ask>   # take one; you get a fork to push your answer to`,
+      `${brand.cli} check         # run the gate's checks locally before you push`,
     ]),
     "",
     `\`${brand.cli} --help\` lists every command; \`${brand.cli} mcp\` serves them as MCP tools over stdio.`,

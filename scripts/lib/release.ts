@@ -30,8 +30,11 @@ export const binaryName = (brand: typeof Brand, target: Target) =>
 /**
  * A module statement as rolldown writes one, at the start of a line: an
  * `import … from "x"` or `export … from "x"`, over any number of lines, or a
- * side-effect `import "x"`. Prose and generated source inside strings never
- * start a line of the build with `import`, so they are not read as imports.
+ * side-effect `import "x"`. Prose and inline strings are not read, but a
+ * template literal's line can start with `import` (`dist/bin.js` holds one:
+ * the rules' `/bun` main imports `./job.json`). Such a line naming a
+ * package is read as an import, which fails the pin loudly (`Unpinned`)
+ * rather than letting an import slip through unpinned.
  */
 const STATEMENT =
   /^(?:import|export)\b[^;"'`]*?\bfrom\s*["'](?<from>[^"']+)["']|^import\s*["'](?<bare>[^"']+)["']/gmu;
@@ -278,46 +281,83 @@ const BUILD: readonly ReleaseStep[] = [
 /** What a build or an upload ends with: the install script for its origin, and the digests. */
 const RELEASE_FILES: readonly ReleaseStep[] = ["installScript", "checksums"];
 
-/**
- * The steps a release runs, in order: `build` (416's build with both
- * targets, the npm package and the binaries), the install script and the
- * checksums, `upload` to the stage's own release storage, and `publish`
- * last. An upload names a stage the repo declares (`dev-oscabriel` or
- * `demo`); a stage given to a build only says whose origin the install
- * script fetches from, and is checked the same way. Under any agent's env,
- * a plan that publishes is refused whole (H2): the script prints the
- * command for a person to run instead.
- */
-export const releasePlan = (input: {
+/** What `bun run release` was asked to do, and the env it runs in. */
+export interface ReleaseFlags {
   readonly build: boolean;
   readonly upload: boolean;
   readonly stage?: string;
   readonly publish: boolean;
   readonly env: Readonly<Record<string, string | undefined>>;
-}): Result.Result<
-  readonly ReleaseStep[],
-  PublishNeedsAPerson | NoStage | UnknownStage
-> => {
-  const markers = input.publish ? agentMarkers(input.env) : [];
+}
 
-  if (markers.length > 0) {
-    return Result.fail(new PublishNeedsAPerson({ markers }));
-  }
-
-  if (input.stage === undefined && input.upload) {
+/**
+ * The steps `flags` name, in order: `build` (416's build with both
+ * targets, the npm package and the binaries), the install script and the
+ * checksums, `upload` to the stage's own release storage, and `publish`
+ * last. An upload names a stage the repo declares (`dev-oscabriel` or
+ * `demo`); a stage given to a build only says whose origin the install
+ * script fetches from, and is checked the same way.
+ */
+const stepsOf = (
+  flags: ReleaseFlags
+): Result.Result<readonly ReleaseStep[], NoStage | UnknownStage> => {
+  if (flags.stage === undefined && flags.upload) {
     return Result.fail(new NoStage());
   }
 
-  if (input.stage !== undefined && Option.isNone(declaredStage(input.stage))) {
-    return Result.fail(new UnknownStage({ stage: input.stage }));
+  if (flags.stage !== undefined && Option.isNone(declaredStage(flags.stage))) {
+    return Result.fail(new UnknownStage({ stage: flags.stage }));
   }
 
   return Result.succeed([
-    ...(input.build ? BUILD : []),
-    ...(input.build || input.upload ? RELEASE_FILES : []),
-    ...(input.upload ? (["upload"] as const) : []),
-    ...(input.publish ? (["publish"] as const) : []),
+    ...(flags.build ? BUILD : []),
+    ...(flags.build || flags.upload ? RELEASE_FILES : []),
+    ...(flags.upload ? (["upload"] as const) : []),
+    ...(flags.publish ? (["publish"] as const) : []),
   ]);
+};
+
+/**
+ * The steps a release runs, in order (`stepsOf`). Under any agent's env, a
+ * plan that publishes is refused (H2); `releaseRun` says what the script
+ * then does instead.
+ */
+export const releasePlan = (
+  flags: ReleaseFlags
+): Result.Result<
+  readonly ReleaseStep[],
+  PublishNeedsAPerson | NoStage | UnknownStage
+> => {
+  const markers = flags.publish ? agentMarkers(flags.env) : [];
+
+  return markers.length > 0
+    ? Result.fail(new PublishNeedsAPerson({ markers }))
+    : stepsOf(flags);
+};
+
+/** One run of `bun run release`: the steps it runs, and who it hands the publish to. */
+export interface ReleaseRun {
+  readonly steps: readonly ReleaseStep[];
+  /** The agent markers that refused the publish (H2); none when a person runs it. */
+  readonly handOver: readonly string[];
+}
+
+/**
+ * What the script runs for `flags`. A person's run is the plan. Under an
+ * agent, a run that publishes still runs every other step it names, so a
+ * `--build --publish` builds, and hands the publish to a person in place
+ * of running it: the script checks the staged package and prints the
+ * command (H2), rather than ending well with nothing done.
+ */
+export const releaseRun = (
+  flags: ReleaseFlags
+): Result.Result<ReleaseRun, NoStage | UnknownStage> => {
+  const handOver = flags.publish ? agentMarkers(flags.env) : [];
+
+  return Result.map(
+    stepsOf({ ...flags, publish: flags.publish && handOver.length === 0 }),
+    (steps) => ({ handOver, steps })
+  );
 };
 
 // --- The version -------------------------------------------------------------

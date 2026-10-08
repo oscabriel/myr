@@ -547,8 +547,12 @@ export const missingFromPackage = (layout: Layout, version: string) =>
     );
   });
 
-/** `publish`: `npm publish` of the staged package, once it is whole and of this version. */
-const publish = (layout: Layout, release: Release) =>
+/**
+ * The staged package is whole and of this release's version, so what
+ * `npm publish` ships is what this release built: checked before the
+ * publish runs, and before an agent hands its command to a person (H2).
+ */
+export const publishable = (layout: Layout, release: Release) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
 
@@ -570,14 +574,19 @@ const publish = (layout: Layout, release: Release) =>
           failed("publish", `the staged package lacks ${missing.join(", ")}`)
       )
     );
+  });
 
-    return yield* run(
+/** `publish`: `npm publish` of the staged package, once it is `publishable`. */
+const publish = (layout: Layout, release: Release) =>
+  Effect.andThen(
+    publishable(layout, release),
+    run(
       "publish",
       "npm",
       ["publish", layout.npm, "--access", "public"],
       layout.root
-    );
-  });
+    )
+  );
 
 /** `installScript`: the install script for this version, fetching from the release's origin. */
 const writeInstallScript = (layout: Layout, release: Release) =>

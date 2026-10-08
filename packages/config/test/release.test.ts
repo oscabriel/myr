@@ -33,6 +33,7 @@ import {
   PublishNeedsAPerson,
   releaseManifest,
   releasePlan,
+  releaseRun,
   releaseVersion,
   targets,
   Unpinned,
@@ -247,6 +248,57 @@ describe("a release's plan", () => {
     ).toStrictEqual(
       Result.fail(new PublishNeedsAPerson({ markers: ["CLAUDECODE"] }))
     );
+  });
+
+  it("under an agent, still runs every other step it was asked for, and hands only the publish to a person", () => {
+    expect({
+      agent: releaseRun({
+        build: true,
+        env: { CLAUDECODE: "1" },
+        publish: true,
+        stage: "demo",
+        upload: true,
+      }),
+      alone: releaseRun({
+        build: false,
+        env: { CLAUDECODE: "1" },
+        publish: true,
+        upload: false,
+      }),
+      person: releaseRun({
+        build: false,
+        env: {},
+        publish: true,
+        upload: false,
+      }),
+    }).toStrictEqual({
+      agent: Result.succeed({
+        handOver: ["CLAUDECODE"],
+        steps: [
+          "tsdown",
+          "manifest",
+          "copySkills",
+          "compile",
+          "installScript",
+          "checksums",
+          "upload",
+        ],
+      }),
+      alone: Result.succeed({ handOver: ["CLAUDECODE"], steps: [] }),
+      person: Result.succeed({ handOver: [], steps: ["publish"] }),
+    });
+  });
+
+  it("refuses an unknown stage under an agent too, before it hands anything over", () => {
+    expect(
+      releaseRun({
+        build: false,
+        env: { CLAUDECODE: "1" },
+        publish: true,
+        stage: "prod",
+        upload: true,
+      })
+    ).toStrictEqual(Result.fail(new UnknownStage({ stage: "prod" })));
   });
 
   it("publishes last when a person runs it", () => {
