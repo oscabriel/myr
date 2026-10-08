@@ -38,6 +38,10 @@ const week = "packages/parse/src/week.ts";
 
 const weekTest = "packages/parse/test/week.test.ts";
 
+/** The path set of a layer holding `each`: files, or folders. */
+const layerHolds = (...each: readonly string[]): ReadonlySet<RepoPath> =>
+  new Set(each.map((path) => RepoPath.make(path)));
+
 /** A push that changes `files` and adds `lines` to them. */
 const push = (
   files: readonly string[],
@@ -240,6 +244,77 @@ const rows: readonly {
     refusals: [new PrivatePathInPublicTree({ paths: paths(week) })],
   },
   {
+    facts: push([week, weekTest], [], { layerPaths: layerHolds(weekTest) }),
+    name: "a path a layer holds, pushed by someone who reads no layer: every path they wrote, not which collide",
+    refusals: [new PrivatePathInPublicTree({ paths: paths(week, weekTest) })],
+  },
+  {
+    facts: push([week, weekTest], [], {
+      canReadLayers: false,
+      layerPaths: layerHolds(weekTest),
+    }),
+    name: "a path a layer holds, pushed by someone told they read no layer: every path they wrote",
+    refusals: [new PrivatePathInPublicTree({ paths: paths(week, weekTest) })],
+  },
+  {
+    facts: push([week, weekTest], [], {
+      canReadLayers: true,
+      layerPaths: layerHolds(weekTest),
+    }),
+    name: "a path a layer holds, pushed by someone who reads the layers: only the path that collides",
+    refusals: [new PrivatePathInPublicTree({ paths: paths(weekTest) })],
+  },
+  {
+    facts: push([week, weekTest], [], {
+      layerPaths: layerHolds("packages/parse/test"),
+    }),
+    name: "a path under a folder a layer holds, pushed by someone who reads no layer: every path they wrote",
+    refusals: [new PrivatePathInPublicTree({ paths: paths(week, weekTest) })],
+  },
+  {
+    facts: push([week, weekTest], [], {
+      canReadLayers: true,
+      layerPaths: layerHolds("packages/parse/test"),
+    }),
+    name: "a path under a folder a layer holds, pushed by someone who reads the layers: only the path under it",
+    refusals: [new PrivatePathInPublicTree({ paths: paths(weekTest) })],
+  },
+  {
+    facts: push([week, weekTest], [], {
+      layerPaths: layerHolds("packages/parse/tes", "packages/parse/test/week"),
+    }),
+    name: "a layer path that only begins a path's name holds no path",
+    refusals: [],
+  },
+  {
+    facts: push([week], [], { layerPaths: layerHolds(weekTest) }),
+    name: "a push by someone who reads no layer, with nothing in a layer, is not refused",
+    refusals: [],
+  },
+  {
+    facts: testFacts({
+      changes: [
+        { path: RepoPath.make(week), status: "added" },
+        { path: RepoPath.make(weekTest), status: "deleted" },
+      ],
+      layerPaths: layerHolds(weekTest),
+    }),
+    name: "deleting a path a layer holds writes nothing into the public tree",
+    refusals: [],
+  },
+  {
+    facts: testFacts({
+      changes: [
+        { path: RepoPath.make(week), status: "added" },
+        { path: RepoPath.make(weekTest), status: "modified" },
+        { path: RepoPath.make("packages/parse/src/old.ts"), status: "deleted" },
+      ],
+      layerPaths: layerHolds(weekTest),
+    }),
+    name: "to someone who reads no layer, every path added or modified, never one deleted",
+    refusals: [new PrivatePathInPublicTree({ paths: paths(week, weekTest) })],
+  },
+  {
     facts: push(
       [week],
       [[week, 1, 'import { pad } from "../../format/src/pad.ts";']]
@@ -426,7 +501,10 @@ const rows: readonly {
       new TouchedJudge({ paths: paths(".github/workflows/ci.yml") }),
       new Weakened({ at: at(week, 4), weakening: { marker: "@ts-ignore" } }),
       new Weakened({ at: at(week, 9), weakening: { marker: ".only(" } }),
-      new PrivatePathInPublicTree({ paths: paths("docs/guide.md") }),
+      // bob reads no layer, so he hears every path he wrote.
+      new PrivatePathInPublicTree({
+        paths: paths(".github/workflows/ci.yml", "docs/guide.md", week),
+      }),
       new ReachedInternals({
         at: at(week, 1),
         from: RepoPath.make(week),

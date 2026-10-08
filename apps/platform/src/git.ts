@@ -20,9 +20,9 @@ import { concat, packetAt, pkt, utf8 } from "@repo/git/pkt-line";
 import { Upstream } from "@repo/git/upstream";
 import type { Projects } from "@repo/project/projects";
 import type { LayerAccess } from "@repo/project/visibility-port";
-import { RepoName } from "@repo/protocol/ids";
+import { CommitSha, RepoName } from "@repo/protocol/ids";
 import { Anonymous, Principal } from "@repo/protocol/principal";
-import { Effect, Option, Ref } from "effect";
+import { Array, Effect, Option, Ref, Schema } from "effect";
 
 import {
   custodyFor,
@@ -127,12 +127,123 @@ const REACH = {
   write: 2,
 } as const satisfies Record<LayerAccess, number>;
 
+const PKT_LENGTH = /^[0-9a-f]{4}$/u;
+
+const WANT = /^want (?<oid>[0-9a-f]{40})(?: |$)/u;
+
+const asCommit = Schema.decodeOption(CommitSha);
+
 /**
- * A git request to a project's layer repo (W6 609, ADR 0007): only the
- * layer's readers clone it and only its writers push to it, each read
- * logged, all through the private namespace's upstream. Someone not signed
- * in is asked to sign in (401, so the credential helper answers); a person
- * the layer does not admit gets 403 with one line git prints.
+ * The text lines of a request in git's pkt-line framing, its flush and
+ * delimiter packets skipped; reading stops where the framing breaks.
+ */
+const pktLines = (bytes: Uint8Array): readonly string[] => {
+  const decoder = new TextDecoder();
+  const lines: string[] = [];
+  let at = 0;
+
+  while (at + 4 <= bytes.length) {
+    const hex = decoder.decode(bytes.subarray(at, at + 4));
+    const length = Number.parseInt(hex, 16);
+
+    if (!PKT_LENGTH.test(hex) || length === 3 || at + length > bytes.length) {
+      break;
+    }
+
+    // 0000 flush, 0001 delimiter, 0002 response end: no payload.
+    if (length > 3) {
+      lines.push(
+        decoder.decode(bytes.subarray(at + 4, at + length)).replace(/\n$/u, "")
+      );
+    }
+
+    at += Math.max(length, 4);
+  }
+
+  return lines;
+};
+
+/** A request body as git wrote it, inflated if git gzipped it; none if it can't be. */
+const inflated = (bytes: Uint8Array, encoding: string | null) => {
+  if (encoding === null) {
+    return Effect.succeedSome(bytes);
+  }
+
+  return encoding === "gzip"
+    ? Effect.tryPromise(() =>
+        new Response(
+          new Response(bytes).body?.pipeThrough(new DecompressionStream("gzip"))
+        ).arrayBuffer()
+      ).pipe(
+        Effect.map((read) => new Uint8Array(read)),
+        Effect.option
+      )
+    : Effect.succeedNone;
+};
+
+/** What one upload-pack request reads of a repo, for the read log. */
+interface UploadRead {
+  /** Whether it may read content: anything but protocol v2's `ls-refs`, which lists refs only. */
+  readonly reads: boolean;
+  /** The first commit it wants, if it names one. */
+  readonly want: Option.Option<CommitSha>;
+}
+
+/**
+ * An upload-pack request, read whole for the read log and sent on
+ * unchanged: its body is a fetch's wants and haves, never a pack. Lines it
+ * can't make out (an encoding git never sends) still count as a read, with
+ * no commit named, so the log errs toward a read. None when the body
+ * itself can't be read.
+ */
+const uploadOf = (request: Request) =>
+  Effect.gen(function* () {
+    const read = yield* Effect.option(
+      Effect.tryPromise(() => request.arrayBuffer())
+    );
+
+    if (Option.isNone(read)) {
+      return Option.none();
+    }
+
+    const bytes = new Uint8Array(read.value);
+
+    const lines = Option.match(
+      yield* inflated(bytes, request.headers.get("content-encoding")),
+      { onNone: () => [], onSome: pktLines }
+    );
+
+    const upload: UploadRead = {
+      reads: lines[0] !== "command=ls-refs",
+      want: Array.findFirst(lines, (line) =>
+        Option.flatMap(
+          Option.fromNullishOr(WANT.exec(line)?.groups?.oid),
+          asCommit
+        )
+      ),
+    };
+
+    return Option.some({
+      request: new Request(request.url, {
+        body: bytes,
+        headers: request.headers,
+        method: request.method,
+      }),
+      upload,
+    });
+  });
+
+/**
+ * A git request to a project's layer repo (W6 606, ADR 0007): only the
+ * layer's readers clone it and only its writers push to it, all through the
+ * private namespace's upstream. Someone not signed in is asked to sign in
+ * (401, so the credential helper answers); a person the layer does not
+ * admit gets 403 with one line git prints.
+ *
+ * Every read is logged with who and which commit (OSR §5.2): each
+ * upload-pack request answered 200, but a v2 `ls-refs`, which lists refs
+ * and reads nothing, so a clone is one read. A fetch that negotiates over
+ * several requests logs each.
  */
 const serveLayer = (
   request: Request,
@@ -162,13 +273,32 @@ const serveLayer = (
         ? yield* layerCustodyFor(principal, target)
         : refuseAll;
 
-    const response = yield* gateway(request).pipe(
+    const fetching =
+      route.endpoint === "git-upload-pack" && request.method === "POST";
+
+    const upload = fetching ? yield* uploadOf(request) : Option.none();
+
+    if (fetching && Option.isNone(upload)) {
+      return plain(400, "the request could not be read");
+    }
+
+    const response = yield* gateway(
+      Option.match(upload, {
+        onNone: () => request,
+        onSome: (read) => read.request,
+      })
+    ).pipe(
       Effect.provideService(Custody, custody),
       Effect.provideService(Upstream, gate.upstream)
     );
 
-    if (route.endpoint === "git-upload-pack" && response.status === 200) {
-      yield* layerRead(principal, target);
+    const read = Option.filter(
+      Option.map(upload, (each) => each.upload),
+      ({ reads }) => reads && response.status === 200
+    );
+
+    if (Option.isSome(read)) {
+      yield* layerRead(principal, target, read.value.want);
     }
 
     return response;

@@ -118,21 +118,42 @@ const weakened = (facts: PushFacts): readonly Refusal[] =>
         : []
   );
 
-/** Added or changed paths a layer holds: nothing from a layer enters a public tree. */
-const privatePaths = (facts: PushFacts): readonly Refusal[] =>
-  Option.match(
-    someOf(
-      facts.changes.flatMap((change) =>
-        change.status !== "deleted" && facts.layerPaths.has(change.path)
-          ? [change.path]
-          : []
-      )
-    ),
+/** Whether a layer's path set holds `path`: the path itself, or a folder above it. */
+const inLayers =
+  (layerPaths: ReadonlySet<RepoPath>) =>
+  (path: RepoPath): boolean => {
+    const held: ReadonlySet<string> = layerPaths;
+    const parts = path.split("/");
+
+    return parts.some((_, end) => held.has(parts.slice(0, end + 1).join("/")));
+  };
+
+/**
+ * Added or changed paths a layer holds: nothing from a layer enters a
+ * public tree (OSR §2.5, §5.4), and a deletion writes nothing. The refusal
+ * is no oracle on which paths are a layer's: to a pusher who cannot read
+ * the layers (`canReadLayers`), it names every path they added or
+ * modified, all of them their own; only a reader hears which collide.
+ */
+const privatePaths = (facts: PushFacts): readonly Refusal[] => {
+  const written = facts.changes.flatMap((change) =>
+    change.status === "deleted" ? [] : [change.path]
+  );
+
+  const colliding = written.filter(inLayers(facts.layerPaths));
+
+  if (colliding.length === 0) {
+    return [];
+  }
+
+  return Option.match(
+    someOf(facts.canReadLayers === true ? colliding : written),
     {
       onNone: () => [],
       onSome: (paths) => [new PrivatePathInPublicTree({ paths })],
     }
   );
+};
 
 // The files whose imports are read: JavaScript and TypeScript sources.
 const SCRIPT = /\.[cm]?[jt]sx?$/u;

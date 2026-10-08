@@ -22,7 +22,12 @@
  * engine's. People are `dora` (who makes the project, so its decider),
  * `alice` and `bob`, each a `SESSION_TOKENS` entry: git sends a person's
  * token as the Basic password its credential helper gives, and the RPC
- * client as a bearer token.
+ * client as a bearer token. Anyone else `sessions` names is a `person`.
+ *
+ * A test may plug a cartridge in (`plugIn`), as `ports.ts` plugs one into
+ * the Worker: over the Worker's ports and over each Project DO's, made
+ * from a second store of bare repos behind a git http-backend of its own:
+ * the private namespace's stand-in, for W6's layer repos.
  *
  * Every log line the Worker's handler writes is kept beside its usual
  * printing, with its annotations (`logged`), and each Project DO's SQLite
@@ -48,6 +53,7 @@ import { ProjectStore } from "@repo/project/project-store";
 import type { RatchetRow } from "@repo/project/project-store/rows";
 import { ProjectStoreSqlite } from "@repo/project/project-store/sqlite";
 import { ProjectionMemory } from "@repo/project/projection/memory";
+import type { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
 import type { Client } from "@repo/protocol/contracts";
 import type { LaneOutcome, LaneResult } from "@repo/protocol/domain/answer";
@@ -86,6 +92,7 @@ import { WorkerFetch } from "../src/adapters/fetch.ts";
 import { MemoryRateLimits, WorkerCaps } from "../src/adapters/rate-limits.ts";
 import type { AnswerParams } from "../src/answer-runs.ts";
 import { decodeEnv, platformOn } from "../src/platform.ts";
+import type { WorkerPorts } from "../src/ports.ts";
 import { projectShell } from "../src/project-shell.ts";
 import { serve } from "../src/surfaces.ts";
 import { runAnswer } from "../src/workflows/answer/program.ts";
@@ -124,6 +131,25 @@ export interface GitClient {
   ) => Effect.Effect<CommitSha>;
 }
 
+/** Someone beside dora, alice and bob, as the world gives them to a test. */
+export interface Person {
+  readonly git: GitClient;
+  readonly rpc: Client["Service"];
+}
+
+/** The ports each Project DO runs on in the world: the Worker's, but `Projects`. */
+export type ProjectDoPorts = Exclude<WorkerPorts, Projects>;
+
+/**
+ * A cartridge, as the world plugs one in (`plugIn` in `ports.ts`): its
+ * layer over the Worker's ports, which the handler and the answer runs
+ * take, and its layer over each Project DO's.
+ */
+export interface PlugIn {
+  readonly worker?: Layer.Layer<never, never, WorkerPorts>;
+  readonly project?: Layer.Layer<never, never, ProjectDoPorts>;
+}
+
 /** One line the Worker's handler logged, with its annotations as text. */
 export interface Logged {
   readonly message: string;
@@ -154,6 +180,12 @@ export interface CoreLoopWorld {
   ) => Effect.Effect<readonly RatchetRow[]>;
   /** A client of the contracts over HTTP at `/rpc`, as that person (or as anyone). */
   readonly rpc: (as: Someone | "anonymous") => Client["Service"];
+  /**
+   * Someone `sessions` names, by handle: their git, whose credential helper
+   * gives their handle and token, and their client of the contracts. A
+   * handle `sessions` does not name is a defect.
+   */
+  readonly person: (handle: string) => Effect.Effect<Person>;
   /** Runs every queued answer run to its end, and any run those start. */
   readonly settle: () => Effect.Effect<void>;
   /** What the Checker answers for a lane at a commit or tree, in order. */
@@ -215,12 +247,12 @@ const listen = (handle: (request: Request) => Effect.Effect<Response>) =>
  * with a username (the person's handle, unless told another) and their
  * platform token as the password.
  */
-const helperScript = (as: Someone, username: string = as) =>
+const helperScript = (token: string, username: string) =>
   [
     "#!/bin/sh",
     'test "$1" = get || exit 0',
     `echo 'username=${username}'`,
-    `echo password=${tokens[as]}`,
+    `echo password=${token}`,
     "",
   ].join("\n");
 
@@ -243,6 +275,12 @@ export interface WorldOptions {
    * token to handle.
    */
   readonly sessions?: Readonly<Record<string, string>>;
+  /**
+   * A cartridge to plug in over the world's ports, made from a second
+   * store of bare repos the world keeps beside the first, behind a git
+   * http-backend of its own (the private namespace stands for one).
+   */
+  readonly plugIn?: (aside: RepoHost["Service"]) => PlugIn;
 }
 
 export const coreLoopWorld = (
@@ -306,6 +344,38 @@ export const coreLoopWorld = (
       )
     );
 
+    // A cartridge's layers, when the test plugs one in, made from a second
+    // store of bare repos behind a git http-backend of its own.
+    const plugged = yield* Option.match(
+      Option.fromUndefinedOr(options.plugIn),
+      {
+        onNone: () => Effect.succeed<PlugIn>({}),
+        onSome: (plugIn) =>
+          Effect.gen(function* () {
+            const aside = `${root}/aside`;
+
+            yield* fs
+              .makeDirectory(aside, { recursive: true })
+              .pipe(Effect.orDie);
+
+            const asideOrigin = yield* listen((request) =>
+              Effect.scoped(httpBackend(aside)(request)).pipe(
+                Effect.provideContext(node)
+              )
+            );
+
+            const store = yield* Layer.build(
+              RepoHostLocal.layer({
+                remoteBase: `${asideOrigin}/git`,
+                root: aside,
+              }).pipe(Layer.provide(WorkerFetch))
+            );
+
+            return plugIn(Context.get(store, RepoHost));
+          }),
+      }
+    );
+
     /** A project's answer runs, queued for `settle`, as the Answer Workflow takes them. */
     const runsOf = (project: ProjectName) =>
       Layer.succeed(
@@ -339,15 +409,29 @@ export const coreLoopWorld = (
           ports: Layer.mergeAll(
             Layer.succeedContext(base),
             AlarmsMemory,
-            runsOf(name)
+            runsOf(name),
+            (plugged.project ?? Layer.empty).pipe(
+              Layer.provide(Layer.succeedContext(base))
+            )
           ),
           sql: Layer.succeedContext(sql),
         });
       })
     );
 
-    const ports = base.pipe(
+    const core = base.pipe(
       Context.merge(yield* Layer.build(DoProjects(namespace)))
+    );
+
+    // The Worker's ports, with the cartridge plugged in over them.
+    const ports = core.pipe(
+      Context.merge(
+        yield* Layer.build(
+          (plugged.worker ?? Layer.empty).pipe(
+            Layer.provide(Layer.succeedContext(core))
+          )
+        )
+      )
     );
 
     // Every request the handler serves logs through the keeper too.
@@ -408,18 +492,22 @@ export const coreLoopWorld = (
 
     yield* fs.makeDirectory(helpers, { recursive: true }).pipe(Effect.orDie);
 
-    const gitOf = (
-      as: Someone,
-      username: string = as
+    /**
+     * git whose credential helper gives `username` and `token`, with a home
+     * of its own and a helper both named `named`.
+     */
+    const gitFor = (
+      named: string,
+      token: string,
+      username: string
     ): Effect.Effect<GitClient> =>
       Effect.gen(function* () {
-        const named = username === as ? as : `${as}-named`;
         const helper = `${helpers}/${named}`;
         const home = `${root}/people/${named}`;
 
         yield* Effect.orDie(
           Effect.all([
-            fs.writeFileString(helper, helperScript(as, username)),
+            fs.writeFileString(helper, helperScript(token, username)),
             fs.chmod(helper, 0o700),
             fs.makeDirectory(home, { recursive: true }),
           ])
@@ -476,11 +564,29 @@ export const coreLoopWorld = (
         };
       });
 
+    const gitOf = (as: Someone, username: string = as) =>
+      gitFor(username === as ? as : `${as}-named`, tokens[as], username);
+
     const gits = {
       alice: yield* gitOf("alice"),
       bob: yield* gitOf("bob"),
       dora: yield* gitOf("dora"),
     };
+
+    // Everyone else `sessions` names: their git and their client, by handle.
+    const people = new Map(
+      yield* Effect.forEach(
+        Object.entries(options.sessions ?? {}),
+        ([token, handle]) =>
+          Effect.map(
+            Effect.all({
+              git: gitFor(handle, token, handle),
+              rpc: clientOf(Option.some(token)),
+            }),
+            (person): readonly [string, Person] => [handle, person]
+          )
+      )
+    );
 
     /** Carries the queued runs, then the runs they started, round by round. */
     const carry = (round: number): Effect.Effect<void> =>
@@ -536,6 +642,12 @@ export const coreLoopWorld = (
       gitWithUsername: gitOf,
       logged: Effect.sync(() => [...logs]),
       origin,
+      person: (handle) =>
+        Option.match(Option.fromUndefinedOr(people.get(handle)), {
+          onNone: () =>
+            Effect.die(`the world has no ${handle}: name them in its sessions`),
+          onSome: Effect.succeed,
+        }),
       print: (at, lane, stdout) =>
         Effect.sync(() => {
           printed.set(scriptKey(at, lane), stdout);
