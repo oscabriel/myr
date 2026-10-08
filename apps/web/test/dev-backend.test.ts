@@ -21,8 +21,8 @@ import type { Scope } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 
-import { devServer } from "../src/dev/backend.ts";
 import { devStart } from "../src/dev/clock.ts";
+import { devServer } from "../src/dev/server.ts";
 import { devToken } from "../src/dev/sessions.ts";
 
 const PROJECTS = [ProjectName.make("burrow"), ProjectName.make("datekit")];

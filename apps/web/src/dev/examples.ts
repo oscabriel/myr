@@ -14,7 +14,9 @@
  *
  * A project's rules are its committed `policy.json`, the config folder the
  * `/json` rules evaluator reads, with every ask it will open stated there;
- * an ask opens when a decider lands its files.
+ * an ask opens when a decider lands its files. Each ask file is written
+ * from the ask `policy.json` states, as the SDK call a maintainer writes,
+ * so the two never disagree.
  */
 import { Brand } from "@repo/brand";
 import { CheckSpec, RatchetMeasure } from "@repo/protocol/domain/check";
@@ -22,13 +24,15 @@ import { Command, SymbolName } from "@repo/protocol/domain/common";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import { PolicyInput } from "@repo/protocol/domain/policy";
 import { AskId, Handle, ProjectName, RepoPath } from "@repo/protocol/ids";
-import { Array, Schema } from "effect";
+import { Array, Predicate, Schema } from "effect";
 
 import type { Files } from "./git.ts";
 
 const dir = Brand.configDir;
 
 const encodeCheck = Schema.encodeSync(CheckSpec);
+
+const decodeCheck = Schema.decodeSync(CheckSpec);
 
 const encodeMeasure = Schema.encodeSync(RatchetMeasure);
 
@@ -52,27 +56,83 @@ interface AskFile {
   readonly path: RepoPath;
 }
 
-/** An ask's file: the SDK call a maintainer writes, for people to read (the evaluator reads `policy.json`). */
-const askFile = (input: {
-  readonly id: string;
-  readonly kind: string;
-  readonly want: string;
-  readonly check: string;
-}): AskFile => ({
-  content: [
-    `import { check, kinds } from "${Brand.cliPackage}/rules";`,
-    "",
-    `export default kinds.${input.kind}.ask({`,
-    `  want: ${JSON.stringify(input.want)},`,
-    `  check: ${input.check},`,
-    "});",
-    "",
-  ].join("\n"),
-  path: RepoPath.make(`${dir}/asks/${input.id}.ask.ts`),
-});
-
 /** The files a decider opens one ask with: its ask file, then its check's file if it has one. */
 export type Opening = Array.NonEmptyReadonlyArray<AskFile>;
+
+/** The args a kind takes for an ask's check, as its ask file passes them (`packages/sdk`'s `kinds`). */
+interface KindArgs {
+  readonly command?: string;
+  readonly count?: string;
+  readonly from?: string;
+  readonly path?: string;
+  readonly ratchet?: string;
+  readonly rule?: string;
+  readonly to?: string | undefined;
+}
+
+/** A string, or a list of them, as TypeScript source spells it. */
+const spelled = (value: string | readonly string[]): string =>
+  Predicate.isString(value)
+    ? JSON.stringify(value)
+    : `[${value.map(spelled).join(", ")}]`;
+
+/**
+ * The args an ask's kind takes for its check, as the ask file spells them.
+ * No SDK call states a `SymbolAbsent` check (a migrate's split opens its
+ * delete step, issue 506), so that file spells the nearest one: a migrate
+ * with no `to`, every use gone.
+ */
+const checkArgs = (check: StatedAsk["check"]) =>
+  CheckSpec.match(decodeCheck(check), {
+    LintToZero: ({ command, rule }): KindArgs => ({ command, rule }),
+    Migrate: ({ count, from, to }): KindArgs => ({ count, from, to }),
+    Ratchet: ({ ratchet }): KindArgs => ({ ratchet }),
+    RedThenGreen: ({ path }): KindArgs => ({ path }),
+    SymbolAbsent: ({ count, symbol }): KindArgs => ({ count, from: symbol }),
+  });
+
+/** An ask's territory as its file spells it: the repo-wide builder for `.`, else the data itself. */
+const territoryOf = ({ module, paths }: StatedAsk["territory"]) =>
+  module === "."
+    ? `territory.paths(${paths.map(spelled).join(", ")})`
+    : `{ module: ${spelled(module)}, paths: ${spelled(paths)} }`;
+
+/** An ask's file: the SDK call that states `stated`, as its maintainer writes it. */
+const askFileOf = (stated: StatedAsk): AskFile => {
+  const territory = territoryOf(stated.territory);
+
+  const passed = Object.entries({
+    ...checkArgs(stated.check),
+    blockedBy: Array.isReadonlyArrayNonEmpty(stated.blockedBy)
+      ? stated.blockedBy
+      : undefined,
+    current: stated.brief.current,
+    mentor: stated.mentor,
+    parent: stated.parent,
+    reserve: stated.reserve,
+    want: stated.brief.want,
+  }).flatMap(([key, value]) =>
+    value === undefined ? [] : [`${key}: ${spelled(value)}`]
+  );
+
+  const args = [...passed, `territory: ${territory}`].toSorted();
+
+  const builders = territory.startsWith("territory.")
+    ? "kinds, territory"
+    : "kinds";
+
+  return {
+    content: [
+      `import { ${builders} } from "${Brand.cliPackage}/rules";`,
+      "",
+      `export default kinds.${stated.kind}.ask({`,
+      ...args.map((arg) => `  ${arg},`),
+      "});",
+      "",
+    ].join("\n"),
+    path: RepoPath.make(stated.file),
+  };
+};
 
 // ------------------------------------------------------------- datekit
 
@@ -93,55 +153,118 @@ const fix = {
   strength: "assertion",
 } satisfies typeof AskKind.Encoded;
 
-/** One datekit ask: its id, file, check and want, in `policy.json`'s terms. */
+/** One datekit ask: as `policy.json` states it, and the check file it opens with. */
+interface DatekitAsk {
+  readonly stated: StatedAsk;
+  readonly test: AskFile;
+}
+
+/**
+ * One datekit ask, from its id, the module file it fixes, its brief and its
+ * check's one test (red on main, by an assertion). One held for a newcomer
+ * names the maintainer who mentors them. datekit is one package, so every
+ * territory is in the repo-wide module, `.`.
+ */
 const datekitAsk = (input: {
   readonly id: string;
   readonly file: string;
-  readonly want: string;
   readonly current: string;
-}): StatedAsk => ({
-  askedBy: datekitPeople.decider,
-  blockedBy: [],
-  brief: { current: input.current, want: input.want },
-  check: encodeCheck(
-    CheckSpec.cases.RedThenGreen.make({
-      path: RepoPath.make(`test/asks/${input.id}.test.ts`),
-    })
-  ),
-  file: `${dir}/asks/${input.id}.ask.ts`,
-  id: input.id,
-  kind: "fix",
-  territory: { module: "datekit", paths: [`src/${input.file}.ts`] },
-});
+  readonly want: string;
+  readonly mentor?: Handle;
+  readonly test: {
+    readonly imports: readonly string[];
+    readonly name: string;
+    readonly assertion: string;
+  };
+}): DatekitAsk => {
+  const path = RepoPath.make(`test/asks/${input.id}.test.ts`);
 
-const datekitAsks: readonly StatedAsk[] = [
+  const stated: StatedAsk = {
+    askedBy: datekitPeople.decider,
+    blockedBy: [],
+    brief: { current: input.current, want: input.want },
+    check: encodeCheck(CheckSpec.cases.RedThenGreen.make({ path })),
+    file: `${dir}/asks/${input.id}.ask.ts`,
+    id: input.id,
+    kind: "fix",
+    territory: { module: ".", paths: [`src/${input.file}.ts`] },
+  };
+
+  return {
+    stated:
+      input.mentor === undefined
+        ? stated
+        : { ...stated, mentor: input.mentor, reserve: "newcomers" },
+    test: {
+      content: [
+        'import { expect, test } from "bun:test";',
+        "",
+        ...input.test.imports,
+        "",
+        `test(${spelled(input.test.name)}, () => {`,
+        `  ${input.test.assertion}`,
+        "});",
+        "",
+      ].join("\n"),
+      path,
+    },
+  };
+};
+
+const datekitAsks: readonly DatekitAsk[] = [
   datekitAsk({
     current: "parseISO returns an invalid date for a week date.",
     file: "parse",
     id: "parse-iso-week",
+    test: {
+      assertion:
+        'expect(parseISO("2026-W41-3").toISOString()).toBe("2026-10-07T00:00:00.000Z");',
+      imports: ['import { parseISO } from "../../src/parse.ts";'],
+      name: "parses an ISO week date",
+    },
     want: "parseISO accepts ISO week dates such as 2026-W41-3.",
   }),
-  // Held for a newcomer, whom its asker mentors.
-  {
-    ...datekitAsk({
-      current: 'format prints "11st", "12nd" and "13rd".',
-      file: "format",
-      id: "format-ordinal",
-      want: 'format(date, "Do") prints 1st, 2nd, 3rd, 11th, 12th, 13th and 21st.',
-    }),
+  datekitAsk({
+    current: 'format prints "11st", "12nd" and "13rd".',
+    file: "format",
+    id: "format-ordinal",
+    // Held for a newcomer, whom its asker mentors.
     mentor: datekitPeople.decider,
-    reserve: "newcomers",
-  },
+    test: {
+      assertion: 'expect(format(parseISO("2026-10-11"), "Do")).toBe("11th");',
+      imports: [
+        'import { format } from "../../src/format.ts";',
+        'import { parseISO } from "../../src/parse.ts";',
+      ],
+      name: "prints the teens as th",
+    },
+    want: 'format(date, "Do") prints 1st, 2nd, 3rd, 11th, 12th, 13th and 21st.',
+  }),
   datekitAsk({
     current: "addMonths(January 31, 1) overflows into March.",
     file: "add",
     id: "add-months-clamp",
+    test: {
+      assertion:
+        'expect(addMonths(parseISO("2026-01-31"), 1).toISOString()).toBe("2026-02-28T00:00:00.000Z");',
+      imports: [
+        'import { addMonths } from "../../src/add.ts";',
+        'import { parseISO } from "../../src/parse.ts";',
+      ],
+      name: "clamps to the end of February",
+    },
     want: "addMonths(January 31, 1) is the last day of February, in leap and common years.",
   }),
   datekitAsk({
     current: "diffInDays counts a day short across the spring change.",
     file: "diff",
     id: "diff-in-days-dst",
+    test: {
+      assertion:
+        'expect(diffInDays(new Date("2026-03-30T00:00:00+02:00"), new Date("2026-03-29T00:00:00+01:00"))).toBe(1);',
+      imports: ['import { diffInDays } from "../../src/diff.ts";'],
+      name: "counts the spring change as one day",
+    },
     want: "diffInDays counts calendar days across a daylight-saving change.",
   }),
 ];
@@ -260,7 +383,7 @@ const library: Files = new Map([
   [
     `${dir}/policy.json`,
     policyJson({
-      asks: datekitAsks,
+      asks: datekitAsks.map(({ stated }) => stated),
       deciders: [
         { handles: [datekitPeople.decider], paths: "**" },
         { handles: [datekitPeople.zones], paths: "src/tz.ts" },
@@ -286,36 +409,6 @@ const library: Files = new Map([
   ],
 ]);
 
-/** A datekit ask's check: red on main, by an assertion. */
-const datekitCheck = (
-  id: string,
-  imports: string,
-  name: string,
-  assertion: string
-): AskFile => ({
-  content: [
-    'import { expect, test } from "bun:test";',
-    "",
-    imports,
-    "",
-    `test(${JSON.stringify(name)}, () => {`,
-    `  ${assertion}`,
-    "});",
-    "",
-  ].join("\n"),
-  path: RepoPath.make(`test/asks/${id}.test.ts`),
-});
-
-const datekitOpening = (id: string, want: string, check: AskFile): Opening => [
-  askFile({
-    check: `check.redThenGreen(${JSON.stringify(check.path)})`,
-    id,
-    kind: "fix",
-    want,
-  }),
-  check,
-];
-
 export const datekit = {
   answer: {
     ask: AskId.make("diff-in-days-dst"),
@@ -334,60 +427,10 @@ export const datekit = {
     ]) satisfies Files,
     message: "Count calendar days across a daylight-saving change",
   },
-  asks: [
-    [
-      AskId.make("parse-iso-week"),
-      datekitOpening(
-        "parse-iso-week",
-        "parseISO accepts ISO week dates such as 2026-W41-3.",
-        datekitCheck(
-          "parse-iso-week",
-          'import { parseISO } from "../../src/parse.ts";',
-          "parses an ISO week date",
-          'expect(parseISO("2026-W41-3").toISOString()).toBe("2026-10-07T00:00:00.000Z");'
-        )
-      ),
-    ],
-    [
-      AskId.make("format-ordinal"),
-      datekitOpening(
-        "format-ordinal",
-        'format(date, "Do") prints 1st, 2nd, 3rd, 11th, 12th, 13th and 21st.',
-        datekitCheck(
-          "format-ordinal",
-          'import { format } from "../../src/format.ts";\nimport { parseISO } from "../../src/parse.ts";',
-          "prints the teens as th",
-          'expect(format(parseISO("2026-10-11"), "Do")).toBe("11th");'
-        )
-      ),
-    ],
-    [
-      AskId.make("add-months-clamp"),
-      datekitOpening(
-        "add-months-clamp",
-        "addMonths(January 31, 1) is the last day of February, in leap and common years.",
-        datekitCheck(
-          "add-months-clamp",
-          'import { addMonths } from "../../src/add.ts";\nimport { parseISO } from "../../src/parse.ts";',
-          "clamps to the end of February",
-          'expect(addMonths(parseISO("2026-01-31"), 1).toISOString()).toBe("2026-02-28T00:00:00.000Z");'
-        )
-      ),
-    ],
-    [
-      AskId.make("diff-in-days-dst"),
-      datekitOpening(
-        "diff-in-days-dst",
-        "diffInDays counts calendar days across a daylight-saving change.",
-        datekitCheck(
-          "diff-in-days-dst",
-          'import { diffInDays } from "../../src/diff.ts";',
-          "counts the spring change as one day",
-          'expect(diffInDays(new Date("2026-03-30T00:00:00+02:00"), new Date("2026-03-29T00:00:00+01:00"))).toBe(1);'
-        )
-      ),
-    ],
-  ] as const,
+  asks: datekitAsks.map(
+    ({ stated, test }) =>
+      [AskId.make(stated.id), [askFileOf(stated), test]] as const
+  ),
   files: library,
   project: ProjectName.make("datekit"),
   /** A commit someone pushed straight to main, past the platform. */
@@ -617,40 +660,10 @@ const monorepo: Files = new Map([
   [`${dir}/vouched.td`, "# The people burrow's deciders vouch for.\n"],
 ]);
 
-const migrateOpening = (
-  id: string,
-  want: string,
-  check = `check.migrate({ count: ${JSON.stringify(COUNT)}, from: "legacyFetch", to: "http.get" })`
-): Opening => [askFile({ check, id, kind: "migrate", want })];
-
 export const burrow = {
-  asks: [
-    [
-      AskId.make(PARENT),
-      migrateOpening(
-        PARENT,
-        "Replace every call to legacyFetch with http.get, then delete legacyFetch."
-      ),
-    ],
-    ...CHILDREN.map(
-      (pkg) =>
-        [
-          AskId.make(`${PARENT}-${pkg}`),
-          migrateOpening(
-            `${PARENT}-${pkg}`,
-            `@burrow/${pkg} calls http.get wherever it called legacyFetch.`
-          ),
-        ] as const
-    ),
-    [
-      AskId.make(`${PARENT}-delete`),
-      migrateOpening(
-        `${PARENT}-delete`,
-        "Delete legacyFetch: nothing calls it any more.",
-        `check.symbolAbsent({ count: ${JSON.stringify(COUNT)}, symbol: "legacyFetch" })`
-      ),
-    ],
-  ] as const,
+  asks: burrowAsks.map(
+    (stated) => [AskId.make(stated.id), [askFileOf(stated)]] as const
+  ),
   files: monorepo,
   project: ProjectName.make("burrow"),
 } as const;

@@ -106,12 +106,6 @@ const framed = (kind: "blob" | "tree" | "commit", content: Uint8Array) => {
   );
 };
 
-/** The id git gives a blob of `text`. */
-export const blobIdOf = (text: string) =>
-  Effect.map(framed("blob", encoder.encode(text)), ({ id }) =>
-    BlobSha.make(id)
-  );
-
 const sortKey = (entry: TreeEntry) =>
   encoder.encode(entry.type === "tree" ? `${entry.name}/` : entry.name);
 
