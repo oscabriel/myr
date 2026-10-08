@@ -1,0 +1,88 @@
+{
+  "command": "asks",
+  "data": {
+    "asks": [
+      {
+        "ask": "drop-legacy-fetch",
+        "blockedBy": [
+          "drop-legacy-fetch-burrow-auth",
+          "drop-legacy-fetch-burrow-billing",
+          "drop-legacy-fetch-burrow-catalog",
+          "drop-legacy-fetch-burrow-kit",
+          "drop-legacy-fetch-burrow-notify",
+          "drop-legacy-fetch-burrow-search",
+          "drop-legacy-fetch-delete"
+        ],
+        "claimed": false,
+        "kind": "migrate",
+        "territory": ".",
+        "want": "Replace every call to legacyFetch with http.get, then delete legacyFetch"
+      },
+      {
+        "ask": "drop-legacy-fetch-burrow-auth",
+        "blockedBy": [],
+        "claimed": false,
+        "kind": "migrate",
+        "territory": "@burrow/auth",
+        "want": "@burrow/auth: 2 callers of legacyFetch → http.get"
+      },
+      {
+        "ask": "drop-legacy-fetch-burrow-billing",
+        "blockedBy": [],
+        "claimed": false,
+        "kind": "migrate",
+        "territory": "@burrow/billing",
+        "want": "@burrow/billing: 2 callers of legacyFetch → http.get"
+      },
+      {
+        "ask": "drop-legacy-fetch-burrow-catalog",
+        "blockedBy": [],
+        "claimed": false,
+        "kind": "migrate",
+        "territory": "@burrow/catalog",
+        "want": "@burrow/catalog: 2 callers of legacyFetch → http.get"
+      },
+      {
+        "ask": "drop-legacy-fetch-burrow-kit",
+        "blockedBy": [],
+        "claimed": false,
+        "kind": "migrate",
+        "territory": "@burrow/kit",
+        "want": "@burrow/kit: 1 caller of legacyFetch → http.get"
+      },
+      {
+        "ask": "drop-legacy-fetch-burrow-notify",
+        "blockedBy": [],
+        "claimed": false,
+        "kind": "migrate",
+        "territory": "@burrow/notify",
+        "want": "@burrow/notify: 1 caller of legacyFetch → http.get"
+      },
+      {
+        "ask": "drop-legacy-fetch-burrow-search",
+        "blockedBy": [],
+        "claimed": false,
+        "kind": "migrate",
+        "territory": "@burrow/search",
+        "want": "@burrow/search: 1 caller of legacyFetch → http.get"
+      },
+      {
+        "ask": "drop-legacy-fetch-delete",
+        "blockedBy": [
+          "drop-legacy-fetch-burrow-auth",
+          "drop-legacy-fetch-burrow-billing",
+          "drop-legacy-fetch-burrow-catalog",
+          "drop-legacy-fetch-burrow-kit",
+          "drop-legacy-fetch-burrow-notify",
+          "drop-legacy-fetch-burrow-search"
+        ],
+        "claimed": false,
+        "kind": "migrate",
+        "territory": ".",
+        "want": "Delete legacyFetch: nothing calls it any more"
+      }
+    ]
+  },
+  "ok": true,
+  "v": 1
+}
