@@ -15,7 +15,22 @@ export { judgeAdmission, planAdmission } from "./admission.ts";
 
 export type { AdmissionResult } from "./admission.ts";
 
-/** Both ports, over the private namespace's repos. */
+export { attemptsLeft, isoWeek } from "./claims.ts";
+
+export { ledgerFor } from "./ledger.ts";
+
+export {
+  AdmissionStarts,
+  manifestPath,
+  ProjectVisibilityLive,
+  SaltSource,
+} from "./state.ts";
+
+/**
+ * Both ports, over the private namespace's repos, a salt source and what
+ * starts admissions (the platform's `apps/platform/src/visibility/state.ts`
+ * gives all three).
+ */
 export const ProjectCartridgeLive = Layer.mergeAll(
   ProjectVisibilityLive,
   ProjectEnvLive
