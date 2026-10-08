@@ -768,6 +768,7 @@ describe("the swarm's flags", () => {
           stage: "dev-oscabriel",
           timeoutMin: 20,
           url: Option.none(),
+          view: "headless",
         });
       })
   );
@@ -800,13 +801,13 @@ describe("the swarm's flags", () => {
   );
 
   it.effect(
-    "refuses demo without --allow-demo, the herdr view until 717, no stage, and a flag it doesn't know",
+    "refuses demo without --allow-demo, a view it doesn't have, no stage, and a flag it doesn't know",
     () =>
       Effect.gen(function* () {
         const reasons = yield* Effect.forEach(
           [
             ["--stage", "demo", "--dry-run"],
-            ["--stage", "dev-oscabriel", "--view", "herdr"],
+            ["--stage", "dev-oscabriel", "--view", "tmux"],
             ["--dry-run"],
             ["--stage", "dev-oscabriel", "--yes"],
             ["--stage", "dev-oscabriel", "--timeout-min", "0"],
@@ -819,7 +820,7 @@ describe("the swarm's flags", () => {
             reason.includes(
               [
                 "--allow-demo",
-                "717",
+                "--view tmux: headless or herdr",
                 "no --stage",
                 "unknown flag --yes",
                 "--timeout-min 0",

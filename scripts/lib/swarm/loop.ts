@@ -20,6 +20,10 @@
  * The run's timeout bounds everything: a harness that never settles, or an
  * answer checked past it, ends the run as `timedOut`, and the harness's
  * process group is killed.
+ *
+ * Where the harness runs, and how a prompt reaches it, is the run's view
+ * (`views/`): its own headless process by default, or a herdr pane
+ * (`--view herdr`, issue 717). The loop is the same in both.
  */
 import { Brand } from "@repo/brand";
 import type { AnswerView } from "@repo/protocol/domain/answer";
@@ -36,21 +40,20 @@ import {
   Duration,
   Effect,
   FileSystem,
-  Fiber,
   Option,
   Ref,
-  Stream,
 } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import type { ChildProcessSpawner } from "effect/process";
 
-import { drivers, HarnessEvent, sessionDirOf } from "./harnesses/index.ts";
-import type { HarnessDriver } from "./harnesses/index.ts";
+import { drivers, sessionDirOf } from "./harnesses/index.ts";
 import { awaitSettledOutcome } from "./outcome.ts";
 import type { AskStatus } from "./outcome.ts";
 import { endsClaim } from "./plan.ts";
 import type { Assignment } from "./plan.ts";
 import type { AgentOutcome, AgentRun } from "./results.ts";
 import type { Contributor } from "./roster.ts";
+import { headlessView, Turn } from "./views/headless.ts";
+import type { SwarmView } from "./views/headless.ts";
 import { scrubbed, SwarmFailed } from "./workspace.ts";
 import type { AgentWorkspace } from "./workspace.ts";
 
@@ -66,6 +69,11 @@ export type RunAgent = (input: {
    * lists every project's claims and answers and the ask is found by name.
    */
   readonly project?: ProjectName;
+  /**
+   * Where the harness runs and how each prompt reaches it: its own
+   * headless process unless a view (herdr's panes) says otherwise.
+   */
+  readonly view?: SwarmView;
 }) => Effect.Effect<
   AgentRun,
   never,
@@ -149,135 +157,6 @@ const harnessEnv = (workspace: AgentWorkspace) =>
       ...workspace.env,
     };
   });
-
-/** What one attempt's output said, and how its process ended. */
-interface Heard {
-  readonly session: Option.Option<string>;
-  readonly settled: boolean;
-  readonly stopReason: Option.Option<string>;
-  /** Why the run failed on the harness's side, unless a response came after. */
-  readonly failure: Option.Option<string>;
-  readonly input: number;
-  readonly output: number;
-}
-
-const nothingHeard: Heard = {
-  failure: Option.none(),
-  input: 0,
-  output: 0,
-  session: Option.none(),
-  settled: false,
-  stopReason: Option.none(),
-};
-
-const hear = (heard: Heard, event: HarnessEvent): Heard =>
-  HarnessEvent.$match(event, {
-    Failed: ({ reason }) => ({ ...heard, failure: Option.some(reason) }),
-    SessionStarted: ({ id }) => ({ ...heard, session: Option.some(id) }),
-    Settled: ({ stopReason }) => ({
-      ...heard,
-      settled: true,
-      stopReason: Option.orElse(stopReason, () => heard.stopReason),
-    }),
-    Usage: ({ input, output, stopReason }) => ({
-      ...heard,
-      failure: Option.none(),
-      input: heard.input + input,
-      output: heard.output + output,
-      stopReason: Option.orElse(stopReason, () => heard.stopReason),
-    }),
-  });
-
-/** How long a settled harness gets to exit on its own before it is killed. */
-const EXIT_GRACE = Duration.seconds(10);
-
-/** How long a killed harness gets before `SIGKILL`. */
-const KILL_GRACE = Duration.seconds(5);
-
-/** The last characters of a harness's stderr kept, to say why it failed. */
-const STDERR_TAIL = 2000;
-
-/**
- * One harness process: `argv` in the clone with `env`. Every stdout line
- * goes to `file`, scrubbed of the token, and is read for events until the
- * session settles or the output ends. A settled harness gets `EXIT_GRACE`
- * to exit; then it is killed with its process group.
- */
-const attempt = (input: {
-  readonly argv: readonly string[];
-  readonly driver: HarnessDriver;
-  readonly env: Readonly<Record<string, string>>;
-  readonly file: string;
-  readonly workspace: AgentWorkspace;
-  /** Runs when the output first names the session: the attempt counts from then. */
-  readonly onSession: Effect.Effect<void>;
-}) =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const [command = "", ...args] = input.argv;
-      const scrub = (text: string) => scrubbed(text, input.workspace);
-
-      yield* fs.writeFileString(input.file, "");
-
-      const child = yield* spawner.spawn(
-        ChildProcess.make(command, args, {
-          cwd: input.workspace.clone,
-          env: { ...input.env },
-          extendEnv: false,
-          forceKillAfter: KILL_GRACE,
-          stdin: "ignore",
-        })
-      );
-
-      const stderr = yield* child.stderr.pipe(
-        Stream.decodeText(),
-        Stream.runFold(
-          () => "",
-          (tail, text) => `${tail}${text}`.slice(-STDERR_TAIL)
-        ),
-        Effect.forkScoped
-      );
-
-      const heard = yield* child.stdout.pipe(
-        Stream.decodeText(),
-        Stream.splitLines,
-        Stream.tap((line) =>
-          fs.writeFileString(input.file, `${scrub(line)}\n`, { flag: "a" })
-        ),
-        Stream.flatMap((line) => Stream.fromIterable(input.driver.parse(line))),
-        Stream.tap((event) =>
-          HarnessEvent.$is("SessionStarted")(event)
-            ? input.onSession
-            : Effect.void
-        ),
-        Stream.takeUntil(HarnessEvent.$is("Settled")),
-        Stream.runFold(() => nothingHeard, hear)
-      );
-
-      const code = yield* child.exitCode.pipe(
-        Effect.timeoutOption(EXIT_GRACE),
-        Effect.map(Option.map(Number))
-      );
-
-      // A harness still running after its grace keeps its stderr open:
-      // its tail is then not waited for.
-      const tail = yield* Fiber.join(stderr).pipe(
-        Effect.timeoutOption(Duration.seconds(1)),
-        Effect.map(Option.getOrElse(() => ""))
-      );
-
-      return { code, heard, stderr: scrub(tail).trim() };
-    })
-  ).pipe(
-    Effect.mapError(
-      ({ message }) =>
-        new SwarmFailed({
-          reason: `${input.argv[0] ?? "the harness"} didn't run: ${message}`,
-        })
-    )
-  );
 
 /** What the loop does once an attempt's answer is known. */
 export type Next = Data.TaggedEnum<{
@@ -493,6 +372,7 @@ export const runAgent: RunAgent = (input) =>
     const { assignment, workspace } = input;
     const { adapter, handle, harness, model } = assignment.contributor;
     const driver = drivers[harness];
+    const view = input.view ?? headlessView;
     const project = Option.fromUndefinedOr(input.project);
     const begun = yield* Clock.currentTimeMillis;
     const progress = yield* Ref.make(started);
@@ -501,12 +381,12 @@ export const runAgent: RunAgent = (input) =>
       Console.error(scrubbed(`${handle}: ${line}`, workspace));
 
     /**
-     * One harness session (the start, or a continuation with `argv`), then
-     * what status says; it calls itself for each continuation, until
+     * One harness session (the start, or a continuation: `turn`), then what
+     * status says; it calls itself for each continuation, until
      * `afterSettle` says the run is done.
      */
     const pass = (
-      argv: readonly string[],
+      turn: Turn,
       env: Readonly<Record<string, string>>
     ): Effect.Effect<
       AgentOutcome,
@@ -516,15 +396,15 @@ export const runAgent: RunAgent = (input) =>
       Effect.gen(function* () {
         const attempts = (yield* Ref.get(progress)).attempts + 1;
 
-        const ran = yield* attempt({
-          argv,
-          driver,
+        const ran = yield* view.attempt({
+          contributor: assignment.contributor,
           env,
           file: `${workspace.dir}/attempt-${attempts}.jsonl`,
           onSession: Ref.update(progress, (now) => ({
             ...now,
             attempts: Math.max(now.attempts, attempts),
           })),
+          turn,
           workspace,
         });
 
@@ -585,13 +465,7 @@ export const runAgent: RunAgent = (input) =>
         );
 
         return yield* pass(
-          driver.resume({
-            adapter,
-            model,
-            prompt: step.next.prompt,
-            session: session.value,
-            workspace,
-          }),
+          Turn.Resume({ prompt: step.next.prompt, session: session.value }),
           env
         );
       });
@@ -613,14 +487,7 @@ export const runAgent: RunAgent = (input) =>
       );
 
       return yield* pass(
-        driver.start({
-          adapter,
-          brief: input.brief,
-          model,
-          sessionDir: sessionDirOf(workspace.dir),
-          sessionKey: handle,
-          workspace,
-        }),
+        Turn.Start({ brief: input.brief }),
         yield* harnessEnv(workspace)
       );
     });

@@ -10,7 +10,7 @@
  *   --allow-demo             required with --stage demo: its burrow family is the recorded take's
  *   --only <handle>…         run only these contributors (repeat, or comma-separate)
  *   --timeout-min <n>        each agent's run timeout, default 20
- *   --view headless|herdr    default headless; herdr is issue 717's, refused until then
+ *   --view headless|herdr    default headless; herdr runs each harness in a herdr pane (issue 717)
  *   --url <origin>           the platform, when not the stage's workers.dev origin
  */
 import { Handle, ProjectName } from "@repo/protocol/ids";
@@ -32,12 +32,21 @@ export interface SwarmOptions {
   /** The contributors to run; every one when `--only` names none. */
   readonly only: readonly Handle[];
   readonly timeoutMin: number;
+  /** Where the harnesses run: their own processes, or herdr's panes (`views/`). */
+  readonly view: ViewName;
   /** The platform's origin, when `--url` names it. */
   readonly url: Option.Option<string>;
 }
 
 export const USAGE =
-  "bun scripts/swarm.ts --stage <dev-…|demo> [--project burrow] [--scenario plain|video] [--dry-run] [--json] [--allow-demo] [--only <handle>…] [--timeout-min 20] [--view headless] [--url <origin>]";
+  "bun scripts/swarm.ts --stage <dev-…|demo> [--project burrow] [--scenario plain|video] [--dry-run] [--json] [--allow-demo] [--only <handle>…] [--timeout-min 20] [--view headless|herdr] [--url <origin>]";
+
+/** The views a run can take. */
+export const ViewName = Schema.Literals(["headless", "herdr"]);
+
+export type ViewName = typeof ViewName.Type;
+
+const decodeView = Schema.decodeUnknownOption(ViewName);
 
 /** The flags that take a value. */
 const VALUED = [
@@ -171,17 +180,14 @@ export const optionsOf = (
       );
     }
 
-    const view = Option.getOrElse(flagValue(argv, "--view"), () => "headless");
+    const rawView = Option.getOrElse(
+      flagValue(argv, "--view"),
+      () => "headless"
+    );
 
-    if (view === "herdr") {
-      return yield* failed(
-        "--view herdr is not built yet (issue 717): run --view headless"
-      );
-    }
-
-    if (view !== "headless") {
-      return yield* failed(`--view ${view}: headless or herdr`);
-    }
+    const view = yield* Effect.fromOption(decodeView(rawView)).pipe(
+      Effect.mapError(() => failed(`--view ${rawView}: headless or herdr`))
+    );
 
     const rawProject = Option.getOrElse(
       flagValue(argv, "--project"),
@@ -257,5 +263,6 @@ export const optionsOf = (
       stage,
       timeoutMin,
       url,
+      view,
     };
   });

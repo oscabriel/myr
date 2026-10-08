@@ -18,6 +18,11 @@
  * the throwaway ledger (`infra/created.ts`). Tokens reach a contributor's
  * processes only through their env, and no line or JSON this prints holds
  * one. Flags: `lib/swarm/args.ts`.
+ *
+ * `--view herdr` (issue 717, for the video) runs from a herdr pane: each
+ * harness runs interactively in a pane of its own, with a counter pane of
+ * claims, pushes and landings (`lib/swarm/views/herdr.ts`). The loop and
+ * its outcomes are the same.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { AskListing } from "@repo/protocol/domain/ask";
@@ -65,6 +70,9 @@ import {
 } from "./lib/swarm/results.ts";
 import type { AgentRun } from "./lib/swarm/results.ts";
 import { roster } from "./lib/swarm/roster.ts";
+import { headlessView } from "./lib/swarm/views/headless.ts";
+import type { SwarmView } from "./lib/swarm/views/headless.ts";
+import { openHerdrView } from "./lib/swarm/views/herdr.ts";
 import {
   anonymousEnv,
   cliEntry,
@@ -354,6 +362,7 @@ const contributorRun = (input: {
   readonly origin: string;
   readonly run: string;
   readonly token: Redacted.Redacted;
+  readonly view: SwarmView;
 }) =>
   Effect.gen(function* () {
     const { assignment, options, origin, token } = input;
@@ -440,6 +449,7 @@ const contributorRun = (input: {
       maxContinuations: 3,
       project: options.project,
       timeoutMs: options.timeoutMin * 60_000,
+      view: input.view,
       workspace: ready.success.workspace,
     });
   });
@@ -517,16 +527,46 @@ export const main = (argv: readonly string[]) =>
     const commit = yield* headCommit;
     const at = yield* DateTime.now;
 
-    const runs = yield* Effect.forEach(
-      plan.assignments,
-      (assignment) =>
-        Effect.flatMap(
-          Effect.fromNullishOr(tokens.get(assignment.contributor.handle)),
-          (token) =>
-            contributorRun({ assignment, options, origin, run: name, token })
-        ),
-      { concurrency: 6 }
-    ).pipe(Effect.mapError(() => failed("a contributor lost their token")));
+    const runs = yield* Effect.scoped(
+      Effect.gen(function* () {
+        const view =
+          options.view === "herdr"
+            ? yield* openHerdrView({
+                contributors: plan.assignments.map(
+                  ({ contributor }) => contributor
+                ),
+                origin,
+                project: options.project,
+                runDir: yield* runDir(name),
+              }).pipe(
+                Effect.tap(({ workspace }) =>
+                  say(
+                    `herdr: workspace ${workspace} holds the panes; close it with herdr workspace close ${workspace}`
+                  )
+                ),
+                Effect.map(({ view: panes }) => panes)
+              )
+            : headlessView;
+
+        return yield* Effect.forEach(
+          plan.assignments,
+          (assignment) =>
+            Effect.flatMap(
+              Effect.fromNullishOr(tokens.get(assignment.contributor.handle)),
+              (token) =>
+                contributorRun({
+                  assignment,
+                  options,
+                  origin,
+                  run: name,
+                  token,
+                  view,
+                })
+            ),
+          { concurrency: 6 }
+        ).pipe(Effect.mapError(() => failed("a contributor lost their token")));
+      })
+    );
 
     const result: AgentsResult = {
       at,
