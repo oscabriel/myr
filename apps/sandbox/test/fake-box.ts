@@ -15,12 +15,20 @@ import { Network } from "../src/checker/network.ts";
 import { Snapshots } from "../src/checker/snapshots.ts";
 import type { CloneProps, EgressProps } from "../src/outbound.ts";
 
+/** What the container could reach at one moment. */
+export type Reach = "clone route" | readonly string[];
+
 /** One thing the Checker did, as the fakes saw it. */
 export type Call =
   | {
       readonly kind: "exec";
       readonly argv: readonly string[];
       readonly options: ExecOptions;
+      /**
+       * What the network let out as the command started: the clone route
+       * alone before the first `allow`, then the hosts that `allow` named.
+       */
+      readonly network: Reach;
     }
   | { readonly kind: "writeFile"; readonly path: string; readonly text: string }
   | { readonly kind: "destroy" }
@@ -62,6 +70,8 @@ export interface FakeOptions {
   readonly lockfiles?: string;
   /** Snapshot keys kept so far, shared by the jobs a test runs. */
   readonly snapshots?: Set<string>;
+  /** What writing a file does, by path; every write succeeds when absent. */
+  readonly writeFile?: (path: string) => Effect.Effect<void, BoxFailed>;
 }
 
 /** A lockfile listing, as `git ls-tree HEAD -- <names>` prints one. */
@@ -76,6 +86,7 @@ const shellCommandOf = (argv: readonly string[]) =>
 export const fakeChecker = (options: FakeOptions = {}) => {
   const calls: Call[] = [];
   const kept = options.snapshots ?? new Set<string>();
+  let reach: Reach = "clone route";
 
   const run = (argv: readonly string[]): Effect.Effect<Executed, BoxFailed> => {
     if (argv[0] === "git" && argv.includes("ls-tree")) {
@@ -100,17 +111,24 @@ export const fakeChecker = (options: FakeOptions = {}) => {
       destroy: () => Effect.sync(() => calls.push({ kind: "destroy" })),
       exec: (argv, execOptions = {}) =>
         Effect.suspend(() => {
-          calls.push({ argv, kind: "exec", options: execOptions });
+          calls.push({
+            argv,
+            kind: "exec",
+            network: reach,
+            options: execOptions,
+          });
 
           return run(argv);
         }),
       writeFile: (path, bytes) =>
-        Effect.sync(() => {
+        Effect.suspend(() => {
           calls.push({
             kind: "writeFile",
             path,
             text: new TextDecoder().decode(bytes),
           });
+
+          return options.writeFile?.(path) ?? Effect.void;
         }),
     })
   );
@@ -119,7 +137,10 @@ export const fakeChecker = (options: FakeOptions = {}) => {
     Network,
     Network.of({
       allow: (hosts) =>
-        Effect.sync(() => calls.push({ hosts: [...hosts], kind: "allow" })),
+        Effect.sync(() => {
+          reach = [...hosts];
+          calls.push({ hosts: [...hosts], kind: "allow" });
+        }),
       routeClone: ({ host, remote, token }) =>
         Effect.sync(() =>
           calls.push({

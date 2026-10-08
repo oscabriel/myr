@@ -7,6 +7,7 @@ import {
   LaneName,
   ProjectName,
   RepoName,
+  RepoPath,
   SuiteRoot,
 } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
@@ -213,7 +214,20 @@ describe(CheckRunnerLocal.layer, () => {
             heldBack: {
               areas: [AreaName.make("parse")],
               at: CommitSha.make("3".repeat(40)),
-              layerRepo: RepoName.make("datekit--maintainers"),
+              files: [
+                {
+                  area: AreaName.make("parse"),
+                  content: new TextEncoder().encode("test('x', () => {});"),
+                  path: RepoPath.make("checks/held-back/parse/x.test.ts"),
+                },
+              ],
+              runs: [
+                {
+                  area: AreaName.make("parse"),
+                  command: "bun test checks/held-back/parse/x.test.ts",
+                  path: RepoPath.make("checks/held-back/parse/x.test.ts"),
+                },
+              ],
               suite: SuiteRoot.make(`sha256:${"4".repeat(64)}`),
             },
           })

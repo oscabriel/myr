@@ -15,6 +15,7 @@ import {
   LaneName,
   ProjectName,
   RepoName,
+  RepoPath,
   SuiteRoot,
   TreeSha,
 } from "@repo/protocol/ids";
@@ -60,18 +61,51 @@ export const CheckLane = Schema.Struct({
 
 export type CheckLane = typeof CheckLane.Type;
 
+/**
+ * One sealed file, as the platform read it from the layer at the pinned
+ * commit: its path in the checked tree, its area, and its bytes. On the
+ * wire the bytes are base64 (`contentBase64`), decoded to bytes where the
+ * job is decoded, before the Checker writes them.
+ */
+export const HeldBackFile = Schema.Struct({
+  area: AreaName,
+  content: Schema.Uint8ArrayFromBase64,
+  path: RepoPath,
+}).pipe(Schema.encodeKeys({ content: "contentBase64" }));
+
+export type HeldBackFile = typeof HeldBackFile.Type;
+
+/** One sealed check to run: its area, its file, and the command that runs it. */
+export const HeldBackCheck = Schema.Struct({
+  area: AreaName,
+  command: Schema.NonEmptyString,
+  path: RepoPath,
+});
+
+export type HeldBackCheck = typeof HeldBackCheck.Type;
+
+/**
+ * A sealed suite's part of a job (W6; OSR §5.3 step 5): the layer's files
+ * under the sealed areas and one run per sealed check, all read by the
+ * platform at the commit the claim was pinned to. No layer repo, route or
+ * token is named: the sandbox never reaches the layer.
+ */
+export const HeldBackPart = Schema.Struct({
+  areas: Schema.Array(AreaName),
+  /** The layer commit the suite was pinned at. */
+  at: CommitSha,
+  files: Schema.Array(HeldBackFile),
+  runs: Schema.Array(HeldBackCheck),
+  suite: SuiteRoot,
+});
+
+export type HeldBackPart = typeof HeldBackPart.Type;
+
 /** A request to run lanes on one tree of one project's repo. */
 export const CheckJob = Schema.Struct({
   at: CheckAt,
-  /** The sealed suite, from the layer's repo at its pinned commit (W6). */
-  heldBack: Schema.optionalKey(
-    Schema.Struct({
-      areas: Schema.Array(AreaName),
-      at: CommitSha,
-      layerRepo: RepoName,
-      suite: SuiteRoot,
-    })
-  ),
+  /** The sealed suite, from the layer at its pinned commit (W6). */
+  heldBack: Schema.optionalKey(HeldBackPart),
   lanes: Schema.Array(CheckLane),
   /** Env items whose values the run sees only as placeholders. */
   placeholders: Schema.Array(EnvKey),

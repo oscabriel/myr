@@ -5,12 +5,10 @@ import { phasePlan } from "@repo/checks/phases";
 import { Command, Hostname } from "@repo/protocol/domain/common";
 import { RunBlock } from "@repo/protocol/domain/run";
 import {
-  AreaName,
   CommitSha,
   LaneName,
   ProjectName,
   RepoName,
-  SuiteRoot,
   TreeSha,
 } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
@@ -175,52 +173,6 @@ describe("the Checker", () => {
             call.kind === "exec" && call.argv[0] === "sh" ? [call.argv[2]] : []
           )
         ).toStrictEqual([SETUP, "bun run lint", "bun test"]);
-      })
-  );
-
-  it.effect(
-    "takes no snapshot once the held-back slot is reached, and refuses a sealed suite until W6 writes one",
-    () =>
-      Effect.gen(function* () {
-        const fake = fakeChecker();
-        const wire = wireFor();
-
-        const outcome = yield* Effect.exit(
-          check({
-            ...wire,
-            job: {
-              ...wire.job,
-              heldBack: {
-                areas: [AreaName.make("parsing")],
-                at: CommitSha.make("b".repeat(40)),
-                layerRepo: RepoName.make("datekit--layer--maintainers"),
-                suite: SuiteRoot.make(`sha256:${"d".repeat(64)}`),
-              },
-            },
-          }).pipe(Effect.provide(fake.layer))
-        );
-
-        expect(Exit.findErrorOption(outcome)).toStrictEqual(
-          Option.some(new VerifierBlocked({}))
-        );
-
-        const slot = fake.calls.findIndex(
-          (call) =>
-            call.kind === "log" && call.annotations.phase === "WriteHeldBack"
-        );
-
-        expect(slot).toBeGreaterThan(-1);
-        expect(
-          fake.calls.slice(slot).filter((call) => call.kind === "save")
-        ).toStrictEqual([]);
-        expect(phasesOf(fake.calls)).toStrictEqual([
-          "clone",
-          "setup",
-          "snapshot",
-          "egressOff",
-          "report",
-          "destroy",
-        ]);
       })
   );
 
