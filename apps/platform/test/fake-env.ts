@@ -7,6 +7,38 @@ import type { ProjectStub } from "../src/adapters/do-projects.ts";
 import { CallRequest, ProjectCalls } from "../src/project-calls.ts";
 import type { ExitEncoded, ProjectMethod } from "../src/project-calls.ts";
 
+/**
+ * A `FRONT_PAGE` database where every query reads no rows, each recorded in
+ * `prepared`: what a call that lists projects (`listProjects`, or `status`
+ * without a project) reads from D1.
+ */
+export const emptyFrontPage = (prepared: string[] = []) =>
+  untouchable<D1Database>("FRONT_PAGE", {
+    prepare: (query) => {
+      prepared.push(query);
+
+      return untouchable<D1PreparedStatement>("D1PreparedStatement", {
+        bind: () =>
+          untouchable<D1PreparedStatement>("D1PreparedStatement", {
+            all: <T>() =>
+              Promise.resolve<D1Result<T>>({
+                meta: {
+                  changed_db: false,
+                  changes: 0,
+                  duration: 0,
+                  last_row_id: 0,
+                  rows_read: 0,
+                  rows_written: 0,
+                  size_after: 0,
+                },
+                results: [],
+                success: true,
+              }),
+          }),
+      });
+    },
+  });
+
 /** The operator's token in every fake env: long enough to decode. */
 export const operatorToken = "operator-token-0123456789abcdef0123";
 

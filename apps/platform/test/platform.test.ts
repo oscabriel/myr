@@ -3,7 +3,7 @@ import { ProjectName } from "@repo/protocol/ids";
 import { Effect, Layer } from "effect";
 
 import { decodeEnv, InvalidEnv, platform } from "../src/platform.ts";
-import { fakeEnv, operatorToken, without } from "./fake-env.ts";
+import { emptyFrontPage, fakeEnv, operatorToken, without } from "./fake-env.ts";
 import { rpcClient, served, toolCall } from "./harness.ts";
 
 const project = ProjectName.make("datekit");
@@ -14,13 +14,19 @@ const failureOf = (env: Env) => Effect.flip(Layer.build(platform(env)));
 describe("the platform Worker's env", () => {
   it.effect("lets the operator's token call the contracts", () =>
     Effect.gen(function* () {
-      const { handler } = yield* served(platform(fakeEnv()));
+      const prepared: string[] = [];
+
+      const { handler } = yield* served(
+        platform({ ...fakeEnv(), FRONT_PAGE: emptyFrontPage(prepared) })
+      );
 
       const operator = yield* rpcClient(handler, operatorToken);
 
       expect(yield* operator.listProjects({})).toStrictEqual({
         projects: [],
       });
+      // The projects come from the front page's projection in D1.
+      expect(prepared).toHaveLength(1);
     })
   );
 
@@ -113,6 +119,7 @@ describe("the platform Worker's env", () => {
 
       const env = {
         ...fakeEnv(),
+        FRONT_PAGE: emptyFrontPage(),
         SESSION_TOKENS: JSON.stringify({ [token]: "alice" }),
       };
 
