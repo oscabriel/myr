@@ -322,7 +322,7 @@ export class SeedTarget extends Context.Service<
     /** Every ref of a project's canonical repo, by name, as git lists them. */
     readonly refsOf: (
       project: ProjectName
-    ) => Effect.Effect<ReadonlyMap<string, string>, SeedFailed>;
+    ) => Effect.Effect<ReadonlyMap<string, CommitSha>, SeedFailed>;
     /**
      * A fresh repo holding `files` in one commit, pushed as `as` to the
      * project's main at the gateway, which admits only its initializer's
@@ -382,7 +382,7 @@ export interface SeededProject {
   /** Its asks that are not closed, as anyone lists them. */
   readonly asks: readonly AskListing[];
   /** Every ref of its canonical repo, by name, sorted: main, the landed mirror, notes, the commits checks ran on. */
-  readonly refs: readonly (readonly [string, string])[];
+  readonly refs: readonly (readonly [string, CommitSha])[];
 }
 
 /** What the platform holds now for each project of `plans`, read as each one's decider. */
@@ -623,20 +623,42 @@ export const platformTarget = (
               )
         );
 
-      const refsOf = (project: ProjectName) =>
-        Effect.map(
-          gitOk(platform.operator, ".", ["ls-remote", remoteOf(project)]),
-          (listed) =>
-            new Map(
-              listed
-                .split("\n")
-                .filter((line) => line.length > 0)
-                .map((line) => {
-                  const [sha = "", ref = ""] = line.split("\t");
+      // An empty folder of the seed's own, removed with the scope: git run
+      // there reads no repo's config, as `gitEnv` keeps the machine's out.
+      const scratch = fs
+        .makeTempDirectoryScoped({ prefix: "seed-" })
+        .pipe(Effect.mapError(() => failed("can't make a temporary folder")));
 
-                  return [ref, sha] as const;
-                })
-            )
+      // `git ls-remote` lists one ref a line: `<sha>\t<ref>`.
+      const refsOf = (project: ProjectName) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const listed = yield* gitOk(platform.operator, yield* scratch, [
+              "ls-remote",
+              remoteOf(project),
+            ]);
+
+            const refs = yield* Effect.forEach(
+              listed.split("\n").filter((line) => line.length > 0),
+              (line) => {
+                const [sha = "", ref = ""] = line.split("\t");
+
+                return ref.length === 0
+                  ? Effect.fail(
+                      failed(`git ls-remote listed ${JSON.stringify(line)}`)
+                    )
+                  : Effect.map(
+                      decoded(
+                        CommitSha,
+                        `the commit ls-remote lists for ${ref}`
+                      )(sha),
+                      (commit) => [ref, commit] as const
+                    );
+              }
+            );
+
+            return new Map(refs);
+          })
         );
 
       const pushInitial = (
@@ -646,11 +668,7 @@ export const platformTarget = (
       ) =>
         Effect.scoped(
           Effect.gen(function* () {
-            const dir = yield* fs
-              .makeTempDirectoryScoped({ prefix: "seed-" })
-              .pipe(
-                Effect.mapError(() => failed("can't make a temporary folder"))
-              );
+            const dir = yield* scratch;
 
             yield* Effect.forEach(
               files,
@@ -686,9 +704,10 @@ export const platformTarget = (
               `HEAD:${MAIN_REF}`,
             ]);
 
-            return CommitSha.make(
-              (yield* gitOk(as, dir, ["rev-parse", "HEAD"])).trim()
-            );
+            return yield* decoded(
+              CommitSha,
+              "the commit git made"
+            )((yield* gitOk(as, dir, ["rev-parse", "HEAD"])).trim());
           })
         );
 

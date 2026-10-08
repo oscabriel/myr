@@ -4,7 +4,15 @@
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { ConfigProvider, Effect, FileSystem, Layer, Path } from "effect";
+import {
+  ConfigProvider,
+  Console,
+  Effect,
+  FileSystem,
+  Layer,
+  Path,
+  Schema,
+} from "effect";
 
 import { Brand } from "../../../scripts/lib/gen.ts";
 import {
@@ -12,11 +20,18 @@ import {
   ready,
   runSeed,
   seeded,
+  SeedTarget,
   stageTarget,
   worldTarget,
 } from "../../../scripts/lib/seed.ts";
 import type { SeedStep } from "../../../scripts/lib/seed.ts";
-import { optionsOf, SeedWhere } from "../../../scripts/seed.ts";
+import {
+  main,
+  optionsOf,
+  SeedEnvelope,
+  SeedWhere,
+  stepLine,
+} from "../../../scripts/seed.ts";
 import { repoRoot } from "./root.ts";
 
 /** The config folder's name, from the brand (`Brand.configDir`). */
@@ -175,9 +190,8 @@ describe(planSeed, () => {
   );
 });
 
-/** Each step's tag and target, with what this run did of it. */
-const linesOf = (steps: readonly SeedStep[]) =>
-  steps.map(({ _tag, result, target }) => `${_tag} ${target}: ${result}`);
+/** Each step as the command prints it. */
+const linesOf = (steps: readonly SeedStep[]) => steps.map(stepLine);
 
 describe(runSeed, () => {
   it.live(
@@ -272,8 +286,18 @@ describe("runSeed, when a person has no session", () => {
       Effect.gen(function* () {
         const plan = yield* planSeed("examples/burrow");
 
-        const failure = yield* runSeed(plan).pipe(
-          Effect.flip,
+        const { failure, refs } = yield* Effect.gen(function* () {
+          const stopped = yield* Effect.flip(runSeed(plan));
+          const target = yield* SeedTarget;
+
+          // No project was made: the gateway has no burrow to list refs of.
+          const listed = yield* target.refsOf(plan.project).pipe(
+            Effect.map((held) => `listed ${held.size} refs`),
+            Effect.catch(({ reason }) => Effect.succeed(reason))
+          );
+
+          return { failure: stopped, refs: listed };
+        }).pipe(
           Effect.provide(
             worldTarget([]).pipe(Layer.provide(NodeServices.layer))
           )
@@ -281,6 +305,7 @@ describe("runSeed, when a person has no session", () => {
 
         expect(failure.reason).toContain("no session for okafor");
         expect(failure.reason).toContain("then run the seed again");
+        expect(refs).toContain("no repo burrow");
       }).pipe(Effect.provide(NodeServices.layer)),
     60_000
   );
@@ -320,6 +345,13 @@ describe(stageTarget, () => {
       "the operator's token is missing",
       { SESSION_TOKENS: JSON.stringify({ [secret]: "ines-v" }) },
     ],
+    [
+      "the stage doesn't answer the operator's status",
+      {
+        OPERATOR_TOKEN: secret,
+        SESSION_TOKENS: JSON.stringify({ [`${secret}-ines`]: "ines-v" }),
+      },
+    ],
   ] as const)(
     "says what is wrong when %s, and never what a token is",
     ([, env]) =>
@@ -343,6 +375,108 @@ describe(stageTarget, () => {
           )
         )
       )
+  );
+});
+
+/** What `main` prints, line by line, and how it ended. */
+const printedBy = (argv: readonly string[]) =>
+  Effect.gen(function* () {
+    const printed: string[] = [];
+
+    const captured: Console.Console = {
+      ...console,
+      log: (...args: readonly unknown[]) => {
+        printed.push(args.map(String).join(" "));
+      },
+    };
+
+    yield* main(argv).pipe(Effect.provideService(Console.Console, captured));
+
+    return printed;
+  }).pipe(Effect.provide(NodeServices.layer));
+
+describe(main, () => {
+  it.live(
+    "prints one line per step, one per project and a summary",
+    () =>
+      Effect.gen(function* () {
+        const printed = yield* printedBy([
+          "--world",
+          "node",
+          "--only",
+          "datekit",
+        ]);
+
+        expect(printed.slice(0, 6)).toStrictEqual([
+          "seed: datekit on the Node world",
+          "Init datekit: done",
+          "Push datekit: done",
+          "OpenAsk datekit/add-months-clamp: done",
+          "OpenAsk datekit/format-ordinal: done",
+          "OpenAsk datekit/parse-iso-week: done",
+        ]);
+
+        expect(printed[6]).toMatch(
+          /^datekit: main at [\da-f]{12}, 3 open asks, decided by ines-v$/u
+        );
+
+        expect(printed.slice(7)).toStrictEqual([
+          "seeded 1 project on the Node world: 5 steps, 5 done, 0 already",
+        ]);
+      }),
+    60_000
+  );
+
+  it.live(
+    "prints only the versioned envelope with --json: each step, and what each project holds",
+    () =>
+      Effect.gen(function* () {
+        const printed = yield* printedBy([
+          "--world",
+          "node",
+          "--only",
+          "burrow",
+          "--json",
+        ]);
+
+        expect(printed).toHaveLength(1);
+
+        const envelope = yield* Schema.decodeEffect(
+          Schema.fromJsonString(SeedEnvelope)
+        )(printed.join("\n"));
+
+        expect({
+          command: envelope.command,
+          ok: envelope.ok,
+          v: envelope.v,
+        }).toStrictEqual({ command: "seed", ok: true, v: 1 });
+
+        const data = envelope.ok ? envelope.data : undefined;
+
+        expect(data?.steps.map(stepLine)).toStrictEqual([
+          "Init burrow: done",
+          "Push burrow: done",
+          "OpenAsk burrow/drop-legacy-fetch: done",
+        ]);
+
+        const [held] = data?.projects ?? [];
+
+        expect({
+          asks: held?.asks.length,
+          decider: held?.decider,
+          project: held?.project,
+          ratchets: held?.ratchets,
+        }).toStrictEqual({
+          // The migrate ask's family: the parent, six children, the delete child.
+          asks: 8,
+          decider: "okafor",
+          project: "burrow",
+          ratchets: ["no-module-level-mutable-state"],
+        });
+
+        expect(held?.main).toMatch(/^[\da-f]{40}$/u);
+      }),
+    60_000
   );
 });
 

@@ -34,12 +34,11 @@ import {
 } from "effect";
 
 import {
-  declaredStage,
   flagValue,
   platformOrigin,
   repoRoot,
   Stage,
-  stages,
+  stageOf,
   subdomainFile,
   WorkersDev,
 } from "../infra/stages.ts";
@@ -98,15 +97,12 @@ const USAGE =
 
 const failed = (reason: string) => new SeedFailed({ reason });
 
-/** The stage `raw` names, its tokens' env vars, and where it lives if `--url` says. */
-const stageFrom = (argv: readonly string[], raw: string) =>
+/** The stage `--stage` names, its tokens' env vars, and where it lives if `--url` says. */
+const stageFrom = (argv: readonly string[]) =>
   Effect.gen(function* () {
-    const stage = yield* Effect.fromOption(declaredStage(raw)).pipe(
-      Effect.mapError(() =>
-        failed(
-          `--stage ${raw} is not a stage infra/stages.ts declares (${stages.join(", ")})`
-        )
-      )
+    // infra's own reading of `--stage`, and its words when it names none.
+    const stage = yield* stageOf(argv).pipe(
+      Effect.mapError(({ message }) => failed(message))
     );
 
     if (stage === "demo" && !argv.includes("--yes")) {
@@ -168,7 +164,7 @@ export const optionsOf = (
       : yield* Option.match(raw, {
           onNone: () =>
             Effect.fail(failed(`name --world node or --stage <s>: ${USAGE}`)),
-          onSome: (named) => stageFrom(argv, named),
+          onSome: () => stageFrom(argv),
         });
 
     const json = argv.includes("--json");
@@ -191,7 +187,7 @@ const SeededSummary = Schema.Struct({
 type SeededSummary = typeof SeededSummary.Type;
 
 /** What `--json` prints: the versioned envelope over the steps and each project. */
-const SeedEnvelope = Envelope(
+export const SeedEnvelope = Envelope(
   Schema.Struct({
     projects: Schema.Array(SeededSummary),
     steps: Schema.Array(SeedStep),
