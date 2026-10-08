@@ -1,0 +1,34 @@
+{
+  "command": "ask",
+  "data": {
+    "ask": {
+      "askedBy": "okafor",
+      "blockedBy": [],
+      "brief": {
+        "want": "@burrow/auth: 2 callers of legacyFetch → http.get"
+      },
+      "check": {
+        "_tag": "Migrate",
+        "count": "bun scripts/count-callers.ts legacyFetch --json",
+        "from": "legacyFetch",
+        "to": "http.get"
+      },
+      "file": "{configDir}/asks/drop-legacy-fetch-burrow-auth.ask.ts",
+      "id": "drop-legacy-fetch-burrow-auth",
+      "kind": "migrate",
+      "openedAt": "2026-10-08T05:21:35.148Z",
+      "openedIn": "9998ebe62c2f282d148b1d806372484916cc2548",
+      "parent": "drop-legacy-fetch",
+      "project": "burrow",
+      "state": "open",
+      "territory": {
+        "module": "@burrow/auth",
+        "paths": ["packages/auth/**"],
+        "publicFiles": ["packages/auth/src/index.ts"]
+      }
+    },
+    "brief": "# @burrow/auth: 2 callers of legacyFetch → http.get\n\nAsk `drop-legacy-fetch-burrow-auth` in burrow, a `migrate` ask from okafor.\n\n## Territory\n\nThe module `@burrow/auth`: `packages/auth/**`.\n\n## Check\n\nNo caller uses `legacyFetch`; they use `http.get`.\n"
+  },
+  "ok": true,
+  "v": 1
+}
