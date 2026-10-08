@@ -32,7 +32,7 @@ import { NodeHttpServer, NodeServices } from "@effect/platform-node";
 import { SqliteClient } from "@effect/sql-sqlite-node";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostLocal } from "@repo/artifacts/repo-host/local";
-import type { CheckAt } from "@repo/checks/check-runner";
+import type { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import { CheckRunnerMemory, scriptKey } from "@repo/checks/check-runner/memory";
 import type { EvidenceStore } from "@repo/checks/evidence-store";
 import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
@@ -226,11 +226,23 @@ const helperScript = (as: Someone, username: string = as) =>
 
 /**
  * What a test may set in its world: where lane logs are kept, in memory by
- * default, and the front page, which lists no project by default.
+ * default; the front page, which lists no project by default; the Checker,
+ * W2's `/memory` scripted by the test unless given; and more people.
  */
 export interface WorldOptions {
   readonly evidence?: Layer.Layer<EvidenceStore>;
   readonly frontPage?: Layer.Layer<FrontPage>;
+  /**
+   * The Checker, made from the folder the world's bare repos live in (each
+   * repo at `<repos>/<repo>.git`), as `serve-world.ts` runs lanes for real.
+   * `script` and `print` then reach nothing.
+   */
+  readonly checker?: (repos: string) => Layer.Layer<CheckRunner>;
+  /**
+   * More people beside dora, alice and bob, as `SESSION_TOKENS` lists them:
+   * token to handle.
+   */
+  readonly sessions?: Readonly<Record<string, string>>;
 }
 
 export const coreLoopWorld = (
@@ -275,7 +287,7 @@ export const coreLoopWorld = (
       Layer.mergeAll(
         UpstreamRepoHost,
         LanderIsogit,
-        CheckRunnerMemory.layer(script, printed),
+        options.checker?.(repos) ?? CheckRunnerMemory.layer(script, printed),
         RulesEvaluatorBun.pipe(Layer.provide(FinishersFromChecks)),
         options.evidence ?? EvidenceStoreMemory,
         options.frontPage ??
@@ -346,11 +358,12 @@ export const coreLoopWorld = (
     // The stage's env as the Worker decodes it, with the people's tokens.
     const env = {
       ...fakeEnv(),
-      SESSION_TOKENS: JSON.stringify(
-        Object.fromEntries(
+      SESSION_TOKENS: JSON.stringify({
+        ...Object.fromEntries(
           Object.entries(tokens).map(([who, token]) => [token, who])
-        )
-      ),
+        ),
+        ...options.sessions,
+      }),
     };
 
     const config = yield* decodeEnv(env).pipe(Effect.orDie);
