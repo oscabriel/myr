@@ -43,11 +43,15 @@ import {
   outcomeOf,
 } from "@repo/project/landing";
 import { Projects } from "@repo/project/projects";
-import { LaneOutcome } from "@repo/protocol/domain/answer";
-import type { Verdict } from "@repo/protocol/domain/answer";
+import { LaneOutcome, Verdict } from "@repo/protocol/domain/answer";
 import type { Outcome } from "@repo/protocol/domain/outcome";
 import { CommitSha } from "@repo/protocol/ids";
-import type { LaneName, ProjectName, RequestId } from "@repo/protocol/ids";
+import type {
+  EnvKey,
+  LaneName,
+  ProjectName,
+  RequestId,
+} from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import {
   Array,
@@ -64,7 +68,9 @@ import type { AnswerParams } from "../../answer-runs.ts";
 import { writeVerdictNote } from "../notes.ts";
 import { StepRunner } from "../step.ts";
 import type { StepRetry } from "../step.ts";
-import { heldBack, unsealed } from "./held-back.ts";
+import { guards, GuardRun, passes } from "./guards.ts";
+import { heldBack, HeldBackRun, unsealed } from "./held-back.ts";
+import type { Judged } from "./held-back.ts";
 import {
   laneOnMain,
   refusalsOf,
@@ -278,11 +284,72 @@ const uncountedRefusals = (cheap: StageRun) =>
       )
     : Effect.succeed([]);
 
+/** What a port step came to: its report, and the held-back run it judged, if any. */
+interface Ran {
+  readonly given: Option.Option<Reported>;
+  readonly judged: Option.Option<Judged>;
+}
+
+const ranOnly = (given: Option.Option<Reported>): Ran => ({
+  given,
+  judged: Option.none(),
+});
+
 /**
- * The checks on the exact merged tree: the cheap stage (its lanes, and the
- * ratchets' counts), then, if it passed, the ask's own check and every
- * other project lane, then, if those passed and a held-back suite judges
- * the answer, its held-back run (step 7 (d), `held-back.ts`). The first
+ * An answer that adds a file holding a stored write-only value, until its
+ * deciders can be asked: the run refuses it as the platform's trouble
+ * (`VerifierBlocked`, which names nothing, so the scan is no oracle on
+ * which item a guess matched), and only the platform's log says which
+ * items, never a value. The `SecretInTree` decision on the deciders' Today
+ * that should hold it instead (`AwaitingDecision` for its answerer) is the
+ * project service's to open.
+ */
+const quarantine = (
+  params: AnswerParams,
+  items: readonly EnvKey[]
+): Effect.Effect<readonly VerifierBlocked[]> =>
+  Array.isReadonlyArrayEmpty(items)
+    ? Effect.succeed([])
+    : Effect.as(
+        Effect.logWarning(
+          "an answer adds a file holding a stored write-only value"
+        ).pipe(
+          Effect.annotateLogs({
+            items: items.join(","),
+            project: params.project,
+            requestId: params.requestId,
+          })
+        ),
+        [new VerifierBlocked({})]
+      );
+
+/** The checks reported refused before any lane ran: the landing guards' refusals. */
+const guardedOut = (
+  params: AnswerParams,
+  call: Call<"RunChecks">,
+  run: Extract<GuardRun, { readonly _tag: "Guarded" }>
+) =>
+  Effect.map(quarantine(params, run.quarantined), (quarantined): Ran =>
+    ranOnly(
+      reported(
+        LandingCommand.Checked({
+          decisions: [],
+          finish: run.finish,
+          refusals: [...run.refusals, ...quarantined],
+          tree: call.tree,
+        }),
+        { heldBack: [], lanes: [] }
+      )
+    )
+  );
+
+/**
+ * The checks on the exact merged tree: first the landing guards (when the
+ * visibility cartridge provides them, `guards.ts`), then the cheap stage
+ * (its lanes, and the ratchets' counts), then, if it passed, the ask's own
+ * check and every other project lane, then, if those passed and a
+ * held-back suite judges the answer, its held-back run (step 7 (d),
+ * `held-back.ts`; `earlier` carries over to an unchanged patch). The first
  * stage that refuses ends them, with its refusals and its lanes. The counts
  * go to the project with the report, which judges them against its
  * baselines (spec §5 step 7 (b)) and opens the decisions a reasoned escape
@@ -291,9 +358,23 @@ const uncountedRefusals = (cheap: StageRun) =>
 const checks = (
   params: AnswerParams,
   call: Call<"RunChecks">,
-  attempt: number
-): Effect.Effect<Option.Option<Reported>, never, AnswerPorts> =>
+  attempt: number,
+  earlier: Option.Option<Judged>
+): Effect.Effect<Ran, never, AnswerPorts> =>
   Effect.gen(function* () {
+    const guarded = yield* guards(params, call.tree, attempt);
+
+    if (Option.isSome(guarded) && !passes(guarded.value)) {
+      return yield* GuardRun.match(guarded.value, {
+        Blocked: ({ attempt: at }) =>
+          Effect.succeed(
+            ranOnly(reported(LandingCommand.Blocked({ attempt: at })))
+          ),
+        Guarded: (run) => guardedOut(params, call, run),
+        Moved: () => Effect.succeed(ranOnly(Option.none())),
+      });
+    }
+
     const ran = yield* stage(params, call.tree, "cheap", attempt);
 
     const cheap = {
@@ -313,27 +394,46 @@ const checks = (
       StageRun.guards.Ran(judged.ran) &&
       judged.refusals.length === 0 &&
       judged.ran.checked.sealed === true
-        ? yield* heldBack(params, attempt)
+        ? yield* heldBack(params, call.tree, attempt, earlier)
         : unsealed;
 
     const counts = StageRun.guards.Ran(cheap.ran)
       ? Option.fromUndefinedOr(cheap.ran.counts)
       : Option.none();
 
-    return StageRun.match(last.ran, {
+    if (HeldBackRun.guards.Blocked(sealed)) {
+      return ranOnly(
+        reported(LandingCommand.Blocked({ attempt: sealed.attempt }))
+      );
+    }
+
+    const held = HeldBackRun.guards.Judged(sealed)
+      ? Option.some(sealed)
+      : Option.none();
+
+    const given = StageRun.match(last.ran, {
       Blocked: ({ attempt: at }) =>
         reported(LandingCommand.Blocked({ attempt: at })),
       Moved: () => Option.none(),
-      Ran: ({ checked, heldBack: areas, lanes }) =>
+      Ran: ({ checked, lanes }) =>
         reported(
           LandingCommand.Checked({
             decisions: [],
             finish: checked.finish,
-            refusals: [...last.refusals, ...sealed.refusals],
+            refusals: [
+              ...last.refusals,
+              ...Option.match(held, {
+                onNone: () => [],
+                onSome: ({ refusals }) => refusals,
+              }),
+            ],
             tree: call.tree,
           }),
           {
-            heldBack: [...areas, ...sealed.results],
+            heldBack: Option.match(held, {
+              onNone: () => [],
+              onSome: ({ results }) => results,
+            }),
             lanes: [
               ...(judged !== undefined && StageRun.guards.Ran(cheap.ran)
                 ? cheap.ran.lanes
@@ -347,6 +447,8 @@ const checks = (
           }
         ),
     });
+
+    return { given, judged: held };
   });
 
 /**
@@ -405,6 +507,9 @@ const noteRetry = {
   while: Schema.is(HostBusy),
 };
 
+/** A verdict as its note holds it: JSON. */
+const encodeVerdict = Schema.encodeEffect(Schema.fromJsonString(Verdict));
+
 /** The verdict as `verdict` shows it: the one the checks gave, with where the answer stands now. */
 const shownVerdict = (run: AnswerRun) =>
   Option.map(Option.fromUndefinedOr(run.verdict), (made): Verdict => ({
@@ -429,6 +534,32 @@ const noteVerdict = (params: AnswerParams) =>
     }
 
     const { fork, verdict } = judged.value;
+
+    // The note leaves the run for the answer's fork: the project scans it
+    // for its stored values first (VL §8.6), and a note that holds one is
+    // not written; the verdict stands in the project.
+    const leaked = yield* Effect.flatMap(
+      Effect.orDie(encodeVerdict(verdict)),
+      (text) =>
+        Effect.flatMap(projectOf(params.project), (api) =>
+          api.scanForValues({ text })
+        )
+    );
+
+    if (Option.isSome(leaked)) {
+      return yield* Effect.as(
+        Effect.logWarning(
+          "an answer's verdict note held a stored write-only value; it was not written"
+        ).pipe(
+          Effect.annotateLogs({
+            item: leaked.value,
+            project: params.project,
+            requestId: params.requestId,
+          })
+        ),
+        Noted.cases.Unwritten.make({ reason: "SecretInOutput" })
+      );
+    }
 
     const written = yield* writeVerdictNote({
       fork,
@@ -478,8 +609,9 @@ const notes = (
 const portStep = (
   params: AnswerParams,
   call: Call<"Land" | "Merge" | "RunChecks">,
-  attempt: number
-): Effect.Effect<Option.Option<Reported>, never, AnswerPorts> =>
+  attempt: number,
+  earlier: Option.Option<Judged>
+): Effect.Effect<Ran, never, AnswerPorts> =>
   Effect.flatMap(StepRunner, ({ step }) =>
     Match.valueTags(call, {
       Land: (landing) =>
@@ -491,11 +623,15 @@ const portStep = (
         ).pipe(
           Effect.catchTag("LandBusy", ({ attempt: at }) =>
             Effect.succeed(reported(LandingCommand.Busy({ attempt: at })))
-          )
+          ),
+          Effect.map(ranOnly)
         ),
       Merge: (merging) =>
-        step(`merge#${attempt}`, Reporting, merge(params, merging)),
-      RunChecks: (checking) => checks(params, checking, attempt),
+        Effect.map(
+          step(`merge#${attempt}`, Reporting, merge(params, merging)),
+          ranOnly
+        ),
+      RunChecks: (checking) => checks(params, checking, attempt, earlier),
     })
   );
 
@@ -505,11 +641,16 @@ const nameOf = {
   RunChecks: "checks",
 } as const satisfies Record<keyof Attempts, string>;
 
-/** Runs the calls `at` names, one after another, until none is left. */
+/**
+ * Runs the calls `at` names, one after another, until none is left.
+ * `earlier` is the last held-back run of this Workflow, which carries over
+ * to a later check of an unchanged patch.
+ */
 const carry = (
   params: AnswerParams,
   at: Steps,
-  attempts: Attempts
+  attempts: Attempts,
+  earlier: Option.Option<Judged>
 ): Effect.Effect<Outcome, never, AnswerPorts> =>
   Effect.gen(function* () {
     // A retry is the project's to start, at its alarm.
@@ -527,7 +668,7 @@ const carry = (
     }
 
     const attempt = attempts[call._tag] + 1;
-    const given = yield* portStep(params, call, attempt);
+    const { given, judged } = yield* portStep(params, call, attempt, earlier);
     const { step } = yield* StepRunner;
 
     const next = yield* step(
@@ -540,7 +681,12 @@ const carry = (
       return next.outcome;
     }
 
-    return yield* carry(params, next, { ...attempts, [call._tag]: attempt });
+    return yield* carry(
+      params,
+      next,
+      { ...attempts, [call._tag]: attempt },
+      Option.orElse(judged, () => earlier)
+    );
   });
 
 /**
@@ -566,7 +712,8 @@ export const runAnswer = (
         effects: callsOf(nextSteps(run.value)),
         outcome: outcomeOf(run.value.state),
       },
-      { Land: 0, Merge: 0, RunChecks: 0 }
+      { Land: 0, Merge: 0, RunChecks: 0 },
+      Option.none()
     );
 
     yield* notes(params, outcome);
