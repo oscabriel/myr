@@ -3,9 +3,11 @@
  * `bun test` inside `examples/datekit` is red on main for exactly the three
  * tests its asks name as their checks, each by an assertion rather than a
  * load error (what red first in GLOSSARY.md asks of a check), and green for
- * every other test. The example is a Bun project of its own, outside the
- * workspaces (spec D21), so it is run as a child process, the way the
- * platform's Checker runs a project's own test command.
+ * every other test. Its run block holds on main too: every lane passes, and
+ * each ask's check, run alone by the block's test command, is red by an
+ * assertion. The example is a Bun project of its own, outside the
+ * workspaces (spec D21), so each command runs as a child process under
+ * `sh -c`, the way the platform's Checker runs a project's commands.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
@@ -72,6 +74,15 @@ const LOAD_ERRORS = [
 // makes the ask's `RedThenGreen.path`.
 const CHECK_PATH = /\bpath:\s*"(?<path>[^"]+)"/u;
 
+// The run block as project.ts writes it (the rules test holds it to the
+// evaluated policy): the command that runs one check file, with `{path}`
+// in it, and the lanes every answer must pass, `checks: { unit: "…" }`.
+const TEST_COMMAND = /\btest:\s*"(?<command>[^"]*\{path\}[^"]*)"/u;
+
+const LANES = /\bchecks:\s*\{(?<lanes>[^}]*)\}/u;
+
+const LANE = /(?<lane>\w+):\s*"(?<command>[^"]+)"/gu;
+
 /** A closing count bun prints (` 3 fail`), or 0 when it prints none. */
 const countOf = (output: string, word: string) =>
   Number(
@@ -126,28 +137,51 @@ const readReport = (output: string): BunReport => {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** Runs `bun test` inside the example, as its own `package.json` does. */
-const bunTest = Effect.scoped(
-  Effect.gen(function* () {
-    const path = yield* Path.Path;
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const root = yield* repoRoot;
+/** Runs `command` inside the example under `sh -c`, as the Checker runs a lane. */
+const inExample = (command: string) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const path = yield* Path.Path;
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const root = yield* repoRoot;
 
-    const child = yield* spawner.spawn(
-      ChildProcess.make("bun", ["test"], { cwd: path.join(root, example) })
-    );
+      const child = yield* spawner.spawn(
+        ChildProcess.make("sh", ["-c", command], {
+          cwd: path.join(root, example),
+        })
+      );
 
-    const [stdout, stderr, exitCode] = yield* Effect.all(
-      [text(child.stdout), text(child.stderr), child.exitCode],
-      { concurrency: "unbounded" }
-    );
+      const [stdout, stderr, exitCode] = yield* Effect.all(
+        [text(child.stdout), text(child.stderr), child.exitCode],
+        { concurrency: "unbounded" }
+      );
 
-    return {
-      exitCode,
-      output: `${stdout}\n${stderr}`.replaceAll(ANSI, ""),
-    } satisfies BunRun;
-  })
-);
+      return {
+        exitCode,
+        output: `${stdout}\n${stderr}`.replaceAll(ANSI, ""),
+      } satisfies BunRun;
+    })
+  );
+
+/** The example's run block, read from its project file. */
+const runBlock = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+
+  const source = yield* fs.readFileString(
+    path.join(yield* repoRoot, example, Brand.configDir, "project.ts")
+  );
+
+  const lanes = Array.from(
+    (LANES.exec(source)?.groups?.lanes ?? "").matchAll(LANE),
+    ({ groups }) => ({
+      command: groups?.command ?? "",
+      lane: groups?.lane ?? "",
+    })
+  );
+
+  return { lanes, test: TEST_COMMAND.exec(source)?.groups?.command ?? "" };
+});
 
 /**
  * Each ask file in the example's config folder, and the check file it names;
@@ -190,7 +224,8 @@ describe("the datekit example", () => {
     "is red on main for exactly its three asks' checks, each by an assertion, and green elsewhere",
     () =>
       Effect.gen(function* () {
-        const run = yield* bunTest;
+        // The example's own `package.json` test script.
+        const run = yield* inExample("bun test");
         const report = readReport(run.output);
         const checks = yield* askChecks;
 
@@ -234,6 +269,67 @@ describe("the datekit example", () => {
       }).pipe(Effect.provide(NodeServices.layer)),
     // One `bun test` over a small library: well under a second alone. The
     // limit catches a hang while turbo runs every package's tests at once.
+    30_000
+  );
+
+  it.live(
+    "holds its run block on main: every lane green, and each ask's check red alone by an assertion",
+    () =>
+      Effect.gen(function* () {
+        const { lanes, test } = yield* runBlock;
+        const checks = yield* askChecks;
+
+        // A lane red on main refuses every answer (`VerifierBlocked`), so the
+        // suite every answer keeps green leaves the open asks' checks out and
+        // runs the four the library keeps green.
+        const laneRuns = yield* Effect.forEach(lanes, ({ command, lane }) =>
+          Effect.map(inExample(command), (run) => {
+            const report = readReport(run.output);
+
+            return {
+              errors: report.errors,
+              exitCode: run.exitCode,
+              failed: report.failed,
+              files: report.ran.files,
+              lane,
+            };
+          })
+        );
+
+        expect(laneRuns).toStrictEqual([
+          { errors: 0, exitCode: 0, failed: 0, files: 4, lane: "unit" },
+        ]);
+
+        // The platform opens an ask only when its check is red first
+        // (`NotRedFirst` otherwise): the test command, with the check's path
+        // for `{path}`, fails its one test by an assertion.
+        const checkRuns = yield* Effect.forEach(checks, ({ check }) =>
+          Effect.map(inExample(test.replaceAll("{path}", check)), (run) => {
+            const report = readReport(run.output);
+
+            return {
+              errors: report.errors,
+              exitedNonZero: run.exitCode !== 0,
+              failing: report.files
+                .filter(({ failed }) => failed.length > 0)
+                .map(howFailed),
+            };
+          })
+        );
+
+        expect(checkRuns).toStrictEqual(
+          [
+            "test/asks/add-months-clamp.test.ts",
+            "test/asks/format-ordinal.test.ts",
+            "test/asks/parse-iso-week.test.ts",
+          ].map((file) => ({
+            errors: 0,
+            exitedNonZero: true,
+            failing: [{ assertion: true, file, loaded: true, tests: 1 }],
+          }))
+        );
+      }).pipe(Effect.provide(NodeServices.layer)),
+    // Four `bun test` runs over a small library, one after another.
     30_000
   );
 });

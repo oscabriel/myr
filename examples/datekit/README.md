@@ -89,6 +89,7 @@ What we want changed is written down as asks, one file each in `.myr/asks/`: a s
 myr asks --project datekit       # what is open
 myr ask format-ordinal           # read one in full
 myr claim format-ordinal         # take it; this prints your fork's remote
+git remote add myr <remote>      # the remote the claim printed
 myr check                        # run its test and the suite, as the platform will
 git push myr HEAD:main           # offer your answer
 ```

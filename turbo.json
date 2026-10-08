@@ -19,6 +19,16 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/platform/migrations/**"],
       "outputs": []
     },
+    "@repo/rules#test": {
+      "dependsOn": ["types", "^types"],
+      "env": ["UPDATE_GOLDEN"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/examples/*/.*/**",
+        "!$TURBO_ROOT$/examples/*/.env*"
+      ],
+      "outputs": []
+    },
     "@repo/config#test": {
       "cache": false,
       "dependsOn": ["types", "^types"],
