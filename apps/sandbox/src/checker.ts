@@ -27,6 +27,18 @@ const DEFAULT_IMAGE = "checker:default";
 /** That image's name in `wrangler.jsonc`, built from `images/check.Dockerfile`. */
 const CHECK_IMAGE = "check";
 
+/**
+ * The Checker's container size: two vCPUs and 8 GiB. oxlint with JS
+ * plugins (burrow's lint lane) reserves about 6 GiB of address space per
+ * thread for its fixed-size allocators (4 GiB aligned on 2 GiB), and Linux
+ * refuses one reservation larger than the machine's memory: on the
+ * runtime's default (`lite`, 256 MiB) the lane aborted on main and on every
+ * answer, so each answer was `VerifierBlocked` (dev-oscabriel, 2026-10-08).
+ * `standard-2`'s 6 GiB leaves no room for one. A restore from a snapshot
+ * starts on it too.
+ */
+export const checkInstance = "standard-3";
+
 /** The Checker's Durable Object, which owns its container. */
 export class Checker extends DurableObject<Env> {
   /** Runs one check job in this object's container, its outcome encoded. */
@@ -76,7 +88,11 @@ export class Checker extends DurableObject<Env> {
     return check(wire).pipe(
       Effect.provide(
         Layer.mergeAll(
-          SdkBox.layer(container, { enableInternet: false, image }),
+          SdkBox.layer(container, {
+            enableInternet: false,
+            image,
+            instance: checkInstance,
+          }),
           SdkChecker.layer(
             container,
             exports,
@@ -85,12 +101,15 @@ export class Checker extends DurableObject<Env> {
               forget: (key) => index.forgetSnapshot(key),
               keep: (key, id) => index.keepSnapshot(key, id),
             },
-            // The hosts its env route may open, reserved ahead of the
-            // catch-all intercept.
-            Option.match(envPlanOf(wire.job).route, {
-              onNone: () => [],
-              onSome: ({ hosts }) => hosts,
-            })
+            {
+              instance: checkInstance,
+              // The hosts its env route may open, reserved ahead of the
+              // catch-all intercept.
+              proxied: Option.match(envPlanOf(wire.job).route, {
+                onNone: () => [],
+                onSome: ({ hosts }) => hosts,
+              }),
+            }
           ),
           WorkerCheckLogs.layer
         )

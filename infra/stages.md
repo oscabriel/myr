@@ -11,13 +11,13 @@ This file has six parts, then how to run a stage:
 5. [Human steps status](#5-human-steps-status)
 6. [URLs](#6-urls)
 
-Sections 1 to 6 hold the state as of 2026-10-08, 14:00 UTC, read from the account with read-only calls.
+Sections 1 to 6 hold the state as of 2026-10-08, 15:00 UTC, read from the account with read-only calls.
 
 ## 1. Stages
 
 | Stage | What it is for | State on 2026-10-08 |
 | --- | --- | --- |
-| `dev-oscabriel` | One person's iteration. Deploy it as often as you like. | Bootstrapped 2026-10-07 and deployed (platform, sandbox, web). Re-checked 2026-10-08: bootstrap created nothing, and the platform holds every required secret. |
+| `dev-oscabriel` | One person's iteration. Deploy it as often as you like. | Bootstrapped 2026-10-07 and deployed (platform, sandbox, web). Re-checked 2026-10-08: bootstrap created nothing, and the platform holds every required secret. The feature-frozen build was deployed at 14:51 UTC on 2026-10-08, and the whole core loop (`bun scripts/smoke.ts --stage dev-oscabriel --loop`) passed on it twice in a row. |
 | `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). | Bootstrapped 2026-10-08: six resources created, migrations `0001` to `0004` applied, and a second run created nothing. Its secrets are set. Its Workers aren't deployed yet. |
 
 There is no `prod` stage before the deadline. The top level of each `wrangler.jsonc` is stage `local`, for tests and `wrangler dev`, and it is never deployed. A new person's stage is added to `stages` in `stages.ts` and gets an `env` block in each `wrangler.jsonc`, in the same change.
@@ -79,11 +79,13 @@ Every resource in the two tables below belongs to its stage. The times are the a
 
 A throwaway is something a smoke run, a swarm run or a `seed --as` copy makes on a stage, beside the stage's own resources. Each run appends one JSON line for each throwaway to `infra/created.jsonl` (`infra/created.ts`), and teardown acts only on those lines.
 
-On 2026-10-08 the ledger holds one entry, which still exists:
+On 2026-10-08 at 15:00 UTC the ledger holds 16 entries, all on `dev-oscabriel`, and each still exists:
 
-| When | By | Kind | Name | Where |
+| When (UTC) | By | Kind | Name | Where |
 | --- | --- | --- | --- | --- |
 | 2026-10-08 12:37 | swarm | repo | `burrow--drop-legacy-fetch-burrow-auth--wren` (a released claim's fork) | `projects-dev-oscabriel` |
+| 2026-10-08 14:40 to 14:58 | smoke | project, repo, repo | four core-loop runs, `smoke-20261008-143944`, `smoke-20261008-144139`, `smoke-20261008-145551` and `smoke-20261008-145715`: each one's project, its repo, and its claim's fork `<project>--parse-year--bram` | `projects-dev-oscabriel` |
+| 2026-10-08 14:52 to 14:54 | seed | project, repo, repo | `burrow-lint-807`, a `seed --as` copy of burrow that proved the Checker runs burrow's lint lane, with its repo and wren's claim fork `burrow-lint-807--drop-legacy-fetch-burrow-auth--wren` | `projects-dev-oscabriel` |
 
 The live runs before the ledger existed left throwaways that it doesn't hold, all on `dev-oscabriel`. Teardown lists them separately and checks each one still exists before it deletes anything:
 
@@ -126,11 +128,11 @@ The account's workers.dev subdomain is in `infra/workers-dev.json`. The demo's r
 
 | Stage | What | URL | State on 2026-10-08 |
 | --- | --- | --- | --- |
-| `dev-oscabriel` | platform | `https://platform-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/health` answers 200) |
+| `dev-oscabriel` | platform | `https://platform-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/health` answers 200); the core loop passed live twice on the 14:51 deploy |
 | `dev-oscabriel` | web | `https://web-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/` answers 200) |
 | `dev-oscabriel` | CLI install | `https://platform-dev-oscabriel.oscargabriel.workers.dev/install.sh` | served from `releases-dev-oscabriel` |
 | `dev-oscabriel` | Google redirect URI (H4) | `https://platform-dev-oscabriel.oscargabriel.workers.dev/oauth/google/callback` | not registered |
-| `dev-oscabriel` | sandbox | none: it has no workers.dev route, and only the platform reaches it | deployed |
+| `dev-oscabriel` | sandbox | none: it has no workers.dev route, and only the platform reaches it | deployed; the Checker's containers start on `standard-3` (2 vCPU, 8 GiB), the Lander's on `standard-2` |
 | `demo` | platform | `https://platform-demo.oscargabriel.workers.dev` | not deployed: a placeholder that holds the secrets, with no route (404) |
 | `demo` | web | `https://web-demo.oscargabriel.workers.dev` | not deployed |
 | `demo` | CLI install | `https://platform-demo.oscargabriel.workers.dev/install.sh` | after the deploy and a `release --upload --stage demo` |

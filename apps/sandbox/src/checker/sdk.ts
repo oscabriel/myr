@@ -199,16 +199,23 @@ const probe = (container: Container) =>
     )
   );
 
-export const SdkChecker = {
+/** How the Checker's container runs: the hosts its env route may open, and its size. */
+export interface CheckerStart {
   /**
-   * `proxied` is every host the job's env route may open (`checker/env.ts`):
-   * a host first registered after the catch-all would never be reached.
+   * Every host the job's env route may open (`checker/env.ts`): a host
+   * first registered after the catch-all would never be reached.
    */
+  readonly proxied: readonly string[];
+  /** The instance a restore starts on: the one the job's `Box` starts. */
+  readonly instance: NonNullable<ContainerStartupOptions["instance"]>;
+}
+
+export const SdkChecker = {
   layer: (
     container: Container,
     gateways: Gateways,
     index: SnapshotIndex,
-    proxied: readonly string[] = []
+    { instance, proxied }: CheckerStart
   ): Layer.Layer<Network | Snapshots> =>
     Layer.effectContext(
       Effect.gen(function* () {
@@ -258,6 +265,7 @@ export const SdkChecker = {
                   containerSnapshot: { id },
                   enableInternet: false,
                   entrypoint: IDLE,
+                  instance,
                 });
               },
             });

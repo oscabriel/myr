@@ -226,7 +226,12 @@ export type ContainerCall =
       readonly env: Readonly<Record<string, string>>;
     }
   | { readonly kind: "intercept"; readonly target: string; readonly to: string }
-  | { readonly kind: "start"; readonly from: string }
+  | {
+      readonly kind: "start";
+      readonly from: string;
+      /** The instance size the start named, when it named one. */
+      readonly instance?: ContainerStartupOptions["instance"];
+    }
   | { readonly kind: "snapshot" }
   | { readonly kind: "destroy" };
 
@@ -240,12 +245,14 @@ const bytes = (text: string) => {
 };
 
 /**
- * A running container as the Container API shows a Durable Object one: it
- * records each call, prints a lockfile listing for `git ls-tree`, and exits
- * 0 with no output for every other command. Its outbound intercepts record
- * which gateway, with which props, took each target.
+ * A container as the Container API shows a Durable Object one, running
+ * unless `running` says otherwise (a stopped one is started before each
+ * command): it records each call, prints a lockfile listing for `git
+ * ls-tree`, and exits 0 with no output for every other command. Its
+ * outbound intercepts record which gateway, with which props, took each
+ * target.
  */
-export const fakeContainer = () => {
+export const fakeContainer = ({ running = true } = {}) => {
   const calls: ContainerCall[] = [];
   const gateways = new Map<Fetcher, string>();
 
@@ -298,17 +305,20 @@ export const fakeContainer = () => {
 
       return Promise.resolve();
     },
-    running: true,
+    running,
     snapshotContainer: () => {
       calls.push({ kind: "snapshot" });
 
       return Promise.resolve({ id: "snapshot-1", size: 1 });
     },
     start: (options) => {
-      calls.push({
-        from: options?.containerSnapshot?.id ?? options?.image ?? "?",
-        kind: "start",
-      });
+      const from = options?.containerSnapshot?.id ?? options?.image ?? "?";
+
+      calls.push(
+        options?.instance === undefined
+          ? { from, kind: "start" }
+          : { from, instance: options.instance, kind: "start" }
+      );
     },
   });
 

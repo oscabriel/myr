@@ -717,7 +717,11 @@ describe("the egress gateway", () => {
  * own fake container, and `snapshots:<project>` names an index kept in
  * `index`.
  */
-const checkerWorld = (options: { readonly withGateways: boolean }) => {
+const checkerWorld = (options: {
+  readonly withGateways: boolean;
+  /** Whether each Checker's container is running before its job; it is unless false. */
+  readonly running?: boolean;
+}) => {
   const boxes: ReturnType<typeof fakeContainer>[] = [];
   const index = new Map<string, string>();
   const named: string[] = [];
@@ -756,7 +760,7 @@ const checkerWorld = (options: { readonly withGateways: boolean }) => {
   const checkers: Checkers = {
     CHECKER: {
       get: () => {
-        const box = fakeContainer();
+        const box = fakeContainer({ running: options.running ?? true });
 
         boxes.push(box);
 
@@ -785,20 +789,26 @@ const checkerWorld = (options: { readonly withGateways: boolean }) => {
 const encodedWire = () =>
   Schema.encodeEffect(CheckWire)(wireFor()).pipe(Effect.orDie);
 
-/** Two jobs of one project through `runCheck`, one after the other. */
-const twoJobs = Effect.gen(function* () {
-  const world = checkerWorld({ withGateways: true });
-  const wire = yield* encodedWire();
+/**
+ * Two jobs of one project through `runCheck`, one after the other, each in
+ * a container that runs before it starts unless `running` is false.
+ */
+const twoJobsIn = ({ running = true } = {}) =>
+  Effect.gen(function* () {
+    const world = checkerWorld({ running, withGateways: true });
+    const wire = yield* encodedWire();
 
-  const outcomes = yield* Effect.forEach([wire, wire], (each) =>
-    Effect.flatMap(
-      Effect.promise(() => runCheck(world.checkers, each)),
-      Schema.decodeEffect(CheckExit)
-    )
-  );
+    const outcomes = yield* Effect.forEach([wire, wire], (each) =>
+      Effect.flatMap(
+        Effect.promise(() => runCheck(world.checkers, each)),
+        Schema.decodeEffect(CheckExit)
+      )
+    );
 
-  return { ...world, outcomes };
-});
+    return { ...world, outcomes };
+  });
+
+const twoJobs = twoJobsIn();
 
 const intercepts = (calls: readonly ContainerCall[]) =>
   calls.flatMap((call) =>
@@ -875,12 +885,38 @@ describe(runCheck, () => {
         expect([...new Set(named)]).toStrictEqual(["snapshots:datekit"]);
         expect(
           second?.calls.filter((call) => call.kind === "start")
-        ).toStrictEqual([{ from: "snapshot-1", kind: "start" }]);
+        ).toStrictEqual([
+          { from: "snapshot-1", instance: "standard-3", kind: "start" },
+        ]);
         expect(
           second?.calls.filter(
             (call) => call.kind === "exec" && call.argv.includes(SETUP)
           )
         ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "starts each container on two vCPUs and 8 GiB, from the image and from a snapshot alike",
+    () =>
+      Effect.gen(function* () {
+        const { boxes } = yield* twoJobsIn({ running: false });
+
+        // oxlint with JS plugins reserves 6 GiB of address space per
+        // thread, which Linux refuses on a smaller instance: on the
+        // runtime's default (`lite`, 256 MiB) burrow's lint lane aborted
+        // on main and on every answer, so each answer was VerifierBlocked
+        // (dev-oscabriel, 2026-10-08).
+        const starts = boxes.flatMap(({ calls }) =>
+          calls.flatMap((call) => (call.kind === "start" ? [call] : []))
+        );
+
+        expect(new Set(starts.map(({ from }) => from))).toStrictEqual(
+          new Set(["registry.cloudflare.com/sandbox/check:315", "snapshot-1"])
+        );
+        expect(new Set(starts.map(({ instance }) => instance))).toStrictEqual(
+          new Set(["standard-3"])
+        );
       })
   );
 
