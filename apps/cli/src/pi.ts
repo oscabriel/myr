@@ -214,20 +214,36 @@ const guardedCall = (event: ToolCallEvent): Option.Option<GuardedCall> =>
   );
 
 /**
+ * The refusals retrying cannot help: the ones the agent must fix. A
+ * retryable refusal is a wait (the repo was busy), as the stop hook reads it.
+ */
+const fixable = (refusals: readonly Refusal[]) =>
+  refusals.filter((refusal) => !refusal.retryable);
+
+/**
  * pi's block for what the gate would refuse that retrying cannot help, with
  * the gateway's own text; a retryable refusal is a wait, never a block.
  */
 const blockFor = (
   refusals: Option.Option<Array.NonEmptyReadonlyArray<Refusal>>
 ): Option.Option<ToolCallEventResult> => {
-  const final = Option.getOrElse(refusals, () => []).filter(
-    (refusal) => !refusal.retryable
-  );
+  const final = fixable(Option.getOrElse(refusals, () => []));
 
   return Array.isReadonlyArrayNonEmpty(final)
     ? Option.some({ block: true, reason: explain(final).join("\n") })
     : Option.none();
 };
+
+/**
+ * What a verdict tells the agent to act on: the refusals it can fix, as the
+ * stop hook's hold names them, or every refusal when the policy holds on
+ * retryable ones alone.
+ */
+const toActOn = (refusals: Array.NonEmptyReadonlyArray<Refusal>) =>
+  Array.match(fixable(refusals), {
+    onEmpty: () => refusals,
+    onNonEmpty: (final) => final,
+  });
 
 /** The session a handler runs in. */
 const sessionOf = (ctx: PiContext): PiSession => ({
@@ -240,12 +256,12 @@ const firstLine = (cause: Cause.Cause<unknown>) =>
   String(Cause.squash(cause)).split("\n")[0] ?? "unknown failure";
 
 /**
- * Runs one handler's answer for pi, which awaits a promise. The gate stays
+ * Runs one handler's reply for pi, which awaits a promise. The gate stays
  * the authority, so a policy that fails, or any defect, lets pi go on as it
  * would without the adapter (a `tool_call` handler that rejects would block
  * the tool), and says why through `ctx.ui.notify` when pi gives one.
  */
-const answer = <A>(
+const reply = <A>(
   ctx: PiContext,
   event: keyof PiHandlers,
   decided: Effect.Effect<Option.Option<A>, HookFailed>
@@ -284,7 +300,7 @@ export const piAdapter =
     pi.on("before_agent_start", (_event, ctx) => {
       const session = sessionOf(ctx);
 
-      return answer(
+      return reply(
         ctx,
         "before_agent_start",
         briefed.has(session.id)
@@ -307,7 +323,7 @@ export const piAdapter =
     });
 
     pi.on("tool_call", (event, ctx) =>
-      answer(
+      reply(
         ctx,
         "tool_call",
         Option.match(guardedCall(event), {
@@ -319,19 +335,19 @@ export const piAdapter =
     );
 
     // Only a verdict the agent can act on sends it back, at most `most`
-    // times a session, and only a run that completed and can go on: a run
-    // the person stopped, or one that failed, stays stopped. Otherwise the
-    // policy is not even asked.
+    // times a session, and only a run that completed: a run the person
+    // stopped, or one that failed, stays stopped. Otherwise the policy is
+    // not even asked. `event.context.canContinue` is no guide: pi computes
+    // it before this handler's entry, and a run that ends on the agent's own
+    // reply reads false until the verdict is appended.
     pi.on("agent_before_settle", (event, ctx) => {
       const session = sessionOf(ctx);
       const used = continued.get(session.id) ?? 0;
 
-      const ended = event.outcome !== "completed" || !event.context.canContinue;
-
-      return answer(
+      return reply(
         ctx,
         "agent_before_settle",
-        ended || used >= most
+        event.outcome !== "completed" || used >= most
           ? Effect.succeedNone
           : Effect.flatMap(deps.settle(session), (verdict) =>
               SettleVerdict.$is("Refused")(verdict) && verdict.actionable
@@ -342,7 +358,7 @@ export const piAdapter =
                       continue: true,
                       entries: [
                         ...event.entries,
-                        verdictEntry(verdict.refusals),
+                        verdictEntry(toActOn(verdict.refusals)),
                       ],
                     });
                   })

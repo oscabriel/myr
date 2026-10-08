@@ -199,10 +199,16 @@ const bashOf = (command: string): ToolCallEvent => ({
   type: "tool_call",
 });
 
-/** A settle with `entries` already proposed by earlier handlers. */
+/**
+ * A completed run's settle with `entries` already proposed by earlier
+ * handlers, as pi 1.0.3 hands it over: the run ended on the agent's own
+ * reply, so the preview says it cannot go on (`canContinue` is false while
+ * the last message is the assistant's, `_buildBoundaryContext` in
+ * `dist/core/agent-session.js`) until a handler appends a message.
+ */
 const settleOf = (entries: SessionBoundaryDraft[]): AgentBeforeSettleEvent => ({
   context: {
-    canContinue: true,
+    canContinue: false,
     contextEntries: [],
     contextMessages: [],
     llmMessages: [],
@@ -544,34 +550,83 @@ describe("the pi adapter", () => {
     );
 
     it.effect(
-      "never sends back a run that was stopped, failed, or cannot go on",
+      "sends back a completed run whose context ends on the agent's own reply",
       () =>
         Effect.gen(function* () {
-          const ended: readonly AgentBeforeSettleEvent[] = [
-            { ...settleOf([]), outcome: "aborted" },
-            { ...settleOf([]), outcome: "error" },
-            {
-              ...settleOf([]),
-              context: { ...settleOf([]).context, canContinue: false },
-            },
-          ];
+          const { asked, handlers } = loaded({ settle: refused(true) });
+          const { ctx } = contextOf("s1");
+          const event = settleOf([]);
 
-          for (const event of ended) {
-            const { asked, handlers } = loaded({ settle: refused(true) });
-            const { ctx } = contextOf("s1");
+          const result = yield* fire(handlers.agent_before_settle, event, ctx);
 
-            const result = yield* fire(
-              handlers.agent_before_settle,
-              event,
-              ctx
-            );
-
-            expect({ asked, result }).toStrictEqual({
-              asked: [],
-              result: undefined,
-            });
-          }
+          // The verdict the adapter appends is what lets the run go on.
+          expect({
+            asked,
+            canContinue: event.context.canContinue,
+            continued: result?.continue,
+            entries: result?.entries?.length,
+          }).toStrictEqual({
+            asked: ["settle s1"],
+            canContinue: false,
+            continued: true,
+            entries: 1,
+          });
         })
+    );
+
+    it.effect(
+      "lists only the refusals the agent can fix, as the stop hook does",
+      () =>
+        Effect.gen(function* () {
+          const { handlers } = loaded({
+            settle: () =>
+              SettleVerdict.Refused({
+                actionable: true,
+                refusals: [new RepoBusy(), outside],
+              }),
+          });
+
+          const { ctx } = contextOf("s1");
+
+          const result = yield* fire(
+            handlers.agent_before_settle,
+            settleOf([]),
+            ctx
+          );
+
+          expect(result?.entries).toStrictEqual([
+            {
+              content: [
+                `The gate refuses this answer as it stands, so you are not done. Fix what follows, then run \`${Brand.cli} check\` before you push again:`,
+                ...explain([outside]),
+              ].join("\n"),
+              customType: `${Brand.slug}-verdict`,
+              display: true,
+              type: "custom_message",
+            },
+          ]);
+        })
+    );
+
+    it.effect("never sends back a run the person stopped or that failed", () =>
+      Effect.gen(function* () {
+        const ended: readonly AgentBeforeSettleEvent[] = [
+          { ...settleOf([]), outcome: "aborted" },
+          { ...settleOf([]), outcome: "error" },
+        ];
+
+        for (const event of ended) {
+          const { asked, handlers } = loaded({ settle: refused(true) });
+          const { ctx } = contextOf("s1");
+
+          const result = yield* fire(handlers.agent_before_settle, event, ctx);
+
+          expect({ asked, result }).toStrictEqual({
+            asked: [],
+            result: undefined,
+          });
+        }
+      })
     );
 
     it.effect(
