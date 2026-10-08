@@ -44,13 +44,14 @@ describe.each(parsers)("the env shape, read through %s", (_, layer) => {
 
   // VL §8.3 #4: an import from outside the repo is never followed, so the
   // schema that names one is refused whole.
-  it.effect.each(refused)("refuses $title", ({ file, text }) =>
+  it.effect.each(refused)("refuses $title", ({ file, reason, text }) =>
     Effect.gen(function* () {
       const parser = yield* EnvSchemaParser;
       const unreadable = yield* Effect.flip(parser.parse(file, text));
 
       expect(unreadable._tag).toBe("EnvSchemaUnreadable");
       expect(unreadable.file).toBe(file);
+      expect(unreadable.reason).toBe(reason);
     }).pipe(Effect.provide(layer))
   );
 });

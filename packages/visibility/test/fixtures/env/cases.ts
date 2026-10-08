@@ -138,6 +138,7 @@ export const fixtures: readonly EnvFixture[] = [
         },
         { decorators: [], key: "EMPTY_STRING", value: "" },
         { decorators: [], key: "UNSET" },
+        { decorators: [], key: "FN_VALUE", value: "eq(1, 1)" },
         {
           decorators: [{ name: "sensitive", value: true }],
           key: "SESSION_SECRET",
@@ -156,8 +157,9 @@ export const fixtures: readonly EnvFixture[] = [
     view: {
       imports: [],
       // required-decorators.test.ts, "@defaultRequired=infer will infer based
-      // on if a value is present": STATIC_VALUE required; EMPTY, UNDEFINED
-      // and EMPTY_STRING not; OVERRIDE_REQUIRED and OVERRIDE_OPTIONAL win.
+      // on if a value is present": STATIC_VALUE and FN_VALUE required;
+      // EMPTY, UNDEFINED and EMPTY_STRING not; OVERRIDE_REQUIRED and
+      // OVERRIDE_OPTIONAL win.
       // sensitive-decorator.test.ts, "static @defaultSensitive=false": TRUE
       // sensitive, DEFAULT not.
       items: [
@@ -177,6 +179,7 @@ export const fixtures: readonly EnvFixture[] = [
         },
         { key: "EMPTY_STRING", required: false, sensitive: false, tags: [] },
         { key: "UNSET", required: false, sensitive: false, tags: [] },
+        { key: "FN_VALUE", required: true, sensitive: false, tags: [] },
         { key: "SESSION_SECRET", required: false, sensitive: true, tags: [] },
         { key: "ADMIN_EMAIL", required: true, sensitive: false, tags: [] },
         { key: "REGION", required: false, sensitive: false, tags: [] },
@@ -438,6 +441,61 @@ export const fixtures: readonly EnvFixture[] = [
           ],
           key: "LEGACY_TOKEN",
         },
+        {
+          decorators: [
+            {
+              name: "proxy",
+              value: {
+                named: [
+                  { key: "domain", value: "api.example.invalid" },
+                  { key: "substituteIn", value: ["header:authorization"] },
+                ],
+                positional: [],
+              },
+            },
+          ],
+          key: "NARROW_TOKEN",
+        },
+        {
+          decorators: [
+            {
+              name: "proxy",
+              value: {
+                named: [
+                  { key: "domain", value: "oauth.example.invalid" },
+                  { key: "path", value: "/oauth/token" },
+                  {
+                    key: "substituteIn",
+                    value: ["header", "body:client_secret"],
+                  },
+                ],
+                positional: [],
+              },
+            },
+          ],
+          key: "CLIENT_SECRET",
+        },
+        {
+          decorators: [
+            {
+              name: "proxy",
+              value: {
+                named: [
+                  { key: "domain", value: "registry.example.invalid" },
+                  {
+                    key: "transform",
+                    value: {
+                      named: [{ key: "scheme", value: "http-basic" }],
+                      positional: [],
+                    },
+                  },
+                ],
+                positional: [],
+              },
+            },
+          ],
+          key: "REGISTRY_TOKEN",
+        },
       ],
     },
     text: proxy,
@@ -502,6 +560,33 @@ export const fixtures: readonly EnvFixture[] = [
           tags: [],
         },
         { key: "LEGACY_TOKEN", required: false, sensitive: true, tags: [] },
+        // guides/proxy/rules.mdx, "Substitution surface": varlock swaps
+        // into any header by default; the platform does the same, so a
+        // rule that allows only `header:authorization` would be widened,
+        // and one that names `header` among its targets is not.
+        {
+          key: "NARROW_TOKEN",
+          proxy: { block: true, domains: ["api.example.invalid"] },
+          required: false,
+          sensitive: true,
+          tags: [],
+        },
+        {
+          key: "CLIENT_SECRET",
+          proxy: { domains: ["oauth.example.invalid"], path: "/oauth/token" },
+          required: false,
+          sensitive: true,
+          tags: [],
+        },
+        // guides/proxy/rules.mdx, "Request transforms": the credential is
+        // computed at the wire, which the platform does not do.
+        {
+          key: "REGISTRY_TOKEN",
+          proxy: { block: true, domains: ["registry.example.invalid"] },
+          required: false,
+          sensitive: true,
+          tags: [],
+        },
       ],
     },
   },
@@ -678,6 +763,7 @@ export interface RefusedFixture {
   readonly file: RepoPath;
   readonly text: string;
   readonly parsed: ParsedEnvSchema;
+  readonly reason: string;
 }
 
 /** `API_KEY=` under a header that imports `path`, as the parser reads it. */
@@ -691,18 +777,21 @@ export const refused: readonly RefusedFixture[] = [
   {
     file: RepoPath.make("home-import/.env.schema"),
     parsed: importing("~/.env.shared"),
+    reason: "imports ~/.env.shared, outside the repo",
     text: homeImport,
     title: "an import from the home folder",
   },
   {
     file: RepoPath.make("absolute-import/.env.schema"),
     parsed: importing("/etc/datekit/.env.schema"),
+    reason: "imports /etc/datekit/.env.schema, outside the repo",
     text: absoluteImport,
     title: "an import by absolute path",
   },
   {
     file: RepoPath.make("escaping-import/.env.schema"),
     parsed: importing("../../.env.schema"),
+    reason: "imports ../../.env.schema, above the repo's root",
     text: escapingImport,
     title: "an import from above the repo's root",
   },

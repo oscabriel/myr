@@ -71,12 +71,27 @@ const textsOf = (value: ParsedValue): Option.Option<readonly string[]> => {
 };
 
 /**
+ * Whether the platform's swap, the placeholder in any request header, stays
+ * where the rule lets the value go: varlock's default (any header), or a
+ * `substituteIn` that names `header` among its targets. A rule that allows
+ * only some headers (`header:authorization`), the query or a body field
+ * would see the value land where it never allowed it.
+ */
+const swapsInsideTargets = (args: ParsedArgs): boolean =>
+  Option.match(namedArg(args, "substituteIn"), {
+    onNone: () => true,
+    onSome: (targets) =>
+      Option.exists(textsOf(targets), (each) => each.includes("header")),
+  });
+
+/**
  * One `@proxy(…)` rule: its hosts in order, and the path, method and
  * `block` that narrow it. None when it names no host as text (a host only
  * the environment decides gets no value). A rule the platform cannot honour
  * exactly is blocked rather than widened: one that waits on an `approval`,
- * carries `rules` for other paths, or has a path or method that is not
- * text.
+ * carries `rules` for other paths, computes its credential with a
+ * `transform`, keeps the value out of some headers (`substituteIn`), or has
+ * a path or method that is not text.
  */
 const ruleOf = (args: ParsedArgs): Option.Option<Proxy> =>
   Option.flatMap(Option.flatMap(namedArg(args, "domain"), textsOf), (hosts) => {
@@ -96,7 +111,9 @@ const ruleOf = (args: ParsedArgs): Option.Option<Proxy> =>
       (Option.isNone(path) || Predicate.isString(path.value)) &&
       (Option.isNone(method) || Option.isSome(methods)) &&
       Option.isNone(namedArg(args, "approval")) &&
-      Option.isNone(namedArg(args, "rules"));
+      Option.isNone(namedArg(args, "rules")) &&
+      Option.isNone(namedArg(args, "transform")) &&
+      swapsInsideTargets(args);
 
     if (Option.isSome(path) && Predicate.isString(path.value)) {
       rule.path = path.value;
