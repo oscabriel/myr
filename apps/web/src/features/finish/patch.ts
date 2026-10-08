@@ -14,18 +14,32 @@ export const PATCH_LABEL = "patch";
 /** The evidence label naming the answer's fork, the repo a finish fetches from and pushes to. */
 export const FORK_LABEL = "fork";
 
+/** A decision whose subject is a finish. */
+export type FinishDecision = Decision & {
+  readonly subject: Extract<DecisionSubject, { readonly _tag: "Finish" }>;
+};
+
+const finishes = DecisionSubject.isAnyOf(["Finish"]);
+
+/** Whether a decision is a finish: the one subject whose page shows a diff. */
+export const isFinishDecision = (
+  decision: Decision
+): decision is FinishDecision => finishes(decision.subject);
+
 /** The diff a `Finish` decision carries, if it carries one; never another subject's. */
 export const patchOf = (decision: Decision): Option.Option<string> =>
-  DecisionSubject.isAnyOf(["Finish"])(decision.subject)
+  isFinishDecision(decision)
     ? Option.map(
         Arr.findFirst(decision.evidence, ({ label }) => label === PATCH_LABEL),
         ({ value }) => value
       ).pipe(Option.filter((patch) => patch.trim().length > 0))
     : Option.none();
 
-const NEW_FILE = /^\+\+\+ (?:b\/)?(?<path>.+)$/u;
+// git ends a `---`/`+++` line with a tab when its path holds a space, and
+// `diff -u` puts its timestamp after one: the path stops at the tab.
+const NEW_FILE = /^\+\+\+ (?:b\/)?(?<path>[^\t]+)(?:\t.*)?$/u;
 
-const OLD_FILE = /^--- (?:a\/)?(?<path>.+)$/u;
+const OLD_FILE = /^--- (?:a\/)?(?<path>[^\t]+)(?:\t.*)?$/u;
 
 const RENAMED = /^rename to (?<path>.+)$/u;
 

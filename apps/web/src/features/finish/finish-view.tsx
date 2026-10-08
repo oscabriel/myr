@@ -15,7 +15,6 @@
 import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
-import type { Decision, DecisionSubject } from "@repo/protocol/domain/decision";
 import { Array as Arr, Option } from "effect";
 import { FileDiff } from "lucide-react";
 import type { ReactNode } from "react";
@@ -24,13 +23,11 @@ import { CommandLine } from "../shared/command.tsx";
 import { OutcomeView, StageStrip } from "../shared/outcome.tsx";
 import { ClientPatchDiffs } from "./client-diff.tsx";
 import { changedFiles, FORK_LABEL, patchOf } from "./patch.ts";
+import type { FinishDecision } from "./patch.ts";
 
 export { patchOf } from "./patch.ts";
 
-/** A decision whose subject is a finish. */
-export type FinishDecision = Decision & {
-  readonly subject: Extract<DecisionSubject, { readonly _tag: "Finish" }>;
-};
+export type { FinishDecision } from "./patch.ts";
 
 /** Where the answer's head lives: its fork's git URL on the platform. */
 const remoteOf = (decision: FinishDecision, platformUrl: string) =>

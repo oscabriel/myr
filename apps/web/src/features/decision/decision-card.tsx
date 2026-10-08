@@ -9,9 +9,9 @@
  * vouch). The default's word is the decision's `default` field as the
  * platform set it: the web keeps no table of defaults by subject.
  */
+import type { Decide } from "@repo/protocol/contracts";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
-import type { DecisionId, ProjectName } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
 import { FileDiff, Hourglass, ShieldCheck } from "lucide-react";
 import { useId, useState } from "react";
@@ -19,16 +19,16 @@ import type { ReactNode } from "react";
 
 import { Button } from "../../components/ui/button.tsx";
 import { Textarea } from "../../components/ui/textarea.tsx";
-import { changedFiles, PATCH_LABEL, patchOf } from "../finish/patch.ts";
+import {
+  changedFiles,
+  isFinishDecision,
+  PATCH_LABEL,
+  patchOf,
+} from "../finish/patch.ts";
 import { When } from "../shared/time.tsx";
 
-/** What a decider sends when they choose: the `decide` contract's payload. */
-export interface DecideInput {
-  readonly project: ProjectName;
-  readonly decision: DecisionId;
-  readonly choice: Choice;
-  readonly note?: string;
-}
+/** What a decider sends when they choose: the `decide` contract's payload, from its one schema. */
+export type DecideInput = typeof Decide.payloadSchema.Type;
 
 const yesOrNo: readonly Choice[] = ["accept", "decline"];
 
@@ -51,8 +51,6 @@ export const allowedChoices = DecisionSubject.match({
 });
 
 const short = (sha: string) => sha.slice(0, 7);
-
-const isFinish = DecisionSubject.isAnyOf(["Finish"]);
 
 /** A ref as people say it: `main` for `refs/heads/main`. */
 const refWords = (ref: string) => ref.replace(/^refs\/heads\//u, "");
@@ -249,7 +247,7 @@ export const DecisionCard = ({
 
       <Evidence decision={decision} />
 
-      {isFinish(decision.subject) && !standalone ? (
+      {isFinishDecision(decision) && !standalone ? (
         <FinishLink decision={decision} />
       ) : null}
 

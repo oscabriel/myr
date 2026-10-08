@@ -189,13 +189,15 @@ describe(FinishView, () => {
       />
     );
 
-    const markup = markupOf(element);
+    // Each file's view, by the name it carries: the region around one
+    // `<diffs-container>`.
+    const views = [
+      ...markupOf(element).matchAll(
+        /<section aria-label="(?<file>[^"]+)"><diffs-container\b/gu
+      ),
+    ].map((view) => view.groups?.file);
 
-    expect(markup.match(/<diffs-container\b/gu)).toHaveLength(FILES.length);
-
-    for (const file of FILES) {
-      expect(textOf(element)).toContain(file);
-    }
+    expect(views).toStrictEqual(FILES);
   });
 
   it("names the changed files on the server and leaves the drawing to the browser", () => {
@@ -284,5 +286,31 @@ describe(patchOf, () => {
 describe(changedFiles, () => {
   it("lists each file a diff changes, by where it ends up, or where it was when deleted", () => {
     expect(changedFiles(PATCH)).toStrictEqual(FILES);
+  });
+
+  it("names a path with a space without the tab git ends its file lines with", () => {
+    // git ends `---`/`+++` with a tab when the path holds a space.
+    const spaced = [
+      "diff --git a/docs/read me.md b/docs/read me.md",
+      "index 1111111..2222222 100644",
+      "--- a/docs/read me.md\t",
+      "+++ b/docs/read me.md\t",
+      "@@ -1 +1 @@",
+      "-Old.",
+      "+New.",
+      "diff --git a/old notes.md b/old notes.md",
+      "deleted file mode 100644",
+      "index 3333333..0000000",
+      "--- a/old notes.md\t",
+      "+++ /dev/null",
+      "@@ -1 +0,0 @@",
+      "-Gone.",
+      "",
+    ].join("\n");
+
+    expect(changedFiles(spaced)).toStrictEqual([
+      "docs/read me.md",
+      "old notes.md",
+    ]);
   });
 });

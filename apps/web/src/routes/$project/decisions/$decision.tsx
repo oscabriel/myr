@@ -1,7 +1,6 @@
 import { useAtom, useAtomValue } from "@effect/atom-react";
 import { Brand } from "@repo/brand";
-import { DecisionSubject } from "@repo/protocol/domain/decision";
-import type { Decision, Today } from "@repo/protocol/domain/decision";
+import type { Today } from "@repo/protocol/domain/decision";
 import { DecisionId, ProjectName } from "@repo/protocol/ids";
 import { createFileRoute, getRouteApi } from "@tanstack/react-router";
 import { DateTime, Option, Schema } from "effect";
@@ -16,7 +15,8 @@ import { todayAtom } from "../../../client/today.ts";
 import { DecisionCard } from "../../../features/decision/decision-card.tsx";
 import type { DecideInput } from "../../../features/decision/decision-card.tsx";
 import { FinishView } from "../../../features/finish/finish-view.tsx";
-import type { FinishDecision } from "../../../features/finish/finish-view.tsx";
+import { isFinishDecision } from "../../../features/finish/patch.ts";
+import type { FinishDecision } from "../../../features/finish/patch.ts";
 import { EmptyState } from "../../../features/shared/empty.tsx";
 import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
 import {
@@ -37,9 +37,6 @@ const root = getRouteApi("__root__");
 const projectOf = Schema.decodeUnknownOption(ProjectName);
 
 const decisionOf = Schema.decodeUnknownOption(DecisionId);
-
-const isFinish = (decision: Decision): decision is FinishDecision =>
-  DecisionSubject.isAnyOf(["Finish"])(decision.subject);
 
 /** The ask and verdict a finish shows beside its diff, as they arrive. */
 const Finish = ({ decision }: { readonly decision: FinishDecision }) => {
@@ -106,7 +103,7 @@ const Found = ({
       soon={soon}
       standalone
     >
-      {isFinish(decision) ? <Finish decision={decision} /> : undefined}
+      {isFinishDecision(decision) ? <Finish decision={decision} /> : undefined}
     </DecisionCard>
   );
 };

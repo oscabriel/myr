@@ -13,16 +13,18 @@
  * holds no other client module; the same `ContractsClient.query` atoms
  * serve any other page that asks for them with the same keys).
  */
+import type { Decide } from "@repo/protocol/contracts";
 import type { AskId, CommitSha, ProjectName } from "@repo/protocol/ids";
 import { Effect } from "effect";
 import { Reactivity } from "effect/reactivity";
 
-import type { DecideInput } from "../features/decision/decision-card.tsx";
 import { ContractsClient } from "../surfaces.ts";
 import { keys } from "./keys.ts";
 
 /** Take one decision: `{ project, decision, choice, note? }`, answered with the decision as it now stands. */
-export const decideAtom = ContractsClient.runtime.fn<DecideInput>()(
+export const decideAtom = ContractsClient.runtime.fn<
+  typeof Decide.payloadSchema.Type
+>()(
   Effect.fnUntraced(function* (input) {
     const client = yield* ContractsClient;
 

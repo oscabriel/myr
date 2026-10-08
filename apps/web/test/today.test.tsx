@@ -27,7 +27,10 @@ import { AsyncResult } from "effect/reactivity";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { allowedChoices } from "../src/features/decision/decision-card.tsx";
+import {
+  allowedChoices,
+  describeSubject,
+} from "../src/features/decision/decision-card.tsx";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
 import {
   orderDecisions,
@@ -211,6 +214,16 @@ describe(TodayView, () => {
     expect(text).toContain("If nobody decides by Thu 8 Oct, 10:00 UTC: adopt");
   });
 
+  it("says what each decision is about in plain words", () => {
+    const text = textOf(page);
+
+    expect(text).toContain(
+      "main moved without a landing, from aaaaaaa to bbbbbbb"
+    );
+    expect(text).toContain("Vouch for lin-h, so they may claim asks");
+    expect(text).toContain("Open the ask proposed in prop-000004");
+  });
+
   it("says how many more wait for tomorrow", () => {
     expect(textOf(page)).toContain("4 more wait for tomorrow");
   });
@@ -279,38 +292,38 @@ describe(orderDecisions, () => {
   });
 });
 
+const ask = AskId.make("parse-iso");
+
+const subjects = [
+  stray.subject,
+  vouch.subject,
+  proposal.subject,
+  DecisionSubject.cases.Finish.make({ ask, head: sha("e") }),
+  DecisionSubject.cases.RaiseRatchet.make({
+    after: 3,
+    ask,
+    before: 2,
+    ratchet: RatchetName.make("no-explicit-any"),
+    territory: "packages/format",
+  }),
+  DecisionSubject.cases.Waiver.make({
+    ask,
+    at: { line: 12, path: RepoPath.make("src/parse.test.ts") },
+    marker: ".skip(",
+    reason: "flaky on leap days",
+  }),
+  DecisionSubject.cases.PostureChange.make({ from: "open", to: "openCore" }),
+  DecisionSubject.cases.SecretInTree.make({
+    ask,
+    item: EnvKey.make("SENTRY_DSN"),
+  }),
+  DecisionSubject.cases.ProxyWidened.make({
+    hosts: [],
+    item: EnvKey.make("SENTRY_DSN"),
+  }),
+];
+
 describe(allowedChoices, () => {
-  const ask = AskId.make("parse-iso");
-
-  const subjects = [
-    stray.subject,
-    vouch.subject,
-    proposal.subject,
-    DecisionSubject.cases.Finish.make({ ask, head: sha("e") }),
-    DecisionSubject.cases.RaiseRatchet.make({
-      after: 3,
-      ask,
-      before: 2,
-      ratchet: RatchetName.make("no-explicit-any"),
-      territory: "packages/format",
-    }),
-    DecisionSubject.cases.Waiver.make({
-      ask,
-      at: { line: 12, path: RepoPath.make("src/parse.test.ts") },
-      marker: ".skip(",
-      reason: "flaky on leap days",
-    }),
-    DecisionSubject.cases.PostureChange.make({ from: "open", to: "openCore" }),
-    DecisionSubject.cases.SecretInTree.make({
-      ask,
-      item: EnvKey.make("SENTRY_DSN"),
-    }),
-    DecisionSubject.cases.ProxyWidened.make({
-      hosts: [],
-      item: EnvKey.make("SENTRY_DSN"),
-    }),
-  ];
-
   it("lets a stray push be adopted or reverted, and anything else accepted or declined", () => {
     expect(
       subjects.map((subject) => [subject._tag, allowedChoices(subject)])
@@ -324,6 +337,22 @@ describe(allowedChoices, () => {
       ["PostureChange", ["accept", "decline"]],
       ["SecretInTree", ["accept", "decline"]],
       ["ProxyWidened", ["accept", "decline"]],
+    ]);
+  });
+});
+
+describe(describeSubject, () => {
+  it("says each subject in one plain sentence, in the glossary's words", () => {
+    expect(subjects.map(describeSubject)).toStrictEqual([
+      "main moved without a landing, from aaaaaaa to bbbbbbb",
+      "Vouch for lin-h, so they may claim asks",
+      "Open the ask proposed in prop-000004",
+      "Finish the passing answer to parse-iso, at eeeeeee",
+      "Raise the no-explicit-any ratchet in packages/format from 2 to 3, for the answer to parse-iso",
+      "Allow .skip( at src/parse.test.ts:12 in the answer to parse-iso: flaky on leap days",
+      "Change the project's posture from open to openCore",
+      "A stored value of SENTRY_DSN turned up in the answer to parse-iso, which is held aside",
+      "Let SENTRY_DSN be sent to more hosts through the platform's proxy",
     ]);
   });
 });
