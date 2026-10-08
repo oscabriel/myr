@@ -21,7 +21,7 @@ import { Harness } from "./results.ts";
 export const Contributor = Schema.Struct({
   /** True only for the pi agent that loads the CLI's pi adapter (`-e`). */
   adapter: Schema.Boolean,
-  /** A fictional person: a key of the stage's `SESSION_TOKENS` (human step H5 on demo). */
+  /** A fictional person: a key of the stage's `SESSION_TOKENS` (`infra/stages.md`, "Secrets"). */
   handle: Handle,
   harness: Harness,
   /**

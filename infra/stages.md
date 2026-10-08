@@ -2,23 +2,24 @@
 
 A stage is one full copy of the platform on Cloudflare: its own Workers, Workflows, Artifacts namespaces (public and private), database, KV namespace and buckets. `infra/stages.ts` is the one table of stage names and resource names. Every other file, both `wrangler.jsonc` files included, matches it, and `packages/config/test/bootstrap.test.ts` checks that they do.
 
-This file has six parts, then how to run a stage:
+This file has five parts, then how to run a stage, and it ends with what is left for a person to do:
 
 1. [Stages](#1-stages)
 2. [Resources per stage](#2-resources-per-stage)
 3. [Throwaway ledger summary](#3-throwaway-ledger-summary)
 4. [Teardown policy](#4-teardown-policy)
-5. [Human steps status](#5-human-steps-status)
-6. [URLs](#6-urls)
+5. [URLs](#5-urls)
+6. [Running a stage](#running-a-stage)
+7. [Human steps: status and next action](#human-steps-status-and-next-action)
 
-Sections 1 to 6 hold the state as of 2026-10-08, 18:00 UTC, read from the account with read-only calls.
+Sections 1 to 5 hold the state as of 2026-10-08, 18:00 UTC, read from the account with read-only calls; the demo stage and the teardown plan were read again at 18:15 UTC and had not changed. The human steps at the end hold their status as of 2026-10-08, 18:30 UTC.
 
 ## 1. Stages
 
 | Stage | What it is for | State on 2026-10-08 |
 | --- | --- | --- |
 | `dev-oscabriel` | One person's iteration. Deploy it as often as you like. | Bootstrapped 2026-10-07 and deployed (platform, sandbox, web). Re-checked 2026-10-08: bootstrap created nothing, and the platform holds every required secret. The feature-frozen build was deployed at 14:51 UTC on 2026-10-08, and the whole core loop (`bun scripts/smoke.ts --stage dev-oscabriel --loop`) passed on it twice in a row. |
-| `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). | Bootstrapped 2026-10-08: six resources created, migrations `0001` to `0004` applied, and a second run created nothing. Its secrets are set. Deployed at 15:39 UTC on 2026-10-08 (the build the dev stage proved), and smoke passed. Seeded at 15:44 UTC with `datekit` (its maintainers layer and both sealed suites admitted) and `burrow` (the `drop-legacy-fetch` family), nothing claimed. Each later deploy is listed, with its reason, in [Deploys of demo](#deploys-of-demo). |
+| `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). | Bootstrapped 2026-10-08: six resources created, migrations `0001` to `0004` applied, and a second run created nothing. Its secrets are set. Deployed at 15:39 UTC on 2026-10-08 (the build the dev stage proved), and smoke passed. Seeded at 15:44 UTC with `datekit` (its maintainers layer and both sealed suites admitted) and `burrow` (the `drop-legacy-fetch` family), nothing claimed. The rehearsal (17:08 to 17:39 UTC) only read it, apart from ines-v's `env set SENTRY_AUTH_TOKEN` with a made-up value, which stays set for the take. At 18:13 UTC smoke passed 7 of 7, the deployed web's Playwright check passed 5 of 5, and burrow's six `drop-legacy-fetch-burrow-*` children were open and unclaimed. Each later deploy is listed, with its reason, in [Deploys of demo](#deploys-of-demo). |
 
 There is no `prod` stage before the deadline. The top level of each `wrangler.jsonc` is stage `local`, for tests and `wrangler dev`, and it is never deployed. A new person's stage is added to `stages` in `stages.ts` and gets an `env` block in each `wrangler.jsonc`, in the same change.
 
@@ -149,26 +150,7 @@ Kept, and why:
 - **Finished `Answer` Workflow instances** on `platform-dev-oscabriel`. They are records, not resources.
 - **Any `--as` copy the user still wants.** Add `--keep <project>` to the script's two teardown lines.
 
-## 5. Human steps status
-
-As of 2026-10-08, after the demo's bootstrap. "Agent" is the build's agent.
-
-| Step | Status | What the agent prepared | What the user does next |
-| --- | --- | --- | --- |
-| H1: a custom domain | Not done, and optional. The stages live on workers.dev. | Nothing needs it. | If wanted, buy the domain and say so. The agent then adds `routes` to each `wrangler.jsonc` and redeploys `demo`. |
-| H2: the npm org and publishing the CLI | Open. | `bun run release -- --build` stages the npm package in `apps/cli/release/npm/`. `--publish` runs every other step and prints the publish command. | Create the npm org, run `npm login`, then `npm publish apps/cli/release/npm --access public` in your own terminal. |
-| H3: the GitHub org and the public repo | Open, due before submission (Oct 14). | Every commit is on local `main`. No remote exists and nothing has been pushed. | Create the org and an empty public repo, then `git remote add origin …` and push. Before that, rotate the generated secrets (the H5 row). |
-| H4: a Google OAuth client | Not done, and optional. Sign-in works with platform accounts (a handle and a password). | The redirect URIs are in [section 6](#6-urls). Migrations `0003_identities.sql` and later are applied on both stages. | Only if Google sign-in is wanted: create a Web client with the stage's redirect URI, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` together, then redeploy. |
-| H5: secret values | Done by the agent on both stages, under a recorded decision that extends generated secrets to `demo` (see [Secrets](#secrets)). Not blocking. | Five values per stage, generated and kept only in that stage's secrets file outside the repo (mode 600), never printed or committed. `SESSION_TOKENS` on `demo` holds bram, ines-v, okafor, okonkwo, lin-h and the swarm's six (wren, tamsin, ivo, marisol, dagny, pell). | **Rotate both stages' generated secrets before the repo goes public**, and keep a copy of each stage's `MASTER_KEY` somewhere other than this machine. Rotating `PASSWORD_PEPPER` breaks every stored password, rotating `MASTER_KEY` loses every stored env value unless they are re-wrapped first, and rotating `SESSION_TOKENS` means each CLI profile logs in again. |
-| H6: Workers Paid | Confirmed. | The account's subscriptions, read again on 2026-10-08, list `workers_paid` as Paid. The sandbox (containers) and both Workflows have run on `dev-oscabriel` since 2026-10-07. | Nothing. |
-| H7: the recording | Open (Oct 13). | `docs/demo/` holds the script, the shot list and the rehearsal checklist. The demo stage is deployed and seeded (2026-10-08, 15:44 UTC), with nothing claimed; the rehearsal comes next. The recording lock exists: while `infra/.recording` is there, `infra/deploy.ts` refuses every deploy. | Run `bun infra/recording.ts on` before the first take and `bun infra/recording.ts off` after the last (the rehearsal checklist says when). |
-| H8: submitting | Open, due Oct 14 by noon PDT. | The demo URL is `https://web-demo.oscargabriel.workers.dev` (section 6). | Submit the repo URL, the video and the demo URL. |
-| H9: `docker login` | Not needed so far. No image pull has been rate-limited. | Nothing. | Only if a deploy's image pull is rate-limited: run `docker login` in your own terminal. |
-| ChatGPT usage for the swarm's tamsin | Not blocking: the fallback was taken on 2026-10-08. | OpenCode's ChatGPT sign-in hit its usage limit during the swarm's live rehearsal, and Codex says it is back on Oct 16, after the deadline. The roster now runs tamsin on `opencode-go/gpt-6-luna` (OpenCode Go, signed in). | Nothing. To show `openai/gpt-5.5` in the take instead, raise the ChatGPT plan's limit (a purchase, yours to make) and swap the roster's one line back. |
-| OpenCode Zen key for the swarm's pell | Not blocking: the fallback was taken on 2026-10-08. | pi here still has no OpenCode Zen key, so the roster now runs pell on `opencode-go/qwen3.8-flash`, as it ran in the swarm's live rehearsal on `dev-oscabriel`. | Nothing. To show Gemini flash in the take instead, add OpenCode Zen's key to pi and swap the roster's one line back. |
-| Deleting the throwaways | Open: the script is ready, and nothing is deleted yet (section 4, [The teardown record](#the-teardown-record)). | `bun infra/teardown.ts` printed the plan (52 repos on `dev-oscabriel`), and the user's script runs it with `--apply`. The script also removes the pre-ledger leftovers that still exist and skips any that are already gone. | After the last take and before Oct 14, read the teardown script and run it in your own terminal. Then commit `infra/created.jsonl`, which now carries a `deleted` line for each repo removed. |
-
-## 6. URLs
+## 5. URLs
 
 The account's workers.dev subdomain is in `infra/workers-dev.json`. The demo's rows are filled in when it is deployed.
 
@@ -191,7 +173,7 @@ The account's workers.dev subdomain is in `infra/workers-dev.json`. The demo's r
 
 1. **Log Wrangler in**, once per machine: `apps/platform/node_modules/.bin/wrangler login`. Deploys and the D1, KV and R2 creates use this login, never the infra token. Once the login is stale, `wrangler d1 list` fails with `Authentication error [code: 10000]`, and `wrangler whoami` refreshes it.
 2. **Set the infra credentials**, `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, as `infra/.env.schema` describes. The token uses the "Read all resources" template plus Account › Artifacts › Edit. `bun run bootstrap` and `bun run ops` get them through `varlock run --path infra/`. To check they are set without seeing them, run `bun run env:check`.
-3. **Confirm the plan**: Containers and Workflows need Workers Paid (H6, confirmed on this account in section 5).
+3. **Confirm the plan**: Containers and Workflows need Workers Paid (H6, confirmed on this account: see [the human steps](#human-steps-status-and-next-action)).
 
 ### Bootstrap a stage
 
@@ -226,7 +208,7 @@ It never deletes anything and never prints or reads a secret's value.
 
 To set them for a stage, do one of these:
 
-- **A generated secrets file (both stages).** Keep a dotenv file for the stage outside the repo with mode 600, holding crypto-random values (32 bytes in base64url each, and `MASTER_KEY` as 64 hex characters). Deploy with `STAGE_SECRETS_FILE=<that file> bun run deploy -- --stage <s>`. The platform's deploy step gets only the names `.env.schema` declares, as its environment, and that environment overrides any `.env` value. Nothing prints them. `dev-oscabriel` has used one since its first deploy. `demo` has had one since 2026-10-08, by a recorded decision made under the user's blanket approval, and the same values were set on `platform-demo` with `wrangler secret put` before its first deploy. Both stages' values were generated by the build's agent, so rotate them before the repo goes public (section 5).
+- **A generated secrets file (both stages).** Keep a dotenv file for the stage outside the repo with mode 600, holding crypto-random values (32 bytes in base64url each, and `MASTER_KEY` as 64 hex characters). Deploy with `STAGE_SECRETS_FILE=<that file> bun run deploy -- --stage <s>`. The platform's deploy step gets only the names `.env.schema` declares, as its environment, and that environment overrides any `.env` value. Nothing prints them. `dev-oscabriel` has used one since its first deploy. `demo` has had one since 2026-10-08, by a recorded decision made under the user's blanket approval, and the same values were set on `platform-demo` with `wrangler secret put` before its first deploy. Both stages' values were generated by the build's agent, so rotate them before the repo goes public (H5 in [the human steps](#human-steps-status-and-next-action)).
 - **varlock (H5).** Write `NAME=varlock(prompt)` for each one into `apps/platform/.env.local`, run `./node_modules/.bin/varlock load --path apps/platform/` in your own terminal, then deploy. `varlock-wrangler` hands the values to the Worker.
 - **By hand**, one at a time: `apps/platform/node_modules/.bin/wrangler secret put <NAME> --env <s>` in `apps/platform`, with the value on stdin. On a stage whose platform isn't deployed yet, this makes `platform-<s>` as an empty placeholder Worker that the first deploy replaces. A deploy still needs the values through one of the two ways above, since varlock-wrangler resolves every required name.
 
@@ -292,3 +274,22 @@ None of this is automated, and it is the user's alone (section 4): no script del
 4. The KV namespace: `wrangler kv namespace delete --namespace-id <id>`. The id is in the stage's block of `apps/platform/wrangler.jsonc`.
 5. The buckets: empty `evidence-<s>` and `releases-<s>`, then run `wrangler r2 bucket delete evidence-<s>` and `wrangler r2 bucket delete releases-<s>`.
 6. Put the stage's placeholder ids back in `apps/platform/wrangler.jsonc`.
+
+## Human steps: status and next action
+
+Only a person can take these steps. No agent buys or registers anything, pushes, adds a git remote, publishes to npm, reads the closed env files or deletes a Cloudflare resource. The status is as of 2026-10-08, 18:30 UTC. "Agent" means the build's agent.
+
+| Step | Status | What the agent prepared | Your exact next action |
+| --- | --- | --- | --- |
+| H1: a custom domain | Not done, and optional. Both stages live on workers.dev. | Nothing needs it. | Only if you want one: buy the domain, which is a purchase and yours to make, then ask the agent. It adds `routes` to each `wrangler.jsonc` and deploys `demo` outside a take, with the reason in [Deploys of demo](#deploys-of-demo). |
+| H2: the npm org, and publishing the CLI | Open, and optional for the submission: both stages already serve the CLI from their own install line ([section 5](#5-urls)). | `bun run release -- --build` stages the package `@myr/cli` in `apps/cli/release/npm/`. Under an agent, `--publish` checks the staged package and prints the command without running it. Known before publishing: `--version` prints `0.0.0` in the built CLI, and the npm build cannot evaluate a TypeScript config folder on its own. | Create the npm org `myr` and run `npm login`. Then, from the repo root in your own terminal (not inside an agent session), run `bun run release -- --build --publish --version 0.1.0`. |
+| H3: the GitHub org and the public repo | Open, due before submission (Oct 14). | Every commit is on local `main`. No remote exists and nothing has been pushed. `bun run verify` passes on the last commit. | Rotate the generated secrets first (H5). Create the org `getmyr` and an empty public repo `getmyr/myr`, then run `git remote add origin https://github.com/getmyr/myr.git` and `git push -u origin main`. |
+| H4: a Google OAuth client | Not done, and optional. Sign-in works with platform accounts (a handle and a password). | Migrations `0003_identities.sql` and later are applied on both stages. Each deploy printed its redirect URI: `https://platform-demo.oscargabriel.workers.dev/oauth/google/callback` and `https://platform-dev-oscabriel.oscargabriel.workers.dev/oauth/google/callback`. | Only if you want "Continue with Google": create a Web client in the Google Cloud console with the stage's redirect URI above, exactly as printed. Add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` together to the stage's secrets ([Secrets](#secrets)), then deploy the stage outside a take. |
+| H5: secret values | Done by the agent on both stages, under a recorded decision that extends generated secrets to `demo` ([Secrets](#secrets)). No secret is missing. `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are optional and come only with H4. | Five values per stage (`OPERATOR_TOKEN`, `SESSION_TOKENS`, `COOKIE_KEY`, `PASSWORD_PEPPER`, `MASTER_KEY`). Each was generated and is kept only in that stage's secrets file, outside the repo with mode 600, and was never printed or committed. `SESSION_TOKENS` on `demo` holds bram, ines-v, okafor, okonkwo, lin-h and the swarm's six (wren, tamsin, ivo, marisol, dagny, pell). | **After the last take and before the repo goes public (H3), rotate both stages' generated secrets.** Write new values into each stage's secrets file, then run `STAGE_SECRETS_FILE=<that file> bun run deploy -- --stage <s>`, outside a take. Keep a copy of each `MASTER_KEY` off this machine. Rotating `PASSWORD_PEPPER` breaks every stored password, and rotating `MASTER_KEY` loses every stored env value, so set demo's `SENTRY_AUTH_TOKEN` again with `env set`. Rotating `SESSION_TOKENS` means each CLI profile logs in again. |
+| H6: Workers Paid | Confirmed. | The account's subscriptions, read again on 2026-10-08, list `workers_paid` and `r2_paid` as Paid. Containers and both Workflows run on both stages. | Nothing. |
+| H7: the recording | Open. `demo` is deployed, seeded and smoke-clean, with nothing claimed, and every shot was walked once on 2026-10-08. | `docs/demo/` holds the script, the shot list and the rehearsal checklist, with each failed shot's fallback. While `infra/.recording` exists, `infra/deploy.ts` refuses every deploy and teardown's `--apply` refuses to run. | Walk the pre-flight in `docs/demo/rehearsal.md` on the morning of the take. Run `bun infra/recording.ts on` before the first take and `bun infra/recording.ts off` after the last. Any fix you want shown first (for example datekit's "Open" badge on the front page, or a seeded person signing in on the web) is a code change and a `demo` deploy, which must happen before you turn the lock on. |
+| H8: submitting | Open, due Oct 14 by noon PDT (the form closes at 11:59 PM PDT). | The demo URL is `https://web-demo.oscargabriel.workers.dev` ([section 5](#5-urls)). | Submit the form with the repo URL (after H3), the video (H7) and the demo URL. Optionally, reply once to @zeke's call for entries. |
+| H9: `docker login` | Not needed so far. No image pull has been rate-limited on either stage. | Nothing. | Only if a deploy's image pull is rate-limited, run `docker login` in your own terminal and deploy again. |
+| Deleting the throwaways | Open. The script is ready, and nothing is deleted yet ([The teardown record](#the-teardown-record)). | `bun infra/teardown.ts` printed its plan (52 repos on `dev-oscabriel`, the same at 18:15 UTC). The user's teardown script runs it with `--apply`, then removes the leftovers from before the ledger that still exist, and skips any that are gone. | After the last take and before Oct 14, read the teardown script the build left for you and run it in your own terminal. Then commit `infra/created.jsonl`, which by then holds a `deleted` line for each repo removed. |
+| ChatGPT usage for the swarm's tamsin | Not blocking. The fallback was taken on 2026-10-08. | OpenCode's ChatGPT sign-in hit its usage limit during the swarm's rehearsal, and it resets on Oct 16, after the deadline. The roster runs tamsin on `opencode-go/gpt-6-luna` (OpenCode Go). | Nothing. To show `openai/gpt-5.5` in the take instead, raise the ChatGPT plan's limit (a purchase, yours) and change tamsin's line in `scripts/lib/swarm/roster.ts` back. Before the take, check OpenCode Go's and Amp's usage headroom: a six-agent run used about 3.2M input tokens on OpenCode Go. |
+| OpenCode Zen key for the swarm's pell | Not blocking. The fallback was taken on 2026-10-08. | pi here has no OpenCode Zen key, so the roster runs pell on `opencode-go/qwen3.8-flash`, as in the swarm's rehearsal. | Nothing. To show Gemini flash in the take instead, add OpenCode Zen's key to pi and change pell's line in `scripts/lib/swarm/roster.ts` back. |
