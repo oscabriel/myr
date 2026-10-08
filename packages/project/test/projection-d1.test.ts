@@ -1,8 +1,8 @@
 /**
  * The front page's D1 projection over sqlite-node, with the platform's D1
- * migration applied from its file: projects' outbox rows go in through
- * `ProjectionD1`, and `FrontPageD1` reads every open ask back out, as the
- * anonymous viewer may take it.
+ * migrations for it applied from their files: projects' outbox rows go in
+ * through `ProjectionD1`, and `FrontPageD1` reads every open ask back out,
+ * as the anonymous viewer may take it.
  */
 import { NodeServices } from "@effect/platform-node";
 import { SqliteClient } from "@effect/sql-sqlite-node";
@@ -29,29 +29,33 @@ import { ProjectionD1 } from "../src/projection-d1/projection.ts";
 import { FrontPageDdl } from "../src/projection-d1/tables.ts";
 import { Projection, ProjectionFailed } from "../src/projection.ts";
 
-/** The migration the platform's D1 database applies, as its file holds it. */
-const migration = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
+/** A migration the platform's D1 database applies, as its file holds it. */
+const migration = (file: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
 
-  return yield* fs.readFileString(
-    yield* path.fromFileUrl(
-      new URL(
-        "../../../apps/platform/migrations/0001_front_page.sql",
-        import.meta.url
+    return yield* fs.readFileString(
+      yield* path.fromFileUrl(
+        new URL(`../../../apps/platform/migrations/${file}`, import.meta.url)
       )
-    )
-  );
-}).pipe(Effect.provide(NodeServices.layer));
+    );
+  }).pipe(Effect.provide(NodeServices.layer));
 
-/** A fresh in-memory database each time, with the migration file applied. */
+/**
+ * A fresh in-memory database each time, with the projection's migration
+ * files applied in order: the front page's, then the project list's and
+ * the credits'.
+ */
 const database = Layer.effectDiscard(
   Effect.gen(function* () {
     const sql = yield* SqlClient;
 
-    for (const statement of (yield* migration).split(";")) {
-      if (statement.trim().length > 0) {
-        yield* sql.unsafe(statement);
+    for (const file of ["0001_front_page.sql", "0004_projects_credits.sql"]) {
+      for (const statement of (yield* migration(file)).split(";")) {
+        if (statement.trim().length > 0) {
+          yield* sql.unsafe(statement);
+        }
       }
     }
   })
@@ -404,13 +408,13 @@ describe("the front page's D1 projection", () => {
 
   it.effect("reads the migration the platform's D1 applies", () =>
     Effect.gen(function* () {
-      expect(yield* migration).toBe(FrontPageDdl);
+      expect(yield* migration("0001_front_page.sql")).toBe(FrontPageDdl);
     })
   );
 
-  // Until W5 514's projects table, the projects are those the projection
-  // has applied events of, so a call without a project (`status`, `today`)
-  // reaches each of them.
+  // A call without a project (`status`, `today`) reaches each project the
+  // projection lists, so it lists every project it has applied events of,
+  // even one with no ask open.
   it.effect(
     "lists every project it has heard from, with its open asks, and reads no credits",
     () =>
