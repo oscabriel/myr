@@ -14,10 +14,11 @@
  *   through `serverClient` (`src/server/client.ts`), never through atoms.
  *
  * The atoms run in the browser, against the same-origin `/rpc`, which
- * `#backend` carries to the platform.
+ * `#backend` carries to the platform. A stream the page follows as it
+ * happens (`watch`) goes over the framed `/rpc` instead (`framedClient`).
  */
 import { surfaced } from "@repo/protocol/contracts";
-import { Layer } from "effect";
+import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { AtomRpc } from "effect/reactivity";
 import { RpcClient, RpcSerialization } from "effect/rpc";
@@ -36,3 +37,16 @@ export class ContractsClient extends AtomRpc.Service<ContractsClient>()(
     ),
   }
 ) {}
+
+/**
+ * The web's contracts over the framed `/rpc` (NDJSON), which the platform
+ * answers message by message, so a stream stays open for as long as the
+ * page reads it: how a page follows `watch` (`client/watch.ts`, issue 510).
+ */
+export const framedClient = RpcClient.make(webContracts).pipe(
+  Effect.provide(
+    RpcClient.layerProtocolHttp({ url: "/rpc" }).pipe(
+      Layer.provide([FetchHttpClient.layer, RpcSerialization.layerNdjson])
+    )
+  )
+);
