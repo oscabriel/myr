@@ -8,15 +8,21 @@
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { AskId, ProjectName } from "@repo/protocol/ids";
 import type { Refusal } from "@repo/protocol/refusal";
-import { Array, Order, Result, Schema } from "effect";
+import { Array, Option, Order, Result, Schema } from "effect";
 
-import { Contributor } from "./roster.ts";
-import { ScenarioName } from "./scenario.ts";
+import { Contributor, roster } from "./roster.ts";
+import { nudges, ScenarioName } from "./scenario.ts";
 
 /** One contributor's ask, and the territory (module) it may change. */
 export const Assignment = Schema.Struct({
   ask: AskId,
   contributor: Contributor,
+  /**
+   * What the run's scenario adds to this contributor's brief. The plan
+   * carries it, so the table and `--json` both show it: staging is never
+   * hidden.
+   */
+  nudge: Schema.optionalKey(Schema.NonEmptyString),
   territory: Schema.NonEmptyString,
 });
 
@@ -72,12 +78,30 @@ const overlaps = (one: string, other: string) =>
   one === other || one === WHOLE_REPO || other === WHOLE_REPO;
 
 /**
+ * The nudge `scenario` gives `contributor`, by their place in the whole
+ * roster, so a contributor planned alone (`--only`) is told what the full
+ * run would tell them.
+ */
+const nudgeFor = (scenario: ScenarioName, contributor: Contributor) =>
+  Option.match(
+    nudges(
+      scenario,
+      roster.findIndex(({ handle }) => handle === contributor.handle)
+    ),
+    {
+      onNone: () => ({}),
+      onSome: (nudge) => ({ nudge }),
+    }
+  );
+
+/**
  * Plans a run: each contributor in `roster`, in roster order, gets one open,
  * unclaimed and unblocked ask, taken in `AskId` order, whose territory
- * overlaps no ask already handed out. An ask is blocked while any ask it
- * waits on is still listed (`listAsks` lists every ask not closed); blocked
- * asks are held. With fewer asks to hand out than contributors, the plan
- * fails `NotEnoughAsks`, counting the asks it could hand out.
+ * overlaps no ask already handed out, and the nudge the scenario gives them.
+ * An ask is blocked while any ask it waits on is still listed (`listAsks`
+ * lists every ask not closed); blocked asks are held. With fewer asks to
+ * hand out than contributors, the plan fails `NotEnoughAsks`, counting the
+ * asks it could hand out.
  */
 export const planSwarm = (input: {
   readonly roster: readonly Contributor[];
@@ -119,7 +143,12 @@ export const planSwarm = (input: {
     assignments: Array.zipWith(
       input.roster,
       disjoint,
-      (contributor, { ask, territory }) => ({ ask, contributor, territory })
+      (contributor, { ask, territory }) => ({
+        ask,
+        contributor,
+        territory,
+        ...nudgeFor(input.scenario, contributor),
+      })
     ),
     held: held.map(({ ask }) => ask),
     project: input.project,

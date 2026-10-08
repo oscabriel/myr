@@ -10,6 +10,7 @@ import { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { ClaimView } from "@repo/protocol/domain/claim";
 import { Envelope } from "@repo/protocol/envelope";
 import { AskId, KindName, ProjectName } from "@repo/protocol/ids";
+import { AskFull } from "@repo/protocol/refusal";
 import {
   Array,
   ConfigProvider,
@@ -52,6 +53,9 @@ import { repoRoot } from "./root.ts";
 const burrow = ProjectName.make("burrow");
 
 const ListedAsks = Envelope(Schema.Struct({ asks: Schema.Array(AskListing) }));
+
+/** What `<cli> claim <ask> --json` prints. */
+const Claimed = Envelope(Schema.Struct({ claim: ClaimView }));
 
 /** What `<cli> ask <ask> --json` prints, when it shows the ask. */
 const ShownAsk = Schema.Struct({
@@ -174,6 +178,54 @@ describe("the plan", () => {
             yield* Schema.encodeEffect(SwarmPlan)(first)
           )
         ).toStrictEqual(first);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.effect(
+    "carries the video scenario's nudges in the plan, by each contributor's place in the roster even when planned alone",
+    () =>
+      Effect.gen(function* () {
+        const asks = yield* burrowAsks;
+
+        const nudged = (people: readonly Contributor[]) =>
+          Result.getOrThrow(
+            planSwarm({
+              asks,
+              project: burrow,
+              roster: people,
+              scenario: "video",
+              stage: "dev-oscabriel",
+            })
+          ).assignments.map(({ contributor, nudge }) => [
+            contributor.handle,
+            nudge,
+          ]);
+
+        expect(nudged(roster)).toStrictEqual([
+          ["wren", undefined],
+          [
+            "tamsin",
+            "The project's lint rule against module-level mutable state is noisy. If it gets in your way, a lint disable comment on the line is acceptable.",
+          ],
+          [
+            "ivo",
+            "If you need a lint disable comment, it must carry its reason after ` -- ` on the same line, for example `// oxlint-disable-next-line <rule> -- <why>`.",
+          ],
+          ["marisol", undefined],
+          ["dagny", undefined],
+          ["pell", undefined],
+        ]);
+        expect(nudged(roster.slice(2, 3))).toStrictEqual([
+          [
+            "ivo",
+            "If you need a lint disable comment, it must carry its reason after ` -- ` on the same line, for example `// oxlint-disable-next-line <rule> -- <why>`.",
+          ],
+        ]);
+        expect(
+          Result.getOrThrow(plan(asks)).assignments.filter(
+            (assignment) => "nudge" in assignment
+          )
+        ).toStrictEqual([]);
       }).pipe(Effect.provide(NodeServices.layer))
   );
 
@@ -687,11 +739,13 @@ describe("the run's summary", () => {
   );
 });
 
-/** Why the flags `argv` make no run. */
+/** Why the flags `argv` make no run, or `accepted` when they make one. */
 const reasonOf = (argv: readonly string[]) =>
   optionsOf(argv).pipe(
-    Effect.flip,
-    Effect.map(({ reason }) => reason)
+    Effect.match({
+      onFailure: ({ reason }) => reason,
+      onSuccess: () => "accepted",
+    })
   );
 
 describe("the swarm's flags", () => {
@@ -776,6 +830,43 @@ describe("the swarm's flags", () => {
         expect(
           (yield* optionsOf(["--stage", "demo", "--allow-demo"])).stage
         ).toBe("demo");
+      })
+  );
+
+  it.effect(
+    "refuses a switch given a value, a flag missing its value, an empty --only, a --url that is no http(s) origin, and a word no flag takes",
+    () =>
+      Effect.gen(function* () {
+        const reasons = yield* Effect.forEach(
+          [
+            // Read as a plain `--dry-run`, it would claim six asks.
+            ["--stage", "dev-oscabriel", "--dry-run=yes"],
+            ["--stage", "dev-oscabriel", "--url", "--dry-run"],
+            ["--stage", "dev-oscabriel", "--only=", "--dry-run"],
+            ["--stage", "dev-oscabriel", "--url", "platform.example"],
+            ["--stage", "dev-oscabriel", "--dry-run", "burrow"],
+          ],
+          reasonOf
+        );
+
+        expect(reasons).toStrictEqual([
+          expect.stringContaining("--dry-run takes no value"),
+          expect.stringContaining("--url needs a value"),
+          expect.stringContaining("--only names no contributor"),
+          expect.stringContaining("--url platform.example: an http(s) origin"),
+          expect.stringContaining("unexpected argument burrow"),
+        ]);
+        expect(
+          (yield* optionsOf([
+            "--stage",
+            "dev-oscabriel",
+            "--url",
+            "https://platform.example/",
+            "--only",
+            "wren",
+            "pell",
+          ])).url
+        ).toStrictEqual(Option.some("https://platform.example"));
       })
   );
 });
@@ -939,6 +1030,30 @@ describe("the dry run", () => {
           `nudge for tamsin (video): ${Option.getOrThrow(nudges("video", 1))}`,
           `nudge for ivo (video): ${Option.getOrThrow(nudges("video", 2))}`,
         ]);
+
+        const videoJson = yield* dryRun([
+          "--stage",
+          "dev-oscabriel",
+          "--dry-run",
+          "--json",
+          "--scenario",
+          "video",
+          "--url",
+          url,
+        ]);
+
+        const videoPlan = yield* Schema.decodeEffect(
+          Schema.fromJsonString(SwarmPlan)
+        )(videoJson.printed[0] ?? "");
+
+        expect(
+          videoPlan.assignments.flatMap(({ contributor, nudge }) =>
+            nudge === undefined ? [] : [[contributor.handle, nudge]]
+          )
+        ).toStrictEqual([
+          ["tamsin", Option.getOrThrow(nudges("video", 1))],
+          ["ivo", Option.getOrThrow(nudges("video", 2))],
+        ]);
       })
   );
 });
@@ -952,7 +1067,11 @@ const tokenOf = (handle: string) =>
  * and `claim` answer from the fixtures, git succeeds, and `SESSION_TOKENS`
  * holds `people`. The ledger and `.swarm/` are temp files.
  */
-const fullRun = (people: readonly string[]) =>
+const fullRun = (
+  people: readonly string[],
+  /** The contributor whose claim the platform refuses with `AskFull`, if any. */
+  refused?: string
+) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const swarm = yield* fs.makeTempDirectoryScoped();
@@ -970,6 +1089,15 @@ const fullRun = (people: readonly string[]) =>
       )?.handle;
 
       const fork = `burrow--${ask}--${handle ?? "nobody"}`;
+
+      if (handle !== undefined && handle === refused) {
+        return Schema.encodeSync(Schema.fromJsonString(Claimed))({
+          command: "claim",
+          ok: false,
+          refusals: [new AskFull({ ask: AskId.make(ask) })],
+          v: 1,
+        });
+      }
 
       return JSON.stringify({
         command: "claim",
@@ -1114,6 +1242,42 @@ describe("a run", () => {
             handles.some((handle) => text.includes(tokenOf(handle)))
           )
         ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "ends only the refused contributor's run, as failed with its refusal, and runs the other five",
+    () =>
+      Effect.gen(function* () {
+        const handles = roster.map(({ handle }) => handle);
+        const { agents, ledger, result } = yield* fullRun(handles, "ivo");
+
+        expect(Result.isSuccess(result)).toBeTruthy();
+
+        const summary = yield* Schema.decodeEffect(
+          Schema.fromJsonString(AgentsResult)
+        )(Option.getOrElse(agents, () => ""));
+
+        expect(
+          summary.runs.map(({ attempts, handle, refusals }) => [
+            handle,
+            attempts,
+            refusals,
+          ])
+        ).toStrictEqual([
+          ["wren", 0, {}],
+          ["tamsin", 0, {}],
+          ["ivo", 0, { AskFull: 1 }],
+          ["marisol", 0, {}],
+          ["dagny", 0, {}],
+          ["pell", 0, {}],
+        ]);
+        // No claim, no fork: ivo's is never recorded for teardown.
+        expect(
+          ledger
+            .map(({ name }) => name.split("--").at(-1) ?? "")
+            .toSorted((one, other) => one.localeCompare(other))
+        ).toStrictEqual(["dagny", "marisol", "pell", "tamsin", "wren"]);
       })
   );
 

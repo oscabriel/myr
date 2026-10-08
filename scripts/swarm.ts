@@ -65,8 +65,6 @@ import {
 } from "./lib/swarm/results.ts";
 import type { AgentRun } from "./lib/swarm/results.ts";
 import { roster } from "./lib/swarm/roster.ts";
-import type { Contributor } from "./lib/swarm/roster.ts";
-import { nudges } from "./lib/swarm/scenario.ts";
 import {
   anonymousEnv,
   cliEntry,
@@ -191,10 +189,6 @@ const listAsks = (origin: string, project: ProjectName) =>
     return listed.asks;
   });
 
-/** A contributor's position in the whole roster, which the scenarios' nudges go by. */
-const rosterIndex = ({ handle }: Contributor) =>
-  roster.findIndex((one) => one.handle === handle);
-
 /** The plan as the terminal shows it: one row per contributor, ending in the command that starts them. */
 const planLines = (
   plan: SwarmPlan,
@@ -231,14 +225,10 @@ const planLines = (
       )
       .join("  ");
 
-  const nudged = plan.assignments.flatMap(({ contributor }) =>
-    Option.toArray(
-      Option.map(
-        nudges(plan.scenario, rosterIndex(contributor)),
-        (nudge) =>
-          `nudge for ${contributor.handle} (${plan.scenario}): ${nudge}`
-      )
-    )
+  const nudged = plan.assignments.flatMap(({ contributor, nudge }) =>
+    nudge === undefined
+      ? []
+      : [`nudge for ${contributor.handle} (${plan.scenario}): ${nudge}`]
   );
 
   return [
@@ -409,7 +399,7 @@ const contributorRun = (input: {
         text: brief({
           ask: assignment.ask,
           askMarkdown: page.brief,
-          nudge: nudges(options.scenario, rosterIndex(contributor)),
+          nudge: Option.fromUndefinedOr(assignment.nudge),
           project: options.project,
           remote: claim.remote,
         }),

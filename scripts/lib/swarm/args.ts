@@ -79,6 +79,43 @@ const flagsIn = (argv: readonly string[]) =>
     arg.startsWith("--") ? [arg.split("=")[0] ?? arg] : []
   );
 
+const isValued = (flag: string): flag is (typeof VALUED)[number] =>
+  VALUED.some((valued) => valued === flag);
+
+/**
+ * The words no flag takes: each valued flag takes the word after it (unless
+ * it wrote `=value`), and `--only` every word up to the next flag.
+ */
+const straysIn = (argv: readonly string[]) => {
+  const strays: string[] = [];
+  let takes: "none" | "one" | "many" = "none";
+
+  for (const arg of argv) {
+    if (arg.startsWith("--")) {
+      const bare = !arg.includes("=");
+
+      if (bare && isValued(arg)) {
+        takes = "one";
+      } else {
+        takes = bare && arg === "--only" ? "many" : "none";
+      }
+    } else if (takes === "none") {
+      strays.push(arg);
+    } else if (takes === "one") {
+      takes = "none";
+    }
+  }
+
+  return strays;
+};
+
+/** `raw` as the platform's origin, without a trailing `/`, if it is an http(s) URL. */
+const originOf = (raw: string) =>
+  Option.filter(
+    Option.liftThrowable((url: string) => new URL(url))(raw),
+    ({ protocol }) => protocol === "https:" || protocol === "http:"
+  ).pipe(Option.as(raw.replace(/\/+$/u, "")));
+
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
 const decodeScenario = Schema.decodeUnknownOption(ScenarioName);
@@ -93,6 +130,34 @@ export const optionsOf = (
 
     if (strange.length > 0) {
       return yield* failed(`unknown flag ${strange.join(", ")}: ${USAGE}`);
+    }
+
+    // A switch read only by its bare spelling: `--dry-run=yes` would
+    // otherwise pass as a known flag and leave the run live.
+    const switchValue = argv.find((arg) =>
+      SWITCHES.some((flag) => arg.startsWith(`${flag}=`))
+    );
+
+    if (switchValue !== undefined) {
+      return yield* failed(
+        `${switchValue.split("=")[0] ?? switchValue} takes no value: ${USAGE}`
+      );
+    }
+
+    const valueless = VALUED.find(
+      (flag) => argv.includes(flag) && Option.isNone(flagValue(argv, flag))
+    );
+
+    if (valueless !== undefined) {
+      return yield* failed(`${valueless} needs a value: ${USAGE}`);
+    }
+
+    const strays = straysIn(argv);
+
+    if (strays.length > 0) {
+      return yield* failed(
+        `unexpected argument ${strays.join(", ")}: ${USAGE}`
+      );
     }
 
     // infra's own reading of `--stage`, and its words when it names none.
@@ -163,9 +228,25 @@ export const optionsOf = (
       )
     );
 
-    if (argv.includes("--only") && only.length === 0) {
+    const onlyGiven = argv.some(
+      (arg) => arg === "--only" || arg.startsWith("--only=")
+    );
+
+    if (onlyGiven && only.length === 0) {
       return yield* failed("--only names no contributor");
     }
+
+    const url = yield* Effect.transposeOption(
+      Option.map(flagValue(argv, "--url"), (raw) =>
+        Effect.fromOption(originOf(raw)).pipe(
+          Effect.mapError(() =>
+            failed(
+              `--url ${raw}: an http(s) origin, such as https://platform.example`
+            )
+          )
+        )
+      )
+    );
 
     return {
       dryRun: argv.includes("--dry-run"),
@@ -175,8 +256,6 @@ export const optionsOf = (
       scenario,
       stage,
       timeoutMin,
-      url: Option.map(flagValue(argv, "--url"), (url) =>
-        url.replace(/\/+$/u, "")
-      ),
+      url,
     };
   });
