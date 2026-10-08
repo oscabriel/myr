@@ -10,9 +10,10 @@ import { Glob } from "@repo/protocol/domain/common";
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { RunBlock } from "@repo/protocol/domain/run";
 import { RepoPath } from "@repo/protocol/ids";
-import { Equal, Option, Predicate, Result, Schema } from "effect";
+import { Effect, Equal, Option, Predicate, Result, Schema } from "effect";
 import { parse } from "yaml";
 
+import { findRunBlock } from "./finder.ts";
 import type { RepoFile } from "./finder.ts";
 
 /** A closure glob that starts with this takes paths back out of the closure. */
@@ -347,15 +348,29 @@ const isRelative = (specifier: string) =>
 
 const isPackageJson = (path: string) => matchGlob("**/package.json", path);
 
+/**
+ * The files a closure is computed over: every path, in the order given, and
+ * a file's text when asked for it (`undefined` for a path not among them).
+ * Every walk reads a file's text only through `read`, so a caller can learn
+ * which files a closure reads (`judgeReads`).
+ */
+interface Tree {
+  readonly paths: ReadonlySet<string>;
+  readonly read: (path: string) => string | undefined;
+}
+
+const treeOf = (contents: ReadonlyMap<string, string>): Tree => ({
+  paths: new Set(contents.keys()),
+  read: (path) => contents.get(path),
+});
+
 /** Each workspace package's name and folder, from the manifests given. */
-const workspacesOf = (
-  contents: ReadonlyMap<string, string>
-): ReadonlyMap<string, string> =>
+const workspacesOf = (tree: Tree): ReadonlyMap<string, string> =>
   new Map(
-    [...contents]
-      .filter(([path]) => isPackageJson(path))
-      .flatMap(([path, content]) =>
-        decodeJson(content).pipe(
+    [...tree.paths]
+      .filter((path) => isPackageJson(path))
+      .flatMap((path) =>
+        decodeJson(tree.read(path) ?? "").pipe(
           Option.filter(isJsonObject),
           Option.flatMapNullishOr((manifest) => manifest.name),
           Option.filter(Predicate.isString),
@@ -389,8 +404,8 @@ const inWorkspace = (
 
 // `./base` names `base.json` when only that exists, as TypeScript resolves
 // it; a target not among the files keeps the name tsc would read.
-const configFile = (path: string, contents: ReadonlyMap<string, string>) =>
-  [path, `${path}.json`].find((candidate) => contents.has(candidate)) ??
+const configFile = (path: string, paths: ReadonlySet<string>) =>
+  [path, `${path}.json`].find((candidate) => paths.has(candidate)) ??
   (path.endsWith(".json") ? path : `${path}.json`);
 
 /**
@@ -401,18 +416,18 @@ const configFile = (path: string, contents: ReadonlyMap<string, string>) =>
 const resolveExtends = (
   from: string,
   specifier: string,
-  contents: ReadonlyMap<string, string>,
+  paths: ReadonlySet<string>,
   workspaces: ReadonlyMap<string, string>
 ): Option.Option<string> => {
   if (isRelative(specifier)) {
     return Option.map(join(dirname(from), specifier), (path) =>
-      configFile(path, contents)
+      configFile(path, paths)
     );
   }
 
   return Option.flatMap(inWorkspace(specifier, workspaces), ({ dir, rest }) =>
     Option.map(join(dir, rest === "" ? "tsconfig.json" : rest), (path) =>
-      configFile(path, contents)
+      configFile(path, paths)
     )
   );
 };
@@ -428,14 +443,14 @@ const note = (path: string, reason: string) => `${path}: ${reason}`;
 
 const chainFrom = (
   start: string,
-  contents: ReadonlyMap<string, string>,
+  tree: Tree,
   workspaces: ReadonlyMap<string, string>
 ) => {
   const chain = [start];
   const notes: string[] = [];
 
   for (const next of chain) {
-    const content = contents.get(next);
+    const content = tree.read(next);
     const config = Option.flatMap(Option.fromNullishOr(content), decodeJsonc);
 
     if (content === undefined) {
@@ -448,7 +463,7 @@ const chainFrom = (
       onNone: () => [],
       onSome: extendsOf,
     }).flatMap((specifier) =>
-      Option.toArray(resolveExtends(next, specifier, contents, workspaces))
+      Option.toArray(resolveExtends(next, specifier, tree.paths, workspaces))
     );
 
     chain.push(...parents.filter((parent) => !chain.includes(parent)));
@@ -470,7 +485,11 @@ export const tsconfigChain = (
 ): {
   readonly chain: readonly RepoPath[];
   readonly notes: readonly string[];
-} => chainFrom(start, files, workspacesOf(files));
+} => {
+  const tree = treeOf(files);
+
+  return chainFrom(start, tree, workspacesOf(tree));
+};
 
 /** A token of JavaScript or JSON text, its comments dropped. */
 interface Token {
@@ -901,20 +920,19 @@ const runsFrom = (
  */
 const walkImports = (
   seeds: readonly string[],
-  contents: ReadonlyMap<string, string>,
-  paths: ReadonlySet<string>,
+  tree: Tree,
   follows: (path: string) => boolean = () => true
 ): readonly string[] => {
   const queue = [...seeds];
   const globs: string[] = [];
 
   for (const path of queue) {
-    const content = contents.get(path);
+    const content = tree.read(path);
 
     if (content !== undefined) {
-      const targets = runsFrom(path, content, paths)
+      const targets = runsFrom(path, content, tree.paths)
         .filter(follows)
-        .map((target) => settle(target, paths));
+        .map((target) => settle(target, tree.paths));
 
       globs.push(...targets.flatMap((target) => target.globs));
       queue.push(
@@ -942,14 +960,14 @@ interface LintSources {
  * lint source too). Then what those modules import, relatively.
  */
 const lintSources = (
-  contents: ReadonlyMap<string, string>,
-  paths: ReadonlySet<string>,
+  tree: Tree,
   workspaces: ReadonlyMap<string, string>
 ): LintSources => {
+  const { paths } = tree;
   const configs = [...paths].filter(isLintConfig).toSorted();
 
   const named = configs.map((path) => {
-    const names = lintNames({ content: contents.get(path) ?? "", path });
+    const names = lintNames({ content: tree.read(path) ?? "", path });
 
     const targets = [...names.plugins, ...names.imports].flatMap((specifier) =>
       isRelative(specifier)
@@ -975,7 +993,7 @@ const lintSources = (
     anchors: settled.map((target) => target.anchor),
     globs: [
       ...settled.flatMap((target) => target.globs),
-      ...walkImports(files, contents, paths),
+      ...walkImports(files, tree),
     ],
     notes: named.flatMap((config) => config.notes),
   };
@@ -1032,18 +1050,11 @@ const readingsOf = (from: string, text: string): readonly string[] => {
     : [rooted];
 };
 
-/**
- * The rule fixture tests of local lint plugins: the `test/`, `tests/` and
- * `__fixtures__/` folders beside each plugin (beside a plugin file, or beside
- * a plugin's folder; never at the repo root, where they hold the project's
- * own tests), any `*-rule.test.*`, and every test file whose text names a
- * plugin's path, by import or as a string from the root. Plugins are given
- * as their entry files (an `index.*` stands for its folder) or folders.
- */
-export const ruleFixtures = (
+/** `ruleFixtures`, reading a test file's text only when some plugin may be named in it. */
+const fixturesOf = (
   pluginPaths: readonly string[],
   files: readonly string[],
-  contents: ReadonlyMap<string, string>
+  read: Tree["read"]
 ): readonly Glob[] => {
   const plugins = pluginPaths.map((plugin): PluginName =>
     isIndex(plugin)
@@ -1067,10 +1078,13 @@ export const ruleFixtures = (
   const lastNames = plugins.map((plugin) => basename(stemOf(plugin.path)));
 
   const naming = files.filter((path) => {
-    const content = contents.get(path) ?? "";
+    if (plugins.length === 0 || !TEST_FILE.test(path)) {
+      return false;
+    }
+
+    const content = read(path) ?? "";
 
     return (
-      TEST_FILE.test(path) &&
       lastNames.some((name) => content.includes(name)) &&
       tokensOf(content).some(
         (token) =>
@@ -1089,6 +1103,21 @@ export const ruleFixtures = (
     .toSorted()
     .map((glob) => Glob.make(glob));
 };
+
+/**
+ * The rule fixture tests of local lint plugins: the `test/`, `tests/` and
+ * `__fixtures__/` folders beside each plugin (beside a plugin file, or beside
+ * a plugin's folder; never at the repo root, where they hold the project's
+ * own tests), any `*-rule.test.*`, and every test file whose text names a
+ * plugin's path, by import or as a string from the root. Plugins are given
+ * as their entry files (an `index.*` stands for its folder) or folders.
+ */
+export const ruleFixtures = (
+  pluginPaths: readonly string[],
+  files: readonly string[],
+  contents: ReadonlyMap<string, string>
+): readonly Glob[] =>
+  fixturesOf(pluginPaths, files, (path) => contents.get(path));
 
 // Keys whose strings a hook manager runs: Claude Code, Cursor, Codex and
 // Gemini's `command` (with `args`), Copilot's `bash` and `powershell`,
@@ -1186,28 +1215,24 @@ const hookCommands = (hook: RepoFile): HookCommands => {
  * The hook configs among the files, the scripts their commands name, and
  * what those scripts and code plugins (pi, OpenCode, Amp) import.
  */
-const hookSources = (
-  contents: ReadonlyMap<string, string>,
-  paths: ReadonlySet<string>,
-  sorted: readonly string[]
-) => {
+const hookSources = (tree: Tree, sorted: readonly string[]) => {
   const configs = sorted.filter((path) =>
     hookConfigGlobs.some((glob) => matchGlob(glob, path))
   );
 
   const read = configs.map((path) =>
-    hookCommands({ content: contents.get(path) ?? "", path })
+    hookCommands({ content: tree.read(path) ?? "", path })
   );
 
   const scripts = commandScripts(
     read.flatMap((hook) => hook.commands),
-    paths
+    tree.paths
   );
 
   const code = configs.filter((path) => CODE.test(path));
 
   return {
-    globs: [...scripts, ...walkImports([...scripts, ...code], contents, paths)],
+    globs: [...scripts, ...walkImports([...scripts, ...code], tree)],
     notes: read.flatMap((hook) => hook.notes),
   };
 };
@@ -1233,68 +1258,45 @@ export interface JudgeClosure {
  */
 const checkScripts = (
   scripts: readonly string[],
-  contents: ReadonlyMap<string, string>,
-  paths: ReadonlySet<string>
+  tree: Tree
 ): readonly string[] =>
   scripts.flatMap((script) => {
     const folder = dirname(script);
 
     return folder === ""
       ? []
-      : walkImports([script], contents, paths, (path) =>
-          path.startsWith(`${folder}/`)
-        );
+      : walkImports([script], tree, (path) => path.startsWith(`${folder}/`));
   });
 
-/**
- * The judge closure for a run block over a repo's files: the defaults (the
- * policy files and every hook config among them); every file a run command
- * names (`./test.sh` → `test.sh`) and what it imports or runs from its own
- * folder; every script a hook command names, with all it imports or runs;
- * each tsconfig's `extends` chain; every lint plugin and module a lint config
- * loads, with what it imports and its rule fixture tests; and each
- * `package.json`'s scripts as a pointer. Manifests, lockfiles and dependency
- * lists stay editable. Files are read as text, never run; one that doesn't
- * parse is still judged, and `notes` says where the walk stopped. Its shape
- * is `@repo/rules`' `Finishers.judgeClosure`, so the platform passes it in.
- */
-export const judgeClosure = (
-  run: RunBlock,
-  files: readonly RepoFile[]
-): JudgeClosure => {
-  const contents = new Map(
-    files.map((file) => [withoutDotSlash(file.path), file.content])
+/** Every command a run block runs. */
+const commandsOf = (run: RunBlock): readonly string[] =>
+  [run.setup, run.doctor, run.test, ...Object.values(run.checks)].filter(
+    Predicate.isNotUndefined
   );
 
-  const paths = new Set(contents.keys());
+/** `judgeClosure` over a tree, for run commands given as text. */
+const closureOf = (commands: readonly string[], tree: Tree): JudgeClosure => {
+  const { paths } = tree;
   const sorted = [...paths].toSorted();
-  const workspaces = workspacesOf(contents);
-
-  const commands = [
-    run.setup,
-    run.doctor,
-    run.test,
-    ...Object.values(run.checks),
-  ].filter(Predicate.isNotUndefined);
-
+  const workspaces = workspacesOf(tree);
   const named = commandScripts(commands, paths);
 
   const chains = sorted.flatMap((path) =>
     matchGlob("**/tsconfig*.json", path)
-      ? [chainFrom(path, contents, workspaces)]
+      ? [chainFrom(path, tree, workspaces)]
       : []
   );
 
-  const lint = lintSources(contents, paths, workspaces);
-  const hooks = hookSources(contents, paths, sorted);
+  const lint = lintSources(tree, workspaces);
+  const hooks = hookSources(tree, sorted);
 
   const derived = [
     ...named,
-    ...checkScripts(named, contents, paths),
+    ...checkScripts(named, tree),
     ...hooks.globs,
     ...chains.flatMap(({ chain }) => chain.slice(1)),
     ...lint.globs,
-    ...ruleFixtures(lint.anchors, sorted, contents),
+    ...fixturesOf(lint.anchors, sorted, tree.read),
   ];
 
   const defaults = new Set<string>(defaultJudgeGlobs);
@@ -1323,6 +1325,29 @@ export const judgeClosure = (
 
   return notes.length === 0 ? closure : { ...closure, notes };
 };
+
+/**
+ * The judge closure for a run block over a repo's files: the defaults (the
+ * policy files and every hook config among them); every file a run command
+ * names (`./test.sh` → `test.sh`) and what it imports or runs from its own
+ * folder; every script a hook command names, with all it imports or runs;
+ * each tsconfig's `extends` chain; every lint plugin and module a lint config
+ * loads, with what it imports and its rule fixture tests; and each
+ * `package.json`'s scripts as a pointer. Manifests, lockfiles and dependency
+ * lists stay editable. Files are read as text, never run; one that doesn't
+ * parse is still judged, and `notes` says where the walk stopped. Its shape
+ * is `@repo/rules`' `Finishers.judgeClosure`, so the platform passes it in.
+ */
+export const judgeClosure = (
+  run: RunBlock,
+  files: readonly RepoFile[]
+): JudgeClosure =>
+  closureOf(
+    commandsOf(run),
+    treeOf(
+      new Map(files.map((file) => [withoutDotSlash(file.path), file.content]))
+    )
+  );
 
 // RFC 6901: `/a~1b` is the key `a/b`; `~0` is `~`.
 const pointerTokens = (pointer: string): readonly string[] =>
@@ -1398,3 +1423,162 @@ export const touchedPointers = (
       read(after, target, tokens)
     );
   });
+
+// ------------------------------------------------------------ what it reads
+
+/** The largest file the finder and the judge closure read; a larger one is listed with no text. */
+export const MAX_FACT_BYTES = 256 * 1024;
+
+/** One file of a commit, as a listing gives it: its path, and its size in bytes when the listing knows it. */
+export interface ListedFile {
+  readonly path: string;
+  readonly size?: number;
+}
+
+/** One file's bytes, as a reader gives them back. */
+export interface ReadFile {
+  readonly bytes: Uint8Array;
+  readonly path: string;
+}
+
+/** One file as the finder and the judge closure are handed it. */
+export interface JudgeInput {
+  readonly content: string;
+  readonly path: RepoPath;
+}
+
+/** The folders whose files the run-block finder reads, beside the root's. */
+const CI_FOLDERS: ReadonlySet<string> = new Set([
+  ".github/workflows",
+  ".forgejo/workflows",
+  ".husky",
+]);
+
+/**
+ * Whether a file is read before any walk: the finder reads the root's files
+ * and the CI folders', and the config folder's run block names the scripts
+ * its checks run.
+ */
+const isSeed = (path: string) =>
+  dirname(path) === "" ||
+  CI_FOLDERS.has(dirname(path)) ||
+  path.startsWith(`${Brand.configDir}/`);
+
+/** The commands a found run block runs. */
+const foundCommands = (files: readonly RepoFile[]): readonly string[] => {
+  const { run } = findRunBlock(files);
+
+  return [
+    run.setup,
+    run.doctor,
+    run.test,
+    ...Object.values(run.checks ?? {}),
+  ].filter(Predicate.isNotUndefined);
+};
+
+/**
+ * Which listed files' text the finder and the judge closure still need,
+ * given the texts read so far: the root's files and the CI folders' (the
+ * finder's), the config folder's, and every file the closure's walks reach
+ * from what is read, for any command the config folder's strings or the
+ * found run block could run. Pure: the closure is walked over the listing
+ * with each file not read yet as empty text, and every such file it reads is
+ * wanted. A file the listing says is over `MAX_FACT_BYTES` is never wanted.
+ * Read what it returns and ask again until it returns nothing
+ * (`judgeInputs` does): reading more can only reach more.
+ */
+const judgeReads = (
+  listed: readonly ListedFile[],
+  texts: ReadonlyMap<string, string>
+): readonly string[] => {
+  const sizes = new Map(
+    listed.map(({ path, size }) => [withoutDotSlash(path), size])
+  );
+
+  const wanted = new Set<string>();
+
+  const tree: Tree = {
+    paths: new Set(sizes.keys()),
+    read: (path) => {
+      const text = texts.get(path);
+
+      if (text !== undefined || !sizes.has(path)) {
+        return text;
+      }
+
+      if ((sizes.get(path) ?? 0) <= MAX_FACT_BYTES) {
+        wanted.add(path);
+      }
+
+      return "";
+    },
+  };
+
+  const files = [...tree.paths].map((path) => ({
+    content: (isSeed(path) ? tree.read(path) : texts.get(path)) ?? "",
+    path,
+  }));
+
+  const configStrings = files
+    .filter(({ path }) => path.startsWith(`${Brand.configDir}/`))
+    .flatMap(({ content }) =>
+      tokensOf(content)
+        .filter((token) => token.kind === "string")
+        .map((token) => token.text)
+    );
+
+  closureOf([...foundCommands(files), ...configStrings], tree);
+
+  return [...wanted].toSorted();
+};
+
+/**
+ * The files the finder and the judge closure are handed for one commit:
+ * every listed file, sorted by path, with its text where some walk reads it
+ * (`judgeReads`) and empty text elsewhere, or where it is over
+ * `MAX_FACT_BYTES`. `readAll` reads a batch of paths; a path it leaves out
+ * reads as empty. The platform's facts and the CLI's local check and hook
+ * all gather through this, so each hands the closure the same files.
+ */
+export const judgeInputs = <E, R>(
+  listed: readonly ListedFile[],
+  readAll: (
+    paths: readonly string[]
+  ) => Effect.Effect<readonly ReadFile[], E, R>
+): Effect.Effect<readonly JudgeInput[], E, R> => {
+  const decoder = new TextDecoder();
+
+  const gather = (
+    texts: ReadonlyMap<string, string>
+  ): Effect.Effect<ReadonlyMap<string, string>, E, R> => {
+    const wanted = judgeReads(listed, texts);
+
+    return wanted.length === 0
+      ? Effect.succeed(texts)
+      : Effect.flatMap(readAll(wanted), (files) => {
+          const got = new Map(
+            files.map(({ bytes, path }) => [
+              path,
+              bytes.length <= MAX_FACT_BYTES ? decoder.decode(bytes) : "",
+            ])
+          );
+
+          return gather(
+            new Map([
+              ...texts,
+              ...wanted.map((path) => [path, got.get(path) ?? ""] as const),
+            ])
+          );
+        });
+  };
+
+  return Effect.map(gather(new Map()), (texts) =>
+    [...new Set(listed.map(({ path }) => withoutDotSlash(path)))]
+      .filter((path) => path !== "")
+      .toSorted()
+      .map((path) => ({
+        content: texts.get(path) ?? "",
+        path: RepoPath.make(path),
+      }))
+  );
+};

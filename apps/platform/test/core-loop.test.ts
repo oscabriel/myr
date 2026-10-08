@@ -302,13 +302,20 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           remote: `${world.origin}/${claim.fork}.git`,
         });
 
-        // 5. She puts the readme back and pushes again: the answer is
-        // being checked, then merged, checked green and landed.
+        // 5. She puts the readme back and pushes again, through a harness
+        // that names itself in her credential helper's username: the answer
+        // is being checked, then merged, checked green and landed, and the
+        // landing discloses the harness (never as its author or a credit).
         const fix = yield* aliceGit.commit(work, "Leave the readme alone", {
           "README.md": readme,
         });
 
-        const offered = yield* aliceGit.push(work);
+        const harnessGit = yield* world.gitWithUsername(
+          "alice",
+          "audit;harness=claude-code&model=haiku"
+        );
+
+        const offered = yield* harnessGit.push(work);
         const tree = yield* aliceGit.ok(work, "rev-parse", `${fix}^{tree}`);
 
         // main has not moved since alice claimed, so the merged tree is
@@ -334,6 +341,13 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           .landing({ project, sha: landed });
 
         expect({
+          assisted: yield* doraGit.ok(
+            home,
+            "log",
+            "-1",
+            "--format=%(trailers:key=Assisted-by)",
+            landed
+          ),
           commit: yield* doraGit.ok(
             home,
             "log",
@@ -343,6 +357,7 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           ),
           landing: {
             ask: landing.ask,
+            assisted: landing.assisted,
             author: landing.author,
             credits: landing.credits,
             parent: landing.parent,
@@ -374,9 +389,13 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           ),
           verdict: verdict?.lanes.map(({ lane, result }) => [lane, result]),
         }).toStrictEqual({
+          assisted: "Assisted-by: claude-code:haiku (claimed)",
           commit: [month.landed, tree, "alice", Brand.name].join("\n"),
           landing: {
             ask: parseIso,
+            assisted: [
+              { harness: "claude-code", model: "haiku", verified: false },
+            ],
             author: "alice",
             credits: [
               { handle: "dora", role: "Asked-by" },

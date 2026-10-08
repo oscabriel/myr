@@ -4,6 +4,7 @@ import { Fetch, FetchFailed } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostLocal } from "@repo/artifacts/repo-host/local";
 import { Brand } from "@repo/brand";
+import { isJudged, judgeClosure } from "@repo/checks/judge";
 import { PushTarget } from "@repo/gate/facts";
 import { addedLines, treeDiff } from "@repo/git/tree-diff";
 import {
@@ -166,7 +167,94 @@ describe(localFacts, () => {
   );
 });
 
+/**
+ * A tree whose judge reaches past the root and the CI folders, as
+ * `packages/project/test/facts.test.ts` gives the platform: lefthook runs a
+ * shell script that runs a hook script with a helper, Claude Code's settings
+ * run `scripts/hooks/vcs-policy.ts`, a package's tsconfig extends the base
+ * and a file of its own, oxlint loads a plugin that imports a helper, and a
+ * test outside the plugin's folder names it.
+ */
+const wideTree = {
+  ".claude/settings.json": JSON.stringify({
+    hooks: {
+      PreToolUse: [
+        {
+          hooks: [
+            { command: "bun scripts/hooks/vcs-policy.ts", type: "command" },
+          ],
+        },
+      ],
+    },
+  }),
+  "lefthook.yml":
+    "pre-commit:\n  commands:\n    guard:\n      run: sh scripts/pre-commit.sh\n",
+  "oxlint.config.ts":
+    'export default { jsPlugins: ["./tools/lint/plugin.ts"] };\n',
+  "package.json": JSON.stringify({
+    name: "kit",
+    scripts: { test: "vitest run" },
+    workspaces: ["packages/*"],
+  }),
+  "packages/a/build.json": JSON.stringify({ compilerOptions: {} }),
+  "packages/a/package.json": JSON.stringify({ name: "@kit/a" }),
+  "packages/a/src/index.ts": "export const a = 1;\n",
+  "packages/a/tsconfig.json": JSON.stringify({
+    extends: ["../../tsconfig.base.json", "./build.json"],
+  }),
+  "scripts/hooks/guard.ts":
+    'import { policy } from "./lib/policy.ts";\n\npolicy();\n',
+  "scripts/hooks/lib/policy.ts": "export const policy = () => 0;\n",
+  "scripts/hooks/vcs-policy.ts": "export {};\n",
+  "scripts/pre-commit.sh": "#!/bin/sh\nbun scripts/hooks/guard.ts\n",
+  "src/app.ts": 'import { a } from "@kit/a";\n\nexport const app = a;\n',
+  "test/plugin-cases.test.ts":
+    'import plugin from "../tools/lint/plugin.ts";\n\nplugin;\n',
+  "tools/lint/helper.ts": "export const rule = {};\n",
+  "tools/lint/plugin.ts":
+    'import { rule } from "./helper.ts";\n\nexport default { rules: { rule } };\n',
+  "tsconfig.base.json": JSON.stringify({ compilerOptions: {} }),
+} as const satisfies Readonly<Record<string, string>>;
+
 describe(localPolicy, () => {
+  it.live(
+    "judges by the closure every file at main gives: hook scripts, the tsconfig chain, plugin imports and rule fixture tests",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const root = yield* fs.realPath(yield* fs.makeTempDirectoryScoped());
+
+        yield* gitOk(root, "init", "--quiet", "--initial-branch", "main");
+        yield* commit(root, wideTree, "Start");
+
+        const policy = yield* policyAt(root);
+
+        const every = judgeClosure(
+          policy.run,
+          Object.entries(wideTree).map(([path, content]) => ({ content, path }))
+        );
+
+        expect(policy.judge).toStrictEqual({
+          paths: every.paths,
+          pointers: every.pointers,
+        });
+        expect(
+          [
+            "scripts/pre-commit.sh",
+            "scripts/hooks/guard.ts",
+            "scripts/hooks/lib/policy.ts",
+            "scripts/hooks/vcs-policy.ts",
+            "packages/a/build.json",
+            "tools/lint/helper.ts",
+            "test/plugin-cases.test.ts",
+          ].filter((path) => !isJudged(policy.judge, path))
+        ).toStrictEqual([]);
+        expect(policy.modules).toStrictEqual([
+          { module: "@kit/a", paths: ["packages/a/**"] },
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
   it.live("reads the config folder's policy.json at main, not at HEAD", () =>
     Effect.gen(function* () {
       const repo = yield* aCheckRepo;

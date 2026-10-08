@@ -9,13 +9,15 @@
  * Lander's `bundleRules` and the `/worker` evaluator, here on this machine),
  * else its `policy.json` through `/json`, else the defaults; then finished
  * with `@repo/checks`' finder and judge closure, from the same facts the
- * platform reads at a landing (`@repo/project`'s `evaluationFacts`): the
- * files at the root and in the CI folders, the workspaces the root manifest
- * names, and the vouch file.
+ * platform reads at a landing (`@repo/project`'s `evaluationFacts`): every
+ * file at the commit, with the text of each one the finder or the closure
+ * reads (`@repo/checks`' `judgeInputs`, through `judge-files.ts`), the
+ * workspaces the root manifest names, and the vouch file.
  */
 import { Brand } from "@repo/brand";
 import { findRunBlock } from "@repo/checks/finder";
 import { judgeClosure } from "@repo/checks/judge";
+import { workspacesIn } from "@repo/checks/workspaces";
 import type { Policy } from "@repo/protocol/domain/policy";
 import { LandedSha, RepoPath } from "@repo/protocol/ids";
 import type { CommitSha, Handle, ProjectName } from "@repo/protocol/ids";
@@ -32,7 +34,6 @@ import type {
 import { rulesEvaluatorBun } from "@repo/rules/rules-evaluator/bun";
 import { RulesEvaluatorJson } from "@repo/rules/rules-evaluator/json";
 import {
-  Array,
   Context,
   DateTime,
   Effect,
@@ -40,14 +41,14 @@ import {
   Layer,
   Option,
   Path,
-  Predicate,
-  Schema,
   Stream,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { ConfigRuntime } from "./config-runtime.ts";
 import { commitOf, runGit } from "./facts.ts";
+import { blobsAt, judgeFilesIn } from "./judge-files.ts";
+import type { ListedBlob } from "./judge-files.ts";
 
 /** A file of the config folder, as committed. */
 export interface ConfigFile {
@@ -281,217 +282,33 @@ export interface PolicyAbout {
   readonly initializer: Handle;
 }
 
-/** One file of a commit, as `git ls-tree -r -l` lists it. */
-interface TreeFile {
-  readonly mode: string;
-  readonly path: string;
-  readonly sha: string;
-  readonly size: number;
-}
-
 // A regular file, executable or not: the Lander bundles only these from the
 // config folder, never a link or a submodule.
 const FILE_MODES: ReadonlySet<string> = new Set(["100644", "100755"]);
 
-const ENTRY =
-  /^(?<mode>\d+) (?<type>\w+) (?<sha>[0-9a-f]+) +(?<size>-|\d+)\t(?<path>.+)$/su;
-
-/** Every blob in the commit `sha`'s tree, in git's order. */
-const filesAt = (root: string, sha: CommitSha) =>
-  Effect.map(
-    runGit(root, ["ls-tree", "-r", "-l", "-z", "--full-tree", sha]),
-    ({ stdout }) =>
-      stdout.split("\0").flatMap((record): readonly TreeFile[] => {
-        const groups = ENTRY.exec(record)?.groups;
-
-        return groups?.type === "blob" &&
-          groups.mode !== undefined &&
-          groups.sha !== undefined &&
-          groups.path !== undefined
-          ? [
-              {
-                mode: groups.mode,
-                path: groups.path,
-                sha: groups.sha,
-                size: Math.trunc(Number(groups.size ?? "0")),
-              },
-            ]
-          : [];
-      })
-  );
-
 /** A blob's text. */
-const textOf = (root: string, file: TreeFile) =>
+const textOf = (root: string, file: ListedBlob) =>
   Effect.map(runGit(root, ["cat-file", "blob", file.sha]), ({ stdout }) => ({
     content: stdout,
     path: RepoPath.make(file.path),
   }));
 
-// The platform's facts at a landing (`@repo/project`'s `evaluationFacts`):
-// the folders whose files the run-block finder reads, and how large a file
-// it reads at most.
-const CI_FOLDERS = [".github/workflows", ".forgejo/workflows", ".husky"];
-
-const MAX_FACT_BYTES = 256 * 1024;
-
-const folderOf = (path: string) =>
-  path.slice(0, Math.max(0, path.lastIndexOf("/")));
-
-/** The files directly in `folder` (`""` is the root), small enough to read. */
-const filesIn = (files: readonly TreeFile[], folder: string) =>
-  files.filter(
-    ({ path, size }) => folderOf(path) === folder && size <= MAX_FACT_BYTES
-  );
-
-/** The folders directly in `folder`, in git's order. */
-const foldersIn = (files: readonly TreeFile[], folder: string) => {
-  const prefix = folder === "" ? "" : `${folder}/`;
-
-  return Array.dedupe(
-    files.flatMap(({ path }) => {
-      if (!path.startsWith(prefix)) {
-        return [];
-      }
-
-      const rest = path.slice(prefix.length);
-      const slash = rest.indexOf("/");
-
-      return slash === -1 ? [] : [`${prefix}${rest.slice(0, slash)}`];
-    })
-  );
-};
-
-const Manifest = Schema.fromJsonString(
-  Schema.Struct({
-    exports: Schema.optionalKey(Schema.Json),
-    name: Schema.optionalKey(Schema.String),
-    workspaces: Schema.optionalKey(Schema.Json),
-  })
-);
-
-const decodeManifest = Schema.decodeUnknownOption(Manifest);
-
-const isJsonArray = (value: Schema.Json): value is Schema.JsonArray =>
-  globalThis.Array.isArray(value);
-
-const isJsonObject = (value: Schema.Json): value is Schema.JsonObject =>
-  Predicate.isObject(value) && !isJsonArray(value);
-
-const strings = (value: Schema.Json | undefined): readonly string[] =>
-  value !== undefined && isJsonArray(value)
-    ? value.filter(Predicate.isString)
-    : [];
-
-/** A manifest's `workspaces`: an array of globs, or `{ packages: [...] }`. */
-const workspaceGlobs = (value: Schema.Json | undefined): readonly string[] => {
-  if (value === undefined || value === null) {
-    return [];
-  }
-
-  if (isJsonArray(value)) {
-    return strings(value);
-  }
-
-  return isJsonObject(value) ? strings(value.packages) : [];
-};
-
-/** Every string an `exports` field leads to, nested conditions included. */
-const exportTargets = (value: Schema.Json | undefined): readonly string[] => {
-  if (value === undefined || value === null) {
-    return [];
-  }
-
-  if (Predicate.isString(value)) {
-    return [value];
-  }
-
-  if (isJsonArray(value)) {
-    return value.flatMap(exportTargets);
-  }
-
-  return isJsonObject(value) ? Object.values(value).flatMap(exportTargets) : [];
-};
-
-const withoutDotSlash = (path: string) => path.replace(/^(?:\.\/)+/u, "");
-
 /**
- * The folders a workspace glob names: `packages/*` is every folder in
- * `packages`, and a glob with no `*` is its own folder. Deeper globs are
- * read as their folder prefix's children, as the platform reads them.
+ * The facts the platform evaluates the config folder over, read at `sha`:
+ * `ci` and the workspaces as `@repo/checks` gathers and reads them for the
+ * platform too (`judgeFilesIn`, `workspacesIn`), the vouch file, and the
+ * commit's own clock and seed.
  */
-const foldersOf = (files: readonly TreeFile[], glob: string) => {
-  const clean = withoutDotSlash(glob).replace(/\/+$/u, "");
-  const star = clean.indexOf("*");
-
-  return star === -1
-    ? [clean]
-    : foldersIn(files, clean.slice(0, star).replace(/\/+$/u, ""));
-};
-
-/** The facts the platform evaluates the config folder over, read at `sha`. */
 const factsAt = (input: {
   readonly root: string;
   readonly sha: CommitSha;
-  readonly files: readonly TreeFile[];
+  readonly files: readonly ListedBlob[];
+  readonly ci: EvaluationFacts["ci"];
   readonly about: PolicyAbout;
   readonly vouchFile: string;
 }) =>
   Effect.gen(function* () {
-    const { about, files, root, sha } = input;
-
-    const read = (each: readonly TreeFile[]) =>
-      Effect.forEach(each, (file) => textOf(root, file), { concurrency: 8 });
-
-    const atRoot = yield* read(filesIn(files, ""));
-
-    const ci = [
-      ...atRoot,
-      ...(yield* read(CI_FOLDERS.flatMap((folder) => filesIn(files, folder)))),
-    ];
-
-    const globs = Option.match(
-      Option.flatMap(
-        Option.fromUndefinedOr(
-          atRoot.find(({ path }) => path === "package.json")
-        ),
-        ({ content }) => decodeManifest(content)
-      ),
-      {
-        onNone: () => [],
-        onSome: (manifest) => workspaceGlobs(manifest.workspaces),
-      }
-    );
-
-    const dirs = Array.dedupe(globs.flatMap((glob) => foldersOf(files, glob)));
-
-    const workspaces = Array.getSomes(
-      yield* Effect.forEach(dirs, (dir) =>
-        Option.match(
-          Option.fromUndefinedOr(
-            filesIn(files, dir).find(
-              ({ path }) => path === `${dir}/package.json`
-            )
-          ),
-          {
-            onNone: () => Effect.succeedNone,
-            onSome: (file) =>
-              Effect.map(textOf(root, file), ({ content }) =>
-                Option.flatMap(decodeManifest(content), (manifest) =>
-                  manifest.name === undefined || manifest.name.length === 0
-                    ? Option.none()
-                    : Option.some({
-                        dir,
-                        exports: exportTargets(manifest.exports).map((target) =>
-                          RepoPath.make(`${dir}/${withoutDotSlash(target)}`)
-                        ),
-                        name: manifest.name,
-                      })
-                )
-              ),
-          }
-        )
-      )
-    );
+    const { about, ci, files, root, sha } = input;
 
     const vouch = yield* Option.match(
       Option.fromUndefinedOr(
@@ -523,7 +340,7 @@ const factsAt = (input: {
       now,
       project: about.project,
       seed: Number.parseInt(sha.slice(0, 8), 16),
-      workspaces,
+      workspaces: workspacesIn(ci),
     };
 
     return Option.match(vouch, {
@@ -562,7 +379,7 @@ export const localPolicy = (
       Effect.mapError((failure) => loadFailed(failure.message))
     );
 
-    const files = yield* filesAt(root, sha);
+    const files = yield* blobsAt(root, sha);
 
     const config = files.filter(
       ({ mode, path }) =>
@@ -609,10 +426,13 @@ export const localPolicy = (
           ).pipe(Layer.provide(finishers));
 
     const at = LandedSha.make(sha);
+    const ci = yield* judgeFilesIn(root, files);
 
     const evaluate = (vouchFile: string) =>
-      Effect.flatMap(factsAt({ about, files, root, sha, vouchFile }), (facts) =>
-        RulesEvaluator.use((rules) => rules.evaluate({ at, facts, modules }))
+      Effect.flatMap(
+        factsAt({ about, ci, files, root, sha, vouchFile }),
+        (facts) =>
+          RulesEvaluator.use((rules) => rules.evaluate({ at, facts, modules }))
       ).pipe(Effect.provide(evaluator));
 
     const first = yield* evaluate(defaultVouchFile);

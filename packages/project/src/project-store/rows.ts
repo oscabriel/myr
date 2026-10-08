@@ -1,4 +1,5 @@
 import { Ask } from "@repo/protocol/domain/ask";
+import { AgentTrailer } from "@repo/protocol/domain/credit";
 import { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { LandingView } from "@repo/protocol/domain/landing";
@@ -42,9 +43,15 @@ export const AskRow = Ask;
 
 export type AskRow = typeof AskRow.Type;
 
-/** One person's claim on an ask, its lifecycle state encoded. */
+/**
+ * One person's claim on an ask, its lifecycle state encoded, and the agents
+ * the claimant's pushes to its fork named (their harnesses, as custody heard
+ * them), once each in the order they first pushed: what the answer's landing
+ * discloses as `Assisted-by:`. Audit metadata, never credit.
+ */
 export const ClaimRow = Schema.Struct({
   ask: AskId,
+  assisted: Schema.optionalKey(Schema.Array(AgentTrailer)),
   claimant: Handle,
   /** The encoded claim lifecycle state. */
   state: Schema.Json,

@@ -29,8 +29,10 @@
  *
  * A harness that pushes names itself in the basic-auth username its
  * credential helper gives (`audit;harness=pi&model=…`, `@repo/protocol/audit`).
- * Custody logs it with the push, as audit metadata only: who pushes is the
- * token's person, and the username is never identity, credit or a score.
+ * Custody logs it with the push and reports it with a claimant's push, so
+ * the answer's landing discloses it as `Assisted-by:` (spec D18). It is
+ * audit metadata only: who pushes is the token's person, and the username is
+ * never identity, credit or a score.
  */
 import type { RepoName } from "@repo/artifacts/repo-host";
 import { Custody } from "@repo/git/custody";
@@ -173,11 +175,13 @@ const holds = (api: ProjectApi, person: Person, ask: AskId) =>
 
 /**
  * The claimant's push, which the fork already took: reported to the
- * project, then, if stages 0–1 have nothing to say, offered as the answer.
+ * project with the harness it came through, then, if stages 0–1 have
+ * nothing to say, offered as the answer.
  */
 const offer = (input: {
   readonly api: ProjectApi;
   readonly ask: AskId;
+  readonly audit: Option.Option<HarnessAudit>;
   readonly from: Option.Option<CommitSha>;
   readonly head: CommitSha;
   readonly notice: Notice;
@@ -194,6 +198,10 @@ const offer = (input: {
       pusher: person,
       ref: mainRef,
       repo,
+      ...Option.match(input.audit, {
+        onNone: () => ({}),
+        onSome: (audit) => ({ audit }),
+      }),
     });
 
     if (Array.isReadonlyArrayNonEmpty(refusals)) {
@@ -230,7 +238,8 @@ const claimFork = (
   projects: Projects["Service"],
   fork: Extract<RepoKind, { readonly _tag: "ClaimFork" }>,
   pusher: Person,
-  notice: Notice
+  notice: Notice,
+  audit: Option.Option<HarnessAudit>
 ) =>
   Effect.gen(function* () {
     const isClaimant = sameHandle(pusher.handle, fork.handle);
@@ -257,6 +266,7 @@ const claimFork = (
                 offer({
                   api,
                   ask: fork.ask,
+                  audit,
                   from,
                   head,
                   notice,
@@ -318,8 +328,9 @@ export const refuseAll = custodyOf(directPushes, (_repo, commands) =>
  * Custody of one push by `pusher` to the repo `kind` names. `notice` says a
  * line to the pusher once the push went through: what became of the answer
  * it offered. `audit` is the harness the push came through (`auditOf` in
- * `credential.ts`), if its username named one: logged with the push, never
- * who pushes. Only a signed-in person pushes anywhere.
+ * `credential.ts`), if its username named one: logged with the push and
+ * reported with a claimant's, never who pushes. Only a signed-in person
+ * pushes anywhere.
  */
 export const custodyFor = (
   pusher: Principal,
@@ -341,7 +352,7 @@ export const custodyFor = (
 
     const custody = yield* RepoKind.$match(kind, {
       Canonical: ({ project }) => canonical(projects, project, pusher),
-      ClaimFork: (fork) => claimFork(projects, fork, pusher, notice),
+      ClaimFork: (fork) => claimFork(projects, fork, pusher, notice, audit),
       // The platform makes no repo by any other name; nothing pushes there.
       Unknown: () => Effect.succeed(refuseAll),
       // A person's working fork: only its owner pushes; their `land` judges it.
