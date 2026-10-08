@@ -168,20 +168,19 @@ describe(FrontPageView, () => {
 
     expect(row).toContain('data-takeable="false"');
     expect(row).toContain("Held for newcomers");
-    expect(markup).toContain('data-takeable="true"');
+    expect(row).not.toContain("Open to take");
+    expect(row).not.toContain(`${Brand.cli} claim explain-iso-week`);
+    expect(rowOf(markup, "fix-week-start")).toContain("Open to take");
   });
 
   it("shows each ask's project, want, kind and territory, and links its project", () => {
-    const text = textOf(front({}));
-    const markup = markupOf(front({}));
+    const row = rowOf(markupOf(front({})), "split-format");
 
-    expect(text).toContain(
-      "A week starts on the locale's first day, not always on Sunday."
-    );
-    expect(text).toContain("migrate");
-    expect(text).toContain("format");
-    expect(markup).toContain('href="/burrow"');
-    expect(markup).toContain('href="/datekit/asks/fix-week-start"');
+    expect(row).toContain('href="/burrow"');
+    expect(row).toContain('href="/burrow/asks/split-format"');
+    expect(row).toContain("The format package calls the new parser.");
+    expect(row).toMatch(/>Kind<\/dt><dd\b[^>]*>migrate<\/dd>/u);
+    expect(row).toMatch(/>Territory<\/dt><dd\b[^>]*>format<\/dd>/u);
   });
 
   it("gives an ask the viewer may take the command that claims it", () => {
@@ -202,11 +201,17 @@ describe(FrontPageView, () => {
     expect(markupOf(front({}))).toContain('href="/?reserved=newcomers"');
   });
 
-  it("lists every project with its posture label", () => {
-    const text = textOf(front({}));
+  it("lists every project with its posture label and open asks", () => {
+    const markup = markupOf(front({}));
+    const listed = markup.slice(markup.indexOf('aria-labelledby="projects"'));
 
-    expect(text).toContain("Open with sealed evidence");
-    expect(markupOf(front({}))).toContain('href="/datekit"');
+    expect(markup).toContain('aria-labelledby="projects"');
+    expect(listed).toMatch(
+      /href="\/burrow"[^>]*>burrow<\/a>.*?Open with sealed evidence.*?1 open ask\b/u
+    );
+    expect(listed).toMatch(
+      /href="\/datekit"[^>]*>datekit<\/a>.*?>Open<.*?2 open asks/u
+    );
   });
 
   it("says an empty front page is empty, with the command that starts a project", () => {

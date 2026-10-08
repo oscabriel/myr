@@ -1,4 +1,3 @@
-import { ProjectEvent } from "@repo/protocol/domain/event";
 /**
  * A project page's reads (spec §3.2): its open asks (`listAsks`) and its
  * recent landings, which come from the `watch` replay (spec §3.4), not a
@@ -12,6 +11,7 @@ import { ProjectEvent } from "@repo/protocol/domain/event";
  * the whole replay arrives as one response. The atom keeps the `Landed`
  * events, newest first.
  */
+import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { ProjectName } from "@repo/protocol/ids";
 import { Effect, Stream } from "effect";

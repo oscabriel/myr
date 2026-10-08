@@ -8,13 +8,17 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { AskListing } from "@repo/protocol/domain/ask";
+import { ProjectEvent } from "@repo/protocol/domain/event";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { LandingView } from "@repo/protocol/domain/landing";
+import { AskId, Handle, LandedSha } from "@repo/protocol/ids";
 import { DateTime, Schema } from "effect";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { recentLandings } from "../src/client/project.ts";
 import { ProjectView } from "../src/features/project/project-page.tsx";
+import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -147,14 +151,14 @@ describe(ProjectView, () => {
   });
 
   it("lists every open ask with its want, kind and territory", () => {
-    const text = textOf(page);
+    const row = rowOf(markupOf(page), "fix-week-start");
 
-    expect(text).toContain("fix-week-start");
-    expect(text).toContain(
-      "A week starts on the locale's first day, not always on Sunday."
+    expect(row).toContain('href="/datekit/asks/fix-week-start"');
+    expect(row).toContain(
+      "A week starts on the locale&#x27;s first day, not always on Sunday."
     );
-    expect(text).toContain("bug");
-    expect(text).toContain("core");
+    expect(row).toMatch(/>Kind<\/dt><dd\b[^>]*>bug<\/dd>/u);
+    expect(row).toMatch(/>Territory<\/dt><dd\b[^>]*>core<\/dd>/u);
   });
 
   it("shows the posture label of the project as it is listed", () => {
@@ -174,11 +178,13 @@ describe(ProjectView, () => {
   });
 
   it("says an empty project is empty, with the commands that would fill it", () => {
+    const { landedAt: _landed, ...unlanded } = listing;
+
     const text = textOf(
       <ProjectView
         asks={[]}
         landings={[]}
-        listing={{ ...listing, openAsks: 0 }}
+        listing={{ ...unlanded, openAsks: 0 }}
         now={now}
         platformUrl={platformUrl}
       />
@@ -187,7 +193,94 @@ describe(ProjectView, () => {
     expect(text).toContain("No open asks");
     expect(text).toContain(`${Brand.cli} ask open`);
     expect(text).toContain("Nothing has landed");
-    expect(text).toContain(`${Brand.cli} init`);
+    // The project exists, so `init` would refuse it: its first push lands main.
+    expect(text).toContain(`git push ${platformUrl}/datekit.git HEAD:main`);
+    expect(text).not.toContain(`${Brand.cli} init`);
+  });
+
+  it("never says nothing has landed on a project whose main has landed", () => {
+    const text = textOf(
+      <ProjectView
+        asks={asks}
+        landings={[]}
+        listing={listing}
+        now={now}
+        platformUrl={platformUrl}
+      />
+    );
+
+    expect(text).toContain("Last landed");
+    expect(text).not.toContain("Nothing has landed");
+    expect(text).not.toContain("git push");
+  });
+});
+
+describe(UnknownProjectView, () => {
+  it("shows the platform's UnknownProject refusal for a name that could be a project", () => {
+    const markup = markupOf(<UnknownProjectView name="no-such-project" />);
+
+    expect(markup).toContain('data-refusal="UnknownProject"');
+    expect(markup).toContain("no-such-project");
+  });
+
+  it("says in a sentence that an address naming no possible project names none", () => {
+    const markup = markupOf(<UnknownProjectView name="Not_A_Project" />);
+
+    expect(markup).not.toContain("data-refusal");
+    expect(textOf(<UnknownProjectView name="Not_A_Project" />)).toContain(
+      "No such project"
+    );
+  });
+});
+
+/** The 40-hex sha of the `n`th landing. */
+const shaOf = (n: number) => LandedSha.make(n.toString(16).padStart(40, "0"));
+
+describe(recentLandings, () => {
+  const at = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
+
+  const one = Schema.decodeSync(LandingView)({
+    assisted: [],
+    author: "bram",
+    credits: [{ handle: "bram", role: "Signed-off-by" }],
+    landedAt: "2026-10-07T12:00:00.000Z",
+    project: "datekit",
+    sha: "0000000000000000000000000000000000000000",
+  });
+
+  const landed = (seq: number) =>
+    ProjectEvent.cases.Landed.make({
+      at,
+      landing: { ...one, sha: shaOf(seq) },
+      seq,
+    });
+
+  it("keeps only the landings among a project's events, newest first", () => {
+    const events = [
+      landed(1),
+      ProjectEvent.cases.Claimed.make({
+        ask: AskId.make("fix-week-start"),
+        at,
+        claimant: Handle.make("bram"),
+        seq: 2,
+      }),
+      landed(3),
+    ];
+
+    expect(recentLandings(events).map(({ sha }) => sha)).toStrictEqual([
+      shaOf(3),
+      shaOf(1),
+    ]);
+  });
+
+  it("keeps at most the twenty newest", () => {
+    const events = Array.from({ length: 25 }, (_, index) => landed(index + 1));
+
+    const shown = recentLandings(events).map(({ sha }) => sha);
+
+    expect(shown).toHaveLength(20);
+    expect(shown.at(0)).toBe(shaOf(25));
+    expect(shown.at(-1)).toBe(shaOf(6));
   });
 });
 

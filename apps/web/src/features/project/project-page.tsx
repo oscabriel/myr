@@ -48,6 +48,28 @@ const AskRow = ({
   </li>
 );
 
+/**
+ * The landings section with none to show. Before the project's main first
+ * lands, the push that lands it is its initializer's (`init` would refuse
+ * now: the project exists). After it, the replay may still hold no landing
+ * event, since adopting main is not one: say so, never "nothing landed".
+ */
+const NoLandings = ({
+  listing,
+  platformUrl,
+}: {
+  readonly listing: ProjectListing;
+  readonly platformUrl: string;
+}) =>
+  listing.landedAt === undefined ? (
+    <EmptyState
+      command={`git push ${platformUrl}/${listing.project}.git HEAD:main`}
+      title="Nothing has landed yet. The first push to main, by whoever ran init, lands it."
+    />
+  ) : (
+    <EmptyState title="No landings among the project's recent events." />
+  );
+
 /** The steps that take a newcomer from nothing to a checked answer. */
 const steps = (project: ProjectName, platformUrl: string) =>
   [
@@ -148,10 +170,7 @@ export const ProjectView = ({
             Recent landings
           </h2>
           {landings.length === 0 ? (
-            <EmptyState
-              command={`${Brand.cli} init`}
-              title="Nothing has landed yet. The first push from init lands the project's main."
-            />
+            <NoLandings listing={listing} platformUrl={platformUrl} />
           ) : (
             <LandingList landings={landings} now={now} />
           )}
