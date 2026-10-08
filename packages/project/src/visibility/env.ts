@@ -54,7 +54,6 @@ import {
   Exit,
   Layer,
   Option,
-  Predicate,
   Schema,
 } from "effect";
 
@@ -129,6 +128,10 @@ const reachOf = (item: EnvItem | undefined): readonly string[] =>
     ? Array.dedupe(item.proxy.domains.map((host) => host.toLowerCase()))
     : [];
 
+/** The hosts `key`'s value may reach in `view`: none when the view has no such item. */
+const reachIn = (view: Pick<EnvSchemaView, "items">, key: EnvKey) =>
+  reachOf(view.items.find((item) => item.key === key));
+
 /** A widened `@proxy`: the item, and every host its value may now reach. */
 export interface Widened {
   readonly hosts: readonly Hostname[];
@@ -147,7 +150,7 @@ export const widenedProxies = (
   after: Pick<EnvSchemaView, "items">
 ): readonly Widened[] =>
   after.items.flatMap((item) => {
-    const was = reachOf(before.items.find(({ key }) => key === item.key));
+    const was = reachIn(before, item.key);
     const reach = reachOf(item);
 
     return reach.some((host) => !was.some((each) => covers(each, host)))
@@ -206,7 +209,7 @@ const merged = (views: readonly EnvSchemaView[]): Read => {
   }
 
   const currentEnv = Array.findFirst(views, (view) =>
-    Predicate.isNotUndefined(view.currentEnvKey)
+    Option.fromUndefinedOr(view.currentEnvKey)
   );
 
   return {
@@ -215,10 +218,7 @@ const merged = (views: readonly EnvSchemaView[]): Read => {
       file: first.file,
       imports: Array.dedupe(views.flatMap(({ imports }) => imports)),
       items,
-      ...(Option.isSome(currentEnv) &&
-        currentEnv.value.currentEnvKey !== undefined && {
-          currentEnvKey: currentEnv.value.currentEnvKey,
-        }),
+      ...(Option.isSome(currentEnv) && { currentEnvKey: currentEnv.value }),
     },
   };
 };
@@ -394,18 +394,8 @@ export const ProjectEnvLive: Layer.Layer<
             const id = nextDecisionId(snapshot.decisions, decisions);
 
             const evidence: readonly Evidence[] = [
-              {
-                label: "before",
-                value: hostsText(
-                  reachOf(was.schema.items.find(({ key }) => key === item))
-                ),
-              },
-              {
-                label: "after",
-                value: hostsText(
-                  reachOf(is.schema.items.find(({ key }) => key === item))
-                ),
-              },
+              { label: "before", value: hostsText(reachIn(was.schema, item)) },
+              { label: "after", value: hostsText(reachIn(is.schema, item)) },
             ];
 
             decisions.set(

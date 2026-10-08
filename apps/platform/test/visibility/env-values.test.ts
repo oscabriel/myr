@@ -86,7 +86,7 @@ const tokens = {
   "ines-v": "ines-env-values-token-0123456789abcdef",
 } as const;
 
-/** datekit's `.env.schema` (507), as committed. */
+/** datekit's `.env.schema` (507) cut to its header, one public item and its one sensitive item. */
 const datekitSchema = [
   "# @currentEnv=$APP_ENV",
   "# @defaultRequired=infer @defaultSensitive=false",

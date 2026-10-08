@@ -4,8 +4,9 @@
  * a decider sets and nobody reads back, placeholders and proxies for checks
  * of unlanded code, the scan that finds a stored value, and the decision a
  * widened `@proxy` opens. The parser is the `/memory` fake holding datekit's
- * schema as `@env-spec/parser` reads it, but where two landings must read
- * two texts: there the real adapter reads the committed text.
+ * committed schema as `@env-spec/parser` reads it (a case below holds the
+ * fake to the real parser), but where two landings must read two texts:
+ * there the real adapter reads the committed text.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
@@ -47,7 +48,8 @@ import {
 } from "@repo/visibility/vault";
 import { Context, Effect, Layer, Option, Redacted, Ref, Schema } from "effect";
 
-import { ProjectEnv } from "../../src/env-port.ts";
+import datekitText from "../../../../examples/datekit/.env.schema?raw";
+import { noRunEnv, ProjectEnv } from "../../src/env-port.ts";
 import { ProjectStore } from "../../src/project-store.ts";
 import { projectService } from "../../src/project.ts";
 import type { ProjectApi } from "../../src/project.ts";
@@ -81,30 +83,7 @@ const value = "sntrys_eyJpYXQiOjE3M";
 
 const envFile = RepoPath.make(".env.schema");
 
-/** datekit's `.env.schema` (507), as committed. */
-const datekitText = [
-  "# @currentEnv=$APP_ENV",
-  "# @defaultRequired=infer @defaultSensitive=false",
-  "# ---",
-  "",
-  "# @type=enum(development, test, production)",
-  "APP_ENV=development",
-  "",
-  "# Error reporting DSN. Public: it ships in builds.",
-  "# @type=url",
-  "SENTRY_DSN=https://public@o0.ingest.example.invalid/1",
-  "",
-  "# Source-map upload token. Release step only; never enters a check.",
-  "# @sensitive @required=forEnv(production) @tag(release)",
-  '# @proxy(domain="sentry.io", path="/api/**")',
-  "SENTRY_AUTH_TOKEN=",
-  "",
-  "# Where locale data lives.",
-  "DATEKIT_LOCALE_DIR=./locales",
-  "",
-].join("\n");
-
-/** datekit's schema as `@env-spec/parser` reads it (through 603's adapter). */
+/** datekit's committed `.env.schema` (507), as `@env-spec/parser` reads it (through 603's adapter). */
 const datekitParsed: ParsedEnvSchema = {
   header: [
     {
@@ -322,6 +301,49 @@ const tokenItem = (api: ProjectApi) =>
 const stored = ProjectStore.use((store) => store.load());
 
 describe("the env shape at the landed SHA", () => {
+  // The fake above is written by hand; this holds it to datekit's committed
+  // file as the real parser reads it, so a drift in either shows here.
+  it.effect(
+    "is read from datekit's committed .env.schema as the fake holds it",
+    () =>
+      Effect.gen(function* () {
+        const parser = yield* EnvSchemaParser;
+
+        expect(yield* parser.parse(envFile, datekitText)).toStrictEqual(
+          datekitParsed
+        );
+      }).pipe(Effect.provide(EnvSchemaParserEnvSpec))
+  );
+
+  it.effect(
+    "is empty where no schema can be read, so a decider's value is for an unknown item",
+    () =>
+      Effect.gen(function* () {
+        const api = yield* begun();
+        const shown = yield* api.envShape(anyone);
+
+        const refused = yield* Effect.flip(
+          api.setEnv(ines, { key: token, value: Redacted.make(value) })
+        );
+
+        const env = yield* ProjectEnv;
+
+        expect({
+          file: shown.file,
+          items: shown.items,
+          refused,
+          run: yield* env.runEnv({ landed: false }, yield* stored),
+          stored: (yield* stored).envValues,
+        }).toStrictEqual({
+          file: envFile,
+          items: [],
+          refused: new UnknownEnvItem({ key: token }),
+          run: noRunEnv,
+          stored: [],
+        });
+      }).pipe(Effect.provide(worldWith(EnvSchemaParserMemory(new Map()))))
+  );
+
   it.effect(
     "lists datekit's four items, the token sensitive behind sentry.io and with no value",
     () =>
@@ -330,10 +352,12 @@ describe("the env shape at the landed SHA", () => {
         const shown = yield* api.envShape(anyone);
 
         expect({
+          currentEnvKey: shown.currentEnvKey,
           file: shown.file,
           keys: shown.items.map(({ key }) => key),
           token: shown.items.find(({ key }) => key === token),
         }).toStrictEqual({
+          currentEnvKey: "APP_ENV",
           file: envFile,
           keys: [
             "APP_ENV",
@@ -358,10 +382,12 @@ describe("the env shape at the landed SHA", () => {
         const shown = yield* api.envShape(anyone);
 
         expect({
+          currentEnvKey: shown.currentEnvKey,
           file: shown.file,
           keys: shown.items.map(({ key }) => key),
           week: shown.items.find(({ key }) => key === "WEEK_API_KEY"),
         }).toStrictEqual({
+          currentEnvKey: "APP_ENV",
           file: envFile,
           keys: [
             "APP_ENV",
