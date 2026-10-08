@@ -31,7 +31,8 @@
  *
  * Every log line the Worker's handler writes is kept beside its usual
  * printing, with its annotations (`logged`), and each Project DO's SQLite
- * stays reachable (`ratchets` reads its `ratchets` rows through the store).
+ * stays reachable through the store (`ratchets` reads its `ratchets` rows,
+ * `stored` all its rows and its event log).
  */
 import { NodeHttpServer, NodeServices } from "@effect/platform-node";
 import { SqliteClient } from "@effect/sql-sqlite-node";
@@ -50,7 +51,8 @@ import { Lander } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
 import { FinishersFromChecks } from "@repo/project/project";
 import { ProjectStore } from "@repo/project/project-store";
-import type { RatchetRow } from "@repo/project/project-store/rows";
+import type { ProjectSnapshot } from "@repo/project/project-store";
+import type { EventRow, RatchetRow } from "@repo/project/project-store/rows";
 import { ProjectStoreSqlite } from "@repo/project/project-store/sqlite";
 import { ProjectionMemory } from "@repo/project/projection/memory";
 import type { Projects } from "@repo/project/projects";
@@ -178,6 +180,16 @@ export interface CoreLoopWorld {
   readonly ratchets: (
     project: ProjectName
   ) => Effect.Effect<readonly RatchetRow[]>;
+  /**
+   * A project's rows and its whole event log, as its Durable Object's store
+   * keeps them; none before anyone called it.
+   */
+  readonly stored: (project: ProjectName) => Effect.Effect<
+    Option.Option<{
+      readonly rows: ProjectSnapshot;
+      readonly events: readonly EventRow[];
+    }>
+  >;
   /** A client of the contracts over HTTP at `/rpc`, as that person (or as anyone). */
   readonly rpc: (as: Someone | "anonymous") => Client["Service"];
   /**
@@ -218,7 +230,7 @@ const ROUNDS = 16;
  * request as Node's server hands it over made a plain `Request`, and returns
  * its origin.
  */
-const listen = (handle: (request: Request) => Effect.Effect<Response>) =>
+export const listen = (handle: (request: Request) => Effect.Effect<Response>) =>
   Effect.gen(function* () {
     const app = Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
@@ -392,6 +404,22 @@ export const coreLoopWorld = (
 
     // Each DO's database, kept so a test can read its rows back.
     const databases = new Map<string, Context.Context<SqlClient>>();
+
+    /** `read` over a project's DO store; none before anyone called the DO. */
+    const readStore = <A>(
+      project: ProjectName,
+      read: (store: ProjectStore["Service"]) => Effect.Effect<A>
+    ): Effect.Effect<Option.Option<A>> =>
+      Option.match(Option.fromUndefinedOr(databases.get(project)), {
+        onNone: () => Effect.succeedNone,
+        onSome: (sql) =>
+          ProjectStore.use(read).pipe(
+            Effect.asSome,
+            Effect.provide(
+              ProjectStoreSqlite.pipe(Layer.provide(Layer.succeedContext(sql)))
+            )
+          ),
+      });
 
     // The `PROJECT` namespace in process: a name is one DO, made on its
     // first call, a shell over a database of its own, living in the world's
@@ -653,18 +681,13 @@ export const coreLoopWorld = (
           printed.set(scriptKey(at, lane), stdout);
         }),
       ratchets: (project) =>
-        Option.match(Option.fromUndefinedOr(databases.get(project)), {
-          onNone: () => Effect.succeed([]),
-          onSome: (sql) =>
-            ProjectStore.use((store) => store.load()).pipe(
-              Effect.map(({ ratchets }) => ratchets),
-              Effect.provide(
-                ProjectStoreSqlite.pipe(
-                  Layer.provide(Layer.succeedContext(sql))
-                )
-              )
-            ),
-        }),
+        Effect.map(
+          readStore(project, (store) => store.load()),
+          Option.match({
+            onNone: () => [],
+            onSome: ({ ratchets }) => ratchets,
+          })
+        ),
       rpc: (as) => clients[as],
       script: (at, lane, results) =>
         Effect.sync(() => {
@@ -679,5 +702,12 @@ export const coreLoopWorld = (
           );
         }),
       settle: () => carry(0),
+      stored: (project) =>
+        readStore(project, (store) =>
+          Effect.all({
+            events: store.eventsSince(0, Number.MAX_SAFE_INTEGER),
+            rows: store.load(),
+          })
+        ),
     };
   });
