@@ -8,10 +8,10 @@ Open source had one front door: anyone could offer a change, and a maintainer wo
 
 A platform can do what a setting on a code host cannot:
 
-- **Judge with checks the answer cannot touch.** The files that decide what the checks do (test and lint config, scripts, CI files, the config folder, `.env.schema`) are derived from the project's own run block. A push that edits one, or adds a `.skip` or a lint disable without a reason, is refused at the push.
+- **Judge with checks the answer cannot touch.** The files that decide what the checks do (test and lint config, scripts, CI files, the config folder, `.env.schema`, and every file the project's own run commands name) form its judge closure. A push that edits one, or adds a `.skip` or a lint disable without a reason, is refused at the push.
 - **Hold checks back.** A maintainer's held-back checks run on every answer; the answerer learns one result per area, and each landing names the suite's salted commitment.
 - **Refuse in git's own words.** A refusal is a member of one closed, typed union about the contribution, printed in `git push`'s `remote:` lines with the command to run next and whether retrying can help.
-- **Give one person one claim.** A claim is an exclusive, expiring right to answer an ask, so two agents never race on the same change.
+- **Give an ask one claimant.** A claim is an exclusive, expiring right to answer an ask, so two agents never race on the same change; racing is opt-in, for the kinds of ask where parallel attempts are the point.
 - **Credit the asker too.** A landing names every person by trailer (`Asked-by`, `Signed-off-by`, `Decided-by`, `Finished-by` and more), and a person's record carries across projects. An agent is disclosed, never credited.
 
 Contributors meet four nouns, which [GLOSSARY.md](GLOSSARY.md) defines with the rest:
@@ -88,7 +88,7 @@ bun run seed -- --world node
 
 Wrangler deploys the three Workers; cf is our ops CLI. Cloudflare's cf can't deploy this platform yet: its config cannot declare the Artifacts push-event trigger, its deploy refuses the sandbox's container self-binding, and it would be a second deploy tool in the recording week. So Wrangler deploys, and cf runs read-mostly operations as `bun run ops -- <command>` ([ADR 0002](docs/adr/0002-wrangler-deploys-every-worker.md)).
 
-1. Name your stage `dev-<you>`. Add it to `stages` in `infra/stages.ts`, and give it an `env` block in `apps/platform/wrangler.jsonc`, `apps/sandbox/wrangler.jsonc` and `apps/web/wrangler.jsonc`, copied from `dev-oscabriel`'s; `packages/config/test/bootstrap.test.ts` holds the three files to the table.
+1. Name your stage `dev-<you>`. Add it to `stages` in `infra/stages.ts`, and give it an `env` block in `apps/platform/wrangler.jsonc`, `apps/sandbox/wrangler.jsonc` and `apps/web/wrangler.jsonc`, copied from `dev-oscabriel`'s with your stage's name in its place and your own handle as `OPERATOR_HANDLE`; `packages/config/test/bootstrap.test.ts` holds the three files to the table.
 2. Log Wrangler in once, and set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as `infra/.env.schema` describes (`bun run env:check` shows them, redacted):
 
    ```sh
@@ -113,7 +113,7 @@ Wrangler deploys the three Workers; cf is our ops CLI. Cloudflare's cf can't dep
    bun run deploy -- --stage dev-<you>
    ```
 
-6. Seed the two examples. The seed acts as the examples' fictional deciders, so the stage's `SESSION_TOKENS` must give each of them a token:
+6. Seed the two examples. The seed makes each project as the operator (`OPERATOR_TOKEN`) and opens its asks as the examples' fictional deciders, so the stage's `SESSION_TOKENS` must give each of them a token; varlock hands the seed both:
 
    ```sh
    ./node_modules/.bin/varlock run --path apps/platform/ -- bun run seed -- --stage dev-<you>
@@ -129,7 +129,7 @@ Wrangler deploys the three Workers; cf is our ops CLI. Cloudflare's cf can't dep
 
 ### Install the CLI
 
-The platform serves the CLI itself, linux-x64 and darwin-arm64 binaries from the stage's own `releases-<stage>` bucket, which `bun run release` fills:
+The platform serves the CLI itself: the install script and the linux-x64 and darwin-arm64 binaries come from the stage's own `releases-<stage>` bucket:
 
 ```sh
 curl -fsSL <origin>/install.sh | sh
@@ -146,7 +146,7 @@ A harness needs nothing of ours to read a refusal: it arrives in `git push` outp
 
 - **`myr mcp`** serves the platform's tools over MCP on stdio, in all five protocol versions from 2024-11-05 to 2026-07-28.
 - **Remote MCP** at `<platform>/mcp` speaks the stateless 2026-07-28 protocol, signed in through the platform's OAuth; the web's `/.well-known/mcp.json` points at it.
-- **The credential helper**, `git-credential-myr`, hands git the stored token for the platform's host and never prompts. It passes the harness and model it finds in the environment (`AI_AGENT`, `PI_*`) as audit metadata, which a landing discloses as `Assisted-by`; identity is only ever the person's token.
+- **The credential helper**, `git-credential-myr`, hands git the stored token for the platform's host and never prompts. It passes the harness and model it finds in the environment (`AI_AGENT` first, then Claude Code's, Cursor's or pi's own variables) as audit metadata, which a landing discloses as `Assisted-by`; identity is only ever the person's token.
 - **`myr hook <event> --json`** answers Claude Code's hooks (session start, before a tool runs, before stopping) with the gate's own policy. It fails open: the gateway stays the authority.
 - **The pi package.** Once published, the package carries a `"pi"` key, so `pi install npm:@myr/cli` gives a pi agent the claim's brief, a guard before it edits the judge closure, and a verdict loop that continues at most three times.
 
@@ -174,7 +174,7 @@ Each promise names the check that holds it, and `bun run verify` runs every one.
 | Held-back checks run with egress off and only after the setup snapshot is taken, so no sealed file is ever cached; they report one result per area, with no output. | `apps/sandbox/test/held-back.test.ts`, `apps/platform/test/visibility/held-back.test.ts` |
 | Nobody reads a write-only value back, and unlanded code sees only a placeholder. | `apps/platform/test/visibility/env-values.test.ts`, `apps/sandbox/test/env-injection.test.ts` |
 | Rules are deterministic: config code sees the facts' clock and seed, never the wall clock. | `packages/rules/test/replay.test.ts` |
-| Lifecycles are pure transitions, and a model test over generated histories catches a planted bug. | `packages/project/test/claim.model.test.ts`, `packages/project/test/landing.model.test.ts` |
+| Lifecycles are pure transitions, and model tests over generated histories hold every invariant after every step. | `packages/project/test/claim.model.test.ts`, `packages/project/test/landing.model.test.ts` |
 | The web's production build carries none of the dev world. | `apps/web/test/production-bundle.test.ts` |
 | Visibility plugs in by one marked line, and nothing else reaches into it. | `packages/config/test/cartridge.test.ts` |
 | Each Worker's bundle stays under its byte budget. | `bun run bytes:check` |
@@ -183,7 +183,7 @@ Each promise names the check that holds it, and `bun run verify` runs every one.
 
 What it does not promise:
 
-- **Held-back checks are hidden from people and agents, not from the code under test.** Each runs in a sandbox of its own with the network off, gives back no output, and is capped at a number of failed attempts per area each week. That raises the cost of reading them; it cannot stop a determined reader whose code runs beside them. The `Held-back:` trailer says how many sealed checks a landing passed, nothing more.
+- **Held-back checks are hidden from people and agents, not from the code under test.** They run in the check job's own container with the network off, nothing they or the lanes beside them print comes back, and a claim, or a person in one area, may fail an area only a few times each week. That raises the cost of reading them; it cannot stop a determined reader whose code runs beside them. The `Held-back:` trailer names each area, how many of its sealed checks passed and the suite's commitment, nothing more.
 - **Verdicts after the push are asynchronous.** Custody and shape refusals arrive in `git push`; the merged-tree checks report through `myr status`, `myr verdict`, MCP, the web, and a git note on the answer's head.
 - **No numbers but the table's.** The Numbers section holds only what a live run measured, each with its stage and date.
 
@@ -191,17 +191,17 @@ What it does not promise:
 
 The cut lines, as built, in the order they go when time runs short (the first row first). A cut that follows this section is safe by default ([AGENTS.md](AGENTS.md)).
 
-Only visibility is a cartridge: its files plus one marked line, cut by deletion. The visibility build's own integration (issue 699) proved it: it deleted the cartridge in a scratch worktree, 103 files and 18,364 lines, and `bun run verify` stayed green. The other rows are not cartridges: each lists the files a cut deletes and the callers it edits, and none of those cuts has been rehearsed.
+A cartridge is a cut line removed by deletion. Visibility is the one plugged in by a marked line in `apps/platform/src/cartridges.ts`, and the one whose cut has been rehearsed: the visibility build's own integration (issue 699) deleted it in a scratch worktree, 103 files changed and 18,364 lines deleted, and `bun run verify` stayed green. The other rows list the files a cut deletes and the callers it edits, and none of those cuts has been rehearsed.
 
 | Cut line | What goes | What removes it |
 | --- | --- | --- |
 | 1 | Agent extras: the Markdown ask page, per-project well-known skills, and `myr schema` | `apps/web/src/features/ask/markdown.ts`, `apps/web/test/ask-markdown.test.ts`; `packages/agent-kit/src/well-known.ts`, `apps/platform/src/well-known.ts`, `apps/platform/test/well-known.test.ts`, `apps/web/src/routes/[.]well-known/agent-skills/$.ts`; `apps/cli/test/schema.test.ts` and the `schema` command in `apps/cli/src/surfaces.ts` |
-| 1 | The pi adapter | its module and test under `apps/cli/src/` and `apps/cli/test/`, its entry in `apps/cli/tsdown.config.ts`, and the pi dev dependency in `apps/cli/package.json` |
+| 1 | The pi adapter | its module and test under `apps/cli/src/` and `apps/cli/test/`, its lines in `apps/cli/tsdown.config.ts`, and the pi dev dependency in `apps/cli/package.json` |
 | 2 | `myr why`, verdicts as git notes, and the `ReachedInternals` stage | `apps/cli/src/local/why.ts`, `apps/cli/test/local/why.test.ts`; `packages/git/src/notes.ts`, `apps/platform/src/workflows/notes.ts`, `packages/git/test/notes.test.ts`, `apps/platform/test/notes.test.ts` (verdicts still reach `status`, `verdict` and MCP); `packages/gate/src/imports.ts`, `packages/gate/test/imports.test.ts` and its branch in `packages/gate/src/stages/shape.ts` |
 | 3 | Admission runs and env injection | `packages/project/src/visibility/admission.ts`, `apps/platform/src/workflows/admission-steps.ts`, `packages/project/test/visibility/admission.test.ts`, `apps/platform/test/visibility/admission.test.ts`; `apps/sandbox/src/env-gateway.ts`, `apps/sandbox/src/checker/env.ts`, `apps/sandbox/test/env-injection.test.ts` |
-| 4 | Live streaming views (the pages fall back to reading again every 5 s) | `apps/platform/src/watch.ts`, `apps/platform/test/watch.test.ts`, `apps/web/src/client/watch.ts`, `apps/web/test/watch.test.ts`, the `ProjectSockets` entry in `apps/platform/src/ports.ts`, and the `Watch` contract in `packages/protocol/src/contracts.ts` with its callers |
+| 4 | Live streaming views (the pages poll every 5 s instead, as they already do when the stream fails) | `apps/platform/src/watch.ts`, `apps/platform/test/watch.test.ts`, the `ProjectSockets` entry in `apps/platform/src/ports.ts`, the `Watch` contract in `packages/protocol/src/contracts.ts` with its callers, and the stream half of `apps/web/src/client/watch.ts` and `apps/web/test/watch.test.ts`, keeping the polling |
 | 4 | The D1 projection (the platform falls back to an empty memory front page) | `packages/project/src/projection-d1/`, `packages/project/test/projection-d1.test.ts`, `packages/project/test/projection-d1-credits.test.ts`, `packages/project/test/projection-d1.fixtures.ts`, `apps/platform/migrations/0001_front_page.sql`, `apps/platform/migrations/0004_projects_credits.sql`, and its entry in `apps/platform/src/ports.ts` |
-| 5 | Visibility, the cartridge: layers, held-back checks, posture, the ledger, the env shape and write-only values | `packages/visibility/`, `packages/project/src/visibility/`, `packages/project/test/visibility/`, `apps/platform/src/visibility/`, `apps/platform/test/visibility/`, `apps/cli/test/local/env-set-live.test.ts`, `packages/config/test/seed-layer.test.ts`, `examples/datekit/layers/`, `packages/config/test/cartridge.test.ts`; the marked line in `apps/platform/src/cartridges.ts`; the `@repo/visibility` lines in `apps/platform/package.json` and `packages/project/package.json`; `ARTIFACTS_PRIVATE` and `MASTER_KEY` in `apps/platform/wrangler.jsonc` and `apps/platform/.env.schema` |
+| 5 | Visibility, the cartridge: layers, held-back checks, posture, the ledger, the env shape and write-only values | `packages/visibility/`, `packages/project/src/visibility/`, `packages/project/test/visibility/`, `apps/platform/src/visibility/`, `apps/platform/test/visibility/`, `apps/cli/test/local/env-set-live.test.ts`, `packages/config/test/seed-layer.test.ts`, `examples/datekit/layers/`, `packages/config/test/cartridge.test.ts`; the marked line in `apps/platform/src/cartridges.ts`; the `@repo/visibility` lines in `apps/platform/package.json` and `packages/project/package.json`; `ARTIFACTS_PRIVATE` and `MASTER_KEY` wherever they are named outside it (`apps/platform/wrangler.jsonc`, `apps/platform/.env.schema`, the env decode in `apps/platform/src/platform.ts`, the platform's test env in `apps/platform/test/fake-env.ts` and `apps/platform/test/serve-world.ts`, and their type and binding tests), with the layer rows in `packages/config/test/bootstrap.test.ts` and `packages/config/test/seed.test.ts`; then `bun run --cwd apps/platform types` |
 | 6 | Never cut: the core loop, refusals in git's output, the split family the agents answer together, credit trailers, Today and the front page | `apps/platform/test/core-loop.test.ts`, `examples/burrow/`, `packages/git/src/trailers.ts`, `packages/project/src/attention/today.ts`, `packages/project/src/front-page.ts` |
 
 ## Architecture

@@ -8,10 +8,12 @@
  * headers are the record of what is borrowed).
  *
  * A path is a token in the README's code (inline or fenced) or a link
- * target whose first segment is one of the repo's own top-level entries;
- * `{a,b}` names both, and `*` or `<name>` stands for part of one segment,
- * so such a pattern must match at least one file. Pure file reads, and one
- * `git ls-files` for the files a path may name.
+ * target whose first segment is one of the repo's own top-level entries, or
+ * that reads as a relative file path whatever its first segment, so a typo
+ * or a renamed top-level folder is caught too; `{a,b}` names both, and `*`
+ * or `<name>` stands for part of one segment, so such a pattern must match
+ * at least one file. Pure file reads, and one `git ls-files` for the files
+ * a path may name.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
@@ -93,6 +95,14 @@ const PORTED = /Ported from (?<upstream>[\w.-]+\/[\w.-]+)@[\da-f]{7,40}\b/u;
 
 /** A test file, by its name. */
 const TEST_FILE = /\.test(?:-d)?\.tsx?$/u;
+
+/**
+ * A token that reads as a relative file path: segments of path characters
+ * (pattern ones included), at least two, the last with an extension. A URL,
+ * a ref or a package name has a colon, no extension or a leading `@`, `/`
+ * or `<`.
+ */
+const FILE_PATH = /^\.?[\w-][\w.-]*(?:\/[\w.[\]$<>{},*-]+)+\.\w+$/u;
 
 // ------------------------------------------------------------ the repo
 
@@ -271,12 +281,14 @@ const expand = (token: string): readonly string[] => {
     .flatMap((option) => expand(`${before}${option}${after}`));
 };
 
-/** The repo paths among `tokens`: those whose first segment is a top-level entry. */
+/** The repo paths among `tokens`: those under a top-level entry, and any that read as a file path. */
 const pathsAmong = (tokens: readonly string[], roots: ReadonlySet<string>) =>
   tokens.flatMap((token) => {
     const path = trimmed(token).replace(/^\.\//u, "");
 
-    return roots.has(path.split("/")[0] ?? "") ? expand(path) : [];
+    return roots.has(path.split("/")[0] ?? "") || FILE_PATH.test(path)
+      ? expand(path)
+      : [];
   });
 
 /** Every repo path the README's code and links name. */
@@ -311,19 +323,29 @@ const exists = (path: string, files: readonly string[]) => {
   return files.some((file) => pattern.test(file));
 };
 
+/** Whether a line is one of a Markdown table's rows. */
+const isRow = (line: string) => line.trimStart().startsWith("|");
+
 /** The rows of the first table in `body`, each as its cells, header and rule left out. */
-const tableRows = (body: string) =>
-  body
-    .split("\n")
-    .filter((line) => line.trimStart().startsWith("|"))
-    .slice(2)
-    .map((line) =>
-      line
-        .trim()
-        .replaceAll(/^\||\|$/gu, "")
-        .split("|")
-        .map((cell) => cell.trim())
-    );
+const tableRows = (body: string) => {
+  const lines = body.split("\n");
+  const start = lines.findIndex(isRow);
+
+  if (start === -1) {
+    return [];
+  }
+
+  const rest = lines.slice(start);
+  const end = rest.findIndex((line) => !isRow(line));
+
+  return (end === -1 ? rest : rest.slice(0, end)).slice(2).map((line) =>
+    line
+      .trim()
+      .replaceAll(/^\||\|$/gu, "")
+      .split("|")
+      .map((cell) => cell.trim())
+  );
+};
 
 /** Each `bun run` in `text`: the folder it runs in (the root, or `--cwd`'s) and its script. */
 const runs = (text: string) =>
