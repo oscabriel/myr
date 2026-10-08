@@ -6,9 +6,9 @@
  * prints one JSON document as its last line of stdout: `Collected`, `Called`
  * or `Failed`. Plain JavaScript as source text, like the prelude.
  *
- * `job.json`: `{entry, project?: {file, path}, asks: [{file, path}]}` for an
- * evaluation, plus `{rule, facts}` for a call; `file` is where a module was
- * written, `path` its path in the bundle.
+ * `job.json`: `{entry, project?: {file, path}, visibility?: {file, path},
+ * asks: [{file, path}]}` for an evaluation, plus `{rule, facts}` for a call;
+ * `file` is where a module was written, `path` its path in the bundle.
  */
 export const bunMain = `
 import job from "./job.json" with { type: "json" };
@@ -74,8 +74,14 @@ const run = async () => {
     asks.push(loaded.exported);
   }
 
+  const visibility = job.visibility === undefined ? undefined : await load(job.visibility);
+
+  if (visibility?.failure !== undefined) {
+    return visibility.failure;
+  }
+
   try {
-    return { _tag: "Collected", ...entry.collect(project?.exported, asks) };
+    return { _tag: "Collected", ...entry.collect(project?.exported, asks, visibility?.exported) };
   } catch (error) {
     return failed("the config folder's exports", error, "threw");
   }

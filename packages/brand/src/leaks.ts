@@ -19,12 +19,17 @@ const HOME = "packages/brand/";
 const PROSE = /(?:^|\/)(?:LICENSE[^/]*|[^/]+\.md)$/u;
 
 // An example project's config folder is named after the brand, and its files
-// import the SDK by its published name: `examples/<name>/<config dir>/…`. The
-// example's own code is not exempt.
+// import the SDK by its published name: `examples/<name>/<config dir>/…`, and
+// a layer's the same at its repo's root, `examples/<name>/layers/<layer>/
+// <config dir>/…`. The example's own code is not exempt.
 const inExampleConfig = (path: string) => {
-  const [root, , dir] = path.split("/");
+  const [root, , dir, , layerDir] = path.split("/");
 
-  return root === "examples" && dir === Brand.configDir;
+  return (
+    root === "examples" &&
+    (dir === Brand.configDir ||
+      (dir === "layers" && layerDir === Brand.configDir))
+  );
 };
 
 // Letters on either side make it another word ("myriad"), not the name.

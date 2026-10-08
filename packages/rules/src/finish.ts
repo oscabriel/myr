@@ -2,6 +2,7 @@ import type { Glob } from "@repo/protocol/domain/common";
 import { FromCI, Policy } from "@repo/protocol/domain/policy";
 import type { PolicyInput } from "@repo/protocol/domain/policy";
 import { RunBlock } from "@repo/protocol/domain/run";
+import { VisibilityPolicy } from "@repo/protocol/domain/visibility";
 import type { LandedSha, RepoPath } from "@repo/protocol/ids";
 import { packageDir } from "@repo/sdk";
 import { Array as Arr, Context, DateTime, Effect, Schema } from "effect";
@@ -245,7 +246,20 @@ export const finishPolicy = (input: {
       weakening: policy.weakening,
     } satisfies typeof Policy.Encoded;
 
-    return yield* Schema.decodeEffect(Policy)(candidate).pipe(
+    // The project's layers and held-back checks, as `visibility.ts` states
+    // them; a project without one is Open (OSR §4.1).
+    const stated =
+      policy.visibility === undefined
+        ? candidate
+        : {
+            ...candidate,
+            // A decoded policy always encodes.
+            visibility: yield* Effect.orDie(
+              Schema.encodeEffect(VisibilityPolicy)(policy.visibility)
+            ),
+          };
+
+    return yield* Schema.decodeEffect(Policy)(stated).pipe(
       Effect.mapError(failedAt(`the policy at ${at}`))
     );
   });

@@ -7,7 +7,9 @@
  * each ask's check, run alone by the block's test command, is red by an
  * assertion. The example is a Bun project of its own, outside the
  * workspaces (spec D21), so each command runs as a child process under
- * `sh -c`, the way the platform's Checker runs a project's commands.
+ * `sh -c`, the way the platform's Checker runs a project's commands, in a
+ * copy of its public tree: every file git tracks but its layers (`layers/`,
+ * pushed to the private namespace, never to main; issue 608).
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
@@ -137,18 +139,46 @@ const readReport = (output: string): BunReport => {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** Runs `command` inside the example under `sh -c`, as the Checker runs a lane. */
-const inExample = (command: string) =>
+/**
+ * The example's public tree in a folder of its own, for as long as the
+ * scope lasts: every file git tracks under it but its layers, as the seed
+ * pushes main.
+ */
+const publicTree = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  const root = yield* repoRoot;
+  const dir = yield* fs.makeTempDirectoryScoped({ prefix: "datekit-main-" });
+
+  const tracked = yield* spawner.string(
+    ChildProcess.make("git", ["ls-files", "-z", "--", example], { cwd: root })
+  );
+
+  const files = tracked
+    .split("\0")
+    .filter((file) => file.startsWith(`${example}/`))
+    .map((file) => file.slice(example.length + 1))
+    .filter((file) => !file.startsWith("layers/"));
+
+  for (const file of files) {
+    yield* fs.makeDirectory(path.dirname(path.join(dir, file)), {
+      recursive: true,
+    });
+    yield* fs.copyFile(path.join(root, example, file), path.join(dir, file));
+  }
+
+  return dir;
+});
+
+/** Runs `command` in the example's public tree at `dir` under `sh -c`, as the Checker runs a lane. */
+const inTree = (dir: string, command: string) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const path = yield* Path.Path;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-      const root = yield* repoRoot;
 
       const child = yield* spawner.spawn(
-        ChildProcess.make("sh", ["-c", command], {
-          cwd: path.join(root, example),
-        })
+        ChildProcess.make("sh", ["-c", command], { cwd: dir })
       );
 
       const [stdout, stderr, exitCode] = yield* Effect.all(
@@ -225,7 +255,7 @@ describe("the datekit example", () => {
     () =>
       Effect.gen(function* () {
         // The example's own `package.json` test script.
-        const run = yield* inExample("bun test");
+        const run = yield* inTree(yield* publicTree, "bun test");
         const report = readReport(run.output);
         const checks = yield* askChecks;
 
@@ -266,7 +296,7 @@ describe("the datekit example", () => {
           passedOrFailed: report.passed + report.failed,
         }).toStrictEqual({ files: 7, passedOrFailed: report.ran.tests });
         expect(report.passed).toBeGreaterThan(0);
-      }).pipe(Effect.provide(NodeServices.layer)),
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     // One `bun test` over a small library: well under a second alone. The
     // limit catches a hang while turbo runs every package's tests at once.
     30_000
@@ -278,12 +308,13 @@ describe("the datekit example", () => {
       Effect.gen(function* () {
         const { lanes, test } = yield* runBlock;
         const checks = yield* askChecks;
+        const tree = yield* publicTree;
 
         // A lane red on main refuses every answer (`VerifierBlocked`), so the
         // suite every answer keeps green leaves the open asks' checks out and
         // runs the four the library keeps green.
         const laneRuns = yield* Effect.forEach(lanes, ({ command, lane }) =>
-          Effect.map(inExample(command), (run) => {
+          Effect.map(inTree(tree, command), (run) => {
             const report = readReport(run.output);
 
             return {
@@ -304,7 +335,7 @@ describe("the datekit example", () => {
         // (`NotRedFirst` otherwise): the test command, with the check's path
         // for `{path}`, fails its one test by an assertion.
         const checkRuns = yield* Effect.forEach(checks, ({ check }) =>
-          Effect.map(inExample(test.replaceAll("{path}", check)), (run) => {
+          Effect.map(inTree(tree, test.replaceAll("{path}", check)), (run) => {
             const report = readReport(run.output);
 
             return {
@@ -328,7 +359,7 @@ describe("the datekit example", () => {
             failing: [{ assertion: true, file, loaded: true, tests: 1 }],
           }))
         );
-      }).pipe(Effect.provide(NodeServices.layer)),
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     // Four `bun test` runs over a small library, one after another.
     30_000
   );

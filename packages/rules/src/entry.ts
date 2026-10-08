@@ -36,25 +36,35 @@ export interface CollectedData {
     readonly path: string;
   }[];
   readonly project?: Schema.Json;
+  readonly visibility?: Schema.Json;
 }
 
 /** A module with no default export gives `null`, which the host refuses. */
 const dataOf = (definition: Definition | undefined): Schema.Json =>
   definition ?? null;
 
-/** Collects the project module's data (when the folder has one) and every ask's. */
+/**
+ * Collects the project module's data and the visibility module's (each when
+ * the folder has one), and every ask's.
+ */
 export const collect = (
   project: Exported | undefined,
-  asks: readonly Exported[]
+  asks: readonly Exported[],
+  visibility?: Exported
 ): CollectedData => {
   const collected = asks.map(({ definition, path }) => ({
     ask: dataOf(definition),
     path,
   }));
 
-  return project === undefined
-    ? { asks: collected }
-    : { asks: collected, project: dataOf(project.definition) };
+  const withProject: CollectedData =
+    project === undefined
+      ? { asks: collected }
+      : { asks: collected, project: dataOf(project.definition) };
+
+  return visibility === undefined
+    ? withProject
+    : { ...withProject, visibility: dataOf(visibility.definition) };
 };
 
 const isRule = (value: unknown): value is Rule => Predicate.isFunction(value);

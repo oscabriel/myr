@@ -2,6 +2,7 @@ import { NodeServices } from "@effect/platform-node";
 import { assert, describe, expect, it } from "@effect/vitest";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { Policy } from "@repo/protocol/domain/policy";
+import type { VisibilityPolicy } from "@repo/protocol/domain/visibility";
 import { RepoPath } from "@repo/protocol/ids";
 import { ClaimantFacts, ProposalFacts } from "@repo/sdk";
 import { Duration, Effect, Layer, Result, Schema } from "effect";
@@ -241,6 +242,41 @@ const failed = (modules: ConfigBundle) =>
     return result.failure;
   });
 
+/**
+ * A `visibility.ts`'s default export, as the sdk writes it: one layer of
+ * held-back checks for one area (OSR §4.1, abridged).
+ */
+const visibilityEncoded = {
+  checks: {
+    admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },
+    areas: { parse: "packages/parse/**" },
+    attempts: { perClaim: 3, perPersonPerAreaPerWeek: 10 },
+    canary: false,
+    commit: "salted-sha256-merkle",
+    layer: "maintainers",
+    pin: "claim",
+    result: "area-bit",
+  },
+  env: { setters: "deciders" },
+  flows: { noWriteDown: true, release: "deciders" },
+  layers: [
+    {
+      audience: "maintainers",
+      disclose: "sealed",
+      holds: ["checks"],
+      name: "maintainers",
+      readers: "deciders",
+      reason: "Held-back checks for the parser",
+      writers: "deciders",
+    },
+  ],
+  notice: { narrowingDays: 7 },
+} satisfies typeof VisibilityPolicy.Encoded;
+
+/** A module whose default export is `data`. */
+const exporting = (data: Schema.Json) =>
+  `export default ${JSON.stringify(data)};\n`;
+
 /** An ask file whose brief says what happens today, but not what is wanted. */
 const noWant = `export default ${JSON.stringify({
   blockedBy: [],
@@ -295,6 +331,58 @@ describe("the /bun adapter", () => {
   it.live("gives the defaults to a project with no config folder", () =>
     Effect.gen(function* () {
       expect(yield* evaluated(bundleOf({}))).toStrictEqual(defaultsEncoded);
+    }).pipe(Effect.provide(bunEvaluator()))
+  );
+
+  it.live(
+    "reads visibility.ts into the policy's visibility, beside the project module or without one",
+    () =>
+      Effect.gen(function* () {
+        const project = yield* baseProject;
+
+        const beside = yield* evaluated(
+          bundleOf({
+            "project.ts": project,
+            "visibility.ts": exporting(visibilityEncoded),
+          })
+        );
+
+        const alone = yield* evaluated(
+          bundleOf({ "visibility.ts": exporting(visibilityEncoded) })
+        );
+
+        const without = yield* evaluated(bundleOf({ "project.ts": project }));
+
+        expect([
+          beside.visibility,
+          alone.visibility,
+          without.visibility,
+        ]).toStrictEqual([visibilityEncoded, visibilityEncoded, undefined]);
+        expect(alone.source).toBe("config");
+      }).pipe(Effect.provide(bunEvaluator()))
+  );
+
+  it.live("names a visibility.ts that states no visibility", () =>
+    Effect.gen(function* () {
+      const project = yield* baseProject;
+
+      const failures = yield* Effect.forEach(
+        ["export const nothing = 1;\n", exporting({ layers: "maintainers" })],
+        (visibility) =>
+          failed(
+            bundleOf({ "project.ts": project, "visibility.ts": visibility })
+          )
+      );
+
+      expect(
+        failures.map(({ detail, reason }) => ({
+          names: detail.includes(`${configFolder}/visibility.ts`),
+          reason,
+        }))
+      ).toStrictEqual([
+        { names: true, reason: "decode" },
+        { names: true, reason: "decode" },
+      ]);
     }).pipe(Effect.provide(bunEvaluator()))
   );
 

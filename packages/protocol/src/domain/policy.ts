@@ -170,6 +170,8 @@ export const PolicyInput = Schema.Struct({
   ),
   run: Schema.Union([RunBlock, FromCI]),
   source: Source,
+  /** The config folder's `visibility.ts`, evaluated; absent, the project is Open. */
+  visibility: Schema.optionalKey(VisibilityPolicy),
   vouch: Vouch.pipe(
     Schema.withDecodingDefaultKey(
       Effect.succeed({

@@ -482,15 +482,20 @@ export const configEntry = `${Brand.configDir}/project.ts`;
 /** Whether a file in the config folder is code, which a bundle carries only inlined. */
 export const isScript = (path: string) => SCRIPT.test(path);
 
+/** The config folder's visibility module: its layers and held-back checks (W6). */
+const visibilityEntry = `${Brand.configDir}/visibility.ts`;
+
 /**
  * The modules the rules evaluator imports, each bundled on its own: the
- * project module and every ask file. Other code in the folder (helpers, an
- * ask's check) is inlined where an entry imports it, or left out.
+ * project module, the visibility module and every ask file. Other code in
+ * the folder (helpers, an ask's check) is inlined where an entry imports
+ * it, or left out.
  */
 export const bundleEntries = (paths: readonly string[]) =>
   paths.filter(
     (path) =>
       path === configEntry ||
+      path === visibilityEntry ||
       (path.startsWith(`${Brand.configDir}/asks/`) && ASK_FILE.test(path))
   );
 

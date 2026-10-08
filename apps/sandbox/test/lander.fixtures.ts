@@ -302,7 +302,8 @@ export const config = (file: string) => `${Brand.configDir}/${file}`;
  * A config folder as maintainers write one: the project module (importing
  * the sdk by its published name, and a helper beside it), an ask file
  * (importing the sdk by its workspace name), the ask's check, which imports
- * a test runner the Lander never has, and the vouch file.
+ * a test runner the Lander never has, the visibility module, and the vouch
+ * file.
  */
 export const configFolder = {
   [config("asks/parse-iso.ask.ts")]: [
@@ -332,6 +333,17 @@ export const configFolder = {
     "  admit: (claimant) => claimant.vouched && claimant.record > 1,",
     '  budget: { decisionsPerDay: 3, expire: "7 days" },',
     "  deciders,",
+    "});",
+    "",
+  ].join("\n"),
+  [config("visibility.ts")]: [
+    `import { layer, sealedChecks, visibility } from "${Brand.cliPackage}/rules";`,
+    "",
+    "export default visibility({",
+    '  checks: sealedChecks({ areas: { parse: "src/date.ts" } }),',
+    "  layers: {",
+    '    maintainers: layer({ disclose: "sealed", holds: ["checks"], reason: "Held-back checks" }),',
+    "  },",
     "});",
     "",
   ].join("\n"),

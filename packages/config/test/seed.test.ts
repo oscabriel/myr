@@ -49,7 +49,7 @@ const onDisk = (example: string, path: string) =>
 
 describe(planSeed, () => {
   it.effect(
-    "plans datekit as the library before anyone asked: every tracked file but the asks and their checks, then each ask with its check, opened by ines-v",
+    "plans datekit as the library before anyone asked: every tracked file but the asks, their checks and its layer, then each ask with its check, opened by ines-v",
     () =>
       Effect.gen(function* () {
         const plan = yield* planSeed("examples/datekit");
@@ -69,6 +69,7 @@ describe(planSeed, () => {
           ".env.test",
           ".gitignore",
           `${config}/project.ts`,
+          `${config}/visibility.ts`,
           `${config}/vouched.td`,
           "LICENSE",
           "README.md",
@@ -214,6 +215,7 @@ describe(runSeed, () => {
             "OpenAsk datekit/add-months-clamp: done",
             "OpenAsk datekit/format-ordinal: done",
             "OpenAsk datekit/parse-iso-week: done",
+            "Layer datekit--maintainers: done",
             "Init burrow: done",
             "Push burrow: done",
             "OpenAsk burrow/drop-legacy-fetch: done",
@@ -407,21 +409,22 @@ describe(main, () => {
           "datekit",
         ]);
 
-        expect(printed.slice(0, 6)).toStrictEqual([
+        expect(printed.slice(0, 7)).toStrictEqual([
           "seed: datekit on the Node world",
           "Init datekit: done",
           "Push datekit: done",
           "OpenAsk datekit/add-months-clamp: done",
           "OpenAsk datekit/format-ordinal: done",
           "OpenAsk datekit/parse-iso-week: done",
+          "Layer datekit--maintainers: done",
         ]);
 
-        expect(printed[6]).toMatch(
+        expect(printed[7]).toMatch(
           /^datekit: main at [\da-f]{12}, 3 open asks, decided by ines-v$/u
         );
 
-        expect(printed.slice(7)).toStrictEqual([
-          "seeded 1 project on the Node world: 5 steps, 5 done, 0 already",
+        expect(printed.slice(8)).toStrictEqual([
+          "seeded 1 project on the Node world: 6 steps, 6 done, 0 already",
         ]);
       }),
     60_000

@@ -210,6 +210,51 @@ describe("the datekit example's config folder", () => {
       }).pipe(Effect.provide(bunEvaluator()))
   );
 
+  it.live(
+    "evaluates its visibility.ts into the policy: a sealed maintainers layer of checks for export and parser",
+    () =>
+      Effect.gen(function* () {
+        const { policy } = yield* evaluated;
+        const { visibility } = policy;
+
+        expect({
+          areas: visibility?.checks?.areas,
+          layers: visibility?.layers.map(
+            ({ audience, disclose, holds, name, readers, writers }) => ({
+              audience,
+              disclose,
+              holds,
+              name,
+              readers,
+              writers,
+            })
+          ),
+          suite: {
+            admit: visibility?.checks?.admit,
+            canary: visibility?.checks?.canary,
+            layer: visibility?.checks?.layer,
+          },
+        }).toStrictEqual({
+          areas: { export: "src/format.ts", parser: "src/parse.ts" },
+          layers: [
+            {
+              audience: "maintainers",
+              disclose: "sealed",
+              holds: ["checks", "notes"],
+              name: "maintainers",
+              readers: "deciders",
+              writers: "deciders",
+            },
+          ],
+          suite: {
+            admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },
+            canary: true,
+            layer: "maintainers",
+          },
+        });
+      }).pipe(Effect.provide(bunEvaluator()))
+  );
+
   it.live("reads its vouch file: the two maintainers and one contributor", () =>
     Effect.gen(function* () {
       const { policy } = yield* evaluated;

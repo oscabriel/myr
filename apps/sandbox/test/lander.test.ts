@@ -673,7 +673,7 @@ describe("the Lander's git", () => {
 
   describe(bundleRules, () => {
     it.live(
-      "bundles the project module and each ask file with the sdk inlined, to the data and rules the committed folder gives, beside its other files",
+      "bundles the project module, the visibility module and each ask file with the sdk inlined, to the data and rules the committed folder gives, beside its other files",
       () =>
         Effect.gen(function* () {
           const repos = yield* world;
@@ -694,11 +694,26 @@ describe("the Lander's git", () => {
               config("asks/parse-iso.ask.ts"),
               expect.stringMatching(/^\.[^/]+\/chunk-\w+\.js$/u),
               config("project.ts"),
+              config("visibility.ts"),
               config("vouched.td"),
             ],
             sdkVersion,
           });
           expect(bundled.modules[config("vouched.td")]).toBe("dora\nbob\n");
+
+          const visibilityModule = yield* importedFrom(
+            bundled.modules,
+            config("visibility.ts")
+          );
+
+          const visibilityAsCommitted = yield* importedFrom(
+            committed,
+            config("visibility.ts")
+          );
+
+          expect(dataOf(visibilityModule)).toStrictEqual(
+            dataOf(visibilityAsCommitted)
+          );
 
           const projectModule = yield* importedFrom(
             bundled.modules,

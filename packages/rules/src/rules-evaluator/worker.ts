@@ -6,6 +6,7 @@ import {
   fromCollected,
   projectModule,
   statedWithoutCode,
+  visibilityModule,
 } from "../config-folder.ts";
 import { defaultPolicyInput } from "../defaults.ts";
 import { Finishers, finishPolicy } from "../finish.ts";
@@ -256,8 +257,8 @@ const workerIdOf = (bundle: ConfigBundle, at: string, clock: FrozenFacts) =>
  * Dynamic Worker with no bindings, no outbound and a CPU limit, kept warm
  * per landed commit; asks it to collect the folder's exports or call a
  * rule; and disposes it after, whatever it answered. A bundle with no
- * project module and no asks reads `policy.json`, or gets the defaults,
- * without a worker. Then `finishPolicy`, with the caller's `Finishers`. The
+ * project module, no asks and no visibility module reads `policy.json`, or
+ * gets the defaults, without a worker. Then `finishPolicy`, with the caller's `Finishers`. The
  * adapter reads no clock: an evaluation's clock is `facts.now`, the landed
  * commit's time.
  */
@@ -288,6 +289,7 @@ export const RulesEvaluatorWorker = (
           js: mainModule({
             asks: askModules(bundle),
             project: projectModule(bundle),
+            visibility: visibilityModule(bundle),
           }),
         };
 
@@ -381,6 +383,7 @@ export const RulesEvaluatorWorker = (
           Effect.gen(function* () {
             const project = projectModule(modules);
             const asks = askModules(modules);
+            const visibility = visibilityModule(modules);
 
             const clock: FrozenFacts = {
               now: DateTime.toEpochMillis(facts.now),
@@ -395,7 +398,9 @@ export const RulesEvaluatorWorker = (
                 : defaultPolicyInput;
 
             const policy =
-              project === undefined && asks.length === 0
+              project === undefined &&
+              asks.length === 0 &&
+              visibility === undefined
                 ? fallback
                 : yield* run(modules, at, clock, {}).pipe(
                     Effect.flatMap(
@@ -407,6 +412,7 @@ export const RulesEvaluatorWorker = (
                             entry: project ?? modules.entry,
                             fallback,
                             initializer: facts.initializer,
+                            visibility,
                           }),
                         Failed: (output) => Effect.fail(fromFailed(output)),
                       })

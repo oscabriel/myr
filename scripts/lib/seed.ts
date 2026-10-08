@@ -3,17 +3,20 @@
  * project, read from the example's tracked files, and putting it there.
  *
  * A plan (`planSeed`) is the library as it was before anyone asked (every
- * tracked file but the asks and the checks they name), the decider its
- * config names for the whole tree, and each ask with the files it opens
- * with. Only what git tracks ships, so an ignored file, and above all a
- * closed env file, never leaves the machine.
+ * tracked file but the asks, the checks they name and the layers), the
+ * decider its config names for the whole tree, each ask with the files it
+ * opens with, and each layer the example keeps under `layers/<layer>/`
+ * with its known-bad trees (issue 608). Only what git tracks ships, so an
+ * ignored file, and above all a closed env file, never leaves the machine.
  *
  * A run (`runSeed`) makes the project and pushes main's first commit as the
  * platform's operator (spec D20: the initializer decides until the config
  * names deciders), through the gateway's first-push admission (D1), then
  * opens each ask as the decider, so each is red first on the platform's own
- * Checker (spec §5 steps 1–3). A step already done is reported `already`
- * and left alone, so a second run changes nothing.
+ * Checker (spec §5 steps 1–3). Last, as the decider, it pushes each layer
+ * to the repo the platform made for it in the private namespace, through
+ * the gateway (606), never to the public tree. A step already done is
+ * reported `already` and left alone, so a second run changes nothing.
  *
  * A platform is a `SeedTarget`: a stage (`stageTarget`) or the Node world
  * served by a process of its own (`worldTarget`), each reached over HTTP
@@ -24,11 +27,14 @@
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { AskListing } from "@repo/protocol/domain/ask";
+import { LayerManifest } from "@repo/protocol/domain/visibility";
 import {
   AskId,
   CommitSha,
   Handle,
+  LayerName,
   ProjectName,
+  RepoName,
   RepoPath,
   sameHandle,
 } from "@repo/protocol/ids";
@@ -47,6 +53,7 @@ import {
   Path,
   Redacted,
   Ref,
+  Schedule,
   Schema,
   Stream,
 } from "effect";
@@ -89,6 +96,38 @@ export interface AskStep {
   readonly files: Array.NonEmptyReadonlyArray<AskFile>;
 }
 
+/**
+ * A known-bad tree for a layer's admission (OSR §5.5): main's first tree
+ * with one change that breaks an area, made a commit of its own (no
+ * parent, the decider's, at the seed's fixed dates), so it is the same
+ * commit on every platform and the layer's manifest can name it.
+ */
+export interface KnownBadStep {
+  /** Its branch in the layer repo: `known-bad/<area>`. */
+  readonly branch: string;
+  /** The commit it comes to, which the layer's manifest names in `knownBad`. */
+  readonly commit: CommitSha;
+  /** What the change breaks: the words before its patch's diff. */
+  readonly message: string;
+  /** main's first tree, with the change applied. */
+  readonly files: Array.NonEmptyReadonlyArray<SeedFile>;
+}
+
+/**
+ * One layer the seed pushes to the private namespace, once main has landed
+ * and declared it: its repo's tree, at the same root-relative paths as
+ * main's (OSR §5.1), and the known-bad trees its admission runs on.
+ */
+export interface LayerStep {
+  readonly layer: LayerName;
+  /** Its repo in the private namespace: `<project>--<layer>` (spec §4.5). */
+  readonly repo: RepoName;
+  /** Every file under the example's `layers/<layer>/`, at its path there. */
+  readonly files: Array.NonEmptyReadonlyArray<SeedFile>;
+  /** One per `known-bad/<area>.patch` in the layer, by area. */
+  readonly knownBad: readonly KnownBadStep[];
+}
+
 /** What the seed puts on a platform for one example project. */
 export interface SeedPlan {
   readonly project: ProjectName;
@@ -99,10 +138,27 @@ export interface SeedPlan {
   readonly asks: readonly AskStep[];
   /** The ratchets the config declares, in place once main has landed. */
   readonly ratchets: readonly string[];
+  /** The layers the example keeps beside its public tree, pushed by the decider. */
+  readonly layers: readonly LayerStep[];
 }
 
 /** Where the asks live in an example: the config folder's `asks/`. */
 const ASKS = `${Brand.configDir}/asks/`;
+
+/**
+ * Where an example keeps its layers: `layers/<layer>/`, each the tree of
+ * that layer's repo. Nothing under it enters the public tree.
+ */
+const LAYERS = "layers/";
+
+/** A known-bad change a layer keeps: `known-bad/<area>.patch`. */
+const KNOWN_BAD = /^known-bad\/(?<area>[^/]+)\.patch$/u;
+
+/** A layer's manifest in the JSON form the platform reads (612). */
+const MANIFEST_FILE = `${Brand.configDir}/layer.json`;
+
+// Where a patch's diff starts; the words before it say what it breaks.
+const DIFF_START = /^(?:diff --git |--- )/mu;
 
 /** The config file that names the deciders and the ratchets. */
 const PROJECT_FILE = `${Brand.configDir}/project.ts`;
@@ -167,6 +223,274 @@ const textOf = (fs: FileSystem.FileSystem, at: string, path: string) =>
   fs
     .readFileString(at)
     .pipe(Effect.mapError(() => failed(`can't read ${path}`)));
+
+/**
+ * git's env for a commit by `handle`: fixed dates, so the same files make
+ * the same commit on every machine; no git config from this machine (no
+ * hooks, no signing); English messages.
+ */
+const authorEnv = (handle: Handle) => ({
+  GIT_AUTHOR_DATE: "2026-10-06T12:00:00Z",
+  GIT_AUTHOR_EMAIL: `${handle}@example.com`,
+  GIT_AUTHOR_NAME: handle,
+  GIT_COMMITTER_DATE: "2026-10-06T12:00:00Z",
+  GIT_COMMITTER_EMAIL: `${handle}@example.com`,
+  GIT_COMMITTER_NAME: handle,
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_TERMINAL_PROMPT: "0",
+  LC_ALL: "C",
+});
+
+/** All a byte stream says, as text. */
+const streamText = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
+  bytes.pipe(Stream.decodeText(), Stream.mkString);
+
+/**
+ * git with `args` in `cwd` under `env`, after the `-c` settings in
+ * `settings`: how it ended, and what it printed.
+ */
+const runGit = (
+  spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
+  cwd: string,
+  args: readonly string[],
+  env: Readonly<Record<string, string>>,
+  settings: readonly string[] = []
+) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const child = yield* spawner.spawn(
+        ChildProcess.make("git", [...settings, ...args], {
+          cwd,
+          env,
+          extendEnv: true,
+        })
+      );
+
+      const [stdout, stderr, code] = yield* Effect.all(
+        [streamText(child.stdout), streamText(child.stderr), child.exitCode],
+        { concurrency: "unbounded" }
+      );
+
+      return { code: Number(code), stderr, stdout };
+    })
+  ).pipe(
+    Effect.mapError(({ message }) =>
+      failed(`git ${args[0] ?? ""} didn't run: ${message}`)
+    )
+  );
+
+/** What git printed, when it ended well; else the seed fails with what it said. */
+const okOutput =
+  (args: readonly string[]) =>
+  ({ code, stderr, stdout }: Effect.Success<ReturnType<typeof runGit>>) =>
+    code === 0
+      ? Effect.succeed(stdout)
+      : Effect.fail(
+          failed(`git ${args.join(" ")} exited ${code}: ${stderr.trim()}`)
+        );
+
+/** `files` written under `dir`, each at its path. */
+const writeTree = (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  dir: string,
+  files: readonly { readonly path: string; readonly content: Uint8Array }[]
+) =>
+  Effect.forEach(
+    files,
+    ({ content, path: file }) =>
+      Effect.gen(function* () {
+        const at = path.join(dir, file);
+
+        yield* fs.makeDirectory(path.dirname(at), { recursive: true });
+        yield* fs.writeFile(at, content);
+      }).pipe(Effect.mapError(() => failed(`can't write ${file} to seed`))),
+    { discard: true }
+  );
+
+/**
+ * A known-bad tree made a commit on this machine, in a folder of its own:
+ * main's first files, the patch applied, committed as `decider` at the
+ * seed's fixed dates with the patch's words as its message. The same files
+ * and patch make the same commit wherever the seed runs.
+ */
+const knownBadOf = (input: {
+  readonly area: string;
+  readonly decider: Handle;
+  readonly initFiles: SeedPlan["initFiles"];
+  /** The patch, as a path on this machine. */
+  readonly patch: string;
+  /** The patch, as its layer names it. */
+  readonly named: string;
+}) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const env = authorEnv(input.decider);
+
+      const git = (dir: string, args: readonly string[]) =>
+        Effect.flatMap(runGit(spawner, dir, args, env), okOutput(args));
+
+      const words = yield* textOf(fs, input.patch, input.named);
+      const message = words.split(DIFF_START)[0]?.trim() ?? "";
+
+      if (message === "" || !DIFF_START.test(words)) {
+        return yield* failed(
+          `${input.named} needs a few words on what it breaks, then its diff`
+        );
+      }
+
+      const dir = yield* fs
+        .makeTempDirectoryScoped({ prefix: "seed-known-bad-" })
+        .pipe(Effect.mapError(() => failed("can't make a temporary folder")));
+
+      yield* writeTree(fs, path, dir, input.initFiles);
+      yield* git(dir, ["init", "--quiet", "--initial-branch=main"]);
+      yield* git(dir, ["apply", input.patch]);
+      yield* git(dir, ["add", "--all"]);
+      yield* git(dir, ["commit", "--quiet", "--message", `${message}\n`]);
+
+      const commit = yield* decoded(
+        CommitSha,
+        `the commit ${input.named} makes`
+      )((yield* git(dir, ["rev-parse", "HEAD"])).trim());
+
+      const paths = (yield* git(dir, ["ls-files", "-z"]))
+        .split("\0")
+        .filter((file) => file.length > 0);
+
+      const files = yield* Effect.forEach(paths, (file) =>
+        fs.readFile(path.join(dir, file)).pipe(
+          Effect.map((content) => ({ content, path: RepoPath.make(file) })),
+          Effect.mapError(() => failed(`can't read back ${file}`))
+        )
+      );
+
+      if (!Array.isReadonlyArrayNonEmpty(files)) {
+        return yield* failed(`${input.named} leaves no file in the tree`);
+      }
+
+      return {
+        branch: `known-bad/${input.area}`,
+        commit,
+        files,
+        message,
+      } satisfies KnownBadStep;
+    })
+  );
+
+const decodeManifest = Schema.decodeEffect(
+  Schema.fromJsonString(LayerManifest)
+);
+
+/**
+ * The layers an example keeps under `layers/`, each with its files and its
+ * known-bad trees. A layer whose manifest names other known-bad commits
+ * than its patches make is refused, so the manifest the seed pushes names
+ * commits the layer repo holds.
+ */
+const layersOf = (input: {
+  readonly decider: Handle;
+  readonly folder: string;
+  readonly initFiles: SeedPlan["initFiles"];
+  readonly project: ProjectName;
+  readonly tracked: readonly string[];
+}) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* repoRoot;
+    const at = (file: string) => path.join(root, input.folder, file);
+
+    const names = Array.dedupe(
+      input.tracked.flatMap((file) =>
+        file.startsWith(LAYERS)
+          ? [file.slice(LAYERS.length).split("/")[0] ?? ""]
+          : []
+      )
+    );
+
+    return yield* Effect.forEach(names, (name) =>
+      Effect.gen(function* () {
+        const layer = yield* decoded(LayerName, "the layer name")(name);
+        const prefix = `${LAYERS}${name}/`;
+
+        const inLayer = input.tracked
+          .filter((file) => file.startsWith(prefix))
+          .map((file) => file.slice(prefix.length));
+
+        const files = yield* Effect.forEach(inLayer, (file) =>
+          fs.readFile(at(`${prefix}${file}`)).pipe(
+            Effect.map((content) => ({ content, path: RepoPath.make(file) })),
+            Effect.mapError(() =>
+              failed(`can't read ${input.folder}/${prefix}${file}`)
+            )
+          )
+        );
+
+        if (!Array.isReadonlyArrayNonEmpty(files)) {
+          return yield* failed(
+            `git tracks nothing under ${input.folder}/${prefix}`
+          );
+        }
+
+        const knownBad = yield* Effect.forEach(
+          inLayer.flatMap((file) => {
+            const area = KNOWN_BAD.exec(file)?.groups?.area;
+
+            return area === undefined ? [] : [{ area, file }];
+          }),
+          ({ area, file }) =>
+            knownBadOf({
+              area,
+              decider: input.decider,
+              initFiles: input.initFiles,
+              named: `${input.folder}/${prefix}${file}`,
+              patch: at(`${prefix}${file}`),
+            })
+        );
+
+        if (inLayer.includes(MANIFEST_FILE)) {
+          const named = `${input.folder}/${prefix}${MANIFEST_FILE}`;
+
+          const raw = yield* textOf(fs, at(`${prefix}${MANIFEST_FILE}`), named);
+
+          const manifest = yield* decodeManifest(raw).pipe(
+            Effect.mapError((error) =>
+              failed(`${named} is no layer manifest: ${error.message}`)
+            )
+          );
+
+          // By area, as the patches are named; compared in any order.
+          const made = knownBad.map(({ commit }) => commit);
+
+          if (manifest.layer !== layer) {
+            return yield* failed(
+              `${named} is the manifest of ${manifest.layer}, not ${layer}`
+            );
+          }
+
+          if (
+            manifest.knownBad.toSorted().join(",") !== made.toSorted().join(",")
+          ) {
+            return yield* failed(
+              `${named} names the known-bad commits ${JSON.stringify(manifest.knownBad)}, but its patches make ${JSON.stringify(made)}: write those into knownBad in layer.ts and layer.json`
+            );
+          }
+        }
+
+        return {
+          files,
+          knownBad,
+          layer,
+          repo: RepoName.make(`${input.project}--${layer}`),
+        } satisfies LayerStep;
+      })
+    );
+  });
 
 /**
  * The plan for the example at `dir` (relative to the repo root, as
@@ -264,8 +588,10 @@ export const planSeed = (dir: string) =>
       asks.flatMap(({ files }) => files.map((file) => String(file.path)))
     );
 
+    // A layer's files never enter the public tree (principle 7).
     const initPaths = tracked.filter(
-      (file) => !file.startsWith(ASKS) && !held.has(file)
+      (file) =>
+        !file.startsWith(ASKS) && !file.startsWith(LAYERS) && !held.has(file)
     );
 
     const initFiles = yield* Effect.forEach(initPaths, (file) =>
@@ -279,10 +605,19 @@ export const planSeed = (dir: string) =>
       return yield* failed(`git tracks nothing under ${folder} to seed`);
     }
 
+    const layers = yield* layersOf({
+      decider,
+      folder,
+      initFiles,
+      project,
+      tracked,
+    });
+
     return {
       asks,
       decider,
       initFiles,
+      layers,
       project,
       ratchets,
     } satisfies SeedPlan;
@@ -297,10 +632,11 @@ const step = { result: StepResult, target: Schema.String };
 
 /**
  * One step of a seed: making the project (`Init`), pushing main's first
- * commit (`Push`), opening an ask (`OpenAsk`).
+ * commit (`Push`), opening an ask (`OpenAsk`), pushing a layer (`Layer`).
  */
 export const SeedStep = Schema.TaggedUnion({
   Init: step,
+  Layer: step,
   OpenAsk: step,
   Push: step,
 });
@@ -333,6 +669,36 @@ export class SeedTarget extends Context.Service<
       files: SeedPlan["initFiles"],
       as: Handle
     ) => Effect.Effect<CommitSha, SeedFailed>;
+    /**
+     * Every ref of `repo` as `as` lists them through the gateway, by name;
+     * none when the gateway serves no such repo (a layer's, before the
+     * platform has made it). Fails when `as` may not read it.
+     */
+    readonly refsAt: (
+      repo: RepoName,
+      as: Handle
+    ) => Effect.Effect<
+      Option.Option<ReadonlyMap<string, CommitSha>>,
+      SeedFailed
+    >;
+    /** Every file's path at `ref` of `repo`, as `as` fetches it. */
+    readonly pathsAt: (
+      repo: RepoName,
+      ref: string,
+      as: Handle
+    ) => Effect.Effect<readonly RepoPath[], SeedFailed>;
+    /**
+     * A commit of `files` with no parent, made as `as` with `message` at the
+     * seed's fixed dates, pushed to `ref` of `repo` through the gateway;
+     * gives the commit.
+     */
+    readonly pushCommit: (input: {
+      readonly repo: RepoName;
+      readonly ref: string;
+      readonly files: Array.NonEmptyReadonlyArray<SeedFile>;
+      readonly as: Handle;
+      readonly message: string;
+    }) => Effect.Effect<CommitSha, SeedFailed>;
   }
 >()("seed/SeedTarget") {}
 
@@ -412,10 +778,97 @@ export const seeded = (
     )
   );
 
+/** How often, and how many times, the seed asks again for a layer's repo. */
+const LAYER_WAIT = { every: Duration.seconds(1), times: 30 } as const;
+
+/** The platform has not made a layer's repo yet. */
+class NotMadeYet extends Schema.TaggedError<NotMadeYet>()("NotMadeYet", {
+  repo: RepoName,
+}) {}
+
+/**
+ * Pushes one layer to its repo in the private namespace, as the decider,
+ * once the platform has made it (a landing that declares the layer makes
+ * it, 612): first each known-bad commit to its branch, so admission finds
+ * every commit the manifest names (615), then the layer's files to main,
+ * which proposes its checks. A layer whose main is there is left alone.
+ */
+const seedLayer = (
+  layer: LayerStep,
+  decider: Handle
+): Effect.Effect<SeedStep, SeedFailed, SeedTarget> =>
+  Effect.gen(function* () {
+    const target = yield* SeedTarget;
+
+    const refs = yield* target.refsAt(layer.repo, decider).pipe(
+      Effect.flatMap(
+        Option.match({
+          onNone: () => Effect.fail(new NotMadeYet({ repo: layer.repo })),
+          onSome: Effect.succeed,
+        })
+      ),
+      Effect.retry({
+        schedule: Schedule.spaced(LAYER_WAIT.every),
+        times: LAYER_WAIT.times,
+        while: Schema.is(NotMadeYet),
+      }),
+      Effect.catchTag("NotMadeYet", ({ repo }) =>
+        Effect.fail(
+          failed(
+            `the platform never made ${repo}: does the project's config declare the layer ${layer.layer}, and is its visibility cartridge plugged in?`
+          )
+        )
+      )
+    );
+
+    const reported = (result: StepResult) =>
+      SeedStep.cases.Layer.make({ result, target: layer.repo });
+
+    if (refs.has(MAIN_REF)) {
+      return reported("already");
+    }
+
+    yield* Effect.forEach(
+      layer.knownBad.filter(
+        ({ branch, commit }) => refs.get(`refs/heads/${branch}`) !== commit
+      ),
+      ({ branch, commit, files, message }) =>
+        Effect.flatMap(
+          target.pushCommit({
+            as: decider,
+            files,
+            message,
+            ref: `refs/heads/${branch}`,
+            repo: layer.repo,
+          }),
+          (made) =>
+            made === commit
+              ? Effect.void
+              : Effect.fail(
+                  failed(
+                    `${layer.repo}'s ${branch} came out as ${made}, not the ${commit} its manifest names`
+                  )
+                )
+        ),
+      { discard: true }
+    );
+
+    yield* target.pushCommit({
+      as: decider,
+      files: layer.files,
+      message: `Start ${layer.repo}`,
+      ref: MAIN_REF,
+      repo: layer.repo,
+    });
+
+    return reported("done");
+  });
+
 /**
  * Seeds one project: makes it and pushes main's first commit as the
- * operator, then opens each ask as the decider. Both sessions are checked
- * before the first step, so a missing one stops the seed before it starts.
+ * operator, then opens each ask and pushes each layer as the decider. Both
+ * sessions are checked before the first step, so a missing one stops the
+ * seed before it starts.
  */
 export const runSeed = (
   plan: SeedPlan
@@ -469,10 +922,15 @@ export const runSeed = (
         )
       );
 
+      const layers = yield* Effect.forEach(plan.layers, (layer) =>
+        seedLayer(layer, decider)
+      );
+
       return [
         SeedStep.cases.Init.make({ result: init, target: project }),
         SeedStep.cases.Push.make({ result: push, target: project }),
         ...asks,
+        ...layers,
       ];
     })
   );
@@ -491,6 +949,28 @@ export interface Platform {
   readonly sessionsFrom: string;
 }
 
+/** The refs `git ls-remote` lists, one a line: `<sha>\t<ref>`. */
+const refsIn = (listed: string) =>
+  Effect.map(
+    Effect.forEach(
+      listed.split("\n").filter((line) => line.length > 0),
+      (line) => {
+        const [sha = "", ref = ""] = line.split("\t");
+
+        return ref.length === 0
+          ? Effect.fail(failed(`git ls-remote listed ${JSON.stringify(line)}`))
+          : Effect.map(
+              decoded(CommitSha, `the commit ls-remote lists for ${ref}`)(sha),
+              (commit) => [ref, commit] as const
+            );
+      }
+    ),
+    (refs): ReadonlyMap<string, CommitSha> => new Map(refs)
+  );
+
+// What git says of a repo the server doesn't serve.
+const NOT_SERVED = /\bnot found\b|\b404\b/u;
+
 /** The env var that hands git a token: in git's own env, never in its argv. */
 const TOKEN_VAR = "SEED_GIT_TOKEN";
 
@@ -498,26 +978,11 @@ const TOKEN_VAR = "SEED_GIT_TOKEN";
 const helperFor = (handle: Handle) =>
   `!f() { test "$1" = get || exit 0; echo username=${handle}; echo "password=$${TOKEN_VAR}"; }; f`;
 
-/**
- * Fixed dates, so a seed of the same files makes the same commit; no git
- * config from this machine (no hooks, no signing); English messages.
- */
+/** git's env as `handle`: `authorEnv`'s, and their token for the helper. */
 const gitEnv = (handle: Handle, token: Redacted.Redacted) => ({
-  GIT_AUTHOR_DATE: "2026-10-06T12:00:00Z",
-  GIT_AUTHOR_EMAIL: `${handle}@example.com`,
-  GIT_AUTHOR_NAME: handle,
-  GIT_COMMITTER_DATE: "2026-10-06T12:00:00Z",
-  GIT_COMMITTER_EMAIL: `${handle}@example.com`,
-  GIT_COMMITTER_NAME: handle,
-  GIT_CONFIG_GLOBAL: "/dev/null",
-  GIT_CONFIG_NOSYSTEM: "1",
-  GIT_TERMINAL_PROMPT: "0",
-  LC_ALL: "C",
+  ...authorEnv(handle),
   [TOKEN_VAR]: Redacted.value(token),
 });
-
-const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
-  bytes.pipe(Stream.decodeText(), Stream.mkString);
 
 /** The contracts over HTTP at `origin`'s `/rpc`, with `token` as the bearer. */
 const clientAt = (
@@ -553,7 +1018,9 @@ export const platformTarget = (
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const { origin } = platform;
-      const remoteOf = (project: ProjectName) => `${origin}/${project}.git`;
+
+      const remoteOf = (repo: ProjectName | RepoName) =>
+        `${origin}/${repo}.git`;
 
       const tokenOf = (handle: Handle) =>
         Option.fromNullishOr(
@@ -576,52 +1043,27 @@ export const platformTarget = (
           : Effect.void;
       };
 
-      /** git as `as`, in `cwd`: how it ended, and what it printed. */
+      /**
+       * git as `as`, in `cwd`, with their token for its credential helper
+       * and no other helper: how it ended, and what it printed.
+       */
       const gitAs = (as: Handle, cwd: string, args: readonly string[]) =>
-        Effect.gen(function* () {
-          const token = yield* Effect.fromOption(tokenOf(as)).pipe(
+        Effect.flatMap(
+          Effect.fromOption(tokenOf(as)).pipe(
             Effect.mapError(() => missing([as]))
-          );
-
-          return yield* Effect.scoped(
-            Effect.gen(function* () {
-              const child = yield* spawner.spawn(
-                ChildProcess.make(
-                  "git",
-                  [
-                    "-c",
-                    "credential.helper=",
-                    "-c",
-                    `credential.helper=${helperFor(as)}`,
-                    ...args,
-                  ],
-                  { cwd, env: gitEnv(as, token), extendEnv: true }
-                )
-              );
-
-              const [stdout, stderr, code] = yield* Effect.all(
-                [text(child.stdout), text(child.stderr), child.exitCode],
-                { concurrency: "unbounded" }
-              );
-
-              return { code: Number(code), stderr, stdout };
-            })
-          ).pipe(
-            Effect.mapError((error) =>
-              failed(`git ${args[0] ?? ""} didn't run: ${error.message}`)
-            )
-          );
-        });
+          ),
+          (token) =>
+            runGit(spawner, cwd, args, gitEnv(as, token), [
+              "-c",
+              "credential.helper=",
+              "-c",
+              `credential.helper=${helperFor(as)}`,
+            ])
+        );
 
       /** git as `as` that must succeed; its output. */
       const gitOk = (as: Handle, cwd: string, args: readonly string[]) =>
-        Effect.flatMap(gitAs(as, cwd, args), ({ code, stderr, stdout }) =>
-          code === 0
-            ? Effect.succeed(stdout)
-            : Effect.fail(
-                failed(`git ${args.join(" ")} exited ${code}: ${stderr.trim()}`)
-              )
-        );
+        Effect.flatMap(gitAs(as, cwd, args), okOutput(args));
 
       // An empty folder of the seed's own, removed with the scope: git run
       // there reads no repo's config, as `gitEnv` keeps the machine's out.
@@ -629,7 +1071,6 @@ export const platformTarget = (
         .makeTempDirectoryScoped({ prefix: "seed-" })
         .pipe(Effect.mapError(() => failed("can't make a temporary folder")));
 
-      // `git ls-remote` lists one ref a line: `<sha>\t<ref>`.
       const refsOf = (project: ProjectName) =>
         Effect.scoped(
           Effect.gen(function* () {
@@ -638,55 +1079,67 @@ export const platformTarget = (
               remoteOf(project),
             ]);
 
-            const refs = yield* Effect.forEach(
-              listed.split("\n").filter((line) => line.length > 0),
-              (line) => {
-                const [sha = "", ref = ""] = line.split("\t");
-
-                return ref.length === 0
-                  ? Effect.fail(
-                      failed(`git ls-remote listed ${JSON.stringify(line)}`)
-                    )
-                  : Effect.map(
-                      decoded(
-                        CommitSha,
-                        `the commit ls-remote lists for ${ref}`
-                      )(sha),
-                      (commit) => [ref, commit] as const
-                    );
-              }
-            );
-
-            return new Map(refs);
+            return yield* refsIn(listed);
           })
         );
 
-      const pushInitial = (
-        project: ProjectName,
-        files: SeedPlan["initFiles"],
-        as: Handle
-      ) =>
+      const refsAt = (repo: RepoName, as: Handle) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const listed = yield* gitAs(as, yield* scratch, [
+              "ls-remote",
+              remoteOf(repo),
+            ]);
+
+            if (listed.code === 0) {
+              return Option.some(yield* refsIn(listed.stdout));
+            }
+
+            return NOT_SERVED.test(listed.stderr)
+              ? Option.none<ReadonlyMap<string, CommitSha>>()
+              : yield* failed(
+                  `git ls-remote ${repo} as ${as} exited ${listed.code}: ${listed.stderr.trim()}`
+                );
+          })
+        );
+
+      const pathsAt = (repo: RepoName, ref: string, as: Handle) =>
         Effect.scoped(
           Effect.gen(function* () {
             const dir = yield* scratch;
 
-            yield* Effect.forEach(
-              files,
-              ({ content, path: file }) =>
-                Effect.gen(function* () {
-                  const at = path.join(dir, file);
+            yield* gitOk(as, dir, ["init", "--quiet"]);
+            yield* gitOk(as, dir, ["fetch", "--quiet", remoteOf(repo), ref]);
 
-                  yield* fs.makeDirectory(path.dirname(at), {
-                    recursive: true,
-                  });
+            const listed = yield* gitOk(as, dir, [
+              "ls-tree",
+              "-r",
+              "-z",
+              "--name-only",
+              "FETCH_HEAD",
+            ]);
 
-                  yield* fs.writeFile(at, content);
-                }).pipe(
-                  Effect.mapError(() => failed(`can't write ${file} to seed`))
-                ),
-              { discard: true }
-            );
+            return listed
+              .split("\0")
+              .filter((file) => file.length > 0)
+              .map((file) => RepoPath.make(file));
+          })
+        );
 
+      /** A commit of `files` with no parent, made as `as` and pushed to `ref` of `repo`. */
+      const pushCommit = (input: {
+        readonly repo: ProjectName | RepoName;
+        readonly ref: string;
+        readonly files: Array.NonEmptyReadonlyArray<SeedFile>;
+        readonly as: Handle;
+        readonly message: string;
+      }) =>
+        Effect.scoped(
+          Effect.gen(function* () {
+            const dir = yield* scratch;
+            const { as } = input;
+
+            yield* writeTree(fs, path, dir, input.files);
             yield* gitOk(as, dir, ["init", "--quiet", "--initial-branch=main"]);
             yield* gitOk(as, dir, ["add", "--all"]);
 
@@ -694,14 +1147,14 @@ export const platformTarget = (
               "commit",
               "--quiet",
               "--message",
-              `Start ${project}`,
+              `${input.message}\n`,
             ]);
 
             yield* gitOk(as, dir, [
               "push",
               "--quiet",
-              remoteOf(project),
-              `HEAD:${MAIN_REF}`,
+              remoteOf(input.repo),
+              `HEAD:${input.ref}`,
             ]);
 
             return yield* decoded(
@@ -711,6 +1164,21 @@ export const platformTarget = (
           })
         );
 
+      // git ends a message with one newline whether given one or not, so
+      // main's first commit is the one this made before layers had a step.
+      const pushInitial = (
+        project: ProjectName,
+        files: SeedPlan["initFiles"],
+        as: Handle
+      ) =>
+        pushCommit({
+          as,
+          files,
+          message: `Start ${project}`,
+          ref: MAIN_REF,
+          repo: project,
+        });
+
       return SeedTarget.of({
         clientFor: (handle) =>
           Option.match(tokenOf(handle), {
@@ -718,7 +1186,10 @@ export const platformTarget = (
             onSome: (token) => clientAt(origin, token),
           }),
         operator: platform.operator,
+        pathsAt,
+        pushCommit,
         pushInitial,
+        refsAt,
         refsOf,
         requireSessions,
       });
