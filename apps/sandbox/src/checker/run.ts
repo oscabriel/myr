@@ -7,24 +7,37 @@
  * 2. the plan from `@repo/checks/phases`, keyed by the lockfiles just cloned:
  *    setup (or a snapshot of an earlier one) with egress to the registries
  *    and the run block's `setupEgress` only, the snapshot, egress off, the
- *    held-back slot (W6), the lanes, the report.
+ *    sealed suite's files when the job has one, the lanes and then each
+ *    sealed check, the report.
  *
  * The container is destroyed however the job ends, and its logs are handed
  * to `CheckLogs` before that; the result carries none (a count lane's
  * stdout, in `outputs`, is a result, not a log). A job the Checker
- * cannot run to the end (a clone or a setup that fails, a sealed suite
- * before W6) is `VerifierBlocked`: the gate's trouble, never the
+ * cannot run to the end (a clone or a setup that fails, a sealed file it
+ * cannot write) is `VerifierBlocked`: the gate's trouble, never the
  * answer's. A lane that fails or runs out of time is that lane's result.
+ *
+ * A sealed suite (W6; spec D17, OSR §5.3) is written only after the
+ * snapshot and with egress off, so no snapshot and no request carries it
+ * out, and it reports one result per area (`@repo/checks/held-back-filter`).
+ * From its first write on, nothing a command prints leaves the Checker: the
+ * sealed checks' output is dropped, and so is that of the public lanes
+ * that run beside the sealed files (a `bun test` with no path finds them
+ * too), which report only how they ended.
  */
 import { CheckAt, evidenceFrom } from "@repo/checks/check-runner";
 import type {
   CheckRun,
+  HeldBackCheck,
+  HeldBackPart,
   LaneEvidence,
   LaneOutput,
 } from "@repo/checks/check-runner";
 import type { CheckWire } from "@repo/checks/check-runner/wire";
 import { classifyRun } from "@repo/checks/classify";
 import type { RunExit } from "@repo/checks/classify";
+import { areaBits } from "@repo/checks/held-back-filter";
+import type { HeldBackExit } from "@repo/checks/held-back-filter";
 import { Phase, phasePlan } from "@repo/checks/phases";
 import type { PlannedLane } from "@repo/checks/phases";
 import type { LaneResult } from "@repo/protocol/domain/answer";
@@ -126,9 +139,15 @@ const LOCKFILES = [
 
 const CLONE_LIMIT = Duration.minutes(5);
 
+/** Making the sealed files' folders is quick; it never waits on the network. */
+const FOLDERS_LIMIT = Duration.minutes(1);
+
 const SETUP_LIMIT = Duration.minutes(15);
 
-/** A lane with no time limit of its own gets ten minutes, as `/local` gives. */
+/**
+ * A lane with no time limit of its own gets ten minutes, as `/local` gives;
+ * so does each sealed check.
+ */
 const LANE_LIMIT = Duration.minutes(10);
 
 const timedOut: RunExit = { code: -1, stderr: "", stdout: "", timedOut: true };
@@ -198,16 +217,27 @@ const keep = (kept: Kept, log: PhaseLog) =>
       : [...logs, log]
   );
 
+/** Where a command's output goes: into its phase's log, or nowhere. */
+type Recorder = (text: string) => Effect.Effect<void>;
+
+/** Into the log of `log`'s phase and name. */
+const keeping =
+  (kept: Kept, log: Omit<PhaseLog, "text">): Recorder =>
+  (text) =>
+    keep(kept, { ...log, text });
+
+/** Nowhere: the command ran beside the sealed files (spec D17). */
+const dropping: Recorder = () => Effect.void;
+
 /**
  * One command, to its end or `limit` (none when it ran out of time), its
- * output kept in its phase's log. At the limit the Checker stops waiting for
+ * output handed to `record`. At the limit the Checker stops waiting for
  * it; the process itself ends only when the container is destroyed (the
  * `Box` adapter aborts an `exec` that is still starting, not one already
  * running: W3 315 Comments, for 399).
  */
 const exec = (
-  kept: Kept,
-  log: Omit<PhaseLog, "text">,
+  record: Recorder,
   argv: readonly [string, ...string[]],
   options: ExecOptions,
   limit: Duration.Duration
@@ -217,22 +247,20 @@ const exec = (
   ).pipe(
     Effect.timeoutOption(limit),
     Effect.tap((done) =>
-      keep(kept, {
-        ...log,
-        text: Option.match(done, {
+      record(
+        Option.match(done, {
           onNone: () => `$ ${argv.join(" ")}\ntimed out\n`,
           onSome: ({ stderr, stdout }) =>
             `$ ${argv.join(" ")}\n${stdout}${stderr}`,
-        }),
-      })
+        })
+      )
     )
   );
 
 /** One git command of the checkout, which must succeed: its output. */
 const git = (kept: Kept, ...args: readonly string[]) =>
   exec(
-    kept,
-    { name: "clone", phase: "clone" },
+    keeping(kept, { name: "clone", phase: "clone" }),
     ["git", ...args],
     { cwd: "/", env: GIT_ENV },
     CLONE_LIMIT
@@ -305,6 +333,10 @@ interface Job {
   readonly url: string;
   /** Whether setup was skipped for a snapshot of an earlier one. */
   readonly restored: Ref.Ref<boolean>;
+  /** Whether the work tree holds sealed files yet: from then on, no output is kept. */
+  readonly sealed: Ref.Ref<boolean>;
+  /** How each sealed check ended, in the job's order. */
+  readonly exits: Ref.Ref<readonly HeldBackExit[]>;
 }
 
 /** A snapshot is its project's own: two projects with one lockfile never share one. */
@@ -347,8 +379,7 @@ const setup = (
     yield* network.allow(allowed);
 
     const done = yield* exec(
-      job.kept,
-      { name: "setup", phase: "setup" },
+      keeping(job.kept, { name: "setup", phase: "setup" }),
       ["sh", "-c", command],
       { cwd: REPO, env: ENV },
       SETUP_LIMIT
@@ -427,59 +458,166 @@ const snapshot = (job: Job, key: string) =>
  * classified (`checks.classifyRun`), never an error. A lane that runs out of
  * time, or that the container would not run, never ran to an end. A count
  * lane (`output: "stdout"`) that did hands back its stdout, which its count
- * is read from; any other lane's output stays in its log.
+ * is read from; any other lane's output stays in its log. A lane that runs
+ * beside the sealed files keeps neither, nor its failure's signature: what
+ * it printed may name or quote them.
  */
-const runLane = (job: Job, { command, lane }: PlannedLane) => {
-  const own = job.wire.job.lanes.find((each) => each.lane === lane);
+const runLane = (job: Job, { command, lane }: PlannedLane) =>
+  Effect.gen(function* () {
+    const own = job.wire.job.lanes.find((each) => each.lane === lane);
+    const beside = yield* Ref.get(job.sealed);
 
-  const limit =
-    own?.timeoutMs === undefined ? LANE_LIMIT : Duration.millis(own.timeoutMs);
+    const limit =
+      own?.timeoutMs === undefined
+        ? LANE_LIMIT
+        : Duration.millis(own.timeoutMs);
 
-  const printed = (exit: RunExit): Option.Option<LaneOutput> =>
-    own?.output === "stdout" && exit.timedOut !== true && exit.code !== -1
-      ? Option.some({ lane, stdout: exit.stdout })
-      : Option.none();
+    const printed = (exit: RunExit): Option.Option<LaneOutput> =>
+      !beside &&
+      own?.output === "stdout" &&
+      exit.timedOut !== true &&
+      exit.code !== -1
+        ? Option.some({ lane, stdout: exit.stdout })
+        : Option.none();
 
-  return exec(
-    job.kept,
-    { name: lane, phase: "lane" },
+    return yield* exec(
+      beside ? dropping : keeping(job.kept, { name: lane, phase: "lane" }),
+      ["sh", "-c", command],
+      { cwd: REPO, env: ENV },
+      limit
+    ).pipe(
+      Effect.map(
+        Option.match({
+          onNone: () => timedOut,
+          onSome: ({ exitCode, stderr, stdout }): RunExit => ({
+            code: exitCode,
+            stderr,
+            stdout,
+          }),
+        })
+      ),
+      Effect.catchTag("BoxFailed", ({ reason }) =>
+        Effect.succeed<RunExit>({ code: -1, stderr: reason, stdout: "" })
+      ),
+      Effect.timed,
+      Effect.map(([elapsed, exit]): LaneRan => {
+        const result = classifyRun(lane, exit);
+
+        return {
+          evidence:
+            result === "passed"
+              ? Option.none()
+              : Option.some(beside ? { lane } : evidenceFrom(lane, exit)),
+          output: printed(exit),
+          result: {
+            command,
+            durationMs: Math.round(Duration.toMillis(elapsed)),
+            lane,
+            result,
+          },
+        };
+      })
+    );
+  });
+
+/**
+ * Whether a sealed file's path stays inside the checked tree: relative,
+ * with no empty, `.` or `..` segment.
+ */
+const inTree = (path: string) =>
+  !path.startsWith("/") &&
+  path
+    .split("/")
+    .every((segment) => segment !== "" && segment !== "." && segment !== "..");
+
+/** The folders `paths` sit in, under the work tree, each once. */
+const foldersOf = (paths: readonly string[]) => [
+  ...new Set(
+    paths.flatMap((path) => {
+      const end = path.lastIndexOf("/");
+
+      return end === -1 ? [] : [`${REPO}/${path.slice(0, end)}`];
+    })
+  ),
+];
+
+/** The sealed files are not all in the work tree: nothing logged says which. */
+const unwritten = () =>
+  blocked("the sealed files were not written", { phase: "WriteHeldBack" });
+
+/**
+ * The sealed suite's files, written into the work tree after the snapshot
+ * and with egress off (the plan's order), from the bytes the job carried:
+ * the Checker holds no route to the layer. `Files.writeFile` makes no
+ * folder, so their folders are made first. A file that would land outside
+ * the tree, or that cannot be written, is `VerifierBlocked`; nothing
+ * logged names a path, and no reason the container gave is logged, since
+ * it may name one.
+ */
+const writeHeldBack = (job: Job, { files }: HeldBackPart) =>
+  Effect.gen(function* () {
+    if (!files.every(({ path }) => inTree(path))) {
+      return yield* blocked("a sealed file's path leaves the checked tree", {
+        phase: "WriteHeldBack",
+      });
+    }
+
+    const box = yield* Box;
+    const folders = foldersOf(files.map(({ path }) => path));
+
+    yield* Ref.set(job.sealed, true);
+
+    if (folders.length > 0) {
+      const made = yield* exec(
+        dropping,
+        ["mkdir", "-p", "--", ...folders],
+        { cwd: REPO, env: ENV },
+        FOLDERS_LIMIT
+      ).pipe(Effect.catchTag("BoxFailed", unwritten));
+
+      if (Option.isNone(made) || made.value.exitCode !== 0) {
+        return yield* unwritten();
+      }
+    }
+
+    return yield* Effect.forEach(
+      files,
+      ({ content, path }) =>
+        box
+          .writeFile(`${REPO}/${path}`, content)
+          .pipe(Effect.catchTag("BoxFailed", unwritten)),
+      { discard: true }
+    );
+  });
+
+/**
+ * One sealed check, to its end or the lane time limit: how it ended, and
+ * nothing it printed. A check that runs out of time, or that the container
+ * fails to run, did not pass, and says no more than a failure would: a
+ * different answer would be one more bit about the suite, and one an
+ * answer could ask for without spending an attempt.
+ */
+const runSealed = ({ area, command }: HeldBackCheck) =>
+  exec(
+    dropping,
     ["sh", "-c", command],
     { cwd: REPO, env: ENV },
-    limit
+    LANE_LIMIT
   ).pipe(
     Effect.map(
       Option.match({
-        onNone: () => timedOut,
-        onSome: ({ exitCode, stderr, stdout }): RunExit => ({
+        onNone: (): HeldBackExit => ({ area, code: -1, timedOut: true }),
+        onSome: ({ exitCode }): HeldBackExit => ({
+          area,
           code: exitCode,
-          stderr,
-          stdout,
+          timedOut: false,
         }),
       })
     ),
-    Effect.catchTag("BoxFailed", ({ reason }) =>
-      Effect.succeed<RunExit>({ code: -1, stderr: reason, stdout: "" })
-    ),
-    Effect.timed,
-    Effect.map(([elapsed, exit]): LaneRan => {
-      const result = classifyRun(lane, exit);
-
-      return {
-        evidence:
-          result === "passed"
-            ? Option.none()
-            : Option.some(evidenceFrom(lane, exit)),
-        output: printed(exit),
-        result: {
-          command,
-          durationMs: Math.round(Duration.toMillis(elapsed)),
-          lane,
-          result,
-        },
-      };
-    })
+    Effect.catchTag("BoxFailed", () =>
+      Effect.succeed<HeldBackExit>({ area, code: -1, timedOut: false })
+    )
   );
-};
 
 /** The phases, from the clone to the last lane, with the logs kept as they go. */
 const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
@@ -487,9 +625,13 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
     const network = yield* Network;
     const { clone } = wire;
 
+    const sealed = Option.fromNullishOr(wire.job.heldBack);
+
     const job: Job = {
+      exits: yield* Ref.make<readonly HeldBackExit[]>([]),
       kept,
       restored: yield* Ref.make(false),
+      sealed: yield* Ref.make(false),
       url: cloneUrlOf(clone.url),
       wire,
     };
@@ -507,12 +649,7 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
     );
 
     const plan = phasePlan({
-      heldBack: Option.map(
-        Option.fromNullishOr(wire.job.heldBack),
-        ({ areas }) => ({
-          areas,
-        })
-      ),
+      heldBack: Option.map(sealed, ({ areas }) => ({ areas })),
       lanes: wire.job.lanes.map(({ command, lane }) => ({ command, lane })),
       lockfileHash,
       placeholders: wire.job.placeholders,
@@ -530,31 +667,50 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
           Phase.$match(phase, {
             EgressOff: () => Effect.as(network.allow([]), []),
             Report: () => Effect.succeed([]),
+            // The public lanes, then each sealed check, all with egress off.
             Run: ({ lanes }) =>
-              Effect.forEach(lanes, (lane) => runLane(job, lane)),
+              Effect.tap(
+                Effect.forEach(lanes, (lane) => runLane(job, lane)),
+                () =>
+                  Option.match(sealed, {
+                    onNone: () => Effect.void,
+                    onSome: ({ runs }) =>
+                      Effect.flatMap(Effect.forEach(runs, runSealed), (exits) =>
+                        Ref.set(job.exits, exits)
+                      ),
+                  })
+              ),
             Setup: ({ command, egress }) =>
               Effect.as(setup(job, command, egress, key), []),
             Snapshot: (saved) => Effect.as(snapshot(job, saved.key), []),
-            // Sealed suites arrive in W6 (605), which writes them here, after
-            // the snapshot and with egress off. Until then a job with one is
-            // refused rather than checked without it.
+            // The plan has this phase only for a job with a sealed suite.
             WriteHeldBack: () =>
-              blocked("sealed suites are not built yet", {
-                phase: "WriteHeldBack",
+              Option.match(sealed, {
+                onNone: () => Effect.succeed([]),
+                onSome: (part) => Effect.as(writeHeldBack(job, part), []),
               }),
           })
         )
       )
     );
 
-    return ran.flat();
+    const exits = yield* Ref.get(job.exits);
+
+    return {
+      heldBack: Option.match(sealed, {
+        onNone: () => [],
+        onSome: ({ areas, suite }) => areaBits({ areas, exits, suite }),
+      }),
+      ran: ran.flat(),
+    };
   });
 
 /**
  * One check job in one container: the phases, then the logs handed to
  * `CheckLogs` and the container destroyed, however the phases ended. The
- * result carries each lane's result and evidence, never a log, and a count
- * lane's stdout (`outputs`), which the platform reads its count from.
+ * result carries each lane's result and evidence, never a log, a count
+ * lane's stdout (`outputs`), which the platform reads its count from, and
+ * one result per sealed area.
  */
 export const check = (
   wire: CheckWire
@@ -568,7 +724,7 @@ export const check = (
     const logs = yield* CheckLogs;
     const kept = yield* Ref.make<readonly PhaseLog[]>([]);
 
-    const [elapsed, ran] = yield* Effect.timed(
+    const [elapsed, { heldBack, ran }] = yield* Effect.timed(
       phases(wire, wire.job.run, kept)
     ).pipe(
       Effect.onExit(() => Effect.flatMap(Ref.get(kept), logs.report)),
@@ -580,7 +736,7 @@ export const check = (
     const done = {
       durationMs: Math.round(Duration.toMillis(elapsed)),
       evidence: ran.flatMap(({ evidence }) => Option.toArray(evidence)),
-      heldBack: [],
+      heldBack,
       lanes: ran.map(({ result }) => result),
     };
 
