@@ -43,8 +43,16 @@ const MANIFEST = [
  */
 const TEST_HOMES = ["packages/project/test/visibility/"] as const;
 
-/** Every folder that goes when the cartridge goes. */
-const CARTRIDGE = [...MANIFEST, ...TEST_HOMES];
+/**
+ * Tests outside its folders that run the cartridge's world as a process,
+ * by its path rather than an import (the CLI's end-to-end `env set`, W6
+ * 616: apps never import apps), so no import reader sees them: they go
+ * with it too.
+ */
+const RUNS_ITS_WORLD = ["apps/cli/test/local/env-set-live.test.ts"] as const;
+
+/** Every folder, and every file, that goes when the cartridge goes. */
+const CARTRIDGE = [...MANIFEST, ...TEST_HOMES, ...RUNS_ITS_WORLD];
 
 /**
  * Where the line that plugs the cartridge in lives (`ports.ts` merges every
@@ -634,20 +642,24 @@ describe("the visibility cartridge's reader", () => {
 });
 
 describe("the visibility cartridge", () => {
-  it.effect("has every folder of its manifest", () =>
-    provided(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* repoRoot;
+  it.effect(
+    "has every folder of its manifest, and every test outside it that runs its world",
+    () =>
+      provided(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const root = yield* repoRoot;
 
-        const missing = yield* Effect.filter(MANIFEST, (folder) =>
-          Effect.map(fs.exists(path.join(root, folder)), (found) => !found)
-        );
+          const missing = yield* Effect.filter(
+            [...MANIFEST, ...RUNS_ITS_WORLD],
+            (each) =>
+              Effect.map(fs.exists(path.join(root, each)), (found) => !found)
+          );
 
-        expect(missing).toStrictEqual([]);
-      })
-    )
+          expect(missing).toStrictEqual([]);
+        })
+      )
   );
 
   it.effect(

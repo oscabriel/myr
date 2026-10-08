@@ -6,9 +6,9 @@
  * ledger as structured content, the same ledger the RPC `ledger` gives,
  * and both are the cartridge's.
  *
- * The world's rules evaluator does not read `visibility.ts` yet (601 #4),
- * so datekit's ledger here is the Open one its config folder states, the
- * same as the neutral port's: the test watches the cartridge's port answer.
+ * datekit's config folder here has no `visibility.ts`, so its ledger is the
+ * Open one, the same as the neutral port's: the test watches the
+ * cartridge's port answer.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Fetch } from "@repo/artifacts/fetch";

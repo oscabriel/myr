@@ -13,6 +13,9 @@ import { untouchable } from "@repo/testkit/untouchable";
 import { Effect } from "effect";
 
 import { forwarded } from "../src/features/agents/forward.ts";
+import { Route as skills } from "../src/routes/[.]well-known/agent-skills/$.ts";
+import { Route as installScript } from "../src/routes/install[.]sh.ts";
+import { Route as releases } from "../src/routes/releases/$.ts";
 import { backend } from "../src/server/backend.ts";
 
 const PLATFORM_URL = "https://platform-test.example.workers.dev";
@@ -125,32 +128,27 @@ describe("a path the platform serves, reached on the web host", () => {
   );
 });
 
-/** What a route module says of its server handlers. */
-interface RouteModule {
-  readonly Route: {
-    readonly options: { readonly server?: { readonly handlers?: object } };
-  };
+/** What a route says of its server handlers. */
+interface ServerRoute {
+  readonly options: { readonly server?: { readonly handlers?: object } };
 }
 
-const forwardingRoutes: readonly (readonly [
-  string,
-  () => Promise<RouteModule>,
-])[] = [
-  ["the skills", () => import("../src/routes/[.]well-known/agent-skills/$.ts")],
-  ["the install script", () => import("../src/routes/install[.]sh.ts")],
-  ["the releases", () => import("../src/routes/releases/$.ts")],
+// Imported with the file, not in the test: loading a route module pulls in
+// the router, which can take longer than a test's timeout under a full
+// verify's load.
+const forwardingRoutes: readonly (readonly [string, ServerRoute])[] = [
+  ["the skills", skills],
+  ["the install script", installScript],
+  ["the releases", releases],
 ];
 
 describe("the forwarding routes", () => {
-  it.effect.each(forwardingRoutes)(
+  it.each(forwardingRoutes)(
     "%s answer GET and HEAD, and nothing else",
-    ([, load]) =>
-      Effect.gen(function* () {
-        const { Route } = yield* Effect.promise(load);
-
-        expect(
-          Object.keys(Route.options.server?.handlers ?? {}).toSorted()
-        ).toStrictEqual(["GET", "HEAD"]);
-      })
+    (_name, route) => {
+      expect(
+        Object.keys(route.options.server?.handlers ?? {}).toSorted()
+      ).toStrictEqual(["GET", "HEAD"]);
+    }
   );
 });

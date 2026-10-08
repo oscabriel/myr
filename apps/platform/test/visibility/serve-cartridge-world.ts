@@ -28,8 +28,8 @@
  * A process, not an import: apps never import apps, and the CLI's
  * end-to-end `env set` test (W6 616) runs it. It lives in the cartridge
  * and goes with it. The Worker's modules import `cloudflare:workers`, which
- * this file serves from `../workers-shim.ts` through Bun's runtime plugins
- * before it loads them, as `../serve-world.ts` does.
+ * `../world-process.ts` serves from the shim before this file loads them,
+ * as it does for `../serve-world.ts`.
  */
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import type { RepoHost } from "@repo/artifacts/repo-host";
@@ -41,9 +41,7 @@ import {
   LedgerRow,
 } from "@repo/project/project-store/rows";
 import { ProjectName } from "@repo/protocol/ids";
-import { fakeArtifactsBinding } from "@repo/testkit/fake-artifacts-binding";
 import {
-  Config,
   Console,
   Effect,
   Layer,
@@ -55,42 +53,8 @@ import {
   Stream,
 } from "effect";
 
-import * as shim from "../workers-shim.ts";
+import { shimWorkers, worldSessions } from "../world-process.ts";
 import type { PlugIn } from "../world.ts";
-
-/** Bun's runtime plugins, as far as this file uses them (the platform has no Bun types). */
-interface BunPlugins {
-  readonly plugin: (plugin: {
-    readonly name: string;
-    readonly setup: (build: {
-      readonly module: (
-        specifier: string,
-        load: () => {
-          readonly exports: typeof shim;
-          readonly loader: "object";
-        }
-      ) => void;
-    }) => void;
-  }) => void;
-}
-
-declare const Bun: BunPlugins;
-
-/** `cloudflare:workers` served from the shim, for every module loaded after. */
-const shimWorkers = Effect.sync(() => {
-  Bun.plugin({
-    name: "cloudflare-workers-shim",
-    setup: (build) => {
-      build.module("cloudflare:workers", () => ({
-        exports: { ...shim },
-        loader: "object",
-      }));
-    },
-  });
-});
-
-/** Where the private namespace's stand-in says its repos are. */
-const PRIVATE_REMOTES = "https://artifacts.private.test";
 
 /**
  * The Checker: each job kept as it came, and every lane failed the same
@@ -124,10 +88,6 @@ const keepingChecker = (jobs: CheckJob[]): Layer.Layer<CheckRunner> =>
         }),
     })
   );
-
-const decodeSessions = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(Schema.Record(Schema.String, Schema.String))
-);
 
 /**
  * Each job as the Checker got it, encoded by its fields alone: without
@@ -163,20 +123,12 @@ const isReply = (response: Response) => {
 const serve = Effect.gen(function* () {
   yield* shimWorkers;
 
-  const raw = yield* Config.String("WORLD_SESSIONS").pipe(
-    Config.withDefault("{}")
-  );
-
-  const sessions = yield* decodeSessions(raw).pipe(
-    Effect.catch(() =>
-      Effect.die("WORLD_SESSIONS is not a JSON object from token to handle")
-    )
-  );
+  const sessions = yield* worldSessions;
 
   // Loaded after the shim: each reaches `cloudflare:workers`.
   const [
     { coreLoopWorld, listen },
-    { fakeEnv },
+    { fakeEnv, withPrivateNamespace },
     { decodeEnv },
     { live },
     { stateLive },
@@ -194,12 +146,7 @@ const serve = Effect.gen(function* () {
 
   /** The world's stage config, the second store standing in for the private namespace. */
   const configOver = (aside: RepoHost["Service"]) =>
-    decodeEnv({
-      ...fakeEnv(),
-      ARTIFACTS_PRIVATE: fakeArtifactsBinding(aside, {
-        remoteBase: PRIVATE_REMOTES,
-      }),
-    }).pipe(Effect.orDie);
+    decodeEnv(withPrivateNamespace(fakeEnv(), aside)).pipe(Effect.orDie);
 
   /**
    * The cartridge as the Worker plugs it: whole over the Worker's ports, and

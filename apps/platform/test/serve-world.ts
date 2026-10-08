@@ -25,8 +25,7 @@
  * reaches it over HTTP and git, as it reaches a stage. A process, not an
  * import: apps never import apps, and no file outside the platform imports
  * its test world. The Worker's modules import `cloudflare:workers`, which
- * this file serves from `workers-shim.ts` through Bun's runtime plugins,
- * before it loads them, as vitest's alias does for the platform's tests.
+ * `world-process.ts` serves from the shim before this file loads them.
  */
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import type { RepoHost } from "@repo/artifacts/repo-host";
@@ -37,54 +36,14 @@ import { Projects } from "@repo/project/projects";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { git } from "@repo/testkit/git";
 import { untouchable } from "@repo/testkit/untouchable";
-import {
-  Config,
-  Console,
-  Effect,
-  FileSystem,
-  Layer,
-  Schema,
-  Stdio,
-  Stream,
-} from "effect";
+import { Console, Effect, FileSystem, Layer, Stdio, Stream } from "effect";
 
 import type * as Cartridges from "../src/cartridges.ts";
 import type { decodeEnv, PlatformConfig } from "../src/platform.ts";
 import type { WorkerPorts } from "../src/ports.ts";
 import { fakeEnv, withPrivateNamespace } from "./fake-env.ts";
-import * as shim from "./workers-shim.ts";
+import { shimWorkers, worldSessions } from "./world-process.ts";
 import type { PlugIn } from "./world.ts";
-
-/** Bun's runtime plugins, as far as this file uses them (the platform has no Bun types). */
-interface BunPlugins {
-  readonly plugin: (plugin: {
-    readonly name: string;
-    readonly setup: (build: {
-      readonly module: (
-        specifier: string,
-        load: () => {
-          readonly exports: typeof shim;
-          readonly loader: "object";
-        }
-      ) => void;
-    }) => void;
-  }) => void;
-}
-
-declare const Bun: BunPlugins;
-
-/** `cloudflare:workers` served from the shim, for every module loaded after. */
-const shimWorkers = Effect.sync(() => {
-  Bun.plugin({
-    name: "cloudflare-workers-shim",
-    setup: (build) => {
-      build.module("cloudflare:workers", () => ({
-        exports: { ...shim },
-        loader: "object",
-      }));
-    },
-  });
-});
 
 /**
  * A clone of the bare repo at `bare`, its work tree set to `at`, removed
@@ -190,22 +149,10 @@ const cartridgesOver =
     };
   };
 
-const decodeSessions = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(Schema.Record(Schema.String, Schema.String))
-);
-
 const serve = Effect.gen(function* () {
   yield* shimWorkers;
 
-  const raw = yield* Config.String("WORLD_SESSIONS").pipe(
-    Config.withDefault("{}")
-  );
-
-  const sessions = yield* decodeSessions(raw).pipe(
-    Effect.catch(() =>
-      Effect.die("WORLD_SESSIONS is not a JSON object from token to handle")
-    )
-  );
+  const sessions = yield* worldSessions;
 
   const { coreLoopWorld } = yield* Effect.promise(() => import("./world.ts"));
 

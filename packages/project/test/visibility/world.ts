@@ -6,10 +6,10 @@
  * admissions recorded instead of started. Answer runs wait for the test to
  * drive them (`drive`), so an answer can stop where its held-back run is.
  *
- * Its rules evaluator returns the scenario's policy at every commit, with
- * datekit's visibility config (a maintainers layer; sealed areas `export`
- * and `parser`) whenever the commit's config folder holds `visibility.ts`:
- * the rules package does not read that file yet (601 #4, 604 #2).
+ * Its rules evaluator runs no config code: it returns the scenario's policy
+ * at every commit, with datekit's visibility config (a maintainers layer;
+ * sealed areas `export` and `parser`) whenever the commit's config folder
+ * holds `visibility.ts`, as the real evaluator reads that file (608).
  */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";

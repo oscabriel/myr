@@ -14,10 +14,9 @@
  * over a private namespace of its own; admissions are queued instead of
  * started, and the test runs each over the Worker's ports with the steps
  * kept in memory, as the `Answer` Workflow runs one over the engine's. The
- * rules package does not read `visibility.ts` yet (604 #2), so the DO's
- * rules give datekit's visibility config whenever the config folder holds
- * that file. The Checker answers lane jobs from a script, and held-back
- * jobs with area bits: green on main, red on the known-bad tree.
+ * DO's rules read datekit's visibility config from its `visibility.ts` (608).
+ * The Checker answers lane jobs from a script, and held-back jobs with area
+ * bits: green on main, red on the known-bad tree.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
@@ -31,10 +30,7 @@ import {
   ProjectVisibilityLive,
 } from "@repo/project/visibility/state";
 import type { HeldBackResult, LaneResult } from "@repo/protocol/domain/answer";
-import {
-  LedgerEntry,
-  VisibilityPolicy,
-} from "@repo/protocol/domain/visibility";
+import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import {
   AreaName,
   AskId,
@@ -45,10 +41,9 @@ import {
   RepoName,
   RepoPath,
 } from "@repo/protocol/ids";
-import { RulesEvaluator } from "@repo/rules/rules-evaluator";
 import { LayerRepos } from "@repo/visibility/layer-repos";
 import type { Context } from "effect";
-import { Array, Effect, FileSystem, Layer, Order, Schema } from "effect";
+import { Array, Effect, FileSystem, Layer, Order } from "effect";
 
 import { AdmissionParams } from "../../src/answer-runs.ts";
 import type { WorkerPorts } from "../../src/ports.ts";
@@ -74,36 +69,6 @@ const tokens = {
 
 const sdk = `${Brand.cliPackage}/rules`;
 
-const visibilityFile = `${Brand.configDir}/visibility.ts`;
-
-/** datekit's visibility config, as the rules would evaluate it: admission on. */
-const datekitVisibility = Schema.decodeSync(VisibilityPolicy)({
-  checks: {
-    admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },
-    areas: { export: "src/export/**", parser: "src/parser/**" },
-    attempts: { perClaim: 3, perPersonPerAreaPerWeek: 10 },
-    canary: false,
-    commit: "salted-sha256-merkle",
-    layer: "maintainers",
-    pin: "claim",
-    result: "area-bit",
-  },
-  env: { setters: "deciders" },
-  flows: { noWriteDown: true, release: "deciders" },
-  layers: [
-    {
-      audience: "maintainers",
-      disclose: "sealed",
-      holds: ["checks", "notes"],
-      name: "maintainers",
-      readers: "deciders",
-      reason: "Held-back checks for export and parser",
-      writers: "deciders",
-    },
-  ],
-  notice: { narrowingDays: 7 },
-});
-
 /** datekit as ines-v first pushes it, its visibility config with it. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
@@ -116,31 +81,31 @@ const start = {
     ``,
   ].join("\n"),
   [`${Brand.configDir}/vouched.td`]: "bram\nines-v\nokonkwo\n",
-  [visibilityFile]: "export default {};\n",
+  // Admission on: three runs green on main, red on one known-bad tree.
+  [`${Brand.configDir}/visibility.ts`]: [
+    `import { flows, layer, sealedChecks, visibility } from "${sdk}";`,
+    ``,
+    `export default visibility({`,
+    `  checks: sealedChecks({`,
+    `    admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },`,
+    `    areas: { export: "src/export/**", parser: "src/parser/**" },`,
+    `  }),`,
+    `  flows: flows.noWriteDown(),`,
+    `  layers: {`,
+    `    maintainers: layer({`,
+    `      disclose: "sealed",`,
+    `      holds: ["checks", "notes"],`,
+    `      reason: "Held-back checks for export and parser",`,
+    `    }),`,
+    `  },`,
+    `});`,
+    ``,
+  ].join("\n"),
   "package.json": '{ "name": "datekit", "private": true }\n',
   "src/export/svg.ts":
     'export const svg = (title: string) => title.replaceAll("<", "&lt;");\n',
   "src/parser/week.ts": "export const week = (iso: string) => 1;\n",
 };
-
-/**
- * The DO's rules: the Worker's, with datekit's visibility config added at
- * any commit whose config folder holds `visibility.ts`.
- */
-const rulesWithVisibility = Layer.effect(
-  RulesEvaluator,
-  Effect.map(Effect.service(RulesEvaluator), (rules) =>
-    RulesEvaluator.of({
-      ...rules,
-      evaluate: (input) =>
-        Effect.map(rules.evaluate(input), (policy) =>
-          Object.hasOwn(input.modules.modules, visibilityFile)
-            ? { ...policy, visibility: datekitVisibility }
-            : policy
-        ),
-    })
-  )
-);
 
 /** A held-back check, by path: its area and its source. */
 const checkFile = (area: string, name: string, body: string) =>
@@ -279,25 +244,22 @@ const admissionWorld = Effect.gen(function* () {
       const layers = Layer.succeed(LayerRepos, LayerRepos.of(store));
 
       return {
-        project: Layer.mergeAll(
-          ProjectVisibilityLive.pipe(
-            Layer.provide(
-              Layer.mergeAll(
-                layers,
-                WebCryptoSalts,
-                Layer.succeed(
-                  AdmissionStarts,
-                  AdmissionStarts.of({
-                    start: (input) =>
-                      Effect.sync(() => {
-                        queued.push(AdmissionParams.make(input));
-                      }),
-                  })
-                )
+        project: ProjectVisibilityLive.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              layers,
+              WebCryptoSalts,
+              Layer.succeed(
+                AdmissionStarts,
+                AdmissionStarts.of({
+                  start: (input) =>
+                    Effect.sync(() => {
+                      queued.push(AdmissionParams.make(input));
+                    }),
+                })
               )
             )
-          ),
-          rulesWithVisibility
+          )
         ),
         worker: Layer.mergeAll(
           LayerGateLive.pipe(Layer.provide(layers)),
