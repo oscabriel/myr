@@ -24,6 +24,13 @@ const PRIVATE = [
   ".scratch/build",
 ] as const;
 
+/**
+ * What a reference into the build's private plan looks like, which a reader
+ * with only the repo cannot follow: a section of its spec (`spec §8`) or one
+ * of its issues by wave (`W3 313`).
+ */
+const PLAN_REFERENCES = [/\bspec §/u, /\bW\d \d{3}\b/u] as const;
+
 /** Terms the code uses in public names, each of which GLOSSARY.md defines. */
 const TERMS = [
   "Claim fork",
@@ -112,9 +119,12 @@ describe("the repo's public docs", () => {
 
       expect(
         docs.flatMap(({ path, text }) =>
-          PRIVATE.flatMap((pointer) =>
-            text.includes(pointer) ? [`${path}: ${pointer}`] : []
-          )
+          [
+            ...PRIVATE.filter((pointer) => text.includes(pointer)),
+            ...PLAN_REFERENCES.flatMap((reference) =>
+              reference.test(text) ? [reference.source] : []
+            ),
+          ].map((found) => `${path}: ${found}`)
         )
       ).toStrictEqual([]);
     }).pipe(Effect.provide(NodeServices.layer))

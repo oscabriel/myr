@@ -40,7 +40,7 @@ _Avoid_: failing test requirement
 The shape of an ask's check: redThenGreen, lintToZero, ratchet, migrate, or symbolAbsent (a family's delete child).
 
 **Family**:
-A migrate ask opened as one child ask per module that still uses the old name, each with that module as its territory, plus a delete child that waits on every child and checks the name is gone; the parent closes when its last child lands.
+A migrate ask whose old name is used in two or more modules, opened as one child ask per module that uses it, each with that module as its territory, plus a delete child that waits on every child and checks the name is gone; the parent closes when its last child lands.
 _Avoid_: epic, subtasks, batch
 
 **Territory**:

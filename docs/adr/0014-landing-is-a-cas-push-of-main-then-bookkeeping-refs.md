@@ -9,7 +9,7 @@ The platform lands a checked tree as one new commit on canonical `main`, whose p
 ## Considered Options
 
 - **One atomic push of `main`, the mirror ref and the note.** This was the earlier design. Artifacts refuses `--atomic` (spike, Oct 6), and its receive-pack advertises no `atomic` capability.
-- **`--force-with-lease` on `main`.** It is a compare-and-swap too, but it is a forced push: a wrong expected value rewrites history instead of failing. A plain push of a commit whose parent is the old tip can only move `main` forward.
+- **`--force-with-lease` on `main`.** It is a compare-and-swap too, but it is a forced push: once the expected value matches, any commit replaces `main`, even one that does not descend from it, so a landing built on the wrong parent would rewrite history instead of failing. A plain push of a commit whose parent is the old tip can only move `main` forward. The Lander uses a lease only for its own compose refs, never for `main`.
 - **Bookkeeping first, `main` last.** A mirror or a note naming a commit that never landed would mislead its readers, and Artifacts accepts a notes ref naming a commit the repo lacks, then fails the fetch of that commit.
 
 ## Consequences
