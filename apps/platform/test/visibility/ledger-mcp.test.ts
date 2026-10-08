@@ -3,16 +3,20 @@
  * the `ledger` contract's tool): over the platform's Node world (the W3
  * core-loop world) with the visibility cartridge's project state composed
  * into every Project DO, a `tools/call` of `ledger` for datekit returns the
- * ledger as structured content, the same ledger the RPC `ledger` gives.
+ * ledger as structured content, the same ledger the RPC `ledger` gives,
+ * and both are the cartridge's.
  *
  * The world's rules evaluator does not read `visibility.ts` yet (601 #4),
- * so datekit's ledger here is the Open one its config folder states.
+ * so datekit's ledger here is the Open one its config folder states, the
+ * same as the neutral port's: the test watches the cartridge's port answer.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Fetch } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { Brand } from "@repo/brand";
+import { ProjectVisibility } from "@repo/project/visibility-port";
+import type { VisibilityPort } from "@repo/project/visibility-port";
 import { Ledger } from "@repo/protocol/domain/visibility";
 import { ProjectName } from "@repo/protocol/ids";
 import { fakeArtifactsBinding } from "@repo/testkit/fake-artifacts-binding";
@@ -45,11 +49,8 @@ const start = {
 /** A `Fetch` that nothing here may call. */
 const noFetch = Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch"));
 
-/**
- * The cartridge's project state for the world's stage, over a private
- * namespace of its own: what the Worker plugs into each Project DO.
- */
-const cartridge = Layer.unwrap(
+/** The cartridge's project state for the world's stage, over a private namespace of its own. */
+const stateOfStage = Layer.unwrap(
   Effect.gen(function* () {
     const host = yield* Effect.provide(
       Effect.service(RepoHost),
@@ -66,6 +67,29 @@ const cartridge = Layer.unwrap(
     return stateLive(config).pipe(Layer.provide(noFetch));
   })
 );
+
+/**
+ * That state as the Worker plugs it into each Project DO, watched: each
+ * project the cartridge's port is asked the ledger of joins `asked`.
+ */
+const cartridge = (asked: ProjectName[]) =>
+  Layer.effect(
+    ProjectVisibility,
+    Effect.gen(function* () {
+      const port = yield* ProjectVisibility;
+
+      const watched: VisibilityPort = {
+        ...port,
+        ledger: (of, snapshot) => {
+          asked.push(of);
+
+          return port.ledger(of, snapshot);
+        },
+      };
+
+      return watched;
+    })
+  ).pipe(Layer.provide(stateOfStage));
 
 const version = "2026-07-28";
 
@@ -128,34 +152,44 @@ describe("the ledger over MCP, with the visibility cartridge composed", () => {
   it.live(
     "returns datekit's ledger as structured content, as the ledger contract gives it",
     () =>
-      Effect.scoped(
-        Effect.gen(function* () {
-          const world = yield* coreLoopWorld();
-          const dora = world.rpc("dora");
-          const made = yield* dora.initProject({ project });
-          const home = yield* world.git("dora").clone(made.remote);
+      Effect.suspend(() => {
+        const asked: ProjectName[] = [];
 
-          yield* world.git("dora").commit(home, "Start datekit", start);
-          yield* world.git("dora").push(home);
+        return Effect.scoped(
+          Effect.gen(function* () {
+            const world = yield* coreLoopWorld();
+            const dora = world.rpc("dora");
+            const made = yield* dora.initProject({ project });
+            const home = yield* world.git("dora").clone(made.remote);
 
-          const { result } = yield* replyOf(yield* world.fetch(ledgerCall));
-          const ledger = yield* world.rpc("anonymous").ledger({ project });
+            yield* world.git("dora").commit(home, "Start datekit", start);
+            yield* world.git("dora").push(home);
 
-          expect({
-            isError: result.isError,
-            structured: yield* Schema.decodeUnknownEffect(Ledger)(
-              result.structuredContent
-            ),
-          }).toStrictEqual({ isError: false, structured: ledger });
-          expect(ledger).toStrictEqual({
-            entries: [],
-            layers: [],
-            posture: "open",
-            postureLabel: "Open",
-            project,
-          });
-        }).pipe(Effect.provide(cartridge))
-      ),
+            const { result } = yield* replyOf(yield* world.fetch(ledgerCall));
+            const overMcp = [...asked];
+            const ledger = yield* world.rpc("anonymous").ledger({ project });
+
+            expect({
+              asked: [overMcp, asked],
+              isError: result.isError,
+              structured: yield* Schema.decodeUnknownEffect(Ledger)(
+                result.structuredContent
+              ),
+            }).toStrictEqual({
+              asked: [[project], [project, project]],
+              isError: false,
+              structured: ledger,
+            });
+            expect(ledger).toStrictEqual({
+              entries: [],
+              layers: [],
+              posture: "open",
+              postureLabel: "Open",
+              project,
+            });
+          }).pipe(Effect.provide(cartridge(asked)))
+        );
+      }),
     30_000
   );
 });

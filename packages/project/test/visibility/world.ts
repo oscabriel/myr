@@ -277,10 +277,13 @@ const standIns = Layer.effectContext(
 
 /**
  * The scenario's policy at any commit, holding the asks whose files the
- * commit's config folder has, and datekit's visibility config when it has
- * `visibility.ts` (or `visibility` when given).
+ * commit's config folder has, and, when it has `visibility.ts`, the config
+ * `configs` gives for that file's source, or `visibility`.
  */
-const rulesWith = (visibility: VisibilityPolicy) =>
+const rulesWith = (
+  visibility: VisibilityPolicy,
+  configs: ReadonlyMap<string, VisibilityPolicy>
+) =>
   Layer.effect(
     RulesEvaluator,
     Effect.gen(function* () {
@@ -299,9 +302,16 @@ const rulesWith = (visibility: VisibilityPolicy) =>
               judge: finishers.judgeClosure(policy.run, facts.ci),
             };
 
-            return visibilityFile in modules.modules
-              ? { ...evaluated, visibility }
-              : evaluated;
+            return Option.match(
+              Option.fromUndefinedOr(modules.modules[visibilityFile]),
+              {
+                onNone: () => evaluated,
+                onSome: (source) => ({
+                  ...evaluated,
+                  visibility: configs.get(source) ?? visibility,
+                }),
+              }
+            );
           }),
       });
     })
@@ -309,13 +319,18 @@ const rulesWith = (visibility: VisibilityPolicy) =>
 
 /**
  * The world: datekit over memory adapters, answer runs left to the test,
- * and the visibility cartridge's live port over the stand-ins.
+ * and the visibility cartridge's live port over the stand-ins. Its
+ * `visibility.ts` evaluates to `visibility`, or to the config `configs`
+ * gives for its source.
  */
-export const visibilityWorld = (visibility = datekitVisibility) =>
+export const visibilityWorld = (
+  visibility = datekitVisibility,
+  configs: ReadonlyMap<string, VisibilityPolicy> = new Map()
+) =>
   Layer.mergeAll(
     worldOf(scenario, "memory"),
     Layer.succeed(AnswerRuns, AnswerRuns.of({ start: () => Effect.void })),
-    rulesWith(visibility),
+    rulesWith(visibility, configs),
     ProjectVisibilityLive.pipe(Layer.provideMerge(standIns))
   );
 
@@ -341,9 +356,10 @@ export const made = (api: ProjectApi) =>
   });
 
 /**
- * `who` lands `files` from their working fork as a decider's own change:
- * every lane scripted to pass on the merge, and the run driven to its end.
- * Landing the same request again changes nothing.
+ * `who` lands `files` from their working fork, brought up to main first as
+ * their git would fetch it, as a decider's own change: every lane scripted
+ * to pass on the merge, and the run driven to its end. Landing the same
+ * request again changes nothing.
  */
 export const landOwn = (
   api: ProjectApi,
@@ -356,6 +372,11 @@ export const landOwn = (
 ) =>
   Effect.gen(function* () {
     const forked = yield* api.fork(who);
+
+    yield* RepoHost.use((host) =>
+      Effect.andThen(host.remove(forked.fork), host.fork(repo, forked.fork))
+    ).pipe(Effect.orDie);
+
     const base = yield* mainTip;
 
     const head = yield* Pusher.use((pusher) =>

@@ -109,9 +109,14 @@ export interface Standing {
 
 /**
  * The posture in effect at `now` under `visibility`: the declared one,
- * unless the latest decision asked about narrowing to it has not taken
- * effect (open, declined, expired, or accepted with notice still to run);
- * then the posture it would narrow from, in GLOSSARY's words.
+ * unless the latest posture decision asked about narrowing to it and has
+ * not taken effect (open, declined, expired, or accepted with notice still
+ * to run); then the posture it would narrow from, in GLOSSARY's words.
+ *
+ * Only the latest posture decision counts: every landing that narrows what
+ * stands opens one, so a config that moved on from the latest one's `to`
+ * without a decision widened, and stands, whatever an older decision about
+ * the same posture came to.
  */
 export const standing = (input: {
   readonly decisions: readonly Decision[];
@@ -120,8 +125,10 @@ export const standing = (input: {
 }): Standing => {
   const declared = declaredBy(input.visibility);
 
-  const asked = Arr.findLast(
-    input.decisions.flatMap((decision) => Option.toArray(askedOf(decision))),
+  const asked = Option.filter(
+    Arr.last(
+      input.decisions.flatMap((decision) => Option.toArray(askedOf(decision)))
+    ),
     ({ subject }) => subject.to === declared.posture
   );
 

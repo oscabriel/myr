@@ -64,6 +64,7 @@ import {
   Context,
   DateTime,
   Effect,
+  Equal,
   Layer,
   Option,
   Order,
@@ -443,10 +444,7 @@ const onPolicy: VisibilityPort["onPolicy"] = (input, snapshot) =>
 
     // A project's first config stands at once, and an unchanged one
     // decides nothing again (a declined narrowing stays declined).
-    const changed =
-      Option.isSome(input.before) &&
-      JSON.stringify(Option.getOrNull(before)) !==
-        JSON.stringify(Option.getOrNull(after));
+    const changed = Option.isSome(input.before) && !Equal.equals(before, after);
 
     const to = declaredBy(after);
 
@@ -799,8 +797,11 @@ const live = Effect.gen(function* () {
           Effect.orDie(repos.readBlob(repo, ObjectId.make(blob))),
           (content) =>
             Option.match(content, {
+              // The blob's id stays out: unsalted, it would test a guess at the check.
               onNone: () =>
-                Effect.die(`the layer repo ${repo} has no blob ${blob}`),
+                Effect.die(
+                  `the layer repo ${repo} lost a sealed check at ${at}`
+                ),
               onSome: (bytes) => Effect.succeed({ area, content: bytes, path }),
             })
         )

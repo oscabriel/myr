@@ -33,9 +33,11 @@ import {
   datekitVisibility,
   firstSuite,
   inesV,
+  landOwn,
   layerFiles,
   LayerPusher,
   layerRepo,
+  mainFiles,
   maintainers,
   manifestFile,
   okonkwo,
@@ -44,6 +46,7 @@ import {
   pushLayer,
   sealedByInes,
   Seen,
+  visibilityFile,
   visibilityWorld,
 } from "./world.ts";
 import type { SealedFile } from "./world.ts";
@@ -222,6 +225,81 @@ describe("a landing that adds the visibility config", () => {
           posture,
         }).toStrictEqual({ choices: ["decline"], posture: "open" });
       }).pipe(Effect.provide(visibilityWorld()))
+  );
+});
+
+/** A `visibility.ts` whose maintainers layer also holds shipped source: Open core. */
+const coreSource =
+  "export default visibility({ layers: { maintainers: withSource } });\n";
+
+/** What `coreSource` evaluates to: datekit's config, its maintainers layer holding source too. */
+const openCore = {
+  ...datekitVisibility,
+  layers: datekitVisibility.layers.map((layer) => ({
+    ...layer,
+    holds: Array.append(layer.holds, "source" as const),
+  })),
+};
+
+/** main's files with `visibility.ts` holding `source`. */
+const mainWith = (source: string) =>
+  mainFiles.map(
+    ([path, content]) =>
+      [path, path === visibilityFile ? source : content] as const
+  );
+
+describe("a landing that widens the posture", () => {
+  it.effect(
+    "stands at once, though an older narrowing to the same posture was declined",
+    () =>
+      Effect.gen(function* () {
+        // Sealed evidence is asked for and declined by default: Open stands.
+        const { api } = yield* sealedByInes;
+
+        yield* advanceTo("2026-11-07T12:00:00Z");
+        yield* api.onAlarm();
+
+        // Open core is asked for and accepted, and its notice runs out.
+        yield* landOwn(api, inesV, {
+          files: mainWith(coreSource),
+          message: "Keep the core's source in the maintainers layer",
+          requestId: "land-core",
+        });
+
+        const [core] = yield* postureDecisions(api);
+        const asked = Option.getOrThrow(Option.fromUndefinedOr(core));
+
+        yield* api.decide(okonkwo, { choice: "accept", decision: asked.id });
+        yield* advanceTo("2026-11-14T12:00:00Z");
+
+        const closed = yield* api.ledger(anyone);
+
+        // Back to sealed evidence: wider than Open core, so no decision.
+        yield* landOwn(api, inesV, {
+          files: mainFiles,
+          message: "Release the core's source again",
+          requestId: "land-sealed-again",
+        });
+
+        const widened = yield* api.ledger(anyone);
+
+        expect({
+          asked: asked.subject,
+          open: (yield* postureDecisions(api)).length,
+          postures: [closed, widened].map(({ posture }) => posture),
+        }).toStrictEqual({
+          asked: DecisionSubject.cases.PostureChange.make({
+            from: "open",
+            to: "openCore",
+          }),
+          open: 0,
+          postures: ["openCore", "openWithSealedEvidence"],
+        });
+      }).pipe(
+        Effect.provide(
+          visibilityWorld(datekitVisibility, new Map([[coreSource, openCore]]))
+        )
+      )
   );
 });
 
@@ -474,7 +552,7 @@ const admitting = {
 
 describe("a push to the maintainers layer, with admission on", () => {
   it.effect(
-    "stays proposed, starts its admission once, and lands only on an admission's result",
+    "stays proposed, starts its admission once, and lands nothing on an admission that admits nothing",
     () =>
       Effect.gen(function* () {
         const { api } = yield* sealedByInes;
