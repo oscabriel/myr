@@ -560,7 +560,6 @@
       "description": "Finish a passing answer with a decider's own commits on top; they are checked again, and credited with Finished-by when it lands.",
       "destructive": false,
       "flags": [
-        "--ask",
         "--base",
         "--head",
         "--project",
@@ -620,7 +619,9 @@
         ],
         "type": "object"
       },
-      "positional": [],
+      "positional": [
+        "ask"
+      ],
       "readOnly": false,
       "source": "contract",
       "surfaces": [
@@ -1085,7 +1086,6 @@
       "description": "Release the caller's claim on an ask, so anyone may claim it again.",
       "destructive": false,
       "flags": [
-        "--ask",
         "--project",
         "--json",
         "--dry-run"
@@ -1126,7 +1126,9 @@
         ],
         "type": "object"
       },
-      "positional": [],
+      "positional": [
+        "ask"
+      ],
       "readOnly": false,
       "source": "contract",
       "surfaces": [
@@ -1193,7 +1195,6 @@
       "description": "Offer the commit `head`, built on `base`, as an answer to a claimed ask; the receipt says it is being checked, and it lands if it passes.",
       "destructive": false,
       "flags": [
-        "--ask",
         "--base",
         "--head",
         "--project",
@@ -1252,7 +1253,9 @@
         ],
         "type": "object"
       },
-      "positional": [],
+      "positional": [
+        "ask"
+      ],
       "readOnly": false,
       "source": "contract",
       "surfaces": [
@@ -1300,7 +1303,6 @@
       "description": "Show the verdict on an answer to an ask, for its latest head or the one named; held-back checks show one bit per area.",
       "destructive": false,
       "flags": [
-        "--ask",
         "--head",
         "--project",
         "--json"
@@ -1345,7 +1347,9 @@
         ],
         "type": "object"
       },
-      "positional": [],
+      "positional": [
+        "ask"
+      ],
       "readOnly": true,
       "source": "contract",
       "surfaces": [

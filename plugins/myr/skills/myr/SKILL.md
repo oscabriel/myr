@@ -3,7 +3,7 @@ name: myr
 description: "Contribute to projects on Myr with the `myr` CLI: find an ask, claim it, check your answer locally, push it to your fork, and read the verdict. Use when a repo's remote is on Myr, or when a push was refused with a refusal such as OutOfScope or StaleBase."
 metadata:
   managed-by: "myr"
-  content-hash: "sha256:bd1f1c815649d83b48ca8dac25f0b3e9b98e54e3a5dd8edc3171261a75e065ca"
+  content-hash: "sha256:5a87960d45b403f8c2b24f8975cdd1c86dd0f490f97d368875ffd7d7f073a6b3"
 ---
 # Myr
 
@@ -41,7 +41,7 @@ A command whose flags list `--json` prints Markdown, or one versioned JSON envel
 | `myr env set <key>` | `--project` `--acknowledge-short` `--yes` `--dry-run` `--json` | Set a sensitive env item's value from stdin; nobody can read it back. Runs only with `--yes`. |
 | `myr env shape` | `--project` `--json` | Show a project's env shape: the public schema of its environment variables, and who set each write-only value; never a value. Only reads. |
 | `myr evidence <ref>` | `--project` `--json` | Show the log a failing lane left, by the logRef its verdict names, to the answer's own claimant and the project's deciders only; the last 256 KiB. Only reads. |
-| `myr finish` | `--ask` `--base` `--head` `--project` `--requestId` `--json` `--yes` `--dry-run` | Finish a passing answer with a decider's own commits on top; they are checked again, and credited with Finished-by when it lands. Runs only with `--yes`. |
+| `myr finish <ask>` | `--base` `--head` `--project` `--requestId` `--json` `--yes` `--dry-run` | Finish a passing answer with a decider's own commits on top; they are checked again, and credited with Finished-by when it lands. Runs only with `--yes`. |
 | `myr fork` | `--project` `--json` `--dry-run` | Make the caller's working fork of a project, or return it if it exists. |
 | `myr front` | `--kind` `--reserved` `--json` | List the open asks across every project, each saying whether the caller may take it; optionally of one kind, or held for newcomers or people. Only reads. |
 | `myr hook <event>` | `--json` | Answer a harness hook (session-start, pre-tool-use, stop) with the gate's policy. Only reads. |
@@ -54,12 +54,12 @@ A command whose flags list `--json` prints Markdown, or one versioned JSON envel
 | `myr mcp` |  | Serve the platform's tools over MCP on stdio. |
 | `myr projects` | `--json` | List every project on the platform, with its posture and how many asks it has open. Only reads. |
 | `myr propose` | `--files` `--project` `--sealed` `--territory` `--want` `--json` `--dry-run` | Propose an ask, optionally with a sealed answer; the proposal expires unless a decider accepts it. |
-| `myr release` | `--ask` `--project` `--json` `--dry-run` | Release the caller's claim on an ask, so anyone may claim it again. |
+| `myr release <ask>` | `--project` `--json` `--dry-run` | Release the caller's claim on an ask, so anyone may claim it again. |
 | `myr schema <command>` | `--json` | Print the JSON Schema of a command's payload. Only reads. |
 | `myr status` | `--project` `--json` | Show who the caller is, and their claims and answers, in one project or in every one. Only reads. |
-| `myr submit` | `--ask` `--base` `--head` `--project` `--requestId` `--json` `--dry-run` | Offer the commit `head`, built on `base`, as an answer to a claimed ask; the receipt says it is being checked, and it lands if it passes. |
+| `myr submit <ask>` | `--base` `--head` `--project` `--requestId` `--json` `--dry-run` | Offer the commit `head`, built on `base`, as an answer to a claimed ask; the receipt says it is being checked, and it lands if it passes. |
 | `myr today` | `--project` `--json` | Show the caller's Today: the decisions to take, held to their budget, each with its evidence and a safe default. Only reads. |
-| `myr verdict` | `--ask` `--head` `--project` `--json` | Show the verdict on an answer to an ask, for its latest head or the one named; held-back checks show one bit per area. Only reads. |
+| `myr verdict <ask>` | `--head` `--project` `--json` | Show the verdict on an answer to an ask, for its latest head or the one named; held-back checks show one bit per area. Only reads. |
 | `myr vouch` | `--handle` `--note` `--project` `--verdict` `--json` `--yes` `--dry-run` | Vouch for a person, or denounce them, by landing a line in the project's vouch file. Runs only with `--yes`. |
 | `myr why <location>` | `--project` `--json` | Explain a line: the ask, the answer and the people that landed it. Only reads. |
 

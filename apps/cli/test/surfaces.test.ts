@@ -457,6 +457,124 @@ const receiving = (receipt: ReturnType<typeof receiptAt>) =>
     Contracts.toLayerHandler("submitAnswer", () => Effect.succeed(receipt))
   );
 
+/** Each command that names an ask, and what else it takes, as a person types it. */
+const naming = {
+  finish: [
+    "--project",
+    project,
+    "--base",
+    base,
+    "--head",
+    head,
+    "--requestId",
+    requestId,
+    "--yes",
+  ],
+  release: ["--project", project],
+  submit: [
+    "--project",
+    project,
+    "--base",
+    base,
+    "--head",
+    head,
+    "--requestId",
+    requestId,
+  ],
+  verdict: ["--project", project],
+} as const satisfies Readonly<Record<string, readonly string[]>>;
+
+/** A platform that records the ask each call names, and answers each call plainly. */
+const recordingAsks = (named: Ref.Ref<readonly string[]>) => {
+  const record = (given: string) => Ref.update(named, (all) => [...all, given]);
+
+  const receipt = receiptAt(Outcome.cases.Checking.make({ stage: "merge" }));
+
+  return Layer.mergeAll(
+    unanswered,
+    Contracts.toLayerHandler("verdict", (payload) =>
+      record(payload.ask).pipe(Effect.as({}))
+    ),
+    Contracts.toLayerHandler("release", (payload) =>
+      record(payload.ask).pipe(Effect.as({ released: true }))
+    ),
+    Contracts.toLayerHandler("submitAnswer", (payload) =>
+      record(payload.ask).pipe(Effect.as(receipt))
+    ),
+    Contracts.toLayerHandler("finish", (payload) =>
+      record(payload.ask).pipe(Effect.as(receipt))
+    )
+  );
+};
+
+describe("the ask a command is about", () => {
+  it.effect(
+    "is its first argument on verdict, release, submit and finish, as on claim",
+    () =>
+      Effect.gen(function* () {
+        const named = yield* Ref.make<readonly string[]>([]);
+
+        const codes = yield* Effect.forEach(
+          Object.entries(naming),
+          ([command, rest]) =>
+            Effect.map(
+              runProgram([command, ask, ...rest], {
+                handlers: recordingAsks(named),
+              }),
+              ({ code }) => [command, code] as const
+            )
+        );
+
+        expect(codes).toStrictEqual(
+          Object.keys(naming).map((command) => [command, 0])
+        );
+        expect(yield* Ref.get(named)).toStrictEqual([ask, ask, ask, ask]);
+      })
+  );
+
+  it.effect(
+    "still comes from --ask, which help no longer shows and which prints nothing more",
+    () =>
+      Effect.gen(function* () {
+        const named = yield* Ref.make<readonly string[]>([]);
+
+        const runs = yield* Effect.forEach(
+          Object.entries(naming),
+          ([command, rest]) =>
+            runProgram([command, "--ask", ask, ...rest], {
+              handlers: recordingAsks(named),
+            })
+        );
+
+        expect(runs.map(({ code }) => code)).toStrictEqual([0, 0, 0, 0]);
+        expect(runs.flatMap(({ err }) => err)).toStrictEqual([]);
+        expect(yield* Ref.get(named)).toStrictEqual([ask, ask, ask, ask]);
+
+        const help = yield* runProgram(["verdict", "--help"], {
+          handlers: unanswered,
+        });
+
+        expect(help.out.join("\n")).toContain("<ask>");
+        expect(help.out.join("\n")).not.toContain("--ask");
+      })
+  );
+
+  it.effect("is a usage error naming <ask> when neither form gives it", () =>
+    Effect.gen(function* () {
+      const named = yield* Ref.make<readonly string[]>([]);
+
+      const run = yield* runProgram(["verdict", ...naming.verdict], {
+        handlers: recordingAsks(named),
+      });
+
+      expect(run.code).toBe(2);
+      expect(run.err).toHaveLength(1);
+      expect(run.err[0]).toContain("<ask>");
+      expect(yield* Ref.get(named)).toStrictEqual([]);
+    })
+  );
+});
+
 describe("an answer offered with submit", () => {
   it.effect("prints the same line git's remote: output gives its push", () =>
     Effect.gen(function* () {

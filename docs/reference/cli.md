@@ -255,7 +255,7 @@ myr evidence <ref> [--project <project>] [--json]
 Finish a passing answer with a decider's own commits on top; they are checked again, and credited with Finished-by when it lands.
 
 ```sh
-myr finish --ask <ask> --base <base> --head <head> [--project <project>] --requestId <requestId> [--json] [--yes] [--dry-run]
+myr finish <ask> --base <base> --head <head> [--project <project>] --requestId <requestId> [--json] [--yes] [--dry-run]
 ```
 
 - Contract: `finish`
@@ -267,7 +267,7 @@ myr finish --ask <ask> --base <base> --head <head> [--project <project>] --reque
 
 | Argument | Takes | Required |
 | --- | --- | --- |
-| `--ask` | text | yes |
+| `<ask>` | text | yes |
 | `--base` | text | yes |
 | `--head` | text | yes |
 | `--project` | text | no: the project of the repo you stand in |
@@ -514,7 +514,7 @@ myr propose [--files <files>] [--project <project>] [--sealed <sealed>] [--terri
 Release the caller's claim on an ask, so anyone may claim it again.
 
 ```sh
-myr release --ask <ask> [--project <project>] [--json] [--dry-run]
+myr release <ask> [--project <project>] [--json] [--dry-run]
 ```
 
 - Contract: `release`
@@ -526,7 +526,7 @@ myr release --ask <ask> [--project <project>] [--json] [--dry-run]
 
 | Argument | Takes | Required |
 | --- | --- | --- |
-| `--ask` | text | yes |
+| `<ask>` | text | yes |
 | `--project` | text | no: the project of the repo you stand in |
 | `--json` | nothing (a switch) | no |
 | `--dry-run` | nothing (a switch) | no |
@@ -572,7 +572,7 @@ myr status [--project <project>] [--json]
 Offer the commit `head`, built on `base`, as an answer to a claimed ask; the receipt says it is being checked, and it lands if it passes.
 
 ```sh
-myr submit --ask <ask> --base <base> --head <head> [--project <project>] --requestId <requestId> [--json] [--dry-run]
+myr submit <ask> --base <base> --head <head> [--project <project>] --requestId <requestId> [--json] [--dry-run]
 ```
 
 - Contract: `submitAnswer`
@@ -584,7 +584,7 @@ myr submit --ask <ask> --base <base> --head <head> [--project <project>] --reque
 
 | Argument | Takes | Required |
 | --- | --- | --- |
-| `--ask` | text | yes |
+| `<ask>` | text | yes |
 | `--base` | text | yes |
 | `--head` | text | yes |
 | `--project` | text | no: the project of the repo you stand in |
@@ -617,7 +617,7 @@ myr today [--project <project>] [--json]
 Show the verdict on an answer to an ask, for its latest head or the one named; held-back checks show one bit per area.
 
 ```sh
-myr verdict --ask <ask> [--head <head>] [--project <project>] [--json]
+myr verdict <ask> [--head <head>] [--project <project>] [--json]
 ```
 
 - Contract: `verdict`
@@ -629,7 +629,7 @@ myr verdict --ask <ask> [--head <head>] [--project <project>] [--json]
 
 | Argument | Takes | Required |
 | --- | --- | --- |
-| `--ask` | text | yes |
+| `<ask>` | text | yes |
 | `--head` | text | no |
 | `--project` | text | no: the project of the repo you stand in |
 | `--json` | nothing (a switch) | no |

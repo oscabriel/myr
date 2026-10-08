@@ -51,10 +51,16 @@ export const NeedsApproval = Context.Reference<boolean>(
   { defaultValue: () => false }
 );
 
-/** The CLI command it becomes: its name, and the payload fields taken in order. */
+/**
+ * The CLI command it becomes: its name, the payload fields taken in order,
+ * and those of them that were flags until now (`formerFlags`): each still
+ * parses as a flag of its own name, hidden from help, so a script that types
+ * it keeps working for a release. Drop a name from `formerFlags` to end that.
+ */
 export const Cli = Context.Reference<{
   readonly name?: string;
   readonly positional?: readonly string[];
+  readonly formerFlags?: readonly string[];
 }>("protocol/Cli", { defaultValue: () => ({}) });
 
 /** Every surface a contract can be served on. */
