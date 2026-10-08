@@ -14,3 +14,13 @@
 {"at":"2026-10-08T14:57:40.569Z","by":"smoke","kind":"project","name":"smoke-20261008-145715","stage":"dev-oscabriel"}
 {"at":"2026-10-08T14:57:40.570Z","by":"smoke","kind":"repo","name":"smoke-20261008-145715","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
 {"at":"2026-10-08T14:58:04.791Z","by":"smoke","kind":"repo","name":"smoke-20261008-145715--parse-year--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:07:13.963Z","by":"seed","kind":"project","name":"datekit-803","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:07:13.963Z","by":"seed","kind":"repo","name":"datekit-803","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:07:13.963Z","by":"seed","kind":"repo","name":"datekit-803--maintainers","namespace":"layers-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:09:32.565Z","by":"seed","kind":"project","name":"burrow-803","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:09:32.565Z","by":"seed","kind":"repo","name":"burrow-803","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:11:06.868Z","by":"seed","kind":"repo","name":"datekit-803--parse-iso-week--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:12:15.089Z","by":"seed","kind":"repo","name":"datekit-803--format-ordinal--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:14:54.562Z","by":"swarm","kind":"repo","name":"burrow-803--drop-legacy-fetch-burrow-billing--ivo","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:14:54.718Z","by":"swarm","kind":"repo","name":"burrow-803--drop-legacy-fetch-burrow-auth--tamsin","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T16:21:19.706Z","by":"seed","kind":"repo","name":"datekit-803--add-months-clamp--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
