@@ -7,8 +7,7 @@
  * the repo is followed.
  */
 import { RepoPath } from "@repo/protocol/ids";
-import { Context, Schema } from "effect";
-import type { Effect } from "effect";
+import { Array, Context, Effect, Predicate, Result, Schema } from "effect";
 
 /**
  * A decorator's value as the schema writes it, never evaluated: text or a
@@ -87,3 +86,86 @@ export class EnvSchemaParser extends Context.Service<
     ) => Effect.Effect<ParsedEnvSchema, EnvSchemaUnreadable>;
   }
 >()("visibility/EnvSchemaParser") {}
+
+/** Whether a value is a function call as written (`forEnv(production)`). */
+export const isCall = (value: ParsedValue): value is ParsedCall =>
+  Predicate.hasProperty(value, "fn");
+
+/** Whether a value is arguments alone: a bare call's or an object's. */
+export const isArgs = (value: ParsedValue): value is ParsedArgs =>
+  Predicate.hasProperty(value, "named") && !isCall(value);
+
+/** Whether a value is a list as written (`[GET, POST]`). */
+export const isList = (value: ParsedValue): value is readonly ParsedValue[] =>
+  Array.isArray(value);
+
+/** A path that starts outside any repo: the home folder, the root, a drive or a scheme (`C:`, `https:`). */
+const OUTSIDE = /^(?:~|[/\\]|[A-Za-z][\w+.-]*:)/u;
+
+/**
+ * The repo path an `@import` names, resolved from the folder of the schema
+ * that imports it; a reason when it names a place outside the repo. A
+ * folder import (`../shared/`) keeps its trailing `/`.
+ */
+const repoImport = (
+  file: RepoPath,
+  written: string
+): Result.Result<RepoPath, string> => {
+  if (written === "") {
+    return Result.fail("an @import names no path");
+  }
+
+  if (OUTSIDE.test(written)) {
+    return Result.fail(`imports ${written}, outside the repo`);
+  }
+
+  const folder: string[] = file.split("/").slice(0, -1);
+
+  for (const segment of written.split(/[/\\]/u)) {
+    if (segment === "..") {
+      if (folder.pop() === undefined) {
+        return Result.fail(`imports ${written}, above the repo's root`);
+      }
+    } else if (segment !== "" && segment !== ".") {
+      folder.push(segment);
+    }
+  }
+
+  const path = folder.join("/") || ".";
+
+  return Result.succeed(
+    RepoPath.make(written.endsWith("/") && path !== "." ? `${path}/` : path)
+  );
+};
+
+/**
+ * A parsed schema with the files its header's `@import`s name, as repo
+ * paths, recorded and never merged. An import from outside the repo
+ * (`~/…`, an absolute path, above the repo's root) makes the schema
+ * unreadable: the platform never follows one. Both parsers end here, so
+ * the rule is the same whichever reads the text.
+ */
+export const withImports = (
+  file: RepoPath,
+  parsed: Pick<ParsedEnvSchema, "header" | "items">
+): Effect.Effect<ParsedEnvSchema, EnvSchemaUnreadable> =>
+  Effect.forEach(
+    parsed.header.filter(({ name }) => name === "import"),
+    ({ value }) => {
+      const written = isArgs(value) ? value.positional[0] : undefined;
+
+      return Effect.fromResult(
+        Predicate.isString(written)
+          ? repoImport(file, written)
+          : Result.fail("an @import names no path")
+      ).pipe(
+        Effect.mapError((reason) => new EnvSchemaUnreadable({ file, reason }))
+      );
+    }
+  ).pipe(
+    Effect.map((imports) => ({
+      header: parsed.header,
+      imports,
+      items: parsed.items,
+    }))
+  );
