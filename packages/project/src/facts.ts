@@ -2,12 +2,15 @@
  * The facts the gate and the rules evaluator decide over, gathered from the
  * repos through `RepoHost`: the gate's `PushFacts` for one push (its change
  * list, the lines it added, where it goes), and the rules' `EvaluationFacts`
- * at one commit (its CI and manifest files, its workspaces, its vouch file).
+ * at one commit (the files its finder and judge closure read, its
+ * workspaces, its vouch file).
  * Neither the gate nor rule code reads a repo; the project service hands
  * them these.
  */
 import { ObjectId, RepoHost, Revision } from "@repo/artifacts/repo-host";
-import type { RepoNotFound, TreeEntry } from "@repo/artifacts/repo-host";
+import type { RepoNotFound } from "@repo/artifacts/repo-host";
+import { judgeInputs } from "@repo/checks/judge";
+import { workspacesIn } from "@repo/checks/workspaces";
 import { PushTarget } from "@repo/gate/facts";
 import type { PushFacts } from "@repo/gate/facts";
 import { addedLines, treeDiff } from "@repo/git/tree-diff";
@@ -16,22 +19,17 @@ import type { Ask } from "@repo/protocol/domain/ask";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { RefNameText } from "@repo/protocol/domain/common";
 import type { Policy } from "@repo/protocol/domain/policy";
-import {
-  AskId,
-  Handle,
-  LayerName,
-  RepoPath,
-  TreeSha,
-} from "@repo/protocol/ids";
+import { AskId, Handle, LayerName, TreeSha } from "@repo/protocol/ids";
 import type {
   CommitSha,
   LandedSha,
   ProjectName,
   RepoName,
+  RepoPath,
 } from "@repo/protocol/ids";
 import type { Principal } from "@repo/protocol/principal";
 import type { EvaluationFacts } from "@repo/rules/rules-evaluator";
-import { Array, Effect, Option, Predicate, Schema } from "effect";
+import { Array, Effect, Option, Schema } from "effect";
 import type { DateTime } from "effect";
 
 /** A commit the push names that the repo does not hold. */
@@ -191,166 +189,59 @@ export const pushFacts = (
 
 // ------------------------------------------------------------ rules facts
 
-// The folders whose files the run-block finder reads (spec §4.2 `checks`).
-const CI_FOLDERS = [".github/workflows", ".forgejo/workflows", ".husky"];
+/** How many of a repo's trees or blobs the facts read at once. */
+const READS_AT_ONCE = 16;
 
-// A file the finder reads is small; a large one is no config.
-const MAX_FACT_BYTES = 256 * 1024;
-
-const Manifest = Schema.fromJsonString(
-  Schema.Struct({
-    exports: Schema.optionalKey(Schema.Json),
-    name: Schema.optionalKey(Schema.String),
-    workspaces: Schema.optionalKey(Schema.Json),
-  })
-);
-
-const decodeManifest = Schema.decodeUnknownOption(Manifest);
-
-/** The entries of the folder at `path` (`""` for the root) of a tree. */
-const folderAt = (
-  repo: RepoName,
-  root: ObjectId,
-  path: string
-): Effect.Effect<readonly TreeEntry[], RepoNotFound, RepoHost> =>
-  Effect.reduce(
-    path === "" ? [] : path.split("/"),
-    (): Option.Option<ObjectId> => Option.some(root),
-    (folder, segment) =>
-      Option.match(folder, {
-        onNone: () => Effect.succeedNone,
-        onSome: (id) =>
-          RepoHost.use((host) => host.readTree(repo, id)).pipe(
-            Effect.map((entries) =>
-              Option.flatMap(entries, (found) =>
-                Option.fromNullishOr(
-                  found.find(
-                    (entry) => entry.name === segment && entry.type === "tree"
-                  )?.sha
-                )
-              )
-            )
-          ),
-      })
-  ).pipe(
-    Effect.flatMap(
-      Option.match({
-        onNone: () => Effect.succeed([]),
-        onSome: (id) =>
-          RepoHost.use((host) => host.readTree(repo, id)).pipe(
-            Effect.map(Option.getOrElse(() => []))
-          ),
-      })
-    )
-  );
-
-/** Each blob directly in a folder, as a path and its text. */
-const filesIn = (repo: RepoName, root: ObjectId, folder: string) =>
-  Effect.flatMap(folderAt(repo, root, folder), (entries) =>
-    Effect.forEach(
-      entries.filter(({ type }) => type === "blob"),
-      (entry) =>
-        RepoHost.use((host) => host.readBlob(repo, entry.sha)).pipe(
-          Effect.map((bytes) =>
-            Option.filter(bytes, (read) => read.length <= MAX_FACT_BYTES).pipe(
-              Option.map((read) => ({
-                content: textOf(read),
-                path: RepoPath.make(
-                  folder === "" ? entry.name : `${folder}/${entry.name}`
-                ),
-              }))
-            )
-          )
-        )
-    ).pipe(Effect.map(Array.getSomes))
-  );
-
-const isJsonArray = (value: Schema.Json): value is Schema.JsonArray =>
-  globalThis.Array.isArray(value);
-
-const isJsonObject = (value: Schema.Json): value is Schema.JsonObject =>
-  Predicate.isObject(value) && !isJsonArray(value);
-
-const strings = (value: Schema.Json | undefined): readonly string[] =>
-  value !== undefined && isJsonArray(value)
-    ? value.filter(Predicate.isString)
-    : [];
-
-/** A manifest's `workspaces`: an array of globs, or `{ packages: [...] }`. */
-const workspaceGlobs = (value: Schema.Json | undefined): readonly string[] => {
-  if (value === undefined || value === null) {
-    return [];
-  }
-
-  if (isJsonArray(value)) {
-    return strings(value);
-  }
-
-  return isJsonObject(value) ? strings(value.packages) : [];
-};
-
-/** Every string an `exports` field leads to, nested conditions included. */
-const exportTargets = (value: Schema.Json | undefined): readonly string[] => {
-  if (value === undefined || value === null) {
-    return [];
-  }
-
-  if (Predicate.isString(value)) {
-    return [value];
-  }
-
-  if (isJsonArray(value)) {
-    return value.flatMap(exportTargets);
-  }
-
-  return isJsonObject(value) ? Object.values(value).flatMap(exportTargets) : [];
-};
-
-const withoutDotSlash = (path: string) => path.replace(/^(?:\.\/)+/u, "");
+/** A blob or a folder of a commit's tree: its path from the root, and its id. */
+interface Located {
+  readonly path: string;
+  readonly sha: ObjectId;
+}
 
 /**
- * The folders a workspace glob names: `packages/*` is every folder in
- * `packages`, and a glob with no `*` is its own folder. Deeper globs are
- * read as their folder prefix's children.
+ * Every blob under the tree `root`, by its path from the root: each folder
+ * read once, a level at a time. A submodule is no file.
  */
-const foldersOf = (repo: RepoName, root: ObjectId, glob: string) => {
-  const clean = withoutDotSlash(glob).replace(/\/+$/u, "");
-  const star = clean.indexOf("*");
-
-  if (star === -1) {
-    return Effect.succeed([clean]);
-  }
-
-  const parent = clean.slice(0, star).replace(/\/+$/u, "");
-
-  return Effect.map(folderAt(repo, root, parent), (entries) =>
-    entries
-      .filter(({ type }) => type === "tree")
-      .map(({ name }) => (parent === "" ? name : `${parent}/${name}`))
-  );
-};
-
-/** One workspace package: its folder, its name, and the files its `exports` name. */
-const workspaceAt = (repo: RepoName, root: ObjectId, dir: string) =>
-  Effect.map(filesIn(repo, root, dir), (files) =>
-    Option.flatMap(
-      Option.fromNullishOr(
-        files.find(({ path }) => path === `${dir}/package.json`)
-      ),
-      ({ content }) => decodeManifest(content)
-    ).pipe(
-      Option.flatMap((manifest) =>
-        Option.map(Option.fromNullishOr(manifest.name), (name) => ({
-          dir,
-          exports: exportTargets(manifest.exports).map((target) =>
-            RepoPath.make(`${dir}/${withoutDotSlash(target)}`)
+const blobsUnder = (
+  repo: RepoName,
+  root: ObjectId
+): Effect.Effect<readonly Located[], RepoNotFound, RepoHost> => {
+  const level = (
+    folders: readonly Located[],
+    found: readonly Located[]
+  ): Effect.Effect<readonly Located[], RepoNotFound, RepoHost> =>
+    folders.length === 0
+      ? Effect.succeed(found)
+      : Effect.flatMap(
+          Effect.forEach(
+            folders,
+            (folder) =>
+              RepoHost.use((host) => host.readTree(repo, folder.sha)).pipe(
+                Effect.map((entries) =>
+                  Option.getOrElse(entries, () => []).map((entry) => ({
+                    path:
+                      folder.path === ""
+                        ? entry.name
+                        : `${folder.path}/${entry.name}`,
+                    sha: entry.sha,
+                    type: entry.type,
+                  }))
+                )
+              ),
+            { concurrency: READS_AT_ONCE }
           ),
-          name,
-        }))
-      ),
-      Option.filter(({ name }) => name.length > 0)
-    )
-  );
+          (children) => {
+            const all = children.flat();
+
+            return level(
+              all.filter(({ type }) => type === "tree"),
+              [...found, ...all.filter(({ type }) => type === "blob")]
+            );
+          }
+        );
+
+  return level([{ path: "", sha: root }], []);
+};
 
 /** What `evaluationFacts` is told besides the commit. */
 export interface FactsInput {
@@ -362,12 +253,13 @@ export interface FactsInput {
 }
 
 /**
- * The rules' facts at one commit of `repo`: the files at its root and in
- * its CI folders (what the run-block finder and the judge closure read), the
- * workspaces its root manifest declares, and its vouch file. The seed is the
- * commit's own first eight hex digits, so the same commit always sees the
- * same randomness. A commit the repo lacks gives empty facts: the evaluation
- * then decides on its config folder alone.
+ * The rules' facts at one commit of `repo`: every file of its tree, with
+ * the text of each one the run-block finder or the judge closure reads
+ * (`@repo/checks`' `judgeInputs`, which the CLI's local check and hook
+ * gather through too), the workspaces its root manifest declares, and its
+ * vouch file. The seed is the commit's own first eight hex digits, so the
+ * same commit always sees the same randomness. A commit the repo lacks gives
+ * empty facts: the evaluation then decides on its config folder alone.
  */
 export const evaluationFacts = (
   repo: RepoName,
@@ -390,44 +282,37 @@ export const evaluationFacts = (
       return empty;
     }
 
-    const root = commit.value.tree;
-    const atRoot = yield* filesIn(repo, root, "");
+    const blobs = yield* blobsUnder(repo, commit.value.tree);
+    const ids = new Map(blobs.map(({ path, sha }) => [path, sha]));
 
-    const ci = [
-      ...atRoot,
-      ...(yield* Effect.forEach(CI_FOLDERS, (folder) =>
-        filesIn(repo, root, folder)
-      )).flat(),
-    ];
-
-    const globs = Option.match(
-      Option.flatMap(
-        Option.fromNullishOr(
-          atRoot.find(({ path }) => path === "package.json")
-        ),
-        ({ content }) => decodeManifest(content)
-      ),
-      {
-        onNone: () => [],
-        onSome: (manifest) => workspaceGlobs(manifest.workspaces),
-      }
-    );
-
-    const dirs = Array.dedupe(
-      (yield* Effect.forEach(globs, (glob) =>
-        foldersOf(repo, root, glob)
-      )).flat()
-    );
-
-    const workspaces = Array.getSomes(
-      yield* Effect.forEach(dirs, (dir) => workspaceAt(repo, root, dir))
+    const ci = yield* judgeInputs(blobs, (paths) =>
+      Effect.forEach(
+        paths,
+        (path) =>
+          Option.match(Option.fromUndefinedOr(ids.get(path)), {
+            onNone: () => Effect.succeed([]),
+            onSome: (sha) =>
+              RepoHost.use((host) => host.readBlob(repo, sha)).pipe(
+                Effect.map((bytes) =>
+                  Option.toArray(
+                    Option.map(bytes, (read) => ({ bytes: read, path }))
+                  )
+                )
+              ),
+          }),
+        { concurrency: READS_AT_ONCE }
+      ).pipe(Effect.map((read) => read.flat()))
     );
 
     const vouch = yield* RepoHost.use((host) =>
       host.readFile(repo, Revision.Commit({ sha: at }), input.vouchFile)
     );
 
-    const facts: EvaluationFacts = { ...empty, ci, workspaces };
+    const facts: EvaluationFacts = {
+      ...empty,
+      ci,
+      workspaces: workspacesIn(ci),
+    };
 
     return Option.match(vouch, {
       onNone: () => facts,

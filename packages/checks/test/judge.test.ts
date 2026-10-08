@@ -5,7 +5,7 @@ import { Command } from "@repo/protocol/domain/common";
 import type { RunBlock } from "@repo/protocol/domain/run";
 import { LaneName, RepoPath } from "@repo/protocol/ids";
 import { gitOk } from "@repo/testkit/git";
-import { Context, Effect, FileSystem, Layer, Path } from "effect";
+import { Context, Effect, FileSystem, Layer, Path, Ref } from "effect";
 
 import type { RepoFile } from "../src/finder.ts";
 import {
@@ -15,6 +15,7 @@ import {
   isJudged,
   jsPluginSpecifiers,
   judgeClosure,
+  judgeInputs,
   matchGlob,
   ruleFixtures,
   touchedPointers,
@@ -849,14 +850,28 @@ describe("the judge closure over workspace and task-runner policy", () => {
   });
 });
 
-// The platform reads no file above this size for the closure; here such a
-// file keeps its path and is given with empty content.
+// The platform reads no file above this many bytes for the closure; here
+// such a file keeps its path and is given with empty content.
 const MAX_BYTES = 256 * 1024;
+
+const encoder = new TextEncoder();
+
+/** One tracked file of this repo: its path, its size in bytes, and its text (empty above the limit). */
+interface Tracked {
+  readonly content: string;
+  readonly path: string;
+  readonly size: number;
+}
 
 /** This repo's tracked files, as `git ls-files` lists them, and its closure. */
 class ThisRepo extends Context.Service<
   ThisRepo,
-  { readonly closure: JudgeClosure; readonly tracked: readonly string[] }
+  {
+    readonly closure: JudgeClosure;
+    readonly files: readonly Tracked[];
+    readonly tracked: readonly string[];
+    readonly verify: RunBlock;
+  }
 >()("checks/test/ThisRepo") {}
 
 const thisRepo = Layer.effect(
@@ -873,12 +888,18 @@ const thisRepo = Layer.effect(
 
     const files = yield* Effect.forEach(
       tracked,
-      (name) =>
+      (name): Effect.Effect<Tracked> =>
         fs.readFileString(path.join(root, name)).pipe(
-          Effect.map((content) =>
-            file(name, content.length > MAX_BYTES ? "" : content)
-          ),
-          Effect.orElseSucceed(() => file(name))
+          Effect.map((content) => {
+            const size = encoder.encode(content).length;
+
+            return {
+              content: size > MAX_BYTES ? "" : content,
+              path: name,
+              size,
+            };
+          }),
+          Effect.orElseSucceed(() => ({ content: "", path: name, size: 0 }))
         ),
       { concurrency: 16 }
     );
@@ -889,7 +910,15 @@ const thisRepo = Layer.effect(
       test: Command.make("bunx vitest run {path}"),
     };
 
-    return { closure: judgeClosure(verify, files), tracked };
+    return {
+      closure: judgeClosure(
+        verify,
+        files.map(({ content, path: at }) => file(at, content))
+      ),
+      files,
+      tracked,
+      verify,
+    };
   })
 ).pipe(Layer.provide(NodeServices.layer));
 
@@ -963,6 +992,38 @@ layer(thisRepo, { excludeTestServices: true })(
             "packages/config/test/oxlint-fence.test.ts"
           );
         })
+    );
+
+    repo.effect(
+      "is what judgeInputs gathers from the listing, reading a part of it",
+      () =>
+        Effect.gen(function* () {
+          const { closure: judge, files, verify } = yield* ThisRepo;
+          const read = yield* Ref.make<readonly string[]>([]);
+
+          const byPath = new Map(
+            files.map(({ content, path }) => [path, content])
+          );
+
+          const inputs = yield* judgeInputs(
+            files.map(({ path, size }) => ({ path, size })),
+            (paths) =>
+              Effect.as(
+                Ref.update(read, (before) => [...before, ...paths]),
+                paths.map((path) => ({
+                  bytes: encoder.encode(byPath.get(path) ?? ""),
+                  path,
+                }))
+              )
+          );
+
+          expect(judgeClosure(verify, inputs)).toStrictEqual(judge);
+          expect((yield* Ref.get(read)).length).toBeLessThan(files.length);
+        }),
+      // A walk of the whole repo per round, a few rounds: half a second
+      // alone, several while turbo runs every package's tests at once. The
+      // limit catches a hang, not a busy machine.
+      { timeout: 30_000 }
     );
 
     repo.effect(

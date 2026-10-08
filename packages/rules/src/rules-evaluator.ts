@@ -47,9 +47,11 @@ const Workspace = Schema.Struct({
  */
 export const EvaluationFacts = Schema.Struct({
   /**
-   * The files `checks`' finder and judge closure read, where a `run: fromCI`
-   * block is found: CI workflows, hook configs, `package.json`s and the
-   * configs that decide what the checks do.
+   * Every file of the commit, as `checks`' `judgeInputs` gathers them: the
+   * text of each one its finder (where a `run: fromCI` block is found) or
+   * judge closure reads (CI workflows, hook configs and the scripts they
+   * run, `package.json`s, tsconfig chains, lint plugins and their tests,
+   * the config folder), and empty text for the rest.
    */
   ci: Schema.Array(Schema.Struct({ content: Schema.String, path: RepoPath })),
   /** The person who made the project; `owners` resolves to them (spec D20). */

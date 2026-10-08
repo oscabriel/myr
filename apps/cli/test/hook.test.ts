@@ -504,6 +504,20 @@ const aClone = (remote: string) =>
       // The judge closure follows a tsconfig's `extends` among the root's files.
       ["base.json", "{}\n"],
       ["tsconfig.json", '{"extends": "./base"}\n'],
+      // And the scripts a harness's hook config runs, with what they import,
+      // wherever they sit, as the platform's closure does.
+      [
+        ".claude/settings.json",
+        JSON.stringify({
+          hooks: {
+            PreToolUse: [
+              { hooks: [{ command: "bun scripts/hooks/guard.ts" }] },
+            ],
+          },
+        }),
+      ],
+      ["scripts/hooks/guard.ts", 'import "./lib/policy.ts";\n'],
+      ["scripts/hooks/lib/policy.ts", "export {};\n"],
     ]);
 
     for (const [file, content] of files) {
@@ -686,6 +700,7 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
           yield* edit(checkPath),
           yield* edit("packages/a/src/week.ts"),
           yield* edit("base.json"),
+          yield* edit("scripts/hooks/lib/policy.ts"),
         ];
 
         const outOfScope = new OutOfScope({
@@ -704,6 +719,15 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
             code: 0,
             err: [],
             out: [JSON.stringify(deny([touchedJudgeOf("base.json")]))],
+          },
+          {
+            code: 0,
+            err: [],
+            out: [
+              JSON.stringify(
+                deny([touchedJudgeOf("scripts/hooks/lib/policy.ts")])
+              ),
+            ],
           },
         ]);
         expect((yield* Ref.get(asked)).showAsk).toBe(1);

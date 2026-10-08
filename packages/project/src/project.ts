@@ -53,6 +53,7 @@ import { scan } from "@repo/gate/stages/shape";
 import { verdictOf } from "@repo/gate/verdict";
 import { patchId } from "@repo/git/patch-id";
 import { formatLanding } from "@repo/git/trailers";
+import { HarnessAudit } from "@repo/protocol/audit";
 import {
   Claim as ClaimContract,
   Credits,
@@ -89,7 +90,7 @@ import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { RefNameText } from "@repo/protocol/domain/common";
 import type { Evidence } from "@repo/protocol/domain/common";
-import type { Credit } from "@repo/protocol/domain/credit";
+import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
@@ -297,6 +298,13 @@ export const FinishersFromChecks: Layer.Layer<Finishers> = Layer.succeed(
 /** A push one repo took, as the gateway's custody reports it (W3 303). */
 export const PushReport = Schema.Struct({
   after: CommitSha,
+  /**
+   * The harness the push came through, as its credential helper's username
+   * named it (`@repo/protocol/audit`): audit metadata, never who pushed. A
+   * claimant's push keeps it on their claim, for the landing's
+   * `Assisted-by:` (spec D18).
+   */
+  audit: Schema.optionalKey(HarnessAudit),
   before: Schema.Option(CommitSha),
   /** The push event's id; the same event reported twice is acted on once. */
   eventId: Schema.NonEmptyString,
@@ -1174,6 +1182,49 @@ const submitRefusal = (refusal: Refusal, ask: AskId): SubmitRefusal =>
     Match.orElse(() => NotClaimed.of(ask))
   );
 
+/**
+ * The agents a claim's pushes named, with the one `audit` names added: a
+ * harness and its model, once each, in the order they first pushed. The
+ * platform heard the harness from the push's own credential helper and
+ * confirmed nothing, so it is `claimed`. A push no harness named adds none.
+ */
+const withAgent = (
+  agents: readonly AgentTrailer[],
+  audit: HarnessAudit | undefined
+): readonly AgentTrailer[] => {
+  if (audit?.harness === undefined) {
+    return agents;
+  }
+
+  const agent: AgentTrailer = {
+    harness: audit.harness,
+    verified: false,
+    ...(audit.model !== undefined && { model: audit.model }),
+  };
+
+  return agents.some(
+    ({ harness, model }) => harness === agent.harness && model === agent.model
+  )
+    ? agents
+    : [...agents, agent];
+};
+
+/**
+ * The agents an answer's landing discloses as `Assisted-by:` (spec D18):
+ * those its claim's pushes named, unless the project's policy says
+ * `agents: "none"`.
+ */
+const disclosed = (
+  policy: Policy,
+  claim: Option.Option<ClaimRow>
+): readonly AgentTrailer[] =>
+  policy.agents === "none"
+    ? []
+    : Option.match(claim, {
+        onNone: () => [],
+        onSome: ({ assisted }) => assisted ?? [],
+      });
+
 /** A landing's commit message, from the platform's own rows (spec §5 step 8). */
 const messageOf = (
   request: Request,
@@ -1458,6 +1509,16 @@ export const projectService = (
         )
       );
 
+    /** A claim's row as this call has it: as written so far, over the hydrated one. */
+    const claimRowNow = (
+      h: Hydrated,
+      writes: Writes,
+      ask: AskId,
+      claimant: Handle
+    ): ClaimRow | undefined =>
+      writes.claims.get(claimKey(ask, claimant)) ??
+      Option.getOrUndefined(ownClaim(h, ask, claimant))?.row;
+
     const heldBy = (h: Hydrated, handle: Handle, except?: AskId) =>
       h.claims.filter(
         ({ row, state }) =>
@@ -1678,13 +1739,18 @@ export const projectService = (
       }
     };
 
-    /** Records a claim's step: its row, its fork, its events and its ask's state. */
+    /**
+     * Records a claim's step: its row, its fork, its events and its ask's
+     * state. The row keeps the agents the claim's pushes named: `assisted`
+     * when given (a claim granted anew starts with none), else as it had them.
+     */
     const applyClaim = (
       h: Hydrated,
       writes: Writes,
       ask: AskId,
       step: ClaimStep,
-      now: DateTime.Utc
+      now: DateTime.Utc,
+      assisted?: readonly AgentTrailer[]
     ) =>
       Effect.gen(function* () {
         const claim = claimOf(step.state);
@@ -1695,11 +1761,15 @@ export const projectService = (
 
         const { claimant } = claim.value;
 
+        const agents =
+          assisted ?? claimRowNow(h, writes, ask, claimant)?.assisted ?? [];
+
         writes.claims.set(claimKey(ask, claimant), {
           ask,
           claimant,
           state: yield* Effect.orDie(encodeClaim(step.state)),
           updatedAt: now,
+          ...(agents.length > 0 && { assisted: agents }),
         });
 
         yield* Effect.forEach(
@@ -3537,8 +3607,9 @@ export const projectService = (
             })
           );
 
+          // A claim granted anew discloses only the agents its own pushes name.
           if (step.effects.length > 0) {
-            yield* applyClaim(h, writes, id, step, now);
+            yield* applyClaim(h, writes, id, step, now, []);
           }
 
           const view = yield* viewOf(h.policy, ask, step.state);
@@ -3618,7 +3689,19 @@ export const projectService = (
             ),
             {
               onFailure: () => Effect.void,
-              onSuccess: (step) => applyClaim(h, writes, row.ask, step, now),
+              onSuccess: (step) =>
+                applyClaim(
+                  h,
+                  writes,
+                  row.ask,
+                  step,
+                  now,
+                  withAgent(
+                    claimRowNow(h, writes, row.ask, row.claimant)?.assisted ??
+                      [],
+                    input.push.audit
+                  )
+                ),
             }
           ),
       });
@@ -3911,7 +3994,10 @@ export const projectService = (
             {
               answerer: caller.handle,
               ask: Option.some(input.ask),
-              assisted: [],
+              assisted: disclosed(
+                h.policy.value,
+                Option.map(own, ({ row }) => row)
+              ),
               base: input.base,
               credits: creditsFor(ask.value, caller.handle),
               fork,
