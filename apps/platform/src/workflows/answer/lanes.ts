@@ -4,8 +4,10 @@
  * and every other project lane), always on the exact tree the merge made.
  * A lane whose checker never got going gets one fresh run; every lane that
  * did not pass keeps its log through `EvidenceStore`, and only the name it
- * is kept under travels on. The gate classifies each failure against the
- * same lane on main (`gate.classifyFailure`).
+ * is kept under travels on, unless the project's scan finds a stored
+ * write-only value in it: that log is never kept, and its lane says
+ * `withheld` (W6 613). The gate classifies each failure against the same
+ * lane on main (`gate.classifyFailure`).
  *
  * The merged tree is checked in the answer's fork, where `Lander.merge`
  * keeps it (under `${Brand.refsPrefix}merge/<tree>`), so a merge needs no
@@ -31,11 +33,8 @@ import { MeasuredCount, runBlockOf } from "@repo/project/answer-runs";
 import type { AnswerRun } from "@repo/project/answer-runs";
 import { noRunEnv, RunEnv } from "@repo/project/env-port";
 import { LandingState } from "@repo/project/landing";
-import {
-  HeldBackResult,
-  LaneOutcome,
-  LaneResult,
-} from "@repo/protocol/domain/answer";
+import { Projects } from "@repo/project/projects";
+import { LaneOutcome, LaneResult } from "@repo/protocol/domain/answer";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { AskKind } from "@repo/protocol/domain/kind";
 import { RunBlock } from "@repo/protocol/domain/run";
@@ -134,7 +133,6 @@ export const StageRun = Schema.TaggedUnion({
     checked: Checked,
     /** The cheap stage's: each ratchet's count on the merged tree, per territory. */
     counts: Schema.optionalKey(Schema.Array(MeasuredCount)),
-    heldBack: Schema.Array(HeldBackResult),
     lanes: Schema.Array(LaneRun),
     /** The cheap stage's: a ratchet whose command printed no count the platform can read. */
     uncounted: Schema.optionalKey(RatchetName),
@@ -197,6 +195,13 @@ export const laneLog = (
       )
     ),
   ].join("\n");
+
+/**
+ * Where a lane's log is said to be when it was not kept because it held a
+ * stored write-only value (W6 613; VL §8.6): the lane's refusal stands, its
+ * log is never put in the evidence store, and nothing names the item.
+ */
+export const withheld = "withheld";
 
 const isTrouble = (result: LaneOutcome) =>
   result === "flaked" || result === "blocked";
@@ -443,16 +448,17 @@ const countFields = (counted: Counted): Pick<Ran, "counts" | "uncounted"> =>
 
 /**
  * One stage's lanes on the merged tree `tree`: run, a troubled lane run
- * once more, and each lane that did not pass at first logged. The log's
- * name counts the answer's merges (`#1` on its first main), so a replayed
- * step keeps its log under the same name and a re-merge gets a new one.
- * The cheap stage counts the ratchets too.
+ * once more, and each lane that did not pass at first logged, unless its
+ * log holds a stored value. The log's name counts the answer's merges
+ * (`#1` on its first main), so a replayed step keeps its log under the
+ * same name and a re-merge gets a new one. The cheap stage counts the
+ * ratchets too.
  */
 export const runStage = (
   run: AnswerRun,
   tree: TreeSha,
   stage: Stage
-): Effect.Effect<StageRun, never, CheckRunner | EvidenceStore> =>
+): Effect.Effect<StageRun, never, CheckRunner | EvidenceStore | Projects> =>
   Option.match(checkedOf(run, tree), {
     onNone: () => Effect.succeed(StageRun.cases.Moved.make({})),
     onSome: (checked) =>
@@ -461,6 +467,14 @@ export const runStage = (
         const evidence = yield* EvidenceStore;
         const lanes = lanesFor(run, stage);
 
+        // The project scans each log for its stored values before it leaves
+        // the run, where the values are (VL §8.6); never the sandbox.
+        const api = yield* Projects.use((projects) =>
+          projects.get(checked.project)
+        ).pipe(Effect.orDie);
+
+        const scan = (text: string) => api.scanForValues({ text });
+
         const remerges = LandingState.guards.Checking(run.state)
           ? run.state.remerges
           : 0;
@@ -468,7 +482,7 @@ export const runStage = (
         const counting = stage === "cheap" && run.counts !== undefined;
 
         if (!Array.isReadonlyArrayNonEmpty(lanes) && !counting) {
-          return StageRun.cases.Ran.make({ checked, heldBack: [], lanes: [] });
+          return StageRun.cases.Ran.make({ checked, lanes: [] });
         }
 
         const block = yield* runBlockOf(checked);
@@ -492,7 +506,6 @@ export const runStage = (
         if (!Array.isReadonlyArrayNonEmpty(lanes)) {
           return StageRun.cases.Ran.make({
             checked,
-            heldBack: [],
             lanes: [],
             ...counts,
           });
@@ -517,21 +530,47 @@ export const runStage = (
             return Effect.succeed(judged);
           }
 
-          return Effect.map(
-            evidence.put({
-              attempt: remerges + 1,
-              lane: lane.lane,
-              project: checked.project,
-              requestId: checked.requestId,
-              text: laneLog(standing.stands, standing.said),
-            }),
-            (logRef) => ({ ...judged, result: { ...judged.result, logRef } })
+          const text = laneLog(standing.stands, standing.said);
+
+          return Effect.flatMap(scan(text), (found) =>
+            Option.match(found, {
+              onNone: () =>
+                Effect.map(
+                  evidence.put({
+                    attempt: remerges + 1,
+                    lane: lane.lane,
+                    project: checked.project,
+                    requestId: checked.requestId,
+                    text,
+                  }),
+                  (logRef) => ({
+                    ...judged,
+                    result: { ...judged.result, logRef },
+                  })
+                ),
+              onSome: (item) =>
+                Effect.as(
+                  Effect.logWarning(
+                    "a lane's log held a stored write-only value; it was not kept"
+                  ).pipe(
+                    Effect.annotateLogs({
+                      item,
+                      lane: lane.lane,
+                      project: checked.project,
+                      requestId: checked.requestId,
+                    })
+                  ),
+                  {
+                    ...judged,
+                    result: { ...judged.result, logRef: withheld },
+                  }
+                ),
+            })
           );
         });
 
         return StageRun.cases.Ran.make({
           checked,
-          heldBack: firstRun.heldBack,
           lanes: laneRuns,
           ...counts,
         });
