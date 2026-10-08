@@ -163,7 +163,7 @@ export type AdmissionReport = typeof AdmissionReport.Type;
 
 /** What the gate's stage 1 takes from visibility for one pusher (`ProjectApi.layerFacts`). */
 export const LayerFacts = Schema.Struct({
-  /** Whether the pusher reads any layer: the guards that would be an oracle run only then. */
+  /** Whether the pusher reads every layer the paths come from: only then does a refusal name which paths collide. */
   canRead: Schema.Boolean,
   /** Every path in any layer's path set: none enters a public tree. */
   layerPaths: Schema.Array(RepoPath),

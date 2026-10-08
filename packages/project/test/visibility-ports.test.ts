@@ -190,6 +190,13 @@ const fakeVisibility = (seen: Seen): VisibilityPort => ({
           { body: { layer: maintainers }, id: "provision-maintainers" },
         ],
         writes: {
+          // The layer the project keeps a repo for, as the real port writes it.
+          layers: [
+            {
+              name: maintainers,
+              repo: RepoName.make(`${project}--${maintainers}`),
+            },
+          ],
           ledger: [
             LedgerEntry.cases.LayerDeclared.make({
               at: input.now,
@@ -478,7 +485,8 @@ describe("the project service through its visibility ports", () => {
           judged: [pinned],
           refusals: [[], []],
           suite: Option.some(pinned.suite),
-          trailer: `Held-back: export 1/1 @ ${pinned.suite}`,
+          // The trailer's value: every reader adds its key.
+          trailer: `export 1/1 @ ${pinned.suite}`,
         });
         expect(
           parseTrailers(commit.message).filter(({ key }) => key === "Held-back")

@@ -112,6 +112,13 @@ const visibilityHeard = (heard: Heard): VisibilityPort => ({
 
       return noPlan;
     }),
+  // The layer's row, as 612's port writes it once the config lands: stage
+  // 1 names exact paths only to someone who reads every layer kept.
+  onPolicy: () =>
+    Effect.succeed({
+      effects: [],
+      writes: { layers: [{ name: maintainers, repo: layerRepo }] },
+    }),
   readableLayers: (who) => new Set(keeps(who) ? [maintainers] : []),
   recordRead: ({ handle, layer, sha }) => {
     heard.reads.push({ handle, layer, sha });

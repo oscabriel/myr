@@ -4,7 +4,6 @@
  * the platform's contracts included. Each value is sealed under a random
  * data key, wrapped by the platform's `MASTER_KEY` (`./vault/webcrypto`).
  */
-import { Brand } from "@repo/brand";
 import type { EnvKey } from "@repo/protocol/ids";
 import { ValueTooShort } from "@repo/protocol/refusal";
 import { Context, Effect, Redacted, Schema } from "effect";
@@ -81,13 +80,7 @@ export const admitLength = ({
   const length = charactersIn(Redacted.value(value));
 
   if (length < HARD_MIN_LENGTH) {
-    return Effect.fail(
-      new ValueTooShort({
-        key,
-        minimum: HARD_MIN_LENGTH,
-        next: [Brand.cli, "env", "set", key].join(" "),
-      })
-    );
+    return Effect.fail(ValueTooShort.belowFloor(key, HARD_MIN_LENGTH));
   }
 
   return length < MIN_LENGTH && !acknowledgeShort

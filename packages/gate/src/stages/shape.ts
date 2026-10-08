@@ -20,7 +20,7 @@ import {
 import type { Refusal } from "@repo/protocol/refusal";
 import { Array, Effect, Option, Order } from "effect";
 
-import type { AddedLine, PushFacts } from "../facts.ts";
+import type { AddedLine, Change, PushFacts } from "../facts.ts";
 import { matchAny } from "../glob.ts";
 import { importSpecifiers, reachedInternals as reachInto } from "../imports.ts";
 import { markersOf, scanMarkers } from "../markers.ts";
@@ -129,31 +129,46 @@ const inLayers =
   };
 
 /**
- * Added or changed paths a layer holds: nothing from a layer enters a
- * public tree (OSR §2.5, §5.4), and a deletion writes nothing. The refusal
- * is no oracle on which paths are a layer's: to a pusher who cannot read
- * the layers (`canReadLayers`), it names every path they added or
- * modified, all of them their own; only a reader hears which collide.
+ * The no-write-down guard by path (OSR §2.5, §5.4), the one rule stage 1
+ * and the visibility cartridge's landing guard share (W6 699): added or
+ * changed paths a layer holds, as the path itself or under a folder the set
+ * names. A deletion writes nothing. The refusal is no oracle on which paths
+ * are a layer's: to a pusher who cannot read the layers it names every path
+ * they added or modified, all of them their own; only a reader hears which
+ * collide.
+ *
+ * `pusherCanRead` vouches for every layer whose paths are in `layerPaths`:
+ * true only when the pusher reads all of them, so reading one layer never
+ * names another's paths.
  */
-const privatePaths = (facts: PushFacts): readonly Refusal[] => {
-  const written = facts.changes.flatMap((change) =>
+export const layerPathRefusal = (input: {
+  readonly changes: readonly Pick<Change, "path" | "status">[];
+  readonly layerPaths: ReadonlySet<RepoPath>;
+  readonly pusherCanRead: boolean;
+}): Option.Option<PrivatePathInPublicTree> => {
+  const written = input.changes.flatMap((change) =>
     change.status === "deleted" ? [] : [change.path]
   );
 
-  const colliding = written.filter(inLayers(facts.layerPaths));
+  const colliding = written.filter(inLayers(input.layerPaths));
 
-  if (colliding.length === 0) {
-    return [];
-  }
-
-  return Option.match(
-    someOf(facts.canReadLayers === true ? colliding : written),
-    {
-      onNone: () => [],
-      onSome: (paths) => [new PrivatePathInPublicTree({ paths })],
-    }
-  );
+  return colliding.length === 0
+    ? Option.none()
+    : Option.map(
+        someOf(input.pusherCanRead ? colliding : written),
+        (paths) => new PrivatePathInPublicTree({ paths })
+      );
 };
+
+/** Stage 1's guard by path, over the push's facts (`canReadLayers`). */
+const privatePaths = (facts: PushFacts): readonly Refusal[] =>
+  Option.toArray(
+    layerPathRefusal({
+      changes: facts.changes,
+      layerPaths: facts.layerPaths,
+      pusherCanRead: facts.canReadLayers === true,
+    })
+  );
 
 // The files whose imports are read: JavaScript and TypeScript sources.
 const SCRIPT = /\.[cm]?[jt]sx?$/u;

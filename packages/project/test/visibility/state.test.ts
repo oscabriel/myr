@@ -478,6 +478,41 @@ describe("a claim", () => {
   );
 });
 
+/** datekit's config with a second layer that only okonkwo reads and writes. */
+const withTriage = {
+  ...datekitVisibility,
+  layers: [
+    ...datekitVisibility.layers,
+    {
+      audience: "maintainers" as const,
+      disclose: "counted" as const,
+      holds: Array.make("notes" as const),
+      name: LayerName.make("triage"),
+      readers: Array.make(okonkwo.handle),
+      reason: "Security triage notes",
+      writers: Array.make(okonkwo.handle),
+    },
+  ],
+};
+
+describe("two layers", () => {
+  it.effect(
+    "tell stage 1 its pusher reads the layers only when the pusher reads every one of them",
+    () =>
+      Effect.gen(function* () {
+        const { api } = yield* sealedByInes;
+
+        yield* pushLayer(api, Option.none(), firstSuite);
+
+        expect({
+          bob: (yield* api.layerFacts(bob)).canRead,
+          ines: (yield* api.layerFacts(inesV)).canRead,
+          okonkwo: (yield* api.layerFacts(okonkwo)).canRead,
+        }).toStrictEqual({ bob: false, ines: false, okonkwo: true });
+      }).pipe(Effect.provide(visibilityWorld(withTriage)))
+  );
+});
+
 /** datekit's config with each person's own layer too: config only (spec D14). */
 const withPersonal = {
   ...datekitVisibility,

@@ -15,7 +15,7 @@ export const LandingView = Schema.Struct({
   /** The accountable person. */
   author: Handle,
   credits: Schema.Array(Credit),
-  /** `Held-back: <area> <passed>/<total> @ <suite>`, when held-back checks judged it. */
+  /** The `Held-back:` trailer's value (`<area> <passed>/<total> @ <suite>; …`, without its key), when held-back checks judged it. */
   heldBackTrailer: Schema.optionalKey(Schema.NonEmptyString),
   landedAt: Schema.DateTimeUtcFromString,
   /** Main before it; absent for the first adoption (the initializer's first push, or an import's tip). */

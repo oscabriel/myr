@@ -13,6 +13,7 @@ import {
   RequestId,
 } from "../src/ids.ts";
 import {
+  ChecksFailed,
   DirectPush,
   OutOfScope,
   PrivatePathInPublicTree,
@@ -216,6 +217,34 @@ describe(explain, () => {
     ).toStrictEqual([
       "ValueTooShort: the value for PAYMENTS_KEY is shorter than the 32 characters it needs",
       `  next: ${Brand.cli} env set PAYMENTS_KEY --acknowledge-short`,
+      "  retryable: no",
+    ]);
+  });
+
+  // A log that held a stored value is never kept, and nothing points at it.
+  it("says a lane's log was withheld rather than where it is", () => {
+    expect(
+      explain([
+        new ChecksFailed({
+          lane: "unit",
+          logRef: ChecksFailed.withheld,
+          next: "bun test",
+        }),
+      ])
+    ).toStrictEqual([
+      "ChecksFailed: the unit checks failed; their log was withheld",
+      "  next: bun test",
+      "  retryable: no",
+    ]);
+  });
+
+  // Below the floor no acknowledgement helps, so the next step is another value.
+  it("says a value below the floor needs another value, not an acknowledgement", () => {
+    expect(
+      explain([ValueTooShort.belowFloor(EnvKey.make("PAYMENTS_KEY"), 3)])
+    ).toStrictEqual([
+      "ValueTooShort: the value for PAYMENTS_KEY is shorter than the 3 characters it needs",
+      `  next: ${Brand.cli} env set PAYMENTS_KEY`,
       "  retryable: no",
     ]);
   });

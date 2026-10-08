@@ -41,11 +41,8 @@ import { EnvSchemaParser } from "@repo/visibility/env-schema";
 import type { ParsedEnvSchema } from "@repo/visibility/env-schema";
 import { EnvSchemaParserEnvSpec } from "@repo/visibility/env-schema/env-spec";
 import { EnvSchemaParserMemory } from "@repo/visibility/env-schema/memory";
-import {
-  admitLength,
-  SealedValue,
-  WriteOnlyValues,
-} from "@repo/visibility/vault";
+import { SealedValue } from "@repo/visibility/vault";
+import { WriteOnlyValuesWebCrypto } from "@repo/visibility/vault/webcrypto";
 import { Context, Effect, Layer, Option, Redacted, Ref, Schema } from "effect";
 
 import datekitText from "../../../../examples/datekit/.env.schema?raw";
@@ -235,50 +232,13 @@ const start = (schema: string): Files => [
   [".env.schema", schema],
 ];
 
-const asBase64 = (text: string) =>
-  Schema.encodeEffect(Schema.Uint8ArrayFromBase64)(
-    new TextEncoder().encode(text)
-  ).pipe(Effect.orDie);
-
-const fromBase64 = (text: string) =>
-  Schema.decodeEffect(Schema.Uint8ArrayFromBase64)(text).pipe(
-    Effect.orDie,
-    Effect.map((bytes) => new TextDecoder().decode(bytes))
-  );
-
 /**
- * A vault that seals in memory, with 610's length rules: the value stays in
- * the vault's own map and the sealed value only names it, so nothing the
- * store keeps holds it. 610's WebCrypto vault seals for the platform's test
- * (`apps/platform/test/visibility/env-values.test.ts`): under this
- * package's Node types its `crypto.subtle` calls do not typecheck (614's
- * Comments).
+ * 610's WebCrypto vault under a test master key, as the platform composes
+ * it: the store keeps only the sealed value.
  */
-const vault = Layer.sync(WriteOnlyValues, () => {
-  const kept = new Map<string, Redacted.Redacted>();
-
-  return WriteOnlyValues.of({
-    open: (sealed) =>
-      Effect.flatMap(fromBase64(sealed.ciphertext), (id) =>
-        Effect.orDie(Effect.fromNullishOr(kept.get(id)))
-      ),
-    put: (input) =>
-      Effect.gen(function* () {
-        yield* admitLength(input);
-
-        const id = `sealed-${kept.size + 1}`;
-
-        kept.set(id, input.value);
-
-        return {
-          ciphertext: yield* asBase64(id),
-          iv: yield* asBase64("iv"),
-          keyVersion: 1,
-          wrappedKey: yield* asBase64("wrapped"),
-        };
-      }),
-  });
-});
+const vault = WriteOnlyValuesWebCrypto(
+  Redacted.make("0123456789abcdef".repeat(4))
+);
 
 /** The project's world over memory adapters, with the cartridge's env on `parser`. */
 const worldWith = <More = never>(

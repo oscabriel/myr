@@ -4,6 +4,7 @@ import type { Array } from "effect";
 
 import type { AnswerReceipt } from "./domain/answer.ts";
 import { Outcome } from "./domain/outcome.ts";
+import { ChecksFailed } from "./refusal.ts";
 import type { Refusal } from "./refusal.ts";
 
 const short = (sha: string) => sha.slice(0, 7);
@@ -22,7 +23,9 @@ const reason = Match.typeTags<Refusal, string>()({
   CapReached: ({ cap }) =>
     `you already hold ${cap} claims, the most this project allows`,
   ChecksFailed: ({ lane, logRef }) =>
-    `the ${lane} checks failed; the log is at ${logRef}`,
+    logRef === ChecksFailed.withheld
+      ? `the ${lane} checks failed; their log was withheld`
+      : `the ${lane} checks failed; the log is at ${logRef}`,
   ClaimLapsed: ({ ask }) => `your claim on ${ask} lapsed`,
   DecisionClosed: ({ decision }) =>
     `${decision} was already decided, or expired to its default`,

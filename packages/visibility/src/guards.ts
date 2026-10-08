@@ -1,9 +1,8 @@
+import { layerPathRefusal } from "@repo/gate/stages/shape";
 import type { Change } from "@repo/git/tree-diff";
 import type { BlobSha, RepoPath } from "@repo/protocol/ids";
-import {
-  LayerContentInPublicTree,
-  PrivatePathInPublicTree,
-} from "@repo/protocol/refusal";
+import { LayerContentInPublicTree } from "@repo/protocol/refusal";
+import type { PrivatePathInPublicTree } from "@repo/protocol/refusal";
 import { Array, Option, Order } from "effect";
 
 /** The paths, once each and sorted, or none when there are none. */
@@ -17,22 +16,11 @@ const named = (paths: readonly RepoPath[]) =>
 const written = (changes: readonly Change[]) =>
   changes.filter((change) => change.status !== "deleted");
 
-/** A path in the set, or under a folder the set names. */
-const inSet = (layerPaths: ReadonlySet<RepoPath>) => {
-  const listed: ReadonlySet<string> = layerPaths;
-
-  return (path: RepoPath) => {
-    const parts = path.split("/");
-
-    return parts.some((_, end) =>
-      listed.has(parts.slice(0, end + 1).join("/"))
-    );
-  };
-};
-
 /**
- * Stage 1's no-write-down guard by path (OSR §2.5, §5.4): the answer's
- * public tree may hold no path from any layer's path set. A deletion never
+ * Stage 1's no-write-down guard by path (OSR §2.5, §5.4), as the gate owns
+ * it (`@repo/gate/stages/shape`'s `layerPathRefusal`), so the landing guard
+ * and stage 1 hold one rule: the answer's public tree may hold no path from
+ * any layer's path set, a path or a folder above it. A deletion never
  * triggers. The refusal is no oracle on which paths are layer paths: to a
  * pusher who cannot read the layer it names every path they added or
  * modified, all of them their own; only a reader hears exactly which ones
@@ -43,21 +31,11 @@ const inSet = (layerPaths: ReadonlySet<RepoPath>) => {
  * reads all of them: reading one layer must not name another's paths. Call
  * it once per layer, or with the union and `false`, when they read some.
  */
-export const privatePaths = (input: {
+export const privatePaths: (input: {
   readonly changes: readonly Change[];
   readonly layerPaths: ReadonlySet<RepoPath>;
   readonly pusherCanRead: boolean;
-}): Option.Option<PrivatePathInPublicTree> => {
-  const own = written(input.changes).map((change) => change.path);
-  const colliding = own.filter(inSet(input.layerPaths));
-
-  return Option.flatMap(named(colliding), (exact) =>
-    Option.map(
-      input.pusherCanRead ? Option.some(exact) : named(own),
-      (paths) => new PrivatePathInPublicTree({ paths })
-    )
-  );
-};
+}) => Option.Option<PrivatePathInPublicTree> = layerPathRefusal;
 
 /**
  * The write-down guard by content (OSR §5.4, exact match only): a file the

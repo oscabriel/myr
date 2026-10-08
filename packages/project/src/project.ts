@@ -1919,12 +1919,26 @@ export const projectService = (
         );
       });
 
-    /** `facts` with the layer paths, and whether its pusher reads a layer. */
+    /**
+     * Whether `who` reads every layer the project keeps a repo for, so every
+     * layer stage 1's paths come from: only then may a refusal name which
+     * paths collide. Reading one layer never names another's paths (602
+     * review #3).
+     */
+    const readsEveryLayer = (who: Principal, snapshot: ProjectSnapshot) => {
+      const readable = visibility.readableLayers(who, snapshot);
+
+      return (
+        snapshot.layers.length > 0 &&
+        snapshot.layers.every((row) => readable.has(row.name))
+      );
+    };
+
+    /** `facts` with the layer paths, and whether its pusher reads every layer. */
     const layered = (snapshot: ProjectSnapshot, facts: PushFacts) =>
       Effect.map(visibility.layerPaths(snapshot), (layerPaths): PushFacts => ({
         ...facts,
-        canReadLayers:
-          visibility.readableLayers(facts.pusher, snapshot).size > 0,
+        canReadLayers: readsEveryLayer(facts.pusher, snapshot),
         layerPaths,
       }));
 
@@ -2809,10 +2823,8 @@ export const projectService = (
           requestId: request.requestId,
           sha,
           ...field("ask", request.ask),
-          ...field(
-            "heldBackTrailer",
-            Option.map(landed.heldBack, (value) => `Held-back: ${value}`)
-          ),
+          // The value alone: the web, the CLI and git notes add the key.
+          ...field("heldBackTrailer", landed.heldBack),
           ...field("verdict", landedVerdict(landed.verdict, sha)),
         });
 
@@ -4766,7 +4778,7 @@ export const projectService = (
         const paths = yield* visibility.layerPaths(h.snapshot);
 
         return {
-          canRead: visibility.readableLayers(caller, h.snapshot).size > 0,
+          canRead: readsEveryLayer(caller, h.snapshot),
           layerPaths: [...paths],
         };
       });

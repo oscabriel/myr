@@ -330,7 +330,7 @@ describe("the held-back step", () => {
         ]);
         expect(sealedJobs.map(({ at }) => at)).toStrictEqual([answer.merged]);
         expect(landing.heldBackTrailer).toBe(
-          `Held-back: export 2/2 @ ${suiteRoot}; parser 1/1 @ ${suiteRoot}`
+          `export 2/2 @ ${suiteRoot}; parser 1/1 @ ${suiteRoot}`
         );
       }).pipe(Effect.provide(sealedWorld(policy)))
   );
@@ -433,7 +433,7 @@ describe("the held-back step", () => {
         expect(
           parseTrailers(commit.message).filter(({ key }) => key === "Held-back")
         ).toStrictEqual([{ key: "Held-back", value }]);
-        expect(landing.heldBackTrailer).toBe(`Held-back: ${value}`);
+        expect(landing.heldBackTrailer).toBe(value);
         expect(
           jobs.map((job) => ({
             at: job.at,

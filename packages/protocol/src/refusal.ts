@@ -203,7 +203,13 @@ export class ChecksFailed extends Schema.TaggedError<ChecksFailed>()(
     lane: Label,
     logRef: Label,
   }
-) {}
+) {
+  /**
+   * The `logRef` of a lane whose log held a stored write-only value (W6
+   * 613; VL §8.6): the log was never kept, and nothing names the item.
+   */
+  static readonly withheld = "withheld";
+}
 
 /** A held-back check failed; only its area and suite are disclosed. */
 export class HeldBackFailed extends Schema.TaggedError<HeldBackFailed>()(
@@ -378,6 +384,10 @@ export class ValueTooShort extends Schema.TaggedError<ValueTooShort>()(
       minimum,
       next: cli("env", "set", key, "--acknowledge-short"),
     });
+
+  /** Shorter than the floor no acknowledgement lifts: the next step is another value. */
+  static readonly belowFloor = (key: EnvKey, minimum: number) =>
+    new ValueTooShort({ key, minimum, next: cli("env", "set", key) });
 }
 
 const pushAndClaim = [

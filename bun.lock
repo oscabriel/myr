@@ -346,6 +346,7 @@
         "@repo/artifacts": "workspace:*",
         "@repo/brand": "workspace:*",
         "@repo/checks": "workspace:*",
+        "@repo/gate": "workspace:*",
         "@repo/git": "workspace:*",
         "@repo/protocol": "workspace:*",
         "effect": "catalog:",

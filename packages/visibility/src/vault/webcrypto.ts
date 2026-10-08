@@ -48,7 +48,15 @@ class MasterKeyUnusable extends Schema.TaggedError<MasterKeyUnusable>()(
 
 const encodeBase64 = Schema.encodeEffect(Schema.Uint8ArrayFromBase64);
 
-const decodeBase64 = Schema.decodeEffect(Schema.Uint8ArrayFromBase64);
+/**
+ * The bytes in a buffer of their own. WebCrypto takes an `ArrayBuffer`-backed
+ * view, and a decoded `Uint8Array` is typed over any buffer under Node's types.
+ */
+const owned = (bytes: Uint8Array): Uint8Array<ArrayBuffer> =>
+  new Uint8Array(bytes);
+
+const decodeBase64 = (text: string) =>
+  Effect.map(Schema.decodeEffect(Schema.Uint8ArrayFromBase64)(text), owned);
 
 /** The value's UTF-8 bytes, then `0x80`, then zeros to the next step. */
 const padded = (value: string) => {
@@ -80,7 +88,7 @@ const importMasterKey = (masterKey: Redacted.Redacted) =>
     ),
     Effect.flatMap((bytes) =>
       Effect.promise(() =>
-        crypto.subtle.importKey("raw", bytes, "AES-KW", false, [
+        crypto.subtle.importKey("raw", owned(bytes), "AES-KW", false, [
           "wrapKey",
           "unwrapKey",
         ])

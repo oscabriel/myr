@@ -49,12 +49,8 @@ import {
   RequestId,
   TreeSha,
 } from "@repo/protocol/ids";
-import type {
-  ChecksFailed,
-  Flake,
-  StaleBase,
-  VerifierBlocked,
-} from "@repo/protocol/refusal";
+import { ChecksFailed } from "@repo/protocol/refusal";
+import type { Flake, StaleBase, VerifierBlocked } from "@repo/protocol/refusal";
 import { Array, Effect, Option, Order, Result, Schema } from "effect";
 
 /**
@@ -201,7 +197,7 @@ export const laneLog = (
  * stored write-only value (W6 613; VL §8.6): the lane's refusal stands, its
  * log is never put in the evidence store, and nothing names the item.
  */
-export const withheld = "withheld";
+export const { withheld } = ChecksFailed;
 
 const isTrouble = (result: LaneOutcome) =>
   result === "flaked" || result === "blocked";
