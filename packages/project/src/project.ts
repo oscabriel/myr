@@ -23,13 +23,29 @@ import {
 import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { Brand } from "@repo/brand";
-import { CheckAt, CheckLane, CheckRunner } from "@repo/checks/check-runner";
+import {
+  CheckAt,
+  CheckLane,
+  CheckRunner,
+  outputOf,
+} from "@repo/checks/check-runner";
+import type { CheckRun } from "@repo/checks/check-runner";
 import { EvidenceStore, LogRef, logOfRef } from "@repo/checks/evidence-store";
 import { findRunBlock } from "@repo/checks/finder";
 import { judgeClosure } from "@repo/checks/judge";
 import { checkVersion, commandFor } from "@repo/checks/kinds";
+import { lintToZeroCount } from "@repo/checks/kinds/lint-to-zero";
+import type { LintToZeroCheck } from "@repo/checks/kinds/lint-to-zero";
+import { measure } from "@repo/checks/kinds/ratchet";
+import type { RatchetCount } from "@repo/checks/kinds/ratchet";
 import { redFirstOfRuns } from "@repo/checks/red-first";
 import { weaknessesOf } from "@repo/checks/weak-shapes";
+import {
+  escapeDecisions,
+  escapeRatchet,
+  territoryOf,
+} from "@repo/gate/escapes";
+import type { Waiver } from "@repo/gate/escapes";
 import { PushTarget } from "@repo/gate/facts";
 import type { PushFacts } from "@repo/gate/facts";
 import { pushStages, runGate } from "@repo/gate/gate";
@@ -72,8 +88,10 @@ import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { RefNameText } from "@repo/protocol/domain/common";
+import type { Evidence } from "@repo/protocol/domain/common";
 import type { Credit } from "@repo/protocol/domain/credit";
-import type { Decision } from "@repo/protocol/domain/decision";
+import { DecisionSubject } from "@repo/protocol/domain/decision";
+import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import type { LandingView } from "@repo/protocol/domain/landing";
@@ -146,17 +164,20 @@ import {
   Semaphore,
   Struct,
 } from "effect";
+import type { Data } from "effect";
 import { init } from "isomorphic-git";
 
 import { Alarms } from "./alarms.ts";
 import {
   AnswerReport,
   AnswerRun,
+  MeasuredCount,
   ReportedCommand,
   Steps,
 } from "./answer-runs.ts";
 import type { AnswerQueue, AnswerRuns, RunnableEffect } from "./answer-runs.ts";
 import { isStep } from "./answer-runs/steps.ts";
+import { openDecision } from "./attention/decisions.ts";
 import { recordOf } from "./attention/record.ts";
 import { mayClaim, standing } from "./attention/vouch.ts";
 import {
@@ -171,6 +192,7 @@ import type { ClaimStep, Live } from "./claim.ts";
 import {
   deciderDeadlines,
   deciders,
+  decidersOn,
   decidesOn,
   envSchemaMethod,
   isDecider,
@@ -202,7 +224,7 @@ import {
   outcomeOf,
   transition as landingTransition,
 } from "./landing.ts";
-import type { LandingQueue, Request } from "./landing.ts";
+import type { LandingQueue, PendingDecision, Request } from "./landing.ts";
 import {
   isDue,
   outboxRow,
@@ -220,9 +242,16 @@ import type {
   OutboxRow,
   ProjectRow,
   PushEventRow,
+  RatchetRow,
 } from "./project-store/rows.ts";
 import type { Projection } from "./projection.ts";
 import { askToLand, holdsSlot, leave, queueOf, storedQueue } from "./queue.ts";
+import { afterLanding, decideRaise, judgeRatchets } from "./ratchets.ts";
+import type {
+  RaiseRatchet,
+  RaiseRequest,
+  RatchetBaseline,
+} from "./ratchets.ts";
 
 /** Every port one project's service runs on. */
 export type ProjectPorts =
@@ -609,14 +638,31 @@ export const MethodSchemas = {
 } as const satisfies { readonly [M in keyof ProjectApi]: MethodSchema };
 
 /**
+ * What the checks of an answer's last checked tree counted: each of the
+ * policy's ratchets per territory, and each territory's reasoned escapes
+ * once the answer is in (its count on main, and those the answer adds).
+ * The answer's landing writes them to the project's `ratchets` rows.
+ */
+export const Measured = Schema.Struct({
+  declared: Schema.Array(MeasuredCount),
+  escapes: Schema.Array(MeasuredCount),
+});
+
+export type Measured = typeof Measured.Type;
+
+/**
  * Where one answer stands, as its row keeps it: the landing lifecycle's
  * state, the receipt its request was first given (a replay gets it again),
- * and the verdict on its last checked tree.
+ * the verdict on its last checked tree, what that tree counted, and each
+ * `Waiver` a decider accepted for this answer (checked again after main
+ * moved, it is not asked again; another answer to the ask is).
  */
 export const AnswerRecord = Schema.Struct({
   landing: LandingState,
+  measured: Schema.optionalKey(Measured),
   receipt: AnswerReceipt,
   verdict: Schema.optionalKey(Verdict),
+  waived: Schema.optionalKey(Schema.Array(DecisionSubject.cases.Waiver)),
 });
 
 export type AnswerRecord = typeof AnswerRecord.Type;
@@ -724,6 +770,8 @@ interface Hydrated {
   readonly project: Option.Option<ProjectRow>;
   readonly proposals: readonly Proposal[];
   readonly queue: LandingQueue;
+  /** Every ratchet's baseline per territory, the escape ratchets' included. */
+  readonly ratchets: readonly RatchetRow[];
 }
 
 /**
@@ -744,6 +792,8 @@ interface Writes {
   readonly proposals: Map<ProposalId, Proposal>;
   readonly pushEvents: PushEventRow[];
   readonly queue: Map<"queue", LandingQueue>;
+  /** Keyed by ratchet and territory (`ratchetKey`). */
+  readonly ratchets: Map<string, RatchetRow>;
 }
 
 const writesOf = (): Writes => ({
@@ -759,6 +809,7 @@ const writesOf = (): Writes => ({
   proposals: new Map(),
   pushEvents: [],
   queue: new Map(),
+  ratchets: new Map(),
 });
 
 const isEmpty = (writes: Writes) =>
@@ -775,6 +826,7 @@ const isEmpty = (writes: Writes) =>
     writes.proposals.size,
     writes.pushEvents.length,
     writes.queue.size,
+    writes.ratchets.size,
   ].every((count) => count === 0);
 
 const claimKey = (ask: AskId, claimant: Handle) =>
@@ -854,22 +906,189 @@ const creditsFor = (ask: Ask, answerer: Handle): readonly Credit[] => [
 const askLaneOf = (policy: Policy, ask: Ask) =>
   commandFor(ask.check, policy.run, policy.ratchets);
 
+/**
+ * The lane an ask's check runs as: a `lintToZero` check is a count, so its
+ * lane hands back what its lint printed.
+ */
+const askCheckLane = (policy: Policy, ask: Ask) =>
+  Option.map(askLaneOf(policy, ask), ({ command, lane }) =>
+    CheckSpec.guards.LintToZero(ask.check)
+      ? CheckLane.make({ command, lane, output: "stdout" })
+      : CheckLane.make({ command, lane })
+  );
+
 /** The lanes an answer's checks run: the ask's own check, then every project lane. */
 const lanesOf = (
   policy: Policy,
   ask: Option.Option<Ask>
 ): readonly CheckLane[] => [
   ...Option.toArray(
-    Option.flatMap(ask, (asked) =>
-      Option.map(askLaneOf(policy, asked), ({ command, lane }) =>
-        CheckLane.make({ command, lane })
-      )
-    )
+    Option.flatMap(ask, (asked) => askCheckLane(policy, asked))
   ),
   ...Record.toEntries(policy.run.checks).map(([lane, command]) =>
     CheckLane.make({ command, lane })
   ),
 ];
+
+/**
+ * The policy's ratchets that `command` counts, read from what it printed:
+ * one count per ratchet and territory. A ratchet whose count can't be read
+ * there is left out, and its first answer's landing sets its baseline.
+ */
+const countedBy = (policy: Policy, command: string, stdout: string) =>
+  Effect.map(
+    Effect.forEach(
+      policy.ratchets.filter((spec) => spec.measure.command === command),
+      (spec) =>
+        measure(
+          spec,
+          () => Effect.succeed({ code: 0, stdout }),
+          policy.modules
+        ).pipe(
+          Effect.catchTag("CountUnreadable", (unread) =>
+            Effect.as(
+              Effect.logWarning(
+                `the ratchet ${spec.name} has no count in what its command printed`,
+                unread
+              ),
+              []
+            )
+          )
+        )
+    ),
+    (counts): readonly RatchetCount[] => counts.flat()
+  );
+
+/** A ratchet row's key in a call's writes: its ratchet and territory. */
+const ratchetKey = (row: {
+  readonly ratchet: string;
+  readonly territory: string;
+}) => JSON.stringify([row.ratchet, row.territory]);
+
+/** A row as `ratchets.ts` reads a baseline. */
+const baselineOf = (row: RatchetRow): RatchetBaseline => ({
+  count: row.count,
+  ratchet: row.ratchet,
+  setAt: row.at,
+  territory: row.territory,
+});
+
+/**
+ * Whether a row is a territory's escape ratchet's (`escapeRatchet`), which
+ * has no command: its count is the territory's reasoned escapes on main,
+ * moved by those each landing adds.
+ */
+const isEscapeRow = (row: {
+  readonly ratchet: string;
+  readonly territory: string;
+}) => row.ratchet === escapeRatchet(row.territory);
+
+/** Whether two `Waiver`s are about one escape: one ask, one marker and reason, one line. */
+const sameEscape = (one: Waiver) => (other: Waiver) =>
+  other.ask === one.ask &&
+  other.marker === one.marker &&
+  other.reason === one.reason &&
+  other.at.path === one.at.path &&
+  other.at.line === one.at.line;
+
+/** What a decider just decided for an answer waiting on it: the subject, and the choice in its words. */
+interface DecidedOn {
+  readonly choice: Choice;
+  readonly subject: PendingDecision["subject"];
+}
+
+/** The decision `command` takes, when it is one the answer waiting in `before` waits on. */
+const decidedOn = (
+  before: LandingState,
+  command: LandingCommand
+): Option.Option<DecidedOn> =>
+  LandingCommand.$is("Decided")(command) &&
+  LandingState.guards.AwaitingDecision(before)
+    ? Option.map(
+        Option.fromUndefinedOr(
+          before.decisions.find(({ id }) => id === command.decision)
+        ),
+        ({ subject }) => ({ choice: command.choice, subject })
+      )
+    : Option.none();
+
+/** The `Waiver`s a decider accepted for an answer: those it had, and the one just accepted. */
+const waivedAfter = (
+  waived: readonly Waiver[],
+  decided: Option.Option<DecidedOn>
+): readonly Waiver[] => [
+  ...waived,
+  ...Option.toArray(
+    Option.flatMap(decided, ({ choice, subject }) =>
+      choice === "accept" && DecisionSubject.guards.Waiver(subject)
+        ? Option.some(subject)
+        : Option.none()
+    )
+  ),
+];
+
+/** What a decider weighs for one subject an answer waits on. */
+const evidenceFor = (
+  request: Request,
+  subject: Waiver | RaiseRatchet
+): readonly Evidence[] => [
+  {
+    label: "answer",
+    value: `${request.answerer} at ${request.head} (${request.requestId})`,
+  },
+  DecisionSubject.guards.Waiver(subject)
+    ? {
+        label: "escape",
+        value: `${subject.at.path}:${subject.at.line}: ${subject.marker} -- ${subject.reason}`,
+      }
+    : {
+        label: "ratchet",
+        value: `${subject.ratchet} in ${subject.territory}: ${subject.before} to ${subject.after}`,
+      },
+];
+
+/**
+ * A `lintToZero` check is red first by its count: twice on the composed
+ * commit its rule reports something in its territory, the same number
+ * both times (CAA E). Gives what the policy's ratchets count in the same
+ * lint, for their baselines at the ask's opening.
+ */
+const redByCount = (input: {
+  readonly ask: Ask;
+  readonly check: LintToZeroCheck;
+  readonly lane: LaneName;
+  readonly policy: Policy;
+  readonly runs: readonly [CheckRun, CheckRun];
+}) =>
+  Effect.gen(function* () {
+    const { ask, check, policy } = input;
+
+    const read = (run: CheckRun) =>
+      Effect.fromOption(outputOf(run, input.lane)).pipe(
+        Effect.flatMap((stdout) =>
+          Effect.map(
+            lintToZeroCount({
+              asked: ask.territory,
+              check,
+              modules: policy.modules,
+              stdout,
+            }),
+            (count) => ({ count, stdout })
+          )
+        ),
+        Effect.mapError(() => new NotRedFirst({}))
+      );
+
+    const [first, second] = input.runs;
+    const once = yield* read(first);
+    const again = yield* read(second);
+
+    if (once.count === 0 || once.count !== again.count) {
+      return yield* new NotRedFirst({});
+    }
+
+    return yield* countedBy(policy, check.command, once.stdout);
+  });
 
 /** A section of a brief, when it has lines. */
 const section = (heading: string, lines: readonly string[] | undefined) =>
@@ -1152,6 +1371,7 @@ export const projectService = (
         project: snapshot.project,
         proposals: snapshot.proposals,
         queue: yield* queueOf(snapshot.queue),
+        ratchets: snapshot.ratchets,
       };
     });
 
@@ -1166,6 +1386,50 @@ export const projectService = (
     /** The ask as this call has it: as written so far, or as hydrated. */
     const askNow = (h: Hydrated, writes: Writes, id: AskId) =>
       Option.fromUndefinedOr(writes.asks.get(id) ?? h.asks.get(id));
+
+    /** The `ratchets` rows as this call has them: written so far, over the hydrated ones. */
+    const ratchetsNow = (
+      h: Hydrated,
+      writes: Writes
+    ): readonly RatchetRow[] => [
+      ...h.ratchets.map((row) => writes.ratchets.get(ratchetKey(row)) ?? row),
+      ...[...writes.ratchets.values()].filter(
+        (row) =>
+          !h.ratchets.some((held) => ratchetKey(held) === ratchetKey(row))
+      ),
+    ];
+
+    /** The baselines of the policy's ratchets, as this call has them; the escape ratchets apart. */
+    const baselinesNow = (h: Hydrated, writes: Writes) =>
+      ratchetsNow(h, writes)
+        .filter((row) => !isEscapeRow(row))
+        .map(baselineOf);
+
+    /** Writes each baseline that differs from the row this call has for it. */
+    const putRatchets = (
+      h: Hydrated,
+      writes: Writes,
+      baselines: readonly RatchetBaseline[]
+    ) => {
+      const held = new Map(
+        ratchetsNow(h, writes).map((row) => [ratchetKey(row), row])
+      );
+
+      for (const baseline of baselines) {
+        const row: RatchetRow = {
+          at: baseline.setAt,
+          count: baseline.count,
+          ratchet: baseline.ratchet,
+          territory: baseline.territory,
+        };
+
+        const before = held.get(ratchetKey(row));
+
+        if (before?.count !== row.count || before.at !== row.at) {
+          writes.ratchets.set(ratchetKey(row), row);
+        }
+      }
+    };
 
     const ownClaim = (h: Hydrated, ask: AskId, handle: Handle) =>
       Option.fromUndefinedOr(
@@ -1253,6 +1517,7 @@ export const projectService = (
           outbox,
           proposals: [...writes.proposals.values()],
           pushEvents: writes.pushEvents,
+          ratchets: [...writes.ratchets.values()],
           ...field(
             "project",
             Option.fromUndefinedOr(writes.project.get("row"))
@@ -1814,6 +2079,13 @@ export const projectService = (
         ...field("ask", ask),
         ...field("askLane", askLane),
         ...field(
+          "counts",
+          Option.map(h.policy, ({ modules, ratchets }) => ({
+            modules,
+            ratchets,
+          }))
+        ),
+        ...field(
           "run",
           Option.map(h.policy, ({ run }) => run)
         ),
@@ -2129,9 +2401,225 @@ export const projectService = (
       );
     };
 
+    /**
+     * The checks' report on the tree under way, judged against the
+     * project's ratchets (spec §5 step 7 (b), (e)). Each of the policy's
+     * ratchets the merged tree counts over its baseline is refused
+     * `Weakened{ratchet}`, unless a reasoned escape the answer adds in its
+     * territory asks to raise it (`RaiseRatchet`); each reasoned escape over
+     * its territory's escape baseline waits on a `Waiver`, unless a decider
+     * already accepted it for this answer (`waived`: a re-check after main
+     * moved asks nothing twice). Nothing waits once something refused; the
+     * decisions open with their subject's default, `decline`. The answer's
+     * lines unread are the gate's trouble (`VerifierBlocked`): no escape
+     * lands unweighed. What the tree counted is kept for the answer's
+     * landing.
+     */
+    const ratchetJudged = (input: {
+      readonly checking: Checking;
+      readonly command: Data.TaggedEnum.Value<LandingCommand, "Checked">;
+      readonly h: Hydrated;
+      readonly now: DateTime.Utc;
+      readonly report: AnswerReport | undefined;
+      readonly waived: readonly Waiver[];
+      readonly writes: Writes;
+    }) =>
+      Effect.gen(function* () {
+        const { checking, command, h, now, writes } = input;
+        const { request } = checking;
+        const ask = Option.flatMap(request.ask, (id) => askNow(h, writes, id));
+        const known = Option.all({ ask, policy: h.policy, row: h.project });
+
+        if (Option.isNone(known)) {
+          return { command, measured: Option.none<Measured>() };
+        }
+
+        const { ask: asked, policy } = known.value;
+        const { initializer } = known.value.row;
+
+        const escapeBaselines = new Map(
+          ratchetsNow(h, writes)
+            .filter(isEscapeRow)
+            .map(({ count, ratchet }) => [ratchet, count])
+        );
+
+        const facts = yield* withPorts(
+          pushFacts({
+            ask,
+            base: request.base,
+            claim: Option.none(),
+            claimsHeld: 0,
+            head: request.head,
+            landed: checking.main,
+            policy,
+            project: name,
+            pusher: Person.make({ handle: request.answerer }),
+            ref: mainRef,
+            repo: request.fork,
+          })
+        ).pipe(
+          Effect.tapError((unread) =>
+            Effect.logWarning(
+              `the lines of answer ${request.requestId} could not be read for its escapes`,
+              unread
+            )
+          ),
+          Effect.result
+        );
+
+        const waivers = Result.match(facts, {
+          onFailure: (): readonly Waiver[] => [],
+          onSuccess: (found) =>
+            escapeDecisions({ ...found, ratchetBaselines: escapeBaselines }),
+        });
+
+        const unread = Result.isFailure(facts) ? [new VerifierBlocked({})] : [];
+
+        const territoryIn = (waiver: Waiver) =>
+          territoryOf(policy, asked, waiver.at.path);
+
+        // A reasoned escape in a territory explains a raise there.
+        const raises = waivers.flatMap((waiver): readonly RaiseRequest[] =>
+          policy.ratchets.map(({ name: ratchet }) => ({
+            ratchet,
+            reason: waiver.reason,
+            territory: territoryIn(waiver),
+          }))
+        );
+
+        const declared = input.report?.ratchets ?? [];
+
+        const judgement = judgeRatchets({
+          ask: asked.id,
+          baselines: baselinesNow(h, writes),
+          measured: declared,
+          raises,
+        });
+
+        const escapes = Array.dedupe(waivers.map(territoryIn)).map(
+          (territory): MeasuredCount => {
+            const ratchet = escapeRatchet(territory);
+
+            return {
+              count:
+                (escapeBaselines.get(ratchet) ?? 0) +
+                waivers.filter((waiver) => territoryIn(waiver) === territory)
+                  .length,
+              ratchet,
+              territory,
+            };
+          }
+        );
+
+        const refusals = [
+          ...command.refusals,
+          ...unread,
+          ...judgement.refusals,
+        ];
+
+        const asking = Array.isReadonlyArrayEmpty(refusals)
+          ? [
+              ...waivers.filter(
+                (waiver) => !input.waived.some(sameEscape(waiver))
+              ),
+              ...judgement.decisions,
+            ]
+          : [];
+
+        const changed = checking.changes.map(({ path }) => path);
+
+        const pending = asking.map((subject): PendingDecision => {
+          const decision = openDecision({
+            deciders: decidersOn(
+              policy,
+              DecisionSubject.guards.Waiver(subject)
+                ? [subject.at.path]
+                : changed,
+              initializer
+            ),
+            evidence: evidenceFor(request, subject),
+            expireDays: policy.budget.expireDays,
+            id: nextDecisionId(h.decisions, writes.decisions),
+            now,
+            project: name,
+            subject,
+          });
+
+          writes.decisions.set(decision.id, decision);
+
+          return { id: decision.id, subject };
+        });
+
+        return {
+          command: LandingCommand.Checked({
+            ...command,
+            decisions: [...command.decisions, ...pending],
+            refusals,
+          }),
+          measured: Option.some<Measured>({ declared, escapes }),
+        };
+      });
+
+    /** An accepted `RaiseRatchet` the answer waits on raises its baseline: the one way a baseline rises. */
+    const raiseOnDecision = (
+      h: Hydrated,
+      writes: Writes,
+      decided: Option.Option<DecidedOn>
+    ) => {
+      const live = liveRow(h);
+
+      if (Option.isNone(decided) || Option.isNone(live)) {
+        return;
+      }
+
+      const { choice, subject } = decided.value;
+
+      if (DecisionSubject.guards.RaiseRatchet(subject)) {
+        putRatchets(
+          h,
+          writes,
+          decideRaise(
+            baselinesNow(h, writes),
+            subject,
+            choice,
+            live.value.landed
+          )
+        );
+      }
+    };
+
+    /**
+     * A landing's counts become the baselines: each of the policy's
+     * ratchets lowered where the landed tree counts less (or set, where it
+     * had none), and each territory's escapes as they stand with the
+     * answer's in; the gate let no raise land that a decider did not accept.
+     */
+    const ratchetsAtLanding = (
+      h: Hydrated,
+      writes: Writes,
+      measured: Option.Option<Measured>,
+      sha: LandedSha
+    ) => {
+      if (Option.isNone(measured)) {
+        return;
+      }
+
+      const { declared, escapes } = measured.value;
+
+      putRatchets(h, writes, [
+        ...afterLanding(baselinesNow(h, writes), declared, sha).baselines,
+        ...escapes.map(({ count, ratchet, territory }) => ({
+          count,
+          ratchet,
+          setAt: sha,
+          territory,
+        })),
+      ]);
+    };
+
     /** One reported step of an answer, under the lock: its transition and all it settles. */
     const advanceBody =
-      (requestId: RequestId, command: LandingCommand, report?: AnswerReport) =>
+      (requestId: RequestId, reported: LandingCommand, report?: AnswerReport) =>
       (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
         Effect.gen(function* () {
           const found = findAnswer(h, requestId);
@@ -2142,8 +2630,41 @@ export const projectService = (
 
           const { record, row } = found.value;
           const before = record.landing;
+
+          const counted =
+            LandingCommand.$is("Checked")(reported) &&
+            LandingState.guards.Checking(before) &&
+            before.tree === reported.tree
+              ? yield* ratchetJudged({
+                  checking: before,
+                  command: reported,
+                  h,
+                  now,
+                  report,
+                  waived: record.waived ?? [],
+                  writes,
+                })
+              : { command: reported, measured: Option.none<Measured>() };
+
+          const { command } = counted;
           const { effects, state } = landingTransition(before, command, now);
           const { request } = state;
+
+          const measured = Option.orElse(counted.measured, () =>
+            Option.fromUndefinedOr(record.measured)
+          );
+
+          const decided = decidedOn(before, command);
+          const waived = waivedAfter(record.waived ?? [], decided);
+
+          raiseOnDecision(h, writes, decided);
+
+          if (
+            LandingState.guards.Landed(state) &&
+            LandingState.guards.Landing(before)
+          ) {
+            ratchetsAtLanding(h, writes, measured, state.sha);
+          }
 
           const ask = Option.flatMap(request.ask, (id) =>
             askNow(h, writes, id)
@@ -2209,6 +2730,11 @@ export const projectService = (
                   ...record,
                   landing: state,
                   ...field("verdict", verdict),
+                  ...field("measured", measured),
+                  ...field(
+                    "waived",
+                    Option.liftPredicate(waived, Array.isReadonlyArrayNonEmpty)
+                  ),
                 })
               ),
               updatedAt: now,
@@ -2404,10 +2930,14 @@ export const projectService = (
         (refusals) => Array.findFirst(refusals, isTouchedJudge)
       );
 
-    /** Red first: the ask's check fails twice on the composed commit, the same way. */
+    /**
+     * Red first: the ask's check fails twice on the composed commit, the
+     * same way (a `lintToZero` check, by its count). Gives the counts of the
+     * policy's ratchets the check's own run read on the way.
+     */
     const redTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
       Effect.gen(function* () {
-        const lane = askLaneOf(policy, ask);
+        const lane = askCheckLane(policy, ask);
 
         if (Option.isNone(lane)) {
           return yield* new NotRedFirst({});
@@ -2415,7 +2945,7 @@ export const projectService = (
 
         const job = {
           at: CheckAt.cases.Commit.make({ commit: composed }),
-          lanes: [CheckLane.make(lane.value)],
+          lanes: [lane.value],
           placeholders: [],
           project: name,
           proxies: [],
@@ -2423,12 +2953,21 @@ export const projectService = (
           run: policy.run,
         };
 
-        const first = yield* runner.run(job);
-        const second = yield* runner.run(job);
+        const runs = [yield* runner.run(job), yield* runner.run(job)] as const;
 
-        return yield* Effect.fromResult(
-          redFirstOfRuns([first, second], lane.value.lane)
-        );
+        if (CheckSpec.guards.LintToZero(ask.check)) {
+          return yield* redByCount({
+            ask,
+            check: ask.check,
+            lane: lane.value.lane,
+            policy,
+            runs,
+          });
+        }
+
+        yield* Effect.fromResult(redFirstOfRuns(runs, lane.value.lane));
+
+        return [];
       });
 
     /** The landing that opens an ask: its files on main, authored by its asker. */
@@ -2560,7 +3099,7 @@ export const projectService = (
           return yield* new WeakCheck({ weakness: weak.value });
         }
 
-        yield* redTwice(policy, ask, composed.commit);
+        const counted = yield* redTwice(policy, ask, composed.commit);
 
         const landed = yield* landAsk({
           ask,
@@ -2587,6 +3126,13 @@ export const projectService = (
         writes.project.set(
           "row",
           yield* withPolicyAt({ ...row, landed: landed.sha }, landed.sha, now)
+        );
+
+        // The opening landing records the baselines its check's lint read.
+        putRatchets(
+          h,
+          writes,
+          afterLanding(baselinesNow(h, writes), counted, landed.sha).baselines
         );
 
         return { ask: opened, landed: landed.sha };

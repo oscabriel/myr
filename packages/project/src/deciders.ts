@@ -485,7 +485,7 @@ const pathsOf = (
  * Who decides on `paths`: their deciders, else the project's own (`**`),
  * else its initializer (spec D20). A decision always has someone.
  */
-const decidersOn = (
+export const decidersOn = (
   policy: Policy,
   paths: readonly RepoPath[],
   initializer: Handle

@@ -17,10 +17,12 @@ import {
   Verdict,
 } from "@repo/protocol/domain/answer";
 import { Ask } from "@repo/protocol/domain/ask";
+import { RatchetSpec } from "@repo/protocol/domain/check";
 import { Choice } from "@repo/protocol/domain/decision";
 import { AskKind } from "@repo/protocol/domain/kind";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { RunBlock } from "@repo/protocol/domain/run";
+import { Territory } from "@repo/protocol/domain/territory";
 import {
   AskId,
   CommitSha,
@@ -28,6 +30,7 @@ import {
   Handle,
   LandedSha,
   LaneName,
+  RatchetName,
   RepoName,
   RepoPath,
   TreeSha,
@@ -83,6 +86,15 @@ export const Steps = Schema.Struct({
   outcome: Outcome,
 });
 
+/** A ratchet's count in one territory, as a check of a tree measured it. */
+export const MeasuredCount = Schema.Struct({
+  count: Attempt,
+  ratchet: RatchetName,
+  territory: Schema.NonEmptyString,
+});
+
+export type MeasuredCount = typeof MeasuredCount.Type;
+
 /**
  * One answer request as a run needs it: where it stands, whether it holds
  * the project's one landing slot, and the policy's facts its steps use. It
@@ -95,6 +107,16 @@ export const AnswerRun = Schema.Struct({
   ask: Schema.optionalKey(Ask),
   /** The lane the ask's own check reports as, which is red on main by design. */
   askLane: Schema.optionalKey(LaneName),
+  /**
+   * What the cheap stage counts on the merged tree: the policy's ratchets,
+   * and the modules a count is split by. Absent without a policy.
+   */
+  counts: Schema.optionalKey(
+    Schema.Struct({
+      modules: Schema.Array(Territory),
+      ratchets: Schema.Array(RatchetSpec),
+    })
+  ),
   /** Whether a decider must finish it before it lands: the ask kind's `finish`. */
   finish: AskKind.fields.finish,
   /** What the checks run on the merged tree: the ask's check first, then every project lane. */
@@ -129,7 +151,8 @@ export const runBlockOf = (from: {
 
 /**
  * What a step saw beside the command it reports: the lanes and held-back
- * areas a check run judged (the verdict is made from them), and the
+ * areas a check run judged (the verdict is made from them), the ratchets it
+ * counted (the project judges them against its baselines), and the
  * bookkeeping a land left unwritten (the project retries it).
  */
 export const AnswerReport = Schema.Struct({
@@ -138,6 +161,8 @@ export const AnswerReport = Schema.Struct({
   pending: Schema.optionalKey(
     Schema.Array(Schema.Literals(["mirror", "notes"]))
   ),
+  /** Each ratchet's count on the checked tree, per territory: the project judges them. */
+  ratchets: Schema.optionalKey(Schema.Array(MeasuredCount)),
 });
 
 export type AnswerReport = typeof AnswerReport.Type;

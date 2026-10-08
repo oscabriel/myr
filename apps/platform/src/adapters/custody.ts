@@ -26,12 +26,18 @@
  * once); a clean one is offered as the answer (`submitAnswer`, the same path
  * as `<cli> submit`) and the pusher reads that it is being checked. The
  * gate's later stages never run inside the push (spec D5).
+ *
+ * A harness that pushes names itself in the basic-auth username its
+ * credential helper gives (`audit;harness=pi&model=…`, `@repo/protocol/audit`).
+ * Custody logs it with the push, as audit metadata only: who pushes is the
+ * token's person, and the username is never identity, credit or a score.
  */
 import type { RepoName } from "@repo/artifacts/repo-host";
 import { Custody } from "@repo/git/custody";
 import type { Command } from "@repo/git/custody";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
+import type { HarnessAudit } from "@repo/protocol/audit";
 import { RequestId, sameHandle } from "@repo/protocol/ids";
 import type { AskId, CommitSha, Handle, ProjectName } from "@repo/protocol/ids";
 import { Principal } from "@repo/protocol/principal";
@@ -263,6 +269,40 @@ const claimFork = (
     );
   });
 
+/** What a push's log lines and span carry: who pushes, to which kind of repo, through which harness. */
+type PushAnnotations = HarnessAudit & {
+  readonly pusher: string;
+  readonly target: RepoKind["_tag"];
+};
+
+const annotationsOf = (
+  pusher: Person,
+  kind: RepoKind,
+  audit: Option.Option<HarnessAudit>
+): PushAnnotations => ({
+  ...Option.getOrElse(audit, (): HarnessAudit => ({})),
+  pusher: pusher.handle,
+  target: kind._tag,
+});
+
+/**
+ * `custody` with every log line it writes annotated, and its review in a
+ * span with the same attributes. `admit` stays synchronous: the gateway's
+ * body locks the moment the fiber yields.
+ */
+const annotated = (custody: Custody["Service"], annotations: PushAnnotations) =>
+  Custody.of({
+    admit: (repo, commands) =>
+      custody.admit(repo, commands).pipe(Effect.annotateLogs(annotations)),
+    review: (repo, commands) =>
+      custody
+        .review(repo, commands)
+        .pipe(
+          Effect.annotateLogs(annotations),
+          Effect.withSpan("custody.review", { attributes: annotations })
+        ),
+  });
+
 /** Custody that takes every push as it comes: a person's own working fork. */
 const takeAll = custodyOf(
   () => [],
@@ -277,12 +317,15 @@ export const refuseAll = custodyOf(directPushes, (_repo, commands) =>
 /**
  * Custody of one push by `pusher` to the repo `kind` names. `notice` says a
  * line to the pusher once the push went through: what became of the answer
- * it offered. Only a signed-in person pushes anywhere.
+ * it offered. `audit` is the harness the push came through (`auditOf` in
+ * `credential.ts`), if its username named one: logged with the push, never
+ * who pushes. Only a signed-in person pushes anywhere.
  */
 export const custodyFor = (
   pusher: Principal,
   kind: RepoKind,
-  notice: Notice = () => Effect.void
+  notice: Notice = () => Effect.void,
+  audit: Option.Option<HarnessAudit> = Option.none()
 ): Effect.Effect<Custody["Service"], never, Projects> =>
   Effect.gen(function* () {
     if (!Principal.guards.Person(pusher)) {
@@ -290,8 +333,13 @@ export const custodyFor = (
     }
 
     const projects = yield* Projects;
+    const annotations = annotationsOf(pusher, kind, audit);
 
-    return yield* RepoKind.$match(kind, {
+    yield* Effect.logInfo("a push reached custody").pipe(
+      Effect.annotateLogs(annotations)
+    );
+
+    const custody = yield* RepoKind.$match(kind, {
       Canonical: ({ project }) => canonical(projects, project, pusher),
       ClaimFork: (fork) => claimFork(projects, fork, pusher, notice),
       // The platform makes no repo by any other name; nothing pushes there.
@@ -300,4 +348,6 @@ export const custodyFor = (
       WorkingFork: ({ handle }) =>
         Effect.succeed(sameHandle(pusher.handle, handle) ? takeAll : refuseAll),
     });
+
+    return annotated(custody, annotations);
   });

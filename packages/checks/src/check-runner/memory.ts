@@ -2,6 +2,8 @@
  * `CheckRunner` from a script, for tests: each `(tree or commit, lane)` gets
  * its scripted results in order, and the last one again once they run out.
  * A pair with no script is `VerifierBlocked`, as a Checker that cannot run is.
+ * A count lane (`output: "stdout"`) prints what `outputs` scripts for its
+ * pair, a linter's JSON as it was recorded, and nothing when none is.
  */
 import type { LaneResult } from "@repo/protocol/domain/answer";
 import type { LaneName } from "@repo/protocol/ids";
@@ -9,7 +11,7 @@ import { VerifierBlocked } from "@repo/protocol/refusal";
 import { Array, Effect, Layer, Option, Ref } from "effect";
 
 import { CheckRunner, shaOf } from "../check-runner.ts";
-import type { CheckAt, LaneEvidence } from "../check-runner.ts";
+import type { CheckAt, LaneEvidence, LaneOutput } from "../check-runner.ts";
 
 /** Where a lane's script lives in the map: `<tree or commit sha>:<lane>`. */
 export const scriptKey = (at: CheckAt, lane: LaneName) =>
@@ -26,8 +28,14 @@ const evidenceOf = ({ lane, result }: LaneResult): LaneEvidence =>
     : { lane };
 
 export const CheckRunnerMemory = {
+  /**
+   * `script` holds each pair's results; `outputs`, read when a job runs (so
+   * a test may add to it later), the stdout each count lane prints, by the
+   * same key.
+   */
   layer: (
-    script: ReadonlyMap<string, readonly LaneResult[]>
+    script: ReadonlyMap<string, readonly LaneResult[]>,
+    outputs: ReadonlyMap<string, string> = new Map()
   ): Layer.Layer<CheckRunner> =>
     Layer.effect(
       CheckRunner,
@@ -52,8 +60,8 @@ export const CheckRunnerMemory = {
           run: (job) =>
             Effect.gen(function* () {
               // Every lane has a script, or none of them advances.
-              const scripted = yield* Effect.forEach(job.lanes, ({ lane }) => {
-                const key = scriptKey(job.at, lane);
+              const scripted = yield* Effect.forEach(job.lanes, (lane) => {
+                const key = scriptKey(job.at, lane.lane);
 
                 return Option.match(
                   Option.filter(
@@ -62,7 +70,7 @@ export const CheckRunnerMemory = {
                   ),
                   {
                     onNone: () => Effect.fail(new VerifierBlocked({})),
-                    onSome: (results) => Effect.succeed({ key, results }),
+                    onSome: (results) => Effect.succeed({ key, lane, results }),
                   }
                 );
               });
@@ -72,7 +80,14 @@ export const CheckRunnerMemory = {
                 ({ key, results }) => next(key, results)
               );
 
-              return {
+              const printed = scripted.flatMap(
+                ({ key, lane }): readonly LaneOutput[] =>
+                  lane.output === "stdout"
+                    ? [{ lane: lane.lane, stdout: outputs.get(key) ?? "" }]
+                    : []
+              );
+
+              const run = {
                 durationMs: lanes.reduce(
                   (total, { durationMs }) => total + durationMs,
                   0
@@ -83,6 +98,8 @@ export const CheckRunnerMemory = {
                 heldBack: [],
                 lanes,
               };
+
+              return printed.length === 0 ? run : { ...run, outputs: printed };
             }),
         });
       })

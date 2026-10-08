@@ -1,13 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
-import { CheckAt } from "@repo/checks/check-runner";
+import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import { authorLine, committerLine, parseTrailers } from "@repo/git/trailers";
 import { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { ClaimView } from "@repo/protocol/domain/claim";
-import { Glob } from "@repo/protocol/domain/common";
+import { Command, Glob } from "@repo/protocol/domain/common";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   AskId,
@@ -36,7 +36,12 @@ import {
 } from "@repo/protocol/refusal";
 import { advanceTo, at as instant } from "@repo/testkit/clock";
 import type { Files } from "@repo/testkit/git-client";
-import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
+import {
+  aProject,
+  withAsk,
+  withKind,
+  withVouches,
+} from "@repo/testkit/scenarios";
 import {
   Array,
   DateTime,
@@ -44,6 +49,7 @@ import {
   Exit,
   Layer,
   Option,
+  Ref,
   Result,
   Schema,
 } from "effect";
@@ -1272,5 +1278,155 @@ describe("projects", () => {
           );
         }
       )
+  );
+});
+
+/** A `lintToZero` ask over parser, in a project whose kinds list `lintToZero`. */
+const noAny = AskId.make("no-any");
+
+const lintScenario = aProject({ people }).pipe(
+  withVouches(people),
+  withKind({
+    checkKind: "lintToZero",
+    claimers: "vouched",
+    finish: "never",
+    name: "lintToZero",
+    oneWay: false,
+    race: 1,
+    requires: ["want", "check", "territory"],
+    strength: "assertion",
+  }),
+  withAsk({
+    check: CheckSpec.cases.LintToZero.make({
+      command: Command.make("oxlint --format json"),
+      rule: "typescript/no-explicit-any",
+    }),
+    id: noAny,
+    kind: "lintToZero",
+    territory: "packages/parser",
+  })
+);
+
+/** What `oxlint --format json` prints with `count` explicit `any`s in parser. */
+const lintPrinting = (count: number) =>
+  JSON.stringify({
+    // `Array.makeBy` makes at least one: none is its own case.
+    diagnostics:
+      count === 0
+        ? []
+        : Array.makeBy(count, (line) => ({
+            code: "typescript(no-explicit-any)",
+            filename: "packages/parser/src/parse.ts",
+            labels: [
+              { span: { column: 1, length: 3, line: line + 1, offset: 0 } },
+            ],
+            message: "Unexpected `any`. Specify a different type.",
+            severity: "error",
+          })),
+    number_of_files: 1,
+    number_of_rules: 1,
+  });
+
+/**
+ * A Checker whose lint prints `counts` in turn, one run after another: every
+ * run fails (the lint exits 1 on any finding), so only the count tells two
+ * runs apart.
+ */
+const lintPrints = (counts: readonly number[]) =>
+  Layer.effect(
+    CheckRunner,
+    Effect.gen(function* () {
+      const left = yield* Ref.make(counts);
+
+      return CheckRunner.of({
+        run: (job) =>
+          Effect.gen(function* () {
+            const count = yield* Ref.modify(left, ([next = 0, ...rest]) => [
+              next,
+              rest,
+            ]);
+
+            return {
+              durationMs: 1,
+              evidence: job.lanes.map(({ lane }) => ({
+                lane,
+                signature: `${lane}: lint exited 1`,
+              })),
+              heldBack: [],
+              lanes: job.lanes.map(({ command, lane }) => ({
+                command,
+                durationMs: 1,
+                lane,
+                result: "failed" as const,
+              })),
+              outputs: job.lanes.flatMap(({ lane, output }) =>
+                output === "stdout"
+                  ? [{ lane, stdout: lintPrinting(count) }]
+                  : []
+              ),
+            };
+          }),
+      });
+    })
+  );
+
+/** alice opens the `lintToZero` ask, its lint counting `counts` on main, run by run. */
+const openingByCount = (counts: readonly number[]) =>
+  Effect.gen(function* () {
+    yield* advanceTo("2026-10-07T12:00:00Z");
+
+    const api = yield* projectService(project);
+
+    yield* api.initProject(alice, {});
+
+    const first = yield* Pusher.use((pusher) =>
+      pusher.push(repo, Option.none(), start, "Start")
+    );
+
+    yield* api.recordFirstPush(alice, first);
+
+    const { file } = Option.getOrThrow(
+      Array.findFirst(lintScenario.policy.asks, ({ id }) => id === noAny)
+    );
+
+    return yield* Effect.result(
+      api.openAsk(alice, {
+        ask: noAny,
+        files: Array.make({
+          content: `export default "${noAny}";\n`,
+          path: file,
+        }),
+      })
+    );
+  }).pipe(
+    // The world's Checker, in place of the scripted one.
+    Effect.provide(
+      Layer.merge(worldOf(lintScenario, "memory"), lintPrints(counts))
+    )
+  );
+
+describe("opening a lintToZero ask", () => {
+  it.effect(
+    "is red first when its rule counts the same, above zero, twice on main",
+    () =>
+      Effect.map(openingByCount([3, 3]), (opened) => {
+        expect(
+          Result.map(opened, ({ ask }) => [ask.id, ask.check._tag])
+        ).toStrictEqual(Result.succeed([noAny, "LintToZero"]));
+      })
+  );
+
+  it.effect("is refused NotRedFirst when its rule counts nothing on main", () =>
+    Effect.map(openingByCount([0, 0]), (opened) => {
+      expect(opened).toStrictEqual(Result.fail(new NotRedFirst({})));
+    })
+  );
+
+  it.effect(
+    "is refused NotRedFirst when the two runs on main count differently",
+    () =>
+      Effect.map(openingByCount([3, 2]), (opened) => {
+        expect(opened).toStrictEqual(Result.fail(new NotRedFirst({})));
+      })
   );
 });

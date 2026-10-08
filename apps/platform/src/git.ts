@@ -23,7 +23,7 @@ import { Anonymous, Principal } from "@repo/protocol/principal";
 import { Effect, Option, Ref } from "effect";
 
 import { custodyFor, refuseAll } from "./adapters/custody.ts";
-import { credentialOf } from "./credential.ts";
+import { auditOf, credentialOf } from "./credential.ts";
 import { repoKind, RepoKind } from "./repo-names.ts";
 import { Sessions } from "./sessions.ts";
 
@@ -139,8 +139,11 @@ const serve = (
     // Only a push's own request is judged; reads never reach custody.
     const custody =
       route.endpoint === "git-receive-pack"
-        ? yield* custodyFor(principal, kind, (line) =>
-            Ref.update(notices, (said) => [...said, line])
+        ? yield* custodyFor(
+            principal,
+            kind,
+            (line) => Ref.update(notices, (said) => [...said, line]),
+            auditOf(request.headers)
           )
         : refuseAll;
 
