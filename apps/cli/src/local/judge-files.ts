@@ -6,18 +6,20 @@
  * harness hooks both read them here, so each judges by the closure the
  * gateway judges a push by.
  *
- * git runs read-only, outside any hook's repo (`outsideAnyHook`), and a
- * git that fails reads as nothing: the closure is then the defaults.
+ * git runs read-only, outside any hook's repo and with no prompt
+ * (`readOnlyGit`), and a git that fails reads as nothing: the closure is
+ * then the defaults.
  */
 import { judgeInputs } from "@repo/checks/judge";
 import type { JudgeInput } from "@repo/checks/judge";
 import { Array, Effect, Option, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { outsideAnyHook } from "./facts.ts";
+import { readOnlyGit } from "./facts.ts";
 
-/** One blob of a commit, as `git ls-tree -r -l` lists it. */
+/** One blob of a commit, as `git ls-tree -r -l` lists it: its mode, path, id and size. */
 export interface ListedBlob {
+  readonly mode: string;
   readonly path: string;
   readonly sha: string;
   readonly size: number;
@@ -34,7 +36,7 @@ const gitBytes = (root: string, args: readonly string[], stdin?: string) =>
       const child = yield* spawner.spawn(
         ChildProcess.make("git", args, {
           cwd: root,
-          env: { ...outsideAnyHook, GIT_OPTIONAL_LOCKS: "0" },
+          env: readOnlyGit,
           extendEnv: true,
           stderr: "ignore",
           stdin:
@@ -53,7 +55,8 @@ const gitBytes = (root: string, args: readonly string[], stdin?: string) =>
     })
   ).pipe(Effect.orElseSucceed(() => Option.none<Uint8Array>()));
 
-const ENTRY = /^\d+ blob (?<sha>[0-9a-f]+) +(?<size>\d+)\t(?<path>.+)$/su;
+const ENTRY =
+  /^(?<mode>\d+) blob (?<sha>[0-9a-f]+) +(?<size>\d+)\t(?<path>.+)$/su;
 
 /** Every blob of the commit `revision` names, by its path from the root; none when git can't read it. */
 export const blobsAt = (
@@ -83,12 +86,14 @@ export const blobsAt = (
           .flatMap((entry) => {
             const groups = ENTRY.exec(entry)?.groups;
 
-            return groups?.sha === undefined ||
+            return groups?.mode === undefined ||
+              groups.sha === undefined ||
               groups.size === undefined ||
               groups.path === undefined
               ? []
               : [
                   {
+                    mode: groups.mode,
                     path: groups.path,
                     sha: groups.sha,
                     size: Number(groups.size),

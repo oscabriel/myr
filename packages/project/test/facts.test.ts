@@ -11,21 +11,30 @@ import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { Brand } from "@repo/brand";
 import { isJudged, judgeClosure } from "@repo/checks/judge";
+import { CheckSpec } from "@repo/protocol/domain/check";
 import { Command } from "@repo/protocol/domain/common";
 import type { RunBlock } from "@repo/protocol/domain/run";
 import {
+  AskId,
   CommitSha,
   Handle,
+  LandedSha,
+  LaneName,
   ProjectName,
   RepoName,
   RepoPath,
 } from "@repo/protocol/ids";
-import { at } from "@repo/testkit/clock";
+import { Person } from "@repo/protocol/principal";
+import { TouchedJudge } from "@repo/protocol/refusal";
+import { advanceTo, at } from "@repo/testkit/clock";
 import { gitClient } from "@repo/testkit/git-client";
 import type { Files } from "@repo/testkit/git-client";
-import { Effect, Option } from "effect";
+import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
+import { Array, Effect, Option } from "effect";
 
 import { evaluationFacts } from "../src/facts.ts";
+import { projectService } from "../src/project.ts";
+import { CheckScript, composedAt, Pusher, worldOf } from "./world.ts";
 
 const project = ProjectName.make("kit");
 
@@ -173,5 +182,139 @@ describe(evaluationFacts, () => {
         { dir: "packages/a", exports: [], name: "@kit/a" },
       ]);
     })
+  );
+});
+
+// ------------------------------------------------------------ through the gate
+
+const scenario = aProject({ people: ["bob"] }).pipe(
+  withVouches(["bob"]),
+  withAsk({ id: "parse-iso", territory: "packages/parser" })
+);
+
+const gatedRepo = RepoName.make(scenario.project);
+
+const mainRef = RefName.make("refs/heads/main");
+
+const parseIso = AskId.make("parse-iso");
+
+const alice = Person.make({ handle: scenario.initializer });
+
+const bob = Person.make({
+  handle: scenario.people.get("bob") ?? scenario.initializer,
+});
+
+const bobFork = RepoName.make(
+  `${scenario.project}--${parseIso}--${bob.handle}`
+);
+
+const ask = Option.getOrThrow(
+  Array.findFirst(scenario.policy.asks, ({ id }) => id === parseIso)
+);
+
+/** The ask's own files: its file in the config folder, and its check. */
+const askFiles = Array.make(
+  { content: `export default "${parseIso}";\n`, path: ask.file },
+  {
+    content: 'import { it } from "vitest";\n\nit("parses a year", () => {});\n',
+    path: CheckSpec.guards.RedThenGreen(ask.check)
+      ? ask.check.path
+      : RepoPath.make("test/parse-iso.test.ts"),
+  }
+);
+
+/**
+ * A project whose harness hook config sits in a subfolder, not at the root
+ * or in a CI folder, and runs a script outside both.
+ */
+const hooked: Files = [
+  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  ["packages/parser/package.json", '{ "name": "parser" }\n'],
+  ["packages/parser/src/parse.ts", "export const parse = (s) => 0;\n"],
+  [
+    ".claude/settings.json",
+    JSON.stringify({
+      hooks: {
+        PreToolUse: [
+          {
+            hooks: [
+              { command: "bun scripts/hooks/vcs-policy.ts", type: "command" },
+            ],
+          },
+        ],
+      },
+    }),
+  ],
+  ["scripts/hooks/vcs-policy.ts", "export {};\n"],
+];
+
+/**
+ * alice makes the project and opens parse-iso red first; bob claims it and
+ * pushes an edit to the script the hook config runs. What the gate says.
+ */
+const hookScriptPushed = Effect.gen(function* () {
+  yield* advanceTo("2026-10-07T12:00:00Z");
+
+  const api = yield* projectService(scenario.project);
+
+  yield* api.initProject(alice, {});
+
+  const first = yield* Pusher.use((pusher) =>
+    pusher.push(gatedRepo, Option.none(), hooked, "Start")
+  );
+
+  yield* api.recordFirstPush(alice, first);
+
+  const composed = yield* composedAt(
+    gatedRepo,
+    LandedSha.make(first),
+    askFiles
+  );
+
+  yield* CheckScript.use((checker) =>
+    checker.script(composed, LaneName.make("redThenGreen"), [
+      "failed",
+      "failed",
+    ])
+  );
+
+  const { landed } = yield* api.openAsk(alice, {
+    ask: parseIso,
+    files: askFiles,
+  });
+
+  yield* api.claim(bob, parseIso);
+
+  const head = yield* Pusher.use((pusher) =>
+    pusher.push(bobFork, Option.some(landed), [
+      ...hooked.filter(([path]) => path !== "scripts/hooks/vcs-policy.ts"),
+      ...askFiles.map(({ content, path }) => [path, content] as const),
+      ["scripts/hooks/vcs-policy.ts", "process.exit(0);\n"],
+    ])
+  );
+
+  return yield* api.recordPush({
+    after: head,
+    before: Option.some(landed),
+    eventId: "push-hook-script",
+    pusher: bob,
+    ref: mainRef,
+    repo: bobFork,
+  });
+}).pipe(Effect.provide(worldOf(scenario, "memory")));
+
+describe("a claimant's push, judged by these facts", () => {
+  it.effect(
+    "is refused TouchedJudge for an edit to a script a hook config runs, as the local hook refuses it",
+    () =>
+      Effect.map(hookScriptPushed, (refusals) => {
+        expect(refusals).toStrictEqual([
+          new TouchedJudge({
+            paths: [RepoPath.make("scripts/hooks/vcs-policy.ts")],
+          }),
+        ]);
+      }),
+    // Real git objects and every gate stage: the limit catches a hang.
+    { timeout: 30_000 }
   );
 });

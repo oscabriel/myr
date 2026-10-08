@@ -133,11 +133,14 @@ const opened = (api: ProjectApi) =>
 /**
  * bob claims parse-iso and pushes once per entry of `pushes`, each push
  * reported by custody with the harness it named (or none); the last head is
- * checked green and submitted. What lands: its trailers and its view.
+ * checked green and submitted. With `claimedAnewAt`, bob releases his claim
+ * and claims the ask again before that push. What lands: its trailers and
+ * its view.
  */
 const answered = (
   policy: Policy,
-  pushes: readonly Option.Option<HarnessAudit>[]
+  pushes: readonly Option.Option<HarnessAudit>[],
+  claimedAnewAt?: number
 ) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-07T12:00:00Z");
@@ -152,6 +155,11 @@ const answered = (
       (): readonly CommitSha[] => [],
       (done, audit, step) =>
         Effect.gen(function* () {
+          if (step === claimedAnewAt) {
+            yield* api.release(bob, parseIso);
+            yield* api.claim(bob, parseIso);
+          }
+
           const parent = Option.getOrElse(
             Option.fromUndefinedOr(done.at(-1)),
             (): CommitSha => base
@@ -281,6 +289,21 @@ describe("Assisted-by on an answer's landing", () => {
             landedOn: "answer",
             trailers: [],
             view: [],
+          });
+        }
+      ),
+    story
+  );
+
+  it.effect(
+    "names only the harnesses that pushed since the ask was claimed anew",
+    () =>
+      Effect.map(
+        answered(scenario.policy, [claudeCode, pi], 1),
+        ({ landedOn, trailers }) => {
+          expect({ landedOn, trailers }).toStrictEqual({
+            landedOn: "answer",
+            trailers: ["Assisted-by: pi:kimi-k3 (claimed)"],
           });
         }
       ),

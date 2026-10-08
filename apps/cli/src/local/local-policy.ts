@@ -47,7 +47,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { ConfigRuntime } from "./config-runtime.ts";
 import { commitOf, runGit } from "./facts.ts";
-import { judgeFilesIn } from "./judge-files.ts";
+import { blobsAt, judgeFilesIn } from "./judge-files.ts";
+import type { ListedBlob } from "./judge-files.ts";
 
 /** A file of the config folder, as committed. */
 export interface ConfigFile {
@@ -281,47 +282,12 @@ export interface PolicyAbout {
   readonly initializer: Handle;
 }
 
-/** One file of a commit, as `git ls-tree -r -l` lists it. */
-interface TreeFile {
-  readonly mode: string;
-  readonly path: string;
-  readonly sha: string;
-  readonly size: number;
-}
-
 // A regular file, executable or not: the Lander bundles only these from the
 // config folder, never a link or a submodule.
 const FILE_MODES: ReadonlySet<string> = new Set(["100644", "100755"]);
 
-const ENTRY =
-  /^(?<mode>\d+) (?<type>\w+) (?<sha>[0-9a-f]+) +(?<size>-|\d+)\t(?<path>.+)$/su;
-
-/** Every blob in the commit `sha`'s tree, in git's order. */
-const filesAt = (root: string, sha: CommitSha) =>
-  Effect.map(
-    runGit(root, ["ls-tree", "-r", "-l", "-z", "--full-tree", sha]),
-    ({ stdout }) =>
-      stdout.split("\0").flatMap((record): readonly TreeFile[] => {
-        const groups = ENTRY.exec(record)?.groups;
-
-        return groups?.type === "blob" &&
-          groups.mode !== undefined &&
-          groups.sha !== undefined &&
-          groups.path !== undefined
-          ? [
-              {
-                mode: groups.mode,
-                path: groups.path,
-                sha: groups.sha,
-                size: Math.trunc(Number(groups.size ?? "0")),
-              },
-            ]
-          : [];
-      })
-  );
-
 /** A blob's text. */
-const textOf = (root: string, file: TreeFile) =>
+const textOf = (root: string, file: ListedBlob) =>
   Effect.map(runGit(root, ["cat-file", "blob", file.sha]), ({ stdout }) => ({
     content: stdout,
     path: RepoPath.make(file.path),
@@ -336,7 +302,7 @@ const textOf = (root: string, file: TreeFile) =>
 const factsAt = (input: {
   readonly root: string;
   readonly sha: CommitSha;
-  readonly files: readonly TreeFile[];
+  readonly files: readonly ListedBlob[];
   readonly ci: EvaluationFacts["ci"];
   readonly about: PolicyAbout;
   readonly vouchFile: string;
@@ -413,7 +379,7 @@ export const localPolicy = (
       Effect.mapError((failure) => loadFailed(failure.message))
     );
 
-    const files = yield* filesAt(root, sha);
+    const files = yield* blobsAt(root, sha);
 
     const config = files.filter(
       ({ mode, path }) =>

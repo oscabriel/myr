@@ -79,9 +79,13 @@ export const outsideAnyHook = {
   GIT_WORK_TREE: undefined,
 };
 
-// Reads only: git takes no optional lock (a read that would refresh the
-// index leaves it as it is), and never asks for a password.
-const readOnly = {
+/**
+ * The env of a git that only reads: outside any hook's repo, taking no
+ * optional lock (a read that would refresh the index leaves it as it is),
+ * and never asking for a password (a partial clone's missing blob is
+ * fetched without a prompt, or not at all).
+ */
+export const readOnlyGit = {
   ...outsideAnyHook,
   GIT_OPTIONAL_LOCKS: "0",
   GIT_TERMINAL_PROMPT: "0",
@@ -99,7 +103,7 @@ export const runGit = (
       const child = yield* spawner.spawn(
         ChildProcess.make("git", args, {
           cwd,
-          env: readOnly,
+          env: readOnlyGit,
           extendEnv: true,
           stdin: "ignore",
         })
