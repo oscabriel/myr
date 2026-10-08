@@ -10,13 +10,18 @@
  *    held-back slot (W6), the lanes, the report.
  *
  * The container is destroyed however the job ends, and its logs are handed
- * to `CheckLogs` before that; the result carries none. A job the Checker
+ * to `CheckLogs` before that; the result carries none (a count lane's
+ * stdout, in `outputs`, is a result, not a log). A job the Checker
  * cannot run to the end (a clone or a setup that fails, a sealed suite
  * before W6) is `VerifierBlocked`: the gate's trouble, never the
  * answer's. A lane that fails or runs out of time is that lane's result.
  */
 import { CheckAt, evidenceFrom } from "@repo/checks/check-runner";
-import type { CheckRun, LaneEvidence } from "@repo/checks/check-runner";
+import type {
+  CheckRun,
+  LaneEvidence,
+  LaneOutput,
+} from "@repo/checks/check-runner";
 import type { CheckWire } from "@repo/checks/check-runner/wire";
 import { classifyRun } from "@repo/checks/classify";
 import type { RunExit } from "@repo/checks/classify";
@@ -168,10 +173,14 @@ export const blocked = (
     Effect.andThen(Effect.fail(new VerifierBlocked({})))
   );
 
-/** A lane's run, as the lane's result and what it leaves for comparison. */
+/**
+ * A lane's run, as the lane's result, what it leaves for comparison, and,
+ * for a count lane that ran to its end, what it printed.
+ */
 interface LaneRan {
   readonly result: LaneResult;
   readonly evidence: Option.Option<LaneEvidence>;
+  readonly output: Option.Option<LaneOutput>;
 }
 
 /** Every phase's log so far, handed to `CheckLogs` when the check ends. */
@@ -416,11 +425,20 @@ const snapshot = (job: Job, key: string) =>
 /**
  * One lane, to its end or its time limit, as its result: how it ended,
  * classified (`checks.classifyRun`), never an error. A lane that runs out of
- * time, or that the container would not run, never ran to an end.
+ * time, or that the container would not run, never ran to an end. A count
+ * lane (`output: "stdout"`) that did hands back its stdout, which its count
+ * is read from; any other lane's output stays in its log.
  */
 const runLane = (job: Job, { command, lane }: PlannedLane) => {
-  const own = job.wire.job.lanes.find((each) => each.lane === lane)?.timeoutMs;
-  const limit = own === undefined ? LANE_LIMIT : Duration.millis(own);
+  const own = job.wire.job.lanes.find((each) => each.lane === lane);
+
+  const limit =
+    own?.timeoutMs === undefined ? LANE_LIMIT : Duration.millis(own.timeoutMs);
+
+  const printed = (exit: RunExit): Option.Option<LaneOutput> =>
+    own?.output === "stdout" && exit.timedOut !== true && exit.code !== -1
+      ? Option.some({ lane, stdout: exit.stdout })
+      : Option.none();
 
   return exec(
     job.kept,
@@ -451,6 +469,7 @@ const runLane = (job: Job, { command, lane }: PlannedLane) => {
           result === "passed"
             ? Option.none()
             : Option.some(evidenceFrom(lane, exit)),
+        output: printed(exit),
         result: {
           command,
           durationMs: Math.round(Duration.toMillis(elapsed)),
@@ -534,7 +553,8 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
 /**
  * One check job in one container: the phases, then the logs handed to
  * `CheckLogs` and the container destroyed, however the phases ended. The
- * result carries each lane's result and evidence, never a log.
+ * result carries each lane's result and evidence, never a log, and a count
+ * lane's stdout (`outputs`), which the platform reads its count from.
  */
 export const check = (
   wire: CheckWire
@@ -555,10 +575,14 @@ export const check = (
       Effect.ensuring(box.destroy())
     );
 
-    return {
+    const outputs = ran.flatMap(({ output }) => Option.toArray(output));
+
+    const done = {
       durationMs: Math.round(Duration.toMillis(elapsed)),
       evidence: ran.flatMap(({ evidence }) => Option.toArray(evidence)),
       heldBack: [],
       lanes: ran.map(({ result }) => result),
     };
+
+    return outputs.length === 0 ? done : { ...done, outputs };
   });

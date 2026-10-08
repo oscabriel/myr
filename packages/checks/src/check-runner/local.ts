@@ -9,6 +9,8 @@
  * `HOME` in a temp dir it removes after the job. Placeholders
  * and proxies are the Checker's; here a lane sees the user's own env. A sealed
  * suite runs only in the Checker, so a job with one is `VerifierBlocked`.
+ * A count lane (`output: "stdout"`) hands back what it printed, as the
+ * Checker's does.
  */
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { Duration, Effect, FileSystem, Layer, Option, Stream } from "effect";
@@ -16,7 +18,7 @@ import type { Scope } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { CheckRunner, evidenceFrom } from "../check-runner.ts";
-import type { CheckAt, CheckLane } from "../check-runner.ts";
+import type { CheckAt, CheckLane, LaneOutput } from "../check-runner.ts";
 import { classifyRun } from "../classify.ts";
 import type { RunExit } from "../classify.ts";
 
@@ -68,6 +70,13 @@ const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
 const timedOut: RunExit = { code: -1, stderr: "", stdout: "", timedOut: true };
+
+// A count lane that ran to its end hands back its stdout, which its count is
+// read from; any other lane's output goes nowhere.
+const printed = (lane: CheckLane, exit: RunExit): readonly LaneOutput[] =>
+  lane.output === "stdout" && exit.timedOut !== true
+    ? [{ lane: lane.lane, stdout: exit.stdout }]
+    : [];
 
 export const CheckRunnerLocal = {
   layer: (
@@ -126,6 +135,7 @@ export const CheckRunnerLocal = {
             Effect.timed(exitOf(cwd, home, lane)),
             ([elapsed, exit]) => ({
               exit,
+              outputs: printed(lane, exit),
               result: {
                 command: lane.command,
                 durationMs: Math.round(Duration.toMillis(elapsed)),
@@ -153,7 +163,9 @@ export const CheckRunnerLocal = {
                   Effect.forEach(job.lanes, (lane) => runLane(cwd, home, lane))
                 );
 
-                return {
+                const outputs = ran.flatMap((each) => each.outputs);
+
+                const done = {
                   durationMs: Math.round(Duration.toMillis(elapsed)),
                   evidence: ran.flatMap(({ exit, result }) =>
                     result.result === "passed"
@@ -163,6 +175,8 @@ export const CheckRunnerLocal = {
                   heldBack: [],
                   lanes: ran.map(({ result }) => result),
                 };
+
+                return outputs.length === 0 ? done : { ...done, outputs };
               })
             ),
         });

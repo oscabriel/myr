@@ -155,6 +155,38 @@ describe(CheckRunnerLocal.layer, () => {
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
+  it.live(
+    "hands back what a count lane printed, and nothing for a lane that did not ask or ran out of time",
+    () =>
+      Effect.gen(function* () {
+        const { checkout, job } = yield* world;
+
+        const ran = yield* Effect.flatMap(CheckRunner, (runner) =>
+          runner.run(
+            job([
+              // A lint with findings exits 1; its count is read from stdout.
+              {
+                ...lane("no-explicit-any", `printf '{"n":3}'; exit 1`),
+                output: "stdout",
+              },
+              // Prints "4 pass", which its command's text does not hold.
+              lane("unit", "echo $((2 + 2)) pass"),
+              {
+                ...lane("slow", "printf partial; sleep 5"),
+                output: "stdout",
+                timeoutMs: 300,
+              },
+            ])
+          )
+        ).pipe(Effect.provide(CheckRunnerLocal.layer({ checkout })));
+
+        expect(ran.outputs).toStrictEqual([
+          { lane: LaneName.make("no-explicit-any"), stdout: `{"n":3}` },
+        ]);
+        expect(JSON.stringify(ran)).not.toContain("4 pass");
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
   it.live("stops a lane at its time limit and calls it blocked", () =>
     Effect.gen(function* () {
       const { checkout, job } = yield* world;

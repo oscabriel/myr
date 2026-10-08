@@ -359,6 +359,77 @@ describe("the Checker", () => {
   );
 
   it.effect(
+    "hands back what a count lane printed, and nothing for a lane that did not ask or ran out of time",
+    () =>
+      Effect.gen(function* () {
+        const LINT = "oxlint --format json";
+        const printed = `{"diagnostics":[{"code":"typescript-eslint(no-explicit-any)","filename":"src/parser/week.ts"}]}`;
+        const started = yield* Latch.make();
+
+        const fake = fakeChecker({
+          commands: new Map([
+            // A lint with findings exits 1; its count is read from stdout.
+            [LINT, exited(1, { stderr: "1 warning\n", stdout: printed })],
+            ["bun test", exited(0, { stdout: "4 pass\n" })],
+            ["slow-count", started.open.pipe(Effect.andThen(Effect.never))],
+          ]),
+        });
+
+        const wire = wireFor();
+
+        const fiber = yield* check({
+          ...wire,
+          job: {
+            ...wire.job,
+            lanes: [
+              {
+                command: LINT,
+                lane: LaneName.make("no-explicit-any"),
+                output: "stdout",
+              },
+              { command: "bun test", lane: LaneName.make("unit") },
+              {
+                command: "slow-count",
+                lane: LaneName.make("slow"),
+                output: "stdout",
+                timeoutMs: 1000,
+              },
+            ],
+          },
+        }).pipe(Effect.provide(fake.layer), Effect.forkChild);
+
+        yield* started.await;
+        yield* TestClock.adjust(Duration.seconds(1));
+
+        const ran = yield* Fiber.join(fiber);
+
+        expect(ran.outputs).toStrictEqual([
+          { lane: "no-explicit-any", stdout: printed },
+        ]);
+
+        // The outcome crosses the binding with it.
+        const crossed = yield* Schema.encodeEffect(CheckExit)(
+          Exit.succeed(ran)
+        ).pipe(Effect.flatMap(Schema.decodeEffect(CheckExit)));
+
+        expect(crossed).toStrictEqual(Exit.succeed(ran));
+      })
+  );
+
+  it.effect("hands back no outputs when no lane asks for one", () =>
+    Effect.gen(function* () {
+      const fake = fakeChecker({
+        commands: new Map([["bun test", exited(0, { stdout: "4 pass\n" })]]),
+      });
+
+      const ran = yield* check(wireFor()).pipe(Effect.provide(fake.layer));
+
+      expect(ran).not.toHaveProperty("outputs");
+      expect(JSON.stringify(ran)).not.toContain("4 pass");
+    })
+  );
+
+  it.effect(
     "restores the snapshot for a second job of the same project and lockfile, instead of running setup again",
     () =>
       Effect.gen(function* () {
