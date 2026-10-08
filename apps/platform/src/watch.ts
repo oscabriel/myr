@@ -1,4 +1,3 @@
-import type { ProjectApi } from "@repo/project/project";
 /**
  * `watch` live (spec §3.4, issue 510): a project's events, replayed from a
  * sequence number and then heard as they are committed.
@@ -23,6 +22,7 @@ import type { ProjectApi } from "@repo/project/project";
  * answer is sent when the call ends, so there `watch` replays what is kept
  * and ends, as it always has.
  */
+import type { ProjectApi } from "@repo/project/project";
 import { keptEvents } from "@repo/project/project-store";
 import { Projects } from "@repo/project/projects";
 import { NoneOrMore } from "@repo/protocol/domain/common";
@@ -43,7 +43,7 @@ import {
   Schema,
   Stream,
 } from "effect";
-import { Headers } from "effect/http";
+import { Headers, HttpServerRequest } from "effect/http";
 import { RpcSerialization } from "effect/rpc";
 
 import { decodeReply, encodeCall } from "./project-calls.ts";
@@ -88,14 +88,25 @@ const SinceText = Schema.FiniteFromString.pipe(Schema.decodeTo(NoneOrMore));
 const decodeSince = Schema.decodeUnknownOption(SinceText);
 
 /**
- * Whether a call came over a framed transport (NDJSON), which sends each
- * message as it is ready, so a stream can stay open: the RPC server puts
- * the HTTP request's headers on every call it carries.
+ * Whether an HTTP request was posted framed (NDJSON), so its answer is
+ * sent message by message as it is ready and a stream can stay open.
  */
 export const isFramed = (headers: Headers.Headers) =>
   Option.exists(Headers.get(headers, "content-type"), (type) =>
     type.startsWith(RpcSerialization.ndjson.contentType)
   );
+
+/**
+ * Whether the call being served came over a framed `/rpc`, as the HTTP
+ * request that carried it says; false for a call that came from no
+ * request. Never the call's own headers: the RPC server lays them over the
+ * request's, so a call posted as JSON could claim to be framed, and a live
+ * `watch` on a buffered answer would never be sent.
+ */
+export const servedFramed = Effect.map(
+  Effect.serviceOption(HttpServerRequest.HttpServerRequest),
+  Option.exists((request) => isFramed(request.headers))
+);
 
 // --- The Project DO's side ---------------------------------------------------
 

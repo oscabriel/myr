@@ -35,7 +35,7 @@ import { HttpServerRequest } from "effect/http";
 import type { Rpc, RpcGroup } from "effect/rpc";
 
 import { RateLimits } from "./rate-limits.ts";
-import { isFramed, watchHandler } from "./watch.ts";
+import { servedFramed, watchHandler } from "./watch.ts";
 
 /** How many projects a call without one asks at once. */
 const FAN_OUT = 8;
@@ -358,10 +358,10 @@ export const Handlers: Layer.Layer<
           on(project, (api) => api.vouch(who, input))
         ),
       // Live over a framed `/rpc`; replayed and ended over a buffered one.
-      watch: (payload, { headers }) =>
-        watchHandler(payload, { live: isFramed(headers) }).pipe(
-          Stream.provideService(Projects, projects)
-        ),
+      watch: (payload) =>
+        Stream.unwrap(
+          Effect.map(servedFramed, (live) => watchHandler(payload, { live }))
+        ).pipe(Stream.provideService(Projects, projects)),
     };
   })
 );

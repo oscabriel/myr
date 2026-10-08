@@ -337,6 +337,37 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
       }),
     60_000
   );
+
+  it.live(
+    "answers a call posted as JSON in one body when its replay ends, even when the call's own headers claim NDJSON",
+    () =>
+      Effect.gen(function* () {
+        const world = yield* coreLoopWorld();
+        const reader = world.rpc("anonymous");
+
+        yield* world.rpc("dora").initProject({ project });
+
+        const kept = yield* Stream.runCollect(
+          reader.watch({ project, since: 0 })
+        );
+
+        // The RPC server puts a call's own headers after the HTTP
+        // request's, so only the request itself says how it was framed.
+        const claimingFramed = yield* Stream.runCollect(
+          reader.watch(
+            { project, since: 0 },
+            {
+              headers: {
+                "content-type": RpcSerialization.ndjson.contentType,
+              },
+            }
+          )
+        ).pipe(Effect.timeoutOption(LIVE));
+
+        expect(claimingFramed).toStrictEqual(Option.some(kept));
+      }),
+    60_000
+  );
 });
 
 /**

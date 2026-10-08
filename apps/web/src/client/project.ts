@@ -1,15 +1,15 @@
 /**
  * A project page's reads (spec §3.2): its open asks (`listAsks`) and its
  * recent landings, which come from the `watch` replay (spec §3.4), not a
- * contract of their own. Both are read once per page; issue 510 makes them
- * live. Each renders as waiting on the server, and the browser calls `/rpc`
- * (see `front.ts`).
+ * contract of their own. Both read again when the project's key is
+ * invalidated, which the page's live view (`watch.ts`, issue 510) does on
+ * each event. Each renders as waiting on the server, and the browser calls
+ * `/rpc` (see `front.ts`).
  *
  * The landings read `watch` from the start of the project's events
- * (`since: 0`) to the end of the replay: until 510 keeps the stream open,
- * the platform's `watch` ends there, and over HTTP with JSON (not framed)
- * the whole replay arrives as one response. The atom keeps the `Landed`
- * events, newest first.
+ * (`since: 0`) over JSON, where the platform replays the kept events in
+ * one response and ends (only the framed `/rpc` keeps the stream open).
+ * The atom keeps the `Landed` events, newest first.
  */
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { LandingView } from "@repo/protocol/domain/landing";
