@@ -4,9 +4,10 @@
  * and every other project lane), always on the exact tree the merge made.
  * A lane whose checker never got going gets one fresh run; every lane that
  * did not pass keeps its log through `EvidenceStore`, and only the name it
- * is kept under travels on. A log the project's scan finds a stored
- * write-only value in is never kept (W6 613): its lane says `withheld`. The gate classifies each failure against the
- * same lane on main (`gate.classifyFailure`).
+ * is kept under travels on, unless the project's scan finds a stored
+ * write-only value in it: that log is never kept, and its lane says
+ * `withheld` (W6 613). The gate classifies each failure against the same
+ * lane on main (`gate.classifyFailure`).
  *
  * The merged tree is checked in the answer's fork, where `Lander.merge`
  * keeps it (under `${Brand.refsPrefix}merge/<tree>`), so a merge needs no
@@ -33,11 +34,7 @@ import type { AnswerRun } from "@repo/project/answer-runs";
 import { noRunEnv, RunEnv } from "@repo/project/env-port";
 import { LandingState } from "@repo/project/landing";
 import { Projects } from "@repo/project/projects";
-import {
-  HeldBackResult,
-  LaneOutcome,
-  LaneResult,
-} from "@repo/protocol/domain/answer";
+import { LaneOutcome, LaneResult } from "@repo/protocol/domain/answer";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { AskKind } from "@repo/protocol/domain/kind";
 import { RunBlock } from "@repo/protocol/domain/run";
@@ -136,7 +133,6 @@ export const StageRun = Schema.TaggedUnion({
     checked: Checked,
     /** The cheap stage's: each ratchet's count on the merged tree, per territory. */
     counts: Schema.optionalKey(Schema.Array(MeasuredCount)),
-    heldBack: Schema.Array(HeldBackResult),
     lanes: Schema.Array(LaneRun),
     /** The cheap stage's: a ratchet whose command printed no count the platform can read. */
     uncounted: Schema.optionalKey(RatchetName),
@@ -453,10 +449,10 @@ const countFields = (counted: Counted): Pick<Ran, "counts" | "uncounted"> =>
 /**
  * One stage's lanes on the merged tree `tree`: run, a troubled lane run
  * once more, and each lane that did not pass at first logged, unless its
- * log holds a stored value. The log's
- * name counts the answer's merges (`#1` on its first main), so a replayed
- * step keeps its log under the same name and a re-merge gets a new one.
- * The cheap stage counts the ratchets too.
+ * log holds a stored value. The log's name counts the answer's merges
+ * (`#1` on its first main), so a replayed step keeps its log under the
+ * same name and a re-merge gets a new one. The cheap stage counts the
+ * ratchets too.
  */
 export const runStage = (
   run: AnswerRun,
@@ -486,7 +482,7 @@ export const runStage = (
         const counting = stage === "cheap" && run.counts !== undefined;
 
         if (!Array.isReadonlyArrayNonEmpty(lanes) && !counting) {
-          return StageRun.cases.Ran.make({ checked, heldBack: [], lanes: [] });
+          return StageRun.cases.Ran.make({ checked, lanes: [] });
         }
 
         const block = yield* runBlockOf(checked);
@@ -510,7 +506,6 @@ export const runStage = (
         if (!Array.isReadonlyArrayNonEmpty(lanes)) {
           return StageRun.cases.Ran.make({
             checked,
-            heldBack: [],
             lanes: [],
             ...counts,
           });
@@ -576,7 +571,6 @@ export const runStage = (
 
         return StageRun.cases.Ran.make({
           checked,
-          heldBack: firstRun.heldBack,
           lanes: laneRuns,
           ...counts,
         });

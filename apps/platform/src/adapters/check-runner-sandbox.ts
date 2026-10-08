@@ -30,7 +30,7 @@ import type {
 } from "@repo/project/lander/wire";
 import type { HeldBackResult } from "@repo/protocol/domain/answer";
 import { VerifierBlocked } from "@repo/protocol/refusal";
-import { Effect, Layer } from "effect";
+import { Array, Effect, Layer } from "effect";
 
 import { sandboxJob, withRemote } from "./sandbox-credentials.ts";
 
@@ -59,7 +59,10 @@ export interface SandboxBinding {
   ) => Promise<typeof BundleExit.Encoded>;
 }
 
-/** Whether `bits` are the area bits of `job`'s suite: each area it sent, once, in order. */
+/**
+ * Whether `bits` are the area bits of `job`'s suite: each area it sent,
+ * once and in order, as the Checker counts them (`areaBits`).
+ */
 const answersJob = (job: CheckJob, bits: readonly HeldBackResult[]) => {
   const suite = job.heldBack;
 
@@ -67,9 +70,11 @@ const answersJob = (job: CheckJob, bits: readonly HeldBackResult[]) => {
     return bits.length === 0;
   }
 
+  const areas = Array.dedupe(suite.areas);
+
   return (
-    bits.length === suite.areas.length &&
-    suite.areas.every((area, index) => {
+    bits.length === areas.length &&
+    areas.every((area, index) => {
       const each = bits[index];
       const total = suite.runs.filter((run) => run.area === area).length;
 

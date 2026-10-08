@@ -83,10 +83,14 @@ export const GuardRun = Schema.TaggedUnion({
 
 export type GuardRun = typeof GuardRun.Type;
 
-/** Whether the guards let the tree on to its checks. */
+/**
+ * Whether the guards let the tree on to its checks: only when they ran on
+ * it and found nothing. A blocked run waits, and a moved one stops.
+ */
 export const passes = (run: GuardRun): boolean =>
-  !GuardRun.guards.Guarded(run) ||
-  (run.refusals.length === 0 && run.quarantined.length === 0);
+  GuardRun.guards.Guarded(run) &&
+  run.refusals.length === 0 &&
+  run.quarantined.length === 0;
 
 /** Files the answer puts into the public tree: added, or modified to a new blob. */
 const written = (changes: readonly Change[]) =>
@@ -137,20 +141,21 @@ const guarded = (
 
     const host = yield* RepoHost;
 
-    const blobs = yield* Effect.forEach(written(state.changes), (blob) =>
-      host
-        .readBlob(request.fork, ObjectId.make(blob))
-        .pipe(Effect.orElseSucceed(() => Option.none<Uint8Array>()))
+    // A fork the platform cannot read leaves its files unscanned: the guards
+    // try again later, and never let the tree by. An id no blob in the fork
+    // has is a submodule's pointer, a commit in another repo (`tree-diff`):
+    // it brings no content of its own into the tree, so there is none to scan.
+    const read = yield* Effect.option(
+      Effect.forEach(written(state.changes), (blob) =>
+        host.readBlob(request.fork, ObjectId.make(blob))
+      )
     );
-
-    // A blob the fork does not give back cannot be scanned: never let it by.
-    const read = Option.all(blobs);
 
     if (Option.isNone(read)) {
       return GuardRun.cases.Blocked.make({ attempt: state.attempt });
     }
 
-    const held = yield* Effect.forEach(read.value, (blob) =>
+    const held = yield* Effect.forEach(Array.getSomes(read.value), (blob) =>
       api.scanForValues({ blob })
     );
 

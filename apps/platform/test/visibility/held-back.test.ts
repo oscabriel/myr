@@ -10,7 +10,7 @@
  * `SecretInTree` decision that should hold it for the deciders.
  */
 import { describe, expect, it } from "@effect/vitest";
-import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
+import { ObjectId, RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { CheckAt, CheckRunner, shaOf } from "@repo/checks/check-runner";
 import type { CheckJob } from "@repo/checks/check-runner";
@@ -129,38 +129,41 @@ const decodeVerdict = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Verdict)
 );
 
-/** The verdict note on `head` in bob's fork, read as plain git finds it. */
-const noteOn = (head: CommitSha) =>
+/** The verdict note on `commit` in `at`, read as plain git finds it. */
+const noteIn = (at: RepoName, commit: CommitSha) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
-    const tip = (yield* host.refs(bobFork).pipe(Effect.orDie)).get(notesRef);
+    const tip = (yield* host.refs(at).pipe(Effect.orDie)).get(notesRef);
 
     if (tip === undefined) {
       return Option.none();
     }
 
-    const commit = Option.getOrThrow(
-      yield* host.readCommit(bobFork, tip).pipe(Effect.orDie)
+    const notes = Option.getOrThrow(
+      yield* host.readCommit(at, tip).pipe(Effect.orDie)
     );
 
     const entries = Option.getOrThrow(
-      yield* host.readTree(bobFork, commit.tree).pipe(Effect.orDie)
+      yield* host.readTree(at, notes.tree).pipe(Effect.orDie)
     );
 
-    const entry = entries.find(({ name }) => name === head);
+    const entry = entries.find(({ name }) => name === commit);
 
     if (entry === undefined) {
       return Option.none();
     }
 
     const blob = Option.getOrThrow(
-      yield* host.readBlob(bobFork, ObjectId.make(entry.sha)).pipe(Effect.orDie)
+      yield* host.readBlob(at, ObjectId.make(entry.sha)).pipe(Effect.orDie)
     );
 
     return Option.some(
       yield* decodeVerdict(new TextDecoder().decode(blob)).pipe(Effect.orDie)
     );
   });
+
+/** The verdict note on `head` in bob's fork. */
+const noteOn = (head: CommitSha) => noteIn(bobFork, head);
 
 /**
  * bob's next answer on the same claim: `files` pushed on his fork's last
@@ -465,6 +468,45 @@ const jobsOn = (at: CheckAt) =>
     Effect.map(jobs, (all) => all.filter((job) => shaOf(job.at) === shaOf(at)))
   );
 
+const encoder = new TextEncoder();
+
+/** The git id of a blob holding `text`. */
+const blobIdOf = (text: string) =>
+  Effect.map(
+    Effect.promise(() =>
+      crypto.subtle.digest(
+        "SHA-1",
+        encoder.encode(`blob ${encoder.encode(text).length}\0${text}`)
+      )
+    ),
+    (digest) =>
+      ObjectId.make(
+        [...new Uint8Array(digest)]
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("")
+      )
+  );
+
+/**
+ * The world's host, with each blob read from bob's fork going through
+ * `read` (given the read the host would make), as the Workflow sees it.
+ */
+const forkReads = (
+  read: (
+    id: ObjectId,
+    given: Effect.Effect<Option.Option<Uint8Array>, RepoNotFound>
+  ) => Effect.Effect<Option.Option<Uint8Array>, RepoNotFound>
+) =>
+  Effect.map(Effect.service(RepoHost), (host) =>
+    RepoHost.of({
+      ...host,
+      readBlob: (name, id) =>
+        name === bobFork
+          ? read(id, host.readBlob(name, id))
+          : host.readBlob(name, id),
+    })
+  );
+
 describe("the landing guards", () => {
   it.effect(
     "are plugged into the Worker's ports with the cartridge, and nowhere without it",
@@ -599,6 +641,58 @@ describe("the landing guards", () => {
         );
       }).pipe(Effect.provide(sealedWorld(policy)))
   );
+
+  it.effect(
+    "wait, running no check and counting nothing, when the answer's fork cannot be read for the files it writes",
+    () =>
+      Effect.gen(function* () {
+        const answer = yield* admitted();
+
+        yield* allGreen(answer.merged);
+
+        const host = yield* forkReads(() =>
+          Effect.fail(new RepoNotFound({ name: bobFork }))
+        );
+
+        const outcome = yield* run(answer).pipe(
+          Effect.provideService(RepoHost, host)
+        );
+
+        expect(outcome).toStrictEqual(
+          Outcome.cases.Checking.make({ stage: "checks" })
+        );
+        expect(yield* jobsOn(answer.merged)).toStrictEqual([]);
+        expect(yield* mainTip).toBe(answer.opened);
+      }).pipe(Effect.provide(sealedWorld(policy)))
+  );
+
+  it.effect(
+    "scan nothing for a change no blob in the fork holds, a submodule's pointer, and let the answer on",
+    () =>
+      Effect.gen(function* () {
+        const content = "a pointer to a commit in another repo\n";
+
+        const answer = yield* admitted(
+          changed(fixed, "packages/parser/src/tz", content)
+        );
+
+        yield* allGreen(answer.merged);
+
+        const pointer = yield* blobIdOf(content);
+
+        const host = yield* forkReads((id, given) =>
+          id === pointer ? Effect.succeedNone : given
+        );
+
+        const outcome = yield* run(answer).pipe(
+          Effect.provideService(RepoHost, host)
+        );
+
+        expect(outcome).toStrictEqual(
+          Outcome.cases.Landed.make({ sha: yield* mainTip })
+        );
+      }).pipe(Effect.provide(sealedWorld(policy)))
+  );
 });
 
 /** datekit's `SENTRY_AUTH_TOKEN`, as a decider stores it. */
@@ -658,7 +752,11 @@ describe("a stored value where it must not be", () => {
         const outcome = yield* run(answer);
         const read = yield* answererReads(answer);
 
-        expect(Outcome.guards.Landed(outcome)).toBeFalsy();
+        // Until the project can open the deciders' `SecretInTree` decision
+        // (and the answer waits, `AwaitingDecision`), a refusal naming nothing.
+        expect(outcome).toStrictEqual(
+          Outcome.cases.Refused.make({ refusals: [new VerifierBlocked({})] })
+        );
         expect(yield* jobsOn(answer.merged)).toStrictEqual([]);
         expect(yield* mainTip).toBe(answer.opened);
         expect(read).not.toContain(sentry);
@@ -713,7 +811,7 @@ describe("a stored value where it must not be", () => {
   );
 
   it.effect(
-    "writes no verdict note that would carry a stored value, and the answer lands as it would",
+    "writes no verdict note that would carry a stored value, on the fork or on the landed commit, and the answer lands as it would",
     () =>
       Effect.gen(function* () {
         const answer = yield* admitted();
@@ -722,11 +820,11 @@ describe("a stored value where it must not be", () => {
         yield* allGreen(answer.merged);
 
         const outcome = yield* run(answer);
+        const tip = yield* mainTip;
 
-        expect(outcome).toStrictEqual(
-          Outcome.cases.Landed.make({ sha: yield* mainTip })
-        );
+        expect(outcome).toStrictEqual(Outcome.cases.Landed.make({ sha: tip }));
         expect(yield* noteOn(answer.head)).toStrictEqual(Option.none());
+        expect(yield* noteIn(repo, tip)).toStrictEqual(Option.none());
       }).pipe(
         Effect.provide(
           sealedWorld({
@@ -825,6 +923,28 @@ describe("a held-back job through the sandbox", () => {
           },
         ]);
         expect(JSON.stringify(sent)).not.toContain(maintainers);
+      }).pipe(Effect.provide(Layer.fresh(RepoHostMemory)))
+  );
+
+  it.effect(
+    "takes one bit per area from a suite that names an area twice, as the Checker counts them",
+    () =>
+      Effect.gen(function* () {
+        const { runner } = yield* overSandbox(allPassed);
+
+        const ran = yield* Effect.exit(
+          runner.run({
+            ...sealedJob,
+            heldBack: {
+              ...heldBackJob,
+              areas: [exportArea, parserArea, exportArea],
+            },
+          })
+        );
+
+        expect(Exit.map(ran, ({ heldBack }) => heldBack)).toStrictEqual(
+          Exit.succeed(allPassed)
+        );
       }).pipe(Effect.provide(Layer.fresh(RepoHostMemory)))
   );
 

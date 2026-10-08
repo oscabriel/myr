@@ -62,6 +62,7 @@ import {
   Option,
   Schedule,
   Schema,
+  Struct,
 } from "effect";
 
 import type { AnswerParams } from "../../answer-runs.ts";
@@ -178,19 +179,64 @@ const load = ({ project, requestId }: AnswerParams) =>
 
 /**
  * The port call `effect` names, run as W2's in-process run runs it
- * (`runStep`), on the answer's run as its project holds it now; `None`
- * when the run no longer waits on `call`.
+ * (`runStep`), on the answer's run as its project holds it now (as
+ * `prepare` hands it on); `None` when the run no longer waits on `call`.
  */
 const portCall = (
   params: AnswerParams,
   call: Call<"Land" | "Merge">,
-  effect: LandingEffect
+  effect: LandingEffect,
+  prepare: (run: AnswerRun) => Effect.Effect<AnswerRun, never, Projects> = (
+    run
+  ) => Effect.succeed(run)
 ) =>
   Effect.flatMap(load(params), (run) =>
     Option.isSome(run) && waitsOn(run.value, call)
-      ? runStep(run.value, effect)
+      ? Effect.flatMap(prepare(run.value), (ready) => runStep(ready, effect))
       : Effect.succeedNone
   );
+
+/** A verdict as its note holds it: JSON. */
+const encodeVerdict = Schema.encodeEffect(Schema.fromJsonString(Verdict));
+
+/**
+ * The stored write-only value `verdict`'s note would carry, by its item:
+ * the project scans the note before it leaves the run (VL §8.6). Only the
+ * platform's log hears which item, never the value.
+ */
+const leakIn = (params: AnswerParams, verdict: Verdict, where: string) =>
+  Effect.gen(function* () {
+    const text = yield* Effect.orDie(encodeVerdict(verdict));
+    const api = yield* projectOf(params.project);
+    const found = yield* api.scanForValues({ text });
+
+    if (Option.isSome(found)) {
+      yield* Effect.logWarning(
+        "an answer's verdict note held a stored write-only value; it was not written"
+      ).pipe(
+        Effect.annotateLogs({
+          item: found.value,
+          project: params.project,
+          requestId: params.requestId,
+          where,
+        })
+      );
+    }
+
+    return found;
+  });
+
+/**
+ * The run as its land takes it: the verdict `Lander.land` writes as the
+ * landed commit's note on canonical is left off when it holds a stored
+ * value, so the landing writes no note; the verdict stands in the project.
+ */
+const withSafeNote = (params: AnswerParams) => (run: AnswerRun) =>
+  run.verdict === undefined
+    ? Effect.succeed(run)
+    : Effect.map(leakIn(params, run.verdict, "canonical"), (leaked) =>
+        Option.isSome(leaked) ? Struct.omit(run, ["verdict"]) : run
+      );
 
 /** The answer's head merged onto the main the call names. */
 const merge = (params: AnswerParams, call: Call<"Merge">) =>
@@ -216,7 +262,8 @@ const land = (params: AnswerParams, call: Call<"Land">) =>
     portCall(
       params,
       call,
-      LandingEffect.Land({ main: call.main, tree: call.tree })
+      LandingEffect.Land({ main: call.main, tree: call.tree }),
+      withSafeNote(params)
     ),
     (given) =>
       Option.isSome(given) && LandingCommand.$is("Busy")(given.value.command)
@@ -507,9 +554,6 @@ const noteRetry = {
   while: Schema.is(HostBusy),
 };
 
-/** A verdict as its note holds it: JSON. */
-const encodeVerdict = Schema.encodeEffect(Schema.fromJsonString(Verdict));
-
 /** The verdict as `verdict` shows it: the one the checks gave, with where the answer stands now. */
 const shownVerdict = (run: AnswerRun) =>
   Option.map(Option.fromUndefinedOr(run.verdict), (made): Verdict => ({
@@ -535,30 +579,10 @@ const noteVerdict = (params: AnswerParams) =>
 
     const { fork, verdict } = judged.value;
 
-    // The note leaves the run for the answer's fork: the project scans it
-    // for its stored values first (VL §8.6), and a note that holds one is
-    // not written; the verdict stands in the project.
-    const leaked = yield* Effect.flatMap(
-      Effect.orDie(encodeVerdict(verdict)),
-      (text) =>
-        Effect.flatMap(projectOf(params.project), (api) =>
-          api.scanForValues({ text })
-        )
-    );
-
-    if (Option.isSome(leaked)) {
-      return yield* Effect.as(
-        Effect.logWarning(
-          "an answer's verdict note held a stored write-only value; it was not written"
-        ).pipe(
-          Effect.annotateLogs({
-            item: leaked.value,
-            project: params.project,
-            requestId: params.requestId,
-          })
-        ),
-        Noted.cases.Unwritten.make({ reason: "SecretInOutput" })
-      );
+    // The note leaves the run for the answer's fork: a note that holds a
+    // stored value is not written; the verdict stands in the project.
+    if (Option.isSome(yield* leakIn(params, verdict, "fork"))) {
+      return Noted.cases.Unwritten.make({ reason: "SecretInOutput" });
     }
 
     const written = yield* writeVerdictNote({

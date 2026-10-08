@@ -1,4 +1,3 @@
-import type { Fetch } from "@repo/artifacts/fetch";
 /**
  * The visibility cartridge's landing guards (W6 613; OSR §5.4): the
  * no-write-down guards the `Answer` Workflow runs on an answer's merged
@@ -17,6 +16,7 @@ import type { Fetch } from "@repo/artifacts/fetch";
  *
  * Nothing here names a layer's paths or content in a refusal or a log.
  */
+import type { Fetch } from "@repo/artifacts/fetch";
 import { ObjectId, RefName } from "@repo/artifacts/repo-host";
 import type { RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
 import type { ProjectApi } from "@repo/project/project";
