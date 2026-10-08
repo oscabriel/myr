@@ -221,9 +221,7 @@ describe(FinishView, () => {
 
     expect(text).toContain(`git fetch ${PLATFORM_URL}/`);
     expect(text).toContain(` ${head}`);
-    expect(text).toContain(
-      `${Brand.cli} finish --project datekit --ask parse-iso`
-    );
+    expect(text).toContain(`${Brand.cli} finish parse-iso --project datekit`);
     expect(markupOf(element)).not.toContain("<diffs-container");
     expect(markupOf(element)).not.toContain('data-diff="');
   });

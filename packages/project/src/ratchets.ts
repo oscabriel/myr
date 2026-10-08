@@ -1,17 +1,21 @@
 /**
  * Ratchets' baselines, and the rules that move them (GLOSSARY "Ratchet"):
  * a baseline per (ratchet, territory), recorded at landing and lowered by a
- * landing with no one asking; an answer that raises one is refused, unless
- * it asks a decider to raise it; the only way up is a `RaiseRatchet`
- * decision a decider accepts. Pure: the counts come from
- * `@repo/checks/kinds/ratchet`'s `measure`, and the baselines live in the
- * Project DO's `ratchets` rows (no suppressions file in the tree; FE §8.4 B3).
+ * landing with no one asking; the only way up is a `RaiseRatchet` decision a
+ * decider accepts. Pure: the counts come from `@repo/checks/kinds/ratchet`'s
+ * `measure`, an answer's counts are judged against these baselines there
+ * (`judgeRatchets`, which `<cli> check` judges with too), and the baselines
+ * live in the Project DO's `ratchets` rows (no suppressions file in the
+ * tree; FE §8.4 B3).
  */
-import type { RatchetCount } from "@repo/checks/kinds/ratchet";
-import { DecisionSubject } from "@repo/protocol/domain/decision";
+import { sameRatchet } from "@repo/checks/kinds/ratchet";
+import type {
+  RaiseRatchet,
+  RatchetCount,
+  RatchetKey,
+} from "@repo/checks/kinds/ratchet";
 import type { Choice } from "@repo/protocol/domain/decision";
-import type { AskId, LandedSha, RatchetName } from "@repo/protocol/ids";
-import { Weakened } from "@repo/protocol/refusal";
+import type { LandedSha, RatchetName } from "@repo/protocol/ids";
 import { Array, Option } from "effect";
 
 /** A ratchet's baseline in one territory, and the landed SHA that set it. */
@@ -22,16 +26,6 @@ export interface RatchetBaseline {
   readonly setAt: LandedSha;
 }
 
-/** An answer asking a decider to raise one ratchet in one territory, and why. */
-export interface RaiseRequest {
-  readonly ratchet: RatchetName;
-  readonly territory: string;
-  readonly reason: string;
-}
-
-/** The decision a raise waits on. */
-export type RaiseRatchet = Extract<DecisionSubject, { _tag: "RaiseRatchet" }>;
-
 /** A baseline a landing lowered, from what to what. */
 export interface Lowered {
   readonly ratchet: RatchetName;
@@ -40,83 +34,14 @@ export interface Lowered {
   readonly after: number;
 }
 
-/** What judging an answer's counts gives: its refusals, and the raises it waits on. */
-export interface RatchetJudgement {
-  readonly refusals: readonly Weakened[];
-  readonly decisions: readonly RaiseRatchet[];
-}
-
 /** The baselines after a landing, and the ones it lowered. */
 export interface BaselinesAfterLanding {
   readonly baselines: readonly RatchetBaseline[];
   readonly lowered: readonly Lowered[];
 }
 
-interface Keyed {
-  readonly ratchet: RatchetName;
-  readonly territory: string;
-}
-
-/** Whether two rows name one ratchet in one territory. */
-const sameRatchet =
-  (one: Keyed) =>
-  (other: Keyed): boolean =>
-    one.ratchet === other.ratchet && one.territory === other.territory;
-
-const baselineOf = (baselines: readonly RatchetBaseline[], key: Keyed) =>
+const baselineOf = (baselines: readonly RatchetBaseline[], key: RatchetKey) =>
   Array.findFirst(baselines, sameRatchet(key));
-
-/**
- * Judges an answer's counts against the baselines. A count at or under its
- * baseline passes; one over it is refused with `Weakened{ratchet}`, unless
- * the answer asks to raise that ratchet in that territory: then it is not
- * refused, and waits on a `RaiseRatchet` decision instead. A ratchet with no
- * baseline yet is not judged (its first landing sets it).
- */
-export const judgeRatchets = (input: {
-  readonly baselines: readonly RatchetBaseline[];
-  readonly measured: readonly RatchetCount[];
-  readonly ask: AskId;
-  readonly raises: readonly RaiseRequest[];
-}): RatchetJudgement => {
-  const raised = input.measured.flatMap((measured) =>
-    Option.match(baselineOf(input.baselines, measured), {
-      onNone: () => [],
-      onSome: (held) =>
-        measured.count > held.count
-          ? [
-              {
-                after: measured.count,
-                asked: input.raises.some(sameRatchet(measured)),
-                before: held.count,
-                ratchet: measured.ratchet,
-                territory: measured.territory,
-              },
-            ]
-          : [],
-    })
-  );
-
-  return {
-    decisions: raised
-      .filter(({ asked }) => asked)
-      .map(({ after, before, ratchet, territory }) =>
-        DecisionSubject.cases.RaiseRatchet.make({
-          after,
-          ask: input.ask,
-          before,
-          ratchet,
-          territory,
-        })
-      ),
-    refusals: raised
-      .filter(({ asked }) => !asked)
-      .map(
-        ({ after, before, ratchet, territory }) =>
-          new Weakened({ weakening: { after, before, ratchet, territory } })
-      ),
-  };
-};
 
 /**
  * The baselines after a landing measured `measured` at `landed`: each count

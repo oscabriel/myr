@@ -2,6 +2,7 @@
 // (MIT, LICENSES/rat-stack.MIT.txt). Changes are listed in PROVENANCE.md.
 import {
   Array,
+  Config,
   Context,
   Effect,
   Option,
@@ -296,10 +297,26 @@ const argumentBuilders = {
   (name: string, field: Plain, spec: FieldSpec) => Argument.Argument<unknown>
 >;
 
+/**
+ * An argument that was a flag until now, left out: none yet. The parser
+ * takes it so, since the flag it was may still give its value, and the
+ * handler says if neither did (`MissingValue`). Unlike `Argument.optional`,
+ * a fallback leaves help showing the argument as required.
+ */
+const leftOutForNow = (
+  argument: Argument.Argument<unknown>
+): Argument.Argument<unknown> =>
+  argument.pipe(
+    Argument.map(Option.some),
+    Argument.withFallbackConfig(Config.succeed(Option.none())),
+    Argument.map(Option.getOrUndefined)
+  );
+
 const argumentFor = (
   name: string,
   field: Plain,
-  fallback: string | undefined
+  fallback: string | undefined,
+  wasFlag: boolean
 ): Argument.Argument<unknown> => {
   const spec = describe(field);
   const base = argumentBuilders[spec.kind](name, field, spec);
@@ -308,9 +325,29 @@ const argumentFor = (
   const described =
     help === undefined ? base : base.pipe(Argument.withDescription(help));
 
-  return spec.optional || fallback !== undefined
-    ? described.pipe(Argument.optional, Argument.map(Option.getOrUndefined))
-    : described;
+  if (spec.optional || fallback !== undefined) {
+    return described.pipe(
+      Argument.optional,
+      Argument.map(Option.getOrUndefined)
+    );
+  }
+
+  return wasFlag ? leftOutForNow(described) : described;
+};
+
+/**
+ * The flag a positional field was until now (`Cli`'s `formerFlags`): it
+ * still parses, checked by the field's schema, but help leaves it out and
+ * using it prints nothing more.
+ */
+const formerFlagFor = (name: string, field: Plain): Flag.Flag<unknown> => {
+  const spec = describe(field);
+
+  return flagBuilders[spec.kind](name, field, spec).pipe(
+    Flag.withHidden,
+    Flag.optional,
+    Flag.map(Option.getOrUndefined)
+  );
 };
 
 /**
@@ -401,6 +438,11 @@ export const toCommand = <
   const cli = Context.get(rpc.annotations, Cli);
   const command = commandName(rpc);
   const positional = new Set(cli.positional);
+
+  const wasFlag = new Set(
+    cli.formerFlags?.filter((name) => positional.has(name))
+  );
+
   const approval = Context.get(rpc.annotations, NeedsApproval);
   const readOnly = Context.get(rpc.annotations, ReadOnly);
   const filled = options.defaults?.fields ?? {};
@@ -415,12 +457,18 @@ export const toCommand = <
     Flag.Flag<unknown> | Argument.Argument<unknown>
   > = {};
 
+  const former: Record<string, Flag.Flag<unknown>> = {};
+
   for (const [name, field] of fields) {
     const fallback = required.includes(name) ? filled[name] : undefined;
 
     payload[name] = positional.has(name)
-      ? argumentFor(name, field, fallback)
+      ? argumentFor(name, field, fallback, wasFlag.has(name))
       : flagFor(name, field, fallback);
+
+    if (wasFlag.has(name)) {
+      former[name] = formerFlagFor(name, field);
+    }
   }
 
   const decodePayload = Schema.decodeUnknownEffect(rpc.payloadSchema);
@@ -466,8 +514,8 @@ export const toCommand = <
 
   return Command.make(
     commandPath(rpc).at(-1) ?? rpc._tag,
-    { control: controls(approval, readOnly), payload },
-    ({ control, payload: given }) =>
+    { control: controls(approval, readOnly), former, payload },
+    ({ control, former: formerly, payload: given }) =>
       Effect.gen(function* () {
         const json = control.json === true;
         const dryRun = control.dryRun === true;
@@ -476,7 +524,13 @@ export const toCommand = <
           return yield* new ApprovalNeeded({ command });
         }
 
-        const decoded = yield* complete(Object.entries(given));
+        // An argument left out takes the value its former flag gave.
+        const decoded = yield* complete(
+          Object.entries(given).map(
+            ([name, value]) => [name, value ?? formerly[name]] as const
+          )
+        );
+
         const output = yield* options.output;
 
         if (dryRun) {

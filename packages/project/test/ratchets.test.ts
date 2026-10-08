@@ -1,16 +1,13 @@
 import { describe, expect, it } from "@effect/vitest";
-import type { RatchetCount } from "@repo/checks/kinds/ratchet";
+import { judgeRatchets } from "@repo/checks/kinds/ratchet";
+import type { RaiseRatchet, RatchetCount } from "@repo/checks/kinds/ratchet";
+import type { RaiseRequest } from "@repo/gate/escapes";
 import { Choice, DecisionSubject } from "@repo/protocol/domain/decision";
 import { AskId, LandedSha, RatchetName } from "@repo/protocol/ids";
-import { Weakened } from "@repo/protocol/refusal";
 import { Arbitrary, Array, Effect, Option, Result, Schema } from "effect";
 
-import { afterLanding, decideRaise, judgeRatchets } from "../src/ratchets.ts";
-import type {
-  RaiseRatchet,
-  RaiseRequest,
-  RatchetBaseline,
-} from "../src/ratchets.ts";
+import { afterLanding, decideRaise } from "../src/ratchets.ts";
+import type { RatchetBaseline } from "../src/ratchets.ts";
 
 const hex = (n: number) => n.toString(16).padStart(40, "0");
 
@@ -35,15 +32,6 @@ const measuring = (count: number): RatchetCount => ({
   territory: parser,
 });
 
-const raising: RaiseRequest = {
-  ratchet: noExplicitAny,
-  reason: "the parser's one cast, until the date types land",
-  territory: parser,
-};
-
-const wire = (refusals: readonly Weakened[]) =>
-  refusals.map((refusal) => Schema.encodeSync(Weakened)(refusal));
-
 const raiseTo = (after: number): RaiseRatchet =>
   DecisionSubject.cases.RaiseRatchet.make({
     after,
@@ -52,93 +40,6 @@ const raiseTo = (after: number): RaiseRatchet =>
     ratchet: noExplicitAny,
     territory: parser,
   });
-
-describe(judgeRatchets, () => {
-  it("refuses an answer that raises a ratchet with Weakened", () => {
-    const { decisions, refusals } = judgeRatchets({
-      ask,
-      baselines: [baseline(14)],
-      measured: [measuring(15)],
-      raises: [],
-    });
-
-    expect(decisions).toStrictEqual([]);
-    expect(wire(refusals)).toStrictEqual(
-      wire([
-        new Weakened({
-          weakening: {
-            after: 15,
-            before: 14,
-            ratchet: noExplicitAny,
-            territory: parser,
-          },
-        }),
-      ])
-    );
-  });
-
-  it.each([14, 12, 0])("lets an answer through at %i", (count) => {
-    expect(
-      judgeRatchets({
-        ask,
-        baselines: [baseline(14)],
-        measured: [measuring(count)],
-        raises: [],
-      })
-    ).toStrictEqual({ decisions: [], refusals: [] });
-  });
-
-  it("turns an asked-for raise into one RaiseRatchet decision, not a refusal", () => {
-    expect(
-      judgeRatchets({
-        ask,
-        baselines: [baseline(14)],
-        measured: [measuring(15)],
-        raises: [raising],
-      })
-    ).toStrictEqual({ decisions: [raiseTo(15)], refusals: [] });
-  });
-
-  it("refuses a raise asked for in another territory", () => {
-    const { decisions, refusals } = judgeRatchets({
-      ask,
-      baselines: [baseline(14)],
-      measured: [measuring(15)],
-      raises: [{ ...raising, territory: "packages/lexer" }],
-    });
-
-    expect(decisions).toStrictEqual([]);
-    expect(refusals.map(({ weakening }) => weakening)).toStrictEqual([
-      { after: 15, before: 14, ratchet: noExplicitAny, territory: parser },
-    ]);
-  });
-
-  it("judges nothing a ratchet has no baseline for yet", () => {
-    expect(
-      judgeRatchets({
-        ask,
-        baselines: [],
-        measured: [measuring(15)],
-        raises: [],
-      })
-    ).toStrictEqual({ decisions: [], refusals: [] });
-  });
-
-  it("judges each territory against its own baseline", () => {
-    const lexer = "packages/lexer";
-
-    const { refusals } = judgeRatchets({
-      ask,
-      baselines: [baseline(14), { ...baseline(2), territory: lexer }],
-      measured: [measuring(14), { ...measuring(3), territory: lexer }],
-      raises: [],
-    });
-
-    expect(refusals.map(({ weakening }) => weakening)).toStrictEqual([
-      { after: 3, before: 2, ratchet: noExplicitAny, territory: lexer },
-    ]);
-  });
-});
 
 describe(afterLanding, () => {
   it("lowers a baseline to a landing's lower count, by itself", () => {

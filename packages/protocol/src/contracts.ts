@@ -260,7 +260,7 @@ export class VerdictOf extends Rpc.make("verdict", {
   .annotate(Idempotent, true)
   .annotate(Destructive, false)
   .annotate(NeedsApproval, false)
-  .annotate(Cli, { name: "verdict" })
+  .annotate(Cli, { formerFlags: ["ask"], name: "verdict", positional: ["ask"] })
   .annotate(Surfaces, servedOn.verdict) {}
 
 export class LandingOf extends Rpc.make("landing", {
@@ -567,7 +567,7 @@ export class Release extends Rpc.make("release", {
   .annotate(Idempotent, true)
   .annotate(Destructive, false)
   .annotate(NeedsApproval, false)
-  .annotate(Cli, { name: "release" })
+  .annotate(Cli, { formerFlags: ["ask"], name: "release", positional: ["ask"] })
   .annotate(Surfaces, servedOn.release) {}
 
 export class SubmitAnswer extends Rpc.make("submitAnswer", {
@@ -603,7 +603,7 @@ export class SubmitAnswer extends Rpc.make("submitAnswer", {
   .annotate(Idempotent, true)
   .annotate(Destructive, false)
   .annotate(NeedsApproval, false)
-  .annotate(Cli, { name: "submit" })
+  .annotate(Cli, { formerFlags: ["ask"], name: "submit", positional: ["ask"] })
   .annotate(Surfaces, servedOn.submitAnswer) {}
 
 export class Finish extends Rpc.make("finish", {
@@ -633,7 +633,7 @@ export class Finish extends Rpc.make("finish", {
   .annotate(Idempotent, true)
   .annotate(Destructive, false)
   .annotate(NeedsApproval, true)
-  .annotate(Cli, { name: "finish" })
+  .annotate(Cli, { formerFlags: ["ask"], name: "finish", positional: ["ask"] })
   .annotate(Surfaces, servedOn.finish) {}
 
 export class Land extends Rpc.make("land", {

@@ -77,7 +77,7 @@ const table = [
   },
   {
     audience: "public",
-    cli: "verdict",
+    cli: "verdict <ask>",
     errors: ["UnknownProject", "UnknownAsk"],
     flags: "RI",
     on: "RMCW",
@@ -205,7 +205,7 @@ const table = [
   },
   {
     audience: "signedIn",
-    cli: "release",
+    cli: "release <ask>",
     errors: ["UnknownProject", "NotClaimed"],
     flags: "I",
     on: "RMC",
@@ -213,7 +213,7 @@ const table = [
   },
   {
     audience: "signedIn",
-    cli: "submit",
+    cli: "submit <ask>",
     errors: [
       "UnknownProject",
       "NotClaimed",
@@ -232,7 +232,7 @@ const table = [
   },
   {
     audience: "decider",
-    cli: "finish",
+    cli: "finish <ask>",
     errors: [
       "UnknownProject",
       "NotDecider",

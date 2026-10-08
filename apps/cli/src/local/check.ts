@@ -4,7 +4,9 @@
  * push of HEAD to the claim's fork would give the gateway (`localFacts`),
  * under the policy at `main` (`localPolicy`), and prints the same refusals,
  * tag for tag; then it runs the ask's check and the project's lanes on
- * HEAD's tree, in a temp clone, through `CheckRunner` `/local`.
+ * HEAD's tree, in a temp clone, through `CheckRunner` `/local`, and counts
+ * the project's ratchets on HEAD and on its base (`ratchets.ts`), refusing
+ * a raised count with the platform's `Weakened{ratchet}`.
  *
  * Nothing here writes to the repo, its config or its refs, and `--offline`
  * calls no platform: the parse stage then judges a live claim made up for
@@ -73,6 +75,7 @@ import {
   ConfigBundlerBun,
   localPolicy,
 } from "./local-policy.ts";
+import { countRatchets, judgeMoves, RatchetMove } from "./ratchets.ts";
 import { staleGenerated } from "./stale.ts";
 import type { StaleCopy } from "./stale.ts";
 
@@ -87,13 +90,15 @@ const Stale = Schema.Struct({
 
 /**
  * What `check --json` prints on success: the ask, the diff it judged, each
- * lane, and the generated files that are out of date, when any are.
+ * lane, each ratchet's count on the base and on HEAD when it counted any,
+ * and the generated files that are out of date, when any are.
  */
 const Checked = Schema.Struct({
   ask: AskId,
   base: CommitSha,
   head: CommitSha,
   lanes: Schema.Array(LaneResult),
+  ratchets: Schema.optionalKey(Schema.NonEmptyArray(RatchetMove)),
   /** The last stage that ran: `shape` with `--shape-only`, else `checks`. */
   stage: Schema.Literals(["shape", "checks"]),
   stale: Schema.optionalKey(Schema.NonEmptyArray(Stale)),
@@ -504,14 +509,21 @@ const checkoutOf = (input: {
       )
   );
 
-/** The run as a person reads it: each lane and how it ended. */
+/** A ratchet's count on the base and on HEAD, as a line says it. */
+const moveText = ({ after, before, ratchet, territory }: RatchetMove) =>
+  `${ratchet} in ${territory}: ${before} on the base, ${after} here`;
+
+/** The run as a person reads it: each lane and how it ended, then each ratchet's count. */
 const viewOf = (checked: Checked) => {
+  const moves = checked.ratchets ?? [];
+
   const lines = [
     `${checked.ask} at ${checked.head.slice(0, 12)}: the gate's shape stage has nothing to say.`,
     ...checked.lanes.map(
       ({ durationMs, lane, result }) =>
         `  ${lane}: ${result} (${durationMs} ms)`
     ),
+    ...moves.map((move) => `  ratchet ${moveText(move)}`),
   ];
 
   return {
@@ -522,10 +534,18 @@ const viewOf = (checked: Checked) => {
         ({ durationMs, lane, result }) =>
           `- \`${lane}\`: ${result} (${durationMs} ms)`
       ),
+      ...moves.map((move) => `- ratchet ${moveText(move)}`),
     ].join("\n"),
     text: lines.join("\n"),
   };
 };
+
+/** The counts as `--json` lists them: absent when there are none. */
+const ratchetsField = (moves: readonly RatchetMove[]) =>
+  Array.match(moves, {
+    onEmpty: () => ({}),
+    onNonEmpty: (ratchets) => ({ ratchets }),
+  });
 
 export const check = Command.make(
   COMMAND,
@@ -741,8 +761,17 @@ export const check = Command.make(
         );
       }
 
-      const run = yield* CheckRunner.use((runner) =>
-        runner.run({
+      const runner = CheckRunnerLocal.layer({
+        checkout: (at) =>
+          checkoutOf({
+            note: output.note,
+            root: context.root,
+            setup: Option.fromUndefinedOr(policy.run.setup),
+          })(at).pipe(Effect.provide(services)),
+      });
+
+      const run = yield* CheckRunner.use((checker) =>
+        checker.run({
           at: CheckAt.cases.Commit.make({ commit: facts.head }),
           lanes,
           placeholders: [],
@@ -752,16 +781,7 @@ export const check = Command.make(
           run: policy.run,
         })
       ).pipe(
-        Effect.provide(
-          CheckRunnerLocal.layer({
-            checkout: (at) =>
-              checkoutOf({
-                note: output.note,
-                root: context.root,
-                setup: Option.fromUndefinedOr(policy.run.setup),
-              })(at).pipe(Effect.provide(services)),
-          })
-        ),
+        Effect.provide(runner),
         Effect.catchTag("VerifierBlocked", (blocked) =>
           refuse(json, [blocked])
         ),
@@ -780,13 +800,51 @@ export const check = Command.make(
         }
       }
 
-      if (Array.isReadonlyArrayNonEmpty(failed)) {
-        return yield* refuse(json, failed);
+      // The ratchets, counted on the base and on HEAD as the platform's
+      // cheap stage counts them, unless `--lane` asked for lanes alone.
+      const declared = Array.isReadonlyArrayNonEmpty(policy.ratchets);
+      const counting = declared && flags.lane.length === 0;
+
+      if (declared && !counting) {
+        yield* output.note(
+          "The ratchets were not counted: --lane runs only the lanes it names."
+        );
+      }
+
+      const counts = counting
+        ? yield* countRatchets({
+            base: facts.base,
+            head: facts.head,
+            policy,
+            project,
+            repo: fork,
+          }).pipe(Effect.provide(runner))
+        : { moves: [], uncounted: [] };
+
+      for (const { ratchet, why } of counts.uncounted) {
+        yield* output.note(
+          `Could not count the ratchet ${ratchet} here: ${why}. The platform counts it after the push.`
+        );
+      }
+
+      const ratcheted = judgeMoves(facts, ask.value, counts.moves);
+
+      for (const move of ratcheted.decisions) {
+        yield* output.note(
+          `The ratchet ${moveText(move)}: a reasoned escape you add there asks a decider to raise it, so the answer will wait on that decision.`
+        );
+      }
+
+      const refusals = [...failed, ...ratcheted.refusals];
+
+      if (Array.isReadonlyArrayNonEmpty(refusals)) {
+        return yield* refuse(json, refusals);
       }
 
       const checked: Checked = {
         ...judged,
         lanes: run.lanes,
+        ...ratchetsField(counts.moves),
         stage: "checks",
         ...staleField(stale),
       };

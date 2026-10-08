@@ -1,10 +1,16 @@
 import { describe, expect, it } from "@effect/vitest";
+import { RatchetMeasure, RatchetSpec } from "@repo/protocol/domain/check";
+import { Command } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { RatchetName, RepoPath } from "@repo/protocol/ids";
 import { Option } from "effect";
 
-import { escapeDecisions, escapeRatchet } from "../src/escapes.ts";
-import { addedLines, ask, testFacts } from "./facts.ts";
+import {
+  escapeDecisions,
+  escapeRatchet,
+  explainedRaises,
+} from "../src/escapes.ts";
+import { addedLines, ask, policy, testFacts } from "./facts.ts";
 
 const week = "packages/parse/src/week.ts";
 
@@ -121,6 +127,70 @@ describe(escapeDecisions, () => {
           ask: Option.none(),
         })
       )
+    ).toStrictEqual([]);
+  });
+});
+
+describe(explainedRaises, () => {
+  const anyCount = RatchetName.make("no-explicit-any");
+
+  const bundleKb = RatchetName.make("bundle-kb");
+
+  const declaring = {
+    ...policy,
+    ratchets: [
+      RatchetSpec.make({
+        measure: RatchetMeasure.cases.Count.make({
+          command: Command.make("oxlint --format json"),
+          rule: "typescript/no-explicit-any",
+        }),
+        name: anyCount,
+      }),
+      RatchetSpec.make({
+        measure: RatchetMeasure.cases.Count.make({
+          command: Command.make("oxlint --format json"),
+          rule: "import/max-dependencies",
+        }),
+        name: bundleKb,
+      }),
+    ],
+  };
+
+  it("asks to raise every declared ratchet in each reasoned escape's territory, for its reason", () => {
+    expect(
+      explainedRaises(declaring, ask, [
+        waiver(week, 4, "oxlint-disable", "the parser's one cast"),
+        waiver(pad, 2, "eslint-disable", "generated tables"),
+      ])
+    ).toStrictEqual([
+      {
+        ratchet: anyCount,
+        reason: "the parser's one cast",
+        territory: "@datekit/parse",
+      },
+      {
+        ratchet: bundleKb,
+        reason: "the parser's one cast",
+        territory: "@datekit/parse",
+      },
+      {
+        ratchet: anyCount,
+        reason: "generated tables",
+        territory: "@datekit/format",
+      },
+      {
+        ratchet: bundleKb,
+        reason: "generated tables",
+        territory: "@datekit/format",
+      },
+    ]);
+  });
+
+  it("asks nothing of a project that declares no ratchets", () => {
+    expect(
+      explainedRaises(policy, ask, [
+        waiver(week, 4, "oxlint-disable", "the parser's one cast"),
+      ])
     ).toStrictEqual([]);
   });
 });

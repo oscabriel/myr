@@ -25,7 +25,7 @@ import {
 import type { CheckRun, LaneEvidence } from "@repo/checks/check-runner";
 import { EvidenceStore } from "@repo/checks/evidence-store";
 import { lintToZeroCount } from "@repo/checks/kinds/lint-to-zero";
-import { measure } from "@repo/checks/kinds/ratchet";
+import { countLanes, measure } from "@repo/checks/kinds/ratchet";
 import { classifyFailure } from "@repo/gate/classify";
 import { MeasuredCount, runBlockOf } from "@repo/project/answer-runs";
 import type { AnswerRun } from "@repo/project/answer-runs";
@@ -395,12 +395,7 @@ const countRatchets = <E, R>(
       return { counts: [], uncounted: Option.none() };
     }
 
-    const lanes = Array.dedupeWith(
-      specs,
-      (one, other) => one.measure.command === other.measure.command
-    ).map(({ measure: { command }, name }) =>
-      CheckLane.make({ command, lane: LaneName.make(name), output: "stdout" })
-    );
+    const lanes = countLanes(specs);
 
     const ran = yield* job(lanes);
 
