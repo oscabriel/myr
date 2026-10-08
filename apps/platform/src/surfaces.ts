@@ -33,6 +33,7 @@ import {
 
 import { serveGit } from "./git.ts";
 import type { GitServices } from "./git.ts";
+import { LayerGate } from "./layer-gate.ts";
 import { releaseRoutes } from "./releases.ts";
 import type { ReleaseStore } from "./releases.ts";
 import { Sessions } from "./sessions.ts";
@@ -373,13 +374,15 @@ const GIT_ROUTES = [
 
 /**
  * git's smart-HTTP paths, each handed to the gateway with the services it
- * needs, taken once when the router is built.
+ * needs, taken once when the router is built: the layer repos too, which
+ * a cartridge may have plugged in over their default (`LayerGate`).
  */
 const git = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const services = Context.make(Sessions, yield* Sessions).pipe(
       Context.add(Projects, yield* Projects),
-      Context.add(Upstream, yield* Upstream)
+      Context.add(Upstream, yield* Upstream),
+      Context.add(LayerGate, yield* LayerGate)
     );
 
     for (const path of GIT_ROUTES) {

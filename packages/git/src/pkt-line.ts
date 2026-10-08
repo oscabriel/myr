@@ -83,3 +83,37 @@ export const packets = (bytes: Uint8Array) => {
 
   return found;
 };
+
+const LENGTH = /^[0-9a-f]{4}$/u;
+
+/**
+ * The text lines of a request in pkt-line framing, newline dropped, for a
+ * reader that only looks: protocol v2's delimiter (`0001`) and response
+ * end (`0002`) carry no line, nor does a flush, and reading stops where
+ * the framing breaks, keeping the lines before it. `packets` is the strict
+ * reader.
+ */
+export const textLines = (bytes: Uint8Array): readonly string[] => {
+  const decoder = new TextDecoder();
+  const lines: string[] = [];
+  let at = 0;
+
+  while (at + 4 <= bytes.length) {
+    const hex = decoder.decode(bytes.subarray(at, at + 4));
+    const length = Number.parseInt(hex, 16);
+
+    if (!LENGTH.test(hex) || length === 3 || at + length > bytes.length) {
+      break;
+    }
+
+    if (length > 3) {
+      lines.push(
+        decoder.decode(bytes.subarray(at + 4, at + length)).replace(/\n$/u, "")
+      );
+    }
+
+    at += Math.max(length, 4);
+  }
+
+  return lines;
+};

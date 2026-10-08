@@ -394,15 +394,23 @@ export const layerCustodyFor = (
 
 /**
  * A clone or fetch of a layer's repo, for its read log (OSR §5.2): who
- * read which layer. A project never made logs nothing.
+ * read which layer, and the commit they asked for when their request named
+ * one. A project never made logs nothing.
  */
 export const layerRead = (
   reader: Person,
-  target: LayerTarget
+  target: LayerTarget,
+  sha: Option.Option<CommitSha>
 ): Effect.Effect<void, never, Projects> =>
   Projects.use((projects) => projects.get(target.project)).pipe(
     Effect.flatMap((api) =>
-      api.recordLayerRead(reader, { layer: target.layer })
+      api.recordLayerRead(reader, {
+        layer: target.layer,
+        ...Option.match(sha, {
+          onNone: () => ({}),
+          onSome: (read) => ({ sha: read }),
+        }),
+      })
     ),
     Effect.catchTag("UnknownProject", () => Effect.void)
   );

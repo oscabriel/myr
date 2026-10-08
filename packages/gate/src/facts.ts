@@ -74,12 +74,17 @@ export interface PushFacts {
   readonly addedLines: ReadonlyMap<RepoPath, readonly AddedLine[]>;
   /** Whether `package.json#/scripts` differs; the caller compares the two JSON pointers. */
   readonly scriptsChanged: boolean;
-  /** Paths that belong to a layer, which no public tree may carry (W6; empty before). */
+  /**
+   * Paths that belong to a layer, which no public tree may carry (W6; empty
+   * before): files, or folders whose every path is the layer's.
+   */
   readonly layerPaths: ReadonlySet<RepoPath>;
   /**
-   * Whether the pusher reads any layer (W6): only a reader could have
-   * copied from one, so a guard that would answer a non-reader's probe (an
-   * oracle) reads this first. Absent, they read none.
+   * Whether the pusher reads the layers `layerPaths` holds (W6). Only a
+   * reader hears which of their paths collide with a layer; anyone else
+   * hears every path they wrote, so the refusal is no oracle. It vouches for
+   * every layer in the set: true only when the pusher reads all of them, so
+   * reading one layer never names another's paths. Absent, they read none.
    */
   readonly canReadLayers?: boolean;
   /** How many live claims the pusher holds, for `CapReached`. */

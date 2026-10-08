@@ -9,14 +9,17 @@
  * (`adapters/custody.ts`) decides what it may move. A credential the
  * platform does not know is a 401 everywhere. A name the platform never
  * makes (spec §4.5) is a 404, unless `LayerGate` says it is a layer's repo
- * (W6), which only the layer's readers read and its writers push to. The client's credential never travels past
- * this file: the gateway forwards only the headers git's protocol needs, and
- * the upstream adds the platform's own.
+ * (W6), which only the layer's readers read and its writers push to. The
+ * client's credential never travels past this file: the gateway forwards
+ * only the headers git's protocol needs, and the upstream adds the
+ * platform's own.
  */
 import { Brand } from "@repo/brand";
 import { Custody } from "@repo/git/custody";
 import { gateway, gitRoute, plain } from "@repo/git/gateway";
 import { concat, packetAt, pkt, utf8 } from "@repo/git/pkt-line";
+import { readUpload } from "@repo/git/upload-pack";
+import type { UploadRequest } from "@repo/git/upload-pack";
 import { Upstream } from "@repo/git/upstream";
 import type { Projects } from "@repo/project/projects";
 import type { LayerAccess } from "@repo/project/visibility-port";
@@ -32,7 +35,7 @@ import {
 } from "./adapters/custody.ts";
 import { auditOf, credentialOf } from "./credential.ts";
 import { LayerGate } from "./layer-gate.ts";
-import type { LayerTarget } from "./layer-gate.ts";
+import type { LayerReach } from "./layer-gate.ts";
 import { repoKind, RepoKind } from "./repo-names.ts";
 import { Sessions } from "./sessions.ts";
 
@@ -127,18 +130,78 @@ const REACH = {
   write: 2,
 } as const satisfies Record<LayerAccess, number>;
 
+/** A request body as git wrote it, inflated if git gzipped it; none if it can't be. */
+const inflated = (bytes: Uint8Array, encoding: string | null) => {
+  if (encoding === null) {
+    return Effect.succeedSome(bytes);
+  }
+
+  return encoding === "gzip"
+    ? Effect.tryPromise(() =>
+        new Response(
+          new Response(bytes).body?.pipeThrough(new DecompressionStream("gzip"))
+        ).arrayBuffer()
+      ).pipe(
+        Effect.map((read) => new Uint8Array(read)),
+        Effect.option
+      )
+    : Effect.succeedNone;
+};
+
 /**
- * A git request to a project's layer repo (W6 609, ADR 0007): only the
- * layer's readers clone it and only its writers push to it, each read
- * logged, all through the private namespace's upstream. Someone not signed
- * in is asked to sign in (401, so the credential helper answers); a person
- * the layer does not admit gets 403 with one line git prints.
+ * An upload-pack request, read whole for the read log and sent on
+ * unchanged: its body is a fetch's wants and haves, never a pack. A body
+ * in an encoding git never sends still counts as a read, with no commit
+ * named, so the log errs toward a read. None when the body itself can't be
+ * read.
+ */
+const uploadOf = (request: Request) =>
+  Effect.gen(function* () {
+    const read = yield* Effect.option(
+      Effect.tryPromise(() => request.arrayBuffer())
+    );
+
+    if (Option.isNone(read)) {
+      return Option.none();
+    }
+
+    const bytes = new Uint8Array(read.value);
+
+    const upload = Option.match(
+      yield* inflated(bytes, request.headers.get("content-encoding")),
+      {
+        onNone: (): UploadRequest => ({ reads: true, want: Option.none() }),
+        onSome: readUpload,
+      }
+    );
+
+    return Option.some({
+      request: new Request(request.url, {
+        body: bytes,
+        headers: request.headers,
+        method: request.method,
+      }),
+      upload,
+    });
+  });
+
+/**
+ * A git request to a project's layer repo (W6 606, ADR 0007): only the
+ * layer's readers clone it and only its writers push to it, all through the
+ * private namespace's upstream. Someone not signed in is asked to sign in
+ * (401, so the credential helper answers); a person the layer does not
+ * admit gets 403 with one line git prints.
+ *
+ * Every read is logged with who and which commit (OSR §5.2): each
+ * upload-pack request answered 200, but a v2 `ls-refs`, which lists refs
+ * and reads nothing, so a clone is one read. A fetch that negotiates over
+ * several requests logs each.
  */
 const serveLayer = (
   request: Request,
   route: { readonly endpoint: string; readonly name: string },
   principal: Principal,
-  target: LayerTarget
+  { access, target }: LayerReach
 ) =>
   Effect.gen(function* () {
     const gate = yield* LayerGate;
@@ -147,8 +210,6 @@ const serveLayer = (
     if (!Principal.guards.Person(principal)) {
       return signIn("a layer is read by its readers");
     }
-
-    const access = yield* gate.access(principal, target);
 
     if (REACH[access] < REACH[pushing ? "write" : "read"]) {
       return plain(
@@ -162,13 +223,28 @@ const serveLayer = (
         ? yield* layerCustodyFor(principal, target)
         : refuseAll;
 
-    const response = yield* gateway(request).pipe(
-      Effect.provideService(Custody, custody),
-      Effect.provideService(Upstream, gate.upstream)
-    );
+    const served = (sent: Request) =>
+      gateway(sent).pipe(
+        Effect.provideService(Custody, custody),
+        Effect.provideService(Upstream, gate.upstream)
+      );
 
-    if (route.endpoint === "git-upload-pack" && response.status === 200) {
-      yield* layerRead(principal, target);
+    // Only a fetch's request reads content; the rest pass straight through.
+    if (route.endpoint !== "git-upload-pack" || request.method !== "POST") {
+      return yield* served(request);
+    }
+
+    const fetched = yield* uploadOf(request);
+
+    if (Option.isNone(fetched)) {
+      return plain(400, "the request could not be read");
+    }
+
+    const { upload } = fetched.value;
+    const response = yield* served(fetched.value.request);
+
+    if (upload.reads && response.status === 200) {
+      yield* layerRead(principal, target, upload.want);
     }
 
     return response;
@@ -186,12 +262,12 @@ const serve = (
     // A name the platform makes for no repo of its own may be a layer's.
     if (RepoKind.$is("Unknown")(kind)) {
       const layer = yield* LayerGate.use((gate) =>
-        gate.classify(RepoName.make(route.name))
+        gate.classify(RepoName.make(route.name), principal)
       );
 
       return yield* Option.match(layer, {
         onNone: () => Effect.succeed(notFound(route.name)),
-        onSome: (target) => serveLayer(request, route, principal, target),
+        onSome: (reach) => serveLayer(request, route, principal, reach),
       });
     }
 
