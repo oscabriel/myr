@@ -15,15 +15,19 @@ import {
   CheckAt,
   CheckLane,
   CheckRunner,
+  outputOf,
   shaOf,
 } from "@repo/checks/check-runner";
+import type { CheckRun, LaneEvidence } from "@repo/checks/check-runner";
 import { CheckRunnerLocal } from "@repo/checks/check-runner/local";
 import { commandFor } from "@repo/checks/kinds";
+import { lintToZeroCount } from "@repo/checks/kinds/lint-to-zero";
 import { PushTarget } from "@repo/gate/facts";
 import { pushStages, runGate } from "@repo/gate/gate";
 import { Client } from "@repo/protocol/contracts";
 import { LaneResult } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
+import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import type { Policy } from "@repo/protocol/domain/policy";
 import {
@@ -306,18 +310,99 @@ const syntheticClaim = (input: {
     };
   });
 
-/** The lanes an answer's checks run: the ask's own check, then every project lane. */
+/**
+ * The lanes an answer's checks run: the ask's own check, then every project
+ * lane. A `lintToZero` ask's lane hands back what its lint printed, since
+ * its count, not its exit code, judges it.
+ */
 const lanesOf = (policy: Policy, ask: Ask): readonly CheckLane[] => [
   ...Option.toArray(
     Option.map(
       commandFor(ask.check, policy.run, policy.ratchets),
-      ({ command, lane }) => CheckLane.make({ command, lane })
+      ({ command, lane }) =>
+        CheckSpec.guards.LintToZero(ask.check)
+          ? CheckLane.make({ command, lane, output: "stdout" })
+          : CheckLane.make({ command, lane })
     )
   ),
   ...Record.toEntries(policy.run.checks).map(([lane, command]) =>
     CheckLane.make({ command, lane })
   ),
 ];
+
+/**
+ * The run with a `lintToZero` ask's lane as its count decides it, as the
+ * platform's Answer Workflow does (`countedAskLane` in
+ * `apps/platform/src/workflows/answer/lanes.ts`): passed at zero findings
+ * of its rule in its territory, failed above (its evidence says how many),
+ * a load error when its lint printed no count. A lane that never got going
+ * stays as it ran.
+ */
+const countedAskLane = (
+  policy: Policy,
+  ask: Ask,
+  ran: CheckRun
+): Effect.Effect<CheckRun> => {
+  const { check } = ask;
+
+  const lane = Option.map(
+    commandFor(check, policy.run, policy.ratchets),
+    (found) => found.lane
+  );
+
+  const result = Option.flatMap(lane, (name) =>
+    Array.findFirst(ran.lanes, (each) => each.lane === name)
+  );
+
+  if (
+    !CheckSpec.guards.LintToZero(check) ||
+    Option.isNone(result) ||
+    result.value.result === "blocked"
+  ) {
+    return Effect.succeed(ran);
+  }
+
+  const counted = result.value;
+
+  const replaced = (
+    outcome: LaneResult["result"],
+    evidence: Option.Option<LaneEvidence>
+  ): CheckRun => ({
+    ...ran,
+    evidence: [
+      ...ran.evidence.filter((each) => each.lane !== counted.lane),
+      ...Option.toArray(evidence),
+    ],
+    lanes: ran.lanes.map((each) =>
+      each.lane === counted.lane ? { ...counted, result: outcome } : each
+    ),
+  });
+
+  return Effect.fromOption(outputOf(ran, counted.lane)).pipe(
+    Effect.flatMap((stdout) =>
+      lintToZeroCount({
+        asked: ask.territory,
+        check,
+        modules: policy.modules,
+        stdout,
+      })
+    ),
+    Effect.map((count) =>
+      count === 0
+        ? replaced("passed", Option.none())
+        : replaced(
+            "failed",
+            Option.some({
+              lane: counted.lane,
+              signature: `${check.rule}: ${count} in ${check.territory ?? ask.territory.module}`,
+            })
+          )
+    ),
+    Effect.orElseSucceed(() =>
+      replaced("loadError", Option.some({ lane: counted.lane }))
+    )
+  );
+};
 
 /** The last lines of a setup's output, for the note that says why it failed. */
 const TAIL = 4000;
@@ -677,7 +762,10 @@ export const check = Command.make(
               })(at).pipe(Effect.provide(services)),
           })
         ),
-        Effect.catchTag("VerifierBlocked", (blocked) => refuse(json, [blocked]))
+        Effect.catchTag("VerifierBlocked", (blocked) =>
+          refuse(json, [blocked])
+        ),
+        Effect.flatMap((ran) => countedAskLane(policy, ask.value, ran))
       );
 
       const failed = run.lanes.flatMap(({ command, lane, result }) =>

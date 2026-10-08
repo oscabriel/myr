@@ -487,6 +487,82 @@ describe(`${Brand.cli} check`, () => {
   );
 
   it.live(
+    "judges a lintToZero ask's lane by its count in the ask's territory, not by the lint's exit code, as the platform does",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* aCheckRepo;
+        const sdk = `${Brand.cliPackage}/rules`;
+
+        // One explicit `any` is left, in b: outside the ask's territory, so
+        // the count in a is zero, while the lint exits 1 for it.
+        const report = JSON.stringify({
+          diagnostics: [
+            {
+              code: "typescript(no-explicit-any)",
+              filename: "packages/b/src/b.ts",
+            },
+          ],
+        });
+
+        yield* gitOk(repo.root, "checkout", "--quiet", "main");
+        yield* gitOk(repo.root, "rm", "--quiet", policyFile);
+
+        yield* commit(
+          repo.root,
+          {
+            [`${Brand.configDir}/asks/no-any-in-a.ask.ts`]: [
+              `import { kinds, territory } from "${sdk}";`,
+              "",
+              "export default kinds.lintToZero.ask({",
+              '  command: "sh lint.sh",',
+              '  rule: "typescript/no-explicit-any",',
+              '  territory: territory.package("a"),',
+              '  want: "a types every value",',
+              "});",
+              "",
+            ].join("\n"),
+            [`${Brand.configDir}/project.ts`]: [
+              `import { kinds, project } from "${sdk}";`,
+              "",
+              "export default project({",
+              "  kinds: [kinds.lintToZero],",
+              '  run: { checks: {}, test: "true {path}" },',
+              "});",
+              "",
+            ].join("\n"),
+            "lint.sh": `printf '%s\\n' '${report}'\nexit 1\n`,
+          },
+          "Ask for no explicit any in a"
+        );
+
+        yield* gitOk(repo.root, "checkout", "--quiet", "-b", "typed");
+        yield* commit(
+          repo.root,
+          { "packages/a/src/a.ts": "export const a: number = 2;\n" },
+          "Type a"
+        );
+
+        const printed = yield* run([
+          "check",
+          "--dir",
+          repo.root,
+          "--ask",
+          "no-any-in-a",
+          "--offline",
+          "--json",
+        ]).pipe(Effect.provide(services(unreachable)));
+
+        expect(yield* envelopeOf(printed.out)).toMatchObject({
+          data: {
+            lanes: [{ lane: "lintToZero", result: "passed" }],
+            stage: "checks",
+          },
+          ok: true,
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
     "diffs from the claim's base, as the gateway does, even when the answer is committed on main",
     () =>
       Effect.gen(function* () {

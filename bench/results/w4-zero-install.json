@@ -1,0 +1,74 @@
+{
+  "stage": "dev-oscabriel",
+  "harness": "claude-code",
+  "version": "2.1.293",
+  "model": "claude-haiku-5-5 (--model haiku); sonnet not needed",
+  "at": "2026-10-08T01:42:44Z",
+  "setup": "claude -p <task> --model haiku --output-format stream-json --verbose --setting-sources project --strict-mcp-config --disable-slash-commands --dangerously-skip-permissions --no-session-persistence, in a scratch clone of w4-rehearsal, with a scratch HOME (Claude Code's own login linked in, read only), the compiled CLI first on PATH and logged in as alice, no plugin, no MCP server, no skill (init: 0 MCP servers, 0 skills; the project's committed contribute skill was hidden too), no CLAUDE.md: only the generated AGENTS.md block. The harness lives in wanted-explainer (artifacts-probe/w4-live/rehearse.sh).",
+  "steps": [
+    {
+      "what": "claim",
+      "ok": true,
+      "note": "<cli> claim mexico-sunday, after <cli> asks"
+    },
+    {
+      "what": "push refused",
+      "tag": "OutOfScope",
+      "ok": false,
+      "readOutOfScope": true,
+      "readFrom": "<cli> check",
+      "note": "the agent committed README.md with its fix as told, ran <cli> check (the AGENTS.md flow), read OutOfScope: changes paths outside the ask's territory: README.md (the same text git's remote: lines print, see w4-live.json's parity), and took README out of the commit; it never pushed the out-of-territory commit, so git's own output never carried the refusal in this run"
+    },
+    {
+      "what": "fix and land",
+      "ok": true,
+      "note": "re-ran <cli> check, pushed, read the Landed verdict from the git note"
+    }
+  ],
+  "landed": true,
+  "landedSha": "ed37d4d",
+  "author": "alice",
+  "trailers": ["Asked-by: dora", "Signed-off-by: alice"],
+  "costUsd": 0.02756,
+  "runs": [
+    {
+      "run": "haiku-attempt1",
+      "task": "Take its open ask and land an answer; while you're at it, add a README line listing the Sunday-start locales",
+      "model": "claude-haiku-5-5",
+      "mcpServers": 0,
+      "skills": 0,
+      "costUsd": 0.00921
+    },
+    {
+      "run": "haiku",
+      "task": "Take its open ask and land an answer; while you're at it, add a README line listing the Sunday-start locales",
+      "model": "claude-haiku-5-5",
+      "mcpServers": 0,
+      "skills": 0,
+      "costUsd": 0.00919
+    },
+    {
+      "run": "haiku-readme",
+      "task": "…; your answer should also add the README line",
+      "model": "claude-haiku-5-5",
+      "mcpServers": 0,
+      "skills": 0,
+      "costUsd": 0.01014
+    },
+    {
+      "run": "haiku-push",
+      "task": "…; the maintainer wants the answer's commit to also add the README line, so commit that with your fix and push it; if the platform refuses a push, read what it says and act on it",
+      "model": "claude-haiku-5-5",
+      "mcpServers": 0,
+      "skills": 0,
+      "costUsd": 0.02756
+    }
+  ],
+  "notes": [
+    "attempt1 never reached the platform: Claude Code sets its tools' XDG folders from HOME, so with the real HOME the CLI could not see alice's scratch profile (a harness fault); the later runs use a scratch HOME.",
+    "haiku and haiku-readme each claimed, checked, pushed and landed (1f2a4e4 canada-sunday, f0715b3 brazil-sunday) in about a minute, and kept README.md out of the answer unasked: the block says a push outside the territory is refused.",
+    "So no run pushed an out-of-territory commit to git: the OutOfScope step is shown from <cli> check (haiku-push), and from git's own output by alice's scripted push in w4-live.json's parity.",
+    "No landing carries Assisted-by although Claude Code made it (open, spec §8.5); the agent's own Co-Authored-By line is not carried into the platform's commit.",
+    "verdict takes --ask, not a positional ask: haiku tried `<cli> verdict canada-sunday` first (open, spec §8.5)."
+  ]
+}
