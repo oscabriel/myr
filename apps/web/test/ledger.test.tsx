@@ -6,6 +6,7 @@
  * check name and no file name, and the view adds none.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { Client, Contracts } from "@repo/protocol/contracts";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Ledger, LedgerEntry } from "@repo/protocol/domain/visibility";
 import {
@@ -17,14 +18,23 @@ import {
   LayerName,
   SuiteRoot,
 } from "@repo/protocol/ids";
-import { DateTime, Option, Schema } from "effect";
+import { UnknownProject } from "@repo/protocol/refusal";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { isNotFound } from "@tanstack/react-router";
+import { DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
+import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
+import { RpcTest } from "effect/rpc";
 
+import { keys } from "../src/client/keys.ts";
+import { ledgerAtom } from "../src/client/ledger.ts";
 import {
   LedgerView,
   areaSummaries,
 } from "../src/features/ledger/ledger-page.tsx";
 import { ProjectView } from "../src/features/project/project-page.tsx";
-import { inOrder, markupOf, textOf } from "./ask-fixtures.ts";
+import { readLedger } from "../src/routes/$project/ledger.tsx";
+import { ContractsClient, webContracts } from "../src/surfaces.ts";
+import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 
 const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
 
@@ -142,6 +152,12 @@ const seqsOf = (markup: string) =>
     Number(found.groups?.seq)
   );
 
+/** The words of the first `<time>` after `marker` in `markup`. */
+const whenOf = (markup: string, marker: string) =>
+  /<time\b[^>]*>(?<when>[^<]*)<\/time>/u.exec(
+    markup.slice(markup.indexOf(marker))
+  )?.groups?.when;
+
 describe("a project's ledger", () => {
   it("shows the posture label the platform computed", () => {
     const markup = markupOf(page);
@@ -168,14 +184,28 @@ describe("a project's ledger", () => {
     ).toBeTruthy();
   });
 
-  it("shows each sealed area's count, authors, root and admission record", () => {
-    const text = textOf(page);
+  it("shows each sealed area's count, authors, root, last change and admission record", () => {
+    const markup = markupOf(page);
 
-    expect(text).toContain("export: 7 sealed checks by 3 people");
-    expect(text).toContain(root);
-    expect(text).toContain(
-      "admitted Oct 11; passes main 3/3; catches 2 known-bad"
+    // The area's own block: from its row to the history (which names the root too).
+    const area = plainText(
+      markup.slice(
+        markup.indexOf('data-area="export"'),
+        markup.indexOf('id="history"')
+      )
     );
+
+    expect(
+      inOrder(area, [
+        "export: 7 sealed checks by 3 people",
+        "Root",
+        root,
+        "Last changed",
+        "1 d ago",
+        "Admission",
+        "admitted Oct 11; passes main 3/3; catches 2 known-bad",
+      ])
+    ).toBeTruthy();
   });
 
   it("lists the entries newest first, each in the ledger's words", () => {
@@ -205,10 +235,25 @@ describe("a project's ledger", () => {
     }
   });
 
-  it("shows a project without layers as Open, with nothing held back", () => {
-    const text = textOf(<LedgerView ledger={open} now={now} />);
+  it("never shows an entry as recorded in the future, though it arrived after the page was read", () => {
+    // Served at 07:00; the release at 08:00 arrived while the page stayed open.
+    const markup = markupOf(
+      <LedgerView
+        ledger={datekit}
+        now={DateTime.makeUnsafe("2026-10-12T07:00:00Z")}
+      />
+    );
 
-    expect(text).toContain("Open");
+    expect(whenOf(markup, 'data-seq="8"')).toBe("now");
+    expect(whenOf(markup, 'data-seq="7"')).toBe("22 h ago");
+    expect(markup).not.toMatch(/>in \d+ (?:min|h|d)</u);
+  });
+
+  it("shows a project without layers as Open, with nothing held back", () => {
+    const view = <LedgerView ledger={open} now={now} />;
+    const text = textOf(view);
+
+    expect(markupOf(view)).toMatch(/data-posture="open"[^>]*>Open</u);
     expect(text).toContain("Nothing is held back");
     expect(text).not.toContain("sealed checks by");
   });
@@ -264,6 +309,137 @@ describe(areaSummaries, () => {
   it("has no area for a ledger with no sealed entries", () => {
     expect(areaSummaries(open)).toStrictEqual([]);
   });
+});
+
+/** A platform that knows only datekit, counting the ledgers it is asked for. */
+const platformHandlers = (asked: Ref.Ref<number>) =>
+  Layer.mergeAll(
+    unanswered,
+    Contracts.toLayerHandler("ledger", ({ project }) =>
+      Effect.gen(function* () {
+        yield* Ref.update(asked, (seen) => seen + 1);
+
+        if (project !== datekit.project) {
+          return yield* new UnknownProject({ project });
+        }
+
+        return datekit;
+      })
+    ),
+    asTester
+  );
+
+/** That platform, as the page's loader reaches it on the server. */
+const platformOf = (asked: Ref.Ref<number>) =>
+  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+    Layer.provide(platformHandlers(asked))
+  );
+
+describe(readLedger, () => {
+  it.effect("reads the project's ledger, entries and all", () =>
+    Effect.gen(function* () {
+      const asked = yield* Ref.make(0);
+
+      const read = yield* readLedger("datekit").pipe(
+        Effect.provide(platformOf(asked))
+      );
+
+      expect(read.ledger.postureLabel).toBe("Open with sealed evidence");
+      expect(read.ledger.entries.map(({ seq }) => seq)).toStrictEqual([
+        1, 2, 3, 4, 5, 6, 7, 8,
+      ]);
+      expect(yield* Ref.get(asked)).toBe(1);
+    })
+  );
+
+  it.effect("is a not-found for a project the platform does not know", () =>
+    Effect.gen(function* () {
+      const asked = yield* Ref.make(0);
+
+      const failed = yield* Effect.flip(
+        readLedger("no-such-project").pipe(Effect.provide(platformOf(asked)))
+      );
+
+      expect(isNotFound(failed)).toBeTruthy();
+      expect(yield* Ref.get(asked)).toBe(1);
+    })
+  );
+
+  it.effect(
+    "is a not-found, asking nothing, for an address that names no project",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(0);
+
+        const failed = yield* Effect.flip(
+          readLedger("Not_A-Project").pipe(Effect.provide(platformOf(asked)))
+        );
+
+        expect(isNotFound(failed)).toBeTruthy();
+        expect(yield* Ref.get(asked)).toBe(0);
+      })
+  );
+});
+
+/** Lets the atoms' fibers run until `done` holds, or long enough that it would have. */
+const runUntil = (done: Effect.Effect<boolean>) =>
+  Effect.yieldNow.pipe(
+    Effect.andThen(done),
+    Effect.repeat({ times: 200, until: (held) => held })
+  );
+
+describe(ledgerAtom, () => {
+  it.effect(
+    "reads the ledger again when the project's keys change, as the watch's poll changes them",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(0);
+
+        // One browser tab whose `ContractsClient` reaches the stub platform in process.
+        const registry = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            AtomRegistry.make({
+              initialValues: [
+                Atom.initialValue(
+                  ContractsClient.runtime.layer,
+                  Layer.effect(
+                    ContractsClient,
+                    RpcTest.makeClient(webContracts, { flatten: true })
+                  ).pipe(
+                    Layer.provide(platformHandlers(asked)),
+                    Layer.provideMerge(Reactivity.layer)
+                  )
+                ),
+              ],
+            })
+          ),
+          (made) =>
+            Effect.sync(() => {
+              made.dispose();
+            })
+        );
+
+        const atom = ledgerAtom(datekit.project);
+
+        registry.mount(atom);
+        yield* AtomRegistry.getResult(registry, atom, {
+          suspendOnWaiting: true,
+        });
+
+        // What the watch's poll does every POLL_MS: the project's keys changed.
+        yield* AtomRegistry.getResult(
+          registry,
+          ContractsClient.runtime.atom(
+            Reactivity.invalidate(keys.project(datekit.project))
+          ),
+          { suspendOnWaiting: true }
+        );
+
+        expect(
+          yield* runUntil(Ref.get(asked).pipe(Effect.map((seen) => seen > 1)))
+        ).toBeTruthy();
+      })
+  );
 });
 
 describe("the ledger's way in", () => {

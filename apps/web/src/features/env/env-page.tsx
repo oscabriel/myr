@@ -17,7 +17,7 @@
 import { Brand } from "@repo/brand";
 import type { EnvItem, EnvSchemaView } from "@repo/protocol/domain/env";
 import type { ProjectName } from "@repo/protocol/ids";
-import type { DateTime } from "effect";
+import { DateTime } from "effect";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -34,6 +34,24 @@ const VARLOCK = "https://varlock.dev";
 const Code = ({ children }: { readonly children: ReactNode }) => (
   <code className={CODE}>{children}</code>
 );
+
+/**
+ * When the env shape was read, at the latest: `now`, or the newest time a
+ * value was set if that is later. The page keeps the `now` it was served
+ * with while it reads the env shape again as values are set, and a value
+ * that was set is never set in the future.
+ */
+const readAt = (schema: EnvSchemaView, now: DateTime.Utc) => {
+  let latest = now;
+
+  for (const { value } of schema.items) {
+    if (value !== undefined) {
+      latest = DateTime.max(latest, value.setAt);
+    }
+  }
+
+  return latest;
+};
 
 /** Whether `docs` is a web address, so a link to it can go nowhere else. */
 const isWebAddress = (docs: string) => /^https?:\/\//iu.test(docs);
@@ -181,6 +199,7 @@ export const EnvView = ({
   readonly schema: EnvSchemaView;
 }) => {
   const { items, project } = schema;
+  const seen = readAt(schema, now);
 
   return (
     <PageShell title={`Env shape of ${project}`}>
@@ -232,7 +251,7 @@ export const EnvView = ({
         ) : (
           <ol className="flex flex-col gap-6">
             {items.map((item) => (
-              <ItemBlock item={item} key={item.key} now={now} />
+              <ItemBlock item={item} key={item.key} now={seen} />
             ))}
           </ol>
         )}

@@ -175,6 +175,22 @@ const dayOf = (at: DateTime.Utc) =>
 /** A commit as git abbreviates it. */
 const short = (sha: string) => sha.slice(0, 7);
 
+/**
+ * When the ledger was read, at the latest: `now`, or its newest entry's
+ * time if that is later. The page keeps the `now` it was served with while
+ * it reads the ledger again as entries arrive, and a recorded entry is never
+ * in the future.
+ */
+const readAt = (ledger: Ledger, now: DateTime.Utc) => {
+  let latest = now;
+
+  for (const entry of ledger.entries) {
+    latest = DateTime.max(latest, entry.at);
+  }
+
+  return latest;
+};
+
 const Code = ({ children }: { readonly children: ReactNode }) => (
   <code className={CODE}>{children}</code>
 );
@@ -334,6 +350,7 @@ export const LedgerView = ({
 }) => {
   const { layers, project } = ledger;
   const areas = areaSummaries(ledger);
+  const seen = readAt(ledger, now);
 
   return (
     <PageShell title={`Ledger of ${project}`}>
@@ -373,13 +390,13 @@ export const LedgerView = ({
           </p>
           <ul className="flex flex-col gap-6">
             {areas.map((summary) => (
-              <AreaBlock key={summary.area} now={now} summary={summary} />
+              <AreaBlock key={summary.area} now={seen} summary={summary} />
             ))}
           </ul>
         </Region>
       )}
       <Region id="history" title="History">
-        <History ledger={ledger} now={now} />
+        <History ledger={ledger} now={seen} />
       </Region>
     </PageShell>
   );

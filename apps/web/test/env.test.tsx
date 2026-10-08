@@ -8,13 +8,19 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { Client, Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
 import { EnvSchemaView } from "@repo/protocol/domain/env";
 import type { EnvItem } from "@repo/protocol/domain/env";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
-import { DateTime, Schema } from "effect";
+import { UnknownProject } from "@repo/protocol/refusal";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { isNotFound } from "@tanstack/react-router";
+import { DateTime, Effect, Layer, Ref, Schema } from "effect";
+import { RpcTest } from "effect/rpc";
 
 import { EnvView, NothingLanded } from "../src/features/env/env-page.tsx";
 import { ProjectView } from "../src/features/project/project-page.tsx";
+import { readEnv } from "../src/routes/$project/env.tsx";
 import { inOrder, markupOf, textOf } from "./ask-fixtures.ts";
 
 const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
@@ -104,6 +110,22 @@ describe("a project's env shape", () => {
         "2 d ago",
       ])
     ).toBeTruthy();
+  });
+
+  it("never says a value was set in the future, though it was set after the page was read", () => {
+    // Served at 09:00; ines-v set the value at 09:30 while the page stayed open.
+    const item = itemOf(
+      markupOf(
+        <EnvView
+          now={DateTime.makeUnsafe("2026-10-10T09:00:00Z")}
+          schema={datekit}
+        />
+      ),
+      "SENTRY_AUTH_TOKEN"
+    );
+
+    expect(item).toMatch(/<time\b[^>]*>now<\/time>/u);
+    expect(item).not.toMatch(/>in \d+ (?:min|h|d)</u);
   });
 
   it("shows every item's name, type and description", () => {
@@ -234,4 +256,128 @@ describe("the env shape's way in", () => {
       /<a\b[^>]*href="\/datekit\/env"[^>]*>Env shape<\/a>/u
     );
   });
+});
+
+/** What the stub platform was asked: env shapes and ask lists. */
+interface Asked {
+  readonly asks: number;
+  readonly schemas: number;
+}
+
+const nothingAsked: Asked = { asks: 0, schemas: 0 };
+
+/**
+ * A platform as the env page's loader calls it: `known` says whether it
+ * knows datekit at all, `landed` whether datekit's main has landed (before
+ * that, `envShape` has no commit to read and answers `UnknownProject`).
+ */
+const platformWhere = (
+  asked: Ref.Ref<Asked>,
+  { known, landed }: { readonly known: boolean; readonly landed: boolean }
+) =>
+  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+    Layer.provide([
+      Layer.mergeAll(
+        unanswered,
+        Contracts.toLayerHandler(EnvSchemaOf._tag, ({ project }) =>
+          Effect.gen(function* () {
+            yield* Ref.update(asked, (seen) => ({
+              ...seen,
+              schemas: seen.schemas + 1,
+            }));
+
+            if (!(known && landed) || project !== datekit.project) {
+              return yield* new UnknownProject({ project });
+            }
+
+            return datekit;
+          })
+        ),
+        Contracts.toLayerHandler("listAsks", ({ project }) =>
+          Effect.gen(function* () {
+            yield* Ref.update(asked, (seen) => ({
+              ...seen,
+              asks: seen.asks + 1,
+            }));
+
+            if (!known || project !== datekit.project) {
+              return yield* new UnknownProject({ project });
+            }
+
+            return { asks: [] };
+          })
+        )
+      ),
+      asTester,
+    ])
+  );
+
+describe(readEnv, () => {
+  it.effect(
+    "reads the env shape of a project whose main has landed, and asks nothing more",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
+
+        const read = yield* readEnv("datekit").pipe(
+          Effect.provide(platformWhere(asked, { known: true, landed: true }))
+        );
+
+        expect(read.project).toBe("datekit");
+        expect(read.schema?.items.map(({ key }) => key)).toStrictEqual([
+          "APP_ENV",
+          "SENTRY_DSN",
+          "SENTRY_AUTH_TOKEN",
+          "DATEKIT_LOCALE_DIR",
+        ]);
+        expect(yield* Ref.get(asked)).toStrictEqual({ asks: 0, schemas: 1 });
+      })
+  );
+
+  it.effect(
+    "reads no env shape, and no 404, for a project whose main has not landed",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
+
+        const read = yield* readEnv("datekit").pipe(
+          Effect.provide(platformWhere(asked, { known: true, landed: false }))
+        );
+
+        expect(read.project).toBe("datekit");
+        expect(read.schema).toBeUndefined();
+        expect(yield* Ref.get(asked)).toStrictEqual({ asks: 1, schemas: 1 });
+      })
+  );
+
+  it.effect("is a not-found for a project the platform does not know", () =>
+    Effect.gen(function* () {
+      const asked = yield* Ref.make(nothingAsked);
+
+      const failed = yield* Effect.flip(
+        readEnv("no-such-project").pipe(
+          Effect.provide(platformWhere(asked, { known: true, landed: true }))
+        )
+      );
+
+      expect(isNotFound(failed)).toBeTruthy();
+    })
+  );
+
+  it.effect(
+    "is a not-found, asking nothing, for an address that names no project",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
+
+        const failed = yield* Effect.flip(
+          readEnv("Not_A-Project").pipe(
+            Effect.provide(platformWhere(asked, { known: true, landed: true }))
+          )
+        );
+
+        expect(isNotFound(failed)).toBeTruthy();
+        expect(yield* Ref.get(asked)).toStrictEqual(nothingAsked);
+      })
+  );
 });
