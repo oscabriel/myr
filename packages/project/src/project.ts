@@ -36,7 +36,7 @@ import { judgeClosure } from "@repo/checks/judge";
 import { checkVersion, commandFor } from "@repo/checks/kinds";
 import { lintToZeroCount } from "@repo/checks/kinds/lint-to-zero";
 import type { LintToZeroCheck } from "@repo/checks/kinds/lint-to-zero";
-import { measure } from "@repo/checks/kinds/ratchet";
+import { measure, WHOLE_PROJECT } from "@repo/checks/kinds/ratchet";
 import type { RatchetCount } from "@repo/checks/kinds/ratchet";
 import { redFirstOfRuns } from "@repo/checks/red-first";
 import { weaknessesOf } from "@repo/checks/weak-shapes";
@@ -114,6 +114,7 @@ import type {
   LaneName,
   ProjectName,
   ProposalId,
+  TreeSha,
 } from "@repo/protocol/ids";
 import { Person, Principal } from "@repo/protocol/principal";
 import {
@@ -225,6 +226,16 @@ import {
   transition as landingTransition,
 } from "./landing.ts";
 import type { LandingQueue, PendingDecision, Request } from "./landing.ts";
+import {
+  callerCountOf,
+  callersIn,
+  callersRatchet,
+  callersSpecs,
+  familyClosed,
+  remainingBlockers,
+  sameCount,
+  splitFamily,
+} from "./migrate.ts";
 import {
   isDue,
   outboxRow,
@@ -908,13 +919,20 @@ const creditsFor = (ask: Ask, answerer: Handle): readonly Credit[] => [
 const askLaneOf = (policy: Policy, ask: Ask) =>
   commandFor(ask.check, policy.run, policy.ratchets);
 
+/** A check judged by what its command prints: a lint's count, or a migrate's callers. */
+const isCounted = CheckSpec.isAnyOf(["LintToZero", "Migrate", "SymbolAbsent"]);
+
+/** A check that counts a name's callers: a migrate, or its delete step. */
+const countsCallers = CheckSpec.isAnyOf(["Migrate", "SymbolAbsent"]);
+
 /**
- * The lane an ask's check runs as: a `lintToZero` check is a count, so its
- * lane hands back what its lint printed.
+ * The lane an ask's check runs as: a `lintToZero`, `migrate` or
+ * `symbolAbsent` check is a count, so its lane hands back what its command
+ * printed.
  */
 const askCheckLane = (policy: Policy, ask: Ask) =>
   Option.map(askLaneOf(policy, ask), ({ command, lane }) =>
-    CheckSpec.guards.LintToZero(ask.check)
+    isCounted(ask.check)
       ? CheckLane.make({ command, lane, output: "stdout" })
       : CheckLane.make({ command, lane })
   );
@@ -2084,7 +2102,14 @@ export const projectService = (
           "counts",
           Option.map(h.policy, ({ modules, ratchets }) => ({
             modules,
-            ratchets,
+            // An open migrate ask's callers are counted on every answer.
+            ratchets: [
+              ...ratchets,
+              ...callersSpecs(h.asks.values()).filter(
+                (spec) =>
+                  !ratchets.some(({ name: named }) => named === spec.name)
+              ),
+            ],
           }))
         ),
         ...field(
@@ -2181,9 +2206,62 @@ export const projectService = (
           ),
       });
 
+    /** Every ask as this call has it: as written so far, over the hydrated ones. */
+    const asksNow = (h: Hydrated, writes: Writes): ReadonlyMap<AskId, Ask> =>
+      new Map([...h.asks, ...writes.asks]);
+
+    /**
+     * A migrate family once its step `landed` closed (CAA §2.F): each step
+     * waiting on its siblings opens when the last of them lands, and the
+     * parent closes on the landing that closes its last step.
+     */
+    const familyAfter = (
+      h: Hydrated,
+      writes: Writes,
+      landed: AskId,
+      at: { readonly now: DateTime.Utc; readonly sha: LandedSha }
+    ) => {
+      const parent = Option.flatMap(askNow(h, writes, landed), (ask) =>
+        Option.fromUndefinedOr(ask.parent)
+      );
+
+      if (Option.isNone(parent)) {
+        return;
+      }
+
+      const before = asksNow(h, writes);
+
+      for (const step of before.values()) {
+        if (
+          step.parent === parent.value &&
+          step.state === "waitingOnParent" &&
+          remainingBlockers(step, before).length === 0
+        ) {
+          const opened: Ask = { ...step, state: "open" };
+
+          writes.asks.set(step.id, opened);
+          writes.events.push(askOpened(opened, at.now));
+        }
+      }
+
+      const parentOpen = Option.filter(
+        askNow(h, writes, parent.value),
+        ({ state }) => state !== "closed"
+      );
+
+      if (
+        Option.isSome(parentOpen) &&
+        familyClosed(parent.value, asksNow(h, writes))
+      ) {
+        writes.asks.set(parent.value, { ...parentOpen.value, state: "closed" });
+        writes.events.push(askClosed(parent.value, at.sha, at.now));
+      }
+    };
+
     /**
      * A landing on main recorded: the landing, its ask closed, the answering
-     * claim answered, the landed SHA moved and the policy read there.
+     * claim answered, its migrate family moved on, the landed SHA moved and
+     * the policy read there.
      */
     const recordLanding = (
       h: Hydrated,
@@ -2229,6 +2307,8 @@ export const projectService = (
             { answerer: request.answerer, sha },
             now
           );
+
+          familyAfter(h, writes, id, { now, sha });
         }
 
         const row = Option.orElse(
@@ -2490,12 +2570,24 @@ export const projectService = (
 
         const declared = input.report?.ratchets ?? [];
 
-        const judgement = judgeRatchets({
-          ask: asked.id,
-          baselines: baselinesNow(h, writes),
-          measured: declared,
-          raises,
-        });
+        // A tree merged onto a main that has moved on since is not judged:
+        // its counts still hold what later landings removed (a sibling
+        // step's callers), which against the baselines those landings
+        // lowered would read as a raise. It cannot land as it is: its land
+        // finds main moved, and it is merged and checked again first.
+        const current = Option.exists(
+          liveRow(h),
+          ({ landed }) => landed === checking.main
+        );
+
+        const judgement = current
+          ? judgeRatchets({
+              ask: asked.id,
+              baselines: baselinesNow(h, writes),
+              measured: declared,
+              raises,
+            })
+          : { decisions: [], refusals: [] };
 
         const escapes = Array.dedupe(waivers.map(territoryIn)).map(
           (territory): MeasuredCount => {
@@ -2930,12 +3022,8 @@ export const projectService = (
         (refusals) => Array.findFirst(refusals, isTouchedJudge)
       );
 
-    /**
-     * Red first: the ask's check fails twice on the composed commit, the
-     * same way (a `lintToZero` check, by its count). Gives the counts of the
-     * policy's ratchets the check's own run read on the way.
-     */
-    const redTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
+    /** An ask's own check run twice on the composed commit, and the lane it ran as. */
+    const runTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
       Effect.gen(function* () {
         const lane = askCheckLane(policy, ask);
 
@@ -2955,31 +3043,179 @@ export const projectService = (
 
         const runs = [yield* runner.run(job), yield* runner.run(job)] as const;
 
+        return { lane: lane.value.lane, runs };
+      });
+
+    /**
+     * Red first: the ask's check fails twice on the composed commit, the
+     * same way (a `lintToZero` check, by its count). Gives the counts of the
+     * policy's ratchets the check's own run read on the way.
+     */
+    const redTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
+      Effect.gen(function* () {
+        const { lane, runs } = yield* runTwice(policy, ask, composed);
+
         if (CheckSpec.guards.LintToZero(ask.check)) {
           return yield* redByCount({
             ask,
             check: ask.check,
-            lane: lane.value.lane,
+            lane,
             policy,
             runs,
           });
         }
 
-        yield* Effect.fromResult(redFirstOfRuns(runs, lane.value.lane));
+        yield* Effect.fromResult(redFirstOfRuns(runs, lane));
 
         return [];
       });
 
-    /** The landing that opens an ask: its files on main, authored by its asker. */
+    /**
+     * Red first for a check that counts callers (`migrate`, `symbolAbsent`):
+     * twice on the composed commit its count command prints the same
+     * callers, and some in the ask's territory. Gives the count.
+     */
+    const callersTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
+      Effect.gen(function* () {
+        const { lane, runs } = yield* runTwice(policy, ask, composed);
+
+        const read = (run: CheckRun) =>
+          Effect.fromOption(
+            Option.flatMap(outputOf(run, lane), callerCountOf)
+          ).pipe(Effect.mapError(() => new NotRedFirst({})));
+
+        const [first, second] = runs;
+        const once = yield* read(first);
+        const again = yield* read(second);
+
+        if (
+          !sameCount(once, again) ||
+          callersIn(ask.territory, once, policy.modules) === 0
+        ) {
+          return yield* new NotRedFirst({});
+        }
+
+        return once;
+      });
+
+    /**
+     * The family files of a split that would land on a path already taken:
+     * an ask the project holds, one main's config folder states, one of the
+     * decider's own files, or another file of the family. Overwriting any
+     * would change the judge beyond the ask's own files (`TouchedJudge`).
+     */
+    const takenBy = (
+      h: Hydrated,
+      writes: Writes,
+      input: {
+        readonly added: readonly ComposedFile[];
+        readonly files: readonly AskFile[];
+        readonly policy: Policy;
+      }
+    ) => {
+      const held = new Set<string>([
+        ...[...h.asks.values(), ...writes.asks.values()].map(
+          ({ file }) => file
+        ),
+        ...input.policy.asks.map(({ file }) => file),
+        ...input.files.map(({ path }) => path),
+      ]);
+
+      return input.added.flatMap(({ path }, at) =>
+        held.has(path) ||
+        input.added.findIndex((other) => other.path === path) !== at
+          ? [path]
+          : []
+      );
+    };
+
+    /**
+     * What a migrate (or `symbolAbsent`) ask's opening lands: red first by
+     * its callers, then, when its callers sit in two or more of its
+     * modules, its family's files beside the decider's (CAA §2.F), every
+     * ask of the family, and the callers ratchet at the counted total.
+     */
+    const migrateOpening = (input: {
+      readonly ask: Ask;
+      readonly composed: { readonly commit: CommitSha; readonly tree: TreeSha };
+      readonly files: Array.NonEmptyReadonlyArray<AskFile>;
+      readonly h: Hydrated;
+      readonly main: LandedSha;
+      readonly policy: Policy;
+      readonly writes: Writes;
+    }) =>
+      Effect.gen(function* () {
+        const { ask, composed, files, policy } = input;
+        const counts = yield* callersTwice(policy, ask, composed.commit);
+
+        const counted: readonly RatchetCount[] = CheckSpec.guards.Migrate(
+          ask.check
+        )
+          ? [
+              {
+                count: counts.total,
+                ratchet: callersRatchet(ask.check.from),
+                territory: WHOLE_PROJECT,
+              },
+            ]
+          : [];
+
+        const family = splitFamily({
+          configDir: Brand.configDir,
+          counts,
+          modules: policy.modules,
+          parent: ask,
+        });
+
+        if (Option.isNone(family)) {
+          return {
+            asks: Array.make(ask),
+            counted,
+            files,
+            steps: [],
+            tree: composed.tree,
+          };
+        }
+
+        const { children, deleteChild, parent } = family.value;
+        const added = family.value.files;
+        const taken = takenBy(input.h, input.writes, { added, files, policy });
+
+        if (Array.isReadonlyArrayNonEmpty(taken)) {
+          return yield* new TouchedJudge({ paths: taken });
+        }
+
+        const all = Array.appendAll(files, added);
+
+        const { tree } = yield* lander.compose({
+          files: all,
+          main: input.main,
+          repo,
+        });
+
+        return {
+          asks: Array.make(parent, ...children, deleteChild),
+          counted,
+          files: all,
+          steps: [...children, deleteChild].map(({ id }) => id),
+          tree,
+        };
+      });
+
+    /**
+     * The landing that opens an ask: its files on main, authored by its
+     * asker. A migrate ask's landing names the steps it opened with it.
+     */
     const landAsk = (input: {
       readonly ask: Ask;
       readonly credits: readonly Credit[];
       readonly files: Array.NonEmptyReadonlyArray<ComposedFile>;
       readonly main: LandedSha;
+      readonly steps: readonly AskId[];
       readonly tree: Checking["tree"];
     }) => {
       const requestId = RequestId.make(`open-${input.tree}`);
-      const { credits } = input;
+      const { credits, steps } = input;
 
       const landing = lander
         .land({
@@ -2988,7 +3224,15 @@ export const projectService = (
           message: formatLanding({
             ask: { ask: input.ask.id, project: name },
             assisted: [],
-            body: input.ask.brief.want,
+            body:
+              steps.length === 0
+                ? input.ask.brief.want
+                : [
+                    input.ask.brief.want,
+                    "",
+                    "Its steps, the last waiting on the rest:",
+                    ...steps.map((step) => `- ${step}`),
+                  ].join("\n"),
             credits,
             requestId,
             subject: `Open ask ${input.ask.id}`,
@@ -3099,20 +3343,47 @@ export const projectService = (
           return yield* new WeakCheck({ weakness: weak.value });
         }
 
-        const counted = yield* redTwice(policy, ask, composed.commit);
+        const opens = countsCallers(ask.check)
+          ? yield* migrateOpening({
+              ask,
+              composed,
+              files,
+              h,
+              main,
+              policy,
+              writes,
+            })
+          : {
+              asks: Array.make(ask),
+              counted: yield* redTwice(policy, ask, composed.commit),
+              files,
+              steps: [],
+              tree: composed.tree,
+            };
 
         const landed = yield* landAsk({
           ask,
           credits: opening.credits,
-          files,
+          files: opens.files,
           main,
-          tree: composed.tree,
+          steps: opens.steps,
+          tree: opens.tree,
         });
 
-        const opened: Ask = { ...ask, openedIn: landed.sha };
+        const opened = Array.map(opens.asks, (each): Ask => ({
+          ...each,
+          openedIn: landed.sha,
+        }));
 
-        writes.asks.set(opened.id, opened);
-        writes.events.push(askOpened(opened, now));
+        for (const each of opened) {
+          writes.asks.set(each.id, each);
+
+          // A step that waits on others opens when they land.
+          if (each.state === "open") {
+            writes.events.push(askOpened(each, now));
+          }
+        }
+
         writes.landings.push({
           assisted: [],
           author: opening.asker,
@@ -3128,14 +3399,15 @@ export const projectService = (
           yield* withPolicyAt({ ...row, landed: landed.sha }, landed.sha, now)
         );
 
-        // The opening landing records the baselines its check's lint read.
+        // The opening landing records the baselines its check's count read.
         putRatchets(
           h,
           writes,
-          afterLanding(baselinesNow(h, writes), counted, landed.sha).baselines
+          afterLanding(baselinesNow(h, writes), opens.counted, landed.sha)
+            .baselines
         );
 
-        return { ask: opened, landed: landed.sha };
+        return { ask: Array.headNonEmpty(opened), landed: landed.sha };
       });
 
     const openBody =
@@ -3223,9 +3495,7 @@ export const projectService = (
 
           const command = ClaimCommand.cases.Claim.make({
             base: live.value.landed,
-            blockedBy: ask.value.blockedBy.filter(
-              (blocker) => h.asks.get(blocker)?.state !== "closed"
-            ),
+            blockedBy: remainingBlockers(ask.value, h.asks),
             cap: policy.caps.claimsPerPerson,
             denounced: trust.denounced,
             heldByWho: heldBy(h, caller.handle, id),
