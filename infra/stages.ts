@@ -150,3 +150,7 @@ export const WorkersDev = Schema.Struct({ subdomain: Schema.NonEmptyString });
 /** The platform's public origin at `stage`, on the account's workers.dev. */
 export const platformOrigin = (stage: Stage, subdomain: string) =>
   `https://${resources(stage).platform}.${subdomain}.workers.dev`;
+
+/** The web's public origin at `stage`, on the account's workers.dev. */
+export const webOrigin = (stage: Stage, subdomain: string) =>
+  `https://${resources(stage).web}.${subdomain}.workers.dev`;

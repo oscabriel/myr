@@ -1,8 +1,8 @@
 /**
- * smoke's probes: read-only requests to a live stage's platform, each of which
- * a misbehaving public surface fails. Every probe runs, whatever the others
- * did, so one run names every surface that broke; each one is timed, for the
- * benches (311).
+ * smoke's probes: read-only requests to a live stage's platform and web, each
+ * of which a misbehaving public surface fails. Every probe runs, whatever the
+ * others did, so one run names every surface that broke; each one is timed,
+ * for the benches (311).
  *
  * 1. `health`: `GET /health` answers `200 {ok: true, stage}`, and names the
  *    stage smoke was pointed at, when it was told one;
@@ -12,7 +12,14 @@
  * 4. `anonymous-unknown-project`: an anonymous `/rpc` `listAsks` for a project
  *    that doesn't exist answers 200 with a typed `UnknownProject` refusal;
  * 5. `missing-repo-404`: git's `info/refs` for a repo that doesn't exist
- *    answers 404.
+ *    answers 404;
+ * 6. `web-front-page`: the web's `GET /` answers 200 with HTML;
+ * 7. `web-llms-txt`: the web's `GET /llms.txt` answers 200 with Markdown,
+ *    which it builds from the platform's project list, so only a web that
+ *    reaches the platform through its service binding passes (W5 599).
+ *
+ * The web's two run when smoke knows where the web lives: bootstrap's
+ * workers.dev record, or `--web-url`.
  *
  * A probe the platform answers with its own failure (a server error, or an
  * RPC defect) asks again for up to `settling`, as a fresh deploy gives
@@ -41,18 +48,25 @@ import {
   repoRoot,
   stageOf,
   subdomainFile,
+  webOrigin,
   WorkersDev,
 } from "./stages.ts";
 import type { Stage } from "./stages.ts";
 
-/** Every probe, in the order smoke runs them. */
-export const probes = [
+/** The platform's probes, in the order smoke runs them. */
+export const platformProbes = [
   "health",
   "oauth-metadata",
   "mcp-needs-credential",
   "anonymous-unknown-project",
   "missing-repo-404",
 ] as const;
+
+/** The web's probes, run after the platform's when smoke has the web's origin. */
+export const webProbes = ["web-front-page", "web-llms-txt"] as const;
+
+/** Every probe, in the order smoke runs them. */
+export const probes = [...platformProbes, ...webProbes] as const;
 
 export const Probe = Schema.Literals(probes);
 
@@ -115,6 +129,7 @@ class Missed extends Schema.TaggedError<Missed>()("Missed", {
 
 /** The parts of a response a probe judges. */
 interface Answer {
+  readonly contentType: string;
   readonly status: number;
   readonly text: string;
 }
@@ -129,7 +144,11 @@ const send = (
     const response = yield* client.execute(request);
     const text = yield* response.text;
 
-    return { status: response.status, text };
+    return {
+      contentType: response.headers["content-type"] ?? "",
+      status: response.status,
+      text,
+    };
   }).pipe(
     Effect.catchTag("HttpClientError", ({ reason }) =>
       Effect.fail(
@@ -317,6 +336,48 @@ const missingRepo = (origin: string) => {
   ).pipe(Effect.flatMap(statusIs(label, 404)), Effect.asVoid);
 };
 
+/** `answer`, when its content type is `wanted` (by its media type alone). */
+const typeIs =
+  (label: string, wanted: string, said: string) => (answer: Answer) =>
+    answer.contentType.split(";")[0]?.trim() === wanted
+      ? Effect.succeed(answer)
+      : Effect.fail(
+          new Missed({
+            reason: `${label} answered ${answer.contentType || "no content type"}, not ${said}`,
+          })
+        );
+
+/** The web's front page renders: a page a browser shows, not an error's JSON. */
+const webFrontPage = (web: string) => {
+  const label = "GET / on the web";
+
+  return send(label, HttpClientRequest.get(`${web}/`)).pipe(
+    Effect.flatMap(statusIs(label, 200)),
+    Effect.flatMap(typeIs(label, "text/html", "HTML")),
+    Effect.asVoid
+  );
+};
+
+/**
+ * The web's `/llms.txt`: Markdown that opens with its title. The web answers
+ * 503 when the platform does not, so a 200 is the service binding working.
+ */
+const webLlmsTxt = (web: string) => {
+  const label = "GET /llms.txt on the web";
+
+  return send(label, HttpClientRequest.get(`${web}/llms.txt`)).pipe(
+    Effect.flatMap(statusIs(label, 200)),
+    Effect.flatMap(typeIs(label, "text/markdown", "Markdown")),
+    Effect.flatMap(({ text }) =>
+      text.startsWith("# ")
+        ? Effect.void
+        : Effect.fail(
+            new Missed({ reason: `${label} answered 200 without a title` })
+          )
+    )
+  );
+};
+
 /**
  * One probe's run: how long it took, and whether it held. A transient miss
  * is asked again, every `ASK_AGAIN`, for `settling` at most; the probe fails
@@ -345,13 +406,18 @@ const timed = <A>(
   );
 
 /**
- * Runs every probe against the platform at `origin`; with `stage`, `/health`
- * must name it. `settling` bounds how long a probe asks again while the
- * platform answers with its own failure (30 s unless given).
+ * Runs every probe against the platform at `origin`, and with `web` the
+ * web's probes against that origin; with `stage`, `/health` must name it.
+ * `settling` bounds how long a probe asks again while a Worker answers with
+ * its own failure (30 s unless given).
  */
 export const smoke = (
   origin: string,
-  options: { readonly stage?: Stage; readonly settling?: Duration.Input } = {}
+  options: {
+    readonly stage?: Stage;
+    readonly settling?: Duration.Input;
+    readonly web?: string;
+  } = {}
 ): Effect.Effect<SmokeReport, SmokeFailed, HttpClient.HttpClient> =>
   Effect.gen(function* () {
     const settling = options.settling ?? SETTLING;
@@ -368,6 +434,12 @@ export const smoke = (
         ["mcp-needs-credential", mcpNeedsCredential(origin)],
         ["anonymous-unknown-project", anonymousUnknownProject(origin)],
         ["missing-repo-404", missingRepo(origin)],
+        ...(options.web === undefined
+          ? []
+          : ([
+              ["web-front-page", webFrontPage(options.web)],
+              ["web-llms-txt", webLlmsTxt(options.web)],
+            ] as const)),
       ] as const,
       ([probe, run]) => timed(probe, run, settling)
     );
@@ -410,13 +482,26 @@ export class NoOrigin extends Schema.TaggedError<NoOrigin>()("NoOrigin", {
   }
 }
 
-/** Where `stage`'s platform lives: `--url`, or bootstrap's workers.dev record. */
-const originOf = (argv: readonly string[], stage: Stage) =>
+/** Where a stage's platform lives, and its web when smoke can know it. */
+interface Origins {
+  readonly platform: string;
+  readonly web: Option.Option<string>;
+}
+
+const trimmed = (origin: string) => origin.replace(/\/+$/u, "");
+
+/**
+ * Where `stage`'s platform and web live: `--url` (and `--web-url`), or
+ * bootstrap's workers.dev record. A platform given by `--url` has no web
+ * unless `--web-url` names it.
+ */
+const originsOf = (argv: readonly string[], stage: Stage) =>
   Effect.gen(function* () {
     const given = flagValue(argv, "--url");
+    const web = Option.map(flagValue(argv, "--web-url"), trimmed);
 
     if (Option.isSome(given)) {
-      return given.value.replace(/\/+$/u, "");
+      return { platform: trimmed(given.value), web } satisfies Origins;
     }
 
     const fs = yield* FileSystem.FileSystem;
@@ -430,21 +515,35 @@ const originOf = (argv: readonly string[], stage: Stage) =>
         Effect.mapError(() => unknown)
       );
 
-    return platformOrigin(stage, subdomain);
+    return {
+      platform: platformOrigin(stage, subdomain),
+      web: Option.orElse(web, () => Option.some(webOrigin(stage, subdomain))),
+    } satisfies Origins;
   });
 
 /**
- * `bun scripts/smoke.ts --stage <s> [--url <origin>]`: smoke-tests the
- * stage, printing each probe's time, or each failure and why.
+ * `bun scripts/smoke.ts --stage <s> [--url <origin>] [--web-url <origin>]`:
+ * smoke-tests the stage, printing each probe's time, or each failure and why.
  */
 export const main = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const stage = yield* stageOf(argv);
-    const origin = yield* originOf(argv, stage);
+    const origins = yield* originsOf(argv, stage);
 
-    yield* Console.log(`smoke ${stage}: ${origin}`);
+    yield* Console.log(
+      `smoke ${stage}: ${origins.platform}${Option.match(origins.web, {
+        onNone: () => "",
+        onSome: (web) => ` and ${web}`,
+      })}`
+    );
 
-    const report = yield* smoke(origin, { stage }).pipe(
+    const report = yield* smoke(origins.platform, {
+      stage,
+      ...Option.match(origins.web, {
+        onNone: () => ({}),
+        onSome: (web) => ({ web }),
+      }),
+    }).pipe(
       Effect.tapError(({ failures }) =>
         Effect.forEach(
           failures,

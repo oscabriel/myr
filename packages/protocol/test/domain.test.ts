@@ -249,6 +249,17 @@ describe("names and ids", () => {
     }
   );
 
+  // The web serves its own pages and files at these first path segments, so
+  // a project so named would be unreachable at `<web>/<project>` (503 #8,
+  // 505 #6). An ask may still take them: an ask's page is under its project.
+  it.each(["assets", "auth", "icons", "people", "releases", "rpc", "today"])(
+    "a project may not be named %j, a path the web takes for itself",
+    (name) => {
+      expect(refuses(ProjectName, name)).toBeTruthy();
+      expect(refuses(AskId, name)).toBeFalsy();
+    }
+  );
+
   const tree = "5555555555555555555555555555555555555555";
 
   const patchId = "6".repeat(64);

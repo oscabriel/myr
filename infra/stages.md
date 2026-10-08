@@ -94,9 +94,9 @@ bun run smoke -- --stage dev-oscabriel
 bun run smoke -- --stage dev-oscabriel --url http://localhost:8787
 ```
 
-The second form points smoke at another origin, such as `wrangler dev --env dev-oscabriel` in `apps/platform`. Plain `wrangler dev` serves stage `local`, which no `--stage` names, so its `health` probe fails.
+The second form points smoke at another origin, such as `wrangler dev --env dev-oscabriel` in `apps/platform`. Plain `wrangler dev` serves stage `local`, which no `--stage` names, so its `health` probe fails. Smoke finds the stage's web at `https://web-<s>.<subdomain>.workers.dev`; with `--url` it probes a web only when `--web-url <origin>` names one.
 
-Smoke only reads. Every probe runs even when others fail, and the output names each probe that failed and why. It also prints how long each probe took. A probe the platform answers with its own failure (a 5xx, or an RPC defect) asks again every second for up to 30 s, since a fresh deploy gives those for its first seconds (seen on `dev-oscabriel`'s first deploy); any other wrong answer fails the probe at once.
+Smoke only reads, from the platform and then the web. Every probe runs even when others fail, and the output names each probe that failed and why. It also prints how long each probe took. A probe the platform answers with its own failure (a 5xx, or an RPC defect) asks again every second for up to 30 s, since a fresh deploy gives those for its first seconds (seen on `dev-oscabriel`'s first deploy); any other wrong answer fails the probe at once.
 
 | Probe | Passes when |
 | --- | --- |
@@ -105,6 +105,8 @@ Smoke only reads. Every probe runs even when others fail, and the output names e
 | `mcp-needs-credential` | `POST /mcp` without a credential answers 401 |
 | `anonymous-unknown-project` | an anonymous `/rpc` `listAsks` for `no-such-project` answers with a typed `UnknownProject` |
 | `missing-repo-404` | `GET /no-such-project.git/info/refs?service=git-upload-pack` answers 404 |
+| `web-front-page` | the web's `GET /` answers 200 with HTML |
+| `web-llms-txt` | the web's `GET /llms.txt` answers 200 with Markdown that opens with its title; the web builds it from the platform's project list, so it passes only when the web reaches the platform through its service binding |
 
 ## Tear down a stage
 

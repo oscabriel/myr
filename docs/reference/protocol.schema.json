@@ -1315,6 +1315,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -2032,6 +2047,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -2387,6 +2417,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -2445,6 +2490,21 @@
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -2522,6 +2582,21 @@
                 "type": "integer"
               },
               "project": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "assets",
+                        "auth",
+                        "icons",
+                        "people",
+                        "releases",
+                        "rpc",
+                        "today"
+                      ]
+                    }
+                  }
+                ],
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                 "type": "string"
               },
@@ -2596,6 +2671,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -2701,6 +2791,21 @@
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -3054,6 +3159,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -3192,6 +3312,21 @@
           "type": "array"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -3219,6 +3354,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -3301,6 +3451,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -3739,6 +3904,21 @@
           ]
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -3793,6 +3973,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -3848,6 +4043,21 @@
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -3926,6 +4136,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -4062,6 +4287,21 @@
                 "type": "string"
               },
               "project": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "assets",
+                        "auth",
+                        "icons",
+                        "people",
+                        "releases",
+                        "rpc",
+                        "today"
+                      ]
+                    }
+                  }
+                ],
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                 "type": "string"
               },
@@ -4116,6 +4356,21 @@
           "type": "object"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -4133,6 +4388,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -4179,6 +4449,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -4601,6 +4886,21 @@
           ]
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -4632,6 +4932,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -4737,6 +5052,21 @@
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -5249,6 +5579,21 @@
                   "type": "string"
                 },
                 "project": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "enum": [
+                          "assets",
+                          "auth",
+                          "icons",
+                          "people",
+                          "releases",
+                          "rpc",
+                          "today"
+                        ]
+                      }
+                    }
+                  ],
                   "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                   "type": "string"
                 },
@@ -5316,6 +5661,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -5766,6 +6126,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -5786,6 +6161,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -5909,6 +6299,21 @@
                 "type": "string"
               },
               "project": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "assets",
+                        "auth",
+                        "icons",
+                        "people",
+                        "releases",
+                        "rpc",
+                        "today"
+                      ]
+                    }
+                  }
+                ],
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                 "type": "string"
               }
@@ -6016,6 +6421,21 @@
           "type": "array"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -6280,6 +6700,21 @@
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -6422,6 +6857,21 @@
           "type": "array"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -6493,6 +6943,21 @@
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -6584,6 +7049,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -6636,6 +7116,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -6702,6 +7197,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -6965,6 +7475,21 @@
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -7054,6 +7579,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -7545,6 +8085,21 @@
                 "type": "string"
               },
               "project": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "assets",
+                        "auth",
+                        "icons",
+                        "people",
+                        "releases",
+                        "rpc",
+                        "today"
+                      ]
+                    }
+                  }
+                ],
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                 "type": "string"
               },
@@ -7661,6 +8216,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -8099,6 +8669,21 @@
           ]
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -8131,6 +8716,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -8256,6 +8856,21 @@
                 "type": "string"
               },
               "project": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "assets",
+                        "auth",
+                        "icons",
+                        "people",
+                        "releases",
+                        "rpc",
+                        "today"
+                      ]
+                    }
+                  }
+                ],
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                 "type": "string"
               },
@@ -8704,6 +9319,21 @@
                 "type": "string"
               },
               "project": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "assets",
+                        "auth",
+                        "icons",
+                        "people",
+                        "releases",
+                        "rpc",
+                        "today"
+                      ]
+                    }
+                  }
+                ],
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                 "type": "string"
               },
@@ -9216,6 +9846,21 @@
                     "type": "string"
                   },
                   "project": {
+                    "allOf": [
+                      {
+                        "not": {
+                          "enum": [
+                            "assets",
+                            "auth",
+                            "icons",
+                            "people",
+                            "releases",
+                            "rpc",
+                            "today"
+                          ]
+                        }
+                      }
+                    ],
                     "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                     "type": "string"
                   },
@@ -9318,6 +9963,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         }
@@ -9832,6 +10492,21 @@
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -9902,6 +10577,21 @@
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -9940,6 +10630,21 @@
       "additionalProperties": true,
       "properties": {
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -10716,6 +11421,21 @@
                   "type": "string"
                 },
                 "project": {
+                  "allOf": [
+                    {
+                      "not": {
+                        "enum": [
+                          "assets",
+                          "auth",
+                          "icons",
+                          "people",
+                          "releases",
+                          "rpc",
+                          "today"
+                        ]
+                      }
+                    }
+                  ],
                   "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                   "type": "string"
                 },
@@ -11228,6 +11948,21 @@
                       "type": "string"
                     },
                     "project": {
+                      "allOf": [
+                        {
+                          "not": {
+                            "enum": [
+                              "assets",
+                              "auth",
+                              "icons",
+                              "people",
+                              "releases",
+                              "rpc",
+                              "today"
+                            ]
+                          }
+                        }
+                      ],
                       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                       "type": "string"
                     },

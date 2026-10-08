@@ -224,11 +224,45 @@ export const RepoPath = Schema.NonEmptyString.pipe(Schema.brand("RepoPath"));
 export type RepoPath = typeof RepoPath.Type;
 
 /**
+ * Words a project may not be named: the web serves its own pages and files
+ * at these first path segments (`/today`, `/people/<handle>`, `/auth/…`,
+ * `/rpc`, `/releases/…`, `/icons/…` and the client build's `/assets/…`), so a
+ * project so named would be unreachable at `<web>/<project>`. A name with a
+ * dot (`llms.txt`, `install.sh`, `.well-known`) is no project's name anyway.
+ * `apps/web/test/routes.test.ts` holds this list to the web's routes.
+ */
+export const reservedProjectNames = [
+  "assets",
+  "auth",
+  "icons",
+  "people",
+  "releases",
+  "rpc",
+  "today",
+] as const;
+
+/**
  * A project's name. Lowercase words joined by single dashes, like an ask's,
- * so a command that names it is safe to paste into a shell.
+ * so a command that names it is safe to paste into a shell; none of
+ * `reservedProjectNames`, which the web's own pages take.
  */
 export const ProjectName = Schema.String.pipe(
-  Schema.check(Schema.isPattern(Words)),
+  Schema.check(
+    Schema.isPattern(Words),
+    Schema.makeFilter(
+      (name: string) =>
+        reservedProjectNames.some((reserved) => reserved === name)
+          ? `${name} is a path the web serves its own pages at, so no project takes it`
+          : true,
+      {
+        expected: `a project name other than ${reservedProjectNames.join(" or ")}`,
+        toCode: () => ({
+          runtime: `Schema.makeFilter((name: string) => !${JSON.stringify(reservedProjectNames)}.includes(name))`,
+        }),
+        toJsonSchema: () => ({ not: { enum: [...reservedProjectNames] } }),
+      }
+    )
+  ),
   Schema.brand("ProjectName")
 );
 

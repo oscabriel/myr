@@ -53,6 +53,21 @@ List every project on the platform, with its posture and how many asks it has op
             "type": "string"
           },
           "project": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "assets",
+                    "auth",
+                    "icons",
+                    "people",
+                    "releases",
+                    "rpc",
+                    "today"
+                  ]
+                }
+              }
+            ],
             "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           }
@@ -199,6 +214,21 @@ List the open asks across every project, each saying whether the caller may take
             "type": "string"
           },
           "project": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "assets",
+                    "auth",
+                    "icons",
+                    "people",
+                    "releases",
+                    "rpc",
+                    "today"
+                  ]
+                }
+              }
+            ],
             "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           },
@@ -242,6 +272,21 @@ List a project's open asks.
   "additionalProperties": true,
   "properties": {
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -375,6 +420,21 @@ Show one ask in full, with its brief in Markdown for an answerer to read first.
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -643,6 +703,21 @@ Show one ask in full, with its brief in Markdown for an answerer to read first.
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -745,6 +820,21 @@ Show who the caller is, and their claims and answers, in one project or in every
   "additionalProperties": true,
   "properties": {
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -2072,6 +2162,21 @@ Show who the caller is, and their claims and answers, in one project or in every
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -2665,6 +2770,21 @@ Show who the caller is, and their claims and answers, in one project or in every
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -3460,6 +3580,21 @@ Show who the caller is, and their claims and answers, in one project or in every
             "type": "string"
           },
           "project": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "assets",
+                    "auth",
+                    "icons",
+                    "people",
+                    "releases",
+                    "rpc",
+                    "today"
+                  ]
+                }
+              }
+            ],
             "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           },
@@ -3554,6 +3689,21 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -4885,6 +5035,21 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -5478,6 +5643,21 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -6292,6 +6472,21 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -6358,6 +6553,21 @@ Show one landing on a project's main: the ask it answered, the people it credits
   "additionalProperties": true,
   "properties": {
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -7693,6 +7903,21 @@ Show one landing on a project's main: the ask it answered, the people it credits
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -8286,6 +8511,21 @@ Show one landing on a project's main: the ask it answered, the people it credits
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -8687,6 +8927,21 @@ Show one landing on a project's main: the ask it answered, the people it credits
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -9199,6 +9454,21 @@ Show one landing on a project's main: the ask it answered, the people it credits
               "type": "string"
             },
             "project": {
+              "allOf": [
+                {
+                  "not": {
+                    "enum": [
+                      "assets",
+                      "auth",
+                      "icons",
+                      "people",
+                      "releases",
+                      "rpc",
+                      "today"
+                    ]
+                  }
+                }
+              ],
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
               "type": "string"
             },
@@ -9308,6 +9578,21 @@ Count a person's credits by project, area and role; never a score.
             "type": "integer"
           },
           "project": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "assets",
+                    "auth",
+                    "icons",
+                    "people",
+                    "releases",
+                    "rpc",
+                    "today"
+                  ]
+                }
+              }
+            ],
             "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           },
@@ -9360,6 +9645,21 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
   "additionalProperties": true,
   "properties": {
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -10687,6 +10987,21 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -11280,6 +11595,21 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -11709,6 +12039,21 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
             "type": "string"
           },
           "project": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "assets",
+                    "auth",
+                    "icons",
+                    "people",
+                    "releases",
+                    "rpc",
+                    "today"
+                  ]
+                }
+              }
+            ],
             "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           },
@@ -12157,6 +12502,21 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
             "type": "string"
           },
           "project": {
+            "allOf": [
+              {
+                "not": {
+                  "enum": [
+                    "assets",
+                    "auth",
+                    "icons",
+                    "people",
+                    "releases",
+                    "rpc",
+                    "today"
+                  ]
+                }
+              }
+            ],
             "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
             "type": "string"
           },
@@ -12669,6 +13029,21 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                 "type": "string"
               },
               "project": {
+                "allOf": [
+                  {
+                    "not": {
+                      "enum": [
+                        "assets",
+                        "auth",
+                        "icons",
+                        "people",
+                        "releases",
+                        "rpc",
+                        "today"
+                      ]
+                    }
+                  }
+                ],
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
                 "type": "string"
               },
@@ -12757,6 +13132,21 @@ Show a project's ledger: its layers, counts, commitments, releases and posture c
   "additionalProperties": true,
   "properties": {
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -13212,6 +13602,21 @@ Show a project's ledger: its layers, counts, commitments, releases and posture c
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -13245,6 +13650,21 @@ Show a project's env shape: the public schema of its environment variables, and 
   "additionalProperties": true,
   "properties": {
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -13388,6 +13808,21 @@ Show a project's env shape: the public schema of its environment variables, and 
       "type": "array"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -13438,6 +13873,21 @@ Make a project, empty or imported from a public git repo, with the caller as its
       "type": "object"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -13460,6 +13910,21 @@ Make a project, empty or imported from a public git repo, with the caller as its
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -13550,6 +14015,21 @@ Open an ask by landing its file, once its check fails on main by an assertion, t
       "type": "array"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -13819,6 +14299,21 @@ Open an ask by landing its file, once its check fails on main by an assertion, t
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -13961,6 +14456,21 @@ Propose an ask, optionally with a sealed answer; the proposal expires unless a d
       "type": "array"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -14037,6 +14547,21 @@ Propose an ask, optionally with a sealed answer; the proposal expires unless a d
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -14134,6 +14659,21 @@ Flag an open ask to its deciders with a reason, as a proposal that expires unles
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -14194,6 +14734,21 @@ Flag an open ask to its deciders with a reason, as a proposal that expires unles
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -14291,6 +14846,21 @@ Take one decision from Today: accept, decline, adopt or revert. Asks a person fi
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -14401,6 +14971,21 @@ Take one decision from Today: accept, decline, adopt or revert. Asks a person fi
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -14783,6 +15368,21 @@ Claim an ask: an exclusive, expiring right to answer it, with a fork to push to;
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -14846,6 +15446,21 @@ Claim an ask: an exclusive, expiring right to answer it, with a fork to push to;
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -14928,6 +15543,21 @@ Release the caller's claim on an ask, so anyone may claim it again.
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -14999,6 +15629,21 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -16337,6 +16982,21 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -16930,6 +17590,21 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -17661,6 +18336,21 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
       ]
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -17723,6 +18413,21 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -19061,6 +19766,21 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -19654,6 +20374,21 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -20385,6 +21120,21 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
       ]
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -20435,6 +21185,21 @@ Land a decider's own change from their working fork, after the same checks an an
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -21773,6 +22538,21 @@ Land a decider's own change from their working fork, after the same checks an an
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -22366,6 +23146,21 @@ Land a decider's own change from their working fork, after the same checks an an
           "type": "string"
         },
         "project": {
+          "allOf": [
+            {
+              "not": {
+                "enum": [
+                  "assets",
+                  "auth",
+                  "icons",
+                  "people",
+                  "releases",
+                  "rpc",
+                  "today"
+                ]
+              }
+            }
+          ],
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "type": "string"
         },
@@ -23081,6 +23876,21 @@ Land a decider's own change from their working fork, after the same checks an an
       ]
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },
@@ -23118,6 +23928,21 @@ Make the caller's working fork of a project, or return it if it exists.
   "additionalProperties": true,
   "properties": {
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     }
@@ -23177,6 +24002,21 @@ Vouch for a person, or denounce them, by landing a line in the project's vouch f
       "type": "string"
     },
     "project": {
+      "allOf": [
+        {
+          "not": {
+            "enum": [
+              "assets",
+              "auth",
+              "icons",
+              "people",
+              "releases",
+              "rpc",
+              "today"
+            ]
+          }
+        }
+      ],
       "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
       "type": "string"
     },

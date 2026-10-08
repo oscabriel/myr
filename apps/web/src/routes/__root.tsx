@@ -32,10 +32,31 @@ const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
   platformUrl: env.PUBLIC_PLATFORM_URL,
 }));
 
+/**
+ * The browser's chrome colour for each scheme. Rendered into the head
+ * directly, not through `rootHead`: both metas are named `theme-color`, and
+ * TanStack's `HeadContent` keeps one meta per name.
+ */
+export const ThemeColors = () => (
+  <>
+    <meta
+      content={themeColors.light}
+      media="(prefers-color-scheme: light)"
+      name="theme-color"
+    />
+    <meta
+      content={themeColors.dark}
+      media="(prefers-color-scheme: dark)"
+      name="theme-color"
+    />
+  </>
+);
+
 const Document = ({ children }: Readonly<{ children: ReactNode }>) => (
   <html lang="en">
     <head>
       <HeadContent />
+      <ThemeColors />
     </head>
     <body className="flex min-h-dvh flex-col">
       {children}
@@ -59,31 +80,33 @@ const Root = () => {
   );
 };
 
+/** The site's icon, drawn to scale (`public/icons/icon.svg`, issue 505). */
+const ICON_PATH = "/icons/icon.svg";
+
+/**
+ * The document's head on every page: the stylesheet, the manifest, the icon
+ * and the metas. TanStack keeps one meta per `name` (the last a route gives),
+ * so each meta here must have a name of its own; the two theme colours are
+ * `ThemeColors`, in the document itself.
+ */
+export const rootHead = () => ({
+  links: [
+    { href: styles, rel: "stylesheet" },
+    // Written from `Brand.name` at each build by `vite.config.ts` (issue 505).
+    { href: MANIFEST_PATH, rel: "manifest" },
+    { href: ICON_PATH, rel: "icon", type: "image/svg+xml" },
+  ],
+  meta: [
+    { charSet: "utf-8" },
+    { content: "width=device-width, initial-scale=1", name: "viewport" },
+    { content: "light dark", name: "color-scheme" },
+    { title: Brand.name },
+  ],
+});
+
 export const Route = createRootRoute({
   component: Root,
-  head: () => ({
-    links: [
-      { href: styles, rel: "stylesheet" },
-      // Written from `Brand.name` at each build by `vite.config.ts` (issue 505).
-      { href: MANIFEST_PATH, rel: "manifest" },
-    ],
-    meta: [
-      { charSet: "utf-8" },
-      { content: "width=device-width, initial-scale=1", name: "viewport" },
-      { content: "light dark", name: "color-scheme" },
-      {
-        content: themeColors.light,
-        media: "(prefers-color-scheme: light)",
-        name: "theme-color",
-      },
-      {
-        content: themeColors.dark,
-        media: "(prefers-color-scheme: dark)",
-        name: "theme-color",
-      },
-      { title: Brand.name },
-    ],
-  }),
+  head: rootHead,
   loader: () => siteFacts(),
   // The facts are the stage's, fixed for the Worker's life: fetch them once.
   staleTime: Number.POSITIVE_INFINITY,

@@ -480,29 +480,33 @@ describe("the CLI's releases, served by the platform", () => {
       })
   );
 
+  // `releases` is a name no project may take (W5 599: the web forwards
+  // `/releases/*` here), so git's paths under it reach the gateway and find
+  // no repo; a project's own push still asks for a credential. The releases'
+  // own 404 has no body, so the text says the gateway answered.
   it.effect(
-    "leaves git's paths to the gateway, even for a project named releases",
+    "leaves git's paths to the gateway, which knows no repo named releases",
     () =>
       Effect.gen(function* () {
         const { reads, send } = yield* releasesServed(files);
 
-        // A push with no credential: the gateway asks git for one.
-        const pushes = [
-          yield* send("/releases/info/refs?service=git-receive-pack"),
-          yield* send("/datekit/info/refs?service=git-receive-pack"),
-        ];
-
-        expect(
-          pushes.map((reply) => ({
-            challenge: reply.headers.get("www-authenticate"),
-            status: reply.status,
-          }))
-        ).toStrictEqual(
-          pushes.map(() => ({
-            challenge: `Basic realm="${Brand.name}"`,
-            status: 401,
-          }))
+        const reserved = yield* send(
+          "/releases/info/refs?service=git-receive-pack"
         );
+
+        // A push with no credential: the gateway asks git for one.
+        const push = yield* send("/datekit/info/refs?service=git-receive-pack");
+
+        expect({
+          push: {
+            challenge: push.headers.get("www-authenticate"),
+            status: push.status,
+          },
+          reserved: { status: reserved.status, text: yield* textOf(reserved) },
+        }).toStrictEqual({
+          push: { challenge: `Basic realm="${Brand.name}"`, status: 401 },
+          reserved: { status: 404, text: "no repo releases\n" },
+        });
         expect(yield* reads).toStrictEqual([]);
       })
   );

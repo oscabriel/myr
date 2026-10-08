@@ -12,15 +12,18 @@ import { NoStage, UnknownStage } from "../../../infra/stages.ts";
 import {
   main,
   NoOrigin,
+  platformProbes,
   probes,
   smoke,
   SmokeFailed,
+  webProbes,
 } from "../../../scripts/smoke.ts";
 
 /** What the fake platform answers one request with. */
 interface Reply {
   readonly status: number;
   readonly body?: string;
+  readonly contentType?: string;
 }
 
 /** A request as the fake platform sees it. */
@@ -127,7 +130,7 @@ const fakePlatform = (answer: (seen: Seen) => Reply) =>
       return reply.body === undefined
         ? HttpServerResponse.empty({ status: reply.status })
         : HttpServerResponse.text(reply.body, {
-            contentType: "application/json",
+            contentType: reply.contentType ?? "application/json",
             status: reply.status,
           });
     });
@@ -152,7 +155,7 @@ describe("smoke against a live stage", () => {
       expect(report.origin).toBe(origin);
       expect(report.stage).toBe("dev-oscabriel");
       expect(report.probes.map(({ probe }) => probe)).toStrictEqual([
-        ...probes,
+        ...platformProbes,
       ]);
       expect(
         report.probes.every(({ elapsedMs }) => elapsedMs >= 0)
@@ -197,7 +200,10 @@ describe("smoke against a live stage", () => {
         expect({
           asked,
           probes: report.probes.map(({ probe }) => probe),
-        }).toStrictEqual({ asked: { health: 3, rpc: 2 }, probes: [...probes] });
+        }).toStrictEqual({
+          asked: { health: 3, rpc: 2 },
+          probes: [...platformProbes],
+        });
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
@@ -240,8 +246,85 @@ describe("smoke against a live stage", () => {
         Result.isFailure(result)
           ? result.failure.failures.map(({ probe }) => probe)
           : []
-      ).toStrictEqual([...probes]);
+      ).toStrictEqual([...platformProbes]);
     }).pipe(Effect.provide(FetchHttpClient.layer))
+  );
+});
+
+/**
+ * The web as smoke expects to find it (W5 599): its front page renders, and
+ * its `/llms.txt` answers with the Markdown it builds from the platform's
+ * project list, which only a web that reaches the platform can.
+ */
+const healthyWeb = ({ method, path }: Seen): Reply => {
+  if (method === "GET" && path === "/") {
+    return {
+      body: '<!DOCTYPE html><html lang="en"><head></head><body></body></html>',
+      contentType: "text/html; charset=utf-8",
+      status: 200,
+    };
+  }
+
+  if (method === "GET" && path === "/llms.txt") {
+    return {
+      body: "# Platform\n\n> A Git platform.\n",
+      contentType: "text/markdown; charset=utf-8",
+      status: 200,
+    };
+  }
+
+  return { status: 404 };
+};
+
+describe("smoke against a stage's web", () => {
+  it.live(
+    "passes the front page and /llms.txt from the web, after every platform probe",
+    () =>
+      Effect.gen(function* () {
+        const origin = yield* fakePlatform(healthy);
+        const web = yield* fakePlatform(healthyWeb);
+        const report = yield* smoke(origin, { web });
+
+        expect(report.probes.map(({ probe }) => probe)).toStrictEqual([
+          ...probes,
+        ]);
+        expect(webProbes).toStrictEqual(["web-front-page", "web-llms-txt"]);
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  it.live(
+    "fails the web's probes when its front page is not HTML and its /llms.txt cannot reach the platform",
+    () =>
+      Effect.gen(function* () {
+        const origin = yield* fakePlatform(healthy);
+
+        const web = yield* fakePlatform((seen) =>
+          seen.path === "/llms.txt"
+            ? {
+                body: "# Unavailable\n\nThe platform did not answer.\n",
+                contentType: "text/markdown; charset=utf-8",
+                status: 503,
+              }
+            : { body: "{}", contentType: "application/json", status: 200 }
+        );
+
+        const result = yield* Effect.result(
+          smoke(origin, { settling: "1 second", web })
+        );
+
+        expect(
+          Result.isFailure(result) ? result.failure.failures : []
+        ).toStrictEqual([
+          {
+            probe: "web-front-page",
+            reason: "GET / on the web answered application/json, not HTML",
+          },
+          {
+            probe: "web-llms-txt",
+            reason: "GET /llms.txt on the web answered 503, not 200",
+          },
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 });
 
@@ -333,6 +416,25 @@ describe("the smoke command", () => {
       ).toStrictEqual(["health"]);
       // `runMain` prints a failure as its tag and its message, and nothing else.
       expect(failed.message).toBe(`health failed at ${origin}`);
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live("probes the web at --web-url, and only there, beside --url", () =>
+    Effect.gen(function* () {
+      const origin = yield* fakePlatform(healthy);
+      const web = yield* fakePlatform(() => ({ status: 404 }));
+
+      yield* main(["--stage", "dev-oscabriel", "--url", origin]);
+
+      const failed = yield* Effect.flip(
+        main(["--stage", "dev-oscabriel", "--url", origin, "--web-url", web])
+      );
+
+      expect(
+        Schema.is(SmokeFailed)(failed)
+          ? failed.failures.map(({ probe }) => probe)
+          : []
+      ).toStrictEqual([...webProbes]);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
