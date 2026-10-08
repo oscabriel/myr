@@ -92,9 +92,7 @@ const EVERY_PACKAGE: readonly string[] = [
  * `test-only` rule's to say.
  *
  * Narrower than a row: `OnlySubpaths`. `@repo/web`'s dev backend (the
- * artifacts and project memory adapters) and `@repo/cli`'s narrower edges
- * (`rules/bun`, `artifacts/local`, visibility's parser) are added here when
- * the work that imports them (401, 501) builds those subpaths.
+ * artifacts and project memory adapters) is added there when 501 builds it.
  */
 export const Matrix = {
   "@repo/agent-kit": ["@repo/brand", "@repo/checks", "@repo/protocol"],
@@ -181,6 +179,21 @@ export const ChecksPureSubpaths: readonly string[] = [
  * importer, then imported package. `*` matches the rest of a subpath.
  */
 export const OnlySubpaths = {
+  // The CLI runs on a person's machine (spec §4.1): rules through `/bun` and
+  // `/json` only (never the Worker Loader's `/worker`), repos only on local
+  // disk (never through the binding or the REST API), and visibility's
+  // `.env.schema` parser alone (W6).
+  "@repo/cli": {
+    "@repo/artifacts": ["fetch", "repo-host", "repo-host/local"],
+    "@repo/rules": [
+      "defaults",
+      "finish",
+      "rules-evaluator",
+      "rules-evaluator/bun",
+      "rules-evaluator/json",
+    ],
+    "@repo/visibility": ["env-schema", "env-schema/*"],
+  },
   "@repo/gate": { "@repo/checks": ChecksPureSubpaths },
   // Both sides of the platform's service binding decode the Lander's jobs
   // with one schema; the sandbox takes nothing else of the project.

@@ -32,7 +32,7 @@ myr ask <ask> [--project <project>] [--json]
 Flag an open ask to its deciders with a reason, as a proposal that expires unless a decider accepts it.
 
 ```sh
-myr ask flag --ask <ask> [--project <project>] --reason <reason> [--json] [--dry-run]
+myr ask flag <ask> [--project <project>] --reason <reason> [--json] [--dry-run]
 ```
 
 - Contract: `flagAsk`
@@ -44,7 +44,7 @@ myr ask flag --ask <ask> [--project <project>] --reason <reason> [--json] [--dry
 
 | Argument | Takes | Required |
 | --- | --- | --- |
-| `--ask` | text | yes |
+| `<ask>` | text | yes |
 | `--project` | text | no: the project of the repo you stand in |
 | `--reason` | text | yes |
 | `--json` | nothing (a switch) | no |
@@ -55,7 +55,7 @@ myr ask flag --ask <ask> [--project <project>] --reason <reason> [--json] [--dry
 Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way.
 
 ```sh
-myr ask open --ask <ask> --files <files> [--project <project>] [--json] [--yes] [--dry-run]
+myr ask open <ask> --files <files> [--project <project>] [--json] [--yes] [--dry-run]
 ```
 
 - Contract: `openAsk`
@@ -67,7 +67,7 @@ myr ask open --ask <ask> --files <files> [--project <project>] [--json] [--yes] 
 
 | Argument | Takes | Required |
 | --- | --- | --- |
-| `--ask` | text | yes |
+| `<ask>` | text | yes |
 | `--files` | JSON | yes |
 | `--project` | text | no: the project of the repo you stand in |
 | `--json` | nothing (a switch) | no |
@@ -549,7 +549,7 @@ myr schema <command> [flags]
 
 ## `myr status`
 
-Show the caller's claims and answers, in one project or in every one.
+Show who the caller is, and their claims and answers, in one project or in every one.
 
 ```sh
 myr status [--project <project>] [--json]

@@ -30,6 +30,16 @@ import { bunPrelude, clockVariable } from "./bun-prelude.ts";
 export interface BunOptions {
   /** The bun binary; `bun` on the `PATH` by default. */
   readonly bun?: string;
+  /**
+   * What the bun binary needs in its env beside `PATH` and the clock: a
+   * compiled CLI runs itself as bun with `BUN_BE_BUN=1`. None by default.
+   */
+  readonly env?: Readonly<Record<string, string>>;
+  /**
+   * The module the main hands the exports to (`../entry.ts` here, or a
+   * bundled copy of it on disk); this package's own by default.
+   */
+  readonly entry?: string;
   /** The module the sdk's imports point at; `@repo/sdk`'s entry by default. */
   readonly sdk?: string;
   /** How long config code may run; 5 seconds by default. */
@@ -167,7 +177,8 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
       const fromUrl = (url: string) =>
         Effect.orDie(path.fromFileUrl(new URL(url)));
 
-      const entry = yield* fromUrl(import.meta.resolve("../entry.ts"));
+      const entry =
+        options.entry ?? (yield* fromUrl(import.meta.resolve("../entry.ts")));
 
       const sdk =
         options.sdk ?? (yield* fromUrl(import.meta.resolve("@repo/sdk")));
@@ -236,7 +247,11 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
             ],
             {
               cwd: dir,
-              env: { [clockVariable]: JSON.stringify(clock), PATH: searchPath },
+              env: {
+                ...options.env,
+                [clockVariable]: JSON.stringify(clock),
+                PATH: searchPath,
+              },
               extendEnv: false,
               forceKillAfter: "1 second",
             }

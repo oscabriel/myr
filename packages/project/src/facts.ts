@@ -181,7 +181,6 @@ export const pushFacts = (
       opensAsk: false,
       policy: input.policy,
       pusher: input.pusher,
-      ratchetCounts: new Map(),
       ref: Option.getOrElse(Schema.decodeOption(RefNameText)(input.ref), () =>
         RefNameText.make("refs/heads/main")
       ),

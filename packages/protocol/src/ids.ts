@@ -15,9 +15,11 @@ const Minted = /^[a-z]+-[0-9a-z]{6,26}$/u;
 
 /**
  * Words an ask may not be named: `me` names a person's working fork
- * (`<project>--me--<handle>`) and `layer` names a layer's repo.
+ * (`<project>--me--<handle>`), `layer` names a layer's repo, and `open` and
+ * `flag` are subcommands of `<cli> ask <ask>`, which would shadow an ask so
+ * named.
  */
-const reservedAskIds = ["me", "layer"] as const;
+const reservedAskIds = ["me", "layer", "open", "flag"] as const;
 
 const isReserved = (name: string) =>
   reservedAskIds.some((reserved) => reserved === name);
@@ -25,7 +27,7 @@ const isReserved = (name: string) =>
 /**
  * An ask's name. Lowercase words joined by single dashes, so a command that
  * names it (`<cli> claim <ask>`) is safe to paste into a shell and a fork's
- * name splits back into its parts. `me` and `layer` are taken.
+ * name splits back into its parts. `me`, `layer`, `open` and `flag` are taken.
  */
 export const AskId = Schema.String.pipe(
   Schema.check(
@@ -33,7 +35,7 @@ export const AskId = Schema.String.pipe(
     Schema.makeFilter(
       (name: string) =>
         isReserved(name)
-          ? `${name} is reserved for working forks and layers, so no ask takes it`
+          ? `${name} is reserved for working forks, layers and the CLI's ask commands, so no ask takes it`
           : true,
       {
         expected: `an ask name other than ${reservedAskIds.join(" or ")}`,

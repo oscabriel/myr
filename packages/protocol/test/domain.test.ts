@@ -238,11 +238,16 @@ describe("names and ids", () => {
   );
 
   // `--` separates a fork's parts, and `me` and `layer` stand where an ask's
-  // name would in a working fork's or a layer's repo name.
-  it.each(["me", "layer"])("an ask may not be named %j", (name) => {
-    expect(refuses(AskId, name)).toBeTruthy();
-    expect(refuses(ProjectName, name)).toBeFalsy();
-  });
+  // name would in a working fork's or a layer's repo name. `open` and `flag`
+  // are `<cli> ask`'s subcommands, so `<cli> ask open` could never show an
+  // ask named `open`.
+  it.each(["me", "layer", "open", "flag"])(
+    "an ask may not be named %j",
+    (name) => {
+      expect(refuses(AskId, name)).toBeTruthy();
+      expect(refuses(ProjectName, name)).toBeFalsy();
+    }
+  );
 
   const tree = "5555555555555555555555555555555555555555";
 

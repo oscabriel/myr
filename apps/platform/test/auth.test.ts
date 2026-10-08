@@ -9,7 +9,7 @@ import {
 } from "@repo/protocol/principal";
 import type { Principal } from "@repo/protocol/principal";
 import { UnknownProject } from "@repo/protocol/refusal";
-import { Effect, Exit, Layer, Option, Redacted, Ref } from "effect";
+import { Effect, Exit, Layer, Option, Redacted, Ref, Schema } from "effect";
 
 import { Sessions } from "../src/sessions.ts";
 import { firstOf } from "../src/sessions/first-of.ts";
@@ -38,6 +38,8 @@ const sessions = MemorySessions.layer({ [aliceToken]: alice });
 
 const metadataUrl = `${origin}/.well-known/oauth-protected-resource`;
 
+const isPerson = Schema.is(Person);
+
 /**
  * The platform before any project exists, except that `listAsks` and
  * `status` answer, each noting who called it in `seen`.
@@ -51,7 +53,17 @@ const noting = (seen: Ref.Ref<readonly Principal[]>) => {
     noProjects,
     Contracts.toLayerHandler("listAsks", () => Effect.as(note, { asks: [] })),
     Contracts.toLayerHandler("status", () =>
-      Effect.as(note, { answers: [], claims: [] })
+      Effect.andThen(note, Effect.service(CurrentPrincipal)).pipe(
+        Effect.flatMap((principal) =>
+          isPerson(principal)
+            ? Effect.succeed({
+                answers: [],
+                claims: [],
+                handle: principal.handle,
+              })
+            : Effect.die("status is for people signed in")
+        )
+      )
     )
   );
 };
@@ -371,7 +383,7 @@ describe("verifying a token", () => {
 
         expect(result).toStrictEqual({
           isError: false,
-          json: { answers: [], claims: [] },
+          json: { answers: [], claims: [], handle: alice },
         });
         expect(yield* Ref.get(seen)).toStrictEqual([
           Person.make({ handle: alice }),
@@ -391,7 +403,7 @@ describe("verifying a token", () => {
       const asAlice = yield* rpcClient(handler, aliceToken);
 
       expect(yield* Effect.exit(asAlice.status({}))).toStrictEqual(
-        Exit.succeed({ answers: [], claims: [] })
+        Exit.succeed({ answers: [], claims: [], handle: alice })
       );
       expect(yield* Ref.get(seen)).toStrictEqual([
         Person.make({ handle: alice }),
@@ -418,10 +430,12 @@ describe("sessions", () => {
         const asAlice = yield* rpcClient(handler, aliceToken);
         const asOperator = yield* rpcClient(handler, operatorToken);
 
-        const empty = Exit.succeed({ answers: [], claims: [] });
-
-        expect(yield* Effect.exit(asAlice.status({}))).toStrictEqual(empty);
-        expect(yield* Effect.exit(asOperator.status({}))).toStrictEqual(empty);
+        expect(yield* Effect.exit(asAlice.status({}))).toStrictEqual(
+          Exit.succeed({ answers: [], claims: [], handle: alice })
+        );
+        expect(yield* Effect.exit(asOperator.status({}))).toStrictEqual(
+          Exit.succeed({ answers: [], claims: [], handle: operator })
+        );
 
         expect(yield* Ref.get(seen)).toStrictEqual([
           Person.make({ handle: alice }),

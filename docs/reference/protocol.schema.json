@@ -16,7 +16,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -49,7 +51,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -65,7 +69,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -111,7 +117,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -329,7 +337,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -854,7 +864,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -1791,7 +1803,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -2362,7 +2376,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -2393,7 +2409,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -2703,7 +2721,9 @@
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -2826,7 +2846,9 @@
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -2871,7 +2893,9 @@
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -2956,7 +2980,9 @@
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -3256,7 +3282,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -3299,7 +3327,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -3689,7 +3719,9 @@
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -3750,7 +3782,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -3796,7 +3830,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -3953,7 +3989,9 @@
                         "not": {
                           "enum": [
                             "me",
-                            "layer"
+                            "layer",
+                            "open",
+                            "flag"
                           ]
                         }
                       }
@@ -3968,7 +4006,9 @@
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -4541,7 +4581,9 @@
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -4616,7 +4658,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -4713,7 +4757,9 @@
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -5179,7 +5225,9 @@
                               "not": {
                                 "enum": [
                                   "me",
-                                  "layer"
+                                  "layer",
+                                  "open",
+                                  "flag"
                                 ]
                               }
                             }
@@ -5760,7 +5808,9 @@
                     "not": {
                       "enum": [
                         "me",
-                        "layer"
+                        "layer",
+                        "open",
+                        "flag"
                       ]
                     }
                   }
@@ -5775,7 +5825,9 @@
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -5913,7 +5965,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -5990,7 +6044,9 @@
                     "not": {
                       "enum": [
                         "me",
-                        "layer"
+                        "layer",
+                        "open",
+                        "flag"
                       ]
                     }
                   }
@@ -6182,7 +6238,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -6211,7 +6269,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -6415,7 +6475,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -6511,7 +6573,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -6627,7 +6691,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -6663,7 +6729,9 @@
                     "not": {
                       "enum": [
                         "me",
-                        "layer"
+                        "layer",
+                        "open",
+                        "flag"
                       ]
                     }
                   }
@@ -6855,7 +6923,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -6884,7 +6954,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -7001,7 +7073,9 @@
                     "not": {
                       "enum": [
                         "me",
-                        "layer"
+                        "layer",
+                        "open",
+                        "flag"
                       ]
                     }
                   }
@@ -7390,7 +7464,9 @@
                             "not": {
                               "enum": [
                                 "me",
-                                "layer"
+                                "layer",
+                                "open",
+                                "flag"
                               ]
                             }
                           }
@@ -7433,7 +7509,9 @@
                     "not": {
                       "enum": [
                         "me",
-                        "layer"
+                        "layer",
+                        "open",
+                        "flag"
                       ]
                     }
                   }
@@ -7508,11 +7586,16 @@
             "type": "object"
           },
           "type": "array"
+        },
+        "handle": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+          "type": "string"
         }
       },
       "required": [
         "answers",
-        "claims"
+        "claims",
+        "handle"
       ],
       "type": "object"
     },
@@ -7559,7 +7642,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -7602,7 +7687,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -7992,7 +8079,9 @@
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -8187,7 +8276,9 @@
                             "not": {
                               "enum": [
                                 "me",
-                                "layer"
+                                "layer",
+                                "open",
+                                "flag"
                               ]
                             }
                           }
@@ -8310,7 +8401,9 @@
                             "not": {
                               "enum": [
                                 "me",
-                                "layer"
+                                "layer",
+                                "open",
+                                "flag"
                               ]
                             }
                           }
@@ -8355,7 +8448,9 @@
                             "not": {
                               "enum": [
                                 "me",
-                                "layer"
+                                "layer",
+                                "open",
+                                "flag"
                               ]
                             }
                           }
@@ -8440,7 +8535,9 @@
                             "not": {
                               "enum": [
                                 "me",
-                                "layer"
+                                "layer",
+                                "open",
+                                "flag"
                               ]
                             }
                           }
@@ -8528,7 +8625,9 @@
                     "not": {
                       "enum": [
                         "me",
-                        "layer"
+                        "layer",
+                        "open",
+                        "flag"
                       ]
                     }
                   }
@@ -8625,7 +8724,9 @@
                         "not": {
                           "enum": [
                             "me",
-                            "layer"
+                            "layer",
+                            "open",
+                            "flag"
                           ]
                         }
                       }
@@ -9091,7 +9192,9 @@
                                 "not": {
                                   "enum": [
                                     "me",
-                                    "layer"
+                                    "layer",
+                                    "open",
+                                    "flag"
                                   ]
                                 }
                               }
@@ -9200,7 +9303,9 @@
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -9235,7 +9340,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -9701,7 +9808,9 @@
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -9860,7 +9969,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -9906,7 +10017,9 @@
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -9921,7 +10034,9 @@
                         "not": {
                           "enum": [
                             "me",
-                            "layer"
+                            "layer",
+                            "open",
+                            "flag"
                           ]
                         }
                       }
@@ -9994,7 +10109,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -10075,7 +10192,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -10464,7 +10583,9 @@
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -10516,7 +10637,9 @@
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -10613,7 +10736,9 @@
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -11079,7 +11204,9 @@
                                   "not": {
                                     "enum": [
                                       "me",
-                                      "layer"
+                                      "layer",
+                                      "open",
+                                      "flag"
                                     ]
                                   }
                                 }
@@ -11182,7 +11309,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -11597,7 +11726,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -11640,7 +11771,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -11678,7 +11811,9 @@
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }

@@ -126,7 +126,9 @@ List the open asks across every project, each saying whether the caller may take
                     "not": {
                       "enum": [
                         "me",
-                        "layer"
+                        "layer",
+                        "open",
+                        "flag"
                       ]
                     }
                   }
@@ -141,7 +143,9 @@ List the open asks across every project, each saying whether the caller may take
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -265,7 +269,9 @@ List a project's open asks.
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -280,7 +286,9 @@ List a project's open asks.
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -356,7 +364,9 @@ Show one ask in full, with its brief in Markdown for an answerer to read first.
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -397,7 +407,9 @@ Show one ask in full, with its brief in Markdown for an answerer to read first.
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -589,7 +601,9 @@ Show one ask in full, with its brief in Markdown for an answerer to read first.
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -618,7 +632,9 @@ Show one ask in full, with its brief in Markdown for an answerer to read first.
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -713,7 +729,7 @@ Show one ask in full, with its brief in Markdown for an answerer to read first.
 
 ## status
 
-Show the caller's claims and answers, in one project or in every one.
+Show who the caller is, and their claims and answers, in one project or in every one.
 
 | Hint | Value |
 | --- | --- |
@@ -757,7 +773,9 @@ Show the caller's claims and answers, in one project or in every one.
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -790,7 +808,9 @@ Show the caller's claims and answers, in one project or in every one.
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -806,7 +826,9 @@ Show the caller's claims and answers, in one project or in every one.
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -852,7 +874,9 @@ Show the caller's claims and answers, in one project or in every one.
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -1070,7 +1094,9 @@ Show the caller's claims and answers, in one project or in every one.
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -1595,7 +1621,9 @@ Show the caller's claims and answers, in one project or in every one.
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -2408,7 +2436,9 @@ Show the caller's claims and answers, in one project or in every one.
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -2958,7 +2988,9 @@ Show the caller's claims and answers, in one project or in every one.
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -3347,7 +3379,9 @@ Show the caller's claims and answers, in one project or in every one.
                         "not": {
                           "enum": [
                             "me",
-                            "layer"
+                            "layer",
+                            "open",
+                            "flag"
                           ]
                         }
                       }
@@ -3390,7 +3424,9 @@ Show the caller's claims and answers, in one project or in every one.
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -3465,11 +3501,16 @@ Show the caller's claims and answers, in one project or in every one.
         "type": "object"
       },
       "type": "array"
+    },
+    "handle": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$",
+      "type": "string"
     }
   },
   "required": [
     "answers",
-    "claims"
+    "claims",
+    "handle"
   ],
   "type": "object"
 }
@@ -3498,7 +3539,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -3543,7 +3586,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -3576,7 +3621,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -3592,7 +3639,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -3638,7 +3687,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -3856,7 +3907,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -4381,7 +4434,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -5194,7 +5249,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -5743,7 +5800,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -6209,7 +6268,9 @@ Show the verdict on an answer to an ask, for its latest head or the one named; h
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -6333,7 +6394,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -6366,7 +6429,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -6382,7 +6447,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -6428,7 +6495,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -6646,7 +6715,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -7171,7 +7242,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -7984,7 +8057,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -8533,7 +8608,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -8630,7 +8707,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -9096,7 +9175,9 @@ Show one landing on a project's main: the ask it answered, the people it credits
                           "not": {
                             "enum": [
                               "me",
-                              "layer"
+                              "layer",
+                              "open",
+                              "flag"
                             ]
                           }
                         }
@@ -9307,7 +9388,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -9340,7 +9423,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -9356,7 +9441,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -9402,7 +9489,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -9620,7 +9709,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -10145,7 +10236,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -10958,7 +11051,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -11634,7 +11729,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                         "not": {
                           "enum": [
                             "me",
-                            "layer"
+                            "layer",
+                            "open",
+                            "flag"
                           ]
                         }
                       }
@@ -11757,7 +11854,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                         "not": {
                           "enum": [
                             "me",
-                            "layer"
+                            "layer",
+                            "open",
+                            "flag"
                           ]
                         }
                       }
@@ -11802,7 +11901,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                         "not": {
                           "enum": [
                             "me",
-                            "layer"
+                            "layer",
+                            "open",
+                            "flag"
                           ]
                         }
                       }
@@ -11887,7 +11988,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                         "not": {
                           "enum": [
                             "me",
-                            "layer"
+                            "layer",
+                            "open",
+                            "flag"
                           ]
                         }
                       }
@@ -11975,7 +12078,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -12072,7 +12177,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                     "not": {
                       "enum": [
                         "me",
-                        "layer"
+                        "layer",
+                        "open",
+                        "flag"
                       ]
                     }
                   }
@@ -12538,7 +12645,9 @@ Show the caller's Today: the decisions to take, held to their budget, each with 
                             "not": {
                               "enum": [
                                 "me",
-                                "layer"
+                                "layer",
+                                "open",
+                                "flag"
                               ]
                             }
                           }
@@ -13390,7 +13499,9 @@ Open an ask by landing its file, once its check fails on main by an assertion, t
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -13472,7 +13583,9 @@ Open an ask by landing its file, once its check fails on main by an assertion, t
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -13664,7 +13777,9 @@ Open an ask by landing its file, once its check fails on main by an assertion, t
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -13693,7 +13808,9 @@ Open an ask by landing its file, once its check fails on main by an assertion, t
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -13902,7 +14019,9 @@ Propose an ask, optionally with a sealed answer; the proposal expires unless a d
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -14004,7 +14123,9 @@ Flag an open ask to its deciders with a reason, as a proposal that expires unles
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -14055,7 +14176,9 @@ Flag an open ask to its deciders with a reason, as a proposal that expires unles
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -14298,7 +14421,9 @@ Take one decision from Today: accept, decline, adopt or revert. Asks a person fi
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -14421,7 +14546,9 @@ Take one decision from Today: accept, decline, adopt or revert. Asks a person fi
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -14466,7 +14593,9 @@ Take one decision from Today: accept, decline, adopt or revert. Asks a person fi
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -14551,7 +14680,9 @@ Take one decision from Today: accept, decline, adopt or revert. Asks a person fi
                       "not": {
                         "enum": [
                           "me",
-                          "layer"
+                          "layer",
+                          "open",
+                          "flag"
                         ]
                       }
                     }
@@ -14641,7 +14772,9 @@ Claim an ask: an exclusive, expiring right to answer it, with a fork to push to;
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -14677,7 +14810,9 @@ Claim an ask: an exclusive, expiring right to answer it, with a fork to push to;
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -14782,7 +14917,9 @@ Release the caller's claim on an ask, so anyone may claim it again.
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -14843,7 +14980,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -14899,7 +15038,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -14932,7 +15073,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -14948,7 +15091,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -14994,7 +15139,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -15212,7 +15359,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -15737,7 +15886,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -16550,7 +16701,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -17096,7 +17249,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -17486,7 +17641,9 @@ Offer the commit `head`, built on `base`, as an answer to a claimed ask; the rec
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -17547,7 +17704,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -17603,7 +17762,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -17636,7 +17797,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -17652,7 +17815,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -17698,7 +17863,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -17916,7 +18083,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -18441,7 +18610,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -19254,7 +19425,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -19800,7 +19973,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
           "not": {
             "enum": [
               "me",
-              "layer"
+              "layer",
+              "open",
+              "flag"
             ]
           }
         }
@@ -20190,7 +20365,9 @@ Finish a passing answer with a decider's own commits on top; they are checked ag
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -20297,7 +20474,9 @@ Land a decider's own change from their working fork, after the same checks an an
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -20330,7 +20509,9 @@ Land a decider's own change from their working fork, after the same checks an an
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -20346,7 +20527,9 @@ Land a decider's own change from their working fork, after the same checks an an
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }
@@ -20392,7 +20575,9 @@ Land a decider's own change from their working fork, after the same checks an an
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -20610,7 +20795,9 @@ Land a decider's own change from their working fork, after the same checks an an
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -21135,7 +21322,9 @@ Land a decider's own change from their working fork, after the same checks an an
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -21948,7 +22137,9 @@ Land a decider's own change from their working fork, after the same checks an an
               "not": {
                 "enum": [
                   "me",
-                  "layer"
+                  "layer",
+                  "open",
+                  "flag"
                 ]
               }
             }
@@ -22870,7 +23061,9 @@ Land a decider's own change from their working fork, after the same checks an an
                   "not": {
                     "enum": [
                       "me",
-                      "layer"
+                      "layer",
+                      "open",
+                      "flag"
                     ]
                   }
                 }

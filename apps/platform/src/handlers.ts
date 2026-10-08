@@ -90,14 +90,21 @@ const atGateway = (claim: ClaimView) =>
     remote,
   }));
 
-/** The caller's claims and answers, each claim at the caller's gateway. */
-const statusAtGateway = (status: {
-  readonly answers: readonly AnswerView[];
-  readonly claims: readonly ClaimView[];
-}) =>
+/**
+ * The caller's claims and answers, each claim at the caller's gateway, under
+ * the caller's own handle (a first login has no claim to read it from).
+ */
+const statusAtGateway = (
+  who: Person,
+  status: {
+    readonly answers: readonly AnswerView[];
+    readonly claims: readonly ClaimView[];
+  }
+) =>
   Effect.map(Effect.forEach(status.claims, atGateway), (claims) => ({
     answers: status.answers,
     claims,
+    handle: who.handle,
   }));
 
 /** Decisions across projects: soonest to expire first, then oldest, then by project and id. */
@@ -307,6 +314,7 @@ export const Handlers: Layer.Layer<
 
           if (project !== undefined) {
             return yield* statusAtGateway(
+              who,
               yield* on(project, (api) => api.status(who))
             );
           }
@@ -315,7 +323,7 @@ export const Handlers: Layer.Layer<
             Effect.map(api.status(who), Option.some)
           );
 
-          return yield* statusAtGateway({
+          return yield* statusAtGateway(who, {
             answers: each.flatMap(({ answers }) => answers),
             claims: each.flatMap(({ claims }) => claims),
           });

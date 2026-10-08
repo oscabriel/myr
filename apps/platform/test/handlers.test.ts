@@ -482,6 +482,7 @@ describe("calls that name no project", () => {
       expect(yield* alice.status({})).toStrictEqual({
         answers: [],
         claims: [],
+        handle: Handle.make("alice"),
       });
       expect(yield* Effect.flip(alice.today({}))).toStrictEqual(
         new NotDecider({})

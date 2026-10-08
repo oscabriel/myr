@@ -422,7 +422,13 @@ describe("the Worker's sessions", () => {
 
         expect(
           yield* Effect.exit(alice.status({ project: datekit }))
-        ).toStrictEqual(Exit.succeed({ answers: [], claims: [] }));
+        ).toStrictEqual(
+          Exit.succeed({
+            answers: [],
+            claims: [],
+            handle: Handle.make("alice"),
+          })
+        );
         expect(
           callsTo(config.PROJECT).filter(({ method }) => method === "status")
         ).toStrictEqual([

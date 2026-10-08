@@ -36,13 +36,6 @@ export interface AddedLine {
   readonly text: string;
 }
 
-/** A ratchet's count on main and on the answer, and the territory it counts. */
-export interface RatchetCount {
-  readonly before: number;
-  readonly after: number;
-  readonly territory: string;
-}
-
 /**
  * Where a push goes, read from the repo's name (spec §4.5): the canonical
  * repo `<project>`, a claim's fork `<project>--<ask>--<handle>`, a person's
@@ -83,8 +76,6 @@ export interface PushFacts {
   readonly scriptsChanged: boolean;
   /** Paths that belong to a layer, which no public tree may carry (W6; empty before). */
   readonly layerPaths: ReadonlySet<RepoPath>;
-  /** Each ratchet's count on main and on the answer, after the cheap lane. */
-  readonly ratchetCounts: ReadonlyMap<RatchetName, RatchetCount>;
   /** How many live claims the pusher holds, for `CapReached`. */
   readonly claimsHeld: number;
   /**

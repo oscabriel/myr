@@ -223,11 +223,13 @@ export class Status extends Rpc.make("status", {
   success: Schema.Struct({
     answers: Schema.Array(AnswerView),
     claims: Schema.Array(ClaimView),
+    /** The caller's own handle, as the platform knows them. */
+    handle: Handle,
   }),
 })
   .annotate(
     Description,
-    "Show the caller's claims and answers, in one project or in every one."
+    "Show who the caller is, and their claims and answers, in one project or in every one."
   )
   .annotate(Audience, "signedIn")
   .annotate(Visibility, "public")
@@ -438,7 +440,7 @@ export class OpenAsk extends Rpc.make("openAsk", {
   .annotate(Idempotent, false)
   .annotate(Destructive, false)
   .annotate(NeedsApproval, true)
-  .annotate(Cli, { name: "ask open" })
+  .annotate(Cli, { name: "ask open", positional: ["ask"] })
   .annotate(Surfaces, servedOn.openAsk) {}
 
 export class ProposeAsk extends Rpc.make("proposeAsk", {
@@ -487,7 +489,7 @@ export class FlagAsk extends Rpc.make("flagAsk", {
   .annotate(Idempotent, false)
   .annotate(Destructive, false)
   .annotate(NeedsApproval, false)
-  .annotate(Cli, { name: "ask flag" })
+  .annotate(Cli, { name: "ask flag", positional: ["ask"] })
   .annotate(Surfaces, servedOn.flagAsk) {}
 
 export class Decide extends Rpc.make("decide", {

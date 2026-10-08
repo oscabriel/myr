@@ -3,7 +3,7 @@ name: myr
 description: "Contribute to projects on Myr with the `myr` CLI: find an ask, claim it, check your answer locally, push it to your fork, and read the verdict. Use when a repo's remote is on Myr, or when a push was refused with a refusal such as OutOfScope or StaleBase."
 metadata:
   managed-by: "myr"
-  content-hash: "sha256:d6fad2ea309b06cc5be6b6ebe7bc0f43bebea43160eabc12b87ea29c47064936"
+  content-hash: "sha256:bd1f1c815649d83b48ca8dac25f0b3e9b98e54e3a5dd8edc3171261a75e065ca"
 ---
 # Myr
 
@@ -30,8 +30,8 @@ A command whose flags list `--json` prints Markdown, or one versioned JSON envel
 | Command | Flags | What it does |
 | --- | --- | --- |
 | `myr ask <ask>` | `--project` `--json` | Show one ask in full, with its brief in Markdown for an answerer to read first. Only reads. |
-| `myr ask flag` | `--ask` `--project` `--reason` `--json` `--dry-run` | Flag an open ask to its deciders with a reason, as a proposal that expires unless a decider accepts it. |
-| `myr ask open` | `--ask` `--files` `--project` `--json` `--yes` `--dry-run` | Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way. Runs only with `--yes`. |
+| `myr ask flag <ask>` | `--project` `--reason` `--json` `--dry-run` | Flag an open ask to its deciders with a reason, as a proposal that expires unless a decider accepts it. |
+| `myr ask open <ask>` | `--files` `--project` `--json` `--yes` `--dry-run` | Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way. Runs only with `--yes`. |
 | `myr asks` | `--project` `--json` | List a project's open asks. Only reads. |
 | `myr check` | `--ask` `--project` `--base` `--offline` `--shape-only` `--lane` `--dir` `--json` | Run the gate's checks on your answer locally, before you push. Only reads. |
 | `myr claim <ask>` | `--project` `--json` `--dry-run` | Claim an ask: an exclusive, expiring right to answer it, with a fork to push to; claiming it again returns the same claim. |
@@ -56,7 +56,7 @@ A command whose flags list `--json` prints Markdown, or one versioned JSON envel
 | `myr propose` | `--files` `--project` `--sealed` `--territory` `--want` `--json` `--dry-run` | Propose an ask, optionally with a sealed answer; the proposal expires unless a decider accepts it. |
 | `myr release` | `--ask` `--project` `--json` `--dry-run` | Release the caller's claim on an ask, so anyone may claim it again. |
 | `myr schema <command>` | `--json` | Print the JSON Schema of a command's payload. Only reads. |
-| `myr status` | `--project` `--json` | Show the caller's claims and answers, in one project or in every one. Only reads. |
+| `myr status` | `--project` `--json` | Show who the caller is, and their claims and answers, in one project or in every one. Only reads. |
 | `myr submit` | `--ask` `--base` `--head` `--project` `--requestId` `--json` `--dry-run` | Offer the commit `head`, built on `base`, as an answer to a claimed ask; the receipt says it is being checked, and it lands if it passes. |
 | `myr today` | `--project` `--json` | Show the caller's Today: the decisions to take, held to their budget, each with its evidence and a safe default. Only reads. |
 | `myr verdict` | `--ask` `--head` `--project` `--json` | Show the verdict on an answer to an ask, for its latest head or the one named; held-back checks show one bit per area. Only reads. |

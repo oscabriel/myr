@@ -189,7 +189,6 @@ export const testFacts = (overrides: Partial<PushFacts> = {}): PushFacts => ({
   opensAsk: false,
   policy,
   pusher: Person.make({ handle: bob }),
-  ratchetCounts: new Map(),
   ref: RefNameText.make("refs/heads/main"),
   scriptsChanged: false,
   target: PushTarget.ClaimFork({

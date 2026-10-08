@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
-import { AskId, KindName } from "@repo/protocol/ids";
+import { AskId, Handle, KindName } from "@repo/protocol/ids";
 import { unanswered } from "@repo/protocol/testing";
 import { ConfigProvider, Effect, Layer, Option, Redacted } from "effect";
 
@@ -34,7 +34,7 @@ const handlers: Handlers = Layer.mergeAll(
     })
   ),
   Contracts.toLayerHandler("status", () =>
-    Effect.succeed({ answers: [], claims: [] })
+    Effect.succeed({ answers: [], claims: [], handle: Handle.make("tester") })
   )
 );
 
@@ -82,6 +82,22 @@ describe("the remote client", () => {
 
       expect(run.code).toBe(0);
       expect(yield* platform.seen).toStrictEqual([`Bearer ${knownToken}`]);
+    }).pipe(Effect.scoped)
+  );
+
+  it.live("status says whom the platform takes the caller for", () =>
+    Effect.gen(function* () {
+      const platform = yield* httpPlatform(handlers);
+
+      const run = yield* runProgram(["status"], {
+        client: remote(
+          holding(Option.some(profileOn(platform.origin, knownToken)))
+        ),
+        handlers,
+      });
+
+      expect(run.code).toBe(0);
+      expect(run.out[0]).toBe("Signed in as tester.");
     }).pipe(Effect.scoped)
   );
 

@@ -506,18 +506,13 @@ const tokenFromBrowser = (url: string, opens: boolean) =>
     })
   );
 
-/** The handle `status` shows: the claimant of the caller's claims, if any. */
-const handleOf = (status: {
-  readonly claims: readonly { readonly claimant: Profile["handle"] }[];
-}) => Option.fromNullishOr(status.claims[0]?.claimant);
-
 /** Asks the platform at `url` who `token` is; a refusal or no answer stores nothing. */
 const verify = (url: string, token: Redacted.Redacted) =>
   Effect.scoped(
     Effect.gen(function* () {
       const client = yield* (yield* PlatformClient).connect({ token, url });
 
-      return handleOf(yield* client.status({}));
+      return (yield* client.status({})).handle;
     })
   ).pipe(
     Effect.mapError(
@@ -599,13 +594,7 @@ export const login = Command.make(
 
       const handle = yield* verify(url, token);
 
-      yield* credentials.put(
-        name,
-        Option.match(handle, {
-          onNone: (): Profile => ({ token, url }),
-          onSome: (who): Profile => ({ handle: who, token, url }),
-        })
-      );
+      yield* credentials.put(name, { handle, token, url });
 
       const commands = gitHelperConfig(url);
 
@@ -615,29 +604,21 @@ export const login = Command.make(
         }
       }
 
-      const who = Option.match(handle, {
-        onNone: () => "",
-        onSome: (known) => ` as ${known}`,
-      });
-
       yield* output.success({
         command: "login",
         data: {
           // The lines, set or not: under --no-git-config they are what to run.
           gitConfig: commands,
           gitConfigSet: !given.noGitConfig,
-          ...Option.match(handle, {
-            onNone: () => ({}),
-            onSome: (known) => ({ handle: known }),
-          }),
+          handle,
           profile: name,
           url,
         },
         json: given.json,
         view: viewOf(
           given.noGitConfig
-            ? `Logged in to ${url}${who} (profile ${name}). git's config is unchanged; for git to use this login, run:`
-            : `Logged in to ${url}${who} (profile ${name}). git now asks ${Brand.cli} for this platform's token; its global config got:`,
+            ? `Logged in to ${url} as ${handle} (profile ${name}). git's config is unchanged; for git to use this login, run:`
+            : `Logged in to ${url} as ${handle} (profile ${name}). git now asks ${Brand.cli} for this platform's token; its global config got:`,
           commands
         ),
       });

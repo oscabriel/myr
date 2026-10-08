@@ -2,7 +2,6 @@ import { NodeHttpServer, NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
-import { ClaimView } from "@repo/protocol/domain/claim";
 import { Handle } from "@repo/protocol/ids";
 import {
   Authenticated,
@@ -113,35 +112,19 @@ const gitConfig = (env: Record<string, string>, ...args: string[]) =>
     })
   );
 
-const claim = Schema.decodeUnknownSync(ClaimView);
-
 const isPerson = Schema.is(Person);
 
-/** One live claim of `handle`'s, as `status` lists it. */
-const claimOf = (handle: string) =>
-  claim({
-    ask: "fix-week",
-    base: "a".repeat(40),
-    checkCommand: "bun test",
-    claimant: handle,
-    fork: `datekit--fix-week--${handle}`,
-    lapsesAt: "2026-10-09T12:00:00.000Z",
-    openedAt: "2026-10-07T12:00:00.000Z",
-    project: "datekit",
-    remote: `${url}/datekit--fix-week--${handle}.git`,
-    state: "live",
-    warnsAt: "2026-10-08T12:00:00.000Z",
-  });
-
 /**
- * The platform's side of a call, as `status` sees it: whoever the server
- * side takes the caller for holds one claim.
+ * The platform's side of a call, as `status` sees it: whoever the server side
+ * takes the caller for holds no claim yet (every first login), and `status`
+ * names them.
  */
 const statusHandler = Contracts.toLayerHandler("status", () =>
-  Effect.map(Effect.service(CurrentPrincipal), (principal) => ({
-    answers: [],
-    claims: isPerson(principal) ? [claimOf(principal.handle)] : [],
-  }))
+  Effect.flatMap(Effect.service(CurrentPrincipal), (principal) =>
+    isPerson(principal)
+      ? Effect.succeed({ answers: [], claims: [], handle: principal.handle })
+      : Effect.die("status is for people signed in")
+  )
 );
 
 /** A server side that refuses every credential, as for a revoked token. */

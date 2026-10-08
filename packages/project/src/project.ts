@@ -602,7 +602,9 @@ export const MethodSchemas = {
   status: {
     args: [Person],
     error: Status.errorSchema,
-    success: Status.successSchema,
+    // The contract adds the caller's handle at the platform's edge; a project
+    // answers with its own claims and answers only.
+    success: Status.successSchema.mapFields(Struct.omit(["handle"])),
   },
   submitAnswer: {
     args: [
@@ -2123,7 +2125,6 @@ export const projectService = (
           opensAsk: false,
           policy,
           pusher: Person.make({ handle: request.answerer }),
-          ratchetCounts: new Map(),
           ref: RefNameText.make("refs/heads/main"),
           scriptsChanged: false,
           target: PushTarget.ClaimFork({
@@ -2922,7 +2923,6 @@ export const projectService = (
           opensAsk: true,
           policy: input.policy,
           pusher: input.caller,
-          ratchetCounts: new Map(),
           ref: RefNameText.make("refs/heads/main"),
           scriptsChanged: false,
           target: PushTarget.Canonical({ project: name }),

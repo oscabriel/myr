@@ -6,7 +6,10 @@
  * 2. tsgo declares the two library entries, workspace packages included,
  *    and tsdown bundles that into `rules.d.ts` and `protocol.d.ts`.
  * 3. `bun build --compile` makes the standalone binary `bin/<cli>` for this
- *    machine, or `bin/<target>/<cli>` for each of `--targets`.
+ *    machine, or `bin/<target>/<cli>` for each of `--targets`. It embeds the
+ *    sdk and the rules' entry, each bundled whole, and hands their embedded
+ *    paths to `src/local/config-runtime.ts` before the CLI starts, so the
+ *    binary alone can bundle and evaluate a TypeScript config folder.
  * 4. Beside each binary, `git-credential-<slug>` links to it: the binary
  *    sees the name it was started by (`src/bin.ts`), so the link is git's
  *    credential helper.
@@ -28,6 +31,7 @@ import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { build } from "tsdown";
 
+import { EMBEDDED_KEY } from "./src/local/config-runtime.ts";
 import { declarations, library } from "./tsdown.config.ts";
 
 class BuildFailed extends Data.TaggedError("BuildFailed")<{
@@ -195,7 +199,54 @@ const make = (targets: readonly string[]) =>
       cwd: root,
     });
 
-    // 3 and 4. The binaries, each with its credential helper link.
+    // 3. What the binary embeds for a TypeScript config folder: the sdk and
+    // the rules' entry, each one file with effect inlined (a machine with
+    // only the binary has no node_modules), and the entry `bun build
+    // --compile` starts from, which hands their embedded paths over before
+    // `src/bin.ts` runs (a module's imports run in order).
+    const compile = path.join(dist, ".compile");
+
+    yield* Effect.acquireRelease(
+      fs.makeDirectory(compile, { recursive: true }),
+      () => Effect.orDie(fs.remove(compile, { recursive: true }))
+    );
+
+    for (const [name, source] of [
+      ["sdk.js", path.join(repo, "packages", "sdk", "src", "index.ts")],
+      ["entry.js", path.join(repo, "packages", "rules", "src", "entry.ts")],
+    ] as const) {
+      yield* run(`bundle ${name}`, "bun", [
+        "build",
+        "--no-macros",
+        "--target=browser",
+        "--format=esm",
+        source,
+        "--outfile",
+        path.join(compile, name),
+      ]);
+    }
+
+    yield* fs.writeFileString(
+      path.join(compile, "runtime.ts"),
+      [
+        'import entry from "./entry.js" with { type: "file" };',
+        'import sdk from "./sdk.js" with { type: "file" };',
+        "",
+        `Object.assign(globalThis, { ${EMBEDDED_KEY}: { entry, sdk } });`,
+        "",
+      ].join("\n")
+    );
+
+    yield* fs.writeFileString(
+      path.join(compile, "main.ts"),
+      [
+        'import "./runtime.ts";',
+        `import ${JSON.stringify(path.join(root, "src", "bin.ts"))};`,
+        "",
+      ].join("\n")
+    );
+
+    // 4. The binaries, each with its credential helper link.
     const outputs =
       targets.length === 0
         ? [{ dir: path.join(dist, "bin"), target: Option.none<string>() }]
@@ -213,7 +264,7 @@ const make = (targets: readonly string[]) =>
           onNone: () => [],
           onSome: (name) => [`--target=bun-${name}`],
         }),
-        path.join(root, "src", "bin.ts"),
+        path.join(compile, "main.ts"),
         "--outfile",
         path.join(dir, Brand.cli),
       ]);

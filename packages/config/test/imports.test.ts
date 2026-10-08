@@ -47,6 +47,7 @@ const workspaces: readonly Workspace[] = [
     "@repo/protocol",
   ]),
   workspace("@repo/artifacts", "packages/artifacts", ["@repo/protocol"]),
+  workspace("@repo/rules", "packages/rules", ["@repo/protocol", "@repo/sdk"]),
   // `@repo/brand` is left out: the matrix allows it, the manifest doesn't.
   workspace("@repo/git", "packages/git", [
     "@repo/artifacts",
@@ -62,9 +63,11 @@ const workspaces: readonly Workspace[] = [
   ]),
   workspace("@repo/web", "apps/web", ["@repo/brand", "@repo/protocol"]),
   workspace("@repo/cli", "apps/cli", [
+    "@repo/artifacts",
     "@repo/checks",
     "@repo/config",
     "@repo/protocol",
+    "@repo/rules",
     "@repo/testkit",
   ]),
 ];
@@ -86,7 +89,9 @@ const clean: readonly SourceFile[] = [
   file("apps/platform/src/surfaces.ts", 'import { Brand } from "@repo/brand";'),
   file(
     "apps/cli/src/main.ts",
-    'import { CheckRunnerLocal } from "@repo/checks/check-runner/local";'
+    'import { CheckRunnerLocal } from "@repo/checks/check-runner/local";',
+    'import { RulesEvaluatorBun } from "@repo/rules/rules-evaluator/bun";',
+    'import { RepoHostLocal } from "@repo/artifacts/repo-host/local";'
   ),
   file(
     "apps/cli/test/stdio.ts",
@@ -302,6 +307,24 @@ describe("import direction", () => {
         'import { CheckRunnerLocal } from "@repo/checks/check-runner/local";'
       ),
       "@repo/checks/check-runner/local"
+    ),
+    refused(
+      "the CLI imports the rules' Worker Loader adapter, which only Workers run",
+      "matrix",
+      file(
+        "apps/cli/src/x.ts",
+        'import { RulesEvaluatorWorker } from "@repo/rules/rules-evaluator/worker";'
+      ),
+      "@repo/rules/rules-evaluator/worker"
+    ),
+    refused(
+      "the CLI imports an Artifacts adapter other than /local",
+      "matrix",
+      file(
+        "apps/cli/src/x.ts",
+        'import { RepoHostBinding } from "@repo/artifacts/repo-host/binding";'
+      ),
+      "@repo/artifacts/repo-host/binding"
     ),
     refused(
       "a package's src imports the test config",

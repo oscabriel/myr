@@ -32,7 +32,10 @@ export const Hostname = Schema.String.pipe(
 
 export type Hostname = typeof Hostname.Type;
 
-/** Where a ratchet reads its number in a command's JSON output: `/total/lines`. */
+/**
+ * Where a ratchet reads its number in a command's JSON output, in the JSONPath
+ * subset `@repo/checks/kinds/metric` reads: `$.total.lines`.
+ */
 export const JsonPath = Schema.NonEmptyString.pipe(Schema.brand("JsonPath"));
 
 export type JsonPath = typeof JsonPath.Type;

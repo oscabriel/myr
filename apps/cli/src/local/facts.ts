@@ -371,7 +371,6 @@ export const localFacts = (
           opensAsk: false,
           policy: input.policy,
           pusher: input.pusher,
-          ratchetCounts: new Map(),
           ref: RefNameText.make("refs/heads/main"),
           scriptsChanged: yield* scriptsChanged(opened.name, changes),
           target: input.target,

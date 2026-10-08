@@ -141,7 +141,7 @@ const table = [
   },
   {
     audience: "decider",
-    cli: "ask open",
+    cli: "ask open <ask>",
     errors: [
       "UnknownProject",
       "NotDecider",
@@ -166,7 +166,7 @@ const table = [
   },
   {
     audience: "signedIn",
-    cli: "ask flag",
+    cli: "ask flag <ask>",
     errors: ["UnknownProject", "UnknownAsk", "Denounced", "CapReached"],
     flags: "",
     on: "RMC",

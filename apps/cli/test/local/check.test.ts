@@ -69,7 +69,11 @@ const noClaims = Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
     Layer.mergeAll(
       unanswered,
       Contracts.toLayerHandler("status", () =>
-        Effect.succeed({ answers: [], claims: [] })
+        Effect.succeed({
+          answers: [],
+          claims: [],
+          handle: Handle.make("tester"),
+        })
       )
     ),
     asTester,
@@ -218,7 +222,6 @@ const gateSays = (repo: CheckRepo, head: string) =>
       opensAsk: false,
       policy,
       pusher: Person.make({ handle: claimant }),
-      ratchetCounts: new Map(),
       ref: RefNameText.make("refs/heads/main"),
       scriptsChanged: false,
       target: PushTarget.ClaimFork({

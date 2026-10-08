@@ -15,6 +15,7 @@ import {
   Hash,
   Layer,
   Path,
+  Schema,
   Stream,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
@@ -285,6 +286,103 @@ layer(BuiltOnce, { excludeTestServices: true, timeout: "180 seconds" })(
           expect(help).toMatchObject({ exitCode: 0 });
           expect(bannerIn(help.stdout)).toStrictEqual(banner);
         }),
+      spawning
+    );
+
+    it.effect(
+      "the binary evaluates a TypeScript config folder for check with neither bun nor node on its PATH",
+      () =>
+        Effect.gen(function* () {
+          const { bare } = yield* Built;
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const binary = yield* written("bin", Brand.cli);
+
+          const repo = yield* fs.makeTempDirectoryScoped({
+            prefix: "ts-config-",
+          });
+
+          const tools = path.join(bare.HOME, "git-only-bin");
+
+          // git alone on the PATH: `check` reads the repo with it.
+          yield* fs.makeDirectory(tools, { recursive: true });
+          yield* fs.symlink("/usr/bin/git", path.join(tools, "git"));
+
+          const env = { ...bare, PATH: tools };
+
+          const git = (...args: readonly string[]) =>
+            run("git", args, { cwd: repo, only: env }).pipe(
+              Effect.tap((ran) =>
+                Effect.sync(() => {
+                  expect(ran).toMatchObject({ exitCode: 0 });
+                })
+              )
+            );
+
+          yield* fs.makeDirectory(path.join(repo, Brand.configDir));
+          yield* fs.writeFileString(
+            path.join(repo, Brand.configDir, "project.ts"),
+            [
+              `import { project } from "${Brand.cliPackage}/rules";`,
+              "",
+              "export default project({",
+              '  run: { checks: { unit: "true" }, test: "true {path}" },',
+              "});",
+              "",
+            ].join("\n")
+          );
+
+          yield* git("init", "--quiet", "--initial-branch=main");
+          yield* git("add", ".");
+          yield* git(
+            "-c",
+            "user.name=Ada",
+            "-c",
+            "user.email=ada@example.test",
+            "commit",
+            "--quiet",
+            "--message",
+            "Write the project in TypeScript"
+          );
+
+          // The policy evaluates, so the ask it lacks is the refusal.
+          const checked = yield* run(
+            binary,
+            [
+              "check",
+              "--offline",
+              "--shape-only",
+              "--json",
+              "--project",
+              "datekit",
+              "--ask",
+              "fix-week",
+            ],
+            { cwd: repo, only: env }
+          );
+
+          expect({
+            exitCode: checked.exitCode,
+            stderr: checked.stderr,
+          }).toStrictEqual({
+            exitCode: 1,
+            stderr: "",
+          });
+
+          const envelope = yield* Schema.decodeEffect(
+            Schema.fromJsonString(
+              Schema.Struct({
+                ok: Schema.Boolean,
+                refusals: Schema.Array(Schema.Struct({ _tag: Schema.String })),
+              })
+            )
+          )(checked.stdout);
+
+          expect({
+            ok: envelope.ok,
+            tags: envelope.refusals.map(({ _tag }) => _tag),
+          }).toStrictEqual({ ok: false, tags: ["UnknownAsk"] });
+        }).pipe(Effect.scoped),
       spawning
     );
 

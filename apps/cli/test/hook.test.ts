@@ -415,7 +415,6 @@ describe("the gateway's own reading of a path", () => {
     opensAsk: false,
     policy,
     pusher: Person.make({ handle: Handle.make("alice") }),
-    ratchetCounts: new Map(),
     ref: RefNameText.make("refs/heads/main"),
     scriptsChanged: false,
     target: PushTarget.ClaimFork({
@@ -550,7 +549,11 @@ const platformOf = (
               ...count,
               status: count.status + 1,
             })),
-            (held) => ({ answers: [], claims: held })
+            (held) => ({
+              answers: [],
+              claims: held,
+              handle: Handle.make("alice"),
+            })
           )
         )
       ),

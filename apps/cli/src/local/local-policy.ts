@@ -46,6 +46,7 @@ import {
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
+import { ConfigRuntime } from "./config-runtime.ts";
 import { commitOf, runGit } from "./facts.ts";
 
 /** A file of the config folder, as committed. */
@@ -91,48 +92,13 @@ const loadFailed = (detail: string) =>
   new RulesFailed({ detail, reason: "load" });
 
 /**
- * The file this CLI's own copy of `specifier` is, looked up only when a
- * TypeScript folder is bundled: a build of the CLI that carries no copy on
- * disk still reads a `policy.json` or the defaults.
- */
-const ownCopyOf = (path: Path.Path, specifier: string) =>
-  Effect.try({
-    catch: () =>
-      loadFailed(
-        `this build of ${Brand.cli} carries no ${specifier} to bundle the config folder with`
-      ),
-    try: () => new URL(import.meta.resolve(specifier)),
-  }).pipe(
-    Effect.flatMap((url) =>
-      path
-        .fromFileUrl(url)
-        .pipe(
-          Effect.mapError(() =>
-            loadFailed(
-              `this build of ${Brand.cli} keeps its ${specifier} where bun build cannot read it`
-            )
-          )
-        )
-    )
-  );
-
-const NODE_MODULES = "/node_modules";
-
-/** The `node_modules` folder a resolved module sits in. */
-const packagesOf = (file: string) => {
-  const at = file.lastIndexOf(`${NODE_MODULES}/`);
-
-  return at === -1
-    ? Option.none()
-    : Option.some(file.slice(0, at + NODE_MODULES.length));
-};
-
-/**
  * The config folder bundled by `bun build`, as the Lander bundles it at a
  * landing: both names of the sdk (the workspace one and the published
  * `<cli package>/rules`) resolve to this CLI's own copy, any other bare
  * import to the packages beside it, macros are off, and code the entries
- * share goes to chunks in the folder. Needs `bun` on the `PATH`.
+ * share goes to chunks in the folder. Bun and the sdk come from
+ * `ConfigRuntime`: `bun` on the `PATH` from source, the binary itself once
+ * compiled.
  */
 export const ConfigBundlerBun: Layer.Layer<
   ConfigBundler,
@@ -169,8 +135,13 @@ export const ConfigBundlerBun: Layer.Layer<
       entries: readonly string[]
     ) =>
       Effect.gen(function* () {
-        const sdk = yield* ownCopyOf(path, "@repo/sdk");
-        const effect = yield* ownCopyOf(path, "effect");
+        const runtime = yield* ConfigRuntime;
+
+        const { packages: beside, sdk } = yield* runtime.modules.pipe(
+          Effect.provideService(FileSystem.FileSystem, fs),
+          Effect.provideService(Path.Path, path)
+        );
+
         const root = path.join(dir, "src");
         const out = path.join(dir, "out");
         const tsconfig = path.join(dir, "tsconfig.json");
@@ -192,7 +163,7 @@ export const ConfigBundlerBun: Layer.Layer<
           })
         );
 
-        yield* Option.match(packagesOf(effect), {
+        yield* Option.match(beside, {
           onNone: () => Effect.void,
           onSome: (packages) =>
             fs
@@ -204,7 +175,7 @@ export const ConfigBundlerBun: Layer.Layer<
           Effect.gen(function* () {
             const child = yield* spawner.spawn(
               ChildProcess.make(
-                "bun",
+                runtime.bun,
                 [
                   "build",
                   "--no-macros",
@@ -218,7 +189,7 @@ export const ConfigBundlerBun: Layer.Layer<
                   `--chunk-naming=${Brand.configDir}/chunk-[hash].[ext]`,
                   ...entries.map((entry) => path.join(root, entry)),
                 ],
-                { cwd: dir, stdin: "ignore" }
+                { cwd: dir, env: runtime.env, extendEnv: true, stdin: "ignore" }
               )
             );
 
@@ -620,7 +591,22 @@ export const localPolicy = (
     const evaluator =
       entries.length === 0
         ? RulesEvaluatorJson.pipe(Layer.provide(finishers))
-        : rulesEvaluatorBun().pipe(Layer.provide(finishers));
+        : Layer.unwrap(
+            Effect.gen(function* () {
+              const runtime = yield* ConfigRuntime;
+              const unpacked = yield* runtime.modules;
+
+              return rulesEvaluatorBun({
+                bun: runtime.bun,
+                env: runtime.env,
+                sdk: unpacked.sdk,
+                ...Option.match(unpacked.entry, {
+                  onNone: () => ({}),
+                  onSome: (entry) => ({ entry }),
+                }),
+              });
+            })
+          ).pipe(Layer.provide(finishers));
 
     const at = LandedSha.make(sha);
 

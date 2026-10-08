@@ -83,6 +83,8 @@ Without `--stage`, or with a stage `stages.ts` doesn't declare, it refuses befor
 5. A read-back of the push-event trigger (`bun run bootstrap -- --stage <s> --check-triggers`), because Wrangler's output doesn't prove it exists.
 6. `bun scripts/smoke.ts --stage <s>`.
 
+Then it prints the redirect URI a Google OAuth client registers for the stage (`<platform origin>/oauth/google/callback`, H4). Google sign-in stays off until `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, and `migrations/0003_identities.sql` must be applied before they are.
+
 Every command runs with `WRANGLER_SEND_METRICS=false`, and with its own folder's `node_modules/.bin` first on `PATH`, so each app deploys with its pinned Wrangler. The first failing step stops the deploy and names that step.
 
 ## Smoke-test a stage

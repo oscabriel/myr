@@ -497,7 +497,8 @@
             "requestId": "push-33333333"
           }
         ],
-        "claims": []
+        "claims": [],
+        "handle": "alice"
       }
     },
     "submitAnswer": {

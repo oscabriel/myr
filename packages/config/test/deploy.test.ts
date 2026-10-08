@@ -1,6 +1,7 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import {
+  Console,
   ConfigProvider,
   Effect,
   FileSystem,
@@ -154,6 +155,31 @@ describe("a deploy to dev-oscabriel", () => {
           ".$ bun run bootstrap --stage dev-oscabriel --check-triggers",
           ".$ bun scripts/smoke.ts --stage dev-oscabriel",
         ]);
+      })
+  );
+
+  it.live(
+    "ends by printing the redirect URI Google sign-in needs registered (H4)",
+    () =>
+      Effect.gen(function* () {
+        const printed: string[] = [];
+
+        const quiet: Console.Console = {
+          ...console,
+          log: (...args: readonly unknown[]) => {
+            printed.push(args.map(String).join(" "));
+          },
+        };
+
+        const { result } = yield* run(["--stage", "dev-oscabriel"]).pipe(
+          Effect.provideService(Console.Console, quiet)
+        );
+
+        expect(Result.isSuccess(result)).toBeTruthy();
+        // infra/workers-dev.json records the account's subdomain.
+        expect(printed.at(-1)).toBe(
+          "deploy dev-oscabriel: to offer Google sign-in, register https://platform-dev-oscabriel.oscargabriel.workers.dev/oauth/google/callback as the Google client's redirect URI (H4)"
+        );
       })
   );
 

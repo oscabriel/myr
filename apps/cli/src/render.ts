@@ -201,8 +201,9 @@ const claim = viewOf(Claim.successSchema, ({ claim: held }) => {
   };
 });
 
-const status = viewOf(Status.successSchema, ({ answers, claims }) =>
+const status = viewOf(Status.successSchema, ({ answers, claims, handle }) =>
   joined(
+    prose(`Signed in as ${handle}.`),
     prose("Claims:"),
     table(
       ["ask", "project", "state", "lapses", "fork"],

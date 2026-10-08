@@ -23,7 +23,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -59,7 +61,6 @@
       "description": "Flag an open ask to its deciders with a reason, as a proposal that expires unless a decider accepts it.",
       "destructive": false,
       "flags": [
-        "--ask",
         "--project",
         "--reason",
         "--json",
@@ -81,7 +82,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -105,7 +108,9 @@
         ],
         "type": "object"
       },
-      "positional": [],
+      "positional": [
+        "ask"
+      ],
       "readOnly": false,
       "source": "contract",
       "surfaces": [
@@ -119,7 +124,6 @@
       "description": "Open an ask by landing its file, once its check fails on main by an assertion, twice in the same way.",
       "destructive": false,
       "flags": [
-        "--ask",
         "--files",
         "--project",
         "--json",
@@ -142,7 +146,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -202,7 +208,9 @@
         ],
         "type": "object"
       },
-      "positional": [],
+      "positional": [
+        "ask"
+      ],
       "readOnly": false,
       "source": "contract",
       "surfaces": [
@@ -296,7 +304,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -574,7 +584,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -1093,7 +1105,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -1142,7 +1156,7 @@
     },
     {
       "contract": "status",
-      "description": "Show the caller's claims and answers, in one project or in every one.",
+      "description": "Show who the caller is, and their claims and answers, in one project or in every one.",
       "destructive": false,
       "flags": [
         "--project",
@@ -1202,7 +1216,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }
@@ -1304,7 +1320,9 @@
                 "not": {
                   "enum": [
                     "me",
-                    "layer"
+                    "layer",
+                    "open",
+                    "flag"
                   ]
                 }
               }

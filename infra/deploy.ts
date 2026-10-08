@@ -10,7 +10,9 @@
  *    exists (W5);
  * 5. the push-event trigger, read back and compared (`bootstrap.ts
  *    --check-triggers`, with the infra token from `varlock run`);
- * 6. `scripts/smoke.ts` against the live stage.
+ * 6. `scripts/smoke.ts` against the live stage;
+ * 7. the redirect URI a Google OAuth client registers for the stage (H4),
+ *    printed for a person to copy; Google sign-in stays off without one.
  *
  * Without `--stage`, or with a stage `stages.ts` doesn't declare, it refuses
  * before it spawns anything. It takes no other flag: verify always runs.
@@ -42,7 +44,13 @@ import {
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { schemaItems } from "./env-schema.ts";
-import { repoRoot, stageOf } from "./stages.ts";
+import {
+  platformOrigin,
+  repoRoot,
+  stageOf,
+  subdomainFile,
+  WorkersDev,
+} from "./stages.ts";
 import type { NoStage, Stage, UnknownStage } from "./stages.ts";
 
 export { NoStage, UnknownStage } from "./stages.ts";
@@ -239,6 +247,38 @@ const runStep = (root: string, stage: Stage, step: Step) =>
       : Effect.fail(new StepFailed({ exitCode, step: step.name }));
   });
 
+/**
+ * Google's redirect back to the platform, as `apps/platform/src/auth/pages.ts`
+ * routes it (infra imports no app).
+ */
+const GOOGLE_CALLBACK = "/oauth/google/callback";
+
+const decodeWorkersDev = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(WorkersDev)
+);
+
+/**
+ * The line naming the redirect URI a Google OAuth client registers for
+ * `stage` (H4, W4 419): the platform's workers.dev origin from bootstrap's
+ * record, or how to get one when bootstrap hasn't run.
+ */
+const googleRedirectLine = (root: string, stage: Stage) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+
+    const recorded = yield* fs
+      .readFileString(path.join(root, subdomainFile))
+      .pipe(Effect.flatMap(decodeWorkersDev), Effect.option);
+
+    return Option.match(recorded, {
+      onNone: () =>
+        `deploy ${stage}: to offer Google sign-in, run bun run bootstrap -- --stage ${stage} for the platform's origin, then register <origin>${GOOGLE_CALLBACK} as the Google client's redirect URI (H4)`,
+      onSome: ({ subdomain }) =>
+        `deploy ${stage}: to offer Google sign-in, register ${platformOrigin(stage, subdomain)}${GOOGLE_CALLBACK} as the Google client's redirect URI (H4)`,
+    });
+  });
+
 /** Deploys the stage `argv`'s `--stage` names, then smoke-tests it. */
 export const deploy = (
   argv: readonly string[]
@@ -270,6 +310,7 @@ export const deploy = (
     );
 
     yield* Console.log(`deploy ${stage}: deployed, and smoke passed.`);
+    yield* Console.log(yield* googleRedirectLine(root, stage));
   });
 
 if (import.meta.main) {

@@ -46,7 +46,9 @@ const served = Effect.gen(function* () {
       note.pipe(Effect.as({ asks: [] }))
     ),
     Contracts.toLayerHandler("status", () =>
-      note.pipe(Effect.as({ answers: [], claims: [] }))
+      note.pipe(
+        Effect.as({ answers: [], claims: [], handle: Handle.make("tester") })
+      )
     )
   );
 
