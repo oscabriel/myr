@@ -129,7 +129,14 @@ const decodeSessions = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.String))
 );
 
-const encodeJobs = Schema.encodeEffect(Schema.Array(CheckJob));
+/**
+ * Each job as the Checker got it, encoded by its fields alone: without
+ * `CheckJob`'s rule that only landed code carries values, so a job that
+ * breaks the rule still shows, values and all, for a test to refuse.
+ */
+const encodeJobs = Schema.encodeEffect(
+  Schema.Array(Schema.Struct(CheckJob.fields))
+);
 
 const encodeStore = Schema.encodeEffect(
   Schema.Struct({
@@ -140,11 +147,11 @@ const encodeStore = Schema.encodeEffect(
 );
 
 /**
- * Whether a response is a contract's or a tool's answer: JSON, or an MCP
+ * Whether a response is a contract's or a tool's reply: JSON, or an MCP
  * event stream. Git's packs and adverts are not, and neither is NDJSON,
  * which only a framed `watch` gets and which never ends while it follows.
  */
-const answers = (response: Response) => {
+const isReply = (response: Response) => {
   const type = response.headers.get("content-type") ?? "";
 
   return (
@@ -230,7 +237,7 @@ const serve = Effect.gen(function* () {
     Effect.gen(function* () {
       const response = yield* world.fetch(request);
 
-      if (answers(response)) {
+      if (isReply(response)) {
         bodies.push(yield* Effect.promise(() => response.clone().text()));
       }
 

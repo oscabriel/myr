@@ -459,7 +459,13 @@ class Scenario extends Context.Service<
   }
 >()("test/EnvSetLiveScenario") {}
 
-const decodeJobs = Schema.decodeUnknownEffect(Schema.Array(CheckJob));
+/**
+ * The jobs as the world encoded them: by `CheckJob`'s fields alone, so a
+ * job of unlanded code that carries values decodes, and a test refuses it.
+ */
+const decodeJobs = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct(CheckJob.fields))
+);
 
 /**
  * The scenario, run once: datekit made and first pushed by ines-v, the
@@ -635,8 +641,30 @@ const filled = (lines: readonly string[]) =>
 /** Everything a run printed or logged, as one text. */
 const allOf = (ran: Ran) => [...ran.out, ...ran.err, ...ran.logged].join("\n");
 
-/** The value, and the value as base64, which an encoding would leave. */
-const forms = [value, btoa(value)];
+/**
+ * The value base64-encoded from `shift` bytes into a longer text, less the
+ * characters it shares there with its neighbours: what any base64 text
+ * holding the value at that alignment contains.
+ */
+const base64At = (shift: number) => {
+  const encoded = btoa(`${"\0".repeat(shift)}${value}`);
+
+  return encoded.slice(
+    shift === 0 ? 0 : 4,
+    (shift + value.length) % 3 === 0 ? encoded.length : encoded.length - 4
+  );
+};
+
+/**
+ * The value, and what base64 or base64url leaves of it wherever it starts
+ * inside an encoded text.
+ */
+const forms = [
+  value,
+  ...[0, 1, 2]
+    .map(base64At)
+    .flatMap((form) => [form, form.replaceAll("+", "-").replaceAll("/", "_")]),
+];
 
 /** Whether a text holds the value in any form. */
 const holds = (text: string) => forms.some((form) => text.includes(form));
@@ -696,13 +724,9 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
           const item = yield* tokenItem(envView);
           const at = setAtOf(set) ?? "never";
 
-          const { entries } = yield* Schema.decodeUnknownEffect(Ledger)(
-            yield* dataOf(ledger)
-          );
-
-          const encoded = yield* Schema.decodeUnknownEffect(Entries)(
-            yield* dataOf(ledger)
-          );
+          const data = yield* dataOf(ledger);
+          const { entries } = yield* Schema.decodeUnknownEffect(Ledger)(data);
+          const encoded = yield* Schema.decodeUnknownEffect(Entries)(data);
 
           expect({
             code: envView.code,
@@ -750,10 +774,10 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
           expect({
             bodies: kept.bodies.filter(holds).length,
             cli: runs.filter((ran) => holds(allOf(ran))).length,
-            envValues: holds(JSON.stringify(kept.store?.envValues)),
-            events: holds(JSON.stringify(kept.store?.events)),
+            envValues: holds(JSON.stringify(kept.store?.envValues ?? null)),
+            events: holds(JSON.stringify(kept.store?.events ?? null)),
             jobs: holds(JSON.stringify(kept.jobs)),
-            ledger: holds(JSON.stringify(kept.store?.ledger)),
+            ledger: holds(JSON.stringify(kept.store?.ledger ?? null)),
             logged: kept.logged.filter(holds).length,
             printed: holds(printed),
           }).toStrictEqual({
@@ -767,23 +791,23 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
             printed: false,
           });
 
-          // What was searched holds what happened: the set's answer, its
+          // What was searched holds what happened: the set's reply, its
           // log line, its sealed row and its ledger event.
-          const answer = JSON.stringify({
+          const reply = JSON.stringify({
             key: token,
             setAt: setAtOf(set),
             setBy: "ines-v",
           });
 
           expect({
-            answers: kept.bodies.filter((body) => body.includes(answer)).length,
-            event: JSON.stringify(kept.store?.events).includes(
+            event: JSON.stringify(kept.store?.events ?? null).includes(
               '"entry":{"_tag":"ValueSet"'
             ),
             logged: kept.logged.filter((line) =>
               line.includes('"a write-only value was set"')
             ),
             printed: printed.includes("a write-only value was set"),
+            replies: kept.bodies.filter((body) => body.includes(reply)).length,
             rows: kept.store?.envValues.map(
               ({ key, sealed, setAt, setBy }) => ({
                 key,
@@ -793,12 +817,12 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
               })
             ),
           }).toStrictEqual({
-            answers: 1,
             event: true,
             logged: [
               `["a write-only value was set"] {"by":"ines-v","key":"${token}"}`,
             ],
             printed: true,
+            replies: 1,
             rows: [
               {
                 key: token,

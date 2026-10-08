@@ -43,6 +43,21 @@
       ],
       "outputs": []
     },
+    "@repo/cli#test": {
+      "dependsOn": ["types", "^types"],
+      "env": ["UPDATE_GOLDEN"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/platform/src/**",
+        "$TURBO_ROOT$/apps/platform/test/**",
+        "$TURBO_ROOT$/packages/*/src/**",
+        "$TURBO_ROOT$/examples/datekit/**",
+        "!$TURBO_ROOT$/examples/datekit/.env",
+        "!$TURBO_ROOT$/examples/datekit/.env.local",
+        "!$TURBO_ROOT$/examples/datekit/.env.*.local"
+      ],
+      "outputs": []
+    },
     "@repo/config#test": {
       "cache": false,
       "dependsOn": ["types", "^types"],
