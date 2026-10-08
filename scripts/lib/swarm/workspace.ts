@@ -1,5 +1,6 @@
 /**
- * One contributor's workspace: `.swarm/<run>/<handle>/`, with their clone of
+ * One contributor's workspace: `<swarm>/<run>/<handle>/` (`SwarmDir`, outside
+ * the checkout), with their clone of
  * the claim's fork, a `bin/` that puts this repo's CLI (and git's credential
  * helper) on `PATH`, their own config folder, and the env their harness runs
  * in. The person's platform token reaches the harness only through that env,
@@ -25,7 +26,7 @@ export class SwarmFailed extends Schema.TaggedError<SwarmFailed>()(
 
 /** Where one contributor works, and the env their harness runs in. */
 export interface AgentWorkspace {
-  /** `.swarm/<run>/<handle>`. */
+  /** `<swarm>/<run>/<handle>`. */
   readonly dir: string;
   /** Their clone of the claim's fork: the harness's working directory. */
   readonly clone: string;
@@ -162,7 +163,7 @@ export const run = (input: {
   );
 
 /**
- * Makes one contributor's workspace for their claim, below `.swarm/<run>/`:
+ * Makes one contributor's workspace for their claim, below `<swarm>/<run>/`:
  *
  * - `bin/<cli>` and `bin/git-credential-<slug>`, shims that run this repo's
  *   CLI from source (the helper as `<cli> credential`), first on `PATH`;

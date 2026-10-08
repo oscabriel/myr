@@ -21,6 +21,8 @@
  * manifest names `./dist/…` and `./skills` from the package's root, and
  * `dist/bin/` holds the binaries, which npm must not ship.
  */
+import { commandDocs } from "@repo/agent-kit/command-doc";
+import { platformSkill } from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
 import {
@@ -40,8 +42,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { resources } from "../../../infra/stages.ts";
 import type { Stage } from "../../../infra/stages.ts";
-import { commandDocs } from "../../../packages/agent-kit/src/command-doc.ts";
-import { platformSkill } from "../../../packages/agent-kit/src/platform.ts";
 import {
   binaryName,
   checksumsFile,

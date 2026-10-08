@@ -146,9 +146,13 @@ export const KindName = Schema.String.pipe(
 
 export type KindName = typeof KindName.Type;
 
-/** A layer's name, as the config folder declares it: `maintainers`. */
+/**
+ * A layer's name, as the config folder declares it: `maintainers`. In an
+ * ask's words (lowercase, single hyphens): its repo is `<project>--<layer>`,
+ * and a `--` in the name would read as a claim fork's.
+ */
 export const LayerName = Schema.String.pipe(
-  Schema.check(Schema.isPattern(ConfigName)),
+  Schema.check(Schema.isPattern(Words)),
   Schema.brand("LayerName")
 );
 

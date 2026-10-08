@@ -3,5 +3,11 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "*.config.ts", "build.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "*.config.ts",
+    "build.ts",
+    "build-targets.ts"
+  ]
 }

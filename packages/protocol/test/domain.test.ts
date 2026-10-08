@@ -320,6 +320,21 @@ describe("names and ids", () => {
     expect(refuses(schema, good)).toBeFalsy();
     expect(refuses(schema, bad)).toBeTruthy();
   });
+
+  // A layer's repo is `<project>--<layer>`; a layer named `a--b` would make
+  // `<project>--a--b`, which reads as a claim fork (`<project>--<ask>--<handle>`).
+  it("names a layer in an ask's words, so its repo never reads as a claim fork", () => {
+    expect(
+      ["security-review", "maintainers2"].map((name) =>
+        refuses(LayerName, name)
+      )
+    ).toStrictEqual([false, false]);
+    expect(
+      ["a--b", "triageTeam", "fix-", "x".repeat(0)].map((name) =>
+        refuses(LayerName, name)
+      )
+    ).toStrictEqual([true, true, true, true]);
+  });
 });
 
 describe("the caller", () => {

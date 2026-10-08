@@ -33,9 +33,7 @@ import {
   Console,
   Duration,
   Effect,
-  FileSystem,
   Option,
-  Path,
   Result,
   Schedule,
   Schema,
@@ -45,11 +43,10 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import {
   flagValue,
   platformOrigin,
-  repoRoot,
+  recordedSubdomain,
   stageOf,
   subdomainFile,
   webOrigin,
-  WorkersDev,
 } from "./stages.ts";
 import type { Stage } from "./stages.ts";
 
@@ -482,10 +479,6 @@ export const smoke = (
     };
   });
 
-const decodeWorkersDev = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(WorkersDev)
-);
-
 /** Neither `--url` nor bootstrap's record says where the stage lives. */
 export class NoOrigin extends Schema.TaggedError<NoOrigin>()("NoOrigin", {
   file: Schema.String,
@@ -518,16 +511,10 @@ const originsOf = (argv: readonly string[], stage: Stage) =>
       return { platform: trimmed(given.value), web } satisfies Origins;
     }
 
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const unknown = new NoOrigin({ file: subdomainFile, stage });
-
-    const { subdomain } = yield* fs
-      .readFileString(path.join(yield* repoRoot, subdomainFile))
-      .pipe(
-        Effect.flatMap(decodeWorkersDev),
-        Effect.mapError(() => unknown)
-      );
+    const subdomain = yield* recordedSubdomain.pipe(
+      Effect.flatMap(Effect.fromOption),
+      Effect.mapError(() => new NoOrigin({ file: subdomainFile, stage }))
+    );
 
     return {
       platform: platformOrigin(stage, subdomain),

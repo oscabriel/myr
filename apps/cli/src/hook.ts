@@ -99,11 +99,14 @@ const sessionFacts = (event: HookEvent, input: HookInput) =>
     return gathered;
   });
 
-/** Stop asks the local check; nothing else does, and only with a claim. */
-const refusalsFor = (event: HookEvent, state: SessionState) =>
-  event === "stop" && state.claim !== undefined
-    ? Effect.flatMap(pushCheck, (check) => check.run(state.root))
+/** Stop asks the local check, from the claim's base; nothing else does, and only with a claim. */
+const refusalsFor = (event: HookEvent, state: SessionState) => {
+  const { claim } = state;
+
+  return event === "stop" && claim !== undefined
+    ? Effect.flatMap(pushCheck, (check) => check.run(state.root, claim.base))
     : Effect.succeed([]);
+};
 
 /** Answers one event: the decision's JSON, with its note on stderr. */
 const answer = (event: HookEvent, input: HookInput) =>

@@ -149,6 +149,7 @@ export const gatherFacts = (
 
       const claim: HookClaim = {
         ask: live.ask,
+        base: live.base,
         checkCommand: live.checkCommand,
         project: live.project,
         territory: shown.ask.territory,

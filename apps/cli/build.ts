@@ -9,7 +9,10 @@
  *    machine, or `bin/<target>/<cli>` for each of `--targets`. It embeds the
  *    sdk and the rules' entry, each bundled whole, and hands their embedded
  *    paths to `src/local/config-runtime.ts` before the CLI starts, so the
- *    binary alone can bundle and evaluate a TypeScript config folder.
+ *    binary alone can bundle and evaluate a TypeScript config folder. For
+ *    each of `--targets`, the target's native packages (`build-targets.ts`)
+ *    are fetched from npm into a temp folder the compile resolves through
+ *    `NODE_PATH`: `bun install` left out every other machine's.
  * 4. Beside each binary, `git-credential-<slug>` links to it: the binary
  *    sees the name it was started by (`src/bin.ts`), so the link is git's
  *    credential helper.
@@ -31,6 +34,7 @@ import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { build } from "tsdown";
 
+import { NATIVE, npmMachineOf } from "./build-targets.ts";
 import { EMBEDDED_KEY } from "./src/local/config-runtime.ts";
 import { declarations, library } from "./tsdown.config.ts";
 
@@ -56,6 +60,13 @@ interface Tsconfig {
   readonly include?: readonly string[];
 }
 
+/** What the build reads of a native package's manifest: its machines' packages. */
+const NativeManifest = Schema.fromJsonString(
+  Schema.Struct({
+    optionalDependencies: Schema.Record(Schema.String, Schema.String),
+  })
+);
+
 /** What the build reads of a workspace package's manifest. */
 const Manifest = Schema.fromJsonString(
   Schema.Struct({
@@ -64,11 +75,25 @@ const Manifest = Schema.fromJsonString(
   })
 );
 
-/** Runs `command` with this terminal's output; any exit but 0 fails `step`. */
-const run = (step: string, command: string, args: readonly string[]) =>
+/**
+ * Runs `command` with this terminal's output, in `cwd` and with `env` over
+ * this process's own when given; any exit but 0 fails `step`.
+ */
+const run = (
+  step: string,
+  command: string,
+  args: readonly string[],
+  options: {
+    readonly cwd?: string;
+    readonly env?: Readonly<Record<string, string>>;
+  } = {}
+) =>
   Effect.flatMap(ChildProcessSpawner.ChildProcessSpawner, (spawner) =>
     spawner.exitCode(
       ChildProcess.make(command, args, {
+        cwd: options.cwd,
+        env: { ...options.env },
+        extendEnv: true,
         stderr: "inherit",
         stdin: "ignore",
         stdout: "inherit",
@@ -246,6 +271,62 @@ const make = (targets: readonly string[]) =>
       ].join("\n")
     );
 
+    /**
+     * `node_modules` in a temp folder holding the native packages of
+     * `target`'s machine, as each of `NATIVE` pins them: `bun install`
+     * filtered them to this machine's. The versions are the installed
+     * manifests' own exact pins.
+     */
+    const nativeFor = (target: string) =>
+      Effect.gen(function* () {
+        const machine = yield* Effect.fromOption(npmMachineOf(target)).pipe(
+          Effect.mapError(
+            () =>
+              new BuildFailed({
+                detail: `Bun names no machine ${target}`,
+                step: "native packages",
+              })
+          )
+        );
+
+        const dependencies: Record<string, string> = {};
+
+        for (const name of NATIVE) {
+          const manifest = yield* path.fromFileUrl(
+            new URL(import.meta.resolve(`${name}/package.json`))
+          );
+
+          const { optionalDependencies } = yield* fs
+            .readFileString(manifest)
+            .pipe(Effect.flatMap(Schema.decodeEffect(NativeManifest)));
+
+          Object.assign(dependencies, optionalDependencies);
+        }
+
+        const folder = yield* fs.makeTempDirectoryScoped({
+          prefix: `${Brand.slug}-native-`,
+        });
+
+        yield* fs.writeFileString(
+          path.join(folder, "package.json"),
+          JSON.stringify({ dependencies, name: "native", private: true })
+        );
+
+        yield* run(
+          `native packages for ${target}`,
+          "bun",
+          [
+            "install",
+            "--no-save",
+            `--os=${machine.os}`,
+            `--cpu=${machine.cpu}`,
+          ],
+          { cwd: folder }
+        );
+
+        return path.join(folder, "node_modules");
+      });
+
     // 4. The binaries, each with its credential helper link.
     const outputs =
       targets.length === 0
@@ -256,18 +337,29 @@ const make = (targets: readonly string[]) =>
           }));
 
     for (const { dir, target } of outputs) {
-      yield* run("bun build --compile", "bun", [
-        "build",
-        "--compile",
-        "--minify",
-        ...Option.match(target, {
-          onNone: () => [],
-          onSome: (name) => [`--target=bun-${name}`],
-        }),
-        path.join(compile, "main.ts"),
-        "--outfile",
-        path.join(dir, Brand.cli),
-      ]);
+      const env = yield* Option.match(target, {
+        onNone: () => Effect.succeed({}),
+        onSome: (name) =>
+          Effect.map(nativeFor(name), (modules) => ({ NODE_PATH: modules })),
+      });
+
+      yield* run(
+        "bun build --compile",
+        "bun",
+        [
+          "build",
+          "--compile",
+          "--minify",
+          ...Option.match(target, {
+            onNone: () => [],
+            onSome: (name) => [`--target=bun-${name}`],
+          }),
+          path.join(compile, "main.ts"),
+          "--outfile",
+          path.join(dir, Brand.cli),
+        ],
+        { env }
+      );
 
       yield* fs.symlink(Brand.cli, path.join(dir, Brand.gitCredentialHelper));
     }

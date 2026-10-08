@@ -1,25 +1,60 @@
 /**
  * The swarm run's summary: one `AgentRun` per contributor, written to
- * `.swarm/<run>/agents.json` (gitignored). A live issue records what a run
- * shows in its own notes; nothing here is committed.
+ * `<swarm>/<run>/agents.json`, where `<swarm>` is `SwarmDir`, outside the
+ * checkout. A live issue records what a run shows in its own notes; nothing
+ * here is committed.
  *
  * Every field follows the wire rule (AGENTS.md "Effect traps"): `Schema.Int`
  * or `Schema.Finite` for numbers, `Schema.optionalKey` for optional keys.
  */
-import { Context, Effect, FileSystem, Schema } from "effect";
+import { Brand } from "@repo/brand";
+import { Context, Effect, FileSystem, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-/**
- * The swarm's folder, `.swarm/` at the repo root (beside `scripts/`), unless
- * a test points it elsewhere. Each run writes below it: `<run>/agents.json`
- * and one workspace per contributor, `<run>/<handle>/`.
- */
-export const SwarmDir = Context.Reference<string>("swarm/SwarmDir", {
-  defaultValue: () =>
-    decodeURIComponent(new URL("../../../.swarm", import.meta.url).pathname),
+/** What the swarm's folder is placed by: the env's state home, else the user's home. */
+const StateEnv = Schema.Struct({
+  HOME: Schema.optionalKey(Schema.NonEmptyString),
+  XDG_STATE_HOME: Schema.optionalKey(Schema.NonEmptyString),
 });
 
-/** A run's own folder: `.swarm/<run>`. */
+/**
+ * The swarm's folder for `env`: `${XDG_STATE_HOME:-$HOME/.local/state}/
+ * <slug>/swarm`, beside the hook's sessions, and never inside a checkout: a
+ * harness reads every AGENTS.md and CLAUDE.md above its folder, so a
+ * workspace inside this repo would hand each contributor the platform's own.
+ * With neither variable set, the system's temp folder.
+ */
+export const swarmDirOf = (env: typeof StateEnv.Type) => {
+  const home = env.HOME === undefined ? "/tmp" : `${env.HOME}/.local/state`;
+
+  return `${env.XDG_STATE_HOME ?? home}/${Brand.slug}/swarm`;
+};
+
+/** The global scope, read only for its `process.env`. */
+const GlobalScope = Schema.Struct({
+  process: Schema.Struct({ env: StateEnv }),
+});
+
+/**
+ * The swarm's folder (`swarmDirOf` this process's env), unless a test points
+ * it elsewhere. Each run writes below it: `<run>/agents.json` and one
+ * workspace per contributor, `<run>/<handle>/`.
+ */
+export const SwarmDir = Context.Reference<string>("swarm/SwarmDir", {
+  defaultValue: () => {
+    // Unknown on purpose: the runtime is whatever started this process.
+    const scope: unknown = globalThis;
+
+    return swarmDirOf(
+      Option.match(Schema.decodeUnknownOption(GlobalScope)(scope), {
+        onNone: () => ({}),
+        onSome: ({ process }) => process.env,
+      })
+    );
+  },
+});
+
+/** A run's own folder: `<swarm>/<run>`. */
 export const runDir = (run: string) =>
   Effect.map(SwarmDir, (dir) => `${dir}/${run}`);
 
@@ -86,7 +121,7 @@ export type AgentsResult = typeof AgentsResult.Type;
 /** The file a run's summary is written to, below the swarm's folder. */
 export const agentsFile = (dir: string) => `${dir}/agents.json`;
 
-/** Writes `result` to `.swarm/<run>/agents.json`, as indented JSON. */
+/** Writes `result` to `<swarm>/<run>/agents.json`, as indented JSON. */
 export const writeAgentsResult = (input: {
   readonly run: string;
   readonly result: AgentsResult;

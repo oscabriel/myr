@@ -17,18 +17,9 @@
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import {
-  Array,
-  Effect,
-  FileSystem,
-  Option,
-  Path,
-  Schema,
-  Stream,
-} from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { Array, Effect, FileSystem, Option, Path, Schema } from "effect";
 
-import { repoRoot } from "./root.ts";
+import { committable, repoRoot, textOf } from "./root.ts";
 
 /** The H2 sections after the pitch, in order; the pitch's title is free. */
 const SECTIONS = [
@@ -106,18 +97,6 @@ const FILE_PATH = /^\.?[\w-][\w.-]*(?:\/[\w.[\]$<>{},*-]+)+\.\w+$/u;
 
 // ------------------------------------------------------------ the repo
 
-/** A file under the repo root, as text, if it exists. */
-const textOf = (file: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const at = path.join(yield* repoRoot, file);
-
-    return (yield* fs.exists(at))
-      ? Option.some(yield* fs.readFileString(at))
-      : Option.none<string>();
-  });
-
 /** The README, or nothing yet: a missing README fails by assertion, not by a read error. */
 const readme = Effect.map(
   textOf("README.md"),
@@ -140,34 +119,15 @@ const scriptsOf = (folder: string) =>
   });
 
 /** Every file git tracks or would track and that is on disk, from the repo root. */
-const committable = Effect.gen(function* () {
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+const onDisk = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const cwd = yield* repoRoot;
 
-  const handle = yield* spawner.spawn(
-    ChildProcess.make(
-      "git",
-      ["ls-files", "--cached", "--others", "--exclude-standard"],
-      { cwd }
-    )
+  return yield* Effect.filter(yield* committable, (file) =>
+    fs.exists(path.join(cwd, file))
   );
-
-  const [listed, code] = yield* Effect.all(
-    [Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode],
-    { concurrency: "unbounded" }
-  );
-
-  if (code !== 0) {
-    return yield* Effect.die(`git ls-files exited with ${code}`);
-  }
-
-  return yield* Effect.filter(
-    listed.split("\n").filter((line) => line.length > 0),
-    (file) => fs.exists(path.join(cwd, file))
-  );
-}).pipe(Effect.scoped);
+});
 
 /** The upstream repositories every committable file's header names, sorted. */
 const portedUpstreams = (files: readonly string[]) =>
@@ -372,7 +332,7 @@ const bunFiles = (text: string) =>
 
 /** The README with what it is read against: the files a path may name and their top-level entries. */
 const world = Effect.gen(function* () {
-  const files = yield* committable;
+  const files = yield* onDisk;
 
   return {
     files,

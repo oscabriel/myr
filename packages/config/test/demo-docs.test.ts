@@ -17,7 +17,7 @@
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, FileSystem, Path, Schema } from "effect";
+import { Effect, FileSystem, Option, Path, Schema } from "effect";
 
 import { blankJsonc } from "../../../infra/jsonc.ts";
 import {
@@ -26,6 +26,8 @@ import {
   webOrigin,
   WorkersDev,
 } from "../../../infra/stages.ts";
+import { roster } from "../../../scripts/lib/swarm/roster.ts";
+import { nudges } from "../../../scripts/lib/swarm/scenario.ts";
 import { commandDocs } from "../../agent-kit/src/command-doc.ts";
 import type { CommandDoc } from "../../agent-kit/src/command-doc.ts";
 import { Brand } from "../../brand/src/index.ts";
@@ -588,6 +590,37 @@ describe("the demo folder", () => {
           }
 
           expect(problems).toStrictEqual([]);
+        })
+      )
+  );
+
+  it.live(
+    "names each contributor's exact model, and quotes the video's nudges word for word",
+    () =>
+      live(
+        Effect.gen(function* () {
+          const scenario = yield* presentText(`${DEMO}/swarm-scenario.md`);
+
+          const rows = scenario
+            .split("\n")
+            .filter((line) => /^\| \d \|/u.test(line))
+            .map((line) => line.split("|").map((cell) => cell.trim()));
+
+          expect(
+            rows.map((cells) => [
+              cells[2],
+              /`(?<id>[^`]+)`/u.exec(cells[4] ?? "")?.groups?.id,
+            ])
+          ).toStrictEqual(roster.map(({ handle, model }) => [handle, model]));
+
+          const told = roster.flatMap((_, index) =>
+            Option.toArray(nudges("video", index))
+          );
+
+          expect(told, "the video scenario nudges two").toHaveLength(2);
+          expect(
+            told.filter((nudge) => !scenario.includes(`> ${nudge}`))
+          ).toStrictEqual([]);
         })
       )
   );

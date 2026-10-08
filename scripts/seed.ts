@@ -24,25 +24,15 @@
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Envelope } from "@repo/protocol/envelope";
 import { Handle, ProjectName } from "@repo/protocol/ids";
-import {
-  Array,
-  Console,
-  Effect,
-  FileSystem,
-  Option,
-  Path,
-  Schema,
-  Stdio,
-} from "effect";
+import { Array, Console, Effect, Option, Path, Schema, Stdio } from "effect";
 
 import {
   flagValue,
   platformOrigin,
-  repoRoot,
+  recordedSubdomain,
   Stage,
   stageOf,
   subdomainFile,
-  WorkersDev,
 } from "../infra/stages.ts";
 import {
   MAIN_REF,
@@ -209,22 +199,16 @@ const stageOrigin = (where: (typeof SeedWhere.cases.Stage)["Type"]) =>
       return where.url;
     }
 
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const root = yield* repoRoot;
-
-    const recorded = yield* fs
-      .readFileString(path.join(root, subdomainFile))
-      .pipe(
-        Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(WorkersDev))),
-        Effect.mapError(() =>
-          failed(
-            `no --url, and ${subdomainFile} doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage ${where.stage} first`
-          )
+    const subdomain = yield* recordedSubdomain.pipe(
+      Effect.flatMap(Effect.fromOption),
+      Effect.mapError(() =>
+        failed(
+          `no --url, and ${subdomainFile} doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage ${where.stage} first`
         )
-      );
+      )
+    );
 
-    return platformOrigin(where.stage, recorded.subdomain);
+    return platformOrigin(where.stage, subdomain);
   });
 
 /** Where the seed goes, said for a person, and the target there. */

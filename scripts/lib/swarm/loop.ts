@@ -13,9 +13,12 @@
  *   person or another ask, recorded as `waiting` (the swarm decides nothing);
  * - `Refused`: the refusals, rendered by protocol's `explain`, go back into
  *   the same session with the first one's `next`, unless one of them ends
- *   the claim (`endsClaim`) or the continuations ran out;
- * - no new answer: one nudge to push, then `noAnswer` (or `refused`, when an
- *   earlier answer was refused and nothing new came).
+ *   the claim (`endsClaim`) or the continuations ran out; refusals that are
+ *   all the platform's side (`VerifierBlocked`, `Flake`, `RepoBusy`) go back
+ *   as a wait: push the same work again, with nothing to fix;
+ * - no new answer: one nudge to push (naming the last answer's head, when
+ *   one came), then `noAnswer` (or `refused`, when an earlier answer was
+ *   refused and nothing new came).
  *
  * The run's timeout bounds everything: a harness that never settles, or an
  * answer checked past it, ends the run as `timedOut`, and the harness's
@@ -213,30 +216,66 @@ const tally = (
 
 const short = (sha: string) => sha.slice(0, 7);
 
-/** The prompt that resumes a session after its answer was refused. */
+/**
+ * The refusals that are the platform's side, not the answer's: the checks
+ * could not run, a lane flaked, the repo was busy. Each is retryable (the
+ * same work may pass), and none names anything in the change to fix.
+ */
+const platformSide: ReadonlySet<Refusal["_tag"]> = new Set([
+  "Flake",
+  "RepoBusy",
+  "VerifierBlocked",
+] as const satisfies readonly Refusal["_tag"][]);
+
+/**
+ * The prompt that resumes a session after its answer was refused. When
+ * every refusal is the platform's side, it says so, and asks for the same
+ * work again rather than a fix: an empty commit, pushed.
+ */
 export const refusalPrompt = (input: {
   readonly answer: Pick<AnswerView, "ask" | "head">;
   readonly refusals: Array.NonEmptyReadonlyArray<Refusal>;
   readonly project: string;
-}) =>
-  [
+}) => {
+  const status = `\`${Brand.cli} status --project ${input.project}\``;
+
+  const what = input.refusals.every(({ _tag }) => platformSide.has(_tag))
+    ? [
+        'This is not a fault in your change: the platform could not finish checking it. Change nothing; push the same work again with an empty commit (`git commit --allow-empty -m "Check again"`, then `git push`).',
+        `Then run ${status} for the new verdict.`,
+      ]
+    : [
+        `Next: ${Array.headNonEmpty(input.refusals).next}`,
+        "",
+        `Fix what the refusal names, commit, and push again; then run ${status} for the new verdict.`,
+      ];
+
+  return [
     `Your answer to ${input.answer.ask} at ${short(input.answer.head)} was refused:`,
     "",
     ...explain(input.refusals),
     "",
-    `Next: ${Array.headNonEmpty(input.refusals).next}`,
-    "",
-    `Fix what the refusal names, commit, and push again; then run \`${Brand.cli} status --project ${input.project}\` for the new verdict.`,
+    ...what,
   ].join("\n");
+};
 
-/** The prompt that resumes a session that pushed no answer. */
+/**
+ * The prompt that resumes a session that pushed no new answer: none at all,
+ * or none since the head of the last one status showed (`since`).
+ */
 export const nudgePrompt = (input: {
   readonly ask: string;
   readonly remote: string;
   readonly project: string;
+  readonly since: Option.Option<string>;
 }) =>
   [
-    `No answer of yours to ${input.ask} has reached the platform yet.`,
+    Option.match(input.since, {
+      onNone: () =>
+        `No answer of yours to ${input.ask} has reached the platform yet.`,
+      onSome: (head) =>
+        `No new answer of yours to ${input.ask} has reached the platform since ${short(head)}.`,
+    }),
     `Commit your change and push it to ${input.remote} with \`git push\`. If git printed refusals in its \`remote:\` lines, fix what they name first, then push again.`,
     `Then run \`${Brand.cli} status --project ${input.project}\` for the verdict.`,
   ].join("\n");
@@ -298,6 +337,8 @@ export const afterSettle = (input: {
               onNone: () => "origin",
               onSome: ({ remote }) => remote,
             }),
+            // Status's latest answer here is one already judged, if any.
+            since: Option.map(input.status.answer, ({ head }) => head),
           }),
         }),
         progress: {

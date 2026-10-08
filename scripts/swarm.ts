@@ -14,7 +14,8 @@
  * from `SESSION_TOKENS`, a JSON object from token to handle, as the
  * platform's own), reads the ask's page, gets a workspace with a clone of
  * the claim's fork, and is handed to the run loop (711), six at once. The
- * run's summary goes to `.swarm/<run>/agents.json`, and each claim's fork to
+ * run's summary goes to `<swarm>/<run>/agents.json` (`SwarmDir`: the state
+ * home's `<slug>/swarm/`, outside every checkout), and each claim's fork to
  * the throwaway ledger (`infra/created.ts`). Tokens reach a contributor's
  * processes only through their env, and no line or JSON this prints holds
  * one. Flags: `lib/swarm/args.ts`.
@@ -37,9 +38,7 @@ import {
   Console,
   DateTime,
   Effect,
-  FileSystem,
   Option,
-  Path,
   Redacted,
   Result,
   Schema,
@@ -49,10 +48,10 @@ import {
 import { readLedger, recordCreated } from "../infra/created.ts";
 import {
   platformOrigin,
+  recordedSubdomain,
   repoRoot,
   resources,
   subdomainFile,
-  WorkersDev,
 } from "../infra/stages.ts";
 import type { Stage } from "../infra/stages.ts";
 import { optionsOf } from "./lib/swarm/args.ts";
@@ -95,26 +94,15 @@ const SESSIONS_VARIABLE = "SESSION_TOKENS";
 const originOf = (options: SwarmOptions) =>
   Option.match(options.url, {
     onNone: () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const root = yield* repoRoot;
-
-        const recorded = yield* fs
-          .readFileString(path.join(root, subdomainFile))
-          .pipe(
-            Effect.flatMap(
-              Schema.decodeEffect(Schema.fromJsonString(WorkersDev))
-            ),
-            Effect.mapError(() =>
-              failed(
-                `no --url, and ${subdomainFile} doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage ${options.stage} first`
-              )
-            )
-          );
-
-        return platformOrigin(options.stage, recorded.subdomain);
-      }),
+      recordedSubdomain.pipe(
+        Effect.flatMap(Effect.fromOption),
+        Effect.mapError(() =>
+          failed(
+            `no --url, and ${subdomainFile} doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage ${options.stage} first`
+          )
+        ),
+        Effect.map((subdomain) => platformOrigin(options.stage, subdomain))
+      ),
     onSome: Effect.succeed,
   });
 

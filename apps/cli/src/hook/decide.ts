@@ -1,7 +1,7 @@
 /**
  * The one hook policy: what `<cli> hook <event>` answers a harness, from
  * facts gathered elsewhere. Pure, so every harness adapter (Claude Code's
- * hook format here; pi's events in W7) asks the same function.
+ * hook format here; pi's events in `../pi.ts`) asks the same function.
  *
  * It writes no second policy: a path's refusal is the gate's own reading of
  * the territory and the judge closure (`@repo/gate/glob`, over the closure
@@ -15,7 +15,7 @@ import { Brand } from "@repo/brand";
 import { matchAny } from "@repo/gate/glob";
 import type { Policy } from "@repo/protocol/domain/policy";
 import { Territory } from "@repo/protocol/domain/territory";
-import { AskId, ProjectName, RepoPath } from "@repo/protocol/ids";
+import { AskId, CommitSha, ProjectName, RepoPath } from "@repo/protocol/ids";
 import { OutOfScope, TouchedJudge } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
@@ -26,6 +26,8 @@ import type { HookInput } from "./input.ts";
 /** The claim this session works on, as the hook needs it. */
 export const HookClaim = Schema.Struct({
   ask: AskId,
+  /** Main when the claim was made: where the gateway's diff of an answer starts. */
+  base: CommitSha,
   /** What `<cli> check` runs locally for the ask: the claim's own. */
   checkCommand: Schema.NonEmptyString,
   project: ProjectName,
@@ -167,19 +169,35 @@ const pathRefusals = (
     : [new OutOfScope({ paths: [path] })];
 };
 
-const preToolUse = (input: HookInput, facts: HookFacts): HookDecision =>
+/**
+ * What the gate's shape stage would refuse of the file a writing tool is
+ * about to change: none without a claim, for a tool that writes no file, or
+ * for a file outside the repo. Every harness's edit guard asks this (Claude
+ * Code's pre-tool-use below; pi's `edit` and `write` in `../pi.ts`).
+ */
+export const toolRefusals = (
+  input: HookInput,
+  facts: Pick<HookFacts, "claim" | "judge" | "root">
+): readonly Refusal[] =>
   Option.match(facts.claim, {
-    onNone: () => allow(facts.holds, NO_CLAIM),
-    onSome: (claim) => {
-      const refusals = Option.match(
+    onNone: () => [],
+    onSome: (claim) =>
+      Option.match(
         Option.flatMap(fileOf(input), (file) =>
           repoPathOf(facts.root, input.cwd, file)
         ),
         {
-          onNone: (): readonly Refusal[] => [],
+          onNone: () => [],
           onSome: (path) => pathRefusals(claim, facts.judge, path),
         }
-      );
+      ),
+  });
+
+const preToolUse = (input: HookInput, facts: HookFacts): HookDecision =>
+  Option.match(facts.claim, {
+    onNone: () => allow(facts.holds, NO_CLAIM),
+    onSome: () => {
+      const refusals = toolRefusals(input, facts);
 
       return Array.isReadonlyArrayNonEmpty(refusals)
         ? {

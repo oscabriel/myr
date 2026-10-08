@@ -16,18 +16,10 @@
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import {
-  Array,
-  Effect,
-  FileSystem,
-  Option,
-  Path,
-  Schema,
-  Stream,
-} from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { Array, Effect, FileSystem, Option, Path, Schema } from "effect";
+import type { ChildProcessSpawner } from "effect/process";
 
-import { repoRoot } from "./root.ts";
+import { committable, repoRoot, textOf } from "./root.ts";
 
 /** The cartridge's folders, from the repo root; each ends with `/`, and each exists. */
 const MANIFEST = [
@@ -132,43 +124,6 @@ const isCartridge = (file: string) =>
 const isSource = (file: string) => /\.tsx?$/u.test(file);
 
 // ------------------------------------------------------------ the repo
-
-/** Every file git tracks or would track (ignored files left out), from the repo root. */
-const committable = Effect.gen(function* () {
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const cwd = yield* repoRoot;
-
-  const handle = yield* spawner.spawn(
-    ChildProcess.make(
-      "git",
-      ["ls-files", "--cached", "--others", "--exclude-standard"],
-      { cwd }
-    )
-  );
-
-  const [listed, code] = yield* Effect.all(
-    [Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode],
-    { concurrency: "unbounded" }
-  );
-
-  if (code !== 0) {
-    return yield* Effect.die(`git ls-files exited with ${code}`);
-  }
-
-  return listed.split("\n").filter((line) => line.length > 0);
-}).pipe(Effect.scoped);
-
-/** A file under the repo root, as text; one deleted but not yet staged reads as none. */
-const textOf = (file: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const at = path.join(yield* repoRoot, file);
-
-    return (yield* fs.exists(at))
-      ? Option.some(yield* fs.readFileString(at))
-      : Option.none<string>();
-  });
 
 /** Every committable file with its text, `filter` deciding which. */
 const filesWhere = (filter: (file: string) => boolean) =>

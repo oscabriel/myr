@@ -42,7 +42,7 @@ import type { FileSystem, Path } from "effect";
 import type { ChildProcessSpawner } from "effect/process";
 
 import { CredentialsFile } from "./credentials.ts";
-import { decideHook, MAX_HOLDS } from "./hook/decide.ts";
+import { decideHook, MAX_HOLDS, toolRefusals } from "./hook/decide.ts";
 import type { HookFacts } from "./hook/decide.ts";
 import { gatherFacts } from "./hook/facts.ts";
 import type { HookInput } from "./hook/input.ts";
@@ -416,14 +416,15 @@ const hookInput = (event: HookEvent, session: PiSession): HookInput => ({
 });
 
 /**
- * What `<cli> check --shape-only` refuses of the work as it stands, by the
- * policy's own `PushCheck`; nothing is asked without a claim.
+ * What `<cli> check --shape-only` refuses of the work as it stands, from the
+ * claim's base, by the policy's own `PushCheck`; nothing is asked without a
+ * claim.
  */
-const localCheck = (state: SessionState) =>
-  state.claim === undefined
+const localCheck = ({ claim, root }: SessionState) =>
+  claim === undefined
     ? Effect.succeed<readonly Refusal[]>([])
     : Effect.flatMap(Effect.service(PushCheck), (check) =>
-        check.run(state.root)
+        check.run(root, claim.base)
       );
 
 /** What the hook policy runs on. */
@@ -467,10 +468,25 @@ export const policyDeps = (services: Layer.Layer<PolicyServices>): PiDeps => ({
           ),
           Effect.provide(services)
         ),
-      // The policy decides an edit (`decideHook`'s pre-tool-use) but hands
-      // back only its text, not the refusals; until it hands them back, a
-      // pi edit is left to the gateway.
-      Write: () => Effect.succeedNone,
+      // An edit is judged as the hook's pre-tool-use judges one, from the
+      // kept facts alone: no check runs and the platform is never asked.
+      Write: ({ file }) =>
+        Effect.map(factsOf(session, false), (state) =>
+          Array.match(
+            toolRefusals(
+              {
+                ...hookInput("pre-tool-use", session),
+                tool_input: { file_path: file },
+                tool_name: "Write",
+              },
+              hookFacts(state, [])
+            ),
+            {
+              onEmpty: () => Option.none(),
+              onNonEmpty: (refusals) => Option.some(refusals),
+            }
+          )
+        ).pipe(Effect.provide(services)),
     }),
 
   settle: (session) =>

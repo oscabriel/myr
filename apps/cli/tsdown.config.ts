@@ -18,7 +18,7 @@ export const library = {
 const shared = {
   deps: {
     alwaysBundle: [/^@repo\//u],
-    // pi's adapter takes it as an optional peer (W7 706): never inlined.
+    // pi's adapter takes it as an optional peer: never inlined.
     neverBundle: [/^@earendil-works\/pi-coding-agent(?:\/|$)/u],
   },
   // `.js` and `.d.ts`: the package is ESM by its `type`.
@@ -51,6 +51,6 @@ export const declarations = (
 export default defineConfig([
   { ...shared, dts: false, entry: { bin: "src/bin.ts" } },
   { ...shared, dts: false, entry: library },
-  // The pi extension (W7 706), which the publish manifest's `"pi"` key names.
+  // The pi extension, which the publish manifest's `"pi"` key names.
   { ...shared, dts: false, entry: { pi: "src/pi.ts" } },
 ]);

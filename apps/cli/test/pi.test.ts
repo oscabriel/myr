@@ -16,7 +16,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client } from "@repo/protocol/contracts";
 import { Glob } from "@repo/protocol/domain/common";
-import { AskId, ProjectName, RepoPath } from "@repo/protocol/ids";
+import { AskId, CommitSha, ProjectName, RepoPath } from "@repo/protocol/ids";
 import {
   ChecksFailed,
   OutOfScope,
@@ -769,6 +769,7 @@ const want = "An ISO week date parses to the Monday of that week.";
 const claimedIn = (root: string): SessionState => ({
   claim: {
     ask: AskId.make("fix-week"),
+    base: CommitSha.make("1".repeat(40)),
     checkCommand: "bun test packages/a",
     project: ProjectName.make("datekit"),
     territory: { module: "a", paths: [Glob.make("packages/a/**")] },
@@ -915,6 +916,41 @@ describe("the live deps, over the hook policy's own modules", () => {
             verdict
           );
         }
+      })
+  );
+
+  it.live(
+    "judge an edit as the hook's pre-tool-use does, from the kept facts and without the check",
+    () =>
+      Effect.gen(function* () {
+        const { deps, folder, keep, roots } = yield* policyWith(
+          refusing(outside)
+        );
+
+        yield* keep("s6", claimedIn(folder));
+
+        // pi names a file absolutely, or from the agent's folder.
+        const session = { cwd: `${folder}/packages/a`, id: "s6" };
+
+        const judged = yield* Effect.forEach(
+          [`${folder}/${projectFile}`, "../../README.md", "src/week.ts"],
+          (file) => deps.guardTool(session, GuardedCall.Write({ file }))
+        );
+
+        const unclaimed = yield* deps.guardTool(
+          { cwd: folder, id: "s7" },
+          GuardedCall.Write({ file: projectFile })
+        );
+
+        expect({ judged, roots, unclaimed }).toStrictEqual({
+          judged: [
+            Option.some([new TouchedJudge({ paths: [projectFile] })]),
+            Option.some([outside]),
+            Option.none(),
+          ],
+          roots: [],
+          unclaimed: Option.none(),
+        });
       })
   );
 

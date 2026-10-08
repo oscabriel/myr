@@ -342,9 +342,10 @@ interface StartupQuestion {
  *
  * - Claude Code asks whether to trust the folder, "No, exit" first: the
  *   clone is the swarm's own, so it answers yes;
- * - then whether to import the CLAUDE.md files above the clone (this
- *   repo's own, when `.swarm/` sits in the checkout), "No" first: it keeps
- *   the default, since they are not the contributor's project.
+ * - then whether to import the CLAUDE.md files above the clone (a
+ *   checkout's, when a test or a person puts the swarm's folder in one),
+ *   "No" first: it keeps the default, since they are not the contributor's
+ *   project.
  *
  * Any other question is left for the person at the panes.
  */

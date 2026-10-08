@@ -2,7 +2,9 @@
  * The Stop hook's question: does `<cli> check` refuse the work as it stands?
  * Asked through a port, so the hook never imports the check command's
  * modules: the default adapter runs this same CLI as a child process,
- * `check --shape-only --offline --json`, and decodes its envelope.
+ * `check --shape-only --offline --json --base <claim's base>`, and decodes
+ * its envelope. Offline, the check cannot read the claim's base itself, and
+ * main would be the wrong start for work committed on main.
  */
 import { Envelope } from "@repo/protocol/envelope";
 import type { Refusal } from "@repo/protocol/refusal";
@@ -30,9 +32,13 @@ export class PushCheckFailed extends Schema.TaggedError<PushCheckFailed>()(
 export class PushCheck extends Context.Service<
   PushCheck,
   {
-    /** The refusals `<cli> check --shape-only` gives for the repo at `root`; none when it passes. */
+    /**
+     * The refusals `<cli> check --shape-only` gives for the repo at `root`,
+     * diffed from the claim's `base` as the gateway diffs; none when it passes.
+     */
     readonly run: (
-      root: string
+      root: string,
+      base: string
     ) => Effect.Effect<readonly Refusal[], PushCheckFailed>;
   }
 >()("cli/PushCheck") {}
@@ -52,7 +58,8 @@ const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
 
 /**
  * `PushCheck` over a child process: `command` (the CLI, as this process was
- * started) with `check --shape-only --offline --json`, in `root`. It exits 1
+ * started) with `check --shape-only --offline --json --base <base>`, in
+ * `root`. It exits 1
  * when it refuses, so the exit code says nothing; the envelope says all.
  */
 export const pushCheckWith = (
@@ -64,15 +71,19 @@ export const pushCheckWith = (
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       const [executable, ...leading] = command;
 
-      const run = (root: string) =>
+      const run = (root: string, base: string) =>
         Effect.scoped(
           Effect.gen(function* () {
             const child = yield* spawner.spawn(
-              ChildProcess.make(executable, [...leading, ...CHECK], {
-                cwd: root,
-                stderr: "ignore",
-                stdin: "ignore",
-              })
+              ChildProcess.make(
+                executable,
+                [...leading, ...CHECK, "--base", base],
+                {
+                  cwd: root,
+                  stderr: "ignore",
+                  stdin: "ignore",
+                }
+              )
             );
 
             const [stdout] = yield* Effect.all(

@@ -9,7 +9,7 @@
  * only from here, and `packages/config/test/bootstrap.test.ts` holds every
  * `env` block of the platform's and the sandbox's `wrangler.jsonc` to it.
  */
-import { Effect, Option, Path, Schema } from "effect";
+import { Effect, FileSystem, Option, Path, Schema } from "effect";
 
 /** A stage's shape: `dev-` and a lowercase user, or `demo`. */
 export const Stage = Schema.Union([
@@ -149,6 +149,25 @@ export const subdomainFile = "infra/workers-dev.json";
 
 /** `subdomainFile`'s contents. */
 export const WorkersDev = Schema.Struct({ subdomain: Schema.NonEmptyString });
+
+/**
+ * The account's workers.dev subdomain, as bootstrap recorded it in
+ * `subdomainFile`; none before bootstrap's first run, or when the file does
+ * not decode. Seed, smoke and the swarm each read it when no `--url` is
+ * given, and say in their own words what to run.
+ */
+export const recordedSubdomain = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+
+  return yield* fs
+    .readFileString(path.join(yield* repoRoot, subdomainFile))
+    .pipe(
+      Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(WorkersDev))),
+      Effect.map(({ subdomain }) => subdomain),
+      Effect.option
+    );
+});
 
 /** The platform's public origin at `stage`, on the account's workers.dev. */
 export const platformOrigin = (stage: Stage, subdomain: string) =>

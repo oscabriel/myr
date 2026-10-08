@@ -1,13 +1,15 @@
 /**
- * The swarm's six fictional contributors: "4 harnesses, 6 models" (SYN Q28).
- * Each is one person (a `SESSION_TOKENS` entry on the stage, spec D9) with
- * one harness and one model, vouched in burrow's `vouched.td`, so their
- * claims are not `NotVouched`.
+ * The swarm's six fictional contributors: "4 harnesses, 6 models". Each is
+ * one person (a `SESSION_TOKENS` entry on the stage, a named session beside
+ * accounts) with one harness and one model, vouched in burrow's
+ * `vouched.td`, so their claims are not `NotVouched`.
  *
- * The model ids are what this machine's harnesses list (2026-10-08):
+ * The model ids are what this machine's harnesses list and run (2026-10-08):
  * `opencode models` for OpenCode's GPT model and OpenCode Zen's Gemini flash,
  * `pi --offline --list-models` for pi's (its ready provider is `opencode-go`),
- * `amp --help` for Amp's modes.
+ * `amp --help` for Amp's modes. OpenCode signed in with a ChatGPT account
+ * refuses `openai/gpt-6.1-sol` ("not supported when using Codex with a
+ * ChatGPT account"), so tamsin runs `openai/gpt-5.5`, which ran headless.
  */
 import { Handle } from "@repo/protocol/ids";
 import { Schema } from "effect";
@@ -53,7 +55,7 @@ export const roster: readonly [
     adapter: false,
     handle: Handle.make("tamsin"),
     harness: "opencode",
-    model: "openai/gpt-6.1-sol",
+    model: "openai/gpt-5.5",
   },
   {
     adapter: false,

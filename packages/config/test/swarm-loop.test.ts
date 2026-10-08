@@ -30,6 +30,7 @@ import {
   ClaimLapsed,
   OutOfScope,
   StaleBase,
+  VerifierBlocked,
 } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
@@ -598,14 +599,14 @@ describe("the verdict loop", () => {
   );
 
   it.effect(
-    "takes an old answer status still shows after a continuation as no new answer",
+    "takes an old answer status still shows after a continuation as no new answer, and nudges with the head it last saw",
     () =>
       Effect.gen(function* () {
         const start = yield* recorded("claude-code", "start");
         const resume = yield* recorded("claude-code", "resume");
         const first = answer(1, refused(checksFailed));
 
-        const { result } = yield* agentRun({
+        const { harnessRuns, result } = yield* agentRun({
           harness: [{ lines: start }, { lines: resume }, { lines: resume }],
           statuses: [status(first)],
         });
@@ -615,6 +616,40 @@ describe("the verdict loop", () => {
           result.attempts,
           result.refusals,
         ]).toStrictEqual(["refused", 3, { ChecksFailed: 1 }]);
+
+        // An answer did arrive: the nudge must not say none ever did.
+        const nudge = promptOf(harnessRuns[2]);
+
+        expect(nudge).toContain(`since ${first.head.slice(0, 7)}`);
+        expect(nudge).not.toContain("yet");
+      })
+  );
+
+  it.effect(
+    "sends a refusal on the platform's side back as a wait, not as something to fix",
+    () =>
+      Effect.gen(function* () {
+        const start = yield* recorded("claude-code", "start");
+        const resume = yield* recorded("claude-code", "resume");
+        const blocked = answer(1, refused(new VerifierBlocked({})));
+        const landed = answer(2, Outcome.cases.Landed.make({ sha: landing }));
+
+        const { harnessRuns, result } = yield* agentRun({
+          harness: [{ lines: start }, { lines: resume }],
+          statuses: [status(blocked), status(blocked, landed)],
+        });
+
+        expect([
+          result.outcome,
+          result.attempts,
+          result.refusals,
+        ]).toStrictEqual(["landed", 2, { VerifierBlocked: 1 }]);
+
+        const prompt = promptOf(harnessRuns[1]);
+
+        expect(prompt).toContain("not a fault in your change");
+        expect(prompt).toContain("git commit --allow-empty");
+        expect(prompt).not.toContain("Fix what the refusal names");
       })
   );
 
@@ -883,7 +918,7 @@ describe("the harness drivers", () => {
               "json",
               "--auto",
               "-m",
-              "openai/gpt-6.1-sol",
+              "openai/gpt-5.5",
               "-s",
               "S-1",
               "Fix it.",
@@ -896,7 +931,7 @@ describe("the harness drivers", () => {
               "json",
               "--auto",
               "-m",
-              "openai/gpt-6.1-sol",
+              "openai/gpt-5.5",
               "Answer it.",
             ],
           },

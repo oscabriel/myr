@@ -179,7 +179,7 @@ describe("the panes", () => {
           {
             argv: ["--standalone", "--auto"],
             // OpenCode's interface takes no model flag: its inline config does.
-            env: { OPENCODE_CONFIG_CONTENT: '{"model":"openai/gpt-6.1-sol"}' },
+            env: { OPENCODE_CONFIG_CONTENT: '{"model":"openai/gpt-5.5"}' },
             kind: "opencode",
           },
           {

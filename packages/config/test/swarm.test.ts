@@ -40,6 +40,7 @@ import { brief } from "../../../scripts/lib/swarm/prompt.ts";
 import {
   AgentsResult,
   SwarmDir,
+  swarmDirOf,
   writeAgentsResult,
 } from "../../../scripts/lib/swarm/results.ts";
 import { roster } from "../../../scripts/lib/swarm/roster.ts";
@@ -739,6 +740,28 @@ describe("the run's summary", () => {
   );
 });
 
+describe("the swarm's folder", () => {
+  it("lives in the state home, as the hook's sessions do", () => {
+    expect(
+      swarmDirOf({ HOME: "/home/ada", XDG_STATE_HOME: "/var/state/ada" })
+    ).toBe(`/var/state/ada/${Brand.slug}/swarm`);
+    expect(swarmDirOf({ HOME: "/home/ada" })).toBe(
+      `/home/ada/.local/state/${Brand.slug}/swarm`
+    );
+  });
+
+  // A harness reads every AGENTS.md and CLAUDE.md above its folder: inside
+  // this checkout, each contributor would read the platform's own.
+  it.effect("is never inside this checkout", () =>
+    Effect.gen(function* () {
+      const root = yield* repoRoot;
+      const dir = yield* SwarmDir;
+
+      expect(dir.startsWith(`${root}/`)).toBeFalsy();
+    }).pipe(Effect.provide(NodeServices.layer))
+  );
+});
+
 /** Why the flags `argv` make no run, or `accepted` when they make one. */
 const reasonOf = (argv: readonly string[]) =>
   optionsOf(argv).pipe(
@@ -948,7 +971,7 @@ describe("the dry run", () => {
           [
             "tamsin",
             "opencode",
-            "openai/gpt-6.1-sol",
+            "openai/gpt-5.5",
             children[1],
             "@burrow/billing",
           ],

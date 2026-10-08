@@ -99,6 +99,7 @@ const ask = Schema.decodeSync(Ask)(askWire);
 /** Alice's claim on `fix-week`, as the hook keeps it. */
 const claim: HookClaim = {
   ask: ask.id,
+  base: CommitSha.make("1".repeat(40)),
   checkCommand: `bun test ${checkPath}`,
   project: ask.project,
   territory: ask.territory,
@@ -741,11 +742,16 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
         const { base, dir } = yield* aClone(fork);
         const state = yield* tempDir;
         const { platform } = yield* platformFor(base);
+        const asked: string[] = [];
 
         const refusing = Layer.mergeAll(
           platform,
           Layer.succeed(PushCheck)({
-            run: () => Effect.succeed([weakened]),
+            run: (_root, from) =>
+              Effect.as(
+                Effect.sync(() => asked.push(from)),
+                [weakened]
+              ),
           })
         );
 
@@ -773,6 +779,8 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
         expect(fourth.code).toBe(0);
         expect(fourth.err.join("\n")).toContain("Weakened");
         expect((yield* stopRun).out).toStrictEqual([held]);
+        // Each check starts from the claim's base, not from main.
+        expect(new Set(asked)).toStrictEqual(new Set([base]));
       }).pipe(Effect.provide(NodeServices.layer))
   );
 
@@ -1104,7 +1112,7 @@ const checkPrinting = (stdout: string, code: number) =>
       pushCheckWith(["sh", "-c", `cat '${printed}'; exit ${code}`])
     );
 
-    return yield* Effect.result(check.run(dir));
+    return yield* Effect.result(check.run(dir, "main"));
   }).pipe(Effect.provide(NodeServices.layer));
 
 describe("the default push check: this CLI, run again", () => {
@@ -1128,6 +1136,45 @@ describe("the default push check: this CLI, run again", () => {
 
       expect(result).toStrictEqual(Result.succeed([]));
     })
+  );
+
+  it.live(
+    "asks the check from the claim's base, as the gateway diffs, so work committed on main is seen",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const dir = yield* tempDir;
+        const args = path.join(dir, "args");
+        const printed = path.join(dir, "envelope.json");
+
+        yield* fs.writeFileString(
+          printed,
+          encodeEnvelope({ command: "check", data: {}, ok: true, v: 1 })
+        );
+
+        const check = yield* Effect.provide(
+          Effect.service(PushCheck),
+          pushCheckWith([
+            "sh",
+            "-c",
+            `printf '%s\\n' "$@" > '${args}'; cat '${printed}'`,
+            "check",
+          ])
+        );
+
+        yield* check.run(dir, sha("1"));
+
+        expect((yield* fs.readFileString(args)).split("\n")).toStrictEqual([
+          "check",
+          "--shape-only",
+          "--offline",
+          "--json",
+          "--base",
+          sha("1"),
+          "",
+        ]);
+      }).pipe(Effect.provide(NodeServices.layer))
   );
 
   it.live("fails, for the hook to allow, when no envelope comes back", () =>
