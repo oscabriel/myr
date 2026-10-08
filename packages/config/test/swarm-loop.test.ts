@@ -619,6 +619,96 @@ describe("the verdict loop", () => {
   );
 
   it.effect(
+    "counts the refusals of every answer one session pushed, not only its last",
+    () =>
+      Effect.gen(function* () {
+        const start = yield* recorded("claude-code", "start");
+
+        // The brief tells the agent to read status and push again, so one
+        // session can push several answers before it settles.
+        const { harnessRuns, result } = yield* agentRun({
+          harness: [{ lines: start }],
+          statuses: [
+            status(
+              answer(1, refused(outOfScope)),
+              answer(2, refused(staleBase)),
+              answer(3, Outcome.cases.Landed.make({ sha: landing }))
+            ),
+          ],
+        });
+
+        expect([
+          result.outcome,
+          result.attempts,
+          result.refusals,
+        ]).toStrictEqual(["landed", 1, { OutOfScope: 1, StaleBase: 1 }]);
+        expect(harnessRuns).toHaveLength(1);
+      })
+  );
+
+  it.effect(
+    "asks status again when a read fails, rather than ending the run",
+    () =>
+      Effect.gen(function* () {
+        const start = yield* recorded("claude-code", "start");
+
+        const { result, spawned } = yield* agentRun({
+          clock: TestClock.adjust("5 seconds"),
+          harness: [{ lines: start }],
+          statuses: [
+            "error: fetch failed",
+            status(answer(1, Outcome.cases.Landed.make({ sha: landing }))),
+          ],
+        });
+
+        expect([result.outcome, result.attempts]).toStrictEqual(["landed", 1]);
+        expect(
+          spawned.filter(({ command }) => command.endsWith(`/bin/${Brand.cli}`))
+        ).toHaveLength(2);
+      })
+  );
+
+  it.effect(
+    "records a pi run whose provider failed as failed, though pi exits 0",
+    () =>
+      Effect.gen(function* () {
+        const start = yield* recorded("pi", "start");
+
+        const finalResponse = start.findLastIndex((line) =>
+          line.startsWith('{"type":"message_end","message":{"role":"assistant"')
+        );
+
+        // pi's last response as JSON mode prints it when the provider fails.
+        const failing = start.map((line, index) =>
+          index === finalResponse
+            ? line.replace(
+                '"stopReason":"stop"',
+                '"stopReason":"error","errorMessage":"429 Too Many Requests"'
+              )
+            : line
+        );
+
+        const { harnessRuns, result, said } = yield* agentRun({
+          contributor: roster[3],
+          harness: [{ code: 0, lines: failing }, { lines: [] }],
+          statuses: [status()],
+        });
+
+        expect(failing[finalResponse]).toContain('"stopReason":"error"');
+        expect([
+          result.outcome,
+          result.attempts,
+          harnessRuns.length,
+        ]).toStrictEqual(["failed", 1, 1]);
+        expect(said).toContainEqual(
+          expect.stringContaining(
+            "marisol: pi failed: error: 429 Too Many Requests"
+          )
+        );
+      })
+  );
+
+  it.effect(
     "records a harness that exits before it starts a session as failed",
     () =>
       Effect.gen(function* () {
@@ -763,6 +853,7 @@ describe("the harness drivers", () => {
               "--verbose",
               "--permission-mode",
               "bypassPermissions",
+              "--strict-mcp-config",
               "--model",
               "claude-opus-5-5",
               "--resume",
@@ -777,6 +868,7 @@ describe("the harness drivers", () => {
               "--verbose",
               "--permission-mode",
               "bypassPermissions",
+              "--strict-mcp-config",
               "--model",
               "claude-opus-5-5",
               "Answer it.",
@@ -844,6 +936,7 @@ describe("the harness drivers", () => {
               "-p",
               "--mode",
               "json",
+              "--no-mcp",
               "--session-dir",
               `/work/.swarm/r1/${handle}/sessions`,
               "--session-id",
@@ -857,6 +950,7 @@ describe("the harness drivers", () => {
               "-p",
               "--mode",
               "json",
+              "--no-mcp",
               "--session-dir",
               `/work/.swarm/r1/${handle}/sessions`,
               "--session-id",
@@ -872,6 +966,7 @@ describe("the harness drivers", () => {
               "-p",
               "--mode",
               "json",
+              "--no-mcp",
               "--session-dir",
               "/work/.swarm/r1/pell/sessions",
               "--session-id",
@@ -887,6 +982,7 @@ describe("the harness drivers", () => {
               "-p",
               "--mode",
               "json",
+              "--no-mcp",
               "--session-dir",
               "/work/.swarm/r1/pell/sessions",
               "--session-id",

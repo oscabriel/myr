@@ -365,7 +365,9 @@ export const nudgePrompt = (input: {
 /**
  * What to do with what status says after an attempt: pure, over the
  * loop's progress. An answer status showed before (its request already
- * judged) is no new answer.
+ * judged) is no new answer. The loop acts on the latest new answer, and
+ * counts the refusals of every new one: an agent that read its verdict
+ * and pushed again in the same session met each of them.
  */
 export const afterSettle = (input: {
   readonly status: AskStatus;
@@ -432,9 +434,19 @@ export const afterSettle = (input: {
 
   const answer = fresh.value;
 
+  const unjudged = input.status.answers.filter(
+    ({ requestId }) => !progress.judged.includes(requestId)
+  );
+
   const judged = {
     ...progress,
-    judged: [...progress.judged, answer.requestId],
+    judged: [...progress.judged, ...unjudged.map(({ requestId }) => requestId)],
+    refusals: tally(
+      progress.refusals,
+      unjudged.flatMap(({ outcome }) =>
+        Outcome.guards.Refused(outcome) ? outcome.refusals : []
+      )
+    ),
   };
 
   return Outcome.match(answer.outcome, {
@@ -446,13 +458,8 @@ export const afterSettle = (input: {
     Landed: ({ sha }) =>
       done("landed", { ...judged, landed: Option.some(sha) }),
     Refused: ({ refusals }) => {
-      const counted = {
-        ...judged,
-        refusals: tally(progress.refusals, refusals),
-      };
-
       if (refusals.some(({ _tag }) => endsClaim.has(_tag)) || !canContinue) {
-        return done("refused", counted);
+        return done("refused", judged);
       }
 
       return {
@@ -460,7 +467,7 @@ export const afterSettle = (input: {
           nudge: false,
           prompt: refusalPrompt({ answer, project, refusals }),
         }),
-        progress: { ...counted, continuations: progress.continuations + 1 },
+        progress: { ...judged, continuations: progress.continuations + 1 },
       };
     },
     WaitingOnParent: () => done("waiting", judged),

@@ -1,8 +1,11 @@
 /**
  * Claude Code, headless: `claude -p` with stream JSON, every tool allowed
- * (`--permission-mode bypassPermissions`: no one is there to approve), and
- * `--resume <id>` to continue the same session. The `system`/`init` line
- * names the session; the `result` line closes the run with its usage.
+ * (`--permission-mode bypassPermissions`: no one is there to approve), no
+ * MCP server (`--strict-mcp-config` with no `--mcp-config`: else the user's
+ * own servers and claude.ai connectors load, with the user's accounts
+ * behind them), and `--resume <id>` to continue the same session. The
+ * `system`/`init` line names the session; the `result` line closes the run
+ * with its usage.
  *
  * Amp's `--stream-json` is "Claude Code-compatible", so `streamJsonEvents`
  * reads both.
@@ -104,7 +107,7 @@ export const streamJsonEvents =
     });
   };
 
-/** The flags every run shares: print mode, stream JSON, no one to ask, the model. */
+/** The flags every run shares: print mode, stream JSON, no one to ask, no MCP, the model. */
 const headless = (model: string) => [
   "-p",
   "--output-format",
@@ -112,6 +115,7 @@ const headless = (model: string) => [
   "--verbose",
   "--permission-mode",
   "bypassPermissions",
+  "--strict-mcp-config",
   "--model",
   model,
 ];

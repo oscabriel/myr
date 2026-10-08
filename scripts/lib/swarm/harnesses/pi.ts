@@ -3,8 +3,10 @@
  * kept in the workspace (`--session-dir`) under an id the swarm picks
  * (`--session-id`, which opens the session or creates it), so a resume is
  * the same command with a new prompt. pi asks no approvals, so it needs no
- * permission flag. The adapter's contributor loads the CLI's pi adapter
- * (issue 706) with `-e`, on the start and on every resume.
+ * permission flag. `--no-mcp` keeps pi's built-in MCP off, so the user's
+ * own servers (`~/.pi/agent/mcp.json`, with the user's accounts behind
+ * them) never reach a contributor. The adapter's contributor loads the
+ * CLI's pi adapter (issue 706) with `-e`, on the start and on every resume.
  *
  * The header line names the session; `agent_settled` says pi will not
  * continue on its own. JSON mode exits 0 when the provider fails, so the
@@ -93,7 +95,7 @@ const parse = (line: string): readonly HarnessEvent[] => {
     : [];
 };
 
-/** The flags every run shares: print mode, JSON events, the session, the model, the adapter. */
+/** The flags every run shares: print mode, JSON events, no MCP, the session, the model, the adapter. */
 const headless = (input: {
   readonly sessionDir: string;
   readonly session: string;
@@ -103,6 +105,7 @@ const headless = (input: {
   "-p",
   "--mode",
   "json",
+  "--no-mcp",
   "--session-dir",
   input.sessionDir,
   "--session-id",

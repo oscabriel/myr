@@ -38,7 +38,12 @@ const decodeStatus = Schema.decodeEffect(
 export interface AskStatus {
   /** Their claim on the ask, while status lists it. */
   readonly claim: Option.Option<ClaimView>;
-  /** Their latest answer to the ask. */
+  /**
+   * Every answer of theirs to the ask, oldest first: one session can push
+   * several before it settles.
+   */
+  readonly answers: readonly AnswerView[];
+  /** Their latest answer to the ask: the last of `answers`. */
   readonly answer: Option.Option<AnswerView>;
 }
 
@@ -46,13 +51,11 @@ export interface AskStatus {
 export const workspaceCli = (workspace: Pick<AgentWorkspace, "dir">) =>
   `${workspace.dir}/bin/${Brand.cli}`;
 
-/** The latest of `answers`, by `at`; of two at the same instant, the one listed last. */
-const latest = (answers: readonly AnswerView[]) =>
-  Array.last(
-    Array.sort(
-      answers,
-      Order.mapInput(Order.Number, ({ at }: AnswerView) => at.epochMilliseconds)
-    )
+/** `answers` oldest first, by `at`; of two at the same instant, the one listed first. */
+const oldestFirst = (answers: readonly AnswerView[]) =>
+  Array.sort(
+    answers,
+    Order.mapInput(Order.Number, ({ at }: AnswerView) => at.epochMilliseconds)
   );
 
 /** How one status read is asked: whose workspace, and which ask (in which project, when known). */
@@ -111,10 +114,13 @@ export const readStatus = (
       });
     }
 
+    const answers = oldestFirst(
+      envelope.data.answers.filter((answer) => answer.ask === ask)
+    );
+
     return {
-      answer: latest(
-        envelope.data.answers.filter((answer) => answer.ask === ask)
-      ),
+      answer: Array.last(answers),
+      answers,
       claim: Array.findLast(envelope.data.claims, (claim) => claim.ask === ask),
     };
   });
@@ -138,10 +144,18 @@ export const readOutcome = (
 export const POLL_MS = 5000;
 
 /**
+ * How many times a status read that fails (the platform briefly down, a
+ * request dropped) is asked again, `pollMs` apart, before the run fails:
+ * one bad read in a run of hundreds should not end a contributor's run.
+ */
+export const STATUS_RETRIES = 5;
+
+/**
  * Reads the ask's status until its latest answer is no longer `Checking`:
  * landed, refused or waiting on someone, or no answer at all. It asks
- * every `pollMs`, and never gives up on its own: the run's timeout
- * (`loop.ts`) bounds it.
+ * every `pollMs`, asks again up to `STATUS_RETRIES` times when a read
+ * fails, and never gives up on its own: the run's timeout (`loop.ts`)
+ * bounds it.
  */
 export const awaitSettledOutcome = (
   query: StatusQuery & { readonly pollMs?: number }
@@ -153,10 +167,10 @@ export const awaitSettledOutcome = (
   const checking = ({ answer }: AskStatus) =>
     Option.exists(answer, ({ outcome }) => Outcome.guards.Checking(outcome));
 
+  const every = Schedule.spaced(Duration.millis(query.pollMs ?? POLL_MS));
+
   return readStatus(query).pipe(
-    Effect.repeat({
-      schedule: Schedule.spaced(Duration.millis(query.pollMs ?? POLL_MS)),
-      while: checking,
-    })
+    Effect.retry({ schedule: every, times: STATUS_RETRIES }),
+    Effect.repeat({ schedule: every, while: checking })
   );
 };
