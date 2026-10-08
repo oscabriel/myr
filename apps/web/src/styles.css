@@ -1,0 +1,252 @@
+@import "tailwindcss";
+@import "shadcn/tailwind.css";
+
+/*
+  The web's tokens (DESIGN.md names each one and when to use it).
+
+  The world is a test certificate: every page is a report sheet on cool
+  bond paper, ruled in one-pixel hairlines, with fields, a results row, and
+  signatories (credit) kept apart from the instruments used (agents). Colour
+  carries state and nothing else, always beside a word and a mark:
+
+  --landed    the change is on main (a certified result)
+  --checking  the gate is running a stage now
+  --waiting   passed or paused, waiting on a person or a parent ask
+  --refused   a refusal (nonconformance); the one rubric colour
+  --sealed    held-back checks, layers and sealed evidence
+  --muted     not reached, not needed, secondary text
+
+  Light and dark follow the system setting (no toggle, no script, no flash):
+  shadcn's `dark:` variant is the media query, not a class.
+*/
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./assets/fonts/public-sans-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Public Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./assets/fonts/public-sans-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./assets/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("./assets/fonts/jetbrains-mono-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  color-scheme: light dark;
+
+  /* Paper, ink and rules. The paper is hex: the theme-color meta and the
+     manifest repeat it (src/features/shared/theme.ts, held by a test). */
+  --background: #f5f8fa;
+  --foreground: oklch(0.21 0.015 258);
+  --surface: oklch(0.955 0.005 245);
+  --muted: oklch(0.48 0.012 258);
+  --rule: oklch(0.86 0.007 255);
+  --rule-strong: oklch(0.21 0.015 258);
+
+  /* State roles: text-safe on paper and on surface (at least 5:1). */
+  --landed: oklch(0.47 0.11 155);
+  --checking: oklch(0.48 0.13 252);
+  --waiting: oklch(0.5 0.1 70);
+  --refused: oklch(0.5 0.18 27);
+  --sealed: oklch(0.46 0.13 305);
+
+  /* shadcn's names, mapped onto the roles above. */
+  --card: var(--background);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.995 0.002 240);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--foreground);
+  --muted-foreground: var(--muted);
+  --accent: var(--surface);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--refused);
+  --border: var(--rule);
+  --input: var(--rule);
+  --ring: var(--foreground);
+  --radius: 0.125rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0e1114;
+    --foreground: oklch(0.94 0.005 258);
+    --surface: oklch(0.215 0.009 258);
+    --muted: oklch(0.72 0.01 258);
+    --rule: oklch(0.33 0.01 258);
+    --rule-strong: oklch(0.94 0.005 258);
+
+    --landed: oklch(0.78 0.13 155);
+    --checking: oklch(0.76 0.11 250);
+    --waiting: oklch(0.82 0.12 78);
+    --refused: oklch(0.73 0.15 25);
+    --sealed: oklch(0.76 0.11 305);
+
+    --popover: oklch(0.235 0.009 258);
+  }
+}
+
+@theme inline {
+  --font-sans:
+    "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo,
+    monospace;
+
+  /* A fixed scale, ratio about 1.2: product type does not float. */
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.1rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.35rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.55rem;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.65rem;
+  --text-xl: 1.4375rem;
+  --text-xl--line-height: 1.9rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.2rem;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-landed: var(--landed);
+  --color-checking: var(--checking);
+  --color-waiting: var(--waiting);
+  --color-refused: var(--refused);
+  --color-sealed: var(--sealed);
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 2);
+  --radius-xl: calc(var(--radius) * 3);
+
+  /* A landing's mark settles once, like a stamp. */
+  --animate-stamp: stamp 420ms cubic-bezier(0.16, 1, 0.3, 1) 1 both;
+
+  @keyframes stamp {
+    from {
+      opacity: 0;
+      transform: scale(1.35);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-color: var(--rule) transparent;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    caret-color: var(--checking);
+  }
+
+  ::selection {
+    background: color-mix(in oklch, var(--checking) 22%, transparent);
+    color: var(--foreground);
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    font-feature-settings: "calt" 0;
+  }
+
+  time,
+  td,
+  th {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

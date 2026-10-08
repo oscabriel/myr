@@ -1,37 +1,89 @@
+import { Brand } from "@repo/brand";
 import {
   createRootRoute,
   HeadContent,
   Outlet,
   Scripts,
+  useLocation,
 } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { env } from "cloudflare:workers";
 import type { ReactNode } from "react";
 
-// A minimal document; issue 511 replaces it with the shell and the design.
+import { TooltipProvider } from "../components/ui/tooltip.tsx";
+import { SessionSlot } from "../features/auth/session-slot.tsx";
+import { SiteFooter, SiteHeader } from "../features/shared/layout.tsx";
+import { themeColors } from "../features/shared/theme.ts";
+
+import styles from "../styles.css?url";
+
+// The shell every page shares (issue 511): the document, the header with
+// the front page, Today and the session, each page's own <main> (from
+// `PageShell`), and the footer's two ways in. Pages read the site's facts
+// from this route's loader data (`getRouteApi("__root__").useLoaderData()`).
+
+/**
+ * What every page may need from the Worker's env: where a browser reaches
+ * the platform (its git remotes and the CLI's install line). Read on the
+ * server; the loader's data rides into the page with the first render.
+ */
+const siteFacts = createServerFn({ method: "GET" }).handler(() => ({
+  platformUrl: env.PUBLIC_PLATFORM_URL,
+}));
 
 const Document = ({ children }: Readonly<{ children: ReactNode }>) => (
   <html lang="en">
     <head>
       <HeadContent />
     </head>
-    <body>
+    <body className="flex min-h-dvh flex-col">
       {children}
       <Scripts />
     </body>
   </html>
 );
 
-const Root = () => (
-  <Document>
-    <Outlet />
-  </Document>
-);
+const Root = () => {
+  const { platformUrl } = Route.useLoaderData();
+  const { pathname } = useLocation();
+
+  return (
+    <Document>
+      <TooltipProvider>
+        <SiteHeader pathname={pathname} session={<SessionSlot />} />
+        <Outlet />
+        <SiteFooter platformUrl={platformUrl} />
+      </TooltipProvider>
+    </Document>
+  );
+};
 
 export const Route = createRootRoute({
   component: Root,
   head: () => ({
+    links: [
+      { href: styles, rel: "stylesheet" },
+      // Served by issue 505 (`public/manifest.webmanifest`).
+      { href: "/manifest.webmanifest", rel: "manifest" },
+    ],
     meta: [
       { charSet: "utf-8" },
       { content: "width=device-width, initial-scale=1", name: "viewport" },
+      { content: "light dark", name: "color-scheme" },
+      {
+        content: themeColors.light,
+        media: "(prefers-color-scheme: light)",
+        name: "theme-color",
+      },
+      {
+        content: themeColors.dark,
+        media: "(prefers-color-scheme: dark)",
+        name: "theme-color",
+      },
+      { title: Brand.name },
     ],
   }),
+  loader: () => siteFacts(),
+  // The facts are the stage's, fixed for the Worker's life: fetch them once.
+  staleTime: Number.POSITIVE_INFINITY,
 });

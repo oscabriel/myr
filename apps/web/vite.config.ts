@@ -14,4 +14,7 @@ export default defineConfig({
     tanstackStart(),
     viteReact(),
   ],
+  // shadcn's components import through `@/` (components.json), which
+  // tsconfig.json's `paths` maps to `src/`.
+  resolve: { tsconfigPaths: true },
 });

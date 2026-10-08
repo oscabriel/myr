@@ -9,12 +9,17 @@ export default mergeConfig(
   preset,
   defineConfig({
     resolve: {
+      // shadcn's `@/` imports, as in vite.config.ts.
+      tsconfigPaths: true,
       alias: {
         "cloudflare:workers": new URL("test/workers-shim.ts", import.meta.url)
           .pathname,
       },
     },
     test: {
+      // The shared tests read styles.css as text (`?raw`); vitest hands
+      // every other stylesheet over empty.
+      css: { include: [/\/src\/styles\.css/u] },
       include: ["test/**/*.test.tsx"],
       typecheck: {
         enabled: true,
