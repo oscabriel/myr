@@ -438,6 +438,7 @@ const contributorRun = (input: {
       assignment,
       brief: ready.success.text,
       maxContinuations: 3,
+      project: options.project,
       timeoutMs: options.timeoutMin * 60_000,
       workspace: ready.success.workspace,
     });

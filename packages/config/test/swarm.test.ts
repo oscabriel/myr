@@ -1065,12 +1065,17 @@ const tokenOf = (handle: string) =>
 /**
  * `main` without `--dry-run`, over a fake platform: the CLI's `asks`, `ask`
  * and `claim` answer from the fixtures, git succeeds, and `SESSION_TOKENS`
- * holds `people`. The ledger and `.swarm/` are temp files.
+ * holds `people`. The ledger and `.swarm/` are temp files. Any other command
+ * (a harness, a workspace's `status`) exits 1 unless `otherwise` answers it.
  */
 const fullRun = (
   people: readonly string[],
   /** The contributor whose claim the platform refuses with `AskFull`, if any. */
-  refused?: string
+  refused?: string,
+  otherwise?: (call: Spawned) => Option.Option<{
+    readonly code?: number;
+    readonly stdout?: string;
+  }>
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -1121,7 +1126,9 @@ const fullRun = (
       });
     };
 
-    const fake = yield* fakeSpawner(({ args, command, env }) => {
+    const fake = yield* fakeSpawner((call) => {
+      const { args, command, env } = call;
+
       if (command === "git") {
         return args.includes("rev-parse")
           ? { stdout: "d7064cb4f9f0f0e0d0c0b0a090807060504030201\n" }
@@ -1135,7 +1142,13 @@ const fullRun = (
           ask: { stdout: shown },
           asks: { stdout: listed },
           claim: { stdout: claimFor(ask, env[`${SLUG}_TOKEN`]) },
-        }[verb] ?? { code: 1 }
+        }[verb] ??
+        Option.getOrElse(
+          Option.flatMap(Option.fromUndefinedOr(otherwise), (answer) =>
+            answer(call)
+          ),
+          () => ({ code: 1 })
+        )
       );
     });
 
@@ -1278,6 +1291,52 @@ describe("a run", () => {
             .map(({ name }) => name.split("--").at(-1) ?? "")
             .toSorted((one, other) => one.localeCompare(other))
         ).toStrictEqual(["dagny", "marisol", "pell", "tamsin", "wren"]);
+      })
+  );
+
+  it.effect(
+    "reads each contributor's status for the swarm's project only, since a seeded copy can hold the same ask names",
+    () =>
+      Effect.gen(function* () {
+        const started = yield* fixture(
+          "harness-output/claude-code/start.jsonl"
+        ).pipe(Effect.provide(NodeServices.layer));
+
+        // wren's Claude Code starts a session; the platform has no answer
+        // from wren yet, so the loop nudges once and asks status again.
+        const nothingYet = JSON.stringify({
+          command: "status",
+          data: { answers: [], claims: [], handle: "wren" },
+          ok: true,
+          v: 1,
+        });
+
+        const answer = ({ args, command }: Spawned) => {
+          if (command === "claude") {
+            return Option.some({ stdout: started });
+          }
+
+          if (args[0] === "status") {
+            return Option.some({ stdout: nothingYet });
+          }
+
+          return Option.none();
+        };
+
+        const { spawned } = yield* fullRun(
+          roster.map(({ handle }) => handle),
+          undefined,
+          answer
+        );
+
+        const reads = spawned
+          .filter(({ args }) => args[0] === "status")
+          .map(({ args }) => args);
+
+        expect(reads).toStrictEqual([
+          ["status", "--project", "burrow", "--json"],
+          ["status", "--project", "burrow", "--json"],
+        ]);
       })
   );
 
