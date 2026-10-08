@@ -55,3 +55,15 @@
 {"at":"2026-10-08T16:57:10.934Z","by":"smoke","kind":"project","name":"smoke-20261008-165645","stage":"dev-oscabriel"}
 {"at":"2026-10-08T16:57:10.935Z","by":"smoke","kind":"repo","name":"smoke-20261008-165645","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
 {"at":"2026-10-08T16:57:42.447Z","by":"smoke","kind":"repo","name":"smoke-20261008-165645--parse-year--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:12:09.537Z","by":"seed","kind":"project","name":"datekit-805","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:12:09.537Z","by":"seed","kind":"repo","name":"datekit-805","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:12:09.537Z","by":"seed","kind":"repo","name":"datekit-805--maintainers","namespace":"layers-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:14:33.862Z","by":"seed","kind":"project","name":"burrow-805","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:14:33.862Z","by":"seed","kind":"repo","name":"burrow-805","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:34:26.478Z","by":"swarm","kind":"repo","name":"burrow-805--drop-legacy-fetch-burrow-billing--ivo","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:34:26.479Z","by":"swarm","kind":"repo","name":"burrow-805--drop-legacy-fetch-burrow-auth--tamsin","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:39:05.727Z","by":"seed","kind":"repo","name":"datekit-805--format-ordinal--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:39:05.825Z","by":"seed","kind":"repo","name":"datekit-805--parse-iso-week--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:39:05.920Z","by":"seed","kind":"repo","name":"datekit-805--add-months-clamp--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:39:06.017Z","by":"seed","kind":"repo","name":"burrow-805--drop-legacy-fetch-burrow-catalog--marisol","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-08T17:39:06.114Z","by":"seed","kind":"repo","name":"burrow-805--drop-legacy-fetch-burrow-kit--dagny","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
