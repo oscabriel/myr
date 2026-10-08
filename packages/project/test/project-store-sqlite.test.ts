@@ -18,7 +18,10 @@ describeProjectStore(
 describe("the project store's migrations", () => {
   it.effect("run each migration once on a fresh database", () =>
     Effect.gen(function* () {
-      expect(yield* migrate).toStrictEqual([[1, "project_state"]]);
+      expect(yield* migrate).toStrictEqual([
+        [1, "project_state"],
+        [2, "visibility"],
+      ]);
       expect(yield* migrate).toStrictEqual([]);
     }).pipe(Effect.provide(database))
   );

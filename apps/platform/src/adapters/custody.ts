@@ -49,6 +49,7 @@ import type { Refusal } from "@repo/protocol/refusal";
 import { receiptLine } from "@repo/protocol/render";
 import { Array, Effect, Option, Result } from "effect";
 
+import type { LayerTarget } from "../layer-gate.ts";
 import { RepoKind } from "../repo-names.ts";
 
 /** The branch every repo the platform makes keeps its work on. */
@@ -362,3 +363,46 @@ export const custodyFor = (
 
     return annotated(custody, annotations);
   });
+
+/**
+ * Custody of a push to a layer's repo (W6 609). The gateway lets only the
+ * layer's writers push there (`git.ts`, through `LayerGate`), so every ref
+ * goes through; once the upstream took the push, the project hears the
+ * head `main` moved to (`recordLayerPush`), which it admits at once or
+ * through admission. A project never made takes no layer push.
+ */
+export const layerCustodyFor = (
+  pusher: Person,
+  target: LayerTarget
+): Effect.Effect<Custody["Service"], never, Projects> =>
+  Effect.map(Projects, (projects) =>
+    custodyOf(
+      () => [],
+      (_repo, commands) =>
+        Option.match(mainTip(commands), {
+          onNone: () => Effect.succeed([]),
+          onSome: ({ head }) =>
+            against(projects, target.project, (api) =>
+              Effect.as(
+                api.recordLayerPush(pusher, { head, layer: target.layer }),
+                []
+              )
+            ),
+        })
+    )
+  );
+
+/**
+ * A clone or fetch of a layer's repo, for its read log (OSR §5.2): who
+ * read which layer. A project never made logs nothing.
+ */
+export const layerRead = (
+  reader: Person,
+  target: LayerTarget
+): Effect.Effect<void, never, Projects> =>
+  Projects.use((projects) => projects.get(target.project)).pipe(
+    Effect.flatMap((api) =>
+      api.recordLayerRead(reader, { layer: target.layer })
+    ),
+    Effect.catchTag("UnknownProject", () => Effect.void)
+  );

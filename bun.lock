@@ -62,6 +62,7 @@
         "@repo/project": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/rules": "workspace:*",
+        "@repo/visibility": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -261,6 +262,7 @@
         "@repo/git": "workspace:*",
         "@repo/protocol": "workspace:*",
         "@repo/rules": "workspace:*",
+        "@repo/visibility": "workspace:*",
         "effect": "catalog:",
         "isomorphic-git": "1.43.0",
       },

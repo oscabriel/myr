@@ -2,9 +2,9 @@
  * The decider-facing half of the project service (221): a decider's Today,
  * proposals and flags, decisions and the defaults their expiry applies,
  * finishes, a decider's own landing from their working fork, vouches and
- * denouncements, a person's credits, and, until the visibility cartridge
- * (W6), a ledger that says the project is Open and an env shape read from
- * the landed `.env.schema`.
+ * denouncements, and a person's credits. The ledger, the env shape and
+ * write-only values are declared here and answered by the visibility ports
+ * (`visibility-port.ts`, `env-port.ts`; W6 609), in `project.ts`.
  *
  * Every call has the core loop's shape (ADR 0012): the project service
  * lends its hydrate, its one-call `write` (hydrate, transition, persist,
@@ -21,6 +21,7 @@ import { RefName, RepoHost, Revision } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { CheckLane } from "@repo/checks/check-runner";
 import type { CheckRunner } from "@repo/checks/check-runner";
+import type { PushFacts } from "@repo/gate/facts";
 import { pushStages, runGate } from "@repo/gate/gate";
 import { scan } from "@repo/gate/stages/shape";
 import { formatLanding } from "@repo/git/trailers";
@@ -31,7 +32,7 @@ import type { Evidence } from "@repo/protocol/domain/common";
 import type { Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
-import type { EnvItem, EnvSchemaView } from "@repo/protocol/domain/env";
+import type { EnvSchemaView } from "@repo/protocol/domain/env";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { Policy } from "@repo/protocol/domain/policy";
@@ -43,7 +44,6 @@ import {
   AskId,
   CommitSha,
   DecisionId,
-  EnvKey,
   LandedSha,
   ProposalId,
   RepoName,
@@ -52,28 +52,28 @@ import {
   TreeSha,
   sameHandle,
 } from "@repo/protocol/ids";
-import type { ProjectName, Handle } from "@repo/protocol/ids";
+import type { ProjectName, Handle, EnvKey } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import type { Principal } from "@repo/protocol/principal";
 import {
   Denounced,
   NotDecider,
-  NotSensitive,
   NotVouched,
   RepoBusy,
   StaleBase,
   TouchedJudge,
   UnknownAsk,
-  UnknownProject,
 } from "@repo/protocol/refusal";
 import type {
   CapReached,
   DecisionClosed,
   IncompleteBrief,
   NotRedFirst,
+  NotSensitive,
   Refusal,
   UnknownDecision,
   UnknownEnvItem,
+  UnknownProject,
   ValueTooShort,
   VerifierBlocked,
   WeakCheck,
@@ -113,6 +113,7 @@ import { recordOf } from "./attention/record.ts";
 import { today } from "./attention/today.ts";
 import { standing } from "./attention/vouch.ts";
 import { ClaimState } from "./claim.ts";
+import type { RunEnv } from "./env-port.ts";
 import { ProjectEventInput } from "./events.ts";
 import { pushFacts } from "./facts.ts";
 import { Lander, Rebuild } from "./lander.ts";
@@ -144,9 +145,9 @@ export const envSchemaMethod = "envShape";
 /** The decider-facing methods of one project's service (spec §3.2's decider rows). */
 export interface DeciderApi {
   /**
-   * The project's env shape: the items its landed `.env.schema` declares,
-   * read minimally until W6 (see `envItemsOf`). A project with nothing
-   * landed has none to read: `UnknownProject`.
+   * The project's env shape at its landed SHA, as `ProjectEnv` reads it
+   * (none without the visibility cartridge). A project with nothing landed
+   * has none to read: `UnknownProject`.
    */
   readonly [envSchemaMethod]: (
     caller: Principal
@@ -222,7 +223,7 @@ export interface DeciderApi {
       readonly requestId: RequestId;
     }
   ) => Effect.Effect<LandReceipt, NotDecider | StaleBase | RepoBusy>;
-  /** The project's ledger: until W6, Open, with no layers and no entries. */
+  /** The project's public ledger, as `ProjectVisibility` keeps it (Open, empty, without the cartridge). */
   readonly ledger: (caller: Principal) => Effect.Effect<Ledger>;
   /** A proposal for a new ask, and the decision that puts it to its deciders. */
   readonly proposeAsk: (
@@ -238,8 +239,9 @@ export interface DeciderApi {
     Denounced | CapReached | NotVouched
   >;
   /**
-   * A write-only value for a sensitive item. Until W6 there is no value
-   * store, so every key is `NotSensitive` for a decider.
+   * A write-only value for a sensitive item, sealed by `ProjectEnv`;
+   * without the visibility cartridge no item takes one (`UnknownEnvItem`
+   * for a decider, `NotDecider` for anyone else).
    */
   readonly setEnv: (
     caller: Person,
@@ -381,6 +383,10 @@ export interface DeciderKernel<
     now: DateTime.Utc
   ) => Effect.Effect<ProjectRow>;
   readonly read: Effect.Effect<H>;
+  /** The env a check of unlanded code carries (`ProjectEnv.runEnv`). */
+  readonly runEnv: Effect.Effect<RunEnv>;
+  /** A push's stage 0–1 facts with the layer paths and whether the pusher reads a layer (`ProjectVisibility`). */
+  readonly withLayers: (facts: PushFacts) => Effect.Effect<PushFacts>;
   /** A repo's URL at the gateway. */
   readonly remote: (fork: RepoName) => Effect.Effect<string>;
   /** The canonical repo. */
@@ -402,9 +408,6 @@ const mainRefName = RefName.make(mainRef);
 
 /** The config folder, as a path prefix. */
 const configFolder = `${Brand.configDir}/`;
-
-/** The env shape's file, at the repo's root (VL §8.3). */
-const envFile = RepoPath.make(".env.schema");
 
 /** How many steps a decider's land takes at most: merges, checks and lands, with re-merges. */
 const landTurns = 16;
@@ -639,87 +642,6 @@ const vouchedText = (
   );
 
   return `${[...lines, `${sign}${input.handle}${note}`].join("\n")}\n`;
-};
-
-// An item line: `KEY=` and whatever value follows, never read.
-const ITEM = /^(?<key>[A-Za-z_][A-Za-z0-9_]*)\s*=(?<rest>.*)$/u;
-
-// The two decorators read, with an optional value.
-const DECORATOR = /@(?<name>sensitive|required)(?:=(?<value>[^\s#]+))?/gu;
-
-interface Flags {
-  readonly required: EnvItem["required"];
-  readonly sensitive: boolean;
-}
-
-/**
- * What one comment says of the two flags; a flag it does not name stays.
- * A function-valued `@sensitive` counts as sensitive (fail safe), and a
- * function-valued `@required` as `depends`.
- */
-const flagsIn = (comment: string, flags: Flags): Flags => {
-  let { required, sensitive } = flags;
-
-  for (const match of comment.matchAll(DECORATOR)) {
-    const value = match.groups?.value;
-    const off = value === "false";
-
-    if (match.groups?.name === "sensitive") {
-      sensitive = !off;
-    } else {
-      required =
-        value === undefined || value === "true" || off ? !off : "depends";
-    }
-  }
-
-  return { required, sensitive };
-};
-
-/**
- * The items a `.env.schema` declares, read minimally until W6 603 brings the
- * real @env-spec parser. It reads only `KEY=` lines and the `@sensitive`
- * and `@required` decorators, in the comment lines directly above an item
- * (a blank line or a `# ---` divider breaks them off) or after its value.
- * It reads no header, so varlock's defaults when the header is silent hold
- * for every item: required and sensitive. `=false` turns a flag off, and a
- * function value counts as sensitive and as required `depends`. Values are
- * never read or resolved; a key declared twice counts once.
- */
-export const envItemsOf = (text: string): readonly EnvItem[] => {
-  const items: EnvItem[] = [];
-  let above: string[] = [];
-
-  for (const raw of text.split(/\r?\n/u)) {
-    const line = raw.trim();
-    const item = ITEM.exec(line)?.groups;
-
-    if (line.startsWith("#") && !line.startsWith("# ---")) {
-      above.push(line);
-    } else if (item?.key === undefined) {
-      above = [];
-    } else {
-      const comment = [
-        ...above,
-        (item.rest ?? "").split(" #").slice(1).join(" #"),
-      ];
-
-      let flags: Flags = { required: true, sensitive: true };
-
-      for (const each of comment) {
-        flags = flagsIn(each, flags);
-      }
-
-      const key = EnvKey.make(item.key);
-
-      if (!items.some((each) => each.key === key)) {
-        items.push({ key, ...flags, tags: [] });
-      }
-
-      above = [];
-    }
-  }
-
-  return items;
 };
 
 /** git's zero id: the `before` of a push that created its ref. */
@@ -1815,6 +1737,8 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
    */
   const carry = (
     input: {
+      /** The env every check job carries: the decider's change is unlanded code. */
+      readonly env: RunEnv;
       readonly lanes: readonly CheckLane[];
       readonly message: string;
       readonly now: DateTime.Utc;
@@ -1833,6 +1757,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
       const run: AnswerRun = {
         admitted: true,
+        env: input.env,
         finish: "optional",
         lanes: input.lanes,
         message: input.message,
@@ -1913,7 +1838,8 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
             Effect.catchTags({
               MissingCommit: () => Effect.fail(stale),
               RepoNotFound: () => Effect.fail(stale),
-            })
+            }),
+            Effect.flatMap(kernel.withLayers)
           );
 
         // A decider lands only in the paths they decide for.
@@ -1957,9 +1883,12 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           requestId: input.requestId,
         };
 
+        const env = yield* kernel.runEnv;
+
         const state = yield* kernel.withPorts(
           carry(
             {
+              env,
               lanes: Record.toEntries(policy.run.checks).map(
                 ([lane, command]) => CheckLane.make({ command, lane })
               ),
@@ -2113,46 +2042,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       });
     });
 
-  const envSchema = Effect.gen(function* () {
-    const h = yield* kernel.read;
-
-    const landed = Option.flatMap(h.project, ({ landed: at }) =>
-      Option.fromUndefinedOr(at)
-    );
-
-    if (Option.isNone(landed)) {
-      return yield* new UnknownProject({ project: name });
-    }
-
-    return {
-      at: landed.value,
-      file: envFile,
-      imports: [],
-      items: envItemsOf(yield* textAt(landed.value, envFile)),
-      project: name,
-    } satisfies EnvSchemaView;
-  });
-
-  const setEnvOf = (
-    caller: Person,
-    key: EnvKey
-  ): Effect.Effect<never, NotDecider | NotSensitive> =>
-    Effect.flatMap(kernel.read, (h) =>
-      Effect.fail(
-        Option.exists(h.policy, (policy) => isDecider(policy, caller.handle))
-          ? new NotSensitive({ key })
-          : new NotDecider({})
-      )
-    );
-
-  const ledger: Effect.Effect<Ledger> = Effect.succeed({
-    entries: [],
-    layers: [],
-    posture: "open",
-    postureLabel: "Open",
-    project: name,
-  });
-
   return {
     credits: (handle: Handle) =>
       Effect.map(kernel.read, (h) => ({
@@ -2163,7 +2052,6 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       caller: Person,
       input: Parameters<DeciderApi["decide"]>[1]
     ) => kernel.write(queue, decideBody(caller, input)),
-    envSchema: (_caller: Principal) => envSchema,
     expire,
     finish: (
       queue: AnswerQueue,
@@ -2182,14 +2070,11 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       caller: Person,
       input: Parameters<DeciderApi["land"]>[1]
     ) => kernel.write(queue, landBody(caller, input)),
-    ledger,
     proposeAsk: (
       queue: AnswerQueue,
       caller: Person,
       input: Parameters<DeciderApi["proposeAsk"]>[1]
     ) => kernel.write(queue, proposeBody(caller, input)),
-    setEnv: (caller: Person, input: Parameters<DeciderApi["setEnv"]>[1]) =>
-      setEnvOf(caller, input.key),
     today: todayOf,
     vouch: (
       queue: AnswerQueue,

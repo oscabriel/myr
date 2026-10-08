@@ -11,6 +11,13 @@
  * cache, the Project DO stubs it found) lives in the layer, never in the
  * module. `Alarms` and `AnswerRuns` are bound per project inside its Durable
  * Object (302); `Sessions` is the surfaces' (`platform.ts`).
+ *
+ * Cartridges plug in over these ports (`plugIn`), one marked line each in
+ * `cartridges.ts`. The visibility cartridge (W6 609) fills `LayerGate` for
+ * the gateway, and `ProjectVisibility` and `ProjectEnv` for each Project
+ * DO's service; without it they answer their defaults, a platform without
+ * typed visibility. Every host takes its ports from here, so the one line
+ * serves them all.
  */
 import { D1Client } from "@effect/sql-d1";
 import type { Fetch } from "@repo/artifacts/fetch";
@@ -40,6 +47,7 @@ import { DoProjects } from "./adapters/do-projects.ts";
 import { WorkerFetch } from "./adapters/fetch.ts";
 import { LanderSandbox } from "./adapters/lander-sandbox.ts";
 import { WorkerRateLimits } from "./adapters/rate-limits.ts";
+import * as cartridges from "./cartridges.ts";
 import type { PlatformConfig } from "./platform.ts";
 import type { RateLimits } from "./rate-limits.ts";
 import { ProjectSockets } from "./watch.ts";
@@ -59,6 +67,30 @@ export type WorkerPorts =
   | Upstream;
 
 /**
+ * A cartridge: its layer for one stage's config, over the platform's own
+ * ports. What it provides are ports with defaults, so its layer adds no
+ * service a host must name.
+ */
+type Cartridge = (
+  config: PlatformConfig
+) => Layer.Layer<never, never, WorkerPorts>;
+
+/**
+ * Every cartridge `cartridges.ts` names, merged over `ports`. Deleting a
+ * cartridge's line there unplugs it: the ports it filled answer their
+ * defaults again.
+ */
+const plugIn = (
+  config: PlatformConfig,
+  ports: Layer.Layer<WorkerPorts>,
+  plugged: readonly Cartridge[]
+): Layer.Layer<WorkerPorts> =>
+  Layer.mergeAll(
+    ports,
+    ...plugged.map((cartridge) => cartridge(config).pipe(Layer.provide(ports)))
+  );
+
+/**
  * The front page with no database behind it: empty, beside a projection
  * nobody reads. What the platform falls back to without the D1 cartridge.
  */
@@ -68,14 +100,15 @@ const memoryFrontPage = Layer.merge(
 );
 
 /**
- * The ports for one stage's env: Artifacts through its binding, git's
- * upstream and every repo read over it, each project's Durable Object, the
- * sandbox's Checker, the Lander `LANDER_ADAPTER` names (spec §8 D6), config
- * folders evaluated in the Worker Loader, the front page in D1, the rate
- * limits, lane logs in the `EVIDENCE` bucket (W4 418), and the `PROJECT`
- * namespace again for `watch`'s relay of each project's socket (issue 510).
+ * The ports for one stage's env, before any cartridge: Artifacts through
+ * its binding, git's upstream and every repo read over it, each project's
+ * Durable Object, the sandbox's Checker, the Lander `LANDER_ADAPTER` names
+ * (spec §8 D6), config folders evaluated in the Worker Loader, the front
+ * page in D1, the rate limits, lane logs in the `EVIDENCE` bucket (W4 418),
+ * and the `PROJECT` namespace again for `watch`'s relay of each project's
+ * socket (issue 510).
  */
-export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
+const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
   Layer.mergeAll(
     memoryFrontPage,
     // The D1 cartridge (W3 309): the front page and its projection in
@@ -106,3 +139,7 @@ export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     Layer.provideMerge(RepoHostBinding.layer(config.ARTIFACTS)),
     Layer.provideMerge(WorkerFetch)
   );
+
+/** The ports for one stage's env, with every cartridge the platform plugs in. */
+export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
+  plugIn(config, corePorts(config), Object.values(cartridges));

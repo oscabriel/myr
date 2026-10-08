@@ -84,12 +84,12 @@ import {
   VerdictOf,
   Vouch,
 } from "@repo/protocol/contracts";
-import { AnswerReceipt, Verdict } from "@repo/protocol/domain/answer";
-import type {
-  AnswerView,
+import {
+  AnswerReceipt,
   HeldBackResult,
-  LaneResult,
+  Verdict,
 } from "@repo/protocol/domain/answer";
+import type { AnswerView, LaneResult } from "@repo/protocol/domain/answer";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
@@ -108,11 +108,14 @@ import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
   CommitSha,
+  EnvKey,
   Handle,
   LandedSha,
+  LayerName,
   RepoName,
   RepoPath,
   RequestId,
+  TreeSha,
   sameHandle,
 } from "@repo/protocol/ids";
 import type {
@@ -120,7 +123,6 @@ import type {
   LaneName,
   ProjectName,
   ProposalId,
-  TreeSha,
 } from "@repo/protocol/ids";
 import { Person, Principal } from "@repo/protocol/principal";
 import {
@@ -207,6 +209,7 @@ import {
   strayDecision,
 } from "./deciders.ts";
 import type { DeciderApi, Opening } from "./deciders.ts";
+import { ProjectEnv } from "./env-port.ts";
 import {
   askClosed,
   askOpened,
@@ -251,20 +254,37 @@ import {
   startRow,
 } from "./outbox.ts";
 import { ProjectStore } from "./project-store.ts";
-import type { ProjectWrites } from "./project-store.ts";
+import type { ProjectSnapshot, ProjectWrites } from "./project-store.ts";
 import type {
   AnswerRow,
+  AttemptRow,
   BudgetDayRow,
   ClaimRow,
+  EnvValueRow,
+  LayerRead,
+  LayerRow,
+  LedgerRow,
   OutboxRow,
+  PinnedSuite,
   ProjectRow,
   PushEventRow,
   RatchetRow,
 } from "./project-store/rows.ts";
+import { Tables } from "./project-store/tables.ts";
+import type { Table } from "./project-store/tables.ts";
 import type { Projection } from "./projection.ts";
 import { askToLand, holdsSlot, leave, queueOf, storedQueue } from "./queue.ts";
 import { afterLanding, decideRaise } from "./ratchets.ts";
 import type { RatchetBaseline } from "./ratchets.ts";
+import {
+  AdmissionPlan,
+  AdmissionReport,
+  HeldBackJob,
+  LayerAccess,
+  LayerFacts,
+  ProjectVisibility,
+} from "./visibility-port.ts";
+import type { VisibilityPlan } from "./visibility-port.ts";
 
 /** Every port one project's service runs on. */
 export type ProjectPorts =
@@ -471,6 +491,58 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
    * due run again.
    */
   readonly onAlarm: () => Effect.Effect<void>;
+  // visibility (W6 609): each delegates to `ProjectVisibility` or
+  // `ProjectEnv`, whose defaults are a project without typed visibility.
+  /**
+   * How far `caller` may reach into `layer`, for the gateway; none when the
+   * project declares no such layer, so its repo is an unknown repo.
+   */
+  readonly layerAccess: (
+    caller: Principal,
+    layer: LayerName
+  ) => Effect.Effect<Option.Option<LayerAccess>>;
+  /** What stage 1 takes from visibility for `caller`'s pushes: the layer paths, and whether they read a layer. */
+  readonly layerFacts: (caller: Principal) => Effect.Effect<LayerFacts>;
+  /** A push a layer's repo took: its head is proposed, and admitted at once or through admission. */
+  readonly recordLayerPush: (
+    caller: Person,
+    input: { readonly head: CommitSha; readonly layer: LayerName }
+  ) => Effect.Effect<void>;
+  /** A clone or fetch of a layer's repo, for its read log. */
+  readonly recordLayerRead: (
+    caller: Person,
+    input: { readonly layer: LayerName; readonly sha?: CommitSha }
+  ) => Effect.Effect<void>;
+  /**
+   * The held-back run an answer's checks end with: the suite its claim was
+   * pinned to, read at the pinned layer commit. None when nothing is sealed
+   * for it (the request is unknown, has no claim, or pinned nothing).
+   */
+  readonly heldBackJob: (
+    requestId: RequestId
+  ) => Effect.Effect<Option.Option<HeldBackJob>>;
+  /**
+   * A held-back run's area bits for the tree the answer is being checked
+   * on, judged once per tree: the refusals it earns, which the run's checks
+   * report with their own. Every area passing keeps the `Held-back:`
+   * trailer for the landing. The same tree reported again is judged as
+   * before, its attempt counted once.
+   */
+  readonly recordHeldBack: (
+    requestId: RequestId,
+    results: readonly HeldBackResult[]
+  ) => Effect.Effect<readonly Refusal[]>;
+  /** The runs that would admit a layer's pushed head; none when nothing waits on admission. */
+  readonly admissionPlan: (input: {
+    readonly head: CommitSha;
+    readonly layer: LayerName;
+  }) => Effect.Effect<Option.Option<AdmissionPlan>>;
+  /** What an admission's runs came to: the layer's landed SHA moves, or stays. */
+  readonly recordAdmission: (input: AdmissionReport) => Effect.Effect<void>;
+  /** The stored write-only value a text or blob contains, by its item; none when it holds none. */
+  readonly scanForValues: (
+    input: { readonly text: string } | { readonly blob: Uint8Array }
+  ) => Effect.Effect<Option.Option<EnvKey>>;
 }
 
 /** The schemas one method's arguments (in order), success and failure cross a boundary with. */
@@ -491,6 +563,11 @@ export const MethodSchemas = {
     args: [Principal],
     error: EnvSchemaOf.errorSchema,
     success: EnvSchemaOf.successSchema,
+  },
+  admissionPlan: {
+    args: [Schema.Struct({ head: CommitSha, layer: LayerName })],
+    error: Schema.Never,
+    success: Schema.Option(AdmissionPlan),
   },
   advanceAnswer: {
     args: [RequestId, ReportedCommand, Schema.UndefinedOr(AnswerReport)],
@@ -549,6 +626,11 @@ export const MethodSchemas = {
     error: Fork.errorSchema,
     success: Fork.successSchema,
   },
+  heldBackJob: {
+    args: [RequestId],
+    error: Schema.Never,
+    success: Schema.Option(HeldBackJob),
+  },
   initProject: {
     args: [
       Person,
@@ -566,6 +648,16 @@ export const MethodSchemas = {
     args: [Principal, CommitSha],
     error: LandingOf.errorSchema,
     success: LandingOf.successSchema,
+  },
+  layerAccess: {
+    args: [Principal, LayerName],
+    error: Schema.Never,
+    success: Schema.Option(LayerAccess),
+  },
+  layerFacts: {
+    args: [Principal],
+    error: Schema.Never,
+    success: LayerFacts,
   },
   ledger: {
     args: [Principal],
@@ -594,10 +686,33 @@ export const MethodSchemas = {
     error: ProposeAsk.errorSchema,
     success: ProposeAsk.successSchema,
   },
+  recordAdmission: {
+    args: [AdmissionReport],
+    error: Schema.Never,
+    success: Schema.Void,
+  },
   recordFirstPush: {
     args: [Person, CommitSha],
     error: DirectPush,
     success: Schema.Struct({ landed: LandedSha }),
+  },
+  recordHeldBack: {
+    args: [RequestId, Schema.Array(HeldBackResult)],
+    error: Schema.Never,
+    success: Schema.Array(Refusal),
+  },
+  recordLayerPush: {
+    args: [Person, Schema.Struct({ head: CommitSha, layer: LayerName })],
+    error: Schema.Never,
+    success: Schema.Void,
+  },
+  recordLayerRead: {
+    args: [
+      Person,
+      Schema.Struct({ layer: LayerName, sha: Schema.optionalKey(CommitSha) }),
+    ],
+    error: Schema.Never,
+    success: Schema.Void,
   },
   recordPush: {
     args: [PushReport],
@@ -608,6 +723,16 @@ export const MethodSchemas = {
     args: [Person, AskId],
     error: Release.errorSchema,
     success: Release.successSchema,
+  },
+  scanForValues: {
+    args: [
+      Schema.Union([
+        Schema.Struct({ text: Schema.String }),
+        Schema.Struct({ blob: Schema.Uint8Array }),
+      ]),
+    ],
+    error: Schema.Never,
+    success: Schema.Option(EnvKey),
   },
   setEnv: {
     args: [Person, SetEnv.payloadSchema.mapFields(Struct.omit(["project"]))],
@@ -673,13 +798,28 @@ export const Measured = Schema.Struct({
 export type Measured = typeof Measured.Type;
 
 /**
+ * A held-back run judged for one checked tree (W6): the refusals it earned,
+ * and the `Held-back:` trailer's value when every area passed. Judged once
+ * per tree, so a run reported again counts no attempt twice.
+ */
+export const HeldBackJudged = Schema.Struct({
+  refusals: Schema.Array(Refusal),
+  trailer: Schema.optionalKey(Schema.NonEmptyString),
+  tree: TreeSha,
+});
+
+export type HeldBackJudged = typeof HeldBackJudged.Type;
+
+/**
  * Where one answer stands, as its row keeps it: the landing lifecycle's
  * state, the receipt its request was first given (a replay gets it again),
- * the verdict on its last checked tree, what that tree counted, and each
- * `Waiver` a decider accepted for this answer (checked again after main
- * moved, it is not asked again; another answer to the ask is).
+ * the verdict on its last checked tree, what that tree counted, its last
+ * held-back run's judgement, and each `Waiver` a decider accepted for this
+ * answer (checked again after main moved, it is not asked again; another
+ * answer to the ask is).
  */
 export const AnswerRecord = Schema.Struct({
+  heldBack: Schema.optionalKey(HeldBackJudged),
   landing: LandingState,
   measured: Schema.optionalKey(Measured),
   receipt: AnswerReceipt,
@@ -794,6 +934,8 @@ interface Hydrated {
   readonly queue: LandingQueue;
   /** Every ratchet's baseline per territory, the escape ratchets' included. */
   readonly ratchets: readonly RatchetRow[];
+  /** The rows as the store gave them, which the visibility ports read. */
+  readonly snapshot: ProjectSnapshot;
 }
 
 /**
@@ -804,11 +946,17 @@ interface Hydrated {
 interface Writes {
   readonly answers: Map<RequestId, AnswerRow>;
   readonly asks: Map<AskId, Ask>;
+  /** Keyed by their table's key (`keyIn`); the visibility ports write them. */
+  readonly attempts: Map<string, AttemptRow>;
   readonly budgetDays: Map<string, BudgetDayRow>;
   readonly claims: Map<string, ClaimRow>;
   readonly decisions: Map<DecisionId, Decision>;
+  readonly envValues: Map<EnvKey, EnvValueRow>;
   readonly events: ProjectEventInput[];
   readonly landings: LandingView[];
+  readonly layerReads: LayerRead[];
+  readonly layers: Map<LayerName, LayerRow>;
+  readonly ledger: Map<number, LedgerRow>;
   readonly outbox: OutboxRow[];
   readonly project: Map<"row", ProjectRow>;
   readonly proposals: Map<ProposalId, Proposal>;
@@ -821,11 +969,16 @@ interface Writes {
 const writesOf = (): Writes => ({
   answers: new Map(),
   asks: new Map(),
+  attempts: new Map(),
   budgetDays: new Map(),
   claims: new Map(),
   decisions: new Map(),
+  envValues: new Map(),
   events: [],
   landings: [],
+  layerReads: [],
+  layers: new Map(),
+  ledger: new Map(),
   outbox: [],
   project: new Map(),
   proposals: new Map(),
@@ -838,11 +991,16 @@ const isEmpty = (writes: Writes) =>
   [
     writes.answers.size,
     writes.asks.size,
+    writes.attempts.size,
     writes.budgetDays.size,
     writes.claims.size,
     writes.decisions.size,
+    writes.envValues.size,
     writes.events.length,
     writes.landings.length,
+    writes.layerReads.length,
+    writes.layers.size,
+    writes.ledger.size,
     writes.outbox.length,
     writes.project.size,
     writes.proposals.size,
@@ -850,6 +1008,169 @@ const isEmpty = (writes: Writes) =>
     writes.queue.size,
     writes.ratchets.size,
   ].every((count) => count === 0);
+
+/** A row's key in its table, as the store keys it. */
+const keyIn = <A>(table: Table<A>, row: A) => {
+  const columns = table.columns(row);
+
+  return JSON.stringify(table.key.map((name) => columns[name]));
+};
+
+/** `held` with `written` over it: each written row in its key's place, the new ones after. */
+const overlaid = <A>(
+  table: Table<A>,
+  held: readonly A[],
+  written: Iterable<A>
+): readonly A[] => {
+  const fresh = new Map(
+    Array.map([...written], (row) => [keyIn(table, row), row])
+  );
+
+  const kept = new Set(held.map((row) => keyIn(table, row)));
+
+  return [
+    ...held.map((row) => fresh.get(keyIn(table, row)) ?? row),
+    ...[...fresh.values()].filter((row) => !kept.has(keyIn(table, row))),
+  ];
+};
+
+/** Ledger entries in order. */
+const bySeq = Order.mapInput(Order.Number, (entry: LedgerRow) => entry.seq);
+
+/**
+ * The project as one call has it so far: the rows it hydrated with the
+ * rows it wrote on top (a landing it recorded first, as the store orders
+ * them). What the visibility ports read, so a port numbers a ledger entry
+ * or a decision after the ones the call already made.
+ */
+const snapshotNow = (h: Hydrated, writes: Writes): ProjectSnapshot => {
+  const held = h.snapshot;
+
+  return {
+    ...held,
+    answers: overlaid(Tables.answers, held.answers, writes.answers.values()),
+    asks: overlaid(Tables.asks, held.asks, writes.asks.values()),
+    attempts: overlaid(
+      Tables.attempts,
+      held.attempts,
+      writes.attempts.values()
+    ),
+    budgetDays: overlaid(
+      Tables.budgetDays,
+      held.budgetDays,
+      writes.budgetDays.values()
+    ),
+    claims: overlaid(Tables.claims, held.claims, writes.claims.values()),
+    decisions: overlaid(
+      Tables.decisions,
+      held.decisions,
+      writes.decisions.values()
+    ),
+    envValues: overlaid(
+      Tables.envValues,
+      held.envValues,
+      writes.envValues.values()
+    ),
+    landings: [...writes.landings.toReversed(), ...held.landings],
+    layers: overlaid(Tables.layers, held.layers, writes.layers.values()),
+    ledger: Array.sort(
+      overlaid(Tables.ledger, held.ledger, writes.ledger.values()),
+      bySeq
+    ),
+    outbox: [...held.outbox, ...writes.outbox],
+    project: Option.orElse(
+      Option.fromUndefinedOr(writes.project.get("row")),
+      () => held.project
+    ),
+    proposals: overlaid(
+      Tables.proposals,
+      held.proposals,
+      writes.proposals.values()
+    ),
+    ratchets: overlaid(
+      Tables.ratchets,
+      held.ratchets,
+      writes.ratchets.values()
+    ),
+  };
+};
+
+/**
+ * The tables a visibility port may write: its own, and the decisions,
+ * events and outbox rows its plans add. The project service writes every
+ * other one itself.
+ */
+const portTables = new Set<string>([
+  "attempts",
+  "decisions",
+  "envValues",
+  "events",
+  "layerReads",
+  "layers",
+  "ledger",
+  "outbox",
+]);
+
+/** A port's rows added to the call's: each keyed table by its key, the logs appended. */
+const absorb = (writes: Writes, more: ProjectWrites) => {
+  const foreign = Object.keys(more).filter((table) => !portTables.has(table));
+
+  if (Array.isReadonlyArrayNonEmpty(foreign)) {
+    return Effect.die(
+      `a visibility port wrote ${foreign.join(", ")}, which the project service writes itself`
+    );
+  }
+
+  for (const row of more.attempts ?? []) {
+    writes.attempts.set(keyIn(Tables.attempts, row), row);
+  }
+
+  for (const row of more.decisions ?? []) {
+    writes.decisions.set(row.id, row);
+  }
+
+  for (const row of more.envValues ?? []) {
+    writes.envValues.set(row.key, row);
+  }
+
+  for (const row of more.layers ?? []) {
+    writes.layers.set(row.name, row);
+  }
+
+  for (const row of more.ledger ?? []) {
+    writes.ledger.set(row.seq, row);
+  }
+
+  writes.events.push(...(more.events ?? []));
+  writes.layerReads.push(...(more.layerReads ?? []));
+  writes.outbox.push(...(more.outbox ?? []));
+
+  return Effect.void;
+};
+
+/**
+ * A port's plan taken into the call: its rows with the call's, and each of
+ * its effects as an outbox row, settled after the commit and retried until
+ * done.
+ */
+const applyPlan = (writes: Writes, plan: VisibilityPlan, now: DateTime.Utc) =>
+  Effect.gen(function* () {
+    yield* absorb(writes, plan.writes);
+
+    yield* Effect.forEach(
+      plan.effects,
+      (effect) =>
+        Effect.map(
+          outboxRow(
+            `visibility:${effect.id}`,
+            OutboxBody.cases.Visibility.make({ effect }),
+            now
+          ),
+          (row) => writes.outbox.push(row)
+        ),
+      { discard: true }
+    );
+  });
 
 const claimKey = (ask: AskId, claimant: Handle) =>
   JSON.stringify([ask, claimant.toLowerCase()]);
@@ -1226,11 +1547,29 @@ const disclosed = (
         onSome: ({ assisted }) => assisted ?? [],
       });
 
+/**
+ * The `Held-back:` trailer's value for the tree a verdict judged: the
+ * answer's last held-back run's, when it ran on that tree and every area
+ * passed.
+ */
+const heldBackTrailerOf = (
+  record: { readonly heldBack?: HeldBackJudged },
+  tree: TreeSha
+): Option.Option<string> =>
+  Option.flatMap(
+    Option.filter(
+      Option.fromUndefinedOr(record.heldBack),
+      (held) => held.tree === tree
+    ),
+    ({ trailer }) => Option.fromUndefinedOr(trailer)
+  );
+
 /** A landing's commit message, from the platform's own rows (spec §5 step 8). */
 const messageOf = (
   request: Request,
   ask: Option.Option<Ask>,
-  verdict: Verdict
+  verdict: Verdict,
+  heldBack: Option.Option<string> = Option.none()
 ): string => {
   const message = {
     assisted: request.assisted,
@@ -1238,6 +1577,7 @@ const messageOf = (
     requestId: request.requestId,
     subject: "Land a change",
     verdict: { checkVersion: verdict.checkVersion, patchId: verdict.patchId },
+    ...field("heldBack", heldBack),
   };
 
   return formatLanding(
@@ -1395,6 +1735,10 @@ export const projectService = (
     const alarms = Context.get(ports, Alarms);
     // Read once, as the ports are: a call runs in its caller's context.
     const generate = yield* ProjectGenerator;
+    // Typed visibility and the env (W6 609): the cartridge's when a host
+    // provides it, a project without them otherwise.
+    const visibility = yield* ProjectVisibility;
+    const envPort = yield* ProjectEnv;
     const lock = yield* Semaphore.make(1);
     const repo = RepoName.make(name);
 
@@ -1444,6 +1788,7 @@ export const projectService = (
         proposals: snapshot.proposals,
         queue: yield* queueOf(snapshot.queue),
         ratchets: snapshot.ratchets,
+        snapshot,
       };
     });
 
@@ -1539,11 +1884,15 @@ export const projectService = (
         () => defaultClaims
       );
 
-    /** A claim as its claimant sees it: with its fork's gateway URL and its check. */
+    /**
+     * A claim as its claimant sees it: with its fork's gateway URL, its
+     * check, and the held-back suite it was pinned to, if any.
+     */
     const viewOf = (
       policy: Option.Option<Policy>,
       ask: Option.Option<Ask>,
-      state: ClaimState
+      state: ClaimState,
+      pinned: PinnedSuite | undefined
     ) =>
       Effect.gen(function* () {
         const gateway = yield* GatewayUrl;
@@ -1558,13 +1907,40 @@ export const projectService = (
         );
 
         return Option.flatMap(claimOf(state), ({ fork }) =>
-          toView(state, {
-            checkCommand,
-            project: name,
-            remote: `${gateway}/${fork}.git`,
-          })
+          Option.map(
+            toView(state, {
+              checkCommand,
+              project: name,
+              remote: `${gateway}/${fork}.git`,
+            }),
+            (view): ClaimView =>
+              pinned === undefined ? view : { ...view, suite: pinned.suite }
+          )
         );
       });
+
+    /** `facts` with the layer paths, and whether its pusher reads a layer. */
+    const layered = (snapshot: ProjectSnapshot, facts: PushFacts) =>
+      Effect.map(visibility.layerPaths(snapshot), (layerPaths): PushFacts => ({
+        ...facts,
+        canReadLayers:
+          visibility.readableLayers(facts.pusher, snapshot).size > 0,
+        layerPaths,
+      }));
+
+    /**
+     * A push's stage 0–1 facts with what visibility knows (W6): every
+     * layer path, and whether the pusher reads a layer. A project without
+     * typed visibility has neither.
+     */
+    const withLayerFacts = <E>(
+      h: Hydrated,
+      writes: Writes,
+      facts: Effect.Effect<PushFacts, E, ProjectPorts>
+    ): Effect.Effect<PushFacts, E> =>
+      withPorts(facts).pipe(
+        Effect.flatMap((found) => layered(snapshotNow(h, writes), found))
+      );
 
     // ------------------------------------------------------------ commit
 
@@ -1591,11 +1967,16 @@ export const projectService = (
         const all: ProjectWrites = {
           answers: [...writes.answers.values()],
           asks: [...writes.asks.values()],
+          attempts: [...writes.attempts.values()],
           budgetDays: [...writes.budgetDays.values()],
           claims: [...writes.claims.values()],
           decisions: [...writes.decisions.values()],
+          envValues: [...writes.envValues.values()],
           events: writes.events,
           landings: writes.landings,
+          layerReads: writes.layerReads,
+          layers: [...writes.layers.values()],
+          ledger: [...writes.ledger.values()],
           outbox,
           proposals: [...writes.proposals.values()],
           pushEvents: writes.pushEvents,
@@ -1751,7 +2132,8 @@ export const projectService = (
       ask: AskId,
       step: ClaimStep,
       now: DateTime.Utc,
-      assisted?: readonly AgentTrailer[]
+      assisted?: readonly AgentTrailer[],
+      pinned?: Option.Option<PinnedSuite>
     ) =>
       Effect.gen(function* () {
         const claim = claimOf(step.state);
@@ -1765,12 +2147,19 @@ export const projectService = (
         const agents =
           assisted ?? claimRowNow(h, writes, ask, claimant)?.assisted ?? [];
 
+        // A claim granted anew is pinned to the suite sealed now; any other
+        // step keeps the suite it was pinned to.
+        const suite =
+          pinned ??
+          Option.fromUndefinedOr(claimRowNow(h, writes, ask, claimant)?.pinned);
+
         writes.claims.set(claimKey(ask, claimant), {
           ask,
           claimant,
           state: yield* Effect.orDie(encodeClaim(step.state)),
           updatedAt: now,
           ...(agents.length > 0 && { assisted: agents }),
+          ...field("pinned", suite),
         });
 
         yield* Effect.forEach(
@@ -2037,8 +2426,63 @@ export const projectService = (
       });
 
     /**
+     * After a call moved the landed SHA (W6 609): the env port hears the
+     * move (a `ProxyWidened` decision for a widened proxy), and, when the
+     * policy was read at the new SHA, the visibility port hears it (layers
+     * provisioned and declared, a narrowing's `PostureChange`). Their plans
+     * go into the same commit; their effects settle after it. Without the
+     * cartridge both plans are empty.
+     */
+    const visibilityAfter = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
+      Effect.gen(function* () {
+        const row = writes.project.get("row");
+        const landed = row?.landed;
+
+        const before = Option.flatMap(h.project, (held) =>
+          Option.fromUndefinedOr(held.landed)
+        );
+
+        if (
+          row === undefined ||
+          landed === undefined ||
+          Option.contains(before, landed)
+        ) {
+          return;
+        }
+
+        yield* applyPlan(
+          writes,
+          yield* envPort.onLanded(
+            { after: landed, before, now },
+            snapshotNow(h, writes)
+          ),
+          now
+        );
+
+        if (row.policy === undefined || row.policyAt !== landed) {
+          return;
+        }
+
+        const after = yield* Effect.orDie(decodePolicy(row.policy));
+
+        yield* applyPlan(
+          writes,
+          yield* visibility.onPolicy(
+            { after, before: h.policy, landings: writes.landings, now },
+            snapshotNow(h, writes)
+          ),
+          now
+        );
+      });
+
+    /** What follows a call that may have landed: the generated files, then visibility. */
+    const afterLandings = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
+      Effect.andThen(followUp(h, writes, now), visibilityAfter(h, writes, now));
+
+    /**
      * One call that writes (`writeLocked`), with the generated follow-up of
-     * any landing the body recorded, in the same commit.
+     * any landing the body recorded and what visibility makes of it, in the
+     * same commit.
      */
     const write = <A, E>(
       queue: AnswerQueue,
@@ -2049,7 +2493,7 @@ export const projectService = (
       ) => Effect.Effect<A, E>
     ): Effect.Effect<A, E> =>
       writeLocked(queue, (h, writes, now) =>
-        Effect.tap(body(h, writes, now), () => followUp(h, writes, now))
+        Effect.tap(body(h, writes, now), () => afterLandings(h, writes, now))
       );
 
     /** A `main` for an imported repo whose branch had another name, at its tip. */
@@ -2154,7 +2598,12 @@ export const projectService = (
       );
 
       const judgedRun = Option.map(Option.fromUndefinedOr(verdict), (each) => ({
-        message: messageOf(request, ask, each),
+        message: messageOf(
+          request,
+          ask,
+          each,
+          heldBackTrailerOf(found.record, each.tree)
+        ),
         verdict: each,
       }));
 
@@ -2339,6 +2788,8 @@ export const projectService = (
       writes: Writes,
       landing: Landing,
       landed: {
+        /** The `Held-back:` trailer's value the landing carries, if its suite judged it. */
+        readonly heldBack: Option.Option<string>;
         readonly sha: LandedSha;
         readonly verdict: Option.Option<Verdict>;
       },
@@ -2358,6 +2809,10 @@ export const projectService = (
           requestId: request.requestId,
           sha,
           ...field("ask", request.ask),
+          ...field(
+            "heldBackTrailer",
+            Option.map(landed.heldBack, (value) => `Held-back: ${value}`)
+          ),
           ...field("verdict", landedVerdict(landed.verdict, sha)),
         });
 
@@ -2401,6 +2856,7 @@ export const projectService = (
         readonly before: LandingState;
         readonly h: Hydrated;
         readonly now: DateTime.Utc;
+        readonly record: AnswerRecord;
         readonly requestId: RequestId;
         readonly verdict: Option.Option<Verdict>;
         readonly writes: Writes;
@@ -2408,7 +2864,7 @@ export const projectService = (
       settled: Settled,
       effect: LandingEffect
     ): Effect.Effect<Settled> => {
-      const { before, h, now, requestId, verdict, writes } = context;
+      const { before, h, now, record, requestId, verdict, writes } = context;
       const handed = { ...settled, steps: [...settled.steps, effect] };
 
       return LandingEffect.$match(effect, {
@@ -2435,7 +2891,17 @@ export const projectService = (
         Record: ({ sha }) =>
           LandingState.guards.Landing(before)
             ? Effect.as(
-                recordLanding(h, writes, before, { sha, verdict }, now),
+                recordLanding(
+                  h,
+                  writes,
+                  before,
+                  {
+                    heldBack: heldBackTrailerOf(record, before.tree),
+                    sha,
+                    verdict,
+                  },
+                  now
+                ),
                 settled
               )
             : Effect.succeed(settled),
@@ -2494,6 +2960,7 @@ export const projectService = (
     /** The row that lands a request's job again, for the bookkeeping it left unwritten. */
     const bookkeepingRow = (input: {
       readonly ask: Option.Option<Ask>;
+      readonly heldBack: Option.Option<string>;
       readonly landing: Landing;
       readonly now: DateTime.Utc;
       readonly verdict: Verdict;
@@ -2509,7 +2976,12 @@ export const projectService = (
             fork: request.fork,
             head: request.head,
             main: input.landing.main,
-            message: messageOf(request, input.ask, input.verdict),
+            message: messageOf(
+              request,
+              input.ask,
+              input.verdict,
+              input.heldBack
+            ),
             repo,
             requestId: request.requestId,
             tree: input.landing.tree,
@@ -2526,6 +2998,7 @@ export const projectService = (
       readonly before: LandingState;
       readonly command: LandingCommand;
       readonly now: DateTime.Utc;
+      readonly record: AnswerRecord;
       readonly report: AnswerReport | undefined;
       readonly verdict: Option.Option<Verdict>;
       readonly writes: Writes;
@@ -2545,6 +3018,7 @@ export const projectService = (
       return Effect.map(
         bookkeepingRow({
           ask: input.ask,
+          heldBack: heldBackTrailerOf(input.record, before.tree),
           landing: before,
           now: input.now,
           verdict: input.verdict.value,
@@ -2854,7 +3328,7 @@ export const projectService = (
             (): Settled => ({ queue: h.queue, steps: [] }),
             (each, effect) =>
               settleEffect(
-                { before, h, now, requestId, verdict, writes },
+                { before, h, now, record, requestId, verdict, writes },
                 each,
                 effect
               )
@@ -2875,6 +3349,7 @@ export const projectService = (
             before,
             command,
             now,
+            record,
             report,
             verdict,
             writes,
@@ -3096,12 +3571,17 @@ export const projectService = (
           return yield* new NotRedFirst({});
         }
 
+        // The ask's files are unlanded code: they run with placeholders.
+        const env = yield* envPort.runEnv(
+          { landed: false },
+          yield* store.load()
+        );
+
         const job = {
+          ...env,
           at: CheckAt.cases.Commit.make({ commit: composed }),
           lanes: [lane.value],
-          placeholders: [],
           project: name,
-          proxies: [],
           repo,
           run: policy.run,
         };
@@ -3602,12 +4082,29 @@ export const projectService = (
             })
           );
 
-          // A claim granted anew discloses only the agents its own pushes name.
+          // A claim granted anew discloses only the agents its own pushes
+          // name, and is judged by the held-back suite sealed now.
           if (step.effects.length > 0) {
-            yield* applyClaim(h, writes, id, step, now, []);
+            yield* applyClaim(
+              h,
+              writes,
+              id,
+              step,
+              now,
+              [],
+              visibility.pinSuite(
+                { ask: id, claimant: caller.handle },
+                snapshotNow(h, writes)
+              )
+            );
           }
 
-          const view = yield* viewOf(h.policy, ask, step.state);
+          const view = yield* viewOf(
+            h.policy,
+            ask,
+            step.state,
+            claimRowNow(h, writes, id, caller.handle)?.pinned
+          );
 
           return yield* Option.match(view, {
             onNone: () => Effect.die("a granted claim has no view"),
@@ -3768,7 +4265,8 @@ export const projectService = (
 
           const view = yield* Option.match(claimed, {
             onNone: () => Effect.succeedNone,
-            onSome: ({ state }) => viewOf(h.policy, ask, state),
+            onSome: ({ row, state }) =>
+              viewOf(h.policy, ask, state, row.pinned),
           });
 
           const base = Option.getOrElse(
@@ -3780,7 +4278,9 @@ export const projectService = (
           );
 
           const refusals = yield* gateOf(
-            withPorts(
+            withLayerFacts(
+              h,
+              writes,
               pushFacts({
                 ask,
                 base,
@@ -3944,10 +4444,13 @@ export const projectService = (
 
           const view = yield* Option.match(own, {
             onNone: () => Effect.succeedNone,
-            onSome: ({ state }) => viewOf(h.policy, ask, state),
+            onSome: ({ row, state }) =>
+              viewOf(h.policy, ask, state, row.pinned),
           });
 
-          const facts = yield* withPorts(
+          const facts = yield* withLayerFacts(
+            h,
+            writes,
             pushFacts({
               ask,
               base: input.base,
@@ -4036,7 +4539,12 @@ export const projectService = (
         const claims = yield* Effect.forEach(
           h.claims.filter(({ row }) => sameHandle(row.claimant, caller.handle)),
           ({ row, state }) =>
-            viewOf(h.policy, Option.fromUndefinedOr(h.asks.get(row.ask)), state)
+            viewOf(
+              h.policy,
+              Option.fromUndefinedOr(h.asks.get(row.ask)),
+              state,
+              row.pinned
+            )
         );
 
         const answers = h.answers.flatMap(({ record, row }): AnswerView[] =>
@@ -4135,6 +4643,184 @@ export const projectService = (
         return { lane, ...tailOf(kept.value) };
       });
 
+    // -------------------------------------------------------- visibility
+    //
+    // Each delegates to `ProjectVisibility` or `ProjectEnv` (W6 609): the
+    // service hydrates, the port decides over the project as the call has
+    // it, and the service commits the port's rows with its own.
+
+    /** The env a check of unlanded code carries, for the project as it is stored. */
+    const unlandedEnv = Effect.flatMap(hydrate, (h) =>
+      envPort.runEnv({ landed: false }, h.snapshot)
+    );
+
+    /** The claim an answer is made through, with the suite it was pinned to: none for a decider's own landing, or a claim that pinned none. */
+    const pinnedClaimOf = (h: Hydrated, record: AnswerRecord) => {
+      const { request } = record.landing;
+
+      return Option.flatMap(request.ask, (ask) =>
+        Option.flatMap(ownClaim(h, ask, request.answerer), ({ row }) =>
+          Option.map(Option.fromUndefinedOr(row.pinned), (pinned) => ({
+            ask,
+            claimant: row.claimant,
+            pinned,
+          }))
+        )
+      );
+    };
+
+    /** An answer's run as `answer` gives it: with the env its checks carry. */
+    const answerOf = (requestId: RequestId) =>
+      Effect.gen(function* () {
+        const h = yield* hydrate;
+        const found = findAnswer(h, requestId);
+
+        if (Option.isNone(found)) {
+          return Option.none<AnswerRun>();
+        }
+
+        const env = yield* envPort.runEnv({ landed: false }, h.snapshot);
+        const sealed = Option.isSome(pinnedClaimOf(h, found.value.record));
+
+        return Option.some<AnswerRun>({
+          ...runOf(h, found.value),
+          env,
+          ...(sealed && { sealed }),
+        });
+      });
+
+    const heldBackJobOf = (requestId: RequestId) =>
+      Effect.gen(function* () {
+        const h = yield* hydrate;
+
+        const claim = Option.flatMap(findAnswer(h, requestId), ({ record }) =>
+          pinnedClaimOf(h, record)
+        );
+
+        return Option.isNone(claim)
+          ? Option.none<HeldBackJob>()
+          : yield* visibility.heldBackJob(claim.value, h.snapshot);
+      });
+
+    /**
+     * A held-back run of the tree the answer is being checked on, judged
+     * once: the same tree reported again answers as it did (its attempt
+     * counted once, principle 8), and a run that no longer checks a tree,
+     * or has no pinned suite, earns nothing.
+     */
+    const heldBackBody =
+      (requestId: RequestId, results: readonly HeldBackResult[]) =>
+      (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
+        Effect.gen(function* () {
+          const found = findAnswer(h, requestId);
+
+          if (Option.isNone(found)) {
+            return [];
+          }
+
+          const { record, row } = found.value;
+          const { landing } = record;
+
+          if (!LandingState.guards.Checking(landing)) {
+            return [];
+          }
+
+          if (record.heldBack?.tree === landing.tree) {
+            return record.heldBack.refusals;
+          }
+
+          const claim = pinnedClaimOf(h, record);
+
+          if (Option.isNone(claim)) {
+            return [];
+          }
+
+          const judgement = visibility.judgeHeldBack(
+            { ...claim.value, now, requestId, results },
+            snapshotNow(h, writes)
+          );
+
+          yield* absorb(writes, judgement.writes);
+
+          const heldBack: HeldBackJudged = {
+            refusals: judgement.refusals,
+            tree: landing.tree,
+            ...field(
+              "trailer",
+              Option.filter(judgement.trailer, (value) => value.length > 0)
+            ),
+          };
+
+          writes.answers.set(requestId, {
+            ...row,
+            state: yield* Effect.orDie(encodeAnswer({ ...record, heldBack })),
+            updatedAt: now,
+          });
+
+          return judgement.refusals;
+        });
+
+    const layerFactsOf = (caller: Principal) =>
+      Effect.gen(function* () {
+        const h = yield* hydrate;
+        const paths = yield* visibility.layerPaths(h.snapshot);
+
+        return {
+          canRead: visibility.readableLayers(caller, h.snapshot).size > 0,
+          layerPaths: [...paths],
+        };
+      });
+
+    /** The project's env shape at its landed SHA; none to read before anything landed. */
+    const envSchemaOf = Effect.gen(function* () {
+      const h = yield* hydrate;
+
+      const landed = Option.flatMap(h.project, ({ landed: at }) =>
+        Option.fromUndefinedOr(at)
+      );
+
+      if (Option.isNone(landed)) {
+        return yield* new UnknownProject({ project: name });
+      }
+
+      const read = yield* envPort.view(landed.value, h.snapshot);
+
+      return { ...read, at: landed.value, project: name };
+    });
+
+    const setEnvBody =
+      (caller: Person, input: Parameters<ProjectApi["setEnv"]>[1]) =>
+      (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
+        Effect.gen(function* () {
+          const set = yield* envPort.set(
+            {
+              acknowledgeShort: input.acknowledgeShort ?? false,
+              by: caller,
+              key: input.key,
+              now,
+              value: input.value,
+            },
+            snapshotNow(h, writes)
+          );
+
+          yield* absorb(writes, set.writes);
+
+          return set.result;
+        });
+
+    /** A plan a port makes of the project as this call has it, taken into the call. */
+    const planned =
+      (
+        plan: (
+          snapshot: ProjectSnapshot,
+          now: DateTime.Utc
+        ) => Effect.Effect<VisibilityPlan>
+      ) =>
+      (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
+        Effect.flatMap(plan(snapshotNow(h, writes), now), (made) =>
+          applyPlan(writes, made, now)
+        );
+
     // ---------------------------------------------------------- deciders
 
     /** The decider-facing methods (221), over the same hydrate, write and helpers. */
@@ -4151,6 +4837,9 @@ export const projectService = (
           return `${yield* GatewayUrl}/${fork}.git`;
         }),
       repo,
+      runEnv: unlandedEnv,
+      withLayers: (facts) =>
+        Effect.flatMap(hydrate, (h) => layered(h.snapshot, facts)),
       withPorts,
       write,
     });
@@ -4166,7 +4855,7 @@ export const projectService = (
             yield* tickAll(h, writes, now);
             yield* decided.expire(h, writes, now);
             // A decision that took its default may have landed (a revert).
-            yield* followUp(h, writes, now);
+            yield* afterLandings(h, writes, now);
 
             return [...(yield* commit(h, writes, now)), ...h.outbox];
           })
@@ -4179,10 +4868,14 @@ export const projectService = (
 
     const api: ProjectApi = {
       [envSchemaMethod]: (caller) =>
+        checked(MethodSchemas[envSchemaMethod], [caller], envSchemaOf),
+      admissionPlan: (input) =>
         checked(
-          MethodSchemas[envSchemaMethod],
-          [caller],
-          decided.envSchema(caller)
+          MethodSchemas.admissionPlan,
+          [input],
+          Effect.flatMap(hydrate, (h) =>
+            visibility.admissionPlan(input, h.snapshot)
+          )
         ),
       advanceAnswer: (requestId, command, report) =>
         checked(
@@ -4191,13 +4884,7 @@ export const projectService = (
           write(api, advanceBody(requestId, command, report))
         ),
       answer: (requestId) =>
-        checked(
-          MethodSchemas.answer,
-          [requestId],
-          Effect.map(hydrate, (h) =>
-            Option.map(findAnswer(h, requestId), (found) => runOf(h, found))
-          )
-        ),
+        checked(MethodSchemas.answer, [requestId], answerOf(requestId)),
       claim: (caller, id) =>
         checked(
           MethodSchemas.claim,
@@ -4252,6 +4939,12 @@ export const projectService = (
         ),
       fork: (caller) =>
         checked(MethodSchemas.fork, [caller], decided.fork(api, caller)),
+      heldBackJob: (requestId) =>
+        checked(
+          MethodSchemas.heldBackJob,
+          [requestId],
+          heldBackJobOf(requestId)
+        ),
       initProject: (caller, input) =>
         checked(
           MethodSchemas.initProject,
@@ -4275,8 +4968,22 @@ export const projectService = (
             })
           )
         ),
+      layerAccess: (caller, layer) =>
+        checked(
+          MethodSchemas.layerAccess,
+          [caller, layer],
+          Effect.map(hydrate, (h) =>
+            visibility.access(caller, layer, h.snapshot)
+          )
+        ),
+      layerFacts: (caller) =>
+        checked(MethodSchemas.layerFacts, [caller], layerFactsOf(caller)),
       ledger: (caller) =>
-        checked(MethodSchemas.ledger, [caller], decided.ledger),
+        checked(
+          MethodSchemas.ledger,
+          [caller],
+          Effect.map(hydrate, (h) => visibility.ledger(name, h.snapshot))
+        ),
       listAsks: (caller) =>
         checked(
           MethodSchemas.listAsks,
@@ -4300,11 +5007,60 @@ export const projectService = (
           [caller, input],
           decided.proposeAsk(api, caller, input)
         ),
+      recordAdmission: (input) =>
+        checked(
+          MethodSchemas.recordAdmission,
+          [input],
+          write(
+            api,
+            planned((snapshot, now) =>
+              Effect.succeed(
+                visibility.onAdmission({ ...input, now }, snapshot)
+              )
+            )
+          )
+        ),
       recordFirstPush: (caller, head) =>
         checked(
           MethodSchemas.recordFirstPush,
           [caller, head],
           write(api, firstPushBody(caller, head))
+        ),
+      recordHeldBack: (requestId, results) =>
+        checked(
+          MethodSchemas.recordHeldBack,
+          [requestId, results],
+          write(api, heldBackBody(requestId, results))
+        ),
+      recordLayerPush: (caller, input) =>
+        checked(
+          MethodSchemas.recordLayerPush,
+          [caller, input],
+          write(
+            api,
+            planned((snapshot, now) =>
+              visibility.onLayerPush(
+                { ...input, now, pusher: caller.handle },
+                snapshot
+              )
+            )
+          )
+        ),
+      recordLayerRead: (caller, input) =>
+        checked(
+          MethodSchemas.recordLayerRead,
+          [caller, input],
+          write(api, (_h, writes, now) =>
+            absorb(
+              writes,
+              visibility.recordRead({
+                at: now,
+                handle: caller.handle,
+                layer: input.layer,
+                sha: Option.fromUndefinedOr(input.sha),
+              })
+            )
+          )
         ),
       recordPush: (input) =>
         checked(MethodSchemas.recordPush, [input], write(api, pushBody(input))),
@@ -4314,11 +5070,17 @@ export const projectService = (
           [caller, id],
           write(api, releaseBody(caller, id))
         ),
+      scanForValues: (input) =>
+        checked(
+          MethodSchemas.scanForValues,
+          [input],
+          Effect.flatMap(hydrate, (h) => envPort.scan(input, h.snapshot))
+        ),
       setEnv: (caller, input) =>
         checked(
           MethodSchemas.setEnv,
           [caller, input],
-          decided.setEnv(caller, input)
+          write(api, setEnvBody(caller, input))
         ),
       showAsk: (caller, id) =>
         checked(

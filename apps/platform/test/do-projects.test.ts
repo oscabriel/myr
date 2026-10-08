@@ -10,6 +10,7 @@ import {
   DecisionId,
   EnvKey,
   LandedSha,
+  LayerName,
   ProjectName,
   RequestId,
 } from "@repo/protocol/ids";
@@ -45,6 +46,8 @@ const sha = CommitSha.make("a".repeat(40));
 
 const requestId = RequestId.make("req-none0001");
 
+const layer = LayerName.make("maintainers");
+
 /** A call's `Exit` as JSON, by its method's own schemas: equal when the outcomes are. */
 const settled = <A, E, R>(
   method: ProjectMethod,
@@ -60,6 +63,10 @@ const settled = <A, E, R>(
 /** Every `ProjectApi` method once, on a project made and not yet pushed to. */
 const everyMethod = (api: ProjectApi) =>
   Effect.all({
+    admissionPlan: settled(
+      "admissionPlan",
+      api.admissionPlan({ head: sha, layer })
+    ),
     advanceAnswer: settled(
       "advanceAnswer",
       api.advanceAnswer(
@@ -93,12 +100,15 @@ const everyMethod = (api: ProjectApi) =>
       api.flagAsk(bob, { ask: parseIso, reason: "It names no format." })
     ),
     fork: settled("fork", api.fork(carol)),
+    heldBackJob: settled("heldBackJob", api.heldBackJob(requestId)),
     initProject: settled("initProject", api.initProject(alice, {})),
     land: settled(
       "land",
       api.land(bob, { base: sha, head: sha, message: "Tidy", requestId })
     ),
     landing: settled("landing", api.landing(anyone, sha)),
+    layerAccess: settled("layerAccess", api.layerAccess(alice, layer)),
+    layerFacts: settled("layerFacts", api.layerFacts(bob)),
     ledger: settled("ledger", api.ledger(anyone)),
     listAsks: settled("listAsks", api.listAsks(anyone)),
     onAlarm: settled("onAlarm", api.onAlarm()),
@@ -110,7 +120,23 @@ const everyMethod = (api: ProjectApi) =>
       "proposeAsk",
       api.proposeAsk(carol, { want: "Parse ISO week dates." })
     ),
+    recordAdmission: settled(
+      "recordAdmission",
+      api.recordAdmission({ head: sha, layer, results: [] })
+    ),
     recordFirstPush: settled("recordFirstPush", api.recordFirstPush(bob, sha)),
+    recordHeldBack: settled(
+      "recordHeldBack",
+      api.recordHeldBack(requestId, [])
+    ),
+    recordLayerPush: settled(
+      "recordLayerPush",
+      api.recordLayerPush(alice, { head: sha, layer })
+    ),
+    recordLayerRead: settled(
+      "recordLayerRead",
+      api.recordLayerRead(alice, { layer, sha })
+    ),
     recordPush: settled(
       "recordPush",
       api.recordPush({
@@ -123,6 +149,10 @@ const everyMethod = (api: ProjectApi) =>
       })
     ),
     release: settled("release", api.release(bob, parseIso)),
+    scanForValues: settled(
+      "scanForValues",
+      api.scanForValues({ text: "a-value-long-enough-0123" })
+    ),
     setEnv: settled(
       "setEnv",
       api.setEnv(bob, {

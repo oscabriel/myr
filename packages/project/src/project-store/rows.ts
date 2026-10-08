@@ -4,15 +4,20 @@ import { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { Proposal } from "@repo/protocol/domain/proposal";
+import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import {
+  AreaName,
   AskId,
   CommitSha,
+  EnvKey,
   Handle,
   LandedSha,
+  LayerName,
   ProjectName,
   RatchetName,
   RepoName,
   RequestId,
+  SuiteRoot,
 } from "@repo/protocol/ids";
 import { Schema } from "effect";
 
@@ -44,6 +49,18 @@ export const AskRow = Ask;
 export type AskRow = typeof AskRow.Type;
 
 /**
+ * The held-back suite a claim was pinned to when it opened (W6): the root of
+ * the sealed suite and the layer commit that holds it. An answer on the
+ * claim is judged by this suite, whatever the layer holds later.
+ */
+export const PinnedSuite = Schema.Struct({
+  at: CommitSha,
+  suite: SuiteRoot,
+});
+
+export type PinnedSuite = typeof PinnedSuite.Type;
+
+/**
  * One person's claim on an ask, its lifecycle state encoded, and the agents
  * the claimant's pushes to its fork named (their harnesses, as custody heard
  * them), once each in the order they first pushed: what the answer's landing
@@ -53,6 +70,8 @@ export const ClaimRow = Schema.Struct({
   ask: AskId,
   assisted: Schema.optionalKey(Schema.Array(AgentTrailer)),
   claimant: Handle,
+  /** The held-back suite pinned when the claim opened; absent when none was sealed. */
+  pinned: Schema.optionalKey(PinnedSuite),
   /** The encoded claim lifecycle state. */
   state: Schema.Json,
   updatedAt: Schema.DateTimeUtcFromString,
@@ -144,6 +163,83 @@ export const OutboxRow = Schema.Struct({
 });
 
 export type OutboxRow = typeof OutboxRow.Type;
+
+// The visibility tables (W6). The store keeps them for the visibility ports
+// (`visibility-port.ts`, `env-port.ts`); the service reads none of them
+// itself, and without the cartridge they stay empty.
+
+/**
+ * A layer the project declared: its repo in the private namespace, the
+ * layer commit it last admitted with that suite's root and when, a pushed
+ * head still waiting on admission, and where the suite's salt is kept. The
+ * salt never leaves the project's store: no ledger entry, trailer, note or
+ * event carries it.
+ */
+export const LayerRow = Schema.Struct({
+  admittedAt: Schema.optionalKey(Schema.DateTimeUtcFromString),
+  landedSha: Schema.optionalKey(CommitSha),
+  name: LayerName,
+  /** A head pushed to the layer that admission has not let in yet. */
+  proposed: Schema.optionalKey(CommitSha),
+  repo: RepoName,
+  saltRef: Schema.optionalKey(Schema.NonEmptyString),
+  suiteRoot: Schema.optionalKey(SuiteRoot),
+});
+
+export type LayerRow = typeof LayerRow.Type;
+
+/**
+ * How many held-back runs one claimant's answers to one ask failed in one
+ * area in one ISO week (`2026-W41`): the per-claim and the per-person,
+ * per-area, per-week caps count these. Never a record of the person.
+ */
+export const AttemptRow = Schema.Struct({
+  area: AreaName,
+  ask: AskId,
+  claimant: Handle,
+  count: Schema.Int,
+  week: Schema.NonEmptyString,
+});
+
+export type AttemptRow = typeof AttemptRow.Type;
+
+/** One entry of the public ledger, numbered by whoever appends it, in order. */
+export const LedgerRow = LedgerEntry;
+
+export type LedgerRow = typeof LedgerRow.Type;
+
+/**
+ * A write-only value for one `@sensitive` env item: sealed by the vault
+ * (the store never reads into it), and who set it, when. Nothing returns
+ * the value.
+ */
+export const EnvValueRow = Schema.Struct({
+  key: EnvKey,
+  sealed: Schema.Json,
+  setAt: Schema.DateTimeUtcFromString,
+  setBy: Handle,
+});
+
+export type EnvValueRow = typeof EnvValueRow.Type;
+
+/** A read of a layer repo through the gateway, before the store numbers it. */
+export const LayerRead = Schema.Struct({
+  at: Schema.DateTimeUtcFromString,
+  handle: Handle,
+  layer: LayerName,
+  /** The layer commit the read was served at, when the gateway knew it. */
+  sha: Schema.optionalKey(CommitSha),
+});
+
+export type LayerRead = typeof LayerRead.Type;
+
+/** A layer read with the number the store gave it: the read log, for the layer's readers. */
+export const LayerReadRow = Schema.Struct({
+  ...LayerRead.fields,
+  seq: Schema.Int,
+});
+
+export type LayerReadRow = typeof LayerReadRow.Type;
 
 /** An event with the sequence number the store gave it. */
 export const EventRow = Schema.Struct({

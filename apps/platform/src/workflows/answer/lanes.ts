@@ -29,6 +29,7 @@ import { countLanes, measure } from "@repo/checks/kinds/ratchet";
 import { classifyFailure } from "@repo/gate/classify";
 import { MeasuredCount, runBlockOf } from "@repo/project/answer-runs";
 import type { AnswerRun } from "@repo/project/answer-runs";
+import { noRunEnv, RunEnv } from "@repo/project/env-port";
 import { LandingState } from "@repo/project/landing";
 import {
   HeldBackResult,
@@ -85,6 +86,8 @@ export const Checked = Schema.Struct({
   base: CommitSha,
   /** Every path the answer changed against its base. */
   changed: Schema.Array(RepoPath),
+  /** The env every check job of the answer carries (W6 609): placeholders, never a value. */
+  env: Schema.optionalKey(RunEnv),
   finish: AskKind.fields.finish,
   /**
    * The answer's fork, which holds the merged tree: the Lander keeps it there
@@ -98,6 +101,8 @@ export const Checked = Schema.Struct({
   requestId: RequestId,
   /** The project's run block, which every check job carries; absent without a policy. */
   run: Schema.optionalKey(RunBlock),
+  /** Whether a held-back suite judges the answer once its checks pass (W6). */
+  sealed: Schema.optionalKey(Schema.Boolean),
   tree: TreeSha,
 });
 
@@ -296,8 +301,13 @@ const checkedOf = (run: AnswerRun, tree: TreeSha): Option.Option<Checked> => {
   const asked =
     run.askLane === undefined ? checked : { ...checked, askLane: run.askLane };
 
+  const blocked = run.run === undefined ? asked : { ...asked, run: run.run };
+
+  const carried =
+    run.env === undefined ? blocked : { ...blocked, env: run.env };
+
   return Option.some(
-    run.run === undefined ? asked : { ...asked, run: run.run }
+    run.sealed === true ? { ...carried, sealed: true } : carried
   );
 };
 
@@ -466,11 +476,10 @@ export const runStage = (
         const job = (each: readonly CheckLane[]) =>
           runner
             .run({
+              ...(checked.env ?? noRunEnv),
               at: CheckAt.cases.Tree.make({ tree }),
               lanes: each,
-              placeholders: [],
               project: checked.project,
-              proxies: [],
               repo: checked.fork,
               run: block,
             })
@@ -589,11 +598,10 @@ export const laneOnMain = (
   Effect.flatMap(runBlockOf(checked), (block) =>
     CheckRunner.use((runner) =>
       runner.run({
+        ...(checked.env ?? noRunEnv),
         at: CheckAt.cases.Commit.make({ commit: checked.main }),
         lanes: [lane],
-        placeholders: [],
         project: checked.project,
-        proxies: [],
         repo: checked.repo,
         run: block,
       })

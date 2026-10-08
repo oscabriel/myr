@@ -10,9 +10,10 @@ import type {
   ProjectSnapshot,
   ProjectWrites,
 } from "../project-store.ts";
-import type { EventRow } from "./rows.ts";
+import type { EventRow, LedgerRow } from "./rows.ts";
 import {
   EventTable,
+  LayerReadTable,
   ProjectTable,
   QueueTable,
   Tables,
@@ -30,6 +31,8 @@ interface Stored {
 type Rows = ReadonlyMap<string, Stored>;
 
 interface State {
+  /** The number of the newest layer read, or 0 before the first. */
+  readonly lastRead: number;
   readonly lastSeq: number;
   /** Each table's rows by table name; the kept events too, oldest first. */
   readonly tables: ReadonlyMap<string, Rows>;
@@ -58,6 +61,9 @@ const newestFirst = Order.combine(
   Order.mapInput(Order.flip(Order.Number), ([index]: Placed) => index)
 );
 
+/** Ledger entries in order, as `/sqlite` reads them. */
+const bySeq = Order.mapInput(Order.Number, (entry: LedgerRow) => entry.seq);
+
 const snapshotOf = (state: State) =>
   Effect.gen(function* () {
     const placed = Array.map(
@@ -73,14 +79,18 @@ const snapshotOf = (state: State) =>
     return {
       answers: yield* all(state, Tables.answers),
       asks: yield* all(state, Tables.asks),
+      attempts: yield* all(state, Tables.attempts),
       budgetDays: yield* all(state, Tables.budgetDays),
       claims: yield* all(state, Tables.claims),
       decisions: yield* all(state, Tables.decisions),
+      envValues: yield* all(state, Tables.envValues),
       landings: yield* decodeAll(
         Tables.landings,
         Array.map(newest, ([, row]) => row)
       ),
       lastSeq: state.lastSeq,
+      layers: yield* all(state, Tables.layers),
+      ledger: Array.sort(yield* all(state, Tables.ledger), bySeq),
       outbox: yield* all(state, Tables.outbox),
       project: Array.head(yield* all(state, ProjectTable)),
       proposals: yield* all(state, Tables.proposals),
@@ -128,7 +138,13 @@ const upsertInto =
 const written = (state: State, writes: ProjectWrites) =>
   Effect.gen(function* () {
     const tables = new Map(state.tables);
-    const seqs = yield* writeAll(writes, state.lastSeq, upsertInto(tables));
+
+    const seqs = yield* writeAll(
+      writes,
+      { read: state.lastRead, seq: state.lastSeq },
+      upsertInto(tables)
+    );
+
     const events = [...(tables.get(EventTable.name) ?? [])];
 
     tables.set(EventTable.name, new Map(events.slice(-keptEvents)));
@@ -136,6 +152,7 @@ const written = (state: State, writes: ProjectWrites) =>
     const committed: Committed = { duplicatePushEvents: [], seqs };
 
     const next: State = {
+      lastRead: state.lastRead + (writes.layerReads?.length ?? 0),
       lastSeq: state.lastSeq + seqs.length,
       tables,
     };
@@ -153,6 +170,7 @@ export const ProjectStoreMemory = Layer.effect(
   ProjectStore,
   Effect.gen(function* () {
     const ref = yield* SynchronizedRef.make<State>({
+      lastRead: 0,
       lastSeq: 0,
       tables: new Map(),
     });
@@ -208,6 +226,18 @@ export const ProjectStoreMemory = Layer.effect(
           return row === undefined
             ? Option.none()
             : Option.some(yield* Tables.landings.decode(row.body));
+        }),
+      layerReadsSince: (seq, limit) =>
+        Effect.gen(function* () {
+          const reads = yield* all(
+            yield* SynchronizedRef.get(ref),
+            LayerReadTable
+          );
+
+          return Array.take(
+            reads.filter((read) => read.seq > seq),
+            limit
+          );
         }),
       load: () => Effect.flatMap(SynchronizedRef.get(ref), snapshotOf),
     });

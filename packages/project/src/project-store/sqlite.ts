@@ -11,6 +11,7 @@ import type { ProjectWrites } from "../project-store.ts";
 import { migrate } from "./migrations.ts";
 import {
   EventTable,
+  LayerReadTable,
   ProjectTable,
   QueueTable,
   Tables,
@@ -62,6 +63,12 @@ export const ProjectStoreSqlite = Layer.effect(
       Effect.map(([row]) => row.last)
     );
 
+    const lastRead =
+      sql`SELECT COALESCE(MAX(seq), 0) AS last FROM layer_reads`.pipe(
+        Effect.flatMap(decodeLastSeq),
+        Effect.map(([row]) => row.last)
+      );
+
     // One statement per row, so a key written twice in one commit replaces
     // its first row in place, as it does in `/memory`.
     const upsert = <A>(table: Table<A>, rows: readonly A[]) =>
@@ -103,7 +110,12 @@ export const ProjectStoreSqlite = Layer.effect(
     const write = (writes: ProjectWrites) =>
       Effect.gen(function* () {
         const last = yield* lastSeq;
-        const seqs = yield* writeAll(writes, last, upsert);
+
+        const seqs = yield* writeAll(
+          writes,
+          { read: yield* lastRead, seq: last },
+          upsert
+        );
 
         yield* sql`DELETE FROM events WHERE seq <= ${last + seqs.length - keptEvents}`;
 
@@ -143,6 +155,11 @@ export const ProjectStoreSqlite = Layer.effect(
           Tables.landings,
           sql`SELECT body FROM landings WHERE sha = ${sha}`
         ).pipe(Effect.map(Array.head), Effect.orDie),
+      layerReadsSince: (seq, limit) =>
+        bodiesOf(
+          LayerReadTable,
+          sql`SELECT body FROM layer_reads WHERE seq > ${seq} ORDER BY seq LIMIT ${limit}`
+        ).pipe(Effect.orDie),
       load: () =>
         sql
           .withTransaction(
@@ -150,9 +167,11 @@ export const ProjectStoreSqlite = Layer.effect(
               return {
                 answers: yield* all(Tables.answers),
                 asks: yield* all(Tables.asks),
+                attempts: yield* all(Tables.attempts),
                 budgetDays: yield* all(Tables.budgetDays),
                 claims: yield* all(Tables.claims),
                 decisions: yield* all(Tables.decisions),
+                envValues: yield* all(Tables.envValues),
                 landings: yield* bodiesOf(
                   Tables.landings,
                   sql`SELECT body FROM landings
@@ -160,6 +179,11 @@ export const ProjectStoreSqlite = Layer.effect(
                     LIMIT ${snapshotLandings}`
                 ),
                 lastSeq: yield* lastSeq,
+                layers: yield* all(Tables.layers),
+                ledger: yield* bodiesOf(
+                  Tables.ledger,
+                  sql`SELECT body FROM ledger ORDER BY seq`
+                ),
                 outbox: yield* all(Tables.outbox),
                 project: Array.head(yield* all(ProjectTable)),
                 proposals: yield* all(Tables.proposals),

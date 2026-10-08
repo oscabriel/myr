@@ -8,7 +8,8 @@
  * repo; a fork is read by a signed-in person; a push needs one, and custody
  * (`adapters/custody.ts`) decides what it may move. A credential the
  * platform does not know is a 401 everywhere. A name the platform never
- * makes (spec §4.5) is a 404. The client's credential never travels past
+ * makes (spec §4.5) is a 404, unless `LayerGate` says it is a layer's repo
+ * (W6), which only the layer's readers read and its writers push to. The client's credential never travels past
  * this file: the gateway forwards only the headers git's protocol needs, and
  * the upstream adds the platform's own.
  */
@@ -16,14 +17,22 @@ import { Brand } from "@repo/brand";
 import { Custody } from "@repo/git/custody";
 import { gateway, gitRoute, plain } from "@repo/git/gateway";
 import { concat, packetAt, pkt, utf8 } from "@repo/git/pkt-line";
-import type { Upstream } from "@repo/git/upstream";
+import { Upstream } from "@repo/git/upstream";
 import type { Projects } from "@repo/project/projects";
+import type { LayerAccess } from "@repo/project/visibility-port";
 import { RepoName } from "@repo/protocol/ids";
 import { Anonymous, Principal } from "@repo/protocol/principal";
 import { Effect, Option, Ref } from "effect";
 
-import { custodyFor, refuseAll } from "./adapters/custody.ts";
+import {
+  custodyFor,
+  layerCustodyFor,
+  layerRead,
+  refuseAll,
+} from "./adapters/custody.ts";
 import { auditOf, credentialOf } from "./credential.ts";
+import { LayerGate } from "./layer-gate.ts";
+import type { LayerTarget } from "./layer-gate.ts";
 import { repoKind, RepoKind } from "./repo-names.ts";
 import { Sessions } from "./sessions.ts";
 
@@ -111,6 +120,60 @@ const withNotices = (response: Response, notices: readonly string[]) =>
     });
   });
 
+/** How far each access reaches: a writer also reads. */
+const REACH = {
+  none: 0,
+  read: 1,
+  write: 2,
+} as const satisfies Record<LayerAccess, number>;
+
+/**
+ * A git request to a project's layer repo (W6 609, ADR 0007): only the
+ * layer's readers clone it and only its writers push to it, each read
+ * logged, all through the private namespace's upstream. Someone not signed
+ * in is asked to sign in (401, so the credential helper answers); a person
+ * the layer does not admit gets 403 with one line git prints.
+ */
+const serveLayer = (
+  request: Request,
+  route: { readonly endpoint: string; readonly name: string },
+  principal: Principal,
+  target: LayerTarget
+) =>
+  Effect.gen(function* () {
+    const gate = yield* LayerGate;
+    const pushing = writes(route.endpoint, new URL(request.url));
+
+    if (!Principal.guards.Person(principal)) {
+      return signIn("a layer is read by its readers");
+    }
+
+    const access = yield* gate.access(principal, target);
+
+    if (REACH[access] < REACH[pushing ? "write" : "read"]) {
+      return plain(
+        403,
+        `${principal.handle} may not ${pushing ? "push to" : "read"} ${route.name}`
+      );
+    }
+
+    const custody =
+      route.endpoint === "git-receive-pack"
+        ? yield* layerCustodyFor(principal, target)
+        : refuseAll;
+
+    const response = yield* gateway(request).pipe(
+      Effect.provideService(Custody, custody),
+      Effect.provideService(Upstream, gate.upstream)
+    );
+
+    if (route.endpoint === "git-upload-pack" && response.status === 200) {
+      yield* layerRead(principal, target);
+    }
+
+    return response;
+  });
+
 /** A git request to `name`, as `principal` may make it. */
 const serve = (
   request: Request,
@@ -120,8 +183,16 @@ const serve = (
   Effect.gen(function* () {
     const kind = repoKind(RepoName.make(route.name));
 
+    // A name the platform makes for no repo of its own may be a layer's.
     if (RepoKind.$is("Unknown")(kind)) {
-      return notFound(route.name);
+      const layer = yield* LayerGate.use((gate) =>
+        gate.classify(RepoName.make(route.name))
+      );
+
+      return yield* Option.match(layer, {
+        onNone: () => Effect.succeed(notFound(route.name)),
+        onSome: (target) => serveLayer(request, route, principal, target),
+      });
     }
 
     const pushing = writes(route.endpoint, new URL(request.url));

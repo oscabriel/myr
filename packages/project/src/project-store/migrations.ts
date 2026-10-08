@@ -59,8 +59,39 @@ const projectState = Effect.gen(function* () {
   yield* sql`CREATE TABLE outbox (id TEXT PRIMARY KEY, body TEXT NOT NULL)`;
 });
 
+// The visibility tables (W6 609): a project's layers, the attempts on its
+// held-back checks, its public ledger, its write-only values, and the read
+// log of its layer repos. Without the visibility cartridge they stay empty.
+const visibility = Effect.gen(function* () {
+  const sql = yield* SqlClient;
+
+  yield* sql`CREATE TABLE layers (name TEXT PRIMARY KEY, body TEXT NOT NULL)`;
+  yield* sql`CREATE TABLE attempts (
+    ask TEXT NOT NULL,
+    claimant TEXT NOT NULL,
+    area TEXT NOT NULL,
+    week TEXT NOT NULL,
+    body TEXT NOT NULL,
+    PRIMARY KEY (ask, claimant, area, week)
+  )`;
+  yield* sql`CREATE TABLE ledger (
+    seq INTEGER PRIMARY KEY,
+    at INTEGER NOT NULL,
+    body TEXT NOT NULL
+  )`;
+  yield* sql`CREATE TABLE env_values (key TEXT PRIMARY KEY, body TEXT NOT NULL)`;
+  yield* sql`CREATE TABLE layer_reads (
+    seq INTEGER PRIMARY KEY,
+    at INTEGER NOT NULL,
+    body TEXT NOT NULL
+  )`;
+});
+
 /** Every migration, by `<id>_<name>`, in the order they run. */
-const migrations = { "1_project_state": projectState };
+const migrations = {
+  "1_project_state": projectState,
+  "2_visibility": visibility,
+};
 
 /**
  * Brings a project's database up to date and returns the migrations it ran.

@@ -84,6 +84,7 @@ const apiOf = (
 
   return {
     [envSchemaMethod]: (caller) => on(envSchemaMethod, [caller]),
+    admissionPlan: (input) => on("admissionPlan", [input]),
     advanceAnswer: (requestId, command, report) =>
       on("advanceAnswer", [requestId, command, report]),
     answer: (requestId) => on("answer", [requestId]),
@@ -98,18 +99,27 @@ const apiOf = (
     firstPusher: () => on("firstPusher", []),
     flagAsk: (caller, input) => assumingMade(on("flagAsk", [caller, input])),
     fork: (caller) => assumingMade(on("fork", [caller])),
+    heldBackJob: (requestId) => on("heldBackJob", [requestId]),
     initProject: (caller, input) => on("initProject", [caller, input]),
     land: (caller, input) => assumingMade(on("land", [caller, input])),
     landing: (caller, sha) => assumingMade(on("landing", [caller, sha])),
+    layerAccess: (caller, layer) => on("layerAccess", [caller, layer]),
+    layerFacts: (caller) => on("layerFacts", [caller]),
     ledger: (caller) => assumingMade(on("ledger", [caller])),
     listAsks: (caller) => assumingMade(on("listAsks", [caller])),
     onAlarm: () => on("onAlarm", []),
     openAsk: (caller, input) => assumingMade(on("openAsk", [caller, input])),
     proposeAsk: (caller, input) =>
       assumingMade(on("proposeAsk", [caller, input])),
+    recordAdmission: (input) => on("recordAdmission", [input]),
     recordFirstPush: (caller, head) => on("recordFirstPush", [caller, head]),
+    recordHeldBack: (requestId, results) =>
+      on("recordHeldBack", [requestId, results]),
+    recordLayerPush: (caller, input) => on("recordLayerPush", [caller, input]),
+    recordLayerRead: (caller, input) => on("recordLayerRead", [caller, input]),
     recordPush: (input) => on("recordPush", [input]),
     release: (caller, ask) => assumingMade(on("release", [caller, ask])),
+    scanForValues: (input) => on("scanForValues", [input]),
     setEnv: (caller, input) => assumingMade(on("setEnv", [caller, input])),
     showAsk: (caller, ask) => assumingMade(on("showAsk", [caller, ask])),
     status: (caller) => assumingMade(on("status", [caller])),

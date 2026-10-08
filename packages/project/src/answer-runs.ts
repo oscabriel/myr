@@ -39,6 +39,7 @@ import type { RequestId } from "@repo/protocol/ids";
 import { Refusal, VerifierBlocked } from "@repo/protocol/refusal";
 import { Context, Effect, Option, Schema } from "effect";
 
+import { RunEnv } from "./env-port.ts";
 import { Change, LandingState, PendingDecision } from "./landing.ts";
 import type { LandingCommand, LandingEffect } from "./landing.ts";
 
@@ -117,6 +118,11 @@ export const AnswerRun = Schema.Struct({
       ratchets: Schema.Array(RatchetSpec),
     })
   ),
+  /**
+   * The env every check job of the answer carries (`ProjectEnv.runEnv` for
+   * unlanded code): placeholders and proxies, never a value. Absent, none.
+   */
+  env: Schema.optionalKey(RunEnv),
   /** Whether a decider must finish it before it lands: the ask kind's `finish`. */
   finish: AskKind.fields.finish,
   /** What the checks run on the merged tree: the ask's check first, then every project lane. */
@@ -130,6 +136,12 @@ export const AnswerRun = Schema.Struct({
    * the project has no policy (the gate is broken, and nothing is checked).
    */
   run: Schema.optionalKey(RunBlock),
+  /**
+   * Whether a held-back suite judges the answer: its claim was pinned to
+   * one (W6). Its checks then end with the held-back run
+   * (`ProjectApi.heldBackJob`, `recordHeldBack`). Absent, none does.
+   */
+  sealed: Schema.optionalKey(Schema.Boolean),
   state: LandingState,
   /** The verdict on the merged tree, once the checks judged it. */
   verdict: Schema.optionalKey(Verdict),

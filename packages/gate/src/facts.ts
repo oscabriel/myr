@@ -76,6 +76,12 @@ export interface PushFacts {
   readonly scriptsChanged: boolean;
   /** Paths that belong to a layer, which no public tree may carry (W6; empty before). */
   readonly layerPaths: ReadonlySet<RepoPath>;
+  /**
+   * Whether the pusher reads any layer (W6): only a reader could have
+   * copied from one, so a guard that would answer a non-reader's probe (an
+   * oracle) reads this first. Absent, they read none.
+   */
+  readonly canReadLayers?: boolean;
   /** How many live claims the pusher holds, for `CapReached`. */
   readonly claimsHeld: number;
   /**

@@ -19,6 +19,7 @@ import { Array, Effect, Option } from "effect";
 
 import { runBlockOf } from "../answer-runs.ts";
 import type { AnswerQueue, AnswerReport, AnswerRun } from "../answer-runs.ts";
+import { noRunEnv } from "../env-port.ts";
 import { Lander, Rebuild } from "../lander.ts";
 import {
   LandingCommand,
@@ -122,11 +123,10 @@ const checks = (
 
     const job = (at: CheckAt, lanes: readonly CheckLane[]) =>
       runner.run({
+        ...(run.env ?? noRunEnv),
         at,
         lanes,
-        placeholders: [],
         project: request.project,
-        proxies: [],
         repo: run.repo,
         run: block,
       });

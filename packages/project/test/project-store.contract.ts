@@ -2,10 +2,12 @@ import { describe, expect, it } from "@effect/vitest";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
+import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import {
   AskId,
   CommitSha,
   Handle,
+  LayerName,
   ProposalId,
   RepoPath,
 } from "@repo/protocol/ids";
@@ -18,10 +20,15 @@ import type { ProjectWrites } from "../src/project-store.ts";
 import {
   AnswerRow,
   AskRow,
+  AttemptRow,
   BudgetDayRow,
   ClaimRow,
   DecisionRow,
+  EnvValueRow,
   LandingRow,
+  LayerReadRow,
+  LayerRow,
+  LedgerRow,
   OutboxRow,
   ProjectRow,
   ProposalRow,
@@ -183,6 +190,68 @@ const pushEventOf = (eventId: string) =>
     repo: "datekit--empty-date--bob",
   }) satisfies (typeof PushEventRow)["Encoded"];
 
+// The visibility tables (W6): a declared layer, attempts on its held-back
+// checks, the public ledger, a write-only value (sealed; the store never
+// reads into it) and the layer read log.
+
+const declared = {
+  admittedAt: at(6),
+  landedSha: sha(7),
+  name: "maintainers",
+  repo: "datekit--maintainers",
+  saltRef: "c2FsdA==",
+  suiteRoot: `sha256:${"ab".repeat(32)}`,
+} satisfies (typeof LayerRow)["Encoded"];
+
+const proposedLayer = {
+  name: "security",
+  proposed: sha(8),
+  repo: "datekit--security",
+} satisfies (typeof LayerRow)["Encoded"];
+
+const attempt = {
+  area: "export",
+  ask: "empty-date",
+  claimant: "bob",
+  count: 1,
+  week: "2026-W41",
+} satisfies (typeof AttemptRow)["Encoded"];
+
+const ledgerEntryOf = (seq: number) =>
+  Schema.encodeSync(LedgerEntry)(
+    LedgerEntry.cases.LayerDeclared.make({
+      at: DateTime.makeUnsafe(at(seq)),
+      disclose: "sealed",
+      kinds: ["checks"],
+      layer: LayerName.make("maintainers"),
+      seq,
+    })
+  ) satisfies (typeof LedgerRow)["Encoded"];
+
+const envValue = {
+  key: "SENTRY_AUTH_TOKEN",
+  sealed: { ciphertext: "Y2lwaGVy", iv: "aXY=", keyVersion: 1 },
+  setAt: at(9),
+  setBy: "alice",
+} satisfies (typeof EnvValueRow)["Encoded"];
+
+const readBy = (handle: string, minute: number) => ({
+  at: DateTime.makeUnsafe(at(minute)),
+  handle: Handle.make(handle),
+  layer: LayerName.make("maintainers"),
+  sha: CommitSha.make(sha(7)),
+});
+
+/** A layer read as the store keeps it once numbered, encoded. */
+const readRow = (handle: string, minute: number, seq: number) =>
+  ({
+    at: at(minute),
+    handle,
+    layer: "maintainers",
+    seq,
+    sha: sha(7),
+  }) satisfies (typeof LayerReadRow)["Encoded"];
+
 // Events are written as the service hands them over: unnumbered.
 
 const claimed: ProjectEventInput = ProjectEvent.cases.Claimed.mapFields(
@@ -218,11 +287,15 @@ const everything: ProjectWrites = {
 const EncodedSnapshot = Schema.Struct({
   answers: Schema.Array(AnswerRow),
   asks: Schema.Array(AskRow),
+  attempts: Schema.Array(AttemptRow),
   budgetDays: Schema.Array(BudgetDayRow),
   claims: Schema.Array(ClaimRow),
   decisions: Schema.Array(DecisionRow),
+  envValues: Schema.Array(EnvValueRow),
   landings: Schema.Array(LandingRow),
   lastSeq: Schema.Int,
+  layers: Schema.Array(LayerRow),
+  ledger: Schema.Array(LedgerRow),
   outbox: Schema.Array(OutboxRow),
   project: Schema.OptionFromNullOr(ProjectRow),
   proposals: Schema.Array(ProposalRow),
@@ -233,11 +306,15 @@ const EncodedSnapshot = Schema.Struct({
 const empty = {
   answers: [],
   asks: [],
+  attempts: [],
   budgetDays: [],
   claims: [],
   decisions: [],
+  envValues: [],
   landings: [],
   lastSeq: 0,
+  layers: [],
+  ledger: [],
   outbox: [],
   project: null,
   proposals: [],
@@ -254,6 +331,12 @@ const loaded = Effect.gen(function* () {
 
 const since = (seq: number, limit: number) =>
   ProjectStore.use((store) => store.eventsSince(seq, limit));
+
+/** The layer read log after `seq`, encoded. */
+const readsSince = (seq: number, limit: number) =>
+  ProjectStore.use((store) => store.layerReadsSince(seq, limit)).pipe(
+    Effect.flatMap(Schema.encodeEffect(Schema.Array(LayerReadRow)))
+  );
 
 /**
  * What every ProjectStore adapter must do, written against the port.
@@ -537,6 +620,86 @@ export const describeProjectStore = (
         expect(
           Option.isNone(yield* store.landing(CommitSha.make(sha(999))))
         ).toBe(true);
+      }).pipe(Effect.provide(layer))
+    );
+
+    it.effect(
+      "loads layers, attempts, ledger entries and write-only values, each replaced under its key",
+      () =>
+        Effect.gen(function* () {
+          const store = yield* ProjectStore;
+
+          yield* store.commit({
+            attempts: decodedAll(AttemptRow, [attempt]),
+            envValues: decodedAll(EnvValueRow, [envValue]),
+            layers: decodedAll(LayerRow, [declared, proposedLayer]),
+            ledger: decodedAll(LedgerRow, [ledgerEntryOf(1), ledgerEntryOf(2)]),
+          });
+
+          expect(yield* loaded).toStrictEqual({
+            ...empty,
+            attempts: [attempt],
+            envValues: [envValue],
+            layers: [declared, proposedLayer],
+            ledger: [ledgerEntryOf(1), ledgerEntryOf(2)],
+          });
+
+          const counted = { ...attempt, count: 2 };
+          const reset = { ...envValue, setAt: at(10), setBy: "carol" };
+          const admitted = { ...proposedLayer, landedSha: sha(8) };
+
+          yield* store.commit({
+            attempts: decodedAll(AttemptRow, [counted]),
+            envValues: decodedAll(EnvValueRow, [reset]),
+            layers: decodedAll(LayerRow, [admitted]),
+            ledger: decodedAll(LedgerRow, [ledgerEntryOf(3)]),
+          });
+
+          expect(yield* loaded).toStrictEqual({
+            ...empty,
+            attempts: [counted],
+            envValues: [reset],
+            layers: [declared, admitted],
+            ledger: [ledgerEntryOf(1), ledgerEntryOf(2), ledgerEntryOf(3)],
+          });
+        }).pipe(Effect.provide(layer))
+    );
+
+    it.effect(
+      "numbers the layer read log and reads it after a number, out of the snapshot",
+      () =>
+        Effect.gen(function* () {
+          const store = yield* ProjectStore;
+
+          yield* store.commit({
+            layerReads: [readBy("alice", 11), readBy("okonkwo", 12)],
+          });
+          yield* store.commit({ layerReads: [readBy("alice", 13)] });
+
+          expect(yield* readsSince(0, 10)).toStrictEqual([
+            readRow("alice", 11, 1),
+            readRow("okonkwo", 12, 2),
+            readRow("alice", 13, 3),
+          ]);
+          expect(yield* readsSince(1, 1)).toStrictEqual([
+            readRow("okonkwo", 12, 2),
+          ]);
+          expect(yield* loaded).toStrictEqual(empty);
+        }).pipe(Effect.provide(layer))
+    );
+
+    it.effect("keeps a claim's pinned suite with its row", () =>
+      Effect.gen(function* () {
+        const store = yield* ProjectStore;
+
+        const pinned = {
+          ...claim,
+          pinned: { at: sha(7), suite: `sha256:${"ab".repeat(32)}` },
+        } satisfies (typeof ClaimRow)["Encoded"];
+
+        yield* store.commit({ claims: decodedAll(ClaimRow, [pinned]) });
+
+        expect((yield* loaded).claims).toStrictEqual([pinned]);
       }).pipe(Effect.provide(layer))
     );
 

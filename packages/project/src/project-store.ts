@@ -6,11 +6,17 @@ import type { ProjectEventInput } from "./events.ts";
 import type {
   AnswerRow,
   AskRow,
+  AttemptRow,
   BudgetDayRow,
   ClaimRow,
   DecisionRow,
+  EnvValueRow,
   EventRow,
   LandingRow,
+  LayerRead,
+  LayerReadRow,
+  LayerRow,
+  LedgerRow,
   OutboxRow,
   ProjectRow,
   ProposalRow,
@@ -32,13 +38,21 @@ export const keptEvents = 500;
 export interface ProjectSnapshot {
   readonly answers: readonly AnswerRow[];
   readonly asks: readonly AskRow[];
+  /** Failed held-back runs per claim, area and week (W6). */
+  readonly attempts: readonly AttemptRow[];
   readonly budgetDays: readonly BudgetDayRow[];
   readonly claims: readonly ClaimRow[];
   readonly decisions: readonly DecisionRow[];
+  /** Write-only values, sealed, by env key (W6). */
+  readonly envValues: readonly EnvValueRow[];
   /** The newest `snapshotLandings` landings, newest first. */
   readonly landings: readonly LandingRow[];
   /** The sequence number of the newest event, or 0 before the first. */
   readonly lastSeq: number;
+  /** The layers the project declared (W6). */
+  readonly layers: readonly LayerRow[];
+  /** The public ledger, every entry (W6). */
+  readonly ledger: readonly LedgerRow[];
   /** Side effects not yet acknowledged, in the order they were written. */
   readonly outbox: readonly OutboxRow[];
   /** Absent until the project is initialized. */
@@ -52,16 +66,25 @@ export interface ProjectSnapshot {
 /**
  * What one call changed. Every row is an upsert by its table's key (an ask
  * by id, a claim by ask and claimant, an answer by `requestId`, a landing by
- * SHA, an outbox entry by id); `events` are appended and numbered.
+ * SHA, an outbox entry by id, a layer by name, an attempt by ask, claimant,
+ * area and week, a ledger entry by `seq`, a value by its key); `events` and
+ * `layerReads` are appended and numbered.
  */
 export interface ProjectWrites {
   readonly answers?: readonly AnswerRow[];
   readonly asks?: readonly AskRow[];
+  readonly attempts?: readonly AttemptRow[];
   readonly budgetDays?: readonly BudgetDayRow[];
   readonly claims?: readonly ClaimRow[];
   readonly decisions?: readonly DecisionRow[];
+  readonly envValues?: readonly EnvValueRow[];
   readonly events?: readonly ProjectEventInput[];
   readonly landings?: readonly LandingRow[];
+  /** Appended to the read log and numbered, as events are. */
+  readonly layerReads?: readonly LayerRead[];
+  readonly layers?: readonly LayerRow[];
+  /** Upserted by `seq`: the ledger's writer numbers its entries. */
+  readonly ledger?: readonly LedgerRow[];
   readonly outbox?: readonly OutboxRow[];
   readonly project?: ProjectRow;
   readonly proposals?: readonly ProposalRow[];
@@ -91,6 +114,8 @@ export interface Committed {
  *   are kept, which `eventsSince` reads for a watcher resuming from a number.
  * - `ackOutbox` drops entries the settle step ran; unknown ids are ignored.
  * - `landing` finds a landing by SHA, older than the snapshot's too.
+ * - Layer reads are numbered from 1 in commit order and all kept; they are
+ *   no part of the snapshot, and `layerReadsSince` reads them.
  * - The store reads no clock: every timestamp arrives in a row.
  *
  * Store failures are defects, not errors: a project whose storage fails can
@@ -108,6 +133,10 @@ export class ProjectStore extends Context.Service<
     readonly landing: (
       sha: CommitSha
     ) => Effect.Effect<Option.Option<LandingRow>>;
+    readonly layerReadsSince: (
+      seq: number,
+      limit: number
+    ) => Effect.Effect<readonly LayerReadRow[]>;
     readonly load: () => Effect.Effect<ProjectSnapshot>;
   }
 >()("project/ProjectStore") {}

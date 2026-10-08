@@ -29,7 +29,7 @@ import {
   CapReached,
   NotClaimed,
   NotDecider,
-  NotSensitive,
+  UnknownEnvItem,
   ProjectExists,
   UnknownCommit,
   UnknownProject,
@@ -610,7 +610,8 @@ describe("each call", () => {
           })
         );
 
-        // Until W6 gives the project a vault, no item takes a value.
+        // The project declares no env item, so none takes a value: a
+        // decider hears the key is unknown, anyone else that deciders set.
         const setPaymentsKey = {
           key: EnvKey.make("PAYMENTS_KEY"),
           project,
@@ -657,7 +658,7 @@ describe("each call", () => {
         }).toStrictEqual({
           aliceDecides: "alice",
           aliceReleases: NotClaimed.of(parseIso),
-          aliceSets: new NotSensitive({ key: setPaymentsKey.key }),
+          aliceSets: new UnknownEnvItem({ key: setPaymentsKey.key }),
           alicesClaims: [],
           alicesFork: {
             fork: "datekit--me--alice",

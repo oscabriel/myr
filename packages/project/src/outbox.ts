@@ -6,9 +6,10 @@
  * next alarm runs it again. Each is safe to run twice.
  *
  * Kinds: a projected event for the read models (`Projected`), a claim's
- * fork (`MakeFork`), the start of an answer run (`StartAnswer`), and a
+ * fork (`MakeFork`), the start of an answer run (`StartAnswer`), a
  * landing's unwritten bookkeeping, written by landing the same job again
- * (`Bookkeeping`).
+ * (`Bookkeeping`), and an effect a visibility plan asked for, settled by
+ * the port that planned it (`Visibility`, W6 609).
  */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { Verdict } from "@repo/protocol/domain/answer";
@@ -30,6 +31,7 @@ import { Lander, Rebuild } from "./lander.ts";
 import { backoff } from "./landing.ts";
 import type { OutboxRow } from "./project-store/rows.ts";
 import { Projection, ProjectedEvent } from "./projection.ts";
+import { ProjectVisibility, VisibilityEffect } from "./visibility-port.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -55,6 +57,7 @@ export const OutboxBody = Schema.Union([
   Schema.TaggedStruct("MakeFork", { from: RepoName, name: RepoName }),
   Schema.TaggedStruct("StartAnswer", { requestId: RequestId }),
   Schema.TaggedStruct("Bookkeeping", { job: LandAgain }),
+  Schema.TaggedStruct("Visibility", { effect: VisibilityEffect }),
 ]).pipe(Schema.toTaggedUnion("_tag"));
 
 export type OutboxBody = typeof OutboxBody.Type;
@@ -177,8 +180,9 @@ const bySeq = Order.mapInput(Order.Number, ({ body }: Decoded) =>
 
 /**
  * Runs the rows: projected events first, in their order and in one call,
- * then forks, bookkeeping, and last the answer runs (which may run long, and
- * settle their own rows). Nothing here fails: each row is done, or retried.
+ * then forks, bookkeeping, visibility's effects, and last the answer runs
+ * (which may run long, and settle their own rows). Nothing here fails: each
+ * row is done, or retried.
  */
 export const runOutbox = (
   rows: readonly OutboxRow[],
@@ -227,6 +231,12 @@ export const runOutbox = (
       Effect.map(landAgain(body.job), (ok) => ran(row, ok, now))
     );
 
+    const visibility = yield* ProjectVisibility;
+
+    const planned = yield* Effect.forEach(of("Visibility"), ({ body, row }) =>
+      Effect.map(visibility.settle(body.effect), (ok) => ran(row, ok, now))
+    );
+
     const runs = yield* Effect.forEach(of("StartAnswer"), ({ body, row }) =>
       Effect.as(
         AnswerRuns.use((answers) => answers.start(body.requestId, queue)),
@@ -238,6 +248,7 @@ export const runOutbox = (
       ...projected.map(({ row }) => ran(row, delivered, now)),
       ...forks,
       ...kept,
+      ...planned,
       ...runs,
     ]);
   });

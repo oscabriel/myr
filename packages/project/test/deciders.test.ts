@@ -12,7 +12,6 @@ import {
   AskId,
   CommitSha,
   DecisionId,
-  EnvKey,
   Handle,
   LandedSha,
   LaneName,
@@ -28,11 +27,9 @@ import {
   DecisionClosed,
   Denounced,
   NotDecider,
-  NotSensitive,
   NotVouched,
   TouchedJudge,
   UnknownAsk,
-  UnknownProject,
   VerifierBlocked,
 } from "@repo/protocol/refusal";
 import { RulesEvaluator } from "@repo/rules/rules-evaluator";
@@ -45,16 +42,7 @@ import {
   withKind,
   withVouches,
 } from "@repo/testkit/scenarios";
-import {
-  Array,
-  DateTime,
-  Effect,
-  Exit,
-  Layer,
-  Option,
-  Redacted,
-  Result,
-} from "effect";
+import { Array, DateTime, Effect, Exit, Layer, Option, Result } from "effect";
 
 import { ScheduledAlarm } from "../src/alarms/memory.ts";
 import { platformHandle } from "../src/attention/effects.ts";
@@ -1316,143 +1304,6 @@ describe("credits", () => {
         expect(seen.dave).toStrictEqual([]);
       }
     )
-  );
-});
-
-/** A first landing with an env schema: two items, a header that says nothing. */
-const withEnvSchema: Files = [
-  ...start,
-  [
-    ".env.schema",
-    [
-      "# The payments provider's key.",
-      "# @sensitive",
-      "PAYMENTS_KEY=",
-      "",
-      "# @required",
-      "DATABASE_URL=postgres://localhost/dev",
-      "",
-    ].join("\n"),
-  ],
-];
-
-/** A first landing whose env schema turns the two flags off, above an item and after one. */
-const withQuietSchema: Files = [
-  ...start,
-  [
-    ".env.schema",
-    [
-      "# @sensitive=false",
-      "# @required=false",
-      "LOG_LEVEL=info",
-      "",
-      "PORT=3000 # @sensitive=false",
-      "",
-    ].join("\n"),
-  ],
-];
-
-const readingQuiet = Effect.gen(function* () {
-  yield* advanceTo("2026-10-07T12:00:00Z");
-
-  const api = yield* projectService(project);
-
-  yield* made(api, repo, withQuietSchema);
-
-  return (yield* api.envShape(anyone)).items;
-});
-
-const reading = Effect.gen(function* () {
-  yield* advanceTo("2026-10-07T12:00:00Z");
-
-  const api = yield* projectService(project);
-  const empty = yield* api.envShape(anyone).pipe(Effect.flip);
-
-  yield* made(api, repo, withEnvSchema);
-
-  const value = Redacted.make("sk_live_0123456789");
-
-  return {
-    bobSets: yield* api
-      .setEnv(bob, { key: EnvKey.make("PAYMENTS_KEY"), value })
-      .pipe(Effect.flip),
-    empty,
-    env: yield* api.envShape(anyone),
-    landed: yield* mainTip,
-    ledger: yield* api.ledger(anyone),
-    sets: yield* api
-      .setEnv(alice, { key: EnvKey.make("PAYMENTS_KEY"), value })
-      .pipe(Effect.flip),
-  };
-});
-
-describe("until the visibility cartridge", () => {
-  it.effect(
-    "the ledger says Open with no layers, the env shape reads the landed .env.schema, and no value is stored",
-    () =>
-      Effect.map(
-        reading.pipe(Effect.provide(worldOf(scenario, "memory"))),
-        (seen) => {
-          expect(seen.ledger).toStrictEqual({
-            entries: [],
-            layers: [],
-            posture: "open",
-            postureLabel: "Open",
-            project,
-          });
-          expect(seen.empty).toStrictEqual(new UnknownProject({ project }));
-          expect(seen.env).toStrictEqual({
-            at: seen.landed,
-            file: RepoPath.make(".env.schema"),
-            imports: [],
-            items: [
-              {
-                key: EnvKey.make("PAYMENTS_KEY"),
-                required: true,
-                sensitive: true,
-                tags: [],
-              },
-              {
-                key: EnvKey.make("DATABASE_URL"),
-                required: true,
-                sensitive: true,
-                tags: [],
-              },
-            ],
-            project,
-          });
-          expect(seen.sets).toStrictEqual(
-            new NotSensitive({ key: EnvKey.make("PAYMENTS_KEY") })
-          );
-          expect(seen.bobSets).toStrictEqual(new NotDecider({}));
-        }
-      )
-  );
-});
-
-describe("the env shape's minimal reading", () => {
-  it.effect(
-    "turns a flag off where a decorator says false, above an item or after it",
-    () =>
-      Effect.map(
-        readingQuiet.pipe(Effect.provide(worldOf(scenario, "memory"))),
-        (items) => {
-          expect(items).toStrictEqual([
-            {
-              key: EnvKey.make("LOG_LEVEL"),
-              required: false,
-              sensitive: false,
-              tags: [],
-            },
-            {
-              key: EnvKey.make("PORT"),
-              required: true,
-              sensitive: false,
-              tags: [],
-            },
-          ]);
-        }
-      )
   );
 });
 

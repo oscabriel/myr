@@ -5,10 +5,15 @@ import type { ProjectWrites } from "../project-store.ts";
 import {
   AnswerRow,
   AskRow,
+  AttemptRow,
   BudgetDayRow,
   ClaimRow,
   DecisionRow,
+  EnvValueRow,
   LandingRow,
+  LayerReadRow,
+  LayerRow,
+  LedgerRow,
   OutboxRow,
   ProjectRow,
   ProposalRow,
@@ -62,6 +67,17 @@ export const Tables = {
     request_id: row.requestId,
   })),
   asks: tableOf("asks", AskRow, ["id"], (row) => ({ id: row.id })),
+  attempts: tableOf(
+    "attempts",
+    AttemptRow,
+    ["ask", "claimant", "area", "week"],
+    (row) => ({
+      area: row.area,
+      ask: row.ask,
+      claimant: row.claimant,
+      week: row.week,
+    })
+  ),
   budgetDays: tableOf(
     "budget_days",
     BudgetDayRow,
@@ -75,9 +91,17 @@ export const Tables = {
   decisions: tableOf("decisions", DecisionRow, ["id"], (row) => ({
     id: row.id,
   })),
+  envValues: tableOf("env_values", EnvValueRow, ["key"], (row) => ({
+    key: row.key,
+  })),
   landings: tableOf("landings", LandingRow, ["sha"], (row) => ({
     landed_at: DateTime.toEpochMillis(row.landedAt),
     sha: row.sha,
+  })),
+  layers: tableOf("layers", LayerRow, ["name"], (row) => ({ name: row.name })),
+  ledger: tableOf("ledger", LedgerRow, ["seq"], (row) => ({
+    at: DateTime.toEpochMillis(row.at),
+    seq: row.seq,
   })),
   outbox: tableOf("outbox", OutboxRow, ["id"], (row) => ({ id: row.id })),
   proposals: tableOf("proposals", ProposalRow, ["id"], (row) => ({
@@ -118,27 +142,47 @@ export const EventTable = tableOf("events", ProjectEvent, ["seq"], (event) => ({
   seq: event.seq,
 }));
 
+/** The layer read log, each body carrying the `seq` it was given. */
+export const LayerReadTable = tableOf(
+  "layer_reads",
+  LayerReadRow,
+  ["seq"],
+  (read) => ({ at: DateTime.toEpochMillis(read.at), seq: read.seq })
+);
+
 /** How an adapter writes one table's rows, each replacing any row under its key. */
 export type Upsert<E, R> = <A>(
   table: Table<A>,
   rows: readonly A[]
 ) => Effect.Effect<void, E, R>;
 
+/** The newest numbers a store gave: its last event's, and its last layer read's. */
+export interface LastNumbers {
+  readonly read: number;
+  readonly seq: number;
+}
+
 /**
  * Writes every row in `writes` through an adapter's `upsert`, table by
- * table, with the events numbered on from `lastSeq`, and returns the numbers
- * it gave them. Both adapters commit through it, so a table `ProjectWrites`
- * gains is written by both or by neither.
+ * table, with the events numbered on from `last.seq` and the layer reads
+ * from `last.read`, and returns the numbers it gave the events. Both
+ * adapters commit through it, so a table `ProjectWrites` gains is written by
+ * both or by neither.
  */
 export const writeAll = <E, R>(
   writes: ProjectWrites,
-  lastSeq: number,
+  last: LastNumbers,
   upsert: Upsert<E, R>
 ): Effect.Effect<readonly number[], E, R> =>
   Effect.gen(function* () {
     const events = Array.map(writes.events ?? [], (event, index) => ({
       ...event,
-      seq: lastSeq + index + 1,
+      seq: last.seq + index + 1,
+    }));
+
+    const reads = Array.map(writes.layerReads ?? [], (read, index) => ({
+      ...read,
+      seq: last.read + index + 1,
     }));
 
     yield* upsert(
@@ -157,6 +201,11 @@ export const writeAll = <E, R>(
     yield* upsert(Tables.pushEvents, writes.pushEvents ?? []);
     yield* upsert(EventTable, events);
     yield* upsert(Tables.outbox, writes.outbox ?? []);
+    yield* upsert(Tables.layers, writes.layers ?? []);
+    yield* upsert(Tables.attempts, writes.attempts ?? []);
+    yield* upsert(Tables.ledger, writes.ledger ?? []);
+    yield* upsert(Tables.envValues, writes.envValues ?? []);
+    yield* upsert(LayerReadTable, reads);
 
     return Array.map(events, (event) => event.seq);
   });

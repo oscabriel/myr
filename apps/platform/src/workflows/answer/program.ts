@@ -64,6 +64,7 @@ import type { AnswerParams } from "../../answer-runs.ts";
 import { writeVerdictNote } from "../notes.ts";
 import { StepRunner } from "../step.ts";
 import type { StepRetry } from "../step.ts";
+import { heldBack, unsealed } from "./held-back.ts";
 import {
   laneOnMain,
   refusalsOf,
@@ -280,10 +281,12 @@ const uncountedRefusals = (cheap: StageRun) =>
 /**
  * The checks on the exact merged tree: the cheap stage (its lanes, and the
  * ratchets' counts), then, if it passed, the ask's own check and every
- * other project lane. The first stage that refuses ends them, with its
- * refusals and its lanes. The counts go to the project with the report,
- * which judges them against its baselines (spec §5 step 7 (b)) and opens
- * the decisions a reasoned escape asks for (step 7 (e)).
+ * other project lane, then, if those passed and a held-back suite judges
+ * the answer, its held-back run (step 7 (d), `held-back.ts`). The first
+ * stage that refuses ends them, with its refusals and its lanes. The counts
+ * go to the project with the report, which judges them against its
+ * baselines (spec §5 step 7 (b)) and opens the decisions a reasoned escape
+ * asks for (step 7 (e)).
  */
 const checks = (
   params: AnswerParams,
@@ -305,6 +308,14 @@ const checks = (
 
     const last = judged ?? cheap;
 
+    const sealed =
+      judged !== undefined &&
+      StageRun.guards.Ran(judged.ran) &&
+      judged.refusals.length === 0 &&
+      judged.ran.checked.sealed === true
+        ? yield* heldBack(params, attempt)
+        : unsealed;
+
     const counts = StageRun.guards.Ran(cheap.ran)
       ? Option.fromUndefinedOr(cheap.ran.counts)
       : Option.none();
@@ -313,16 +324,16 @@ const checks = (
       Blocked: ({ attempt: at }) =>
         reported(LandingCommand.Blocked({ attempt: at })),
       Moved: () => Option.none(),
-      Ran: ({ checked, heldBack, lanes }) =>
+      Ran: ({ checked, heldBack: areas, lanes }) =>
         reported(
           LandingCommand.Checked({
             decisions: [],
             finish: checked.finish,
-            refusals: last.refusals,
+            refusals: [...last.refusals, ...sealed.refusals],
             tree: call.tree,
           }),
           {
-            heldBack,
+            heldBack: [...areas, ...sealed.results],
             lanes: [
               ...(judged !== undefined && StageRun.guards.Ran(cheap.ran)
                 ? cheap.ran.lanes
