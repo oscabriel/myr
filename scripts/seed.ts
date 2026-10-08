@@ -1,0 +1,370 @@
+/**
+ * seed: puts both fictional example projects on a platform, ready for the
+ * demo, and changes nothing when run again (issue 509).
+ *
+ *   bun scripts/seed.ts --world node
+ *   bunx varlock run --path apps/platform/ -- bun scripts/seed.ts --stage dev-<user>
+ *
+ * `--world node` serves the Node world on this machine for the run
+ * (`apps/platform/test/serve-world.ts`). `--stage <s>` seeds a deployed
+ * stage at `--url`, or at the workers.dev origin bootstrap recorded, with
+ * tokens only from the env: `SESSION_TOKENS` (token to handle, as the
+ * platform's own; `--tokens-env` names another) and `OPERATOR_TOKEN`
+ * (`--operator-env`). `--stage demo` also needs `--yes`: the user records
+ * on it (spec §1.5 H7). `--only <project>` seeds one example; `--json`
+ * prints the versioned envelope.
+ *
+ * Each project is made, and main's first commit pushed, as the operator;
+ * each ask is opened as the decider the project's config names, red first
+ * on the platform's own Checker. It prints one line per step, one per
+ * project, and a summary. The seed's core lives in `lib/seed.ts`.
+ */
+import { BunRuntime, BunServices } from "@effect/platform-bun";
+import { Envelope } from "@repo/protocol/envelope";
+import { Handle, ProjectName } from "@repo/protocol/ids";
+import {
+  Array,
+  Console,
+  Effect,
+  FileSystem,
+  Option,
+  Path,
+  Schema,
+  Stdio,
+} from "effect";
+
+import {
+  declaredStage,
+  flagValue,
+  platformOrigin,
+  repoRoot,
+  Stage,
+  stages,
+  subdomainFile,
+  WorkersDev,
+} from "../infra/stages.ts";
+import {
+  MAIN_REF,
+  planSeed,
+  ready,
+  runSeed,
+  SeedFailed,
+  seeded,
+  SeedStep,
+  stageTarget,
+  worldTarget,
+} from "./lib/seed.ts";
+import type { SeededProject, SeedPlan } from "./lib/seed.ts";
+
+/** The examples the seed knows, in the order it seeds them. */
+export const EXAMPLES = ["examples/datekit", "examples/burrow"] as const;
+
+/** Where a seed goes: the Node world on this machine, or a deployed stage. */
+export const SeedWhere = Schema.TaggedUnion({
+  Stage: {
+    stage: Stage,
+    /** The env vars that hold the stage's tokens. */
+    tokens: Schema.Struct({ operator: Schema.String, sessions: Schema.String }),
+    url: Schema.optionalKey(Schema.String),
+  },
+  World: {},
+});
+
+export type SeedWhere = typeof SeedWhere.Type;
+
+/** What `bun scripts/seed.ts` was asked to do. */
+export interface SeedOptions {
+  readonly where: SeedWhere;
+  /** The one project to seed, when not both. */
+  readonly only?: string;
+  /** Print the versioned envelope instead of lines. */
+  readonly json: boolean;
+}
+
+/** The flags the command takes; any other is a typo, refused. */
+const FLAGS = new Set([
+  "--json",
+  "--only",
+  "--operator-env",
+  "--stage",
+  "--tokens-env",
+  "--url",
+  "--world",
+  "--yes",
+]);
+
+const USAGE =
+  "bun scripts/seed.ts --world node | --stage <dev-…|demo> [--url <origin>] [--tokens-env SESSION_TOKENS] [--operator-env OPERATOR_TOKEN] [--only <project>] [--json] [--yes]";
+
+const failed = (reason: string) => new SeedFailed({ reason });
+
+/** The stage `raw` names, its tokens' env vars, and where it lives if `--url` says. */
+const stageFrom = (argv: readonly string[], raw: string) =>
+  Effect.gen(function* () {
+    const stage = yield* Effect.fromOption(declaredStage(raw)).pipe(
+      Effect.mapError(() =>
+        failed(
+          `--stage ${raw} is not a stage infra/stages.ts declares (${stages.join(", ")})`
+        )
+      )
+    );
+
+    if (stage === "demo" && !argv.includes("--yes")) {
+      return yield* failed(
+        "--stage demo is the stage the user records on (H7): seed it only between takes, with --yes"
+      );
+    }
+
+    const tokens = {
+      operator: Option.getOrElse(
+        flagValue(argv, "--operator-env"),
+        () => "OPERATOR_TOKEN"
+      ),
+      sessions: Option.getOrElse(
+        flagValue(argv, "--tokens-env"),
+        () => "SESSION_TOKENS"
+      ),
+    };
+
+    return Option.match(flagValue(argv, "--url"), {
+      onNone: () => SeedWhere.cases.Stage.make({ stage, tokens }),
+      onSome: (url) =>
+        SeedWhere.cases.Stage.make({
+          stage,
+          tokens,
+          url: url.replace(/\/+$/u, ""),
+        }),
+    });
+  });
+
+/** The command's flags, read; a seed of `demo` needs `--yes` (H7: the user records on it). */
+export const optionsOf = (
+  argv: readonly string[]
+): Effect.Effect<SeedOptions, SeedFailed> =>
+  Effect.gen(function* () {
+    const strange = argv.filter(
+      (arg) => arg.startsWith("--") && !FLAGS.has(arg.split("=")[0] ?? arg)
+    );
+
+    if (Array.isReadonlyArrayNonEmpty(strange)) {
+      return yield* failed(`unknown flag ${strange.join(", ")}: ${USAGE}`);
+    }
+
+    const world = flagValue(argv, "--world");
+    const raw = flagValue(argv, "--stage");
+
+    if (Option.isSome(world) && Option.isSome(raw)) {
+      return yield* failed(`--world and --stage: name only one. ${USAGE}`);
+    }
+
+    if (Option.isSome(world) && world.value !== "node") {
+      return yield* failed(
+        `--world ${world.value}: the seed knows only --world node`
+      );
+    }
+
+    const where = Option.isSome(world)
+      ? SeedWhere.cases.World.make({})
+      : yield* Option.match(raw, {
+          onNone: () =>
+            Effect.fail(failed(`name --world node or --stage <s>: ${USAGE}`)),
+          onSome: (named) => stageFrom(argv, named),
+        });
+
+    const json = argv.includes("--json");
+
+    return Option.match(flagValue(argv, "--only"), {
+      onNone: () => ({ json, where }),
+      onSome: (only) => ({ json, only, where }),
+    });
+  });
+
+/** What `--json` prints for one seeded project. */
+const SeededSummary = Schema.Struct({
+  asks: Schema.Array(Schema.String),
+  decider: Handle,
+  main: Schema.optionalKey(Schema.String),
+  project: ProjectName,
+  ratchets: Schema.Array(Schema.String),
+});
+
+type SeededSummary = typeof SeededSummary.Type;
+
+/** What `--json` prints: the versioned envelope over the steps and each project. */
+const SeedEnvelope = Envelope(
+  Schema.Struct({
+    projects: Schema.Array(SeededSummary),
+    steps: Schema.Array(SeedStep),
+  })
+);
+
+const printEnvelope = (envelope: typeof SeedEnvelope.Type) =>
+  Effect.flatMap(
+    Schema.encodeEffect(Schema.fromJsonString(SeedEnvelope))(envelope),
+    Console.log
+  ).pipe(Effect.orDie);
+
+/** Where a stage's platform lives: `--url`, or the workers.dev subdomain bootstrap recorded. */
+const stageOrigin = (where: (typeof SeedWhere.cases.Stage)["Type"]) =>
+  Effect.gen(function* () {
+    if (where.url !== undefined) {
+      return where.url;
+    }
+
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const root = yield* repoRoot;
+
+    const recorded = yield* fs
+      .readFileString(path.join(root, subdomainFile))
+      .pipe(
+        Effect.flatMap(Schema.decodeEffect(Schema.fromJsonString(WorkersDev))),
+        Effect.mapError(() =>
+          failed(
+            `no --url, and ${subdomainFile} doesn't record the account's workers.dev subdomain: run bun run bootstrap -- --stage ${where.stage} first`
+          )
+        )
+      );
+
+    return platformOrigin(where.stage, recorded.subdomain);
+  });
+
+/** Where the seed goes, said for a person, and the target there. */
+const targetFor = (where: SeedWhere, plans: readonly SeedPlan[]) =>
+  SeedWhere.match(where, {
+    Stage: (stage) =>
+      Effect.map(stageOrigin(stage), (origin) => ({
+        label: `${stage.stage} (${origin})`,
+        target: stageTarget(origin, stage.tokens),
+      })),
+    World: () =>
+      Effect.succeed({
+        label: "the Node world",
+        target: worldTarget(plans.map(({ decider }) => decider)),
+      }),
+  });
+
+/** One step as the command prints it: `OpenAsk datekit/format-ordinal: done`. */
+export const stepLine = ({ _tag, result, target }: SeedStep) =>
+  `${_tag} ${target}: ${result}`;
+
+/** One project as the summary prints it. */
+const projectLine = ({
+  asks,
+  decider,
+  main,
+  project,
+  ratchets,
+}: SeededSummary) =>
+  [
+    `${project}: main at ${main?.slice(0, 12) ?? "nothing"}`,
+    `${asks.length} open asks`,
+    `decided by ${decider}`,
+    ...ratchets.map((name) => `ratchet ${name}`),
+  ].join(", ");
+
+/** What a plan's project holds now, for the summary. */
+const summaryOf = (
+  plan: SeedPlan,
+  held: SeededProject | undefined
+): SeededSummary => {
+  const summary = {
+    asks: (held?.asks ?? []).map(({ ask }) => String(ask)),
+    decider: plan.decider,
+    project: plan.project,
+    ratchets: plan.ratchets,
+  };
+
+  const landed = held?.refs.find(([ref]) => ref === MAIN_REF)?.[1];
+
+  return landed === undefined ? summary : { ...summary, main: landed };
+};
+
+/**
+ * `bun scripts/seed.ts …`: plans each example, seeds it on the world or the
+ * stage, then prints one line per step, one per project and a summary (or,
+ * with `--json`, the versioned envelope). A refusal under `--json` prints
+ * the envelope with it, and the command still fails.
+ */
+export const main = (argv: readonly string[]) =>
+  Effect.gen(function* () {
+    const options = yield* optionsOf(argv);
+    const path = yield* Path.Path;
+
+    const folders = EXAMPLES.filter(
+      (folder) =>
+        options.only === undefined || path.basename(folder) === options.only
+    );
+
+    if (!Array.isReadonlyArrayNonEmpty(folders)) {
+      return yield* failed(
+        `--only ${options.only ?? ""} names no example: ${EXAMPLES.map((folder) => path.basename(folder)).join(", ")}`
+      );
+    }
+
+    const plans = yield* Effect.forEach(folders, planSeed);
+    const { label, target } = yield* targetFor(options.where, plans);
+
+    const say = (line: string) =>
+      options.json ? Effect.void : Console.log(line);
+
+    yield* say(
+      `seed: ${plans.map(({ project }) => project).join(", ")} on ${label}`
+    );
+
+    const run = Effect.gen(function* () {
+      yield* ready(plans);
+
+      const steps = yield* Effect.forEach(plans, (plan) =>
+        Effect.tap(runSeed(plan), (done) =>
+          Effect.forEach(done, (each) => say(stepLine(each)), {
+            discard: true,
+          })
+        )
+      ).pipe(Effect.map((each) => each.flat()));
+
+      const held = yield* seeded(plans);
+      const projects = plans.map((plan, at) => summaryOf(plan, held[at]));
+
+      yield* Effect.forEach(projects, (each) => say(projectLine(each)), {
+        discard: true,
+      });
+
+      const done = steps.filter(({ result }) => result === "done").length;
+
+      const count =
+        projects.length === 1 ? "1 project" : `${projects.length} projects`;
+
+      yield* say(
+        `seeded ${count} on ${label}: ${steps.length} steps, ${done} done, ${steps.length - done} already`
+      );
+
+      if (options.json) {
+        yield* printEnvelope({
+          command: "seed",
+          data: { projects, steps },
+          ok: true,
+          v: 1,
+        });
+      }
+    });
+
+    return yield* run.pipe(
+      Effect.provide(target),
+      Effect.tapError(({ refusals }) =>
+        options.json && refusals !== undefined
+          ? printEnvelope({ command: "seed", ok: false, refusals, v: 1 })
+          : Effect.void
+      )
+    );
+  });
+
+if (import.meta.main) {
+  BunRuntime.runMain(
+    Effect.gen(function* () {
+      const args = yield* (yield* Stdio.Stdio).args;
+
+      return yield* main(args);
+    }).pipe(Effect.provide(BunServices.layer))
+  );
+}

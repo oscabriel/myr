@@ -84,6 +84,16 @@
             }
           },
           {
+            "include": ["scripts/seed.ts", "scripts/lib/seed.ts"],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/http",
+                "effect/process",
+                "effect/rpc"
+              ]
+            }
+          },
+          {
             "include": ["packages/config/test/**/*.ts", "infra/**/*.ts"],
             "options": {
               "allowedUnstableApis": ["effect/http", "effect/process"]
