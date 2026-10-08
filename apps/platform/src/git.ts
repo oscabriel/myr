@@ -9,20 +9,23 @@
  * (`adapters/custody.ts`) decides what it may move. A credential the
  * platform does not know is a 401 everywhere. A name the platform never
  * makes (spec §4.5) is a 404, unless `LayerGate` says it is a layer's repo
- * (W6), which only the layer's readers read and its writers push to. The client's credential never travels past
- * this file: the gateway forwards only the headers git's protocol needs, and
- * the upstream adds the platform's own.
+ * (W6), which only the layer's readers read and its writers push to. The
+ * client's credential never travels past this file: the gateway forwards
+ * only the headers git's protocol needs, and the upstream adds the
+ * platform's own.
  */
 import { Brand } from "@repo/brand";
 import { Custody } from "@repo/git/custody";
 import { gateway, gitRoute, plain } from "@repo/git/gateway";
 import { concat, packetAt, pkt, utf8 } from "@repo/git/pkt-line";
+import { readUpload } from "@repo/git/upload-pack";
+import type { UploadRequest } from "@repo/git/upload-pack";
 import { Upstream } from "@repo/git/upstream";
 import type { Projects } from "@repo/project/projects";
 import type { LayerAccess } from "@repo/project/visibility-port";
-import { CommitSha, RepoName } from "@repo/protocol/ids";
+import { RepoName } from "@repo/protocol/ids";
 import { Anonymous, Principal } from "@repo/protocol/principal";
-import { Array, Effect, Option, Ref, Schema } from "effect";
+import { Effect, Option, Ref } from "effect";
 
 import {
   custodyFor,
@@ -32,7 +35,7 @@ import {
 } from "./adapters/custody.ts";
 import { auditOf, credentialOf } from "./credential.ts";
 import { LayerGate } from "./layer-gate.ts";
-import type { LayerTarget } from "./layer-gate.ts";
+import type { LayerReach } from "./layer-gate.ts";
 import { repoKind, RepoKind } from "./repo-names.ts";
 import { Sessions } from "./sessions.ts";
 
@@ -127,42 +130,6 @@ const REACH = {
   write: 2,
 } as const satisfies Record<LayerAccess, number>;
 
-const PKT_LENGTH = /^[0-9a-f]{4}$/u;
-
-const WANT = /^want (?<oid>[0-9a-f]{40})(?: |$)/u;
-
-const asCommit = Schema.decodeOption(CommitSha);
-
-/**
- * The text lines of a request in git's pkt-line framing, its flush and
- * delimiter packets skipped; reading stops where the framing breaks.
- */
-const pktLines = (bytes: Uint8Array): readonly string[] => {
-  const decoder = new TextDecoder();
-  const lines: string[] = [];
-  let at = 0;
-
-  while (at + 4 <= bytes.length) {
-    const hex = decoder.decode(bytes.subarray(at, at + 4));
-    const length = Number.parseInt(hex, 16);
-
-    if (!PKT_LENGTH.test(hex) || length === 3 || at + length > bytes.length) {
-      break;
-    }
-
-    // 0000 flush, 0001 delimiter, 0002 response end: no payload.
-    if (length > 3) {
-      lines.push(
-        decoder.decode(bytes.subarray(at + 4, at + length)).replace(/\n$/u, "")
-      );
-    }
-
-    at += Math.max(length, 4);
-  }
-
-  return lines;
-};
-
 /** A request body as git wrote it, inflated if git gzipped it; none if it can't be. */
 const inflated = (bytes: Uint8Array, encoding: string | null) => {
   if (encoding === null) {
@@ -181,20 +148,12 @@ const inflated = (bytes: Uint8Array, encoding: string | null) => {
     : Effect.succeedNone;
 };
 
-/** What one upload-pack request reads of a repo, for the read log. */
-interface UploadRead {
-  /** Whether it may read content: anything but protocol v2's `ls-refs`, which lists refs only. */
-  readonly reads: boolean;
-  /** The first commit it wants, if it names one. */
-  readonly want: Option.Option<CommitSha>;
-}
-
 /**
  * An upload-pack request, read whole for the read log and sent on
- * unchanged: its body is a fetch's wants and haves, never a pack. Lines it
- * can't make out (an encoding git never sends) still count as a read, with
- * no commit named, so the log errs toward a read. None when the body
- * itself can't be read.
+ * unchanged: its body is a fetch's wants and haves, never a pack. A body
+ * in an encoding git never sends still counts as a read, with no commit
+ * named, so the log errs toward a read. None when the body itself can't be
+ * read.
  */
 const uploadOf = (request: Request) =>
   Effect.gen(function* () {
@@ -208,20 +167,13 @@ const uploadOf = (request: Request) =>
 
     const bytes = new Uint8Array(read.value);
 
-    const lines = Option.match(
+    const upload = Option.match(
       yield* inflated(bytes, request.headers.get("content-encoding")),
-      { onNone: () => [], onSome: pktLines }
+      {
+        onNone: (): UploadRequest => ({ reads: true, want: Option.none() }),
+        onSome: readUpload,
+      }
     );
-
-    const upload: UploadRead = {
-      reads: lines[0] !== "command=ls-refs",
-      want: Array.findFirst(lines, (line) =>
-        Option.flatMap(
-          Option.fromNullishOr(WANT.exec(line)?.groups?.oid),
-          asCommit
-        )
-      ),
-    };
 
     return Option.some({
       request: new Request(request.url, {
@@ -249,7 +201,7 @@ const serveLayer = (
   request: Request,
   route: { readonly endpoint: string; readonly name: string },
   principal: Principal,
-  target: LayerTarget
+  { access, target }: LayerReach
 ) =>
   Effect.gen(function* () {
     const gate = yield* LayerGate;
@@ -258,8 +210,6 @@ const serveLayer = (
     if (!Principal.guards.Person(principal)) {
       return signIn("a layer is read by its readers");
     }
-
-    const access = yield* gate.access(principal, target);
 
     if (REACH[access] < REACH[pushing ? "write" : "read"]) {
       return plain(
@@ -273,32 +223,28 @@ const serveLayer = (
         ? yield* layerCustodyFor(principal, target)
         : refuseAll;
 
-    const fetching =
-      route.endpoint === "git-upload-pack" && request.method === "POST";
+    const served = (sent: Request) =>
+      gateway(sent).pipe(
+        Effect.provideService(Custody, custody),
+        Effect.provideService(Upstream, gate.upstream)
+      );
 
-    const upload = fetching ? yield* uploadOf(request) : Option.none();
+    // Only a fetch's request reads content; the rest pass straight through.
+    if (route.endpoint !== "git-upload-pack" || request.method !== "POST") {
+      return yield* served(request);
+    }
 
-    if (fetching && Option.isNone(upload)) {
+    const fetched = yield* uploadOf(request);
+
+    if (Option.isNone(fetched)) {
       return plain(400, "the request could not be read");
     }
 
-    const response = yield* gateway(
-      Option.match(upload, {
-        onNone: () => request,
-        onSome: (read) => read.request,
-      })
-    ).pipe(
-      Effect.provideService(Custody, custody),
-      Effect.provideService(Upstream, gate.upstream)
-    );
+    const { upload } = fetched.value;
+    const response = yield* served(fetched.value.request);
 
-    const read = Option.filter(
-      Option.map(upload, (each) => each.upload),
-      ({ reads }) => reads && response.status === 200
-    );
-
-    if (Option.isSome(read)) {
-      yield* layerRead(principal, target, read.value.want);
+    if (upload.reads && response.status === 200) {
+      yield* layerRead(principal, target, upload.want);
     }
 
     return response;
@@ -316,12 +262,12 @@ const serve = (
     // A name the platform makes for no repo of its own may be a layer's.
     if (RepoKind.$is("Unknown")(kind)) {
       const layer = yield* LayerGate.use((gate) =>
-        gate.classify(RepoName.make(route.name))
+        gate.classify(RepoName.make(route.name), principal)
       );
 
       return yield* Option.match(layer, {
         onNone: () => Effect.succeed(notFound(route.name)),
-        onSome: (target) => serveLayer(request, route, principal, target),
+        onSome: (reach) => serveLayer(request, route, principal, reach),
       });
     }
 

@@ -4,13 +4,13 @@
  * layers, how far a person reaches into one, and the private namespace's
  * git server behind them.
  *
- * - A name is a layer's repo when it reads `<project>--<layer>` and the
- *   project declares that layer. The project's DO answers both (spec §4.5),
- *   from the policy at its landed SHA (ADR 0005): any other such name stays
- *   an unknown repo, and claim forks and working forks never get here
- *   (their names have three parts).
- * - Access is the DO's too (`ProjectApi.layerAccess`): the layer's readers
- *   clone it, its writers push to it, and nobody else reaches it.
+ * - A name is a layer's repo when it reads `<project>--<layer>` (spec §4.5)
+ *   and the project declares that layer, from the policy at its landed SHA
+ *   (ADR 0005): any other such name stays an unknown repo, and claim forks
+ *   and working forks never get here (their names have three parts).
+ * - Access comes in the same answer (`ProjectApi.layerAccess`, one DO call
+ *   per request): the layer's readers clone it, its writers push to it, and
+ *   nobody else reaches it.
  * - The upstream is git's `UpstreamRepoHost` over the private namespace's
  *   repos (`LayerRepos`): its tokens are minted, cached once per isolate
  *   (S7 #2) and sent only to the store, so none leaves the platform.
@@ -21,8 +21,6 @@ import { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import { Projects } from "@repo/project/projects";
 import { LayerName, ProjectName } from "@repo/protocol/ids";
-import { Anonymous } from "@repo/protocol/principal";
-import type { Principal } from "@repo/protocol/principal";
 import { LayerRepos } from "@repo/visibility/layer-repos";
 import { Effect, Layer, Option, Schema } from "effect";
 
@@ -64,27 +62,17 @@ export const LayerGateLive: Layer.Layer<
     const projects = yield* Projects;
     const upstream = yield* Upstream;
 
-    /** How far `who` reaches into the layer; none when its project declares no such layer, or does not exist. */
-    const reach = (who: Principal, target: LayerTarget) =>
-      projects.get(target.project).pipe(
-        Effect.flatMap((api) => api.layerAccess(who, target.layer)),
-        Effect.catchTag("UnknownProject", () => Effect.succeedNone)
-      );
-
     return LayerGate.of({
-      access: (who, target) =>
-        Effect.map(
-          reach(who, target),
-          Option.getOrElse(() => "none" as const)
-        ),
-      // Someone not signed in reaches into no layer, so the answer says
-      // only whether the project declares it.
-      classify: (repo) =>
+      // The DO answers none for a layer its project does not declare, and
+      // `none` access to someone not signed in.
+      classify: (repo, who) =>
         Option.match(spelled(repo), {
           onNone: () => Effect.succeedNone,
           onSome: (target) =>
-            Effect.map(reach(Anonymous.make({}), target), (declared) =>
-              Option.as(declared, target)
+            projects.get(target.project).pipe(
+              Effect.flatMap((api) => api.layerAccess(who, target.layer)),
+              Effect.map(Option.map((access) => ({ access, target }))),
+              Effect.catchTag("UnknownProject", () => Effect.succeedNone)
             ),
         }),
       upstream,

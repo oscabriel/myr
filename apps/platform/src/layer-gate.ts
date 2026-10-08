@@ -6,17 +6,17 @@
  * is an unknown repo (404), and nothing routes to the private namespace.
  *
  * The visibility cartridge (`./visibility/layers.ts`, 606) provides the live
- * gate: a name `<project>--<layer>` the project declares, access from the
- * layer's readers and writers through the project's DO, and the private
- * namespace's upstream. The gateway (`git.ts`) and custody
- * (`adapters/custody.ts`) depend on this port only.
+ * gate: a name `<project>--<layer>` the project declares, with the caller's
+ * access from the layer's readers and writers, both in one ask of the
+ * project's DO, and the private namespace's upstream. The gateway (`git.ts`)
+ * and custody (`adapters/custody.ts`) depend on this port only.
  */
 import { RepoNotFound } from "@repo/artifacts/repo-host";
 import type { RepoName } from "@repo/artifacts/repo-host";
 import { Upstream } from "@repo/git/upstream";
 import type { LayerAccess } from "@repo/project/visibility-port";
 import type { LayerName, ProjectName } from "@repo/protocol/ids";
-import type { Person } from "@repo/protocol/principal";
+import type { Principal } from "@repo/protocol/principal";
 import type { Option } from "effect";
 import { Context, Effect, Layer } from "effect";
 
@@ -26,24 +26,30 @@ export interface LayerTarget {
   readonly project: ProjectName;
 }
 
+/** A layer repo a request names, and how far its caller reaches into the layer. */
+export interface LayerReach {
+  /** A clone needs `read`, a push `write`; someone not signed in reaches `none`. */
+  readonly access: LayerAccess;
+  readonly target: LayerTarget;
+}
+
 /** The gateway's view of layer repos. */
 export interface LayerGatePort {
-  /** The layer a repo name is, when its project declares one by that name; none for every other name. */
+  /**
+   * The layer a repo name is, when its project declares one by that name,
+   * with how far `who` reaches into it: one question to the project per
+   * request. None for every other name.
+   */
   readonly classify: (
-    repo: RepoName
-  ) => Effect.Effect<Option.Option<LayerTarget>>;
-  /** How far a signed-in person may reach into a layer: a clone needs `read`, a push `write`. */
-  readonly access: (
-    who: Person,
-    target: LayerTarget
-  ) => Effect.Effect<LayerAccess>;
+    repo: RepoName,
+    who: Principal
+  ) => Effect.Effect<Option.Option<LayerReach>>;
   /** The git server behind the layer repos: the private namespace, with the platform's own credentials. */
   readonly upstream: Upstream["Service"];
 }
 
 /** A platform without layers: no repo name is one, and no layer repo exists. */
 export const noLayers: LayerGatePort = {
-  access: () => Effect.succeed("none"),
   classify: () => Effect.succeedNone,
   upstream: Upstream.of({
     exchange: (repo) => Effect.fail(new RepoNotFound({ name: repo })),

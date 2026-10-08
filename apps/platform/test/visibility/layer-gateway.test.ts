@@ -77,6 +77,8 @@ const keeps = (who: Principal) =>
 
 /** What the stand-in for 612's port heard from the DO. */
 interface Heard {
+  /** Each time the DO was asked how far someone reaches into a layer. */
+  readonly asks: LayerName[];
   readonly reads: {
     readonly handle: Handle;
     readonly layer: LayerName;
@@ -96,10 +98,13 @@ interface Heard {
  */
 const visibilityHeard = (heard: Heard): VisibilityPort => ({
   ...noVisibility,
-  access: (who, layer) =>
-    layer === maintainers
+  access: (who, layer) => {
+    heard.asks.push(layer);
+
+    return layer === maintainers
       ? Option.some(keeps(who) ? "write" : "none")
-      : Option.none(),
+      : Option.none();
+  },
   layerPaths: () => Effect.succeed(new Set([RepoPath.make(sealed)])),
   onLayerPush: ({ head, layer, pusher }) =>
     Effect.sync(() => {
@@ -203,7 +208,7 @@ const escaping = {
  */
 const layerWorld = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
-  const heard: Heard = { pushes: [], reads: [] };
+  const heard: Heard = { asks: [], pushes: [], reads: [] };
   const minted: string[] = [];
   const outputs: Ran[] = [];
   const stores: RepoHost["Service"][] = [];
@@ -321,15 +326,25 @@ describe("a project's layer repos, through the gateway", () => {
           tokens.bram
         );
 
+        // A keeper's request asks the project once: whether the layer is
+        // declared and how far she reaches, in one answer.
+        const asksBefore = heard.asks.length;
+        const keeper = yield* ask(layerRepo, tokens["ines-v"]);
+
         expect({
           anonymous: {
             challenge: anonymous.headers.get("www-authenticate"),
             status: anonymous.status,
           },
+          keeper: {
+            asks: heard.asks.length - asksBefore,
+            status: keeper.status,
+          },
           undeclared: undeclared.status,
           undeclaredSignedIn: undeclaredSignedIn.status,
         }).toStrictEqual({
           anonymous: { challenge: `Basic realm="${Brand.name}"`, status: 401 },
+          keeper: { asks: 1, status: 200 },
           undeclared: 404,
           undeclaredSignedIn: 404,
         });
@@ -337,12 +352,16 @@ describe("a project's layer repos, through the gateway", () => {
         // ines-v clones the layer and gets its files; her read is logged
         // once, with the commit she read. bram is told why he can't; with
         // no credential at all, git is asked for one.
-        const clone = yield* ines.git.clone(layerUrl);
+        const outside = yield* fs.makeTempDirectoryScoped();
+        const clone = `${outside}/ines-v`;
+
+        const inesClone = yield* kept(
+          ines.git.run(outside, "clone", "--quiet", layerUrl, "ines-v")
+        );
+
         const cloned = yield* ines.git.ok(clone, "rev-parse", "HEAD");
         const file = yield* fs.readFileString(`${clone}/${sealed}`);
         const readsAfterClone = [...heard.reads];
-
-        const outside = yield* fs.makeTempDirectoryScoped();
 
         const bramClone = yield* kept(
           bram.git.run(outside, "clone", "--quiet", layerUrl, "layer")
@@ -359,6 +378,7 @@ describe("a project's layer repos, through the gateway", () => {
           },
           cloned,
           file,
+          ines: inesClone.exitCode,
           nobody: nobody.exitCode,
           reads: readsAfterClone,
           readsAfterRefusals: heard.reads,
@@ -369,6 +389,7 @@ describe("a project's layer repos, through the gateway", () => {
           },
           cloned: layered,
           file: "it('keeps the offset', () => {});\n",
+          ines: 0,
           nobody: 128,
           reads: [
             {
