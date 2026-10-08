@@ -311,6 +311,82 @@ const inHook = (root: string) =>
     () => Effect.sync(() => vi.unstubAllEnvs())
   );
 
+/** The ratchet the projects below declare, and the rule it counts. */
+const ratchet = "no-explicit-any";
+
+/**
+ * A lint that prints oxlint's JSON: one `no-explicit-any` finding per
+ * explicit `any` under `packages/`, so its count follows the tree it runs on.
+ */
+const countingLint = [
+  "grep -rnow any packages | awk -F: '",
+  '  BEGIN { printf "{\\"diagnostics\\":[" }',
+  '  { printf "%s{\\"code\\":\\"typescript(no-explicit-any)\\",\\"filename\\":\\"%s\\"}", (NR > 1 ? "," : ""), $1 }',
+  '  END { print "]}" }',
+  "'",
+  "exit 1",
+  "",
+].join("\n");
+
+/**
+ * Main as a project that declares the ratchet, counted by `command`, writes
+ * it: the config folder in TypeScript (the fixture's `fix-a`, as a file of
+ * its own), the lint, and two explicit `any`s in a. HEAD is left on main.
+ */
+const declaringRatchet = (repo: CheckRepo, command: string) =>
+  Effect.gen(function* () {
+    const sdk = `${Brand.cliPackage}/rules`;
+
+    yield* gitOk(repo.root, "checkout", "--quiet", "main");
+    yield* gitOk(repo.root, "rm", "--quiet", policyFile);
+
+    return yield* commit(
+      repo.root,
+      {
+        [`${Brand.configDir}/asks/${ask}.ask.ts`]: [
+          `import { kinds, territory } from "${sdk}";`,
+          "",
+          "export default kinds.fix.ask({",
+          `  path: "${checkFile}",`,
+          '  territory: territory.package("a"),',
+          '  want: "a is two",',
+          "});",
+          "",
+        ].join("\n"),
+        [`${Brand.configDir}/project.ts`]: [
+          `import { check, kinds, project } from "${sdk}";`,
+          "",
+          "export default project({",
+          "  kinds: [kinds.fix],",
+          "  ratchets: {",
+          `    "${ratchet}": check.ratchet.count("${command}", { rule: "typescript/no-explicit-any" }),`,
+          "  },",
+          '  run: { checks: {}, test: "true {path}" },',
+          "});",
+          "",
+        ].join("\n"),
+        "lint.sh": countingLint,
+        "packages/a/src/a.ts": "export const a = (x: any, y: any) => 1;\n",
+      },
+      "Count explicit anys"
+    );
+  });
+
+/** An answer on a branch of its own from main that types a third value in a as `any`. */
+const raisingInA = (repo: CheckRepo) =>
+  Effect.gen(function* () {
+    yield* gitOk(repo.root, "checkout", "--quiet", "-b", "raising", "main");
+
+    return yield* commit(
+      repo.root,
+      {
+        "packages/a/src/a.ts":
+          "export const a = (x: any, y: any, z: any) => 2;\n",
+      },
+      "Make a two, loosely"
+    );
+  });
+
 describe(`${Brand.cli} check`, () => {
   it.live(
     "prints the refusals the gateway would give the same head, in one envelope, and exits 1",
@@ -627,6 +703,161 @@ describe(`${Brand.cli} check`, () => {
           v: 1,
         });
         expect(printed.err.join("\n")).toContain(`Checking the ask ${ask}`);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "refuses an answer that raises a ratchet's count from 2 to 3 in the ask's territory, as Weakened, before the push",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* aCheckRepo;
+
+        yield* declaringRatchet(repo, "sh lint.sh");
+        yield* raisingInA(repo);
+
+        const printed = yield* run([
+          "check",
+          "--dir",
+          repo.root,
+          "--ask",
+          ask,
+          "--offline",
+          "--json",
+        ]).pipe(Effect.provide(services(unreachable)));
+
+        // What the platform said live of the same raise (spec §8.5): the
+        // ratchet, the module, and main's count before the answer's after.
+        expect(Exit.isFailure(printed.exit)).toBeTruthy();
+        expect(yield* decodedOf(printed.out)).toStrictEqual({
+          command: "check",
+          ok: false,
+          refusals: [
+            new Weakened({
+              weakening: { after: 3, before: 2, ratchet, territory: "a" },
+            }),
+          ],
+          v: 1,
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "lets a raise a reasoned escape explains wait on a decider, as the platform does, and says so",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* aCheckRepo;
+
+        yield* declaringRatchet(repo, "sh lint.sh");
+        yield* gitOk(repo.root, "checkout", "--quiet", "-b", "escaping");
+
+        yield* commit(
+          repo.root,
+          {
+            "packages/a/src/a.ts": [
+              "// @ts-expect-error -- the codec boundary erases types",
+              "export const a = (x: any, y: any, z: any) => 2;",
+              "",
+            ].join("\n"),
+          },
+          "Make a two, past a codec"
+        );
+
+        const printed = yield* run([
+          "check",
+          "--dir",
+          repo.root,
+          "--ask",
+          ask,
+          "--offline",
+          "--json",
+        ]).pipe(Effect.provide(services(unreachable)));
+
+        expect(Exit.isSuccess(printed.exit)).toBeTruthy();
+        expect(yield* envelopeOf(printed.out)).toMatchObject({
+          data: {
+            ratchets: [
+              { after: 3, before: 2, ratchet, territory: "a" },
+              { after: 0, before: 0, ratchet, territory: "b" },
+            ],
+          },
+          ok: true,
+        });
+        expect(printed.err.join("\n")).toContain(
+          `The ratchet ${ratchet} in a: 2 on the base, 3 here: a reasoned escape you add there asks a decider to raise it`
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "passes an answer that keeps every ratchet's count, and reports the counts",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* aCheckRepo;
+        const main = yield* declaringRatchet(repo, "sh lint.sh");
+
+        yield* gitOk(repo.root, "checkout", "--quiet", "-b", "keeping");
+
+        const head = yield* commit(
+          repo.root,
+          {
+            "packages/a/src/a.ts": "export const a = (x: any, y: any) => 2;\n",
+          },
+          "Make a two"
+        );
+
+        const printed = yield* run([
+          "check",
+          "--dir",
+          repo.root,
+          "--ask",
+          ask,
+          "--offline",
+          "--json",
+        ]).pipe(Effect.provide(services(unreachable)));
+
+        expect(Exit.isSuccess(printed.exit)).toBeTruthy();
+        expect(yield* envelopeOf(printed.out)).toMatchObject({
+          data: {
+            base: main,
+            head,
+            ratchets: [
+              { after: 2, before: 2, ratchet, territory: "a" },
+              { after: 0, before: 0, ratchet, territory: "b" },
+            ],
+            stage: "checks",
+          },
+          ok: true,
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "says plainly that a ratchet it cannot count here is left to the platform, and does not fail on it",
+    () =>
+      Effect.gen(function* () {
+        const repo = yield* aCheckRepo;
+
+        yield* declaringRatchet(repo, "not-installed-here --format json");
+        yield* raisingInA(repo);
+
+        const printed = yield* run([
+          "check",
+          "--dir",
+          repo.root,
+          "--ask",
+          ask,
+          "--offline",
+          "--json",
+        ]).pipe(Effect.provide(services(unreachable)));
+
+        expect(Exit.isSuccess(printed.exit)).toBeTruthy();
+        expect(yield* envelopeOf(printed.out)).toMatchObject({
+          data: { stage: "checks" },
+          ok: true,
+        });
+        expect(printed.err.join("\n")).toContain(
+          `Could not count the ratchet ${ratchet} here`
+        );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 });
