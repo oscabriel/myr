@@ -8,4 +8,4 @@ For datekit's maintainers and their agents, before a finish commit. An answer th
 4. **UTC unless a zone is named.** Code never reads the machine's zone: no `getHours()`, `getDate()` or `toLocaleString()` without `timeZone`. Run the tests under `TZ=Pacific/Kiritimati bun test` before finishing.
 5. **The smallest diff that reads well.** Keep the ask's territory. Rename only what the change makes wrong. Keep the existing helpers (`pad`, `whole`, `utcMidnight`) rather than adding near copies.
 6. **Held-back checks stay here.** Never copy a file from `checks/held-back/` into `test/`, and don't paraphrase one in a public test. If a public test needs a check, release it as a credited landing, then write the public test from the release.
-7. **Credit the answer's author.** A finish commit adds `Finished-by:` and keeps the answer's `Signed-off-by:` as it was.
+7. **Credit stays with the answer's author.** Commit on top of the answer; never rewrite its commits or write credit trailers by hand. The finish lands with you as `Finished-by:`, beside the answer's own `Signed-off-by:`.

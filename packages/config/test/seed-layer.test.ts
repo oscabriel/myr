@@ -202,6 +202,19 @@ const datekit = Effect.gen(function* () {
   return { layer, manifest, plan, policy };
 });
 
+/** The lanes datekit's `project.ts` runs on every answer: the public checks, by name. */
+const publicLanes = Effect.gen(function* () {
+  const { run: block } = yield* Schema.decodeUnknownEffect(
+    Schema.Struct({
+      run: Schema.Struct({
+        checks: Schema.Record(Schema.String, Schema.String),
+      }),
+    })
+  )(yield* defaultExportOf(yield* exampleFile(`${config}/project.ts`)));
+
+  return Object.entries(block.checks);
+});
+
 /** A heading's anchor, as a README link names it: `## Format patterns` is `format-patterns`. */
 const anchorOf = (heading: string) =>
   heading
@@ -409,10 +422,11 @@ describe("datekit's held-back checks, run", () => {
   );
 
   it.live(
-    "fail in their area on each known-bad tree, which the public tests pass",
+    "fail in their area on each known-bad tree, which every public lane passes",
     () =>
       Effect.gen(function* () {
         const { layer } = yield* datekit;
+        const lanes = yield* publicLanes;
 
         const runs = yield* Effect.forEach(
           layer.knownBad,
@@ -427,23 +441,27 @@ describe("datekit's held-back checks, run", () => {
                 `./checks/held-back/${area}`,
               ]);
 
-              const unit = yield* run(bad, "bun", [
-                "test",
-                "--path-ignore-patterns=test/asks/**",
-              ]);
+              // Each lane as the Checker runs it: its command under `sh -c`.
+              const failedLanes = yield* Effect.filter(lanes, ([, command]) =>
+                Effect.map(
+                  run(bad, "sh", ["-c", command]),
+                  ({ code }) => code !== 0
+                )
+              );
 
               return {
                 area,
+                failedLanes: failedLanes.map(([lane]) => lane),
                 heldBackFailed:
                   held.code !== 0 && /\(fail\)/u.test(held.output),
-                publicPassed: unit.code === 0,
               };
             })
         );
 
+        expect(lanes.map(([lane]) => lane)).toStrictEqual(["unit"]);
         expect(runs).toStrictEqual([
-          { area: "export", heldBackFailed: true, publicPassed: true },
-          { area: "parser", heldBackFailed: true, publicPassed: true },
+          { area: "export", failedLanes: [], heldBackFailed: true },
+          { area: "parser", failedLanes: [], heldBackFailed: true },
         ]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     60_000

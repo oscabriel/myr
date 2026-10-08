@@ -246,17 +246,25 @@ const authorEnv = (handle: Handle) => ({
 const streamText = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** git with `args` in `cwd` under `env`: how it ended, and what it printed. */
+/**
+ * git with `args` in `cwd` under `env`, after the `-c` settings in
+ * `settings`: how it ended, and what it printed.
+ */
 const runGit = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   cwd: string,
   args: readonly string[],
-  env: Readonly<Record<string, string>>
+  env: Readonly<Record<string, string>>,
+  settings: readonly string[] = []
 ) =>
   Effect.scoped(
     Effect.gen(function* () {
       const child = yield* spawner.spawn(
-        ChildProcess.make("git", args, { cwd, env, extendEnv: true })
+        ChildProcess.make("git", [...settings, ...args], {
+          cwd,
+          env,
+          extendEnv: true,
+        })
       );
 
       const [stdout, stderr, code] = yield* Effect.all(
@@ -813,11 +821,11 @@ const seedLayer = (
       )
     );
 
-    const pushed = (result: StepResult) =>
+    const reported = (result: StepResult) =>
       SeedStep.cases.Layer.make({ result, target: layer.repo });
 
     if (refs.has(MAIN_REF)) {
-      return pushed("already");
+      return reported("already");
     }
 
     yield* Effect.forEach(
@@ -853,7 +861,7 @@ const seedLayer = (
       repo: layer.repo,
     });
 
-    return pushed("done");
+    return reported("done");
   });
 
 /**
@@ -1035,56 +1043,27 @@ export const platformTarget = (
           : Effect.void;
       };
 
-      /** git as `as`, in `cwd`: how it ended, and what it printed. */
+      /**
+       * git as `as`, in `cwd`, with their token for its credential helper
+       * and no other helper: how it ended, and what it printed.
+       */
       const gitAs = (as: Handle, cwd: string, args: readonly string[]) =>
-        Effect.gen(function* () {
-          const token = yield* Effect.fromOption(tokenOf(as)).pipe(
+        Effect.flatMap(
+          Effect.fromOption(tokenOf(as)).pipe(
             Effect.mapError(() => missing([as]))
-          );
-
-          return yield* Effect.scoped(
-            Effect.gen(function* () {
-              const child = yield* spawner.spawn(
-                ChildProcess.make(
-                  "git",
-                  [
-                    "-c",
-                    "credential.helper=",
-                    "-c",
-                    `credential.helper=${helperFor(as)}`,
-                    ...args,
-                  ],
-                  { cwd, env: gitEnv(as, token), extendEnv: true }
-                )
-              );
-
-              const [stdout, stderr, code] = yield* Effect.all(
-                [
-                  streamText(child.stdout),
-                  streamText(child.stderr),
-                  child.exitCode,
-                ],
-                { concurrency: "unbounded" }
-              );
-
-              return { code: Number(code), stderr, stdout };
-            })
-          ).pipe(
-            Effect.mapError((error) =>
-              failed(`git ${args[0] ?? ""} didn't run: ${error.message}`)
-            )
-          );
-        });
+          ),
+          (token) =>
+            runGit(spawner, cwd, args, gitEnv(as, token), [
+              "-c",
+              "credential.helper=",
+              "-c",
+              `credential.helper=${helperFor(as)}`,
+            ])
+        );
 
       /** git as `as` that must succeed; its output. */
       const gitOk = (as: Handle, cwd: string, args: readonly string[]) =>
-        Effect.flatMap(gitAs(as, cwd, args), ({ code, stderr, stdout }) =>
-          code === 0
-            ? Effect.succeed(stdout)
-            : Effect.fail(
-                failed(`git ${args.join(" ")} exited ${code}: ${stderr.trim()}`)
-              )
-        );
+        Effect.flatMap(gitAs(as, cwd, args), okOutput(args));
 
       // An empty folder of the seed's own, removed with the scope: git run
       // there reads no repo's config, as `gitEnv` keeps the machine's out.
@@ -1147,7 +1126,14 @@ export const platformTarget = (
           })
         );
 
-      const pushCommit: SeedTarget["Service"]["pushCommit"] = (input) =>
+      /** A commit of `files` with no parent, made as `as` and pushed to `ref` of `repo`. */
+      const pushCommit = (input: {
+        readonly repo: ProjectName | RepoName;
+        readonly ref: string;
+        readonly files: Array.NonEmptyReadonlyArray<SeedFile>;
+        readonly as: Handle;
+        readonly message: string;
+      }) =>
         Effect.scoped(
           Effect.gen(function* () {
             const dir = yield* scratch;
@@ -1178,55 +1164,20 @@ export const platformTarget = (
           })
         );
 
+      // git ends a message with one newline whether given one or not, so
+      // main's first commit is the one this made before layers had a step.
       const pushInitial = (
         project: ProjectName,
         files: SeedPlan["initFiles"],
         as: Handle
       ) =>
-        Effect.scoped(
-          Effect.gen(function* () {
-            const dir = yield* scratch;
-
-            yield* Effect.forEach(
-              files,
-              ({ content, path: file }) =>
-                Effect.gen(function* () {
-                  const at = path.join(dir, file);
-
-                  yield* fs.makeDirectory(path.dirname(at), {
-                    recursive: true,
-                  });
-
-                  yield* fs.writeFile(at, content);
-                }).pipe(
-                  Effect.mapError(() => failed(`can't write ${file} to seed`))
-                ),
-              { discard: true }
-            );
-
-            yield* gitOk(as, dir, ["init", "--quiet", "--initial-branch=main"]);
-            yield* gitOk(as, dir, ["add", "--all"]);
-
-            yield* gitOk(as, dir, [
-              "commit",
-              "--quiet",
-              "--message",
-              `Start ${project}`,
-            ]);
-
-            yield* gitOk(as, dir, [
-              "push",
-              "--quiet",
-              remoteOf(project),
-              `HEAD:${MAIN_REF}`,
-            ]);
-
-            return yield* decoded(
-              CommitSha,
-              "the commit git made"
-            )((yield* gitOk(as, dir, ["rev-parse", "HEAD"])).trim());
-          })
-        );
+        pushCommit({
+          as,
+          files,
+          message: `Start ${project}`,
+          ref: MAIN_REF,
+          repo: project,
+        });
 
       return SeedTarget.of({
         clientFor: (handle) =>
