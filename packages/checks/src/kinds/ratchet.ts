@@ -1,18 +1,25 @@
 /**
- * The `ratchet` check kind's measure: run a ratchet's declared command once
- * and read its number per territory, exactly as the project's own tool
- * reports it. A lint count splits by path, so it yields one count per
- * territory (per-territory baselines, so the children of a split land on
- * their own; FE §8.4 B3); a metric is one number, so it yields one. The
- * command runs through the runner it is given, never here.
+ * The `ratchet` check kind: the lanes that count a project's ratchets, the
+ * measure that reads a ratchet's declared command's output as its number
+ * per territory, exactly as the project's own tool reports it, and the
+ * judgement of an answer's counts against the counts it is held to. A lint
+ * count splits by path, so it yields one count per territory (per-territory
+ * baselines, so the children of a split land on their own; FE §8.4 B3); a
+ * metric is one number, so it yields one. The command runs through the
+ * runner it is given, never here. The platform's cheap stage and the Project
+ * DO, and `<cli> check` before a push, all count and judge through here.
  */
 import { RatchetMeasure } from "@repo/protocol/domain/check";
 import type { RatchetSpec } from "@repo/protocol/domain/check";
 import { Glob } from "@repo/protocol/domain/common";
+import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Territory } from "@repo/protocol/domain/territory";
-import type { RatchetName } from "@repo/protocol/ids";
-import { Effect } from "effect";
+import { LaneName } from "@repo/protocol/ids";
+import type { AskId, RatchetName } from "@repo/protocol/ids";
+import { Weakened } from "@repo/protocol/refusal";
+import { Array, Effect, Option } from "effect";
 
+import type { CheckLane } from "../check-runner.ts";
 import { countLint, countWithin } from "./lint-count.ts";
 import type { CountUnreadable } from "./lint-count.ts";
 import { readMetric } from "./metric.ts";
@@ -115,3 +122,95 @@ export const measure = <E, R>(
         ])
       ),
   });
+
+/**
+ * The lanes that count `ratchets`: one per command, named for the first
+ * ratchet that runs it, each handing back what it printed for `measure` to
+ * read (a lint's exit code says nothing of its count).
+ */
+export const countLanes = (
+  ratchets: readonly RatchetSpec[]
+): readonly CheckLane[] =>
+  Array.dedupeWith(
+    ratchets,
+    (one, other) => one.measure.command === other.measure.command
+  ).map(({ measure: { command }, name }) => ({
+    command,
+    lane: LaneName.make(name),
+    output: "stdout",
+  }));
+
+/** A ratchet in a territory: the key a baseline, a count and a raise are kept by. */
+export interface RatchetKey {
+  readonly ratchet: RatchetName;
+  readonly territory: string;
+}
+
+/** Whether two rows name one ratchet in one territory. */
+export const sameRatchet =
+  (one: RatchetKey) =>
+  (other: RatchetKey): boolean =>
+    one.ratchet === other.ratchet && one.territory === other.territory;
+
+/** The decision a raise waits on. */
+export type RaiseRatchet = Extract<DecisionSubject, { _tag: "RaiseRatchet" }>;
+
+/** What judging an answer's counts gives: its refusals, and the raises it waits on. */
+export interface RatchetJudgement {
+  readonly refusals: readonly Weakened[];
+  readonly decisions: readonly RaiseRatchet[];
+}
+
+/**
+ * Judges an answer's counts against the counts it is held to (the Project
+ * DO's baselines; on a person's machine, the counts on the answer's base). A
+ * count at or under its baseline passes; one over it is refused with
+ * `Weakened{ratchet}`, unless the answer asks to raise that ratchet in that
+ * territory: then it is not refused, and waits on a `RaiseRatchet` decision
+ * instead. A ratchet with no baseline yet is not judged (its first landing
+ * sets it).
+ */
+export const judgeRatchets = (input: {
+  readonly baselines: readonly RatchetCount[];
+  readonly measured: readonly RatchetCount[];
+  readonly ask: AskId;
+  readonly raises: readonly RatchetKey[];
+}): RatchetJudgement => {
+  const raised = input.measured.flatMap((measured) =>
+    Option.match(Array.findFirst(input.baselines, sameRatchet(measured)), {
+      onNone: () => [],
+      onSome: (held) =>
+        measured.count > held.count
+          ? [
+              {
+                after: measured.count,
+                asked: input.raises.some(sameRatchet(measured)),
+                before: held.count,
+                ratchet: measured.ratchet,
+                territory: measured.territory,
+              },
+            ]
+          : [],
+    })
+  );
+
+  return {
+    decisions: raised
+      .filter(({ asked }) => asked)
+      .map(({ after, before, ratchet, territory }) =>
+        DecisionSubject.cases.RaiseRatchet.make({
+          after,
+          ask: input.ask,
+          before,
+          ratchet,
+          territory,
+        })
+      ),
+    refusals: raised
+      .filter(({ asked }) => !asked)
+      .map(
+        ({ after, before, ratchet, territory }) =>
+          new Weakened({ weakening: { after, before, ratchet, territory } })
+      ),
+  };
+};

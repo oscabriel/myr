@@ -25,6 +25,13 @@ import type { MarkerHit } from "./markers.ts";
 /** A `Waiver` decision's subject. */
 export type Waiver = Extract<DecisionSubject, { readonly _tag: "Waiver" }>;
 
+/** An answer asking a decider to raise one ratchet in one territory, and why. */
+export interface RaiseRequest {
+  readonly ratchet: RatchetName;
+  readonly territory: string;
+  readonly reason: string;
+}
+
 /**
  * The escape ratchet of `territory`: `escapes-` and the territory's name in
  * lowercase words joined by `-` (`@datekit/parse` is `escapes-datekit-parse`);
@@ -106,3 +113,22 @@ export const escapeDecisions = (facts: PushFacts): readonly Waiver[] =>
         );
     },
   });
+
+/**
+ * The raises a push's `waivers` ask a decider for: a reasoned escape in a
+ * territory explains a raise of every declared ratchet there, for its
+ * reason. The Project DO judges an answer's counts with them, and
+ * `<cli> check` does the same before the push.
+ */
+export const explainedRaises = (
+  policy: Policy,
+  ask: Ask,
+  waivers: readonly Waiver[]
+): readonly RaiseRequest[] =>
+  waivers.flatMap((waiver) =>
+    policy.ratchets.map(({ name: ratchet }) => ({
+      ratchet,
+      reason: waiver.reason,
+      territory: territoryOf(policy, ask, waiver.at.path),
+    }))
+  );

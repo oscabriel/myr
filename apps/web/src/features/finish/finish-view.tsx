@@ -53,7 +53,7 @@ const finishLines = (
 
   return {
     fetch: [`git fetch ${remote} ${head}`, "git switch --detach FETCH_HEAD"],
-    finish: `${Brand.cli} finish --project ${decision.project} --ask ${ask} --base ${base} --head $(git rev-parse HEAD) --requestId finish-$(git rev-parse HEAD) --yes`,
+    finish: `${Brand.cli} finish ${ask} --project ${decision.project} --base ${base} --head $(git rev-parse HEAD) --requestId finish-$(git rev-parse HEAD) --yes`,
     push: `git push ${remote} HEAD:main`,
   };
 };

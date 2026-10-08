@@ -1,48 +1,46 @@
 /**
  * `check`'s ratchets: the project's ratchets counted on this machine, on the
  * tree an answer started from and on the answer's own, by the count lanes
- * the platform's cheap stage runs (one per command, from the run block, each
+ * the platform's cheap stage runs (`countLanes`, from the run block, each
  * handing back its stdout) and read by the platform's own counting code
- * (`measure` in `@repo/checks/kinds/ratchet`); then judged as the Project DO
- * judges an answer's counts, with the base's counts standing in for the
- * baselines, which no contract serves (a landing leaves each baseline at
+ * (`measure`); then judged by the Project DO's own `judgeRatchets` (all three
+ * in `@repo/checks/kinds/ratchet`), with the base's counts standing in for
+ * the baselines, which no contract serves (a landing leaves each baseline at
  * what main then counts). A count over its base's is `Weakened{ratchet}`,
  * unless a reasoned escape the answer adds in that territory asks a decider
- * to raise it: then the answer will wait on that decision instead.
+ * to raise it (`explainedRaises` in `@repo/gate/escapes`): then the answer
+ * will wait on that decision instead.
  *
  * A ratchet this machine cannot count (its command prints nothing the
  * counter reads, or the tree could not be checked out and set up) is named
  * with why, and left to the platform: it never fails `check`.
  */
+import { CheckAt, CheckRunner, outputOf } from "@repo/checks/check-runner";
+import type { CheckLane, CheckRun } from "@repo/checks/check-runner";
 import {
-  CheckAt,
-  CheckLane,
-  CheckRunner,
-  outputOf,
-} from "@repo/checks/check-runner";
-import type { CheckRun } from "@repo/checks/check-runner";
-import { measure } from "@repo/checks/kinds/ratchet";
-import type { RatchetCount } from "@repo/checks/kinds/ratchet";
-import { escapeDecisions, territoryOf } from "@repo/gate/escapes";
+  countLanes,
+  judgeRatchets,
+  measure,
+  sameRatchet,
+} from "@repo/checks/kinds/ratchet";
+import type {
+  RatchetCount,
+  RatchetJudgement,
+} from "@repo/checks/kinds/ratchet";
+import { escapeDecisions, explainedRaises } from "@repo/gate/escapes";
 import type { PushFacts } from "@repo/gate/facts";
 import type { LaneOutcome } from "@repo/protocol/domain/answer";
-import type { RatchetSpec } from "@repo/protocol/domain/check";
+import type { Ask } from "@repo/protocol/domain/ask";
 import type { Policy } from "@repo/protocol/domain/policy";
-import { LaneName } from "@repo/protocol/ids";
-import type {
-  CommitSha,
-  ProjectName,
-  RatchetName,
-  RepoName,
-} from "@repo/protocol/ids";
-import { Weakened } from "@repo/protocol/refusal";
+import { RatchetName } from "@repo/protocol/ids";
+import type { CommitSha, ProjectName, RepoName } from "@repo/protocol/ids";
 import { Array, Effect, Option, Result, Schema } from "effect";
 
 /** One ratchet's count in one territory, on the answer's base and on its head. */
 export const RatchetMove = Schema.Struct({
   after: Schema.Int,
   before: Schema.Int,
-  ratchet: Schema.String,
+  ratchet: RatchetName,
   territory: Schema.String,
 });
 
@@ -59,36 +57,6 @@ export interface LocalCounts {
   readonly moves: readonly RatchetMove[];
   readonly uncounted: readonly Uncounted[];
 }
-
-/** The answer's counts judged: what refuses it, and the raises it will wait on. */
-export interface LocalJudgement {
-  readonly refusals: readonly Weakened[];
-  readonly waiting: readonly RatchetMove[];
-}
-
-/** A ratchet in a territory: the key a baseline and a raise are kept by. */
-interface Keyed {
-  readonly ratchet: string;
-  readonly territory: string;
-}
-
-const sameRatchet =
-  (one: Keyed) =>
-  (other: Keyed): boolean =>
-    one.ratchet === other.ratchet && one.territory === other.territory;
-
-/**
- * The lanes that count `ratchets`, as the platform's cheap stage makes
- * them: one per command, named for the first ratchet that runs it, each
- * handing back what it printed.
- */
-const countLanes = (ratchets: readonly RatchetSpec[]): readonly CheckLane[] =>
-  Array.dedupeWith(
-    ratchets,
-    (one, other) => one.measure.command === other.measure.command
-  ).map(({ measure: { command }, name }) =>
-    CheckLane.make({ command, lane: LaneName.make(name), output: "stdout" })
-  );
 
 /** How a count lane that printed no count ended, in words. */
 const endings = {
@@ -240,51 +208,29 @@ export const countRatchets = (input: {
   });
 
 /**
- * The raises a push asks a decider for, as the Project DO reads them: each
- * reasoned escape it adds over its territory's escape count (a `Waiver`)
- * asks to raise every declared ratchet in that territory.
- */
-export const askedRaises = (facts: PushFacts): readonly Keyed[] =>
-  Option.match(facts.ask, {
-    onNone: () => [],
-    onSome: (ask) =>
-      escapeDecisions(facts).flatMap((waiver) =>
-        facts.policy.ratchets.map(({ name }) => ({
-          ratchet: name,
-          territory: territoryOf(facts.policy, ask, waiver.at.path),
-        }))
-      ),
-  });
-
-/**
- * The answer's counts judged as the platform's `judgeRatchets` judges them,
- * with each count on the base as the baseline: one over it is refused
- * `Weakened{ratchet}`, unless the answer asks to raise that ratchet in that
- * territory, when it waits on a decider instead.
+ * The answer's counts judged by the Project DO's own `judgeRatchets`, with
+ * each count on the base as the baseline and the raises the push's reasoned
+ * escapes explain, as the Project DO reads them from the same facts: a count
+ * over its base's is refused `Weakened{ratchet}`, unless the answer asks to
+ * raise that ratchet in that territory, when it waits on a decider instead
+ * (`decisions`).
  */
 export const judgeMoves = (
-  moves: readonly RatchetMove[],
-  raises: readonly Keyed[]
-): LocalJudgement => {
-  const raised = moves.filter(({ after, before }) => after > before);
-
-  const asked = (move: RatchetMove) => raises.some(sameRatchet(move));
-
-  return {
-    refusals: raised.flatMap((move) =>
-      asked(move)
-        ? []
-        : [
-            new Weakened({
-              weakening: {
-                after: move.after,
-                before: move.before,
-                ratchet: move.ratchet,
-                territory: move.territory,
-              },
-            }),
-          ]
-    ),
-    waiting: raised.filter(asked),
-  };
-};
+  facts: PushFacts,
+  ask: Ask,
+  moves: readonly RatchetMove[]
+): RatchetJudgement =>
+  judgeRatchets({
+    ask: ask.id,
+    baselines: moves.map(({ before, ratchet, territory }) => ({
+      count: before,
+      ratchet,
+      territory,
+    })),
+    measured: moves.map(({ after, ratchet, territory }) => ({
+      count: after,
+      ratchet,
+      territory,
+    })),
+    raises: explainedRaises(facts.policy, ask, escapeDecisions(facts)),
+  });

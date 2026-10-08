@@ -36,13 +36,18 @@ import { judgeClosure } from "@repo/checks/judge";
 import { checkVersion, commandFor } from "@repo/checks/kinds";
 import { lintToZeroCount } from "@repo/checks/kinds/lint-to-zero";
 import type { LintToZeroCheck } from "@repo/checks/kinds/lint-to-zero";
-import { measure, WHOLE_PROJECT } from "@repo/checks/kinds/ratchet";
-import type { RatchetCount } from "@repo/checks/kinds/ratchet";
+import {
+  judgeRatchets,
+  measure,
+  WHOLE_PROJECT,
+} from "@repo/checks/kinds/ratchet";
+import type { RaiseRatchet, RatchetCount } from "@repo/checks/kinds/ratchet";
 import { redFirstOfRuns } from "@repo/checks/red-first";
 import { weaknessesOf } from "@repo/checks/weak-shapes";
 import {
   escapeDecisions,
   escapeRatchet,
+  explainedRaises,
   territoryOf,
 } from "@repo/gate/escapes";
 import type { Waiver } from "@repo/gate/escapes";
@@ -258,12 +263,8 @@ import type {
 } from "./project-store/rows.ts";
 import type { Projection } from "./projection.ts";
 import { askToLand, holdsSlot, leave, queueOf, storedQueue } from "./queue.ts";
-import { afterLanding, decideRaise, judgeRatchets } from "./ratchets.ts";
-import type {
-  RaiseRatchet,
-  RaiseRequest,
-  RatchetBaseline,
-} from "./ratchets.ts";
+import { afterLanding, decideRaise } from "./ratchets.ts";
+import type { RatchetBaseline } from "./ratchets.ts";
 
 /** Every port one project's service runs on. */
 export type ProjectPorts =
@@ -2630,13 +2631,7 @@ export const projectService = (
           territoryOf(policy, asked, waiver.at.path);
 
         // A reasoned escape in a territory explains a raise there.
-        const raises = waivers.flatMap((waiver): readonly RaiseRequest[] =>
-          policy.ratchets.map(({ name: ratchet }) => ({
-            ratchet,
-            reason: waiver.reason,
-            territory: territoryIn(waiver),
-          }))
-        );
+        const raises = explainedRaises(policy, asked, waivers);
 
         const declared = input.report?.ratchets ?? [];
 

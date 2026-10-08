@@ -75,12 +75,7 @@ import {
   ConfigBundlerBun,
   localPolicy,
 } from "./local-policy.ts";
-import {
-  askedRaises,
-  countRatchets,
-  judgeMoves,
-  RatchetMove,
-} from "./ratchets.ts";
+import { countRatchets, judgeMoves, RatchetMove } from "./ratchets.ts";
 import { staleGenerated } from "./stale.ts";
 import type { StaleCopy } from "./stale.ts";
 
@@ -807,11 +802,10 @@ export const check = Command.make(
 
       // The ratchets, counted on the base and on HEAD as the platform's
       // cheap stage counts them, unless `--lane` asked for lanes alone.
-      const counting =
-        Array.isReadonlyArrayNonEmpty(policy.ratchets) &&
-        flags.lane.length === 0;
+      const declared = Array.isReadonlyArrayNonEmpty(policy.ratchets);
+      const counting = declared && flags.lane.length === 0;
 
-      if (Array.isReadonlyArrayNonEmpty(policy.ratchets) && !counting) {
+      if (declared && !counting) {
         yield* output.note(
           "The ratchets were not counted: --lane runs only the lanes it names."
         );
@@ -833,9 +827,9 @@ export const check = Command.make(
         );
       }
 
-      const ratcheted = judgeMoves(counts.moves, askedRaises(facts));
+      const ratcheted = judgeMoves(facts, ask.value, counts.moves);
 
-      for (const move of ratcheted.waiting) {
+      for (const move of ratcheted.decisions) {
         yield* output.note(
           `The ratchet ${moveText(move)}: a reasoned escape you add there asks a decider to raise it, so the answer will wait on that decision.`
         );
