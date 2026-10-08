@@ -66,8 +66,8 @@ Run each as `bun run <name>` from the repo root; `--` passes flags to the script
 - `deploy -- --stage <stage>`: the one way to deploy. It runs `verify`, deploys the three Workers with Wrangler, reads the push trigger back, then runs `smoke`.
 - `smoke -- --stage <stage>`: read-only probes against a live stage.
 - `seed`: puts the two example projects on a platform (`--world node` on this machine, or `--stage <stage>`); a second run changes nothing.
-- `swarm`: not built yet, so it says so and exits 1. Once built, it runs fictional contributors, on several harnesses, against one split family on a stage.
-- `release`: not built yet, so it says so and exits 1. Once built, it builds the CLI's package and binaries, which the platform serves from its own bucket. Only a person publishes.
+- `swarm -- --stage <stage> --project <name>`: plans six fictional contributors, on four harnesses, against one split family on a stage, claims each one's ask and prepares a workspace with a clone of its fork; `--dry-run` only prints the plan. Starting the harnesses is not built yet: each run is recorded as failed.
+- `release -- --build | --upload --stage <stage> | --publish`: builds the CLI's npm package and two binaries, uploads a release to the stage's own bucket, which the platform serves, and leaves `npm publish` to a person: under an agent it prints the command instead.
 
 ## Nouns
 

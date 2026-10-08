@@ -136,7 +136,7 @@ curl -fsSL <origin>/install.sh | sh
 myr login --url <origin>
 ```
 
-`<origin>` is a stage's platform or web. The binaries never come from a code host's release page. Once the npm package `@myr/cli` is published, `npm install -g @myr/cli` is the other way in.
+`<origin>` is a stage's platform or web. The binaries never come from a code host's release page. `bun run release -- --build` builds them, and `bun run release -- --upload --stage dev-<you> --version <semver>` fills the stage's bucket. Once the npm package `@myr/cli` is published, `npm install -g @myr/cli` is the other way in.
 
 `myr login` signs you in through the browser (PKCE against the platform's own OAuth server and its own accounts) and names `git-credential-myr` in git's config for that host, so plain `git clone`, `git fetch` and `git push` work with no token in a URL.
 
@@ -196,7 +196,7 @@ A cartridge is a cut line removed by deletion. Visibility is the one plugged in 
 | Cut line | What goes | What removes it |
 | --- | --- | --- |
 | 1 | Agent extras: the Markdown ask page, per-project well-known skills, and `myr schema` | `apps/web/src/features/ask/markdown.ts`, `apps/web/test/ask-markdown.test.ts`; `packages/agent-kit/src/well-known.ts`, `apps/platform/src/well-known.ts`, `apps/platform/test/well-known.test.ts`, `apps/web/src/routes/[.]well-known/agent-skills/$.ts`; `apps/cli/test/schema.test.ts` and the `schema` command in `apps/cli/src/surfaces.ts` |
-| 1 | The pi adapter | its module and test under `apps/cli/src/` and `apps/cli/test/`, its lines in `apps/cli/tsdown.config.ts`, and the pi dev dependency in `apps/cli/package.json` |
+| 1 | The pi adapter | `apps/cli/src/pi.ts`, `apps/cli/test/pi.test.ts`, its entry and its `neverBundle` line in `apps/cli/tsdown.config.ts`, the pi dev dependency in `apps/cli/package.json`, and the adapter's line in the package manifest's `pi` key in `scripts/lib/release.ts` |
 | 2 | `myr why`, verdicts as git notes, and the `ReachedInternals` stage | `apps/cli/src/local/why.ts`, `apps/cli/test/local/why.test.ts`; `packages/git/src/notes.ts`, `apps/platform/src/workflows/notes.ts`, `packages/git/test/notes.test.ts`, `apps/platform/test/notes.test.ts` (verdicts still reach `status`, `verdict` and MCP); `packages/gate/src/imports.ts`, `packages/gate/test/imports.test.ts` and its branch in `packages/gate/src/stages/shape.ts` |
 | 3 | Admission runs and env injection | `packages/project/src/visibility/admission.ts`, `apps/platform/src/workflows/admission-steps.ts`, `packages/project/test/visibility/admission.test.ts`, `apps/platform/test/visibility/admission.test.ts`; `apps/sandbox/src/env-gateway.ts`, `apps/sandbox/src/checker/env.ts`, `apps/sandbox/test/env-injection.test.ts` |
 | 4 | Live streaming views (the pages poll every 5 s instead, as they already do when the stream fails) | `apps/platform/src/watch.ts`, `apps/platform/test/watch.test.ts`, the `ProjectSockets` entry in `apps/platform/src/ports.ts`, the `Watch` contract in `packages/protocol/src/contracts.ts` with its callers, and the stream half of `apps/web/src/client/watch.ts` and `apps/web/test/watch.test.ts`, keeping the polling |
