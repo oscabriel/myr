@@ -145,15 +145,18 @@ const ENTITIES: ReadonlyMap<string, string> = new Map([
 export const markupOf = (element: ReactElement) =>
   renderToStaticMarkup(element);
 
-/** What a reader sees: the markup without its tags, entities decoded. */
-export const textOf = (element: ReactElement) =>
-  markupOf(element)
+/** What a reader sees of `markup`: the text without its tags, entities decoded. */
+export const plainText = (markup: string) =>
+  markup
     .replaceAll(/<[^>]+>/gu, " ")
     .replaceAll(
       /&(?:#x27|amp|gt|lt|quot);/gu,
       (entity) => ENTITIES.get(entity) ?? entity
     )
     .replaceAll(/\s+/gu, " ");
+
+/** What a reader sees of `element`, rendered. */
+export const textOf = (element: ReactElement) => plainText(markupOf(element));
 
 /** Whether each of `parts` appears in `text`, each after the one before. */
 export const inOrder = (text: string, parts: readonly string[]) => {

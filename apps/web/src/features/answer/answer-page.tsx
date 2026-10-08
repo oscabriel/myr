@@ -38,7 +38,7 @@ import {
   TableRow,
 } from "../../components/ui/table.tsx";
 import { askPath } from "../ask/ask-page.tsx";
-import { CODE, Field, Fields, Region } from "../ask/fields.tsx";
+import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { CreditTrailers } from "../shared/credits.tsx";
 import { EmptyState } from "../shared/empty.tsx";
@@ -162,8 +162,6 @@ const Sha = ({ sha }: { readonly sha: string }) => (
     {short(sha)}
   </code>
 );
-
-const LINK = "decoration-rule underline hover:decoration-current";
 
 export const AnswerView = ({
   landing,

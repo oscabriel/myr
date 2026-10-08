@@ -12,10 +12,11 @@ import { AskId, ProjectName } from "@repo/protocol/ids";
 import { UnknownAsk, UnknownProject } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { Effect, Layer, Ref } from "effect";
+import { Effect, Exit, Layer, Ref } from "effect";
 import { RpcTest } from "effect/rpc";
 
 import {
+  askMarkdownResponse,
   refusalsMarkdown,
   wantsMarkdown,
 } from "../src/features/ask/markdown.ts";
@@ -272,6 +273,30 @@ describe("the ask page", () => {
       vary: "Accept",
     });
   });
+
+  it("names no alternate for a path that can name no ask, so no raw path text reaches a header", () => {
+    expect(
+      askPageHeaders({ params: params('x>; rel="next"\nset-cookie: a=b') })
+    ).toStrictEqual({ vary: "Accept" });
+  });
+});
+
+describe(askMarkdownResponse, () => {
+  it.effect(
+    "never lets a cache keep the answer of a contract only maintainers may see",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* read(
+          askMarkdownResponse(Exit.succeed({ brief }), "maintainers")
+        );
+
+        expect([seen.status, seen.cacheControl, seen.body]).toStrictEqual([
+          200,
+          "private, no-store",
+          brief,
+        ]);
+      })
+  );
 });
 
 describe(refusalsMarkdown, () => {

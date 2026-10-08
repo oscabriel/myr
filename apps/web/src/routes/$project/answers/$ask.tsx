@@ -14,12 +14,8 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import { landingAtom, verdictAtom } from "../../../client/answer.ts";
 import { AnswerView } from "../../../features/answer/answer-page.tsx";
 import { answerPath } from "../../../features/ask/ask-page.tsx";
-import { CODE } from "../../../features/ask/fields.tsx";
-import {
-  NotFoundView,
-  notFoundFor,
-  Refusals,
-} from "../../../features/ask/refused.tsx";
+import { CODE, LINK } from "../../../features/ask/fields.tsx";
+import { NoSuchAsk, notFoundFor } from "../../../features/ask/refused.tsx";
 import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
 import { serverClient } from "../../../server/client.ts";
 
@@ -58,7 +54,7 @@ const landedBy = (verdict: Verdict | undefined): LandedSha | undefined =>
     : undefined;
 
 /** The verdict for the page and, if its answer landed, the landing; or a not-found carrying the refusal (a 404). */
-const readAnswer = ({ ask, head, project }: AnswerAddress) =>
+export const readAnswer = ({ ask, head, project }: AnswerAddress) =>
   Effect.gen(function* () {
     const path = yield* Schema.decodeEffect(AnswerPath)(
       head === undefined ? { ask, project } : { ask, head, project }
@@ -156,8 +152,6 @@ const FreshAnswer = ({
   );
 };
 
-const LINK = "decoration-rule underline hover:decoration-current";
-
 const AnswerPage = () => {
   const read = Schema.decodeSync(AnswerPageData)(Route.useLoaderData());
   const { ask, head, landing, project, verdict } = read;
@@ -199,14 +193,12 @@ const AnswerPage = () => {
   );
 };
 
-/** A not-found's refusals, decoded where they arrive; none when it carries none. */
-const decodeRefusals = Schema.decodeUnknownOption(Refusals);
+/** An address with no refusal behind it: a name that can name nothing, or a `?head=` that is no commit id. */
+const NOTHING =
+  "Nothing is at this address: a project's and an ask's names are lowercase words joined by single dashes, and ?head= takes an answer's whole commit id, 40 hex digits.";
 
 const AnswerNotFound = ({ data }: { readonly data?: unknown }) => (
-  <NotFoundView
-    refusals={Option.getOrUndefined(decodeRefusals(data))}
-    title="No such ask"
-  />
+  <NoSuchAsk data={data} nothing={NOTHING} />
 );
 
 export const Route = createFileRoute("/$project/answers/$ask")({

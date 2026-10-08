@@ -6,13 +6,18 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { Client, Contracts } from "@repo/protocol/contracts";
 import { AskId, Handle } from "@repo/protocol/ids";
 import { UnknownAsk } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
-import { Schema } from "effect";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { isNotFound } from "@tanstack/react-router";
+import { Effect, Layer, Ref, Schema } from "effect";
+import { RpcTest } from "effect/rpc";
 
 import { AskView } from "../src/features/ask/ask-page.tsx";
-import { NotFoundView, Refusals } from "../src/features/ask/refused.tsx";
+import { NoSuchAsk, Refusals } from "../src/features/ask/refused.tsx";
+import { readAsk } from "../src/routes/$project/asks/$ask.tsx";
 import {
   ask,
   askId,
@@ -20,10 +25,15 @@ import {
   inOrder,
   markupOf,
   now,
+  project,
   textOf,
 } from "./ask-fixtures.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
+
+/** The markup inside the first `<pre>`. */
+const inPre = (markup: string) =>
+  /<pre\b[^>]*>(?<inner>.*?)<\/pre>/su.exec(markup)?.groups?.inner;
 
 const page = (shown = ask) => (
   <AskView ask={shown} brief={brief} now={now} platformUrl={platformUrl} />
@@ -158,29 +168,19 @@ describe(AskView, () => {
   });
 
   it("shows the brief exactly as an agent reads it", () => {
-    expect(textOf(page())).toContain(
-      textOf(<pre>{brief}</pre>)
-        .trim()
-        .slice(0, 60)
-    );
+    expect(inPre(markupOf(page()))).toBe(inPre(markupOf(<pre>{brief}</pre>)));
   });
 });
 
-describe(NotFoundView, () => {
-  it("shows the refusal a not-found carried from the server, as git printed it", () => {
+describe(NoSuchAsk, () => {
+  it("shows the refusal a loader's not-found carried from the server, as git printed it", () => {
     const refusal = new UnknownAsk({ ask: AskId.make("no-such-ask") });
 
-    // The refusal crosses from the server encoded, as a loader's not-found carries it.
-    const carried = Schema.decodeUnknownSync(Refusals)(
-      structuredClone(Schema.encodeSync(Refusals)([refusal]))
-    );
-
-    const text = textOf(
-      <NotFoundView refusals={carried} title="No such ask" />
-    );
+    // The not-found's data, as it crosses from the server: encoded, then cloned.
+    const data = structuredClone(Schema.encodeSync(Refusals)([refusal]));
 
     expect(
-      inOrder(text, [
+      inOrder(textOf(<NoSuchAsk data={data} />), [
         "No such ask",
         ...explain([refusal]).map((line) => line.trim()),
         `${Brand.cli} asks`,
@@ -189,8 +189,94 @@ describe(NotFoundView, () => {
   });
 
   it("says nothing is at an address that names no ask at all", () => {
-    expect(
-      textOf(<NotFoundView refusals={undefined} title="No such ask" />)
-    ).toContain("Nothing is at this address");
+    expect(textOf(<NoSuchAsk />)).toContain("Nothing is at this address");
   });
+
+  it("says what its route gives it when a not-found carries no refusal", () => {
+    expect(
+      textOf(<NoSuchAsk nothing="No answer is at this head." />)
+    ).toContain("No answer is at this head.");
+  });
+});
+
+/** A platform that knows datekit's one ask, counting `showAsk` calls. */
+const platformOf = (calls: Ref.Ref<number>) =>
+  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+    Layer.provide([
+      Layer.mergeAll(
+        unanswered,
+        Contracts.toLayerHandler("showAsk", (payload) =>
+          Effect.gen(function* () {
+            yield* Ref.update(calls, (count) => count + 1);
+
+            if (payload.ask !== askId) {
+              return yield* new UnknownAsk({ ask: payload.ask });
+            }
+
+            return { ask, brief };
+          })
+        )
+      ),
+      asTester,
+    ])
+  );
+
+describe(readAsk, () => {
+  it.effect("reads the ask and its brief for the page", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make(0);
+
+      const read = yield* readAsk({ ask: askId, project }).pipe(
+        Effect.provide(platformOf(calls))
+      );
+
+      expect([read.ask.id, read.brief]).toStrictEqual([askId, brief]);
+      expect(yield* Ref.get(calls)).toBe(1);
+    })
+  );
+
+  it.effect(
+    "is a not-found carrying the UnknownAsk refusal for an ask the project lacks",
+    () =>
+      Effect.gen(function* () {
+        const calls = yield* Ref.make(0);
+        const missing = AskId.make("no-such-ask");
+
+        const failed = yield* Effect.flip(
+          readAsk({ ask: missing, project }).pipe(
+            Effect.provide(platformOf(calls))
+          )
+        );
+
+        expect(isNotFound(failed)).toBeTruthy();
+
+        const carried = yield* Schema.decodeUnknownEffect(Refusals)(
+          isNotFound(failed) ? failed.data : undefined
+        );
+
+        expect(explain(carried)).toStrictEqual(
+          explain([new UnknownAsk({ ask: missing })])
+        );
+      })
+  );
+
+  it.effect(
+    "is a not-found with no refusal, and asks nothing, for a name no ask can have",
+    () =>
+      Effect.gen(function* () {
+        const calls = yield* Ref.make(0);
+
+        const failed = yield* Effect.flip(
+          readAsk({ ask: "Not_An-Ask", project }).pipe(
+            Effect.provide(platformOf(calls))
+          )
+        );
+
+        expect(isNotFound(failed)).toBeTruthy();
+        expect(
+          isNotFound(failed) ? failed.data : "not a not-found"
+        ).toBeUndefined();
+        expect(yield* Ref.get(calls)).toBe(0);
+      })
+  );
 });

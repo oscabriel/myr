@@ -13,11 +13,7 @@ import {
   markdownAlternate,
   wantsMarkdown,
 } from "../../../features/ask/markdown.ts";
-import {
-  NotFoundView,
-  notFoundFor,
-  Refusals,
-} from "../../../features/ask/refused.tsx";
+import { NoSuchAsk, notFoundFor } from "../../../features/ask/refused.tsx";
 import { pageTitle } from "../../../features/shared/layout.tsx";
 import { serverClient } from "../../../server/client.ts";
 import { AskPath, askMarkdownHandler } from "./{$ask}[.]md.ts";
@@ -47,11 +43,23 @@ export const askPageHandler =
       ? askMarkdownHandler(clientFor)({ params, request })
       : next();
 
-/** The page's headers: its Markdown as an alternate, and that the URL answers by `Accept`. */
-export const askPageHeaders = ({ params }: { readonly params: AskParams }) => ({
-  link: markdownAlternate(params.project, params.ask),
-  vary: "Accept",
-});
+/**
+ * The page's headers: that the URL answers by `Accept`, and, for a path that
+ * can name an ask, its Markdown as an alternate. A path that cannot (a 404)
+ * names none, so no raw path text reaches a header.
+ */
+export const askPageHeaders = ({
+  params,
+}: {
+  readonly params: AskParams;
+}): Readonly<Record<string, string>> =>
+  Option.match(Schema.decodeOption(AskPath)(params), {
+    onNone: () => ({ vary: "Accept" }),
+    onSome: ({ ask, project }) => ({
+      link: markdownAlternate(project, ask),
+      vary: "Accept",
+    }),
+  });
 
 /** What the page's loader carries from the server, encoded: the ask, its brief, and when it was read. */
 const AskPageData = Schema.Struct({
@@ -61,7 +69,7 @@ const AskPageData = Schema.Struct({
 });
 
 /** The ask for its page, or a not-found carrying the platform's refusal (a 404). */
-const readAsk = (params: AskParams) =>
+export const readAsk = (params: AskParams) =>
   Effect.gen(function* () {
     const path = yield* Schema.decodeEffect(AskPath)(params).pipe(
       Effect.mapError(() => notFound())
@@ -140,16 +148,6 @@ const AskPage = () => {
   );
 };
 
-/** A not-found's refusals, decoded where they arrive; none when it carries none. */
-const decodeRefusals = Schema.decodeUnknownOption(Refusals);
-
-const AskNotFound = ({ data }: { readonly data?: unknown }) => (
-  <NotFoundView
-    refusals={Option.getOrUndefined(decodeRefusals(data))}
-    title="No such ask"
-  />
-);
-
 export const Route = createFileRoute("/$project/asks/$ask")({
   // TanStack infers each option from the ones before it: the loader comes
   // first, so `head` reads its data.
@@ -165,7 +163,7 @@ export const Route = createFileRoute("/$project/asks/$ask")({
   }),
   headers: askPageHeaders,
   component: AskPage,
-  notFoundComponent: AskNotFound,
+  notFoundComponent: NoSuchAsk,
   server: {
     handlers: {
       GET: askPageHandler((request) => serverClient(env, request)),

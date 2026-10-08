@@ -9,14 +9,15 @@
  * Pure: a `Request` or an `Exit` in, a string or a `Response` out.
  */
 import { Brand } from "@repo/brand";
+import type { Visibility } from "@repo/protocol/annotations";
 import { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { Array, Cause, Exit, Option, Schema } from "effect";
 
 const MARKDOWN = "text/markdown; charset=utf-8";
 
-/** Who may share the answer: a `public` contract's for a minute, a `maintainers` one's never. */
-export type ContractVisibility = "public" | "maintainers";
+/** A contract's `Visibility` (spec §3.1): a `public` one's answer may be cached for a minute, a `maintainers` one's never. */
+export type ContractVisibility = ReturnType<typeof Visibility.defaultValue>;
 
 /** One range of an `Accept` header: `text/markdown;q=0.8`. */
 interface MediaRange {

@@ -19,7 +19,7 @@ import { CommandLine } from "../shared/command.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
 import { When } from "../shared/time.tsx";
-import { CODE, Field, Fields, Region } from "./fields.tsx";
+import { CODE, Field, Fields, LINK, Region } from "./fields.tsx";
 import { markdownPath } from "./markdown.ts";
 
 /** An ask's page. */
@@ -29,8 +29,6 @@ export const askPath = (project: ProjectName, ask: AskId) =>
 /** The page of the verdict on an ask's latest answer. */
 export const answerPath = (project: ProjectName, ask: AskId) =>
   `/${project}/answers/${ask}`;
-
-const LINK = "decoration-rule underline hover:decoration-current";
 
 /** Each state as a mark, a word and its role colour (none for open: nothing is happening yet). */
 const states = {
