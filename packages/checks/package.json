@@ -13,6 +13,7 @@
     "./check-runner": "./src/check-runner.ts",
     "./check-runner/memory": "./src/check-runner/memory.ts",
     "./check-runner/local": "./src/check-runner/local.ts",
+    "./null-answer": "./src/null-answer.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
