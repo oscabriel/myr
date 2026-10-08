@@ -139,8 +139,8 @@ const LOCKFILES = [
 
 const CLONE_LIMIT = Duration.minutes(5);
 
-/** Making the sealed files' folders is quick; it never waits on the network. */
-const FOLDERS_LIMIT = Duration.minutes(1);
+/** Making room for the sealed files is quick; it never waits on the network. */
+const ROOM_LIMIT = Duration.minutes(1);
 
 const SETUP_LIMIT = Duration.minutes(15);
 
@@ -530,15 +530,54 @@ const inTree = (path: string) =>
     .split("/")
     .every((segment) => segment !== "" && segment !== "." && segment !== "..");
 
-/** The folders `paths` sit in, under the work tree, each once. */
-const foldersOf = (paths: readonly string[]) => [
-  ...new Set(
-    paths.flatMap((path) => {
-      const end = path.lastIndexOf("/");
+/**
+ * The shell script `roomFor` runs. Its arguments are folders, shallowest
+ * first, then `--`, then files. A folder's place is cleared of anything
+ * that is not a folder (a file, a link, a link to a folder) and the folder
+ * made; a file's place is cleared of whatever stands there. Every path is
+ * absolute, so none reads as `--`.
+ */
+const ROOM = [
+  'while [ "$1" != -- ]; do',
+  '  if [ -L "$1" ] || { [ -e "$1" ] && [ ! -d "$1" ]; }; then',
+  '    rm -f -- "$1" || exit 1',
+  "  fi",
+  '  [ -d "$1" ] || mkdir -- "$1" || exit 1',
+  "  shift",
+  "done",
+  "shift",
+  'rm -rf -- "$@"',
+].join("\n");
 
-      return end === -1 ? [] : [`${REPO}/${path.slice(0, end)}`];
-    })
-  ),
+/** Every folder `path` sits in under `root`, shallowest first. */
+const foldersAbove = (root: string, path: string) => {
+  const folders = path.split("/").slice(0, -1);
+
+  return folders.map(
+    (_, depth) => `${root}/${folders.slice(0, depth + 1).join("/")}`
+  );
+};
+
+/**
+ * The command that makes room under `root` for the sealed files at `paths`
+ * (relative, inside the tree): each folder they sit in, made, and each
+ * file's own place, empty. The answer's tree decides what stands there; a
+ * file where a sealed folder goes, a folder where a sealed file goes, or a
+ * link would fail the write, and a `VerifierBlocked` spends no attempt, so
+ * it would tell the answer, for free, that a sealed path is there. What
+ * the tree holds anywhere else stays, folders on the way included.
+ */
+export const roomFor = (
+  root: string,
+  paths: readonly string[]
+): readonly [string, ...string[]] => [
+  "sh",
+  "-c",
+  ROOM,
+  "room",
+  ...new Set(paths.flatMap((path) => foldersAbove(root, path))),
+  "--",
+  ...paths.map((path) => `${root}/${path}`),
 ];
 
 /** The sealed files are not all in the work tree: nothing logged says which. */
@@ -549,10 +588,10 @@ const unwritten = () =>
  * The sealed suite's files, written into the work tree after the snapshot
  * and with egress off (the plan's order), from the bytes the job carried:
  * the Checker holds no route to the layer. `Files.writeFile` makes no
- * folder, so their folders are made first. A file that would land outside
- * the tree, or that cannot be written, is `VerifierBlocked`; nothing
- * logged names a path, and no reason the container gave is logged, since
- * it may name one.
+ * folder, so room is made first (`roomFor`), whatever the answer's tree
+ * holds there. A file that would land outside the tree, or that the
+ * container cannot write, is `VerifierBlocked`; nothing logged names a
+ * path, and no reason the container gave is logged, since it may name one.
  */
 const writeHeldBack = (job: Job, { files }: HeldBackPart) =>
   Effect.gen(function* () {
@@ -563,21 +602,21 @@ const writeHeldBack = (job: Job, { files }: HeldBackPart) =>
     }
 
     const box = yield* Box;
-    const folders = foldersOf(files.map(({ path }) => path));
 
     yield* Ref.set(job.sealed, true);
 
-    if (folders.length > 0) {
-      const made = yield* exec(
-        dropping,
-        ["mkdir", "-p", "--", ...folders],
-        { cwd: REPO, env: ENV },
-        FOLDERS_LIMIT
-      ).pipe(Effect.catchTag("BoxFailed", unwritten));
+    const made = yield* exec(
+      dropping,
+      roomFor(
+        REPO,
+        files.map(({ path }) => path)
+      ),
+      { cwd: REPO, env: ENV },
+      ROOM_LIMIT
+    ).pipe(Effect.catchTag("BoxFailed", unwritten));
 
-      if (Option.isNone(made) || made.value.exitCode !== 0) {
-        return yield* unwritten();
-      }
+    if (Option.isNone(made) || made.value.exitCode !== 0) {
+      return yield* unwritten();
     }
 
     return yield* Effect.forEach(
@@ -625,7 +664,8 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
     const network = yield* Network;
     const { clone } = wire;
 
-    const sealed = Option.fromNullishOr(wire.job.heldBack);
+    // The job's sealed suite, if it has one.
+    const heldBack = Option.fromNullishOr(wire.job.heldBack);
 
     const job: Job = {
       exits: yield* Ref.make<readonly HeldBackExit[]>([]),
@@ -649,7 +689,7 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
     );
 
     const plan = phasePlan({
-      heldBack: Option.map(sealed, ({ areas }) => ({ areas })),
+      heldBack: Option.map(heldBack, ({ areas }) => ({ areas })),
       lanes: wire.job.lanes.map(({ command, lane }) => ({ command, lane })),
       lockfileHash,
       placeholders: wire.job.placeholders,
@@ -672,7 +712,7 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
               Effect.tap(
                 Effect.forEach(lanes, (lane) => runLane(job, lane)),
                 () =>
-                  Option.match(sealed, {
+                  Option.match(heldBack, {
                     onNone: () => Effect.void,
                     onSome: ({ runs }) =>
                       Effect.flatMap(Effect.forEach(runs, runSealed), (exits) =>
@@ -685,7 +725,7 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
             Snapshot: (saved) => Effect.as(snapshot(job, saved.key), []),
             // The plan has this phase only for a job with a sealed suite.
             WriteHeldBack: () =>
-              Option.match(sealed, {
+              Option.match(heldBack, {
                 onNone: () => Effect.succeed([]),
                 onSome: (part) => Effect.as(writeHeldBack(job, part), []),
               }),
@@ -697,7 +737,7 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
     const exits = yield* Ref.get(job.exits);
 
     return {
-      heldBack: Option.match(sealed, {
+      heldBack: Option.match(heldBack, {
         onNone: () => [],
         onSome: ({ areas, suite }) => areaBits({ areas, exits, suite }),
       }),

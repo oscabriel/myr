@@ -1,3 +1,4 @@
+import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { CheckAt } from "@repo/checks/check-runner";
 import type { CheckRun, HeldBackPart } from "@repo/checks/check-runner";
@@ -21,7 +22,9 @@ import {
   Effect,
   Exit,
   Fiber,
+  FileSystem,
   Latch,
+  Layer,
   Match,
   Option,
   Redacted,
@@ -30,12 +33,13 @@ import {
 import { TestClock } from "effect/testing";
 import { expectTypeOf } from "vitest";
 
-import { BoxFailed } from "../src/box.ts";
+import { Box, BoxFailed } from "../src/box.ts";
 import { REGISTRIES } from "../src/checker/network.ts";
-import { check, REPO } from "../src/checker/run.ts";
+import { check, REPO, roomFor } from "../src/checker/run.ts";
 import { answerJob } from "../src/job.ts";
 import { exited, fakeChecker } from "./fake-box.ts";
 import type { Call, FakeOptions } from "./fake-box.ts";
+import { LocalBox } from "./local-box.ts";
 
 const SETUP = "bun install --frozen-lockfile --ignore-scripts";
 
@@ -144,6 +148,15 @@ const sealedCommands: ReadonlySet<string> = new Set(
   SEALED.map(({ command }) => command)
 );
 
+/**
+ * Whether `call` writes the sealed files or readies their place: a file
+ * written, or a command that names a path in the work tree (no lane or
+ * sealed check does; each runs in it).
+ */
+const writesSealed = (call: Call) =>
+  call.kind === "writeFile" ||
+  (call.kind === "exec" && call.argv.some((arg) => arg.startsWith(`${REPO}/`)));
+
 const shellOf = (call: Call) =>
   call.kind === "exec" && call.argv[0] === "sh" && call.argv[1] === "-c"
     ? Option.fromUndefinedOr(call.argv[2])
@@ -160,8 +173,7 @@ const phaseOf = Match.type<Call>().pipe(
         return ["clone"];
       }
 
-      // The sealed files' folders are made as they are written.
-      if (call.argv[0] === "mkdir") {
+      if (writesSealed(call)) {
         return ["writeHeldBack"];
       }
 
@@ -452,13 +464,7 @@ describe("the Checker's held-back phase", () => {
         );
 
         expect(ran.heldBack).toStrictEqual([]);
-        expect(
-          fake.calls.filter(
-            (call) =>
-              call.kind === "writeFile" ||
-              (call.kind === "exec" && call.argv[0] === "mkdir")
-          )
-        ).toStrictEqual([]);
+        expect(fake.calls.filter(writesSealed)).toStrictEqual([]);
         expect(phasesOf(fake.calls)).toStrictEqual([
           "clone",
           "setup",
@@ -590,11 +596,7 @@ describe("the Checker's held-back phase", () => {
             return {
               error: Exit.findErrorOption(outcome),
               named: leftBy(fake.calls).includes(path),
-              written: fake.calls.filter(
-                (call) =>
-                  call.kind === "writeFile" ||
-                  (call.kind === "exec" && call.argv[0] === "mkdir")
-              ).length,
+              written: fake.calls.filter(writesSealed).length,
             };
           })
         );
@@ -607,6 +609,65 @@ describe("the Checker's held-back phase", () => {
           }))
         );
       })
+  );
+
+  it.live(
+    "makes room for each sealed file whatever the answer's tree holds where it goes, and keeps the tree's other files",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const box = yield* Box;
+        const tree = yield* fs.makeTempDirectoryScoped({ prefix: "tree-" });
+
+        const outside = yield* fs.makeTempDirectoryScoped({
+          prefix: "outside-",
+        });
+
+        const sealed = [
+          "checks/held-back/export/round-trip.test.ts",
+          "checks/held-back/parser/week-54.test.ts",
+          "checks/held-back/tz/zone.test.ts",
+        ];
+
+        // The answer's tree: a file where one sealed folder goes, a link to
+        // a folder outside the tree where another goes, and a folder where
+        // a sealed file goes, beside a file of its own. Left there, each
+        // fails the write, and the refusal would tell the answer that a
+        // sealed path is there without spending an attempt.
+        yield* fs.makeDirectory(`${tree}/checks/held-back/tz/zone.test.ts`, {
+          recursive: true,
+        });
+        yield* fs.writeFileString(`${tree}/checks/held-back/export`, "x\n");
+        yield* fs.symlink(outside, `${tree}/checks/held-back/parser`);
+        yield* fs.writeFileString(`${tree}/checks/own.test.ts`, "own\n");
+
+        const made = yield* box.exec(roomFor(tree, sealed), {
+          cwd: tree,
+          env: { PATH: "/usr/bin:/bin" },
+        });
+
+        expect(made.exitCode).toBe(0);
+
+        yield* Effect.forEach(sealed, (path) =>
+          box.writeFile(
+            `${tree}/${path}`,
+            new TextEncoder().encode(`sealed ${path}\n`)
+          )
+        );
+
+        expect(
+          yield* Effect.forEach(sealed, (path) =>
+            fs.readFileString(`${tree}/${path}`)
+          )
+        ).toStrictEqual(sealed.map((path) => `sealed ${path}\n`));
+        expect(yield* fs.readFileString(`${tree}/checks/own.test.ts`)).toBe(
+          "own\n"
+        );
+        expect(yield* fs.readDirectory(outside)).toStrictEqual([]);
+      }).pipe(
+        Effect.scoped,
+        Effect.provide(Layer.merge(LocalBox, NodeServices.layer))
+      )
   );
 
   it("takes the held-back job the platform reads from the layer as it is", () => {
