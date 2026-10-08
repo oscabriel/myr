@@ -472,99 +472,111 @@ const claimOf = (ask: string, handle: string) => {
  * CLI's `asks`, `ask` and `claim` answer from the fixtures, each
  * contributor's `status` from `statusOf`, git and `mkfifo` succeed, herdr
  * makes panes `w9:p1`, `w9:p2`, … and every agent settles idle, and the
- * counter's `watch` hears nothing new.
+ * counter's `watch` hears nothing new. `replay` is how the counter's read
+ * of where the project stands ends: an empty replay unless a test says.
  */
-const herdrWorld = Effect.gen(function* () {
-  const panes = yield* Ref.make(1);
-  const reads = yield* Ref.make(new Map<string, number>());
-  const listed = yield* fixture("list-asks.json");
+const herdrWorld = (replay: Ending) =>
+  Effect.gen(function* () {
+    const panes = yield* Ref.make(1);
+    const reads = yield* Ref.make(new Map<string, number>());
+    const listed = yield* fixture("list-asks.json");
 
-  const shown = (yield* fixture("show-ask.json")).replaceAll(
-    "{configDir}",
-    Brand.configDir
-  );
+    const shown = (yield* fixture("show-ask.json")).replaceAll(
+      "{configDir}",
+      Brand.configDir
+    );
 
-  const answer = (call: Spawned) =>
-    Effect.gen(function* () {
-      const { args, command, env } = call;
-      const [first = "", second = "", third = ""] = args;
+    const answer = (call: Spawned) =>
+      Effect.gen(function* () {
+        const { args, command, env } = call;
+        const [first = "", second = "", third = ""] = args;
 
-      if (command === "herdr") {
-        if (first === "workspace") {
-          return JSON.stringify({
-            id: "cli:workspace:create",
-            result: {
-              root_pane: { pane_id: "w9:p1", workspace_id: "w9" },
-              type: "workspace_created",
-              workspace: { workspace_id: "w9" },
-            },
-          });
+        if (command === "herdr") {
+          if (first === "workspace") {
+            return JSON.stringify({
+              id: "cli:workspace:create",
+              result: {
+                root_pane: { pane_id: "w9:p1", workspace_id: "w9" },
+                type: "workspace_created",
+                workspace: { workspace_id: "w9" },
+              },
+            });
+          }
+
+          if (second === "split") {
+            return paneJson(
+              `w9:p${yield* Ref.updateAndGet(panes, (n) => n + 1)}`
+            );
+          }
+
+          if (first === "agent") {
+            return agentJson(
+              third,
+              second === "start" ? "agent_started" : "agent_prompted"
+            );
+          }
+
+          return JSON.stringify({ id: "cli:pane", result: { type: "ok" } });
         }
 
-        if (second === "split") {
-          return paneJson(
-            `w9:p${yield* Ref.updateAndGet(panes, (n) => n + 1)}`
-          );
+        if (command === "git") {
+          return "d7064cb4f9f0f0e0d0c0b0a090807060504030201\n";
         }
 
-        if (first === "agent") {
-          return agentJson(
-            third,
-            second === "start" ? "agent_started" : "agent_prompted"
-          );
+        if (first === "status") {
+          const handle = holderOf(env) ?? "nobody";
+
+          const count =
+            (yield* Ref.updateAndGet(reads, (seen) =>
+              new Map(seen).set(handle, (seen.get(handle) ?? 0) + 1)
+            )).get(handle) ?? 1;
+
+          return statusOf(handle, count);
         }
 
-        return JSON.stringify({ id: "cli:pane", result: { type: "ok" } });
+        return (
+          {
+            ask: shown,
+            asks: listed,
+            claim: claimOf(third, holderOf(env) ?? "nobody"),
+          }[second] ?? ""
+        );
+      });
+
+    return yield* fakeSpawner((call) => {
+      if (call.command !== "curl") {
+        return Effect.map(answer(call), (stdout) => ({ stdout }));
       }
 
-      if (command === "git") {
-        return "d7064cb4f9f0f0e0d0c0b0a090807060504030201\n";
-      }
-
-      if (command === "curl") {
-        return args.includes("content-type: application/json")
-          ? '[{"_tag":"Exit","requestId":"1","exit":{"_tag":"Success","value":null}}]'
-          : "";
-      }
-
-      if (first === "status") {
-        const handle = holderOf(env) ?? "nobody";
-
-        const count =
-          (yield* Ref.updateAndGet(reads, (seen) =>
-            new Map(seen).set(handle, (seen.get(handle) ?? 0) + 1)
-          )).get(handle) ?? 1;
-
-        return statusOf(handle, count);
-      }
-
-      return (
-        {
-          ask: shown,
-          asks: listed,
-          claim: claimOf(third, holderOf(env) ?? "nobody"),
-        }[second] ?? ""
+      // The read of where the project stands is plain JSON; the follow hears nothing.
+      return Effect.succeed(
+        call.args.includes("content-type: application/json") ? replay : {}
       );
     });
+  });
 
-  return yield* fakeSpawner((call) =>
-    Effect.map(answer(call), (stdout) => ({ stdout }))
-  );
-});
+/** `watch`'s plain JSON replay of a project that holds no event yet. */
+const emptyReplay: Ending = {
+  stdout:
+    '[{"_tag":"Exit","requestId":"1","exit":{"_tag":"Success","value":null}}]',
+};
 
 /** What herdr puts in the env of a process in one of its panes. */
 const inAPane = { HERDR_ENV: "1" };
 
 /**
  * `main --view herdr` for every contributor over `herdrWorld`, from a herdr
- * pane unless `herdrEnv` says otherwise, with `.swarm/` and the ledger in a
- * temp dir.
+ * pane unless `herdrEnv` says otherwise, the counter's read of the project
+ * ending as `replay`, with `.swarm/` and the ledger in a temp dir.
  */
-const herdrRunWith = (herdrEnv: Readonly<Record<string, string>>) =>
+const herdrRunWith = (
+  herdrEnv: Readonly<Record<string, string>>,
+  replay: Ending = emptyReplay
+) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const swarm = yield* fs.makeTempDirectoryScoped();
-    const world = yield* herdrWorld;
+    const world = yield* herdrWorld(replay);
     const printed: string[] = [];
 
     const captured: Console.Console = {
@@ -841,6 +853,32 @@ describe("a run in herdr's panes", () => {
   );
 
   it.effect(
+    "stops before it opens a pane or claims anything when the counter can't read where the project stands",
+    () =>
+      Effect.gen(function* () {
+        const { result, spawned } = yield* herdrRunWith(inAPane, {
+          code: 7,
+          stderr:
+            "curl: (7) Failed to connect to platform-dev-oscabriel.example.workers.dev port 443\n",
+        });
+
+        expect(
+          Result.match(result, {
+            onFailure: ({ reason }) => reason,
+            onSuccess: () => "",
+          })
+        ).toBe(
+          "the counter couldn't read burrow's events: curl exited 7: curl: (7) Failed to connect to platform-dev-oscabriel.example.workers.dev port 443"
+        );
+        expect(
+          spawned.flatMap(({ args, command }) =>
+            command === "herdr" || args[1] === "claim" ? [args] : []
+          )
+        ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
     "hands each pane its contributor's env through a pipe, so no token is in any argv, script or line",
     () =>
       Effect.gen(function* () {
@@ -881,12 +919,16 @@ const trustQuestion = [
   "   Yes, I trust this folder",
 ].join("\n");
 
-/** …and then whether to import the CLAUDE.md files above the clone. */
+/**
+ * …and then whether to import the CLAUDE.md files above the clone, "No"
+ * under the cursor (live, Enter left the clone's
+ * `hasClaudeMdExternalIncludesApproved` false).
+ */
 const importsQuestion = [
   "  Allow external CLAUDE.md file imports?",
   "",
-  "    No, disable external imports",
-  "  ❯ Yes, allow external imports",
+  "  ❯ No, disable external imports",
+  "    Yes, allow external imports",
 ].join("\n");
 
 const [wren] = roster;
@@ -1099,6 +1141,7 @@ describe("the counter's watch", () => {
           [
             "--silent",
             "--show-error",
+            "--fail",
             "--no-buffer",
             "--request",
             "POST",
@@ -1110,6 +1153,85 @@ describe("the counter's watch", () => {
           ],
         ]);
       })
+  );
+
+  it.effect(
+    "refuses to guess where to start when the project's events can't be read, rather than count its whole history",
+    () =>
+      Effect.gen(function* () {
+        const reasons = yield* Effect.forEach(
+          [
+            {
+              code: 22,
+              stderr: "curl: (22) The requested URL returned error: 502\n",
+            },
+            { stdout: "<html>502 Bad Gateway</html>" },
+          ],
+          (ending) =>
+            Effect.gen(function* () {
+              const world = yield* fakeSpawner(() => Effect.succeed(ending));
+
+              const read = yield* lastHeld(
+                platformUrl,
+                ProjectName.make("burrow")
+              ).pipe(Effect.provide(world.layer), Effect.result);
+
+              return Result.match(read, {
+                onFailure: ({ reason }) => reason,
+                onSuccess: (from) => `counts from event ${from}`,
+              });
+            })
+        );
+
+        expect(reasons).toStrictEqual([
+          "the counter couldn't read burrow's events: curl exited 22: curl: (22) The requested URL returned error: 502",
+          "the counter couldn't read burrow's events: <html>502 Bad Gateway</html>",
+        ]);
+      })
+  );
+
+  it.effect("says once why it can't follow watch, and keeps trying", () =>
+    Effect.gen(function* () {
+      const world = yield* fakeSpawner(() =>
+        Effect.succeed({
+          code: 22,
+          stderr: "curl: (22) The requested URL returned error: 503\n",
+        })
+      );
+
+      const files = new Map<string, string>();
+
+      const memoryFs = FileSystem.makeNoop({
+        writeFileString: (path, data, options) =>
+          Effect.sync(() => {
+            files.set(
+              path,
+              options?.flag === "a" ? `${files.get(path) ?? ""}${data}` : data
+            );
+          }),
+      });
+
+      const fiber = yield* followCounter({
+        file: "/work/counter.log",
+        from: 8,
+        origin: platformUrl,
+        project: ProjectName.make("burrow"),
+      }).pipe(
+        Effect.provide(world.layer),
+        Effect.provideService(FileSystem.FileSystem, memoryFs),
+        Effect.forkChild
+      );
+
+      yield* TestClock.adjust("5 seconds");
+      yield* Fiber.interrupt(fiber);
+
+      expect(files.get("/work/counter.log")?.split("\n")).toStrictEqual([
+        "claims 0 · pushes 0 · landed 0  (burrow, after event 8)",
+        "counter: watch didn't run: curl exited 22: curl: (22) The requested URL returned error: 503",
+        "",
+      ]);
+      expect((yield* world.spawned).length).toBeGreaterThan(1);
+    })
   );
 
   it.effect(
@@ -1153,7 +1275,7 @@ describe("the counter's watch", () => {
           "",
         ]);
         expect(
-          (yield* world.spawned).map(({ args }) => args.slice(6, 9))
+          (yield* world.spawned).map(({ args }) => args.slice(7, 10))
         ).toStrictEqual([
           [
             "content-type: application/ndjson",

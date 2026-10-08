@@ -29,7 +29,7 @@ import {
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { run } from "../workspace.ts";
+import { run, SwarmFailed } from "../workspace.ts";
 
 /** The events the counter counts. */
 const counted = (event: ProjectEvent) =>
@@ -138,7 +138,10 @@ export const eventsIn = (line: string): readonly ProjectEvent[] =>
       Array.getSomes(values.map((value) => eventOf(value))),
   });
 
-/** `curl`'s flags for one POST to the platform's `/rpc` with `contentType`. */
+/**
+ * `curl`'s flags for one POST to the platform's `/rpc` with `contentType`:
+ * an HTTP error fails it (`--fail`), and only its errors reach stderr.
+ */
 const curlArgs = (input: {
   readonly origin: string;
   readonly contentType: string;
@@ -146,6 +149,7 @@ const curlArgs = (input: {
 }) => [
   "--silent",
   "--show-error",
+  "--fail",
   "--no-buffer",
   "--request",
   "POST",
@@ -156,29 +160,45 @@ const curlArgs = (input: {
   `${input.origin}/rpc`,
 ];
 
+/** Why the counter can't say where `project` stands: what curl or the platform said. */
+const unread = (project: ProjectName, said: string) =>
+  new SwarmFailed({
+    reason: `the counter couldn't read ${project}'s events: ${said.trim().slice(0, 300)}`,
+  });
+
 /**
  * The last event `project` already holds, where a run's counter starts:
- * `watch` over plain JSON replays what the project keeps and ends. 0 when
- * it holds none, or the read fails.
+ * `watch` over plain JSON replays what the project keeps and ends; 0 when
+ * it holds none. A read that fails is the run's failure, not 0: a counter
+ * that started from 0 would count the project's whole history as the run's.
  */
 export const lastHeld = (origin: string, project: ProjectName) =>
-  run({
-    args: curlArgs({
-      body: `[${watchRequest(project, Option.none())}]`,
-      contentType: "application/json",
-      origin,
-    }),
-    command: "curl",
-    env: {},
-  }).pipe(
-    Effect.map(({ stdout }) =>
-      Option.getOrElse(decodeReplay(stdout), () => []).flatMap((frame) =>
+  Effect.gen(function* () {
+    const ran = yield* run({
+      args: curlArgs({
+        body: `[${watchRequest(project, Option.none())}]`,
+        contentType: "application/json",
+        origin,
+      }),
+      command: "curl",
+      env: {},
+    }).pipe(Effect.mapError(({ reason }) => unread(project, reason)));
+
+    if (ran.code !== 0) {
+      return yield* unread(project, `curl exited ${ran.code}: ${ran.stderr}`);
+    }
+
+    const frames = yield* Effect.fromOption(decodeReplay(ran.stdout)).pipe(
+      Effect.mapError(() => unread(project, ran.stdout))
+    );
+
+    return Math.max(
+      0,
+      ...frames.flatMap((frame) =>
         isHeld(frame) ? frame.values.map(({ seq }) => seq) : []
       )
-    ),
-    Effect.map((seqs) => Math.max(0, ...seqs)),
-    Effect.orElseSucceed(() => 0)
-  );
+    );
+  });
 
 /** Where the counter stands: the last event heard, and every counted one since the run began. */
 interface Tally {
@@ -241,15 +261,30 @@ export const followCounter = (input: {
               contentType: "application/ndjson",
               origin: input.origin,
             }),
-            { stderr: "ignore", stdin: "ignore" }
+            { stdin: "ignore" }
           )
         );
 
-        yield* child.stdout.pipe(
-          Stream.decodeText(),
-          Stream.splitLines,
-          Stream.flatMap((line) => Stream.fromIterable(eventsIn(line))),
-          Stream.runForEach(hear)
+        // curl's exit says whether the stream ended or the call failed.
+        const [stderr, code] = yield* Effect.all(
+          [
+            child.stderr.pipe(Stream.decodeText(), Stream.mkString),
+            child.exitCode,
+            child.stdout.pipe(
+              Stream.decodeText(),
+              Stream.splitLines,
+              Stream.flatMap((line) => Stream.fromIterable(eventsIn(line))),
+              Stream.runForEach(hear)
+            ),
+          ],
+          { concurrency: "unbounded" }
+        );
+
+        yield* Effect.when(
+          Effect.fail(
+            new SwarmFailed({ reason: `curl exited ${code}: ${stderr.trim()}` })
+          ),
+          Effect.succeed(code !== 0)
         );
       })
     ).pipe(

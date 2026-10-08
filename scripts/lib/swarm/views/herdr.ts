@@ -13,6 +13,11 @@
  * one thing only: to recognise a question a harness asks at startup, before
  * it takes its brief (`STARTUP_QUESTIONS`). Where an answer stands comes
  * from status alone.
+ *
+ * Unlike a headless harness, an agent in a pane outlives its run: a run that
+ * times out (or a swarm that is stopped) leaves it working in its pane,
+ * claim and all, until the person closes the workspace the swarm names
+ * (`herdr workspace close <id>`).
  */
 import type { ProjectName } from "@repo/protocol/ids";
 import {
@@ -700,7 +705,8 @@ const titleOf = ({
  * pane per contributor laid out by `herdrLayout`, and a counter pane that
  * shows `counterFile`, which a fiber in the run's scope keeps writing from
  * the project's `watch`. Outside a herdr pane it refuses: herdr's skill
- * says not to drive a session from outside it.
+ * says not to drive a session from outside it. It refuses too when it can't
+ * read where the project stands (`lastHeld`), before any pane is made.
  */
 export const openHerdrView = (input: {
   readonly contributors: readonly Pick<Contributor, "handle" | "harness">[];
@@ -735,6 +741,9 @@ export const openHerdrView = (input: {
       });
     }
 
+    // Where the counter starts, read before any pane or claim: a run that
+    // can't say where the project stands stops here.
+    const from = yield* lastHeld(input.origin, input.project);
     const root = (yield* repoRoot).replace(/\/$/u, "");
     const counterFile = `${input.runDir}/counter.log`;
     const handles = input.contributors.map(({ handle }) => handle);
@@ -804,8 +813,6 @@ export const openHerdrView = (input: {
       ({ pane, title }) => orFailed(herdr(["pane", "rename", pane, title])),
       { discard: true }
     );
-
-    const from = yield* lastHeld(input.origin, input.project);
 
     yield* Effect.forkScoped(
       followCounter({
