@@ -964,10 +964,10 @@ describe("the dry run", () => {
         ]);
         expect([rows[0], rows[5], ...printed.slice(8)]).toStrictEqual([
           expect.stringContaining(
-            "/<run>/wren/clone' && claude -p --output-format stream-json --verbose --permission-mode bypassPermissions --model claude-opus-5-5 '<brief>'"
+            "/<run>/wren/clone' && claude -p --output-format stream-json --verbose --permission-mode bypassPermissions --strict-mcp-config --model claude-opus-5-5 '<brief>'"
           ),
           expect.stringMatching(
-            / pi -p --mode json .* -e \S+\/apps\/cli\/src\/pi\.ts '<brief>'$/u
+            / pi -p --mode json --no-mcp .* -e \S+\/apps\/cli\/src\/pi\.ts '<brief>'$/u
           ),
           "held: drop-legacy-fetch, drop-legacy-fetch-delete",
           "dry run: nothing claimed, no harness started",
