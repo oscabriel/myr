@@ -563,7 +563,9 @@ const live = Effect.gen(function* () {
   /**
    * The sealed checks a layer commit holds: its manifest's checks in the
    * policy's areas (a check in an area the policy does not name runs
-   * nowhere, 604 #3) whose files the commit has, sorted by path.
+   * nowhere, 604 #3) that cite a clause (one that cites none never judges
+   * an answer, admission or not, Q17) and whose files the commit has,
+   * sorted by path.
    */
   const sealedAt = (
     repo: RepoName,
@@ -581,11 +583,26 @@ const live = Effect.gen(function* () {
       const blobs = yield* blobsAt(repo, at);
       const areas = new Set<string>(Object.keys(checks.areas));
 
+      const uncited = Arr.dedupe(
+        manifest.value.checks.flatMap(({ area, clause }) =>
+          clause === undefined ? [area] : []
+        )
+      );
+
+      if (Arr.isReadonlyArrayNonEmpty(uncited)) {
+        yield* Effect.logWarning(
+          `a check in ${layer} at ${at} cites no clause and is left out of its suite`,
+          { areas: uncited }
+        );
+      }
+
       return Arr.sort(
         manifest.value.checks.flatMap((check): readonly Sealed[] => {
           const blob = blobs.get(check.path);
 
-          return blob === undefined || !areas.has(check.area)
+          return blob === undefined ||
+            !areas.has(check.area) ||
+            check.clause === undefined
             ? []
             : [
                 {
@@ -1009,17 +1026,15 @@ const live = Effect.gen(function* () {
       );
     });
 
+  // Only a head still proposed has a plan: the layer repo is not read for
+  // one that landed or was pushed over (every run step asks again).
   const admissionPlan: VisibilityPort["admissionPlan"] = (input, snapshot) =>
-    Effect.map(
-      admissionOf(input, snapshot),
-      Option.filter(() =>
-        Arr.some(
-          snapshot.layers,
-          ({ name, proposed }) =>
-            name === input.layer && proposed === input.head
-        )
-      )
-    );
+    Arr.some(
+      snapshot.layers,
+      ({ name, proposed }) => name === input.layer && proposed === input.head
+    )
+      ? admissionOf(input, snapshot)
+      : Effect.succeedNone;
 
   /**
    * An admission's results, judged by `./admission.ts` against the plan the
@@ -1083,11 +1098,22 @@ const live = Effect.gen(function* () {
         )
       );
 
-      const admitted = judged.admitted.map((entry, index) => ({
-        ...entry,
-        seq: seq + published.length + index,
-        suite: roots.get(entry.area) ?? entry.suite,
-      }));
+      // Each admitted area cites its new commitment, never the root its
+      // runs carried (that salt was kept nowhere, so nobody could check it).
+      const admitted = yield* Effect.forEach(judged.admitted, (entry, index) =>
+        Option.match(Option.fromUndefinedOr(roots.get(entry.area)), {
+          onNone: () =>
+            Effect.die(
+              `the landing of ${input.head} published no commitment for admitted area ${entry.area}`
+            ),
+          onSome: (suite) =>
+            Effect.succeed({
+              ...entry,
+              seq: seq + published.length + index,
+              suite,
+            }),
+        })
+      );
 
       return planOf({
         ...landed,

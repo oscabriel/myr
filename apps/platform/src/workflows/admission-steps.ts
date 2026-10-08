@@ -58,7 +58,7 @@ const Ran = Schema.TaggedUnion({
 type Ran = typeof Ran.Type;
 
 /** How a run step retries a Checker that could not run, before the push is left unjudged. */
-export const admissionRetry: StepRetry = {
+const admissionRetry: StepRetry = {
   backoff: "exponential",
   delayMs: 10_000,
   limit: 3,

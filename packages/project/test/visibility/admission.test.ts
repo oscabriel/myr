@@ -319,6 +319,28 @@ describe("a layer push's admission plan", () => {
     ]);
   });
 
+  it("runs every check of a changed area on main, but only its new or rewritten checks on a known-bad tree", () => {
+    // `export` held svg-title; the push adds csv-quote beside it.
+    const plan = planAdmission({
+      ...twoExportChecks,
+      landed: blobsOf([isoWeek, svgTitle]),
+      previous: Option.some(manifestOf([isoWeek, svgTitle])),
+    });
+
+    expect(
+      Result.map(plan, ({ runs }) =>
+        runs.map((each) => [label(each), each.job.runs.map(({ path }) => path)])
+      )
+    ).toStrictEqual(
+      Result.succeed([
+        ["export on main #1", [csvQuote.path, svgTitle.path]],
+        ["export on main #2", [csvQuote.path, svgTitle.path]],
+        ["export on main #3", [csvQuote.path, svgTitle.path]],
+        [`export on ${unescaped}`, [csvQuote.path]],
+      ])
+    );
+  });
+
   it("runs only the known-bad commits the manifest names and the layer holds, each once", () => {
     const plan = planAdmission({
       ...twoExportChecks,
@@ -746,6 +768,44 @@ describe("admission through the project service", () => {
           started: [first],
         });
       }).pipe(Effect.provide(visibilityWorld(admitting)))
+  );
+
+  it.effect(
+    "with admission off, lands a push but keeps a check that cites no clause out of its suite and commitments",
+    () =>
+      Effect.gen(function* () {
+        const { api } = yield* sealedByInes;
+
+        yield* countersigned(api);
+
+        const [svg, csv, iso] = firstSuite;
+        const cited = [svg, iso].flatMap((each) => (each ? [each] : []));
+
+        const landed = yield* pushed(
+          api,
+          Option.none(),
+          layerWith(firstSuite, [], [csv?.path ?? ""])
+        );
+
+        const row = yield* layerRow;
+        const roots = yield* rootsUnderStoredSalt(cited);
+        const { entries } = yield* api.ledger(anyone);
+
+        expect({
+          committed: entries.flatMap((entry) =>
+            LedgerEntry.guards.CommitmentPublished(entry)
+              ? [[entry.area, entry.checks, entry.authors, entry.suite]]
+              : []
+          ),
+          row: [row.landedSha, row.proposed],
+        }).toStrictEqual({
+          committed: [
+            [exportArea, 1, 1, roots.get(exportArea)],
+            [parserArea, 1, 1, roots.get(parserArea)],
+          ],
+          row: [landed, undefined],
+        });
+      }).pipe(Effect.provide(visibilityWorld()))
   );
 
   it.effect(

@@ -6,18 +6,23 @@
  * changes is admitted.
  *
  * - Every check in the suite cites the clause of an ask or a public doc it
- *   enforces; one that cites none is `UnstatedRequirement{area}` (shown to
- *   deciders only), before any run is planned.
+ *   enforces; one that cites none is `UnstatedRequirement{area}` (for the
+ *   deciders only, never the public; the platform logs it until Today can
+ *   show it), before any run is planned.
  * - Each changed area's checks run on main as many times as the policy
  *   asks (3 by default), and must pass every time: one red run refuses the
  *   area as flaky or broken.
- * - They run again on each known-bad tree the layer's manifest names (main
- *   with the known-bad commit's files laid over it), and must fail on at
- *   least as many as the policy asks: catching nothing refuses the area.
+ * - The checks the push adds or rewrites in the area run again on each
+ *   known-bad tree the layer's manifest names (main with the known-bad
+ *   commit's files laid over it), and must fail on at least as many as the
+ *   policy asks: catching nothing refuses the area. Only those run there,
+ *   so a new check that catches nothing cannot ride on an older one's
+ *   catch.
  *
- * An area whose checks are unchanged since the layer's landed head is not
- * run again. The public learns only `Admitted{area, suite, mainRuns,
- * knownBadCaught}`: counts and a root, never a check, a path or a clause.
+ * An area the push adds or rewrites no check in (its checks unchanged, or
+ * only removed) is not run again. The public learns only `Admitted{area,
+ * suite, mainRuns, knownBadCaught}`: counts and a root, never a check, a
+ * path or a clause.
  */
 import { commandFor } from "@repo/checks/kinds";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -127,8 +132,8 @@ export interface AdmissionResult {
   readonly refused: readonly AdmissionRefused[];
 }
 
-/** What admits an area when the policy says nothing: OSR §5.5's defaults (and nothing runs). */
-const atOnce = { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 } as const;
+/** The counts a plan carries when the policy asks for no admission (and no run is planned): OSR §5.5's defaults. */
+const osrDefaults = { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 } as const;
 
 /** A suite's checks in order: by area, then path. */
 const byAreaThenPath = Order.combine(
@@ -152,7 +157,7 @@ const suiteIn = (
     byAreaThenPath
   );
 
-/** One area's checks as (path, blob), to tell whether the push changed them. */
+/** One area's checks as (path, blob), to tell which the push added or rewrote. */
 const blobsIn = (
   checks: readonly PushedCheck[],
   area: AreaName,
@@ -168,13 +173,6 @@ const blobsIn = (
         })
       )
   );
-
-const sameBlobs = (
-  left: ReadonlyMap<string, BlobSha>,
-  right: ReadonlyMap<string, BlobSha>
-) =>
-  left.size === right.size &&
-  [...left].every(([path, blob]) => right.get(path) === blob);
 
 /** The runs that admit a layer push's checks; `UnstatedRequirement` for a check that cites no clause. */
 export const planAdmission = (
@@ -199,58 +197,61 @@ export const planAdmission = (
       suiteIn(previous, input.policy, (path) => input.landed.has(path)),
   });
 
+  /**
+   * Each area the push adds or rewrites a check in: all its checks, and
+   * the ones whose (path, blob) the landed head does not hold.
+   */
   const changed = Arr.sort(
     Object.keys(input.policy.areas).map((area) => AreaName.make(area)),
     Order.String
-  ).filter((area) => {
-    const now = blobsIn(suite, area, (path) =>
-      Option.map(fileOf(path), ({ blob }) => blob)
-    );
-
+  ).flatMap((area) => {
     const then = blobsIn(before, area, (path) =>
       Option.fromUndefinedOr(input.landed.get(path))
     );
 
-    return now.size > 0 && !sameBlobs(now, then);
+    const checks = suite.filter((check) => check.area === area);
+
+    const fresh = checks.filter(({ path }) =>
+      Option.exists(fileOf(path), ({ blob }) => then.get(path) !== blob)
+    );
+
+    return Arr.isReadonlyArrayNonEmpty(fresh) ? [{ area, checks, fresh }] : [];
   });
 
   const { admit } = input.policy;
 
   const sealedPaths = new Set(suite.map(({ path }) => path));
 
-  /** One area's job: its checks (after `overlay`, laid over main first), each run by the run block's `test`. */
+  /** A job of `checks` in `area` (after `overlay`, laid over main first), each run by the run block's `test`. */
   const jobOf = (
     area: AreaName,
+    checks: readonly PushedCheck[],
     overlay: readonly OverlayFile[]
-  ): HeldBackJob => {
-    const checks = suite.filter((check) => check.area === area);
-
-    return {
-      areas: [area],
-      at: input.head,
-      files: [
-        ...overlay.flatMap(({ content, path }) =>
-          sealedPaths.has(path) ? [] : [{ area, content, path }]
-        ),
-        ...checks.flatMap(({ path }) =>
-          Option.match(fileOf(path), {
-            onNone: () => [],
-            onSome: ({ content }) => [{ area, content, path }],
-          })
-        ),
-      ],
-      runs: checks.flatMap(({ path }) =>
-        Option.match(
-          commandFor(CheckSpec.cases.RedThenGreen.make({ path }), input.run),
-          {
-            onNone: () => [],
-            onSome: ({ command }) => [{ area, command, path }],
-          }
-        )
+  ): HeldBackJob => ({
+    areas: [area],
+    at: input.head,
+    files: [
+      ...overlay.flatMap(({ content, path }) =>
+        sealedPaths.has(path) ? [] : [{ area, content, path }]
       ),
-      suite: input.suite,
-    };
-  };
+      ...checks.flatMap(({ path }) =>
+        Option.match(fileOf(path), {
+          onNone: () => [],
+          onSome: ({ content }) => [{ area, content, path }],
+        })
+      ),
+    ],
+    runs: checks.flatMap(({ path }) =>
+      Option.match(
+        commandFor(CheckSpec.cases.RedThenGreen.make({ path }), input.run),
+        {
+          onNone: () => [],
+          onSome: ({ command }) => [{ area, command, path }],
+        }
+      )
+    ),
+    suite: input.suite,
+  });
 
   const knownBad = Arr.dedupe(input.manifest.knownBad).flatMap((tree) =>
     Option.match(Option.fromUndefinedOr(input.knownBad.get(tree)), {
@@ -259,11 +260,12 @@ export const planAdmission = (
     })
   );
 
+  // On main, every check of the area; on a known-bad tree, only the new ones.
   const runs =
     admit === undefined
       ? []
-      : changed.flatMap((area) => {
-          const onMain = jobOf(area, []);
+      : changed.flatMap(({ area, checks, fresh }) => {
+          const onMain = jobOf(area, checks, []);
 
           return [
             ...Arr.makeBy(admit.greenOnMainRuns, (index) =>
@@ -276,7 +278,7 @@ export const planAdmission = (
             ...knownBad.map(({ overlay, tree }) =>
               AdmissionRun.cases.OnKnownBad.make({
                 area,
-                job: jobOf(area, overlay),
+                job: jobOf(area, fresh, overlay),
                 tree,
               })
             ),
@@ -284,7 +286,7 @@ export const planAdmission = (
         });
 
   return Result.succeed({
-    admit: admit ?? atOnce,
+    admit: admit ?? osrDefaults,
     head: input.head,
     layer: input.manifest.layer,
     main: input.main,
