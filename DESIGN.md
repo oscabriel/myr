@@ -83,7 +83,7 @@ components:
 
 # Design System: the web
 
-The web's look, for every page issue to start from. Tokens live in `apps/web/src/styles.css`; the shared pieces that draw refusals, credit, posture, outcomes and stages live in `apps/web/src/features/shared/`, and a page uses them rather than drawing its own. Words follow `GLOSSARY.md` and `PRODUCT.md`. Written in W5 (issue 511) from the shell and shared pieces; W7 (issue 713) revises it from the pages that shipped.
+The web's look, for every page issue to start from. Tokens live in `apps/web/src/styles.css`; the shared pieces that draw refusals, credit, posture, outcomes and stages live in `apps/web/src/features/shared/`, and a page uses them rather than drawing its own. Words follow `GLOSSARY.md` and `PRODUCT.md`. Written in W5 (issue 511) from the shell and shared pieces, and checked against the pages that shipped by W5's integration (issue 599); W7 (issue 713) revises it.
 
 ## Overview
 
@@ -120,7 +120,7 @@ Each is text-safe: at least 5:1 on paper and on surface, in both themes.
 
 ### Neutral
 
-- **Bond paper** (`--background`, #f5f8fa; dark #0e1114): the page. Hex, because the `theme-color` meta and the web app manifest repeat it (`features/shared/theme.ts`; a test holds the two equal).
+- **Bond paper** (`--background`, #f5f8fa; dark #0e1114): the page. Hex, because the two `theme-color` metas (one per scheme, drawn by the root document's `ThemeColors`) and the web app manifest repeat it (`features/shared/theme.ts`; a test holds the two equal).
 - **Blue-black ink** (`--foreground`, oklch(0.21 0.015 258); dark oklch(0.94 0.005 258)): text, the double rule, primary buttons, the focus outline.
 - **Field surface** (`--surface`, oklch(0.955 0.005 245); dark oklch(0.215 0.009 258)): command lines and filled fields. shadcn's `bg-muted`, `bg-secondary` and `bg-accent` all resolve here.
 - **Hairline** (`--rule`, oklch(0.86 0.007 255); dark oklch(0.33 0.01 258)): every border and rule.

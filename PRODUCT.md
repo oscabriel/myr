@@ -2,7 +2,7 @@
 
 <!-- impeccable:product-schema 1 -->
 
-What the web of Myr is for, and what it never does. Words follow `GLOSSARY.md`: ask, answer, check, refusal, decider, Today, landing. Written in W5 (issue 511) before the pages were built; W7 (issue 713) revises it from what shipped. Facts marked ASSUMPTION were inferred from the build plan, not confirmed by the maintainer.
+What the web of Myr is for, and what it never does. Words follow `GLOSSARY.md`: ask, answer, check, refusal, decider, Today, landing. Written in W5 (issue 511) before the pages were built, and checked against what shipped by W5's integration (issue 599); W7 (issue 713) revises it. Facts marked ASSUMPTION were inferred from the build plan, not confirmed by the maintainer.
 
 ## Platform
 
@@ -33,11 +33,15 @@ A refusal is a typed value with a reason, a place, a next command and whether re
 - Pages per job:
   - **Front page** (`/`): open asks across projects a viewer may take, filtered by kind and by asks held for newcomers.
   - **Project** (`/$project`): its asks, its posture, its recent landings with their credit trailers, and how to take part (clone, `asks`, `claim`, `check`).
-  - **Ask** (`/$project/asks/$ask`): the want, the territory, the check, who may claim, and the commands; also served as Markdown.
+  - **Ask** (`/$project/asks/$ask`): the want, the territory, the check, who may claim, and the commands; also served as Markdown (by `Accept: text/markdown`, or at `/$project/asks/$ask.md`).
   - **Answer** (`/$project/answers/$ask`): the verdict stage by stage, the lanes, held-back results as one bit per area, or the refusal.
   - **Person** (`/people/$handle`): their credits by role and area, never a score.
-  - **Today** (`/today`): a decider's decisions with evidence, defaults and expiry, against the budget.
+  - **Today** (`/today`): a decider's decisions with evidence, defaults and expiry, against the budget; each decision has its own page (`/$project/decisions/$decision`), and a finish shows the answer's diff there. ASSUMPTION until the platform opens `Finish` decisions (it does not yet): the finish view is built and tested, but no live decision reaches it.
+  - **Sign-in** (`/auth/signin`): through the platform's own accounts; the session lives in an HttpOnly cookie the browser cannot read.
+  - **For agents**: `/llms.txt` and each project's `/$project/llms.txt`, `/.well-known/mcp.json`, and the skills at `/.well-known/agent-skills/` (the platform serves those, through the web).
   - **Ledger and env shape** (W6): the public record of layers, commitments and posture changes; the env shape with no values.
+- The project and answer pages update live while open (the project's `watch` stream), and fall back to reading again every 5 s when the stream cannot be held.
+- A project may not take a name the web uses for its own pages (`today`, `people`, `auth`, `rpc`, `releases`, `icons`, `assets`).
 - Phone width is a first-class target (Today installs as a PWA). ASSUMPTION: deciders use Today mostly on a phone and the other pages mostly on a laptop beside a terminal.
 
 ## Capabilities and Constraints

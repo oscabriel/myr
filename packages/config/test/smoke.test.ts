@@ -292,6 +292,32 @@ describe("smoke against a stage's web", () => {
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
+  // Live on dev-oscabriel (599): smoke ran 4 s after the web Worker's first
+  // deploy, and its new workers.dev hostname answered 404 to both probes; a
+  // run seconds later passed both.
+  it.live(
+    "asks the web again while a first deploy's hostname answers 404, and passes once it settles",
+    () =>
+      Effect.gen(function* () {
+        const origin = yield* fakePlatform(healthy);
+        const asked = { front: 0, llms: 0 };
+
+        const web = yield* fakePlatform((seen) => {
+          const count =
+            seen.path === "/" ? (asked.front += 1) : (asked.llms += 1);
+
+          return count <= 2 ? { status: 404 } : healthyWeb(seen);
+        });
+
+        const report = yield* smoke(origin, { settling: "10 seconds", web });
+
+        expect({
+          asked,
+          probes: report.probes.map(({ probe }) => probe),
+        }).toStrictEqual({ asked: { front: 3, llms: 3 }, probes: [...probes] });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
   it.live(
     "fails the web's probes when its front page is not HTML and its /llms.txt cannot reach the platform",
     () =>
@@ -422,7 +448,8 @@ describe("the smoke command", () => {
   it.live("probes the web at --web-url, and only there, beside --url", () =>
     Effect.gen(function* () {
       const origin = yield* fakePlatform(healthy);
-      const web = yield* fakePlatform(() => ({ status: 404 }));
+      // A web that answers, wrongly: JSON where a page and Markdown belong.
+      const web = yield* fakePlatform(() => ({ body: "{}", status: 200 }));
 
       yield* main(["--stage", "dev-oscabriel", "--url", origin]);
 

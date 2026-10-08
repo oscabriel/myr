@@ -166,16 +166,30 @@ const send = (
     })
   );
 
-/** `answer`, when its status is `expected`; a server error is transient. */
-const statusIs = (label: string, expected: number) => (answer: Answer) =>
-  answer.status === expected
-    ? Effect.succeed(answer)
-    : Effect.fail(
-        new Missed({
-          reason: `${label} answered ${answer.status}, not ${expected}`,
-          transient: answer.status >= 500,
-        })
-      );
+/** A server error: the Worker's own failure, which a fresh deploy gives for its first seconds. */
+const serverError = (status: number) => status >= 500;
+
+/**
+ * A server error, or a 404 from a hostname that is not serving yet: a
+ * Worker's first deploy to workers.dev answers 404 for its first seconds
+ * (599: smoke ran 4 s after the web's first deploy and got 404 twice). Only
+ * the web's probes read a 404 so; the platform's `missing-repo-404` expects
+ * one.
+ */
+const notServingYet = (status: number) => status >= 500 || status === 404;
+
+/** `answer`, when its status is `expected`; `transient` says which others to ask again. */
+const statusIs =
+  (label: string, expected: number, transient = serverError) =>
+  (answer: Answer) =>
+    answer.status === expected
+      ? Effect.succeed(answer)
+      : Effect.fail(
+          new Missed({
+            reason: `${label} answered ${answer.status}, not ${expected}`,
+            transient: transient(answer.status),
+          })
+        );
 
 /** A failure of any kind, as the miss `reason` names. */
 const missing =
@@ -352,7 +366,7 @@ const webFrontPage = (web: string) => {
   const label = "GET / on the web";
 
   return send(label, HttpClientRequest.get(`${web}/`)).pipe(
-    Effect.flatMap(statusIs(label, 200)),
+    Effect.flatMap(statusIs(label, 200, notServingYet)),
     Effect.flatMap(typeIs(label, "text/html", "HTML")),
     Effect.asVoid
   );
@@ -366,7 +380,7 @@ const webLlmsTxt = (web: string) => {
   const label = "GET /llms.txt on the web";
 
   return send(label, HttpClientRequest.get(`${web}/llms.txt`)).pipe(
-    Effect.flatMap(statusIs(label, 200)),
+    Effect.flatMap(statusIs(label, 200, notServingYet)),
     Effect.flatMap(typeIs(label, "text/markdown", "Markdown")),
     Effect.flatMap(({ text }) =>
       text.startsWith("# ")
