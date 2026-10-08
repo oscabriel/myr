@@ -182,6 +182,30 @@ describe("scanning a stream for stored values", () => {
     })
   );
 
+  it.effect(
+    "finds a value JSON-escaped or base64-encoded when the cut falls inside that form",
+    () =>
+      Effect.gen(function* () {
+        // Each cut leaves an end that begins the encoded form but not the
+        // value itself, so only a carry that knows the forms finds it.
+        const json = JSON.stringify({ token: stripe });
+        const encoded = `Basic ${base64(`ci:${sentry}`)}`;
+
+        const hits = yield* Effect.forEach(
+          [
+            chunked(json, [json.indexOf("\\") + 1]),
+            chunked(encoded, [encoded.length - 6]),
+          ],
+          (stream) => scanStream(stream, values)
+        );
+
+        expect(hits).toStrictEqual([
+          found("STRIPE_KEY"),
+          found("SENTRY_AUTH_TOKEN"),
+        ]);
+      })
+  );
+
   it.effect("finds a value cut inside one of its multi-byte characters", () =>
     Effect.gen(function* () {
       const accented = "pässwörd-für-prod";

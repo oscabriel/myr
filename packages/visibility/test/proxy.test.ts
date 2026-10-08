@@ -141,4 +141,16 @@ describe("a placeholder", () => {
       "__DB_PASSWORD_PLACEHOLDER__"
     );
   });
+
+  it("is made from the key when the item's @placeholder is empty: the gateway could not find an empty one to swap", () => {
+    const blank = sensitive("SENTRY_AUTH_TOKEN", {
+      placeholder: "",
+      proxy: { domains: ["sentry.io"] },
+    });
+
+    expect(placeholderFor(blank)).toBe("__SENTRY_AUTH_TOKEN_PLACEHOLDER__");
+    expect(
+      proxyMap({ items: [blank] }).map(({ placeholder }) => placeholder)
+    ).toStrictEqual(["__SENTRY_AUTH_TOKEN_PLACEHOLDER__"]);
+  });
 });

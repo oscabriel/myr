@@ -159,22 +159,26 @@ describe("write-only values over WebCrypto", () => {
     })
   );
 
-  it.effect("does not open a value with a byte changed anywhere in it", () =>
-    Effect.gen(function* () {
-      const sealed = yield* put(token);
+  it.effect(
+    "does not open a value with a byte changed in any of its fields",
+    () =>
+      Effect.gen(function* () {
+        const sealed = yield* put(token);
 
-      const steps = yield* Effect.forEach(
-        ["ciphertext", "iv", "wrappedKey"] as const,
-        (field) =>
-          Effect.exit(open(tampered(sealed, field))).pipe(Effect.map(defectOf))
-      );
+        const steps = yield* Effect.forEach(
+          ["ciphertext", "iv", "wrappedKey"] as const,
+          (field) =>
+            Effect.exit(open(tampered(sealed, field))).pipe(
+              Effect.map(defectOf)
+            )
+        );
 
-      expect(steps).toStrictEqual([
-        new SealedValueUnopenable({ step: "decrypt" }),
-        new SealedValueUnopenable({ step: "decrypt" }),
-        new SealedValueUnopenable({ step: "unwrap" }),
-      ]);
-    }).pipe(Effect.provide(masterKey))
+        expect(steps).toStrictEqual([
+          new SealedValueUnopenable({ step: "decrypt" }),
+          new SealedValueUnopenable({ step: "decrypt" }),
+          new SealedValueUnopenable({ step: "unwrap" }),
+        ]);
+      }).pipe(Effect.provide(masterKey))
   );
 
   it.effect("does not open a value sealed under a key version it lacks", () =>

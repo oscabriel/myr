@@ -8,7 +8,7 @@
  */
 import type { EnvItem, EnvSchemaView } from "@repo/protocol/domain/env";
 import type { EnvKey } from "@repo/protocol/ids";
-import { Option } from "effect";
+import { Option, String } from "effect";
 
 /** One host whose requests the platform intercepts for one item. */
 export interface ProxyRule {
@@ -29,10 +29,15 @@ export interface ProxyRule {
 /**
  * What unlanded code sees in place of an item's value: the item's own
  * `@placeholder`, or one made from its key alone (`__SENTRY_AUTH_TOKEN_PLACEHOLDER__`),
- * the same on every run and plainly not a real value.
+ * the same on every run and plainly not a real value. An empty
+ * `@placeholder` counts as none, as in varlock's proxy: the gateway swaps
+ * the placeholder for the value, and an empty one marks no place to swap.
  */
 export const placeholderFor = (item: EnvItem): string =>
-  item.placeholder ?? `__${item.key}_PLACEHOLDER__`;
+  Option.fromUndefinedOr(item.placeholder).pipe(
+    Option.filter(String.isNonEmpty),
+    Option.getOrElse(() => `__${item.key}_PLACEHOLDER__`)
+  );
 
 /** The rules for every `@sensitive` item's `@proxy`, one per domain, in the schema's order. */
 export const proxyMap = (
