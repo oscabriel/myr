@@ -226,7 +226,7 @@ describe("the panes", () => {
               "--session-id",
               "pell",
               "--model",
-              "opencode/gemini-3.8-flash",
+              "opencode-go/qwen3.8-flash",
               "-e",
               piAdapter,
             ],

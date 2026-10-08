@@ -89,7 +89,7 @@ On the morning of the take, in this order.
 - [ ] The staged commits are ready, and nothing else is:
   - `~/demo/datekit-bram`: a clone of datekit's main with two commits on top, the Do token as an English ordinal (every public test passes), then the one-line change in `examples/datekit/layers/maintainers/known-bad/export.patch`;
   - `~/demo/datekit-hand`: made during S05, with one README line committed before its push.
-- [ ] The harnesses are logged in and on the versions rehearsed, and herdr opens a fresh `demo` session. Amp updates first: its interactive mode refuses new threads until it does. Claude Code's auto-updater stays off for the take (`DISABLE_AUTOUPDATER=1` in the environment the swarm starts from), since an update mid-take changes its startup questions. pi holds the OpenCode Zen key pell's Gemini flash needs, or the roster swaps pell's model (see [`swarm-scenario.md`](swarm-scenario.md)). herdr's agent names must be unique in a session, so close the last swarm workspace, or start a new session, before the take:
+- [ ] The harnesses are logged in and on the versions rehearsed, and herdr opens a fresh `demo` session. Amp updates first: its interactive mode refuses new threads until it does. Claude Code's auto-updater stays off for the take (`DISABLE_AUTOUPDATER=1` in the environment the swarm starts from), since an update mid-take changes its startup questions. pi is signed in to the `opencode-go` provider pell's qwen flash and the other two pi contributors run on (`pi auth check --provider opencode-go` says `ready`; see [`swarm-scenario.md`](swarm-scenario.md)). herdr's agent names must be unique in a session, so close the last swarm workspace, or start a new session, before the take:
 
   ```sh
   amp update

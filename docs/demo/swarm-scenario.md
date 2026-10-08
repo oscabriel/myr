@@ -15,9 +15,9 @@ Six of the people burrow's `.myr/vouched.td` vouches for, each with one harness 
 | 3 | ivo | Amp | `medium` (one of its modes) | none | `drop-legacy-fetch-burrow-catalog` |
 | 4 | marisol | pi | `opencode-go/kimi-k3` | none | `drop-legacy-fetch-burrow-kit` |
 | 5 | dagny | pi | `opencode-go/glm-5.3` | none | `drop-legacy-fetch-burrow-notify` |
-| 6 | pell | pi | `opencode/gemini-3.8-flash` | the pi adapter (`-e`): the brief, the scope guard and a verdict gate | `drop-legacy-fetch-burrow-search` |
+| 6 | pell | pi | `opencode-go/qwen3.8-flash` | the pi adapter (`-e`): the brief, the scope guard and a verdict gate | `drop-legacy-fetch-burrow-search` |
 
-Each handle and model id is the one `scripts/lib/swarm/roster.ts` holds, word for word; the plan prints them (S09), and that printout is what the video shows. pell's Gemini flash is OpenCode Zen's, which pi reaches only once the OpenCode Zen key is in pi on the machine that runs the take; without it, pell's run is recorded as failed with that reason, and `opencode-go/qwen3.8-flash` (which runs headless with the adapter) is the one-line swap in the roster.
+Each handle and model id is the one `scripts/lib/swarm/roster.ts` holds, word for word; the plan prints them (S09), and that printout is what the video shows. pell ran OpenCode Zen's Gemini flash (`opencode/gemini-3.8-flash`) until 2026-10-08, when the swarm's live rehearsal swapped it for `opencode-go/qwen3.8-flash`: pi on this machine has no OpenCode Zen key, and the qwen flash runs headless with the adapter. Putting Gemini back is the one-line swap in the roster, once the key is in pi on the machine that runs the take.
 
 Every agent gets the same zero-install brief: the ask as its page says it, the fork's remote, and the loop the project's AGENTS.md gives (claim, work inside the territory, `myr check`, push, read the verdict). Nothing about the gate's internals.
 

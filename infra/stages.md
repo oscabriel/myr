@@ -124,7 +124,7 @@ As of 2026-10-08, after the demo's bootstrap. "Agent" is the build's agent.
 | H7: the recording | Open (Oct 13). | `docs/demo/` holds the script, the shot list and the rehearsal checklist. The demo stage is deployed and seeded (2026-10-08, 15:44 UTC), with nothing claimed; the rehearsal comes next. The recording lock exists: while `infra/.recording` is there, `infra/deploy.ts` refuses every deploy. | Run `bun infra/recording.ts on` before the first take and `bun infra/recording.ts off` after the last (the rehearsal checklist says when). |
 | H8: submitting | Open, due Oct 14 by noon PDT. | The demo URL is `https://web-demo.oscargabriel.workers.dev` (section 6). | Submit the repo URL, the video and the demo URL. |
 | H9: `docker login` | Not needed so far. No image pull has been rate-limited. | Nothing. | Only if a deploy's image pull is rate-limited: run `docker login` in your own terminal. |
-| OpenCode Zen key for the swarm's pell | Open. | pell is planned on `opencode/gemini-3.8-flash`. The fallback, a one-line swap to `opencode-go/qwen3.8-flash`, is recorded. | Add OpenCode Zen's key to pi, or accept the fallback. |
+| OpenCode Zen key for the swarm's pell | Not blocking: the fallback was taken on 2026-10-08. | pi here still has no OpenCode Zen key, so the roster now runs pell on `opencode-go/qwen3.8-flash`, as it ran in the swarm's live rehearsal on `dev-oscabriel`. | Nothing. To show Gemini flash in the take instead, add OpenCode Zen's key to pi and swap the roster's one line back. |
 | Deleting the throwaways | Open, after the rehearsal. | The teardown plan (section 4). | Read the teardown script and run it in your own terminal. |
 
 ## 6. URLs

@@ -5,11 +5,11 @@
  * `vouched.td`, so their claims are not `NotVouched`.
  *
  * The model ids are what this machine's harnesses list and run (2026-10-08):
- * `opencode models` for OpenCode's GPT model and OpenCode Zen's Gemini flash,
- * `pi --offline --list-models` for pi's (its ready provider is `opencode-go`),
- * `amp --help` for Amp's modes. OpenCode signed in with a ChatGPT account
- * refuses `openai/gpt-6.1-sol` ("not supported when using Codex with a
- * ChatGPT account"), so tamsin runs `openai/gpt-5.5`, which ran headless.
+ * `opencode models` for OpenCode's GPT model, `pi --offline --list-models`
+ * for pi's (its ready provider is `opencode-go`), `amp --help` for Amp's
+ * modes. OpenCode signed in with a ChatGPT account refuses
+ * `openai/gpt-6.1-sol` ("not supported when using Codex with a ChatGPT
+ * account"), so tamsin runs `openai/gpt-5.5`, which ran headless.
  */
 import { Handle } from "@repo/protocol/ids";
 import { Schema } from "effect";
@@ -76,12 +76,12 @@ export const roster: readonly [
     model: "opencode-go/glm-5.3",
   },
   // The tier-2 beat: the pi adapter's brief, scope guard and verdict gate.
-  // OpenCode Zen's provider (`opencode/…`) needs its key in pi on the
-  // machine that runs it (pi reports it not configured here).
+  // It ran OpenCode Zen's `opencode/gemini-3.8-flash` until pi here proved
+  // to have no OpenCode Zen key; the qwen flash ran the adapter live.
   {
     adapter: true,
     handle: Handle.make("pell"),
     harness: "pi",
-    model: "opencode/gemini-3.8-flash",
+    model: "opencode-go/qwen3.8-flash",
   },
 ];

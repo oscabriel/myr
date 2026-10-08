@@ -365,7 +365,7 @@ describe("the roster", () => {
           /^(?:low|medium|high|ultra)$/u,
           /\/kimi-k3$/u,
           /\/glm-5\.3$/u,
-          /\/gemini-[\d.]+-flash$/u,
+          /\/qwen[\d.]+-flash$/u,
         ];
 
         expect(
@@ -981,7 +981,7 @@ describe("the dry run", () => {
           [
             "pell",
             "pi",
-            "opencode/gemini-3.8-flash",
+            "opencode-go/qwen3.8-flash",
             children[5],
             "@burrow/search",
           ],
