@@ -136,6 +136,7 @@ const NOT_BINDINGS: ReadonlySet<string> = new Set([
   "compatibility_flags",
   "containers",
   "env",
+  "keep_names",
   "main",
   "migrations",
   "minify",

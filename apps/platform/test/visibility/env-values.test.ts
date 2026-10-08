@@ -1,8 +1,8 @@
 /**
  * Write-only values over the platform's surfaces (W6 614): the handler the
  * Worker serves, its Project DOs in process on SQLite, the platform's ports
- * in memory, and the visibility cartridge's env composed over them with
- * 603's real parser and 610's WebCrypto vault under the fake env's test
+ * in memory, and the visibility cartridge's env as the Worker composes it
+ * (603's real parser and 610's WebCrypto vault) under the fake env's test
  * `MASTER_KEY`. A decider sets datekit's token over `/rpc` with their
  * token; anyone reads the env shape over `/rpc` and sees who set it and
  * when. The value is in no response body, no log line and no event, and
@@ -39,7 +39,6 @@ import { RulesEvaluator } from "@repo/rules/rules-evaluator";
 import { gitClient } from "@repo/testkit/git-client";
 import { aProject } from "@repo/testkit/scenarios";
 import { untouchable } from "@repo/testkit/untouchable";
-import { EnvSchemaParserEnvSpec } from "@repo/visibility/env-schema/env-spec";
 import { SealedValue } from "@repo/visibility/vault";
 import {
   Cause,
@@ -64,7 +63,7 @@ import {
 import { decodeEnv, platformOn } from "../../src/platform.ts";
 import { projectShell } from "../../src/project-shell.ts";
 import { serve } from "../../src/surfaces.ts";
-import { envOn } from "../../src/visibility/env.ts";
+import { envLive } from "../../src/visibility/env.ts";
 import { fakeEnv } from "../fake-env.ts";
 import { origin } from "../harness.ts";
 import { inProcessNamespace } from "../project-namespace.ts";
@@ -170,7 +169,7 @@ const world = (kept: Kept) =>
         MemoryRateLimits(WorkerCaps),
         Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch")),
         Layer.succeed(Upstream, untouchable<Upstream["Service"]>("Upstream")),
-        envOn(config, EnvSchemaParserEnvSpec)
+        envLive(config)
       ).pipe(Layer.provideMerge(RepoHostMemory))
     );
 

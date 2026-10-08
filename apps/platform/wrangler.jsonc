@@ -21,6 +21,13 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   // Rat Stack's byte limits are for a minified bundle (scripts/startup-budget.ts).
   "minify": true,
+  // esbuild's name-keeping wraps every function and class in a helper call
+  // that restores its name after minifying: about 130 KB of the entry (W6
+  // 614 #1). Nothing here reads a name at run time: Effect's tagged errors
+  // set `name` from their tag, services are keyed by strings, and the
+  // runtime finds Durable Objects, Workflows and entrypoints by export name,
+  // which minifying keeps. A stack trace shows minified function names.
+  "keep_names": false,
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },

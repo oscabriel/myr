@@ -12,13 +12,15 @@
  *   platform's master key; the row and a public `ValueSet` ledger entry are
  *   the call's writes, and nothing returns the value.
  * - The env a check runs with: a placeholder for every sensitive item and
- *   the `@proxy` items, so unlanded code never sees a value.
- * - The scan: the one place a stored value is opened, to find it in a text
- *   or a blob, and it answers with the item's key alone.
+ *   the `@proxy` rules, so unlanded code never sees a value; a run of
+ *   landed code alone also carries the values, opened for that run.
+ * - The scan: the other place a stored value is opened, to find it in a
+ *   text or a blob, and it answers with the item's key alone.
  * - After a landing: a `ProxyWidened` decision for each item whose value
  *   may now reach a host it could not before (Q20; VL §8.7 #4).
  */
 import { RepoHost, Revision } from "@repo/artifacts/repo-host";
+import type { EnvProxy } from "@repo/checks/check-runner";
 import { Hostname } from "@repo/protocol/domain/common";
 import type { Evidence } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
@@ -44,6 +46,8 @@ import { EnvSchemaParser } from "@repo/visibility/env-schema";
 import { envSchemaViewOf } from "@repo/visibility/env-shape";
 import { scanBytes, scanText } from "@repo/visibility/leak-scan";
 import type { Watched } from "@repo/visibility/leak-scan";
+import { placeholderFor, proxyMap } from "@repo/visibility/proxy";
+import type { ProxyRule } from "@repo/visibility/proxy";
 import { SealedValue, WriteOnlyValues } from "@repo/visibility/vault";
 import {
   Array,
@@ -262,6 +266,25 @@ const decodeSealed = Schema.decodeUnknownEffect(
   Schema.toCodecJson(SealedValue)
 );
 
+/** `text`, unless it is absent or empty: the check job's wire takes no empty method or path. */
+const nonEmpty = (text: Option.Option<string>) =>
+  Option.getOrUndefined(Option.filter(text, (each) => each !== ""));
+
+/** A proxy rule as the check job carries it (611's `EnvProxy`): no key for a method or path the rule leaves open. */
+const onTheWire = (rule: ProxyRule): EnvProxy => {
+  const method = nonEmpty(rule.method);
+  const path = nonEmpty(rule.path);
+
+  return {
+    block: rule.block,
+    host: rule.host,
+    key: rule.key,
+    placeholder: rule.placeholder,
+    ...(method !== undefined && { method }),
+    ...(path !== undefined && { path }),
+  };
+};
+
 /** A host list as evidence shows it: `none` before an item had any. */
 const hostsText = (hosts: readonly string[]) =>
   hosts.length === 0 ? "none" : hosts.join(", ");
@@ -424,19 +447,39 @@ export const ProjectEnvLive: Layer.Layer<
             writes: { decisions: [...decisions.values()] },
           };
         }),
-      // A landed run would get the values opened; until the check job has
-      // a field for them (611 adds it), a landed run sees the placeholders
-      // too, and nothing here opens a value for any run.
-      runEnv: (_landed, snapshot) =>
-        Effect.map(landedRead(snapshot), ({ schema }) => {
+      // Every run sees placeholders and goes out through the proxy rules; a
+      // run of landed code alone also carries the values, opened here for
+      // the call that runs it (611's gateway swaps them in on the way out).
+      runEnv: ({ landed }, snapshot) =>
+        Effect.gen(function* () {
+          const { schema } = yield* landedRead(snapshot);
           const sensitive = schema.items.filter((item) => item.sensitive);
 
-          return sensitive.length === 0
-            ? noRunEnv
-            : {
-                placeholders: sensitive.map(({ key }) => key),
-                proxies: sensitive.filter((item) => item.proxy !== undefined),
-              };
+          if (sensitive.length === 0) {
+            return noRunEnv;
+          }
+
+          const unlanded = {
+            placeholders: sensitive.map((item) => ({
+              key: item.key,
+              placeholder: placeholderFor(item),
+            })),
+            proxies: proxyMap(schema).map(onTheWire),
+          };
+
+          if (!landed) {
+            return unlanded;
+          }
+
+          const keys = new Set(sensitive.map(({ key }) => key));
+
+          return {
+            ...unlanded,
+            landed,
+            values: yield* watched(
+              snapshot.envValues.filter((row) => keys.has(row.key))
+            ),
+          };
         }),
       scan: (scanned, snapshot) =>
         Array.isReadonlyArrayEmpty(snapshot.envValues)

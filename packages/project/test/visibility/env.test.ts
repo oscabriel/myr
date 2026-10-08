@@ -207,6 +207,27 @@ const sentryAuthToken = item({
   tags: ["release"],
 });
 
+/** What a check sees in place of the token's value. */
+const tokenPlaceholder = "__SENTRY_AUTH_TOKEN_PLACEHOLDER__";
+
+/**
+ * The env a check of datekit's code runs with, as the check job carries it
+ * (611's wire): the token's placeholder, and its one `@proxy` host with
+ * the path it allows and no method named.
+ */
+const tokenRunEnv = {
+  placeholders: [{ key: token, placeholder: tokenPlaceholder }],
+  proxies: [
+    {
+      block: false,
+      host: "sentry.io",
+      key: token,
+      path: "/api/**",
+      placeholder: tokenPlaceholder,
+    },
+  ],
+};
+
 /** The project as ines-v first pushes it: a package and its env schema. */
 const start = (schema: string): Files => [
   ["package.json", '{ "name": "datekit" }\n'],
@@ -573,6 +594,20 @@ describe("a write-only value", () => {
   );
 });
 
+/** datekit's schema with the token behind `proxy`'s argument list. */
+const proxied = (proxy: string) =>
+  [
+    "# @defaultSensitive=false",
+    "# ---",
+    "# @type=enum(development, test, production)",
+    "APP_ENV=development",
+    "",
+    "# @sensitive",
+    `# @proxy(${proxy})`,
+    "SENTRY_AUTH_TOKEN=",
+    "",
+  ].join("\n");
+
 describe("the env a check of unlanded code runs with", () => {
   it.effect(
     "names a placeholder for every sensitive item and the @proxy items, and holds no value",
@@ -585,12 +620,75 @@ describe("the env a check of unlanded code runs with", () => {
         const env = yield* ProjectEnv;
         const run = yield* env.runEnv({ landed: false }, yield* stored);
 
-        expect(run).toStrictEqual({
-          placeholders: [token],
-          proxies: [sentryAuthToken],
-        });
+        expect(run).toStrictEqual(tokenRunEnv);
         expect(JSON.stringify(run)).not.toContain(value);
       }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "leaves an empty @proxy path or method off the rule, as the check job's wire takes none",
+    () =>
+      Effect.gen(function* () {
+        yield* begun(proxied('domain="sentry.io", path="", method="POST"'));
+
+        const env = yield* ProjectEnv;
+
+        expect(
+          (yield* env.runEnv({ landed: false }, yield* stored)).proxies
+        ).toStrictEqual([
+          {
+            block: false,
+            host: "sentry.io",
+            key: token,
+            method: "POST",
+            placeholder: tokenPlaceholder,
+          },
+        ]);
+      }).pipe(Effect.provide(worldWith(EnvSchemaParserEnvSpec)))
+  );
+});
+
+describe("the env a check of landed code runs with", () => {
+  it.effect(
+    "carries the stored value, opened, beside the same placeholders and proxies",
+    () =>
+      Effect.gen(function* () {
+        const api = yield* begun();
+
+        yield* api.setEnv(ines, { key: token, value: Redacted.make(value) });
+
+        const env = yield* ProjectEnv;
+
+        const { values, ...run } = yield* env.runEnv(
+          { landed: true },
+          yield* stored
+        );
+
+        expect({
+          run,
+          values: values?.map((each) => ({
+            key: each.key,
+            value: Redacted.value(each.value),
+          })),
+        }).toStrictEqual({
+          run: { ...tokenRunEnv, landed: true },
+          values: [{ key: token, value }],
+        });
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect("carries no value for an item whose value nobody set", () =>
+    Effect.gen(function* () {
+      yield* begun();
+
+      const env = yield* ProjectEnv;
+
+      expect(yield* env.runEnv({ landed: true }, yield* stored)).toStrictEqual({
+        ...tokenRunEnv,
+        landed: true,
+        values: [],
+      });
+    }).pipe(Effect.provide(world))
   );
 });
 
@@ -621,20 +719,6 @@ describe("the scan for stored values", () => {
       }).pipe(Effect.provide(world))
   );
 });
-
-/** datekit's schema with the token behind `proxy`'s argument list. */
-const proxied = (proxy: string) =>
-  [
-    "# @defaultSensitive=false",
-    "# ---",
-    "# @type=enum(development, test, production)",
-    "APP_ENV=development",
-    "",
-    "# @sensitive",
-    `# @proxy(${proxy})`,
-    "SENTRY_AUTH_TOKEN=",
-    "",
-  ].join("\n");
 
 const narrow = proxied('domain="sentry.io"');
 

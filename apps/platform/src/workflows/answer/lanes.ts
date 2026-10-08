@@ -31,7 +31,7 @@ import { countLanes, measure } from "@repo/checks/kinds/ratchet";
 import { classifyFailure } from "@repo/gate/classify";
 import { MeasuredCount, runBlockOf } from "@repo/project/answer-runs";
 import type { AnswerRun } from "@repo/project/answer-runs";
-import { noRunEnv, RunEnv } from "@repo/project/env-port";
+import { noRunEnv, UnlandedRunEnv } from "@repo/project/env-port";
 import { LandingState } from "@repo/project/landing";
 import { Projects } from "@repo/project/projects";
 import { LaneOutcome, LaneResult } from "@repo/protocol/domain/answer";
@@ -86,7 +86,7 @@ export const Checked = Schema.Struct({
   /** Every path the answer changed against its base. */
   changed: Schema.Array(RepoPath),
   /** The env every check job of the answer carries (W6 609): placeholders, never a value. */
-  env: Schema.optionalKey(RunEnv),
+  env: Schema.optionalKey(UnlandedRunEnv),
   finish: AskKind.fields.finish,
   /**
    * The answer's fork, which holds the merged tree: the Lander keeps it there

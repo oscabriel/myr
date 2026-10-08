@@ -113,7 +113,7 @@ import { recordOf } from "./attention/record.ts";
 import { today } from "./attention/today.ts";
 import { standing } from "./attention/vouch.ts";
 import { ClaimState } from "./claim.ts";
-import type { RunEnv } from "./env-port.ts";
+import type { UnlandedRunEnv } from "./env-port.ts";
 import { ProjectEventInput } from "./events.ts";
 import { pushFacts } from "./facts.ts";
 import { Lander, Rebuild } from "./lander.ts";
@@ -384,7 +384,7 @@ export interface DeciderKernel<
   ) => Effect.Effect<ProjectRow>;
   readonly read: Effect.Effect<H>;
   /** The env a check of unlanded code carries (`ProjectEnv.runEnv`). */
-  readonly runEnv: Effect.Effect<RunEnv>;
+  readonly runEnv: Effect.Effect<UnlandedRunEnv>;
   /** A push's stage 0–1 facts with the layer paths and whether the pusher reads a layer (`ProjectVisibility`). */
   readonly withLayers: (facts: PushFacts) => Effect.Effect<PushFacts>;
   /** A repo's URL at the gateway. */
@@ -1738,7 +1738,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
   const carry = (
     input: {
       /** The env every check job carries: the decider's change is unlanded code. */
-      readonly env: RunEnv;
+      readonly env: UnlandedRunEnv;
       readonly lanes: readonly CheckLane[];
       readonly message: string;
       readonly now: DateTime.Utc;

@@ -39,7 +39,7 @@ import type { RequestId } from "@repo/protocol/ids";
 import { Refusal, VerifierBlocked } from "@repo/protocol/refusal";
 import { Context, Effect, Option, Schema } from "effect";
 
-import { RunEnv } from "./env-port.ts";
+import { UnlandedRunEnv } from "./env-port.ts";
 import { Change, LandingState, PendingDecision } from "./landing.ts";
 import type { LandingCommand, LandingEffect } from "./landing.ts";
 
@@ -122,7 +122,7 @@ export const AnswerRun = Schema.Struct({
    * The env every check job of the answer carries (`ProjectEnv.runEnv` for
    * unlanded code): placeholders and proxies, never a value. Absent, none.
    */
-  env: Schema.optionalKey(RunEnv),
+  env: Schema.optionalKey(UnlandedRunEnv),
   /** Whether a decider must finish it before it lands: the ask kind's `finish`. */
   finish: AskKind.fields.finish,
   /** What the checks run on the merged tree: the ask's check first, then every project lane. */

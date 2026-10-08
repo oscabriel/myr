@@ -25,19 +25,32 @@ import { noPlan, policyIn } from "./visibility-port.ts";
 import type { VisibilityPlan } from "./visibility-port.ts";
 
 /**
- * The env a check job carries: what unlanded code sees in place of each
- * write-only value, and the outbound hosts whose requests the platform
- * rewrites. The `CheckJob`'s own fields, so the job's schema decides their
- * form (611 reshapes them) and this follows.
+ * The env a check job of unlanded code carries: what the code sees in place
+ * of each write-only value, and the outbound hosts whose requests the
+ * platform's env gateway rewrites. Never a value, so it is what an answer's
+ * run keeps (`AnswerRun.env`) and what crosses a Workflow step. The
+ * `CheckJob`'s own fields, so the job's schema decides their form (611).
+ */
+export const UnlandedRunEnv = Schema.Struct(
+  Struct.pick(CheckJob.fields, ["placeholders", "proxies"])
+);
+
+export type UnlandedRunEnv = typeof UnlandedRunEnv.Type;
+
+/**
+ * The env a check job carries: as for unlanded code, and for a job of
+ * landed code alone, `landed` and the values opened for it (611). Built in
+ * the call that runs the job and dropped after: never stored, never in a
+ * Workflow step's output.
  */
 export const RunEnv = Schema.Struct(
-  Struct.pick(CheckJob.fields, ["placeholders", "proxies"])
+  Struct.pick(CheckJob.fields, ["landed", "placeholders", "proxies", "values"])
 );
 
 export type RunEnv = typeof RunEnv.Type;
 
 /** The env a job carries when the project has no write-only values: none. */
-export const noRunEnv: RunEnv = { placeholders: [], proxies: [] };
+export const noRunEnv: UnlandedRunEnv = { placeholders: [], proxies: [] };
 
 /** A project's env schema at one commit, as `envShape` shows it but for where and whose. */
 export type EnvSchemaFile = Omit<EnvSchemaView, "at" | "project">;
