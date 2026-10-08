@@ -1,5 +1,5 @@
 /**
- * A failing lane's log, kept and read through the platform (W4 418): the
+ * A failing lane's log, kept and read through the platform: the
  * Answer Workflow keeps the log of alice's failing `unit` lane in the
  * stage's evidence bucket (an R2 fake here, through `EvidenceStoreR2`, as
  * the Worker composes it), her refusal names only where it is kept, and

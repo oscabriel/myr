@@ -37,7 +37,7 @@ export interface AddedLine {
 }
 
 /**
- * Where a push goes, read from the repo's name (spec §4.5): the canonical
+ * Where a push goes, read from the repo's name: the canonical
  * repo `<project>`, a claim's fork `<project>--<ask>--<handle>`, a person's
  * working fork `<project>--me--<handle>`, or a layer's repo
  * `<project>--<layer>`.
@@ -75,12 +75,13 @@ export interface PushFacts {
   /** Whether `package.json#/scripts` differs; the caller compares the two JSON pointers. */
   readonly scriptsChanged: boolean;
   /**
-   * Paths that belong to a layer, which no public tree may carry (W6; empty
-   * before): files, or folders whose every path is the layer's.
+   * Paths that belong to a layer, which no public tree may carry (empty without
+   * the visibility cartridge): files, or folders whose every path is the
+   * layer's.
    */
   readonly layerPaths: ReadonlySet<RepoPath>;
   /**
-   * Whether the pusher reads the layers `layerPaths` holds (W6). Only a
+   * Whether the pusher reads the layers `layerPaths` holds. Only a
    * reader hears which of their paths collide with a layer; anyone else
    * hears every path they wrote, so the refusal is no oracle. It vouches for
    * every layer in the set: true only when the pusher reads all of them, so

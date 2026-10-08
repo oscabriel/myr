@@ -1,8 +1,8 @@
 /**
- * What each step of a release does on this machine (issue 715), over the
+ * What each step of a release does on this machine, over the
  * plan `scripts/lib/release.ts` makes:
  *
- * - `tsdown`: 416's `bun run build` in `apps/cli`, with both targets
+ * - `tsdown`: the CLI's `bun run build` in `apps/cli`, with both targets
  *   (`dist/`, and `dist/bin/<target>/` per target);
  * - `manifest`: the npm package, staged in `apps/cli/release/npm/`: the
  *   build's `dist/*.js` and `*.d.ts`, the generated `package.json`, its
@@ -74,9 +74,9 @@ export class ReleaseFailed extends Schema.TaggedError<ReleaseFailed>()(
 /** Where a release reads and writes, from the repo root. */
 export interface Layout {
   readonly root: string;
-  /** `apps/cli`, where 416's build runs. */
+  /** `apps/cli`, where the CLI's build runs. */
   readonly cli: string;
-  /** `apps/cli/dist`, 416's build. */
+  /** `apps/cli/dist`, the CLI's build. */
   readonly dist: string;
   /** `apps/cli/release`: the binaries, the install script and the checksums. */
   readonly release: string;

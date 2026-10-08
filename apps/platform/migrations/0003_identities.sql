@@ -1,4 +1,4 @@
--- Outside identities linked to platform accounts (W4 419): the provider
+-- Outside identities linked to platform accounts: the provider
 -- (`google`), its stable subject id for the person (Google's `sub`), and the
 -- account's `handle_key` (the handle lowercased, as in `accounts`). Nothing
 -- else: no email, no name, no token. One outside account names one handle,

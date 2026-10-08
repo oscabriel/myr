@@ -1,6 +1,6 @@
 /**
- * The platform's MCP surface beside its tools (issue 408), through its fetch
- * handler composed as the Worker's is (the W3 world), once dora has made
+ * The platform's MCP surface beside its tools, through its fetch
+ * handler composed as the Worker's is (the core loop's world), once dora has made
  * datekit and opened fix-week: an ask's brief is a resource, the projects
  * are one, the platform's skill is the prompt `contribute`, and every tool
  * whose contract can refuse returns its refusal as typed JSON. Requests are
@@ -120,7 +120,7 @@ const askFiles = Array.make(
   }
 );
 
-/** The W3 world once dora has made datekit, pushed it, and opened fix-week. */
+/** The core loop's world once dora has made datekit, pushed it, and opened fix-week. */
 class Seeded extends Context.Service<Seeded, CoreLoopWorld>()("test/Seeded") {}
 
 const seeded = Layer.effect(

@@ -1,5 +1,5 @@
 /**
- * The Checker's phases as data (OSR §5.3). `apps/sandbox` runs the plan; this
+ * The Checker's phases as data. `apps/sandbox` runs the plan; this
  * module only decides it, so its order can be proved over every input:
  *
  * 1. `Setup` installs what the checks need, with egress to the registries and

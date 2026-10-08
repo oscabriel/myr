@@ -2,7 +2,7 @@
  * A person's record (GLOSSARY "Record"): their landings by area that stayed
  * unreverted long enough to count, inside the window that still counts. It
  * answers trust rules only, yes or no: it is never a score, never a ranking,
- * and never leaves `packages/project` (spec §2.3). Nothing here counts
+ * and never leaves `packages/project`. Nothing here counts
  * against anyone: a check that flaked or a verifier that was blocked never
  * reached a landing, so it is not in the record at all.
  *

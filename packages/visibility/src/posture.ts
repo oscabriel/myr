@@ -159,7 +159,7 @@ const days = (count: number) => (count === 1 ? "1 day" : `${count} days`);
 
 const labelled = (posture: Posture, label: string) => ({ label, posture });
 
-/** The posture from the layers alone (OSR §2.6's first four rows). */
+/** The posture from the layers alone (the table's first four rows). */
 const fromLayers = (visibility: VisibilityPolicy) => {
   const layers = visibility.layers.filter(narrowing);
   const shipping = layers.filter(ships);
@@ -198,7 +198,7 @@ const fromLayers = (visibility: VisibilityPolicy) => {
 
 /**
  * A project's posture and the label it is shown as, computed from its
- * visibility config and its licence (OSR §2.6): Open; Open with sealed
+ * visibility config and its licence: Open; Open with sealed
  * evidence, naming the sealed areas; Open on schedule, naming the longest
  * embargo; Open core, naming the closed layers; Source available, under a
  * licence that is not OSI-approved, whatever the layers. `licence` is the
@@ -216,7 +216,7 @@ export const postureOf = (input: {
         onSome: fromLayers,
       });
 
-// OSR §2.6's table, from Open down.
+// The postures, from Open down.
 const FURTHER_FROM_OPEN: readonly Posture[] = [
   "open",
   "openWithSealedEvidence",
@@ -228,7 +228,7 @@ const FURTHER_FROM_OPEN: readonly Posture[] = [
 /**
  * Whether moving from one posture to another narrows what the public sees.
  * Narrowing is a `PostureChange` decision with a notice period; widening is
- * a release (OSR §2.6's ratchet).
+ * a release (the posture's ratchet).
  */
 export const narrows = (from: Posture, to: Posture): boolean =>
   FURTHER_FROM_OPEN.indexOf(to) > FURTHER_FROM_OPEN.indexOf(from);

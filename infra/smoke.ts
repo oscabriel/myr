@@ -1,8 +1,7 @@
 /**
  * smoke's probes: read-only requests to a live stage's platform and web, each
  * of which a misbehaving public surface fails. Every probe runs, whatever the
- * others did, so one run names every surface that broke; each one is timed
- * (311).
+ * others did, so one run names every surface that broke; each one is timed.
  *
  * 1. `health`: `GET /health` answers `200 {ok: true, stage}`, and names the
  *    stage smoke was pointed at, when it was told one;
@@ -16,7 +15,7 @@
  * 6. `web-front-page`: the web's `GET /` answers 200 with HTML;
  * 7. `web-llms-txt`: the web's `GET /llms.txt` answers 200 with Markdown,
  *    which it builds from the platform's project list, so only a web that
- *    reaches the platform through its service binding passes (W5 599).
+ *    reaches the platform through its service binding passes.
  *
  * The web's two run when smoke knows where the web lives: bootstrap's
  * workers.dev record, or `--web-url`.
@@ -77,7 +76,7 @@ const PATIENCE = Duration.seconds(30);
 
 /**
  * How long a probe keeps asking a platform that answers with a server error
- * or a defect, as a fresh deploy does for its first seconds (311: the first
+ * or a defect, as a fresh deploy does for its first seconds (the first
  * smoke after the first deploy got a 500 from `/health` and a defect from
  * the first Project DO call; a run seconds later passed).
  */
@@ -169,7 +168,7 @@ const serverError = (status: number) => status >= 500;
 /**
  * A server error, or a 404 from a hostname that is not serving yet: a
  * Worker's first deploy to workers.dev answers 404 for its first seconds
- * (599: smoke ran 4 s after the web's first deploy and got 404 twice). Only
+ * (once, smoke ran 4 s after the web's first deploy and got 404 twice). Only
  * the web's probes read a 404 so; the platform's `missing-repo-404` expects
  * one.
  */
@@ -247,7 +246,7 @@ const oauthMetadata = (origin: string) =>
     );
   });
 
-/** MCP stays closed to anyone without a credential (spec §8 D10). */
+/** MCP stays closed to anyone without a credential. */
 const mcpNeedsCredential = (origin: string) => {
   const label = "POST /mcp without a credential";
 

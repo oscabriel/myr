@@ -5,7 +5,7 @@
  * here without waking any project.
  *
  * Adapters: `/memory` here, seeded from data, for tests; `projection-d1`
- * (W3 309, W5 514) over D1 in the Worker.
+ * over D1 in the Worker.
  */
 import type { Reserve } from "@repo/protocol/domain/ask";
 import type {

@@ -1,5 +1,5 @@
 /**
- * `seed --as` (issue 806): a fresh copy of an example under another project
+ * `seed --as`: a fresh copy of an example under another project
  * name, so a live run (the swarm's rehearsal) can take a family nobody has
  * touched while the original stays fresh for the recording. A name some
  * project already has is refused, and a copy on a stage is written to the

@@ -7,8 +7,8 @@ import { EnvSchemaParser } from "../src/env-schema.ts";
 import { LayerRepos } from "../src/layer-repos.ts";
 import { SealedValue, WriteOnlyValues } from "../src/vault.ts";
 
-// The skeleton's test (601): the ports W6's group A builds against. The
-// issues that fill them add their own tests beside this one.
+// The skeleton's test: the ports the visibility package builds against.
+// The modules that fill them have their own tests beside this one.
 describe("the package", () => {
   it("is @repo/visibility", () => {
     expect(manifest.name).toBe("@repo/visibility");
@@ -26,7 +26,7 @@ describe("the package", () => {
     ]);
   });
 
-  // OSR §5.1: the private namespace is a RepoHost of its own, so code that
+  // The private namespace is a RepoHost of its own, so code that
   // asks for the public one can never be handed the layers' repos.
   it("keeps the layers' repos behind a RepoHost of their own", () => {
     expect(LayerRepos.key).not.toBe(RepoHost.key);

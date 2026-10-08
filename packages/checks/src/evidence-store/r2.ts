@@ -1,6 +1,6 @@
 /**
- * `EvidenceStore` over an R2 bucket: the stage's `evidence-<stage>` (spec
- * §4.4), so a lane's log outlives the isolate that ran its check. Each log
+ * `EvidenceStore` over an R2 bucket: the stage's `evidence-<stage>`,
+ * so a lane's log outlives the isolate that ran its check. Each log
  * is one object, its key the log's own name (`logRefOf`), its body the text
  * whole, labelled with its project and lane and nothing else. Putting a log
  * again under the same name replaces it, so a replayed step converges

@@ -44,7 +44,7 @@ export const root = Command.make(Brand.cli).pipe(
 );
 
 /**
- * The CLI's version until issue 416's build stamps the release's own.
+ * The CLI's version until the release build stamps its own.
  */
 const version = "0.0.0";
 

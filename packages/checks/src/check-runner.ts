@@ -1,7 +1,7 @@
 /**
- * The `CheckRunner` port (spec §4.2): the one way the platform and the CLI run
+ * The `CheckRunner` port: the one way the platform and the CLI run
  * a project's lanes on a tree. `CheckJob` and `CheckRun` are schemas because
- * they cross the sandbox's entrypoint in W3, decoded on both sides.
+ * they cross the sandbox's entrypoint, decoded on both sides.
  * Adapters: `/memory` (scripted, for tests) and `/local` (real processes in a
  * checkout, for the CLI's `check`); the Checker's lives in `apps/platform`.
  */
@@ -84,7 +84,7 @@ export const HeldBackCheck = Schema.Struct({
 export type HeldBackCheck = typeof HeldBackCheck.Type;
 
 /**
- * A sealed suite's part of a job (W6; OSR §5.3 step 5): the layer's files
+ * A sealed suite's part of a job: the layer's files
  * under the sealed areas and one run per sealed check, all read by the
  * platform at the commit the claim was pinned to. No layer repo, route or
  * token is named: the sandbox never reaches the layer.
@@ -102,7 +102,7 @@ export type HeldBackPart = typeof HeldBackPart.Type;
 
 /**
  * What a run sees in place of one write-only value: its item's key, set in
- * every command's env to the placeholder (W6; VL §8.4). The platform makes
+ * every command's env to the placeholder. The platform makes
  * the placeholder (`@repo/visibility/proxy`'s `placeholderFor`); the sandbox
  * only sets it.
  */
@@ -115,7 +115,7 @@ export type EnvPlaceholder = typeof EnvPlaceholder.Type;
 
 /**
  * One outbound host of a `@proxy` item, as `@repo/visibility/proxy`'s
- * `ProxyRule` crosses the wire (VL §8.5): HTTPS requests to `host` (a glob
+ * `ProxyRule` crosses the wire: HTTPS requests to `host` (a glob
  * stays one) go through the Checker's env gateway, which lets out only those
  * whose path matches `path` and whose method is `method` (any, when absent),
  * none when `block`, and, in a run of landed code alone, swaps `placeholder`
@@ -151,7 +151,7 @@ export type EnvValue = typeof EnvValue.Type;
  */
 export const CheckJob = Schema.Struct({
   at: CheckAt,
-  /** The sealed suite, from the layer at its pinned commit (W6). */
+  /** The sealed suite, from the layer at its pinned commit. */
   heldBack: Schema.optionalKey(HeldBackPart),
   /** Whether the job runs landed code. Absent, it does not. */
   landed: Schema.optionalKey(Schema.Boolean),

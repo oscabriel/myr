@@ -1,5 +1,5 @@
 /**
- * The Answer Workflow's program (spec §5 steps 7–8): one admitted answer
+ * The Answer Workflow's program: one admitted answer
  * carried to its verdict and onto main through its project's answer queue,
  * each port call a named durable step.
  *
@@ -18,7 +18,7 @@
  * the landing slot, or must wait for a retry: the project starts it again
  * then. A busy repo during a land is retried by the land step's own
  * retries first. It also stops when a port step finds nothing to do (the
- * answer no longer waits on that call), as W2's in-process run does:
+ * answer no longer waits on that call), as the in-process run (`/inline`) does:
  * whatever moved the answer on carries it, and a run that went on from the
  * state it found could ask for the same call forever. Wherever it stops,
  * its last step writes the verdict, as it stands then, as the note on the
@@ -178,7 +178,7 @@ const load = ({ project, requestId }: AnswerParams) =>
   Effect.flatMap(projectOf(project), (api) => api.answer(requestId));
 
 /**
- * The port call `effect` names, run as W2's in-process run runs it
+ * The port call `effect` names, run as the in-process run runs it
  * (`runStep`), on the answer's run as its project holds it now (as
  * `prepare` hands it on); `None` when the run no longer waits on `call`.
  */
@@ -201,7 +201,7 @@ const encodeVerdict = Schema.encodeEffect(Schema.fromJsonString(Verdict));
 
 /**
  * The stored write-only value `verdict`'s note would carry, by its item:
- * the project scans the note before it leaves the run (VL §8.6). Only the
+ * the project scans the note before it leaves the run. Only the
  * platform's log hears which item, never the value.
  */
 const leakIn = (params: AnswerParams, verdict: Verdict, where: string) =>
@@ -399,7 +399,7 @@ const guardedOut = (
  * `held-back.ts`; `earlier` carries over to an unchanged patch). The first
  * stage that refuses ends them, with its refusals and its lanes. The counts
  * go to the project with the report, which judges them against its
- * baselines (spec §5 step 7 (b)) and opens the decisions a reasoned escape
+ * baselines and opens the decisions a reasoned escape
  * asks for (step 7 (e)).
  */
 const checks = (
@@ -537,7 +537,7 @@ const record = (params: AnswerParams, given: Option.Option<Reported>) =>
 /**
  * What writing an answer's verdict note came to, kept as the step's value:
  * a replay reads it back, and a note that could not be written never fails
- * the run, in this run or a replay (W3 313 #5).
+ * the run, in this run or a replay.
  */
 const Noted = Schema.TaggedUnion({
   /** The answer has no verdict to note: no tree of it was checked. */
@@ -614,8 +614,8 @@ const noteVerdict = (params: AnswerParams) =>
   );
 
 /**
- * Once the run stops, the verdict note on the answer's head in its fork
- * (spec D22, W4 407): the verdict as `verdict` shows it, so an answerer
+ * Once the run stops, the verdict note on the answer's head in its fork:
+ * the verdict as `verdict` shows it, so an answerer
  * reads where the answer stands with plain git, refused, waiting or
  * landed. Its own step, named for the outcome the run stopped at, so a
  * replay reads the record and a restarted run writes the same note again,

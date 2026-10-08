@@ -88,7 +88,7 @@ export interface EnvSwap {
 }
 
 /**
- * Where a job's `@proxy` hosts go (W6; VL §8.5): each of `hosts` to the env
+ * Where a job's `@proxy` hosts go: each of `hosts` to the env
  * gateway, which lets out only the requests `rules` allow and swaps a
  * placeholder for its value only when `values` holds it, which only a job of
  * landed code fills. Every host is HTTPS and named once.

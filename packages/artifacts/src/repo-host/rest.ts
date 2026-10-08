@@ -2,13 +2,13 @@
  * `RepoHost` over the Artifacts REST API, with a Cloudflare API token: for
  * code that runs outside a Worker, such as infra scripts and the seed
  * script. It passes the contract the binding passes, and types the same
- * surprises (S1, S7):
+ * surprises:
  *
  * - a fork names its target (`{name, default_branch_only: true}`), which
  *   cf's `artifacts namespaces repos fork` cannot do (cf #180);
  * - a fork that answers 500 (code 10400) is tried once more, and an
  *   already-exists or a second 500 after that may be the fork the first
- *   made: it is, if it lists `main` (S7), as on the binding;
+ *   made: it is, if it lists `main`, as on the binding;
  * - `refs` and `push` have no REST route, so they go over git smart HTTP to
  *   the repo's `remote` (`smart-http.ts`), with a repo token this layer mints.
  *
@@ -24,7 +24,7 @@
  * | `create` | `POST /repos` | `repos create` | `{name}` |
  * | `remote`, and whether a repo exists | `GET /repos/{name}` | `repos get` | |
  * | `remove` | `DELETE /repos/{name}` | `repos delete` | |
- * | `fork` | `POST /repos/{base}/fork` | `repos fork` | `{name, default_branch_only: true}`: the docs and the probes (S1 #9, S7) send `name`; cf's schema lacks it (cf #180) |
+ * | `fork` | `POST /repos/{base}/fork` | `repos fork` | `{name, default_branch_only: true}`: the docs and the probes send `name`; cf's schema lacks it (cf #180) |
  * | `importFrom` | `POST /repos/{name}/import` | `repos import` | `{url, branch?}` |
  * | `mintToken`, and the git calls' tokens | `POST /tokens` | `tokens create` | `{repo, scope, ttl}` |
  * | `revokeToken` | `DELETE /tokens/{id}` | `tokens revoke` | |
@@ -41,11 +41,11 @@
  * plaintext, scope, expires_at}`; a repo still being imported or forked
  * answers 409 (cf's generated client declares 409 for a repo's info and a
  * token's mint too); errors carry Artifacts' numeric codes (its errors
- * page), which the binding's `numericCode` matches (workers-types), and S7
+ * page), which the binding's `numericCode` matches (workers-types), and probes
  * saw 10201 and 10400 live. A refusal that names no code at all, such as a
  * proxy's, is read by its status: 404 is not found, 5xx internal. One that
  * names only Cloudflare's own codes (7000, an unknown route) is a defect.
- * ASSUMPTIONs, for a live run (W3 308) to settle:
+ * ASSUMPTIONs, for a live run to settle:
  *
  * - a commit is the binding's metadata, spelled in snake case
  *   (`tree_hash`) as the API's other fields are, or in camel case as the
@@ -63,7 +63,7 @@
  * tried once more when they have passed. Git calls share one token per repo
  * and scope, minted on first use, minted again near its expiry, and revoked
  * when the layer closes. The day-long write token create, fork and import
- * return (S1 #2) is dropped, as the binding drops it.
+ * return is dropped, as the binding drops it.
  */
 import { CommitSha } from "@repo/protocol/ids";
 import {
@@ -125,7 +125,7 @@ class Refused extends Data.TaggedError("Refused")<{
   readonly message: string;
 }> {}
 
-/** A fork that answered 500, which may still have made the repo (S7 #2). */
+/** A fork that answered 500, which may still have made the repo. */
 class MaybeForked extends Data.TaggedError("MaybeForked")<{
   readonly refused: Refused;
 }> {}
@@ -327,7 +327,7 @@ const make = (options: {
 }) =>
   Effect.gen(function* () {
     // The service alone: the layer's whole context would carry its Scope, and
-    // every call's finalizers would wait for the layer's end (217).
+    // every call's finalizers would wait for the layer's end.
     const fetch = yield* Fetch;
 
     const root = [
@@ -571,7 +571,7 @@ const make = (options: {
 
     /**
      * After a 500 and then an already-exists or a second 500, the fork may be
-     * made (S7): it is, if it lists `main`. Otherwise it is still being made,
+     * made: it is, if it lists `main`. Otherwise it is still being made,
      * or was undone; either way the caller tries again later.
      */
     const confirmed = (name: RepoName) =>
@@ -652,8 +652,8 @@ const make = (options: {
             Match.when(is("NOT_FOUND"), () =>
               remoteOf(name).pipe(Effect.as(Option.none()))
             ),
-            // A blob's or a commit's id names no tree, as on the other stores
-            // (202 Comment 5); any other failure stays one.
+            // A blob's or a commit's id names no tree, as on the other stores;
+            // any other failure stays one.
             Match.when(is("INTERNAL_ERROR"), () =>
               blobOrCommit(name, tree).pipe(
                 Effect.flatMap((other) =>
@@ -718,7 +718,7 @@ const make = (options: {
               : Effect.die(refused)
           )
         ),
-      // S7: a 500 is tried once more; an already-exists or a second 500 after
+      // A 500 is tried once more; an already-exists or a second 500 after
       // it may be the fork the first made, so it is confirmed, not trusted.
       fork: (base, name) =>
         forkOnce(base, name).pipe(

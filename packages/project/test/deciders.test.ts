@@ -1014,7 +1014,7 @@ describe("a decider's own change", () => {
 
 /**
  * The world, with a rules evaluator that also reads the vouch file at the
- * commit it evaluates, as the real one does (204's `finishPolicy`): its
+ * commit it evaluates, as the real one does (`finishPolicy`): its
  * lines join the scenario's.
  */
 const vouchingWorld = Layer.effect(
@@ -1298,9 +1298,8 @@ const crediting = Effect.gen(function* () {
   };
 });
 
-// Assisted-by never reaches a credit row (220's `creditsByArea` test, and
-// `CreditSummary`'s role type); no answer here carries an agent trailer,
-// since 214's answers carry none yet.
+// Assisted-by never reaches a credit row (the `creditsByArea` test, and
+// `CreditSummary`'s role type); no answer here carries an agent trailer.
 describe("credits", () => {
   it.effect("count a person's roles by project and area across projects", () =>
     Effect.map(
@@ -1392,8 +1391,8 @@ const strayReported = Effect.gen(function* () {
 });
 
 /**
- * A push to canonical main the platform did not make, reported by OnPush
- * (313), which opens the decision, then decided by alice.
+ * A push to canonical main the platform did not make, reported by OnPush,
+ * which opens the decision, then decided by alice.
  */
 const strayDecided = (choice: "accept" | "decline") =>
   Effect.gen(function* () {

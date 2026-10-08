@@ -1,7 +1,7 @@
 /**
- * The ledger of throwaway resources (issue 701): every namespace, repo or
+ * The ledger of throwaway resources: every namespace, repo or
  * project a smoke run, a swarm run or a `seed --as` copy makes on a stage is
- * written to `infra/created.jsonl`, so teardown (808) acts only on what this
+ * written to `infra/created.jsonl`, so teardown acts only on what this
  * build made.
  */
 import { NodeServices } from "@effect/platform-node";

@@ -1,7 +1,7 @@
 /**
  * The signed-in decider's Today, as an atom over the `today` contract: every
  * project they decide in, or the one `project` names. The browser's `/rpc`
- * call carries the session cookie (spec §3.3); the platform decides who is
+ * call carries the session cookie; the platform decides who is
  * asking, and answers a person who decides nothing with `NotDecider`.
  *
  * A write that changes Today (a decision taken, here or by a teammate's

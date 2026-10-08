@@ -1,15 +1,15 @@
 /**
- * The visibility cartridge's landing guards (W6 613; OSR §5.4): the
+ * The visibility cartridge's landing guards: the
  * no-write-down guards the `Answer` Workflow runs on an answer's merged
  * change set before any check, provided as its `LandingGuards` port.
  *
  * - `PrivatePathInPublicTree`: a path in any layer's path set, as the
  *   project gives it (`layerFacts`). It names exactly which paths collide
  *   only when everyone accountable for the answer reads every layer;
- *   anyone else hears every path they added or modified (602's
- *   `privatePaths`), so the refusal is no map of the layers.
+ *   anyone else hears every path they added or modified
+ *   (`privatePaths`), so the refusal is no map of the layers.
  * - `LayerContentInPublicTree`: an added blob identical to a blob of a
- *   layer the answerer or a finisher reads (602's `writeDown`). Only the
+ *   layer the answerer or a finisher reads (`writeDown`). Only the
  *   blobs of layers they read are compared, read here from the private
  *   namespace (`LayerRepos`) at the layer's `main`; for anyone else the
  *   guard says nothing, never an oracle on a layer's content.
@@ -36,7 +36,7 @@ import { layerRepos } from "./layer-repos.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** A layer's repo: as declared, or `<project>--<layer>` (spec §4.5). */
+/** A layer's repo: as declared, or `<project>--<layer>`. */
 const repoOf = (project: string, layer: LayerDeclaration) =>
   layer.repo ?? RepoName.make(`${project}--${layer.name}`);
 

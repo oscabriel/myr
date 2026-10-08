@@ -14,7 +14,7 @@ import { DateTime, Effect, Option, Schema } from "effect";
 import { committerLine } from "./trailers.ts";
 
 /**
- * Where verdicts live as git notes (spec D22): one JSON note per commit, read
+ * Where verdicts live as git notes: one JSON note per commit, read
  * with `git notes --ref=<slug> show <commit>`.
  */
 export const notesRef = RefName.make(`refs/notes/${Brand.slug}`);

@@ -194,7 +194,7 @@ const distinctAsks = (asks: PolicyInput["asks"]) => {
  * Turns what the config folder evaluated to into the project's `Policy` at
  * `at`, filling in what the platform knows from the facts: the run block
  * (`fromCI` resolved by the finder), the modules from the workspaces, each
- * package territory's folder (the sdk's `{dir}`), the judge closure, `owners` as the initializer (spec D20), and the vouch
+ * package territory's folder (the sdk's `{dir}`), the judge closure, `owners` as the initializer, and the vouch
  * file's lines. Each ask counts as open, opened at `facts.now` in `at`: the
  * Project DO overwrites `openedAt`, `openedIn` and `state` from its own rows.
  * The whole is decoded with `Policy`, so a value the finishers or facts got
@@ -247,7 +247,7 @@ export const finishPolicy = (input: {
     } satisfies typeof Policy.Encoded;
 
     // The project's layers and held-back checks, as `visibility.ts` states
-    // them; a project without one is Open (OSR §4.1).
+    // them; a project without one is Open.
     const stated =
       policy.visibility === undefined
         ? candidate

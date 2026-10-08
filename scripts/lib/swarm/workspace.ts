@@ -177,7 +177,7 @@ export const run = (input: {
  * (2 s unless a test says otherwise) after the first, `FORK_TRIES` more at
  * most, so about a minute. A claim returns before its outbox has made the
  * fork, and an Artifacts fork that failed under load is made again only at
- * the Project's next alarm, with backoff. Found live (804): one of six
+ * the Project's next alarm, with backoff. Found live: one of six
  * claims made at once was cloned too soon.
  */
 export const ForkWait = Context.Reference<Duration.Duration>("swarm/ForkWait", {

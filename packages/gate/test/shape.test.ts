@@ -66,7 +66,7 @@ const everyProblem = push(
 );
 
 // The language service reads its directive anywhere in a source file, so
-// the marker is joined at run time (spec §7.4).
+// the marker is joined at run time.
 const effectDiagnostics = ["@effect", "-diagnostics"].join("");
 
 // Two modules, `a` and `b`; the ask's territory is `a`, and the judge
@@ -107,7 +107,7 @@ const pushToA = (
     },
   });
 
-// Every default marker in spec §4.2, as a tool writes it on an added line.
+// Every default marker, as a tool writes it on an added line.
 const markerLines: readonly (readonly [string, string])[] = [
   [".skip(", '  it.skip("parses week 53", () => {'],
   [".only(", '  describe.only("weeks", () => {'],

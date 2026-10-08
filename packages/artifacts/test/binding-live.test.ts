@@ -1,8 +1,8 @@
 /**
  * The binding against live Artifacts. Opt-in, never in `verify`: it runs only
  * with `LIVE_ARTIFACTS=1` and `LIVE_ARTIFACTS_HARNESS` naming, by absolute
- * path, a harness module outside this repo (spec §7.4: live-harness code lives
- * in wanted-explainer). The harness exports `live()`, which resolves to
+ * path, a harness module outside this repo (live-harness code lives
+ * outside it). The harness exports `live()`, which resolves to
  *
  * ```ts
  * {
@@ -24,7 +24,7 @@ import { Fetch, FetchFailed } from "../src/fetch.ts";
 import { RepoHostBinding } from "../src/repo-host/binding.ts";
 import { describeRepoHost } from "./repo-host-contract.ts";
 
-/** The namespace another project owns (spec §4.4). */
+/** The namespace another project owns. */
 const FORBIDDEN = "witness";
 
 const harnessPath = process.env.LIVE_ARTIFACTS_HARNESS;
@@ -62,7 +62,7 @@ const Harness = Schema.Struct({
     Schema.check(
       Schema.makeFilter((namespace) =>
         namespace === FORBIDDEN
-          ? `${FORBIDDEN} belongs to another project (spec §4.4)`
+          ? `${FORBIDDEN} belongs to another project`
           : undefined
       )
     )
@@ -171,7 +171,7 @@ const fetchOver = (send: Harness["fetch"]) =>
 
 describe.runIf(live)("against live Artifacts", () => {
   // Artifacts imports only public HTTPS remotes, and its own refuse anonymous
-  // reads (S1 #10), so the import cases do not run here.
+  // reads, so the import cases do not run here.
   describeRepoHost(
     "binding (live)",
     Layer.unwrap(

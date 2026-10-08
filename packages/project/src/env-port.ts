@@ -1,9 +1,9 @@
 /**
- * The env shape's neutral port (W6 609; ADR 0009): a project's public env
+ * The env shape's neutral port (ADR 0009): a project's public env
  * schema, its write-only values, the env its checks run with, and the scan
  * that finds a stored value where it must not be. The default is a project
  * without the visibility cartridge: no items, no values, nothing to scan
- * for. The cartridge's `ProjectEnv` (614) parses `.env.schema` at the
+ * for. The cartridge's `ProjectEnv` parses `.env.schema` at the
  * landed SHA and seals values with the platform's master key.
  *
  * As `visibility-port.ts`: each method reads the project as the call has it
@@ -29,7 +29,7 @@ import type { VisibilityPlan } from "./visibility-port.ts";
  * of each write-only value, and the outbound hosts whose requests the
  * platform's env gateway rewrites. Never a value, so it is what an answer's
  * run keeps (`AnswerRun.env`) and what crosses a Workflow step. The
- * `CheckJob`'s own fields, so the job's schema decides their form (611).
+ * `CheckJob`'s own fields, so the job's schema decides their form.
  */
 export const UnlandedRunEnv = Schema.Struct(
   Struct.pick(CheckJob.fields, ["placeholders", "proxies"])
@@ -39,7 +39,7 @@ export type UnlandedRunEnv = typeof UnlandedRunEnv.Type;
 
 /**
  * The env a check job carries: as for unlanded code, and for a job of
- * landed code alone, `landed` and the values opened for it (611). Built in
+ * landed code alone, `landed` and the values opened for it. Built in
  * the call that runs the job and dropped after: never stored, never in a
  * Workflow step's output.
  */
@@ -55,7 +55,7 @@ export const noRunEnv: UnlandedRunEnv = { placeholders: [], proxies: [] };
 /** A project's env schema at one commit, as `envShape` shows it but for where and whose. */
 export type EnvSchemaFile = Omit<EnvSchemaView, "at" | "project">;
 
-/** Where the env schema lives: the repo's root (VL §8.3). */
+/** Where the env schema lives: the repo's root. */
 const envFile = RepoPath.make(".env.schema");
 
 /** A write-only value set: what `setEnv` answers with, and the rows that keep it sealed. */

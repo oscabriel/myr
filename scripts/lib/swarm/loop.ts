@@ -26,7 +26,7 @@
  *
  * Where the harness runs, and how a prompt reaches it, is the run's view
  * (`views/`): its own headless process by default, or a herdr pane
- * (`--view herdr`, issue 717). The loop is the same in both.
+ * (`--view herdr`). The loop is the same in both.
  */
 import { Brand } from "@repo/brand";
 import type { AnswerView } from "@repo/protocol/domain/answer";
@@ -115,7 +115,7 @@ export const startCommand = (input: {
  * proxy and certificates. Nothing secret: the run's `SESSION_TOKENS`, cloud
  * tokens and any parent harness's session never reach a contributor's
  * harness, whose only credential is the person's token in the workspace's
- * env (PI §7: a harness runs with the user's OS permissions).
+ * env (a harness runs with the user's OS permissions).
  */
 const KEPT_FROM_SWARM = [
   "HOME",

@@ -1,5 +1,5 @@
 /**
- * The null answer (CAA D): the ask's territory as an answer that does
+ * The null answer: the ask's territory as an answer that does
  * nothing. Every function, arrow, class method and getter the territory
  * exports returns `undefined`, a name a check imports from the territory
  * that main lacks gets a stand-in that does the same, and the rest of the

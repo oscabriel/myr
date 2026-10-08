@@ -171,7 +171,7 @@ interface DiskWorld {
 
 /**
  * Bare repos on local disk (`RepoHost` `/local`), served by real `git
- * http-backend`, as the W3 world serves them: what the platform writes
+ * http-backend`, as the core loop's world serves them: what the platform writes
  * through the port, git reads from the remote.
  */
 const diskWorld: Effect.Effect<

@@ -1,6 +1,5 @@
 /**
- * One check job, phase by phase, in one container that holds no credential
- * (spec §4.3; OSR §5.3):
+ * One check job, phase by phase, in one container that holds no credential:
  *
  * 1. clone: the job's tree, through the clone route, whose gateway adds the
  *    read token outside the container;
@@ -17,7 +16,7 @@
  * cannot write) is `VerifierBlocked`: the gate's trouble, never the
  * answer's. A lane that fails or runs out of time is that lane's result.
  *
- * A sealed suite (W6; spec D17, OSR §5.3) is written only after the
+ * A sealed suite is written only after the
  * snapshot and with egress off, so no snapshot and no request carries it
  * out, and it reports one result per area (`@repo/checks/held-back-filter`).
  * From its first write on, nothing a command prints leaves the Checker: the
@@ -81,8 +80,8 @@ const TRUST = {
 };
 
 /**
- * The project's own bins first, as `npm run` puts them (ASSUMPTION from W2
- * 205 #8), then the image's.
+ * The project's own bins first, as `npm run` puts them (an
+ * ASSUMPTION), then the image's.
  */
 const PATH = [
   `${REPO}/node_modules/.bin`,
@@ -114,7 +113,7 @@ const ENV = {
 
 /**
  * The env every command of the project runs with (setup, the lanes, each
- * sealed check): each write-only value's placeholder (VL §8.4: a process
+ * sealed check): each write-only value's placeholder (a process
  * env beats any resolver, so an unchanged `.env.schema` still loads), under
  * the Checker's own env, which no item's key displaces (an item named
  * `PATH` or `NODE_EXTRA_CA_CERTS` keeps the Checker's). Never a value.
@@ -242,7 +241,7 @@ const keeping =
   (text) =>
     keep(kept, { ...log, text });
 
-/** Nowhere: the command ran beside the sealed files (spec D17). */
+/** Nowhere: the command ran beside the sealed files. */
 const dropping: Recorder = () => Effect.void;
 
 /**
@@ -250,7 +249,7 @@ const dropping: Recorder = () => Effect.void;
  * output handed to `record`. At the limit the Checker stops waiting for
  * it; the process itself ends only when the container is destroyed (the
  * `Box` adapter aborts an `exec` that is still starting, not one already
- * running: W3 315 Comments, for 399).
+ * running).
  */
 const exec = (
   record: Recorder,
@@ -451,7 +450,7 @@ const snapshot = (job: Job, key: string) =>
       return;
     }
 
-    // A project's canonical repo carries the project's name (spec §4.5).
+    // A project's canonical repo carries the project's name.
     if (!CheckAt.guards.Commit(at) || repo !== RepoName.make(project)) {
       yield* Effect.logInfo("an answer's setup is not kept").pipe(
         Effect.annotateLogs({ phase: "snapshot" })

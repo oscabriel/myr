@@ -1,5 +1,5 @@
 /**
- * The web as it deploys (AGENTS.md principle 6, issue 505): the production
+ * The web as it deploys (AGENTS.md principle 6): the production
  * `vite build`, run as `infra/deploy.ts` and bytes:check run it
  * (`NODE_ENV=production`), into a folder of its own, once for every test
  * here. Its client output carries the web app manifest and every icon the
@@ -254,7 +254,7 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
 
     // A build that resolves `#backend` to `src/dev/backend.ts` fails here
     // (`devBackend`) and in the next case (the dev world's modules): checked
-    // by a plant at W5's integration, once 502 gave the dev world its code.
+    // by a planted fault, once the dev world had its code.
     it.effect("resolves #backend to the forward to PLATFORM", () =>
       Effect.gen(function* () {
         const output = yield* Built;

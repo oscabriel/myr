@@ -3,13 +3,13 @@
  * code that takes the binding. It keeps the surprises the spikes found in the
  * real one:
  *
- * - under `wrangler dev`, errors arrive as plain `Error`s with no `code`
- *   (S1 #22): pass `{ codeless: true }`;
+ * - under `wrangler dev`, errors arrive as plain `Error`s with no `code`:
+ *   pass `{ codeless: true }`;
  * - under load, a fork answers HTTP 500 after making the repo, and the retry
- *   answers 409 (S7 #2): pass `{ forkFailures: n }`;
+ *   answers 409: pass `{ forkFailures: n }`;
  * - reads by ref resolve short branch names and commit ids only, never
- *   `refs/heads/main` (S1 #20);
- * - `info().lastPushAt` stays `null` after pushes (S1 #21).
+ *   `refs/heads/main`;
+ * - `info().lastPushAt` stays `null` after pushes.
  *
  * It takes its host structurally (`HostLike`), so `@repo/testkit` depends on
  * no adapter package: a `RepoHost` service value satisfies `HostLike`. Each
@@ -174,8 +174,8 @@ class Refused extends Data.TaggedError("Refused")<{
 }> {}
 
 /**
- * The REST API's numeric code for each binding code. The spikes recorded two
- * (S7: 10201 and 10400); the rest are unknown and read 0, so tests match on
+ * The REST API's numeric code for each binding code. The probes recorded two
+ * (10201 and 10400); the rest are unknown and read 0, so tests match on
  * `code`.
  */
 const numericCodes = {
@@ -190,7 +190,7 @@ const numericOf = (code: ArtifactsError["code"]) =>
     Match.orElse(() => 0)
   );
 
-/** A host's error as the binding words it (S1 #22, S7 #2); a refusal stays as it is. */
+/** A host's error as the binding words it; a refusal stays as it is. */
 const refusalOf = (error: HostError | Refused) =>
   Match.valueTags(error, {
     ForkInProgress: ({ name }) =>
@@ -245,7 +245,7 @@ const decodePath = Schema.decodeUnknownOption(RepoPath);
 
 /**
  * `main` → that branch; 40 hex digits → that commit; anything else, such as
- * `refs/heads/main` or a tag, resolves to nothing (S1 #20).
+ * `refs/heads/main` or a tag, resolves to nothing.
  */
 const revisionOf = (ref: string): Option.Option<Revision> =>
   isObjectId(ref)
@@ -383,7 +383,7 @@ export const fakeArtifactsBinding = (
       return { expiresAt, id: token.id, plaintext, scope: token.scope };
     });
 
-  /** A new repo's result: its metadata, its remote and a day-long write token (S1 #2). */
+  /** A new repo's result: its metadata, its remote and a day-long write token. */
   const createdOf = (repo: Kept) =>
     Effect.gen(function* () {
       const remote = yield* remoteOf(repo.name);
@@ -405,7 +405,7 @@ export const fakeArtifactsBinding = (
     defaultBranch: repo.defaultBranch,
     description: repo.description,
     id: repo.id,
-    // Still null after pushes (S1 #21).
+    // Still null after pushes.
     lastPushAt: null,
     name: repo.name,
     readOnly: repo.readOnly,

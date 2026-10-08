@@ -117,12 +117,12 @@ const result = (report: Uint8Array) =>
     },
   });
 
-// What an upstream says when a ref moved under a push: Artifacts (S1), then
+// What an upstream says when a ref moved under a push: Artifacts, then
 // git's own receive-pack (2.56).
 const MOVED = new Set(["stale ref", "incorrect old value provided"]);
 
 // Artifacts' whole reply to a push it is too busy for: one fatal side-band
-// message and no report (S1, S2).
+// message and no report.
 const BUSY = "artifacts_git_receive_pack_busy";
 
 const busy = (messages: readonly Uint8Array[]) =>

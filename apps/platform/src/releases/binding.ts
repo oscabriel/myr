@@ -1,6 +1,6 @@
 /**
- * `ReleaseStore` over the stage's `RELEASES` R2 bucket (`releases-<stage>`,
- * W4 401). It only reads: W7 715 uploads with Wrangler.
+ * `ReleaseStore` over the stage's `RELEASES` R2 bucket (`releases-<stage>`).
+ * It only reads: the release script uploads with Wrangler.
  */
 import { Effect, Layer, Option } from "effect";
 

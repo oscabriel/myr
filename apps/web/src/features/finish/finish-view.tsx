@@ -2,15 +2,15 @@
  * A `Finish` decision's page: the answer's diff beside the ask's want and the
  * verdict, and the git lines a decider runs to finish it from their own
  * clone. The web shows the diff and the commands; it never calls `finish`
- * (that contract's surfaces are RPC, MCP and the CLI; spec §3.2).
+ * (that contract's surfaces are RPC, MCP and the CLI).
  *
- * What the page reads from the decision's evidence (ASSUMPTION: the
- * platform's `Finish` decisions carry these; issue 504's Comments ask for
- * them): `patch`, the answer's unified diff, and `fork`, the name of the
- * answer's fork (spec §4.5: `<project>--<ask>--<handle>`), where a finish
- * fetches the head and pushes its commits. Without a patch the page shows
- * the lines and no diff; without a fork it names the fork by the spec's
- * pattern and leaves the answerer's handle for the decider to fill in.
+ * What the page reads from the decision's evidence (ASSUMPTION: the platform's
+ * `Finish` decisions carry these; nothing opens one yet): `patch`, the answer's
+ * unified diff, and `fork`, the name of the answer's fork
+ * (`<project>--<ask>--<handle>`), where a finish fetches the head and pushes
+ * its commits. Without a patch the page shows the lines and no diff; without a
+ * fork it names the fork by the claim fork's pattern and leaves the answerer's
+ * handle for the decider to fill in.
  */
 import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";

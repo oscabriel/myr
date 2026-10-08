@@ -5,21 +5,21 @@
  * gate; profile it with `wrangler check startup` in the Worker's folder.
  *
  * The first limits were Rat Stack's (900,000 entry bytes for its 822,362-byte
- * Worker). The platform Worker outgrew them in W3 by carrying more surfaces:
- * 1,513,671 entry bytes once W3 was whole, of which Effect is about 813,000,
- * the OAuth provider 114,000, isomorphic-git and pako 141,000 (the binding's
- * smart-HTTP pushes) and yaml 103,000 (the run-block finder, at each policy
- * refresh). Its startup is 116 to 171 ms live, far under Cloudflare's 1 s
- * limit. The entry limit sits about 10% above that entry, as an alarm for
- * growth. A dynamic `import()` does not shrink the entry: Wrangler's esbuild
- * build has no code splitting and inlines it (checked in W3 399), so moving
- * a dependency off the entry takes a module of its own (`find_additional_modules`)
- * or a Worker of its own.
+ * Worker). The platform Worker outgrew them by carrying more surfaces:
+ * 1,513,671 entry bytes once the core loop ran on Cloudflare, of which Effect
+ * is about 813,000, the OAuth provider 114,000, isomorphic-git and pako 141,000
+ * (the binding's smart-HTTP pushes) and yaml 103,000 (the run-block finder, at
+ * each policy refresh). Its startup is 116 to 171 ms live, far under
+ * Cloudflare's 1 s limit. The entry limit sits about 10% above that entry, as
+ * an alarm for growth. A dynamic `import()` does not shrink the entry:
+ * Wrangler's esbuild build has no code splitting and inlines it (checked by a
+ * probe), so moving a dependency off the entry takes a module of its own
+ * (`find_additional_modules`) or a Worker of its own.
  *
  * The web Worker is built by Vite first (`vite build`, through the
  * Cloudflare plugin, which writes the deploy config under `dist/`); its dry
  * run then bundles nothing more and copies Vite's modules. Its first
- * measurement (W5 501) was an entry of 723,418 bytes, unminified, under the
+ * measurement was an entry of 723,418 bytes, unminified, under the
  * same limits.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";

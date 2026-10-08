@@ -1,18 +1,18 @@
 /**
- * The `Lander` port (spec §4.2): the one way an answer's head is merged onto
+ * The `Lander` port: the one way an answer's head is merged onto
  * main, a decider's ask files are composed onto it, a checked tree lands on
  * canonical `main` as a platform commit, and the config folder is read at a
  * landed commit. The Lander is trusted and runs no project code.
  *
- * Three additions to the spec's port (212): `land`'s `rebuild`, since `merge`
+ * Three additions to the port as first drawn: `land`'s `rebuild`, since `merge`
  * and `land` run in separate calls (the Answer Workflow's steps), so a
  * stateless adapter rebuilds the tree it lands; `land`'s `verdict`, the note
  * written after main moves; and `compose`, for running an ask's check red
- * first before the ask opens (spec §5 step 3).
+ * first before the ask opens.
  *
  * Adapters: `/memory` (scripted, for tests) and `/isogit` (isomorphic-git over
  * `RepoHost`, the fallback until the container Lander in `apps/sandbox`
- * passes, spec D6).
+ * passes).
  */
 import { RefName } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
@@ -39,7 +39,7 @@ import type { Array, Effect, Option } from "effect";
 export type { Change } from "@repo/git/tree-diff";
 
 /**
- * The mirror of canonical `main` (ADR 0005, spec D22): it moves only after
+ * The mirror of canonical `main` (ADR 0005): it moves only after
  * `main` did, in its own push, and only to the commit `main` points at.
  */
 export const landedRef = RefName.make(`${Brand.refsPrefix}landed`);
@@ -114,7 +114,7 @@ export interface LandJob {
   readonly verdict: Option.Option<Verdict>;
 }
 
-/** Bookkeeping written after `main` moved, each in its own push (S1 #6). */
+/** Bookkeeping written after `main` moved, each in its own push. */
 export type Bookkeeping = "mirror" | "notes";
 
 /**
@@ -155,7 +155,7 @@ export class Lander extends Context.Service<
      * base), or `StaleBase` with the paths that conflict. An adapter whose
      * Checker fetches the tree keeps it where the Checker reaches: the
      * sandbox Lander pushes a commit of it to the fork's
-     * `${Brand.refsPrefix}merge/<tree>` (W3 304 #1).
+     * `${Brand.refsPrefix}merge/<tree>`.
      */
     readonly merge: (
       job: MergeJob

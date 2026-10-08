@@ -1,11 +1,11 @@
 /**
  * What starts the `Answer` Workflow. For one answer request: the port that
- * starts it is W2 214's `AnswerRuns` (`@repo/project/answer-runs`); the
- * Project Durable Object implements it with its project bound (W3 302), and
- * the Workflow decodes these params (304). The instance id is the request
- * id, so a second start of one request changes nothing.
+ * starts it is the project service's `AnswerRuns`
+ * (`@repo/project/answer-runs`); the Project Durable Object implements it with
+ * its project bound, and the Workflow decodes these params. The instance id is
+ * the request id, so a second start of one request changes nothing.
  *
- * For the admission of a layer push's sealed checks (W6 609, OSR §5.5):
+ * For the admission of a layer push's sealed checks:
  * admission runs as steps of the same Workflow under its own tagged
  * params, so typed visibility adds no Workflow binding. Its instance id is
  * `admissionId`, so a push admitted twice runs once.

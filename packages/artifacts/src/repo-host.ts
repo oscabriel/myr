@@ -59,7 +59,7 @@ export type TreeEntry = typeof TreeEntry.Type;
 
 /**
  * Where a read starts. Artifacts' binding resolves short branch names and
- * commit ids only (S1 #20), so these are the only two kinds.
+ * commit ids only, so these are the only two kinds.
  */
 export type Revision = Data.TaggedEnum<{
   Branch: { readonly name: BranchName };
@@ -111,7 +111,7 @@ export interface RefUpdate {
   readonly to: CommitSha;
 }
 
-/** What one ref in a push came to. A push is never atomic across refs (S1 #6). */
+/** What one ref in a push came to. A push is never atomic across refs. */
 export type RefOutcome = Data.TaggedEnum<{
   Updated: { readonly ref: RefName };
   Stale: { readonly ref: RefName; readonly tip: Option.Option<CommitSha> };
@@ -140,7 +140,7 @@ export class ImportRefused extends Schema.TaggedError<ImportRefused>()(
   { name: RepoName, reason: Schema.String }
 ) {}
 
-/** The store refused a whole push while busy with another (S1 #5); retry. */
+/** The store refused a whole push while busy with another; retry. */
 export class HostBusy extends Schema.TaggedError<HostBusy>()("HostBusy", {
   name: RepoName,
 }) {}

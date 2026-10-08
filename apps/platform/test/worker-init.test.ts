@@ -342,7 +342,7 @@ const signedUp = (handle: string, password: string) =>
       Layer.mergeAll(
         AccountsMemory.layer,
         Layer.succeed(OAuthStore, store),
-        // No Google client in the fake env: Google sign-in touches neither (W4 419).
+        // No Google client in the fake env: Google sign-in touches neither.
         IdentitiesMemory.layer,
         Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch")),
         SignInAttemptsMemory.layer,

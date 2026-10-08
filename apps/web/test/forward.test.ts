@@ -1,6 +1,6 @@
 /**
- * The paths the platform serves and the web host only passes on (issue
- * 505): the projects' skills under `/.well-known/agent-skills/`, the CLI's
+ * The paths the platform serves and the web host only passes on:
+ * the projects' skills under `/.well-known/agent-skills/`, the CLI's
  * `/install.sh` and its `/releases/`. Each route hands GET and HEAD to the
  * backend; the production backend forwards over `PLATFORM` at the
  * platform's URL with the path, query, method and headers as they came,

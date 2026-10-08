@@ -70,7 +70,7 @@ describe("the platform Worker's env", () => {
     })
   );
 
-  // OSR §5.1: layer repos live in a namespace of their own, which only
+  // Layer repos live in a namespace of their own, which only
   // this Worker binds.
   it.effect("fails to start without the private namespace", () =>
     Effect.gen(function* () {
@@ -223,7 +223,7 @@ describe("the platform Worker's env", () => {
     Effect.gen(function* () {
       const { fetch } = yield* served(platform(fakeEnv()));
 
-      // A name the platform never makes (spec §4.5): the gateway answers
+      // A name the platform never makes: the gateway answers
       // before any port, and nobody is asked to sign in.
       const response = yield* fetch(
         new Request(

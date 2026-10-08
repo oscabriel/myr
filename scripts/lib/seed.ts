@@ -1,21 +1,21 @@
 /**
- * The seed's core (issue 509): what to put on a platform for one example
+ * The seed's core: what to put on a platform for one example
  * project, read from the example's tracked files, and putting it there.
  *
  * A plan (`planSeed`) is the library as it was before anyone asked (every
  * tracked file but the asks, the checks they name and the layers), the
  * decider its config names for the whole tree, each ask with the files it
  * opens with, and each layer the example keeps under `layers/<layer>/`
- * with its known-bad trees (issue 608). Only what git tracks ships, so an
+ * with its known-bad trees. Only what git tracks ships, so an
  * ignored file, and above all a closed env file, never leaves the machine.
  *
  * A run (`runSeed`) makes the project and pushes main's first commit as the
- * platform's operator (spec D20: the initializer decides until the config
- * names deciders), through the gateway's first-push admission (D1), then
+ * platform's operator (the initializer decides until the config
+ * names deciders), through the gateway's first-push admission, then
  * opens each ask as the decider, so each is red first on the platform's own
- * Checker (spec §5 steps 1–3). Last, as the decider, it pushes each layer
+ * Checker. Last, as the decider, it pushes each layer
  * to the repo the platform made for it in the private namespace, through
- * the gateway (606), never to the public tree. A step already done is
+ * the gateway, never to the public tree. A step already done is
  * reported `already` and left alone, so a second run changes nothing.
  *
  * A platform is a `SeedTarget`: a stage (`stageTarget`) or the Node world
@@ -97,7 +97,7 @@ export interface AskStep {
 }
 
 /**
- * A known-bad tree for a layer's admission (OSR §5.5): main's first tree
+ * A known-bad tree for a layer's admission: main's first tree
  * with one change that breaks an area, made a commit of its own (no
  * parent, the decider's, at the seed's fixed dates), so it is the same
  * commit on every platform and the layer's manifest can name it.
@@ -116,11 +116,11 @@ export interface KnownBadStep {
 /**
  * One layer the seed pushes to the private namespace, once main has landed
  * and declared it: its repo's tree, at the same root-relative paths as
- * main's (OSR §5.1), and the known-bad trees its admission runs on.
+ * main's, and the known-bad trees its admission runs on.
  */
 export interface LayerStep {
   readonly layer: LayerName;
-  /** Its repo in the private namespace: `<project>--<layer>` (spec §4.5). */
+  /** Its repo in the private namespace: `<project>--<layer>`. */
   readonly repo: RepoName;
   /** Every file under the example's `layers/<layer>/`, at its path there. */
   readonly files: Array.NonEmptyReadonlyArray<SeedFile>;
@@ -159,7 +159,7 @@ const LAYERS = "layers/";
 /** A known-bad change a layer keeps: `known-bad/<area>.patch`. */
 const KNOWN_BAD = /^known-bad\/(?<area>[^/]+)\.patch$/u;
 
-/** A layer's manifest in the JSON form the platform reads (612). */
+/** A layer's manifest in the JSON form the platform reads. */
 const MANIFEST_FILE = `${Brand.configDir}/layer.json`;
 
 // Where a patch's diff starts; the words before it say what it breaks.
@@ -387,7 +387,7 @@ const knownBadOf = (input: {
     })
   );
 
-/** A layer's repo in the private namespace: `<project>--<layer>` (spec §4.5). */
+/** A layer's repo in the private namespace: `<project>--<layer>`. */
 const layerRepo = (project: ProjectName, layer: LayerName) =>
   RepoName.make(`${project}--${layer}`);
 
@@ -816,8 +816,8 @@ class NotMadeYet extends Schema.TaggedError<NotMadeYet>()("NotMadeYet", {
 /**
  * Pushes one layer to its repo in the private namespace, as the decider,
  * once the platform has made it (a landing that declares the layer makes
- * it, 612): first each known-bad commit to its branch, so admission finds
- * every commit the manifest names (615), then the layer's files to main,
+ * it): first each known-bad commit to its branch, so admission finds
+ * every commit the manifest names, then the layer's files to main,
  * which proposes its checks. A layer whose main is there is left alone.
  */
 const seedLayer = (

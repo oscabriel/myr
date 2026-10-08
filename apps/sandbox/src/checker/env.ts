@@ -1,5 +1,5 @@
 /**
- * A check job's env part, as the Checker applies it (W6; VL §8.4–8.5): which
+ * A check job's env part, as the Checker applies it: which
  * `@proxy` hosts go to the env gateway, with which rules, and which values
  * the gateway may swap in. Pure: the Checker opens the route once egress is
  * off (`run.ts`), and the Durable Object reserves its hosts before the
@@ -103,7 +103,7 @@ const swapsOf = (
  * The job's env route: its rules whose host is intercepted, each with the
  * host the intercept takes; the hosts, each once; and the values a landed
  * job's gateway may swap in. None when no host is left, or when the job has
- * a sealed suite: sealed checks run with the network off (605, D17), and a
+ * a sealed suite: sealed checks run with the network off, and a
  * run with sealed files beside it has no landed value to swap anyway.
  */
 export const envPlanOf = (job: CheckJob): EnvPlan => {

@@ -2,7 +2,7 @@
  * datekit with a maintainers layer whose sealed suite has areas `export`
  * (two checks) and `parser` (one), over the Answer Workflow's world
  * (`../workflows/answer.fixtures.ts`): the project service sees fakes of
- * the two visibility ports (612's and 614's are built beside this issue),
+ * the two visibility ports (the cartridge's own are tested on their own),
  * the Checker answers held-back jobs from a script of failing areas, the
  * layer's repo lives in a `LayerRepos` of its own, and the cartridge's
  * landing guards (`src/visibility/held-back.ts`) are plugged in over them.
@@ -10,8 +10,8 @@
  * The fakes keep to the ports' contracts: the visibility port pins every
  * claim to one suite, reads the suite's files for its job, counts failed
  * held-back runs per claim (the third is `AttemptsExhausted`) and gives
- * 602's trailer value when every area passed; the env port keeps a value
- * `setEnv` stored, and scans with 610's scanner.
+ * the trailer's value when every area passed; the env port keeps a value
+ * `setEnv` stored, and scans with the leak scanner.
  */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -248,7 +248,7 @@ const KeptValue = Schema.Struct({ fake: Schema.String });
 
 /**
  * The env port: a decider's value kept as it was given (only a fake keeps
- * a value it could read back), and 610's scanner over every kept value.
+ * a value it could read back), and the leak scanner over every kept value.
  */
 const envPort: EnvPort = {
   ...noEnv,

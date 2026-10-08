@@ -9,7 +9,7 @@
  * fork (`MakeFork`), the start of an answer run (`StartAnswer`), a
  * landing's unwritten bookkeeping, written by landing the same job again
  * (`Bookkeeping`), and an effect a visibility plan asked for, settled by
- * the port that planned it (`Visibility`, W6 609).
+ * the port that planned it (`Visibility`).
  */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { Verdict } from "@repo/protocol/domain/answer";
@@ -136,7 +136,7 @@ const all = (runs: readonly OutboxRun[]): OutboxRun => ({
 
 /**
  * A claim's fork, made or found made. Artifacts may answer a fork that
- * worked with an error (S7): a fork that exists and has `main` is made.
+ * worked with an error: a fork that exists and has `main` is made.
  */
 const fork = (from: RepoName, name: RepoName) =>
   RepoHost.use((host) =>

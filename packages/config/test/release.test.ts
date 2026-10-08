@@ -1,8 +1,8 @@
 /**
- * The release (issue 715): the CLI's npm package says what it is from
+ * The release: the CLI's npm package says what it is from
  * `Brand` alone, a release builds for exactly two machines, only a person
  * publishes, and what goes to the platform's own release storage is what
- * the platform decodes and serves (issue 420).
+ * the platform decodes and serves.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";

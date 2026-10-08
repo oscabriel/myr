@@ -1,5 +1,5 @@
 /**
- * smoke's `--loop` (issue 806): the whole core loop on a platform, through
+ * smoke's `--loop`: the whole core loop on a platform, through
  * the CLI and git, as its people would take it (`core-loop.ts` holds the
  * steps):
  *

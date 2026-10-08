@@ -17,7 +17,7 @@ const written = (changes: readonly Change[]) =>
   changes.filter((change) => change.status !== "deleted");
 
 /**
- * Stage 1's no-write-down guard by path (OSR §2.5, §5.4), as the gate owns
+ * Stage 1's no-write-down guard by path, as the gate owns
  * it (`@repo/gate/stages/shape`'s `layerPathRefusal`), so the landing guard
  * and stage 1 hold one rule: the answer's public tree may hold no path from
  * any layer's path set, a path or a folder above it. A deletion never
@@ -38,7 +38,7 @@ export const privatePaths: (input: {
 }) => Option.Option<PrivatePathInPublicTree> = layerPathRefusal;
 
 /**
- * The write-down guard by content (OSR §5.4, exact match only): a file the
+ * The write-down guard by content (exact match only): a file the
  * answer adds, or modifies to a new blob, whose git blob id is a blob of the
  * layer. It runs only for someone who can read the layer, the only people
  * who could have copied from it; on anyone else it would be an oracle for

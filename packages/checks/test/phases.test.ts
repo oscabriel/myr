@@ -139,7 +139,7 @@ describe(phasePlan, () => {
       const at = (tag: Phase["_tag"]) => order.indexOf(tag);
 
       // A snapshot taken after held-back files are written would carry them
-      // into the next Sandbox (OSR §5.3 step 3).
+      // into the next Sandbox.
       const afterWrite =
         at("WriteHeldBack") === -1 ? [] : order.slice(at("WriteHeldBack"));
 

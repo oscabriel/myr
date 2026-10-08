@@ -1,5 +1,5 @@
 /**
- * What an agent, or a person, reads first on the web host (issue 505), as
+ * What an agent, or a person, reads first on the web host, as
  * plain Markdown in the `llms.txt` shape (a title, a one-line summary, then
  * sections of links): `/llms.txt` says what the platform is, how to install
  * the CLI, how to connect over MCP, how to find and take an ask, every
@@ -24,7 +24,7 @@ type Command = CommandDoc;
 
 type Commands = readonly CommandDoc[];
 
-/** The MCP protocol the platform serves over HTTP (spec §8 D16). */
+/** The MCP protocol the platform serves over HTTP. */
 const MCP_PROTOCOL = "2026-07-28";
 
 /** Each posture as GLOSSARY.md names it. */

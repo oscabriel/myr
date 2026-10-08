@@ -236,7 +236,7 @@ What it does not promise:
 
 The cut lines, as built, in the order they go when time runs short (the first row first). A cut that follows this section is safe by default ([AGENTS.md](AGENTS.md)).
 
-A cartridge is a cut line removed by deletion. Visibility is the one plugged in by a marked line in `apps/platform/src/cartridges.ts`, and the one whose cut has been rehearsed: the visibility build's own integration (issue 699) deleted it in a scratch worktree, 103 files changed and 18,364 lines deleted, and `bun run verify` stayed green. The other rows list the files a cut deletes and the callers it edits, and none of those cuts has been rehearsed.
+A cartridge is a cut line removed by deletion. Visibility is the one plugged in by a marked line in `apps/platform/src/cartridges.ts`, and the one whose cut has been rehearsed: the visibility build's own integration deleted it in a scratch worktree, 103 files changed and 18,364 lines deleted, and `bun run verify` stayed green. The other rows list the files a cut deletes and the callers it edits, and none of those cuts has been rehearsed.
 
 | Cut line | What goes | What removes it |
 | --- | --- | --- |

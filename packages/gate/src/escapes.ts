@@ -1,6 +1,6 @@
 /**
  * Reasoned escapes: a marker with a reason after ` -- ` is not refused but
- * counted against its territory's escape ratchet (FE §8.4 B2, B3). The
+ * counted against its territory's escape ratchet. The
  * ratchet is incremental, with no command: its count moves by the reasoned
  * markers an answer adds minus those it removes. An answer that would take a
  * territory past its baseline waits for a decider, one `Waiver` per reasoned
@@ -8,7 +8,7 @@
  *
  * This is a pure function beside the stages, not a stage: a waiting answer
  * is not refused, so the caller (the Project DO, when an answer's checks
- * report; 417) opens the decisions.
+ * report) opens the decisions.
  */
 import type { Ask } from "@repo/protocol/domain/ask";
 import { DecisionSubject } from "@repo/protocol/domain/decision";

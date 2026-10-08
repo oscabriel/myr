@@ -34,7 +34,7 @@ const exportCheck = {
   path: "checks/export/escapes-titles.test.ts",
 } as const;
 
-// OSR §4.1's `visibility.ts` as the platform reads it: every default the
+// A `visibility.ts` as the platform reads it: every default the
 // example leaves unsaid is filled, and nothing names a path or a check.
 const osrPolicy = {
   checks: {
@@ -86,7 +86,7 @@ const osrPolicy = {
 };
 
 describe("the config folder's visibility file", () => {
-  it("encodes OSR's example to the policy the platform reads", () => {
+  it("encodes the design's example to the policy the platform reads", () => {
     const definition = visibility({
       checks: sealedChecks({
         admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },
@@ -119,7 +119,7 @@ describe("the config folder's visibility file", () => {
     expect(decodePolicy(definition)).toStrictEqual(osrPolicy);
   });
 
-  it("fills every default OSR's example spells out", () => {
+  it("fills every default the design's example spells out", () => {
     const definition = visibility({
       checks: sealedChecks({
         areas: { export: "src/export/**", parser: "src/parser/**" },

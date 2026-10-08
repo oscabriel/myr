@@ -2,9 +2,9 @@
  * The web's `/rpc`: the route hands each request to a backend with the
  * Worker's env, and the production backend forwards it to the platform over
  * `PLATFORM`, at the platform's own URL (so the remotes the platform names,
- * read from the request's origin, are its own; W3 312 #2), keeping method,
+ * read from the request's origin, are its own), keeping method,
  * headers and body, but never the browser's cookies (the session cookie
- * becomes a bearer there: `session.test.ts`, issue 513). A server route's
+ * becomes a bearer there: `session.test.ts`). A server route's
  * own calls go through the same backend, in process.
  */
 import { describe, expect, it } from "@effect/vitest";

@@ -1,5 +1,5 @@
 /**
- * Admission of held-back checks, pure (W6 615; OSR §5.5, SYN Q17): a layer
+ * Admission of held-back checks, pure: a layer
  * push's plan (each changed area's checks green on main three times, and
  * red on each known-bad tree the layer's manifest names, every check
  * citing a clause) and the judgement of the runs' area bits.
@@ -463,7 +463,7 @@ describe("an admission's judgement", () => {
   });
 });
 
-// ------------------------------------- through the project service (612's world)
+// ------------------------------------- through the project service (the cartridge's world)
 
 /** datekit's config with admission on: a new check passes main 3 times and catches a known-bad tree. */
 const admitting = {

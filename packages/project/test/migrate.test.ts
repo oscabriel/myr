@@ -1,5 +1,5 @@
 /**
- * The migrate split family (CAA §2.F): one migrate ask over six packages
+ * The migrate split family: one migrate ask over six packages
  * opens as six child asks, one per package, and a delete child that waits
  * on them; six people claim the six at once, the children land one by one
  * through the serial queue, and the delete child's landing closes the parent.

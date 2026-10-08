@@ -1,7 +1,7 @@
 /**
- * The demo-readiness scripts (issue 701): a maintainer types `bun run swarm`,
+ * The demo-readiness scripts: a maintainer types `bun run swarm`,
  * `bun run seed` or `bun run release`, and each runs one entry file that
- * exists, so the W7 issues that build them fill an entry without touching a
+ * exists, so the work that builds them fills an entry without touching a
  * root file.
  */
 import { NodeServices } from "@effect/platform-node";

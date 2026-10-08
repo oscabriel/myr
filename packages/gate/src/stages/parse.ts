@@ -59,9 +59,9 @@ const standingOf = (policy: Policy, handle: Handle) => {
 };
 
 /**
- * Main moves only by a landing (spec D1): no push reaches a canonical ref.
+ * Main moves only by a landing: no push reaches a canonical ref.
  * A working fork takes pushes from its owner only, and a layer's repo takes
- * none here: its writers arrive with the visibility cartridge (W6).
+ * none here: its writers arrive with the visibility cartridge.
  */
 const directPush: Rule = (facts) =>
   PushTarget.$match(facts.target, {

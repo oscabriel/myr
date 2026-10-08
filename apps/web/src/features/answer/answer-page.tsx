@@ -7,7 +7,7 @@
  * and its commit.
  *
  * Held-back checks show only what `HeldBackResult` carries: an area, how
- * many passed of how many, and the suite's root (spec D17). A lane's log is
+ * many passed of how many, and the suite's root. A lane's log is
  * never shown here; a refusal that needs it names it, with the command
  * that reads it.
  */

@@ -1,5 +1,5 @@
 /**
- * A project's generated files after a landing (spec D12, W4 410): the
+ * A project's generated files after a landing: the
  * contribute skill and the AGENTS.md block a stranger's agent reads, kept
  * current without anyone writing them. When a landing changes what they say
  * (the run block, the kinds, the judge closure, anything the generator reads
@@ -9,8 +9,8 @@
  * nothing they say changed.
  *
  * Host-free and generator-free: the generator comes in as a function
- * (`Generate`), since `packages/project` may not import `@repo/agent-kit`
- * (spec §4.1). The platform gives the project its generator through
+ * (`Generate`), since `packages/project` may not import `@repo/agent-kit`.
+ * The platform gives the project its generator through
  * `ProjectGenerator`; a project given none generates nothing.
  */
 import { Brand } from "@repo/brand";

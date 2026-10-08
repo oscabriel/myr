@@ -6,19 +6,19 @@
  * permission flag. `--no-mcp` keeps pi's built-in MCP off, so the user's
  * own servers (`~/.pi/agent/mcp.json`, with the user's accounts behind
  * them) never reach a contributor. The adapter's contributor loads the
- * CLI's pi adapter (issue 706) with `-e`, on the start and on every resume.
+ * CLI's pi adapter with `-e`, on the start and on every resume.
  *
  * The header line names the session; `agent_settled` says pi will not
  * continue on its own. JSON mode exits 0 when the provider fails, so the
  * stop reason comes from each assistant `message_end` (`stopReason`), never
- * from the exit code (PI §7).
+ * from the exit code.
  */
 import { Option, Schema } from "effect";
 
 import { HarnessEvent, lineAs, sessionDirOf, Tokens } from "./event.ts";
 import type { HarnessDriver } from "./event.ts";
 
-/** The CLI's pi adapter in this repo (issue 706), loaded with `-e`. */
+/** The CLI's pi adapter in this repo, loaded with `-e`. */
 export const piAdapter = decodeURIComponent(
   new URL("../../../../apps/cli/src/pi.ts", import.meta.url).pathname
 );

@@ -1,5 +1,5 @@
 /**
- * The seed (issue 509): what it plans to put on a platform for each example
+ * The seed: what it plans to put on a platform for each example
  * project, read from the example's tracked files, and putting it there.
  */
 import { NodeServices } from "@effect/platform-node";

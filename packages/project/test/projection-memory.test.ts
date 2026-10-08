@@ -3,7 +3,7 @@
  * local composition: it keeps each project's events once by
  * `(project, event.seq)`, as the `Projection` port asks, even though every
  * project's outbox names its rows by the event's number alone
- * (`projected:<seq>`). Found by 502's dev world: burrow's events vanished
+ * (`projected:<seq>`). Found by the web's dev world: burrow's events vanished
  * from a projection datekit's had reached first.
  */
 import { describe, expect, it } from "@effect/vitest";

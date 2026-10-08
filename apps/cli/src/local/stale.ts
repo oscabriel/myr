@@ -1,5 +1,5 @@
 /**
- * Stale generated files in a working copy (W4 410): the project's
+ * Stale generated files in a working copy: the project's
  * contribute skill (`.agents/skills/<project>-contribute/SKILL.md` and its
  * `.claude/skills/` copy) and the block in its AGENTS.md, regenerated here
  * with `@repo/agent-kit` from the policy at `main` and compared with what is

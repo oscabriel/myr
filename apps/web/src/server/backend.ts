@@ -4,11 +4,11 @@
  *
  * It travels at the platform's own URL (`PUBLIC_PLATFORM_URL`), never the
  * web's: the platform names a project's and a claim's git remote from the
- * origin of the request it is handed (W3 312 #2), and a remote on the web's
+ * origin of the request it is handed, and a remote on the web's
  * host would lead nowhere. Method and body are kept; the browser's session
  * cookie becomes the HTTP `Authorization` header, the only credential the
- * platform reads (W3 305 #2), and the browser's own cookies and any
- * `authorization` it set never leave the web (`session.ts`, issue 513).
+ * platform reads, and the browser's own cookies and any
+ * `authorization` it set never leave the web (`session.ts`).
  *
  * A session the platform no longer knows (it answers 401 to a credential
  * it cannot verify, and only then) is not a refusal of the call: the call is

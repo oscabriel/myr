@@ -3,7 +3,7 @@
  * Worker for a check: the job, with the one remote the Checker clones from,
  * and the run's outcome on the way back. Both sides decode with these
  * schemas (principle 2): the platform encodes the job and decodes the
- * outcome (W3 314); the sandbox does the reverse (W3 315).
+ * outcome; the sandbox does the reverse.
  */
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { Schema } from "effect";
@@ -13,8 +13,7 @@ import { CheckJob, CheckRun } from "../check-runner.ts";
 /**
  * Where a sandbox job reaches one repo: its git URL and a token the platform
  * minted for this job alone. The token is redacted wherever it is printed,
- * and a Checker's never enters its container: the outbound handler adds it
- * (W3 315).
+ * and a Checker's never enters its container: the outbound handler adds it.
  */
 export const Remote = Schema.Struct({
   token: Schema.RedactedFromValue(Schema.String),

@@ -26,7 +26,7 @@
  * token to handle, as `SESSION_TOKENS` is) may call.
  *
  * A process, not an import: apps never import apps, and the CLI's
- * end-to-end `env set` test (W6 616) runs it. It lives in the cartridge
+ * end-to-end `env set` test runs it. It lives in the cartridge
  * and goes with it. The Worker's modules import `cloudflare:workers`, which
  * `../world-process.ts` serves from the shim before this file loads them,
  * as it does for `../serve-world.ts`.

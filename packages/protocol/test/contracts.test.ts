@@ -29,10 +29,10 @@ import { examples } from "./contract-examples.ts";
 import type { Example } from "./contract-examples.ts";
 
 /**
- * Spec §3.2, row by row and in its order. CLI: the command's name, then the
- * fields it takes in order; `none` for a contract with no command. Flags: R
- * reads only, I idempotent, D destructive, A needs a person's approval.
- * Surfaces: R rpc, M mcp, C cli, W web.
+ * The contracts table, row by row and in its order. CLI: the command's name,
+ * then the fields it takes in order; `none` for a contract with no command.
+ * Flags: R reads only, I idempotent, D destructive, A needs a person's
+ * approval. Surfaces: R rpc, M mcp, C cli, W web.
  */
 const table = [
   {

@@ -31,7 +31,7 @@ const darwinSha =
 const oldLinuxSha =
   "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf";
 
-/** The manifest W7 715 writes: two releases, the newer one latest. */
+/** The manifest the release script writes: two releases, the newer one latest. */
 const manifest = {
   latest: "0.1.0",
   versions: {
@@ -256,7 +256,7 @@ describe("the CLI's releases, served by the platform", () => {
     "makes a version's checksums from its manifest, even when the manifest lists an uploaded SHA256SUMS",
     () =>
       Effect.gen(function* () {
-        // 715 may list the SHA256SUMS it uploaded among a version's files:
+        // The release may list the SHA256SUMS it uploaded among a version's files:
         // the served file is still made from the manifest, without a line
         // for itself, and the uploaded copy is never read.
         const listingSums = {
@@ -480,7 +480,7 @@ describe("the CLI's releases, served by the platform", () => {
       })
   );
 
-  // `releases` is a name no project may take (W5 599: the web forwards
+  // `releases` is a name no project may take (the web forwards
   // `/releases/*` here), so git's paths under it reach the gateway and find
   // no repo; a project's own push still asks for a credential. The releases'
   // own 404 has no body, so the text says the gateway answered.
@@ -595,7 +595,7 @@ const holding = (
 describe("the release manifest", () => {
   const decode = Schema.decodeUnknownOption(ReleaseManifest);
 
-  it("decodes what W7 715 writes", () => {
+  it("decodes what the release script writes", () => {
     expect(decode(manifest)).toStrictEqual(Option.some(manifest));
   });
 

@@ -21,8 +21,8 @@ const refusing = (ref: string, refusals: readonly Refusal[]) =>
   });
 
 /**
- * Artifacts' whole reply to a push it is too busy to take, as S2 recorded it:
- * one side-band 3 (fatal) packet, then the end of the response.
+ * Artifacts' whole reply to a push it is too busy to take, as a probe recorded
+ * it: one side-band 3 (fatal) packet, then the end of the response.
  */
 const artifactsBusy = () =>
   new Response("0024\u0003artifacts_git_receive_pack_busy", {

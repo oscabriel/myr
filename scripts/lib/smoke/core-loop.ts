@@ -1,6 +1,6 @@
 /**
- * The core loop's steps, as smoke's `--loop` takes them on a platform (spec
- * §5 steps 1, 3, 4, 6–8 and 10): each one through the CLI (this repo's, run
+ * The core loop's steps, as smoke's `--loop` takes them on a platform:
+ * each one through the CLI (this repo's, run
  * from source with Bun) or git, as a person would, with the person's
  * platform token only in their processes' env, and git's credential helper
  * the CLI itself.

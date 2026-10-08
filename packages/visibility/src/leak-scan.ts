@@ -32,7 +32,7 @@
 // SOFTWARE.
 
 /**
- * The leak scan (VL §8.6; OSR §5.3 step 7): whether a text, some bytes or
+ * The leak scan: whether a text, some bytes or
  * a stream holds a stored value, by exact match. It answers with the item's
  * key alone, never where the value was or what it was, so its answer cannot
  * help anyone guess a value. Values under `HARD_MIN_LENGTH` characters are

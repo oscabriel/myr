@@ -1,6 +1,6 @@
 /**
- * The visibility cartridge's project state, as the platform provides it
- * (W6 612): the project service's live `ProjectVisibility` over the private
+ * The visibility cartridge's project state, as the platform provides it:
+ * the project service's live `ProjectVisibility` over the private
  * namespace's repos (`LayerRepos` over `ARTIFACTS_PRIVATE`), secret salts
  * from WebCrypto's randomness at the platform's edge, and admissions
  * started as runs of the `Answer` Workflow under their own params.
@@ -41,7 +41,7 @@ export interface AdmissionWorkflow {
 const encodeParams = Schema.encodeEffect(AdmissionParams);
 
 /**
- * Admissions as runs of the `Answer` Workflow (609 #8), one instance per
+ * Admissions as runs of the `Answer` Workflow, one instance per
  * project, layer and head (`admissionId`): starting one twice finds the
  * instance the first made, so it runs once. Any other failure is a defect,
  * and the outbox row that asked for the start runs it again.

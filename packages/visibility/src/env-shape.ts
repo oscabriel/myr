@@ -1,5 +1,5 @@
 /**
- * The env shape (ADR 0009; VL §8.3): a project's `.env.schema`, parsed
+ * The env shape (ADR 0009): a project's `.env.schema`, parsed
  * through the parser seam, read the way varlock reads it, and never
  * resolved. Where the header is silent, items are required and sensitive,
  * as in varlock.

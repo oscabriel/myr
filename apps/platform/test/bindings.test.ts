@@ -307,7 +307,7 @@ describe("the platform Worker's bindings", () => {
     >();
   });
 
-  // Principle 7: this Worker binds the private namespace deliberately (W6);
+  // Principle 7: this Worker binds the private namespace deliberately;
   // the web's `test/env.test-d.ts` holds that no public-serving Worker does.
   it("hold the private namespace, decoded as the public one is", () => {
     expectTypeOf<Env>().toHaveProperty("ARTIFACTS_PRIVATE");
@@ -350,7 +350,7 @@ describe("the platform Worker's bindings", () => {
   it("type the sandbox service binding by the entrypoint the platform calls", () => {
     // The generated `Env` types `SANDBOX` as a plain `Fetcher` (an app's
     // types may not name another app's entrypoint), so the env's decode
-    // declares the entrypoint's methods on it (314's `SandboxBinding`). Should
+    // declares the entrypoint's methods on it (`SandboxBinding`). Should
     // `Env` ever carry them, or turn `any`, the first line fails: drop the
     // declaration, or find what made the binding untyped.
     expectTypeOf<Env["SANDBOX"]>().not.toExtend<SandboxBinding>();

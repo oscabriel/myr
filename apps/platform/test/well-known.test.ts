@@ -1,6 +1,6 @@
 /**
- * The projects' contribute skills, found where agents look for skills
- * (issue 505, spec D12): `/.well-known/agent-skills/index.json` lists each
+ * The projects' contribute skills, found where agents look for skills:
+ * `/.well-known/agent-skills/index.json` lists each
  * project whose landed tree holds `.agents/skills/<project>-contribute/SKILL.md`,
  * with the SHA-256 of that file's bytes, and each listed URL serves the file
  * as it landed. Anyone may read them, with no credential or a stale one.

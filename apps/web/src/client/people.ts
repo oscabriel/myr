@@ -1,5 +1,5 @@
 /**
- * A person's page's read (spec §3.2): their credit by project, area and
+ * A person's page's read: their credit by project, area and
  * role. Read once per page; it renders as waiting on the server, and the
  * browser calls `/rpc` (see `front.ts`).
  */

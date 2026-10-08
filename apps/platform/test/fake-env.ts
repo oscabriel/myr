@@ -44,13 +44,13 @@ export const emptyFrontPage = (prepared: string[] = []) =>
 /** The operator's token in every fake env: long enough to decode. */
 export const operatorToken = "operator-token-0123456789abcdef0123";
 
-/** Sign-in's cookie key and pepper in every fake env (W3 316). */
+/** Sign-in's cookie key and pepper in every fake env. */
 export const cookieKey = "cookie-key-0123456789abcdef0123456789";
 
 export const passwordPepper = "pepper-0123456789abcdef0123456789abcdef";
 
 /**
- * The master key in every fake env (W6): 64 hex characters, the 256-bit key
+ * The master key in every fake env: 64 hex characters, the 256-bit key
  * that wraps write-only values. A test value, never a stage's.
  */
 export const masterKey = "0123456789abcdef".repeat(4);
@@ -80,7 +80,7 @@ const replyOf = (method: ProjectMethod, exit: Exit.Exit<unknown, unknown>) =>
  * What a fake Project DO answers. A project in `made` reads as one with no
  * asks and nobody's claims or answers; any other method there is a defect.
  * Any other name holds no project: a contract call answers `UnknownProject`
- * (as 302's shell does before `initProject`); the rest are defects.
+ * (as the Project DO's shell does before `initProject`); the rest are defects.
  */
 const answer = (
   made: ReadonlySet<string>,

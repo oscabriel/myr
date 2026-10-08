@@ -3,8 +3,8 @@
  * Worker for each `Lander` job (`merge`, `land`, `compose`, `bundleRules`):
  * the job as the port takes it, the remotes the platform mints tokens for,
  * and the job's outcome on the way back. Both sides decode with these
- * schemas (principle 2): the platform encodes jobs and decodes outcomes
- * (W3 314); the sandbox's Lander does the reverse (W3 306).
+ * schemas (principle 2): the platform encodes jobs and decodes outcomes;
+ * the sandbox's Lander does the reverse.
  *
  * Each job schema decodes to the port's own argument type (`satisfies`
  * below), so the wire and the port cannot drift apart.
@@ -99,7 +99,7 @@ export const BundleJob = Schema.Struct({
 
 /**
  * A merge: a read token on canonical, and a write token on the answer's
- * fork, where the merged commit waits for the Checker (W3 304 #1).
+ * fork, where the merged commit waits for the Checker.
  */
 export const MergeWire = Schema.Struct({
   fork: Remote,
@@ -109,7 +109,7 @@ export const MergeWire = Schema.Struct({
 
 /**
  * A land: a write token on canonical, which goes only to the trusted Lander,
- * never to a Checker or outside the platform's Workers (S1 change 2); a read
+ * never to a Checker or outside the platform's Workers; a read
  * token on the fork when the rebuild is a merge.
  */
 export const LandWire = Schema.Struct({

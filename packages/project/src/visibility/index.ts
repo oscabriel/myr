@@ -1,5 +1,5 @@
 /**
- * The visibility cartridge's side of the project service (W6 609): the
+ * The visibility cartridge's side of the project service: the
  * `ProjectVisibility` and `ProjectEnv` ports it provides, merged. The
  * platform plugs it in by one marked line (`apps/platform/src/ports.ts`,
  * through `apps/platform/src/visibility/live.ts`); without it the project

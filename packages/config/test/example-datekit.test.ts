@@ -1,15 +1,15 @@
 /**
- * The datekit example (issue 507), run as the project it pretends to be:
+ * The datekit example, run as the project it pretends to be:
  * `bun test` inside `examples/datekit` is red on main for exactly the three
  * tests its asks name as their checks, each by an assertion rather than a
  * load error (what red first in GLOSSARY.md asks of a check), and green for
  * every other test. Its run block holds on main too: every lane passes, and
  * each ask's check, run alone by the block's test command, is red by an
  * assertion. The example is a Bun project of its own, outside the
- * workspaces (spec D21), so each command runs as a child process under
+ * workspaces, so each command runs as a child process under
  * `sh -c`, the way the platform's Checker runs a project's commands, in a
  * copy of its public tree: every file git tracks but its layers (`layers/`,
- * pushed to the private namespace, never to main; issue 608).
+ * pushed to the private namespace, never to main).
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";

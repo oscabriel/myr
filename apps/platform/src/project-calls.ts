@@ -1,8 +1,8 @@
 /**
- * The Project Durable Object's call boundary (principle 2): every
- * `ProjectApi` method, with the schemas its arguments, success and failure
- * cross with. The schemas are W2 214's `MethodSchemas`, so a contract method
- * takes its own from `Contracts` and none is written twice.
+ * The Project Durable Object's call boundary (principle 2): every `ProjectApi`
+ * method, with the schemas its arguments, success and failure cross with. The
+ * schemas are the project service's `MethodSchemas`, so a contract method takes
+ * its own from `Contracts` and none is written twice.
  *
  * The Worker encodes a call (`encodeCall`), the DO decodes it, runs the
  * method on the project's service, and answers the method's `Exit` encoded

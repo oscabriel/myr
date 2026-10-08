@@ -1,5 +1,5 @@
 /**
- * The visibility cartridge as the platform plugs it in (W6 609): over the
+ * The visibility cartridge as the platform plugs it in: over the
  * stage's ports, built from the decoded env without touching a binding, and
  * reaching the private namespace through `ARTIFACTS_PRIVATE` alone. These
  * tests live in the cartridge and go with it.

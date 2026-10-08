@@ -1,5 +1,5 @@
 /**
- * The datekit example's config folder (issue 507), evaluated by the `/bun`
+ * The datekit example's config folder, evaluated by the `/bun`
  * adapter as the Lander's bundle of it would be: every file in the folder,
  * keyed by its repo path, with the facts the platform would give a
  * single-package repo (no workspaces, its vouch file, `ines-v` as the

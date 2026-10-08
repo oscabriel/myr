@@ -165,8 +165,8 @@ const platformKnowing = (
   );
 
 /**
- * Output as 404's agent policy gives it when `CLAUDECODE=1`: Markdown for
- * results, refusals and notes on stderr. 401's `OutputPlain` is the person's.
+ * Output as the agent policy gives it when `CLAUDECODE=1`: Markdown for
+ * results, refusals and notes on stderr. `OutputPlain` is the person's.
  */
 const OutputForAgent = Layer.succeed(Output)({
   mode: "agent",

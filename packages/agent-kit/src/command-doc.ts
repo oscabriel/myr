@@ -1,6 +1,6 @@
 /**
  * One row per CLI command, the list the platform's skill, the CLI's MCP
- * prompt and the web's `llms.txt` all render from (SYN §14). Contract rows
+ * prompt and the web's `llms.txt` all render from. Contract rows
  * come from each contract's annotations; the hand-written commands are
  * listed here, and `apps/cli/test/commands-doc.test.ts` holds the list to
  * the CLI.

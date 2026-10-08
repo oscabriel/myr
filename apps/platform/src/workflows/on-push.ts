@@ -1,13 +1,13 @@
 /**
- * The `OnPush` Workflow, the platform's backstop (spec §5 step 9): Artifacts
+ * The `OnPush` Workflow, the platform's backstop: Artifacts
  * starts one for every ref a push moved in the public namespace
- * (`triggers.events`, S1 #12 and #13), with the event's id as the instance
- * id, so a redelivered event starts nothing (S1 change 6). Each run reads
+ * (`triggers.events`), with the event's id as the instance
+ * id, so a redelivered event starts nothing. Each run reads
  * what the project's Durable Object knows of the push, classifies it, and
  * records what needs recording through the DO: a claim-fork push the
  * gateway never saw keeps its claim alive, and canonical `main` moved
- * without a landing becomes a `StrayPush` decision whose default is revert
- * (CM §4). It reverts nothing itself. The class name is frozen.
+ * without a landing becomes a `StrayPush` decision whose default is revert.
+ * It reverts nothing itself. The class name is frozen.
  */
 import type { PushReport } from "@repo/project/project";
 import type { Projects } from "@repo/project/projects";
@@ -76,7 +76,7 @@ class LooksStray extends Data.TaggedError("LooksStray") {}
 /**
  * How long a `main` that looks stray is asked about again before it is
  * called stray. The platform pushes `main` before its DO records the
- * landing (S1 change 1), and the event can arrive in between (S1 #14): a
+ * landing, and the event can arrive in between: a
  * stray verdict on the platform's own landing would ask the deciders to
  * revert it. Four more reads, 15 s to 2 min apart: about four minutes.
  */

@@ -1,10 +1,10 @@
 /**
- * The install script the platform serves at `<origin>/install.sh` (issue
- * 420), as the release writes it for one version and one origin (issue
- * 715): `curl -fsSL <origin>/install.sh | sh`. POSIX `sh`, so it runs on
- * Linux and macOS as they come. It downloads the binary for the machine
- * from the platform, checks it against the release's `SHA256SUMS` from the
- * same place, and installs nothing unless the two agree.
+ * The install script the platform serves at `<origin>/install.sh`, as the
+ * release writes it for one version and one origin:
+ * `curl -fsSL <origin>/install.sh | sh`. POSIX `sh`, so it runs on Linux and
+ * macOS as they come. It downloads the binary for the machine from the platform, checks it
+ * against the release's `SHA256SUMS` from the same place, and installs nothing
+ * unless the two agree.
  */
 import type { Brand } from "@repo/brand";
 

@@ -1,17 +1,17 @@
 /**
  * A project's layer repos through the platform's own fetch handler, with
- * real git (W6 606; OSR §5.1–5.2, §5.4): the maintainers clone their layer
+ * real git: the maintainers clone their layer
  * and push to it, a contributor is turned away with one line git prints,
  * every read is logged with who and which commit, and a push to a public
  * fork cannot carry a layer's path, without telling a contributor which of
  * their paths collided.
  *
- * The world is the core loop's (`world.ts`) with the cartridge's gateway
- * side plugged into the Worker (`LayerGateLive`), its public repos and the
- * private namespace's each a store of bare repos behind `git http-backend`.
- * Each Project DO runs on a stand-in for 612's `ProjectVisibility`: datekit
- * declares one layer, `maintainers`, which its deciders ines-v and okonkwo
- * read and push to, holding one sealed check; it writes down every read
+ * The world is the core loop's (`world.ts`) with the cartridge's gateway side
+ * plugged into the Worker (`LayerGateLive`), its public repos and the private
+ * namespace's each a store of bare repos behind `git http-backend`. Each
+ * Project DO runs on a stand-in for the cartridge's `ProjectVisibility`:
+ * datekit declares one layer, `maintainers`, which its deciders ines-v and
+ * okonkwo read and push to, holding one sealed check; it writes down every read
  * and every layer push the DO hears.
  */
 import { NodeServices } from "@effect/platform-node";
@@ -85,7 +85,7 @@ const keepers: ReadonlySet<string> = new Set(["ines-v", "okonkwo"]);
 const keeps = (who: Principal) =>
   Principal.guards.Person(who) && keepers.has(who.handle);
 
-/** What the stand-in for 612's port heard from the DO. */
+/** What the stand-in for the visibility port heard from the DO. */
 interface Heard {
   /** Each time the DO was asked how far someone reaches into a layer. */
   readonly asks: LayerName[];
@@ -102,9 +102,9 @@ interface Heard {
 }
 
 /**
- * 612's `ProjectVisibility`, as far as the gateway reaches it: datekit's
- * one layer, its keepers' access, its one path, and every read and layer
- * push written down.
+ * The cartridge's `ProjectVisibility`, as far as the gateway reaches it:
+ * datekit's one layer, its keepers' access, its one path, and every read and
+ * layer push written down.
  */
 const visibilityHeard = (heard: Heard): VisibilityPort => ({
   ...noVisibility,
@@ -122,8 +122,8 @@ const visibilityHeard = (heard: Heard): VisibilityPort => ({
 
       return noPlan;
     }),
-  // The layer's row, as 612's port writes it once the config lands: stage
-  // 1 names exact paths only to someone who reads every layer kept.
+  // The layer's row, as the visibility port writes it once the config lands:
+  // stage 1 names exact paths only to someone who reads every layer kept.
   onPolicy: () =>
     Effect.succeed({
       effects: [],
@@ -268,7 +268,7 @@ const layerWorld = Effect.gen(function* () {
   yield* kept(ines.git.push(home));
 
   // The layer's repo in the private namespace, holding its sealed check,
-  // pushed there as 612's provisioning would leave it.
+  // pushed there as the cartridge's provisioning would leave it.
   yield* layers.create(layerRepo);
 
   const seed = yield* fs.makeTempDirectoryScoped();
@@ -639,7 +639,7 @@ describe("a project's layer repos, through the gateway", () => {
     })
   );
 
-  // Found live (699): the gate's upstream was memoized with the public
+  // Found live: the gate's upstream was memoized with the public
   // namespace's, so every layer clone on a stage answered "no repo".
   it.effect(
     "the stage's layer gate asks the private namespace for a layer repo, never the public one",

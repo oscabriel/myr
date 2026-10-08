@@ -1,11 +1,11 @@
 /**
- * The header's session slot (issue 513): who is signed in, with sign-out,
+ * The header's session slot: who is signed in, with sign-out,
  * or a link to sign in that comes back to this page. Signing in is only
  * for deciders (PRODUCT.md), so the slot stays one quiet line: the handle
  * in ink, the action in the nav's muted text.
  *
  * `SessionView` draws it from props; `SessionSlot` (no props: the root
- * route renders it, issue 511) wires it to `whoAtom` and the location.
+ * route renders it) wires it to `whoAtom` and the location.
  */
 import { useAtomValue } from "@effect/atom-react";
 import type { Handle } from "@repo/protocol/ids";

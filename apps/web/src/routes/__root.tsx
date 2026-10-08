@@ -18,7 +18,7 @@ import { themeColors } from "../features/shared/theme.ts";
 
 import styles from "../styles.css?url";
 
-// The shell every page shares (issue 511): the document, the header with
+// The shell every page shares: the document, the header with
 // the front page, Today and the session, each page's own <main> (from
 // `PageShell`), and the footer's two ways in. Pages read the site's facts
 // from this route's loader data (`getRouteApi("__root__").useLoaderData()`).
@@ -80,7 +80,7 @@ const Root = () => {
   );
 };
 
-/** The site's icon, drawn to scale (`public/icons/icon.svg`, issue 505). */
+/** The site's icon, drawn to scale (`public/icons/icon.svg`). */
 const ICON_PATH = "/icons/icon.svg";
 
 /**
@@ -92,7 +92,7 @@ const ICON_PATH = "/icons/icon.svg";
 export const rootHead = () => ({
   links: [
     { href: styles, rel: "stylesheet" },
-    // Written from `Brand.name` at each build by `vite.config.ts` (issue 505).
+    // Written from `Brand.name` at each build by `vite.config.ts`.
     { href: MANIFEST_PATH, rel: "manifest" },
     { href: ICON_PATH, rel: "icon", type: "image/svg+xml" },
   ],

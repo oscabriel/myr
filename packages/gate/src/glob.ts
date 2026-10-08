@@ -7,7 +7,7 @@
  * `/` means everything under the folder.
  *
  * The gate keeps its own small matcher rather than importing `@repo/checks`'
- * (spec §4.1 gives the gate no checks dependency in W2); both read the same
+ * (the gate takes no checks dependency); both read the same
  * globs.
  */
 

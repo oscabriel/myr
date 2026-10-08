@@ -1,9 +1,9 @@
 /**
- * What a repo's name says it is (spec §4.5): a project's canonical repo
+ * What a repo's name says it is: a project's canonical repo
  * `<project>`, a claim's fork `<project>--<ask>--<handle>`, or a person's
  * working fork `<project>--me--<handle>`, each handle in lowercase. `--`
  * occurs in no project or ask name, so a name splits back into its parts.
- * Pure: the gateway (303), the handlers (312) and OnPush (313) read names
+ * Pure: the gateway, the handlers and OnPush read names
  * with it.
  */
 import { forkName } from "@repo/project/claim";

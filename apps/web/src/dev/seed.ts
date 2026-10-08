@@ -15,8 +15,8 @@
  * and two seeds give the same world. The world then serves at the last
  * step's minute.
  *
- * What the service can't be brought to through its methods is left out
- * (502's `## Comments`): a `Finish` decision (nothing opens one yet) and an
+ * What the service can't be brought to through its methods is left out:
+ * a `Finish` decision (nothing opens one yet) and an
  * answer refused `OutOfScope` (a refused answer is never recorded).
  */
 import { RefName, RefOutcome, RepoHost } from "@repo/artifacts/repo-host";

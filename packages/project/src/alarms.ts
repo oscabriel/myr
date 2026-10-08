@@ -3,7 +3,7 @@
  * one alarm, so `set` replaces whatever was set before; the project service
  * decides when (the earliest claim deadline, outbox retry or answer retry
  * still pending) and calls `onAlarm` when it fires. Adapters: `/memory`
- * here, the DO's storage alarm in `apps/platform` (W3 302).
+ * here, the DO's storage alarm in `apps/platform`.
  */
 import { Context } from "effect";
 import type { DateTime, Effect } from "effect";

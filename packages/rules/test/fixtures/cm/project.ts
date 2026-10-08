@@ -3,7 +3,7 @@ import { Functions } from "@repo/sdk";
 import data from "./project.json" with { type: "json" };
 
 /**
- * The convex-merged design's example project (its §3), as the data the sdk's
+ * The convex-merged design's example project, as the data the sdk's
  * builders encode it to (`project.json`): a `fixBug` kind with a
  * red-then-green check, deciders by glob with the owners for the rest, the
  * budget and caps, `Assisted-by` trailers, and the record window. The run

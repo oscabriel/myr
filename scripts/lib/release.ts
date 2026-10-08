@@ -1,5 +1,5 @@
 /**
- * The release's core (issue 715): what the CLI's npm package says of
+ * The release's core: what the CLI's npm package says of
  * itself, which steps a release runs, and what it hands the platform's own
  * release storage. Pure; `scripts/release.ts` runs it.
  */
@@ -18,7 +18,7 @@ export type Target = "bun-linux-x64" | "bun-darwin-arm64";
 
 export const targets: readonly Target[] = ["bun-linux-x64", "bun-darwin-arm64"];
 
-/** A target as 416's build and the platform name it, without Bun's prefix: `linux-x64`. */
+/** A target as the CLI's build and the platform name it, without Bun's prefix: `linux-x64`. */
 export const machineOf = (target: Target) => target.replace(/^bun-/u, "");
 
 /** A target's binary, as the release folder and the platform name it: `<slug>-linux-x64`. */
@@ -68,7 +68,7 @@ export const importedPackages = (source: string): readonly string[] =>
 
 /**
  * pi, the harness the package plugs into: a host package, so an optional
- * peer and never bundled or depended on (ratstack-pi §1.3 "Packages").
+ * peer and never bundled or depended on.
  */
 const PI_HOST = "@earendil-works/pi-coding-agent";
 
@@ -134,7 +134,7 @@ export const pinnedDependencies = (input: {
 
 // --- The npm package's manifest ----------------------------------------------
 
-/** The command line, under Node or Bun: 416's npm build. */
+/** The command line, under Node or Bun: the CLI's npm build. */
 const BIN = "./dist/bin.js";
 
 /** A library entry: its code, and the types tsgo declared for it. */
@@ -166,7 +166,7 @@ export interface PublishManifest {
   readonly version: string;
 }
 
-/** A library entry of 416's build, by the name it is published under. */
+/** A library entry of the CLI's build, by the name it is published under. */
 const library = (name: "protocol" | "rules"): LibraryEntry =>
   // oxlint-disable-next-line sort-keys -- Node matches export conditions in key order and needs "default" last; TypeScript reads "types" only before it
   ({
@@ -177,11 +177,11 @@ const library = (name: "protocol" | "rules"): LibraryEntry =>
 /**
  * The npm package's manifest for `version`. Every name comes from `brand`:
  * the package, and one bin for each name the one entry answers to (as git's
- * credential helper, it reads its own name; 416's `src/bin.ts`).
+ * credential helper, it reads its own name; `apps/cli/src/bin.ts`).
  * `dependencies` are the packages the build imports, pinned
  * (`pinnedDependencies`). The `pi` key and the `pi-package` keyword make it
  * a pi package (`pi install npm:<package>`): pi loads the adapter at
- * `dist/pi.js` (706) and the platform's skill under `skills/`.
+ * `dist/pi.js` and the platform's skill under `skills/`.
  */
 export const publishManifest = (
   brand: typeof Brand,
@@ -257,7 +257,7 @@ export class PublishNeedsAPerson extends Schema.TaggedError<PublishNeedsAPerson>
 
 /**
  * The env names that say an agent runs this process: each one that alone
- * makes `@repo/protocol/audit`'s `detectHarness` name a harness (W4 401
+ * makes `@repo/protocol/audit`'s `detectHarness` name a harness (it
  * keeps that table once; this reads it, never copies it), sorted.
  */
 export const agentMarkers = (
@@ -270,7 +270,7 @@ export const agentMarkers = (
     Order.String
   );
 
-/** What a build makes: 416's build, then the package and the binaries beside it. */
+/** What a build makes: the CLI's build, then the package and the binaries beside it. */
 const BUILD: readonly ReleaseStep[] = [
   "tsdown",
   "manifest",
@@ -291,7 +291,7 @@ export interface ReleaseFlags {
 }
 
 /**
- * The steps `flags` name, in order: `build` (416's build with both
+ * The steps `flags` name, in order: `build` (the CLI's build with both
  * targets, the npm package and the binaries), the install script and the
  * checksums, `upload` to the stage's own release storage, and `publish`
  * last. An upload names a stage the repo declares (`dev-oscabriel` or
@@ -379,7 +379,7 @@ export class VersionNeeded extends Schema.TaggedError<VersionNeeded>()(
 
 /**
  * Whether the platform serves `version`: its manifest decodes with it as
- * the latest release (420's schema holds the one rule for a version).
+ * the latest release (the platform's schema holds the one rule for a version).
  */
 const served = (version: string) =>
   Option.isSome(
@@ -390,7 +390,7 @@ const served = (version: string) =>
   );
 
 /**
- * What the CLI reports itself as until a build stamps it (416 #6: `main.ts`
+ * What the CLI reports itself as until a build stamps it (`main.ts`
  * says `0.0.0`), and so what a build that neither uploads nor publishes is.
  */
 const UNRELEASED = "0.0.0";
@@ -428,7 +428,7 @@ export { ReleaseManifest } from "../../apps/platform/src/releases.ts";
 /**
  * `releases/manifest.json` once `version` is released with `assets`: every
  * version `previous` lists, kept, and `version`, now latest. It is the shape
- * the platform decodes and serves from (420's `ReleaseManifest`, the one
+ * the platform decodes and serves from (`ReleaseManifest`, the one
  * schema both sides use).
  */
 export const releaseManifest = (input: {
@@ -494,7 +494,7 @@ const byName = <A>(record: Readonly<Record<string, A>>) =>
 /**
  * `SHA256SUMS`: one `<sha256>  <name>` line per file, sorted by name, as
  * `sha256sum` prints them and as the platform makes the one it serves from
- * the manifest (issue 420).
+ * the manifest.
  */
 export const checksumsFile = (
   assets: Readonly<Record<string, ReleaseAsset>>
@@ -506,7 +506,7 @@ export const checksumsFile = (
 /**
  * What an upload puts where, in order: every file of `version` under
  * `releases/<version>/`, sorted, and `releases/manifest.json` last, so the
- * manifest never names a file the bucket lacks (420 #5).
+ * manifest never names a file the bucket lacks.
  */
 export const uploads = (input: {
   readonly version: string;
@@ -523,7 +523,7 @@ export const uploads = (input: {
 
 /**
  * `curl -fsSL <origin>/install.sh | sh` for `version`, whose files the
- * platform serves at `baseUrl` (`<origin>/releases/<version>`, issue 420):
+ * platform serves at `baseUrl` (`<origin>/releases/<version>`):
  * the binary for the machine, checked against `SHA256SUMS` before it is
  * installed as `brand.cli`, with `brand.gitCredentialHelper` linked to it.
  */

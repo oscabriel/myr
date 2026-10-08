@@ -76,7 +76,7 @@ const run = (
 
     // Effect aborts `exec`'s signal only while `exec` itself is pending;
     // once the process runs, an interrupt (a lane's time limit) kills it,
-    // or it would run on beside the lanes after it (W3 315 #11).
+    // or it would run on beside the lanes after it.
     const output = yield* Effect.tryPromise({
       catch: failed("exec"),
       try: () => process.output(),

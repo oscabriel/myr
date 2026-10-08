@@ -1,10 +1,9 @@
 /**
- * The public ledger over MCP (W6 612; OSR §11.2 M5's "MCP `ledger.get`" is
- * the `ledger` contract's tool): over the platform's Node world (the W3
- * core-loop world) with the visibility cartridge's project state composed
- * into every Project DO, a `tools/call` of `ledger` for datekit returns the
- * ledger as structured content, the same ledger the RPC `ledger` gives,
- * and both are the cartridge's.
+ * The public ledger over MCP (`ledger.get` is the `ledger` contract's tool):
+ * over the platform's Node world (the core loop's world) with the visibility
+ * cartridge's project state composed into every Project DO, a `tools/call` of
+ * `ledger` for datekit returns the ledger as structured content, the same
+ * ledger the RPC `ledger` gives, and both are the cartridge's.
  *
  * datekit's config folder here has no `visibility.ts`, so its ledger is the
  * Open one, the same as the neutral port's: the test watches the

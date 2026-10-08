@@ -183,7 +183,7 @@ const jsonEncoded = {
 };
 
 /**
- * The defaults (convex-merged design §3, "no folder means defaults"), as
+ * The defaults (no folder means defaults), as
  * `Policy` encodes them: the sdk's `defaults`, finished with the facts.
  */
 const defaultsEncoded = {
@@ -244,7 +244,7 @@ const failed = (modules: ConfigBundle) =>
 
 /**
  * A `visibility.ts`'s default export, as the sdk writes it: one layer of
- * held-back checks for one area (OSR §4.1, abridged).
+ * held-back checks for one area.
  */
 const visibilityEncoded = {
   checks: {

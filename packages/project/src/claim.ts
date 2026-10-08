@@ -127,7 +127,7 @@ export interface ClaimStep {
   readonly state: ClaimState;
 }
 
-/** A claim's fork: `<project>--<ask>--<handle in lowercase>` (spec §4.5). */
+/** A claim's fork: `<project>--<ask>--<handle in lowercase>`. */
 export const forkName = (project: ProjectName, ask: AskId, handle: Handle) =>
   RepoName.make(`${project}--${ask}--${handle.toLowerCase()}`);
 

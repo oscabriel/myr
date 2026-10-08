@@ -1,7 +1,7 @@
 /**
  * A person's credits (GLOSSARY "Credit"): how many landings name them in
  * each human role, by project and area, for their credits page. Roles and
- * counts only: no score, no total across roles, no ranking (spec §1.4).
+ * counts only: no score, no total across roles, no ranking.
  *
  * Credit is read from each landing's `credits` rows, which the platform wrote
  * as the landing's trailers, never from commit messages. `Assisted-by` is a

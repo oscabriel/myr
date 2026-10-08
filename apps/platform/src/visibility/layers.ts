@@ -1,10 +1,10 @@
 /**
- * The visibility cartridge's gateway side (W6 606; OSR §5.1–5.2, ADR 0007),
+ * The visibility cartridge's gateway side (ADR 0007),
  * as the `LayerGate` port: which repo names are a project's declared
  * layers, how far a person reaches into one, and the private namespace's
  * git server behind them.
  *
- * - A name is a layer's repo when it reads `<project>--<layer>` (spec §4.5)
+ * - A name is a layer's repo when it reads `<project>--<layer>`
  *   and the project declares that layer, from the policy at its landed SHA
  *   (ADR 0005): any other such name stays an unknown repo, and claim forks
  *   and working forks never get here (their names have three parts).
@@ -13,7 +13,7 @@
  *   nobody else reaches it.
  * - The upstream is git's `UpstreamRepoHost` over the private namespace's
  *   repos (`LayerRepos`): its tokens are minted, cached once per isolate
- *   (S7 #2) and sent only to the store, so none leaves the platform.
+ *   and sent only to the store, so none leaves the platform.
  */
 import type { Fetch } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";

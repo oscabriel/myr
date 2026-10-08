@@ -1,5 +1,5 @@
 /**
- * Red first, for the right reason (CAA D): an ask opens only when its check
+ * Red first, for the right reason: an ask opens only when its check
  * fails on main twice in the same way, by an assertion. A check that fails to
  * load fails because its subject is missing, and any answer that exports the
  * subject could pass it; a check that fails two different ways is flaky.

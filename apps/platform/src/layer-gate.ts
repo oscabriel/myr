@@ -1,11 +1,11 @@
 /**
- * The gateway's neutral port for layer repos (W6 609; ADR 0007): which repo
+ * The gateway's neutral port for layer repos (ADR 0007): which repo
  * names are a project's layers, how far a person may reach into one, and
  * the private namespace's git server behind them. The default is a
  * platform without typed visibility: no name is a layer, so a layer's URL
  * is an unknown repo (404), and nothing routes to the private namespace.
  *
- * The visibility cartridge (`./visibility/layers.ts`, 606) provides the live
+ * The visibility cartridge (`./visibility/layers.ts`) provides the live
  * gate: a name `<project>--<layer>` the project declares, with the caller's
  * access from the layer's readers and writers, both in one ask of the
  * project's DO, and the private namespace's upstream. The gateway (`git.ts`)

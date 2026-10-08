@@ -11,7 +11,7 @@ import {
 } from "./src/features/agents/manifest.ts";
 
 /**
- * The web app manifest (issue 505), made from `Brand.name` rather than kept
+ * The web app manifest, made from `Brand.name` rather than kept
  * as a file that would spell the name: written into the client output at
  * each build, beside `public/`'s icons, and served by the dev server.
  */

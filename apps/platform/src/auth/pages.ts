@@ -3,7 +3,7 @@
  * nothing (no script, stylesheet, font or image), so the page's CSP can be
  * `default-src 'none'`. Every value that reaches the HTML is escaped; the
  * client's name and domain come from the client itself. Google sign-in
- * (issue 419) adds its two choices to the sign-in page when offered, and
+ * adds its two choices to the sign-in page when offered, and
  * its own page for a first sign-in's handle.
  */
 import { Brand } from "@repo/brand";

@@ -36,7 +36,7 @@ const VISIBILITY_FILE = /^visibility\.[cm]?[jt]s$/u;
 
 /**
  * The bundle's visibility module (`<folder>/visibility.ts`), when it has
- * one: the project's layers and held-back checks (OSR §4.1).
+ * one: the project's layers and held-back checks.
  */
 export const visibilityModule = (bundle: ConfigBundle): string | undefined => {
   const folder = folderOf(bundle);
@@ -98,7 +98,7 @@ const fromPolicyJson = (
 /**
  * The policy input a bundle states without running code: its `policy.json`,
  * or else the defaults. Its source is the config folder whenever there is
- * one, and the defaults only when there is none (spec §2.5), so every
+ * one, and the defaults only when there is none, so every
  * adapter gives one bundle the same source.
  */
 export const statedWithoutCode = (

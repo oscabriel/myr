@@ -1,5 +1,5 @@
 /**
- * What MCP serves beside the contracts' tools (spec §3.3): each ask's brief
+ * What MCP serves beside the contracts' tools: each ask's brief
  * as a resource at `<scheme>ask/<project>/<ask>`, the projects as one at
  * `<scheme>projects`, and a skill as the prompt `contribute`. Each reads
  * through the `Client` the tools call through, so a host that sends the

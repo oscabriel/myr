@@ -1,7 +1,7 @@
 /**
  * swarm: six fictional contributors, on four harnesses, each answer one child
- * of a project's split family on a stage (issue 702 plans them and prepares
- * each one's workspace; issue 711 runs their harnesses).
+ * of a project's split family on a stage: it plans them, prepares each
+ * one's workspace and runs their harnesses.
  *
  *   bun scripts/swarm.ts --stage dev-oscabriel --project burrow --dry-run
  *   bunx varlock run --path apps/platform/ -- bun scripts/swarm.ts --stage dev-oscabriel
@@ -13,14 +13,14 @@
  * Without it, each contributor claims their ask as themselves (their token
  * from `SESSION_TOKENS`, a JSON object from token to handle, as the
  * platform's own), reads the ask's page, gets a workspace with a clone of
- * the claim's fork, and is handed to the run loop (711), six at once. The
+ * the claim's fork, and is handed to the run loop, six at once. The
  * run's summary goes to `<swarm>/<run>/agents.json` (`SwarmDir`: the state
  * home's `<slug>/swarm/`, outside every checkout), and each claim's fork to
  * the throwaway ledger (`infra/created.ts`). Tokens reach a contributor's
  * processes only through their env, and no line or JSON this prints holds
  * one. Flags: `lib/swarm/args.ts`.
  *
- * `--view herdr` (issue 717, for the video) runs from a herdr pane: each
+ * `--view herdr` (for the video) runs from a herdr pane: each
  * harness runs interactively in a pane of its own, with a counter pane of
  * claims, pushes and landings (`lib/swarm/views/herdr.ts`). The loop and
  * its outcomes are the same.

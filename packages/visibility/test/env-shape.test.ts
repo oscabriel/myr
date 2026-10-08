@@ -18,7 +18,7 @@ const project = ProjectName.make("datekit");
 
 const at = LandedSha.make("a1".repeat(20));
 
-// The env shape (issue 603; ADR 0009; VL §8.3): a project's `.env.schema`,
+// The env shape (ADR 0009): a project's `.env.schema`,
 // parsed at a landed SHA through the parser seam and never resolved, as the
 // public sees it.
 const parsers = [
@@ -42,7 +42,7 @@ describe.each(parsers)("the env shape, read through %s", (_, layer) => {
     }).pipe(Effect.provide(layer))
   );
 
-  // VL §8.3 #4: an import from outside the repo is never followed, so the
+  // An import from outside the repo is never followed, so the
   // schema that names one is refused whole.
   it.effect.each(refused)("refuses $title", ({ file, reason, text }) =>
     Effect.gen(function* () {

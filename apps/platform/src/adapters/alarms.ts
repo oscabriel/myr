@@ -1,7 +1,8 @@
 /**
- * W2 214's `Alarms` port for a Project Durable Object: its storage's one
- * alarm. The service decides when (always its earliest pending deadline);
- * the adapter only sets it, in place of any set before, as a DO's alarm is.
+ * The project service's `Alarms` port for a Project Durable Object: its
+ * storage's one alarm. The service decides when (always its earliest pending
+ * deadline); the adapter only sets it, in place of any set before, as a DO's
+ * alarm is.
  */
 import { Alarms } from "@repo/project/alarms";
 import { DateTime, Effect, Layer } from "effect";

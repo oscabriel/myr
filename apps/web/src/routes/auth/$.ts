@@ -7,7 +7,7 @@ import type { Handled } from "../../server/session.ts";
  * Any other `/auth/<name>`. A development build serves the dev sign-in
  * (`-dev.ts`) at `dev`; Vite writes `import.meta.env.DEV` as `false` in a
  * production build, so the `import()` below is dead code there and the dev
- * module never enters the bundle (W5 505's production-bundle test). It is
+ * module never enters the bundle (`test/production-bundle.test.ts`). It is
  * reached this way, not as a route of its own, so the route tree names no
  * dev path.
  */

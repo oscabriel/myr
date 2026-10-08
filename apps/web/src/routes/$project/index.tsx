@@ -64,7 +64,7 @@ const root = getRouteApi("__root__");
 /**
  * The project as listed; a project the list has not heard from yet (its
  * projection catches up after its first event) reads as the platform lists
- * every project until W6 projects a posture: open.
+ * every project until a `PostureChanged` entry projects a posture: open.
  */
 const listingOf = (
   project: ProjectName,

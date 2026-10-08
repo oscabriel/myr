@@ -1,5 +1,5 @@
 /**
- * Teardown (issue 808): `bun infra/teardown.ts` prints a plan, and only
+ * Teardown: `bun infra/teardown.ts` prints a plan, and only
  * `--apply` deletes it. The plan is the ledger's throwaways that the account
  * still lists, never a stage's own namespaces, never `witness`, never the
  * seeded examples, and never a name the ledger doesn't hold, whatever it is

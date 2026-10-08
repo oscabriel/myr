@@ -1,5 +1,5 @@
 /**
- * datekit's maintainers layer and the seed's layer step (issue 608): the
+ * datekit's maintainers layer and the seed's layer step: the
  * held-back checks datekit keeps in `layers/maintainers/`, each citing the
  * clause it enforces, and the seed pushing them to the private namespace
  * after the public project, never into the public tree.

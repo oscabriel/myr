@@ -1,5 +1,5 @@
 /**
- * The page's live view (issue 510): `watchAtom(project)`, mounted by the
+ * The page's live view: `watchAtom(project)`, mounted by the
  * project and answer pages, follows the project's events and invalidates
  * the keys each one changes, so the page's reads fetch again; a stream
  * that fails before it hears anything turns into a poll every `POLL_MS`.

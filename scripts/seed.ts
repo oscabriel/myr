@@ -1,6 +1,6 @@
 /**
  * seed: puts both fictional example projects on a platform, ready for the
- * demo, and changes nothing when run again (issue 509).
+ * demo, and changes nothing when run again.
  *
  *   bun scripts/seed.ts --world node
  *   bunx varlock run --path apps/platform/ -- bun scripts/seed.ts --stage dev-<user>
@@ -11,7 +11,7 @@
  * tokens only from the env: `SESSION_TOKENS` (token to handle, as the
  * platform's own; `--tokens-env` names another) and `OPERATOR_TOKEN`
  * (`--operator-env`). `--stage demo` also needs `--yes`: the user records
- * on it (spec §1.5 H7). `--only <project>` seeds one example; `--json`
+ * on it (H7). `--only <project>` seeds one example; `--json`
  * prints the versioned envelope.
  *
  * `--only <example> --as <name>` seeds a fresh copy of that example under

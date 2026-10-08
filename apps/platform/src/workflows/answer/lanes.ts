@@ -1,12 +1,12 @@
 /**
- * The answer's lanes on its merged tree (spec §5 step 7 (b), (c)): the
+ * The answer's lanes on its merged tree: the
  * cheap stage (the static lanes) and then the checks (the ask's own check
  * and every other project lane), always on the exact tree the merge made.
  * A lane whose checker never got going gets one fresh run; every lane that
  * did not pass keeps its log through `EvidenceStore`, and only the name it
  * is kept under travels on, unless the project's scan finds a stored
  * write-only value in it: that log is never kept, and its lane says
- * `withheld` (W6 613). The gate classifies each failure against the same
+ * `withheld`. The gate classifies each failure against the same
  * lane on main (`gate.classifyFailure`).
  *
  * The merged tree is checked in the answer's fork, where `Lander.merge`
@@ -81,7 +81,7 @@ export const Checked = Schema.Struct({
   base: CommitSha,
   /** Every path the answer changed against its base. */
   changed: Schema.Array(RepoPath),
-  /** The env every check job of the answer carries (W6 609): placeholders, never a value. */
+  /** The env every check job of the answer carries: placeholders, never a value. */
   env: Schema.optionalKey(UnlandedRunEnv),
   finish: AskKind.fields.finish,
   /**
@@ -96,7 +96,7 @@ export const Checked = Schema.Struct({
   requestId: RequestId,
   /** The project's run block, which every check job carries; absent without a policy. */
   run: Schema.optionalKey(RunBlock),
-  /** Whether a held-back suite judges the answer once its checks pass (W6). */
+  /** Whether a held-back suite judges the answer once its checks pass. */
   sealed: Schema.optionalKey(Schema.Boolean),
   tree: TreeSha,
 });
@@ -194,7 +194,7 @@ export const laneLog = (
 
 /**
  * Where a lane's log is said to be when it was not kept because it held a
- * stored write-only value (W6 613; VL §8.6): the lane's refusal stands, its
+ * stored write-only value: the lane's refusal stands, its
  * log is never put in the evidence store, and nothing names the item.
  */
 export const { withheld } = ChecksFailed;
@@ -464,7 +464,7 @@ export const runStage = (
         const lanes = lanesFor(run, stage);
 
         // The project scans each log for its stored values before it leaves
-        // the run, where the values are (VL §8.6); never the sandbox.
+        // the run, where the values are; never the sandbox.
         const api = yield* Projects.use((projects) =>
           projects.get(checked.project)
         ).pipe(Effect.orDie);

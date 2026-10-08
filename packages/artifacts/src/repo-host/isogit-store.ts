@@ -178,7 +178,7 @@ export const seedRef = (
     );
   });
 
-// S1 #3 and #6: each ref is its own compare-and-swap, applied or refused
+// Each ref is its own compare-and-swap, applied or refused
 // whatever the others in the same push come to.
 const apply = (into: GitDir, source: PushSource, update: RefUpdate) =>
   Effect.gen(function* () {
@@ -227,8 +227,8 @@ const decodeEntries = Schema.decodeUnknownEffect(Schema.Array(TreeEntry));
  * The RepoHost methods that read a repo's objects and refs or push to it,
  * the same over every store whose repos are isomorphic-git directories:
  * `known` finds a repo's directory and lock by name. A push is a
- * compare-and-swap per ref under the repo's lock, never atomic across refs
- * (S1 #6); reads resolve short branch names and commit ids only (S1 #20).
+ * compare-and-swap per ref under the repo's lock, never atomic across refs;
+ * reads resolve short branch names and commit ids only.
  */
 export const objectsAndRefs = (
   known: (name: RepoName) => Effect.Effect<StoredRepo, RepoNotFound>

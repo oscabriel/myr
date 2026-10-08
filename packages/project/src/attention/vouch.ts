@@ -7,7 +7,7 @@
  * into `Policy.vouches`), plus the vouch decisions decided since, which win
  * because they are newer. The project's deciders are its members, the people
  * who vouch, so they stand vouched without a line of their own: otherwise the
- * person who made a project could not fork it or claim in it (spec D11, D20).
+ * person who made a project could not fork it or claim in it.
  *
  * Pure: the project service passes the decisions, the person's record and
  * how many of their landings the project holds.

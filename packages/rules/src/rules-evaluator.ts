@@ -54,7 +54,7 @@ export const EvaluationFacts = Schema.Struct({
    * the config folder), and empty text for the rest.
    */
   ci: Schema.Array(Schema.Struct({ content: Schema.String, path: RepoPath })),
-  /** The person who made the project; `owners` resolves to them (spec D20). */
+  /** The person who made the project; `owners` resolves to them. */
   initializer: Handle,
   /** The frozen clock rule code sees, and when its asks count as opened. */
   now: Schema.DateTimeUtcFromString,
@@ -112,7 +112,7 @@ export const factsOf = (call: RuleCall): Effect.Effect<Schema.Json> => {
  * Turns the config folder at a landed commit into its `Policy`, the same
  * one every time for the same facts, and calls its function-valued rules on
  * demand. Adapters: `/bun` (a subprocess with frozen time), `/json` (a
- * committed `policy.json`, or the defaults) and, in W3, `/worker`.
+ * committed `policy.json`, or the defaults) and, on a stage, `/worker`.
  */
 export class RulesEvaluator extends Context.Service<
   RulesEvaluator,

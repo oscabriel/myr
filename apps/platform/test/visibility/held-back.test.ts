@@ -1,6 +1,6 @@
 /**
- * The `Answer` Workflow judged by the sealed suite its claim was pinned to
- * (W6 613; spec §5 steps 7 (d) and 8): its held-back step, the landing
+ * The `Answer` Workflow judged by the sealed suite its claim was pinned to:
+ * its held-back step, the landing
  * guards before any check, and the scans that keep a stored value out of
  * what leaves a run, over the Answer Workflow's world with the visibility
  * cartridge's parts plugged in (`held-back.fixtures.ts`).

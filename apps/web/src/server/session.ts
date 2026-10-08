@@ -1,6 +1,6 @@
 /**
- * A decider's session on the web (issue 513). The platform is the OAuth
- * authorization server (W3 316); the web is one of its public clients, and
+ * A decider's session on the web. The platform is the OAuth
+ * authorization server; the web is one of its public clients, and
  * signs a person in with PKCE: `/auth/signin` sends the browser to the
  * platform's `/authorize`, `/auth/callback` trades the code at the
  * platform's `/token` over `PLATFORM`, and the access token goes into one
@@ -10,8 +10,8 @@
  * Document the web serves itself (`/auth/client`).
  *
  * Every forward to the platform (`backend.ts`) turns that cookie into the
- * HTTP `Authorization` header, the only credential the platform reads (W3
- * 305 #2), and drops the browser's own cookies and any `authorization` it
+ * HTTP `Authorization` header, the only credential the platform reads,
+ * and drops the browser's own cookies and any `authorization` it
  * set: the browser never chooses the credential.
  */
 import { Brand } from "@repo/brand";

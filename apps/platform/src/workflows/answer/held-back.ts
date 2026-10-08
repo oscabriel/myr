@@ -1,7 +1,7 @@
 /**
- * The `Answer` Workflow's held-back step (W6; spec §5 step 7 (d)): once an
+ * The `Answer` Workflow's held-back step: once an
  * answer's public checks pass on the merged tree, the sealed suite its
- * claim was pinned to judges it, one bit per area (spec D17). The project
+ * claim was pinned to judges it, one bit per area. The project
  * decides everything through `ProjectApi`: the job (`heldBackJob`, the
  * layer's files read at the pinned commit by the platform, so no layer
  * route or token reaches the sandbox), and the judgement of the area bits
@@ -16,8 +16,8 @@
  * the area bits leave the step: no lane, no log, no duration.
  *
  * A held-back result carries over to a later check of the same request only
- * when the answer's `PatchId` and the pinned suite are unchanged (SYN §9
- * #12): a main that moved under a passing answer re-runs its public lanes
+ * when the answer's `PatchId` and the pinned suite are unchanged:
+ * a main that moved under a passing answer re-runs its public lanes
  * on the new merged tree, never its sealed suite.
  */
 import { CheckAt, CheckRunner } from "@repo/checks/check-runner";

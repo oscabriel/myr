@@ -23,7 +23,7 @@ const sentryAuthToken = item({
 });
 
 /**
- * datekit's `.env.schema` (507) as its env shape reads: `@defaultSensitive=false`
+ * datekit's `.env.schema` as its env shape reads: `@defaultSensitive=false`
  * in the header, and one `@sensitive` item behind
  * `@proxy(domain="sentry.io", path="/api/**")`.
  */
@@ -72,9 +72,10 @@ describe("the outbound map", () => {
     ]);
   });
 
-  // 603 x 610: the map above is fed datekit's items as written by hand; this
-  // one reads the committed file through the real parser, so a drift in
-  // either half (a lost path, a rule read as blocked) changes the rule.
+  // The parser and the proxy map together: the map above is fed datekit's items
+  // as written by hand; this one reads the committed file through the real
+  // parser, so a drift in either half (a lost path, a rule read as blocked)
+  // changes the rule.
   it.effect(
     "maps datekit's committed .env.schema, as the parser reads it, onto that same rule",
     () =>

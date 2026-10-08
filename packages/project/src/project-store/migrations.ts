@@ -59,7 +59,7 @@ const projectState = Effect.gen(function* () {
   yield* sql`CREATE TABLE outbox (id TEXT PRIMARY KEY, body TEXT NOT NULL)`;
 });
 
-// The visibility tables (W6 609): a project's layers, the attempts on its
+// The visibility tables: a project's layers, the attempts on its
 // held-back checks, its public ledger, its write-only values, and the read
 // log of its layer repos. Without the visibility cartridge they stay empty.
 const visibility = Effect.gen(function* () {

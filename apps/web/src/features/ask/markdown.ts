@@ -16,7 +16,7 @@ import { Array, Cause, Exit, Option, Schema } from "effect";
 
 const MARKDOWN = "text/markdown; charset=utf-8";
 
-/** A contract's `Visibility` (spec §3.1): a `public` one's answer may be cached for a minute, a `maintainers` one's never. */
+/** A contract's `Visibility`: a `public` one's answer may be cached for a minute, a `maintainers` one's never. */
 export type ContractVisibility = ReturnType<typeof Visibility.defaultValue>;
 
 /** One range of an `Accept` header: `text/markdown;q=0.8`. */
@@ -138,7 +138,7 @@ const markdown = (body: string, status: number, cacheControl: string) =>
     status,
   });
 
-/** What a Markdown answer may be cached for, by its contract's visibility (spec §3.1). */
+/** What a Markdown answer may be cached for, by its contract's visibility. */
 const cacheFor = (visibility: ContractVisibility) =>
   visibility === "public" ? "public, max-age=60" : "private, no-store";
 

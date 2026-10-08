@@ -1,5 +1,5 @@
 # The Lander's image: trusted, it runs git and bun's bundler and never an
-# answer's code (spec §4.3). Debian trixie slim with its git (2.47.3 when this
+# answer's code. Debian trixie slim with its git (2.47.3 when this
 # was written; `merge-tree --write-tree --merge-base` needs 2.40 or later, and
 # the build prints the version), Bun 1.4.2 for `bundleRules`, the sdk under /opt/sdk
 # with the packages it imports beside it, and the Sandbox SDK's
@@ -44,5 +44,5 @@ WORKDIR /workspace
 # The Lander runs every command through the Container API's `exec`, so the
 # container only has to stay up until its Durable Object destroys it.
 # debian's own `bash` exits at once with no stdin, and takes every `exec`
-# with it (exit 137; found live on dev-oscabriel, 311).
+# with it (exit 137; found live on dev-oscabriel).
 CMD ["sleep", "infinity"]

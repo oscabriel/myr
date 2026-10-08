@@ -3,7 +3,7 @@
  * `RepoHost`: the files handed to the judge closure are what `@repo/checks`'
  * `judgeInputs` gathers, the same function the CLI's local check and hook
  * gather through, so the closure the gateway judges a push by is the one
- * every file of the tree gives (spec §8.5, "one home for the policy facts").
+ * every file of the tree gives (one home for the policy facts).
  */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";

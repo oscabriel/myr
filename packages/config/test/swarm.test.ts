@@ -1,5 +1,5 @@
 /**
- * The swarm (issue 702): its plan for a split family, its people, each
+ * The swarm: its plan for a split family, its people, each
  * contributor's brief and workspace, and the run's summary file. The burrow
  * fixtures are what `<cli> asks` and `<cli> ask` printed for burrow's
  * `drop-legacy-fetch` family on the dev stage (2026-10-08).
@@ -713,7 +713,7 @@ describe("a contributor's workspace", () => {
     "clones again while the fork is not made yet, since the claim returns before its outbox makes the fork",
     () =>
       Effect.gen(function* () {
-        // Found live (804): one of six claims at once came back before
+        // Found live: one of six claims at once came back before
         // Artifacts had its fork, and the clone answered 404.
         const { spawned, workspace } = yield* wrensWorkspace(0, (before) =>
           before < 2 ? { code: 128, stderr: forkNotMade } : { code: 0 }

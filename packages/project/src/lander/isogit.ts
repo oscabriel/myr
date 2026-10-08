@@ -1,5 +1,5 @@
 /**
- * The `Lander` over isomorphic-git in a Worker (spec D6): the production
+ * The `Lander` over isomorphic-git in a Worker: the production
  * fallback until the container Lander in `apps/sandbox` passes, and the one
  * the core-loop tests run on. It runs no project code and installs nothing.
  *
@@ -7,8 +7,8 @@
  * through `RepoHost` (never `fetch`), writes the objects it makes into a
  * scratch git directory in memory, and pushes from there: canonical `main`
  * with a non-force compare-and-swap, then the mirror ref and the verdict
- * note, each in its own push, since Artifacts has no atomic multi-ref push
- * (S1 #6). A scratch directory holds only the objects the repo lacks; the
+ * note, each in its own push, since Artifacts has no atomic multi-ref push.
+ * A scratch directory holds only the objects the repo lacks; the
  * rest are referenced by id.
  *
  * The merge is three-way at the tree level, read through the port: it
@@ -17,8 +17,7 @@
  * history of that one file.
  *
  * `bundleRules` returns the config folder's sources as committed. This
- * adapter bundles no TypeScript; the container Lander bundles with Bun (W3
- * 306).
+ * adapter bundles no TypeScript; the container Lander bundles with Bun.
  */
 import {
   BranchName,

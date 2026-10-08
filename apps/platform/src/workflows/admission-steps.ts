@@ -1,6 +1,6 @@
 /**
  * Admission of a layer push's held-back checks, as steps of the `Answer`
- * Workflow (W6 609, 615; OSR §5.5): the project plans the runs
+ * Workflow: the project plans the runs
  * (`ProjectApi.admissionPlan`: each changed area's checks green on main k
  * times, red on each known-bad tree its manifest names), the Checker runs
  * each, and the project judges the area bits (`recordAdmission`), moving

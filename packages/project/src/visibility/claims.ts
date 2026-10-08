@@ -1,12 +1,12 @@
 /**
- * Attempts on held-back checks, pure (W6 612; spec D17, OSR §4.1): how many
+ * Attempts on held-back checks, pure: how many
  * times one claim, and one person in one area, may fail an area's sealed
  * checks in one ISO week before the platform stops judging them.
  *
  * Both caps count failures in the ISO week (UTC) a run is judged in, so
  * both reset when the next week starts: `AttemptsExhausted` is retryable
  * and says when. A failure is a count here and nothing else: it never
- * reaches the answerer's record (spec D17).
+ * reaches the answerer's record.
  */
 import type { HeldBackResult } from "@repo/protocol/domain/answer";
 import type { SealedChecks } from "@repo/protocol/domain/visibility";
@@ -80,8 +80,8 @@ export interface AttemptsJudged {
 }
 
 /**
- * One held-back run of a claim's answer, judged against its attempts (OSR
- * §4.1, spec D17), in each sealed area that ran in it, sorted by name:
+ * One held-back run of a claim's answer, judged against its attempts,
+ * in each sealed area that ran in it, sorted by name:
  *
  * - an area whose attempts were already used up this week is
  *   `AttemptsExhausted`, whatever the run said, and counts nothing: its
@@ -91,8 +91,8 @@ export interface AttemptsJudged {
  *   `AttemptsExhausted` when that failure used the last attempt;
  * - an area that passed counts nothing.
  *
- * With no refusal, the value of the `Held-back:` trailer (602's format,
- * areas with no check in the run as `n/a`). The rows are the attempts
+ * With no refusal, the value of the `Held-back:` trailer (`heldBackValue`'s
+ * format, areas with no check in the run as `n/a`). The rows are the attempts
  * the run counted; nothing here reaches the answerer's record.
  */
 export const judgeAttempts = (input: {

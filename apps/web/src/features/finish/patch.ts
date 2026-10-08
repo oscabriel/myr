@@ -1,8 +1,8 @@
 /**
  * The answer's diff, where a `Finish` decision carries it: the evidence
  * entry labelled `patch`, a unified diff (`git diff <base> <head>`). No other
- * decision carries one (spec §2.3 `Decision.evidence`: "never a diff unless
- * the kind allows a finish"), and the web never fetches one another way.
+ * decision carries one (`Decision.evidence` holds no diff unless
+ * the kind allows a finish), and the web never fetches one another way.
  */
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";

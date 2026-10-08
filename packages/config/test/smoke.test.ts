@@ -163,7 +163,7 @@ describe("smoke against a live stage", () => {
     }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
-  // Live on dev-oscabriel (311): the first smoke after the first deploy got
+  // Live on dev-oscabriel: the first smoke after the first deploy got
   // a 500 from /health and a defect from the first Project DO call, and a
   // second run seconds later passed every probe.
   it.live(
@@ -252,7 +252,7 @@ describe("smoke against a live stage", () => {
 });
 
 /**
- * The web as smoke expects to find it (W5 599): its front page renders, and
+ * The web as smoke expects to find it: its front page renders, and
  * its `/llms.txt` answers with the Markdown it builds from the platform's
  * project list, which only a web that reaches the platform can.
  */
@@ -292,7 +292,7 @@ describe("smoke against a stage's web", () => {
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
-  // Live on dev-oscabriel (599): smoke ran 4 s after the web Worker's first
+  // Live on dev-oscabriel: smoke ran 4 s after the web Worker's first
   // deploy, and its new workers.dev hostname answered 404 to both probes; a
   // run seconds later passed both.
   it.live(

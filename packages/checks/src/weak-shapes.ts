@@ -1,5 +1,5 @@
 /**
- * The static half of "red for the right reason" (CAA D): five shapes of check
+ * The static half of "red for the right reason": five shapes of check
  * that pass whatever the answer does, read from the check file's source
  * before it ever runs. It reads expect-style checks (vitest, jest, bun); a
  * file with no `expect(` call (pytest, go test) is outside it and flags

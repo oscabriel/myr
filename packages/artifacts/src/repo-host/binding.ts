@@ -1,21 +1,22 @@
 /**
  * `RepoHost` over the Workers `Artifacts` binding: how the deployed platform
- * keeps its repos. The binding's surprises (S1, S2, S7) come back typed:
+ * keeps its repos. The binding's surprises, found by probing it live, come back
+ * typed:
  *
  * - errors are read by `code`, and by message when there is none, as under
- *   `wrangler dev` remote bindings (S1 #22);
+ *   `wrangler dev` remote bindings;
  * - a fork that answers 500 is tried once more, and an already-exists or a
  *   second 500 after that may be the fork the first made: it is, if it lists
- *   `main` (S7);
+ *   `main`;
  * - reads name a branch by its short name and a commit by its id, never
- *   `refs/…` (S1 #20), so `refs` and `push` go over git smart HTTP instead;
- * - a busy receive-pack is `HostBusy` (S2 #9).
+ *   `refs/…`, so `refs` and `push` go over git smart HTTP instead;
+ * - a busy receive-pack is `HostBusy`.
  *
  * Refs and pushes use a token the adapter mints for the one call and revokes
  * after it; the token goes nowhere but the `Authorization` header of the
  * adapter's own requests. The day-long write token a create, a fork or an
  * import hands back is revoked at once: any write token can force-push
- * `main` (S1 #4), and no caller needs it (W3 302 #4). A repo still being
+ * `main`, and no caller needs it. A repo still being
  * created or imported is asked for again, from 250 ms apart, up to eight
  * times. Every repo handle is disposed after use.
  */
@@ -61,7 +62,7 @@ import type { Code } from "./artifacts-api.ts";
 import { listRefs, pushRefs } from "./smart-http.ts";
 
 /**
- * The codes a message names when the error carries none (S1 #22): Artifacts'
+ * The codes a message names when the error carries none: Artifacts'
  * words, the fake's, and the code itself.
  */
 const MESSAGES = [
@@ -81,7 +82,7 @@ class Thrown extends Data.TaggedError("Thrown")<{
   readonly error: unknown;
 }> {}
 
-/** A fork that answered `INTERNAL_ERROR`, which may still have made the repo (S7 #2). */
+/** A fork that answered `INTERNAL_ERROR`, which may still have made the repo. */
 class MaybeForked extends Data.TaggedError("MaybeForked")<{
   readonly thrown: Thrown;
 }> {}
@@ -272,7 +273,7 @@ const refsOf = (name: RepoName, repo: ArtifactsRepo) =>
 
 /**
  * After a 500 and then an already-exists or a second 500, the fork may be
- * made (S7): it is, if it lists `main`. Otherwise it is still being made, or
+ * made: it is, if it lists `main`. Otherwise it is still being made, or
  * was undone; either way the caller tries again later.
  */
 const confirmed = (binding: Artifacts, name: RepoName) =>
@@ -343,8 +344,8 @@ const treeAt = (name: RepoName, repo: ArtifactsRepo, tree: string) =>
     Effect.flatMap((found) =>
       found === null ? Effect.succeedNone : Effect.asSome(entriesOf(found))
     ),
-    // A blob's or a commit's id names no tree, as on the other stores (202
-    // Comment 5); any other failure stays one.
+    // A blob's or a commit's id names no tree, as on the other stores;
+    // any other failure stays one.
     Effect.catchIf(threw("INTERNAL_ERROR"), ({ error }) =>
       blobOrCommit(name, repo, tree).pipe(
         Effect.flatMap((other) =>
@@ -468,7 +469,7 @@ const make = (binding: Artifacts) =>
             RepoNotFound: Effect.die,
           })
         ),
-      // S7: a 500 is tried once more; an already-exists or a second 500 after
+      // A 500 is tried once more; an already-exists or a second 500 after
       // it may be the fork the first made, so it is confirmed, not trusted.
       fork: (base, name) =>
         forkOnce(binding, base, name).pipe(

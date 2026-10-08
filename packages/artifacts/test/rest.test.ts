@@ -279,7 +279,7 @@ describe("forks over REST, which name their target", () => {
     )
   );
 
-  // S7 #2: under load a fork answers 500 (code 10400) after making the repo,
+  // Under load a fork answers 500 (code 10400) after making the repo,
   // and a retry answers 409 (code 10201), or 500 again.
   it.live.each([
     { failures: 1, retry: "an already-exists" },
@@ -674,7 +674,7 @@ describe("reads whose replies the REST docs do not show", () => {
 
   // The binding throws `INTERNAL_ERROR` for a read of the wrong kind; the
   // fake's REST API answers 500 there (an ASSUMPTION), and the other stores
-  // read no tree (202 Comment 5).
+  // read no tree.
   it.live("reads no tree at a blob's id or a commit's id", () =>
     within(() =>
       Effect.gen(function* () {

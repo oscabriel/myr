@@ -1,6 +1,6 @@
 /**
  * One project with one answer admitted and waiting for its Answer Workflow,
- * over in-process adapters: `RepoHostMemory`, W2's isomorphic-git `Lander`
+ * over in-process adapters: `RepoHostMemory`, the isomorphic-git `Lander`
  * over it (recorded, and able to answer `RepoBusy`), a `CheckRunner`
  * scripted per (tree or commit, lane), a `RulesEvaluator` that returns the
  * scenario's policy, `ProjectsMemory`, `EvidenceStoreMemory`, and an

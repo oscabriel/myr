@@ -251,7 +251,7 @@ const workerIdOf = (bundle: ConfigBundle, at: string, clock: FrozenFacts) =>
   `rules:${at}:${bundle.sdkVersion}:${clock.now}:${clock.seed}`;
 
 /**
- * `RulesEvaluator` over the Worker Loader (spec §8 D8). Each request loads
+ * `RulesEvaluator` over the Worker Loader. Each request loads
  * the bundle's modules, a prelude that freezes the clock and randomness to
  * the injected facts, and a main that answers one JSON document, as a
  * Dynamic Worker with no bindings, no outbound and a CPU limit, kept warm

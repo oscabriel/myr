@@ -9,10 +9,10 @@
  * helper, no redirects and no automatic maintenance, in a bare repo: the
  * Lander checks nothing out and runs nothing from the trees it handles.
  * Nothing here pushes with force, `--force-with-lease` or `--atomic` to
- * `main` (S1 #4, #6): a landing is a plain push, which git refuses when
+ * `main`: a landing is a plain push, which git refuses when
  * `main` moved, and only a compose ref, never `main`, moves by a lease. A
  * merge pushes one ref, to the answer's fork alone: the merged commit, for
- * the Checker to fetch (W3 304 #1).
+ * the Checker to fetch.
  */
 import { Brand } from "@repo/brand";
 import type { LandJob, Merged, MergeJob } from "@repo/project/lander/wire";
@@ -88,7 +88,7 @@ const safety = [
  * The Lander's copy of a canonical repo, relative to its work folder: one
  * bare repo per project, kept between jobs so a fetch brings only what is
  * new. It is never shallow, so a push from it sends no `shallow` lines,
- * which Artifacts' receive-pack does not advertise (S2 #10).
+ * which Artifacts' receive-pack does not advertise.
  */
 export const copyOf = (repo: RepoName) => `repos/${repo}.git`;
 
@@ -482,7 +482,7 @@ export const configEntry = `${Brand.configDir}/project.ts`;
 /** Whether a file in the config folder is code, which a bundle carries only inlined. */
 export const isScript = (path: string) => SCRIPT.test(path);
 
-/** The config folder's visibility module: its layers and held-back checks (W6). */
+/** The config folder's visibility module: its layers and held-back checks. */
 const visibilityEntry = `${Brand.configDir}/visibility.ts`;
 
 /**
@@ -696,7 +696,7 @@ export type Pushed =
   | "moved"
   /** The ref was not where the push expected: someone else moved it first. */
   | "stale"
-  /** Artifacts was busy with another push to the repo; retryable (S1 #5). */
+  /** Artifacts was busy with another push to the repo; retryable. */
   | "busy"
   /** Anything else. */
   | "failed";
@@ -704,7 +704,7 @@ export type Pushed =
 // git's words for a push the ref's current value refused: a client-side
 // fast-forward check (`fetch first`, `non-fast-forward`, `stale info` for a
 // lease), git receive-pack's compare-and-swap (`incorrect old value
-// provided`, git 2.56), and Artifacts' (`stale ref`, S1 #5).
+// provided`, git 2.56), and Artifacts' (`stale ref`).
 const STALE =
   /fetch first|non-fast-forward|stale info|incorrect old value|stale ref/u;
 

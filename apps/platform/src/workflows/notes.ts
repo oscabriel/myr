@@ -1,21 +1,21 @@
 /**
- * Verdict notes on an answer's fork (spec D22, §5 steps 7 and 10): after the
+ * Verdict notes on an answer's fork: after the
  * platform judges an answer, its answerer reads the verdict with plain git,
  *
  *     git fetch origin refs/notes/<slug>:refs/notes/<slug>
  *     git notes --ref=<slug> show <head>
  *
  * in a clone of their fork. One JSON note per head, the public `Verdict`
- * encoding and nothing more (D17); a newer verdict on the same head
+ * encoding and nothing more; a newer verdict on the same head
  * replaces its note, and the notes on the fork's other heads stay.
  *
  * Everything goes through `RepoHost` (principle 6): the notes ref's tip from
- * the ref listing (the binding resolves no custom ref, S1 #20), the earlier
+ * the ref listing (the binding resolves no custom ref), the earlier
  * notes through reads, and the new note as one compare-and-swap push of the
- * notes ref alone, never beside a branch (no atomic multi-ref push, S1 #6),
+ * notes ref alone, never beside a branch (no atomic multi-ref push),
  * never forced. Each new notes commit has the earlier one as its parent, so
  * the same fetch, without `+`, brings the newer note to a clone that has the
- * older. The canonical notes on landings are the Lander's (W2 212).
+ * older. The canonical notes on landings are the Lander's.
  */
 import { HostBusy, RefOutcome, RepoHost } from "@repo/artifacts/repo-host";
 import type {

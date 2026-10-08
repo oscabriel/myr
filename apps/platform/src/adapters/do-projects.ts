@@ -1,8 +1,8 @@
 /**
- * W2 214's `Projects` port over the Project Durable Object namespace: each
- * project name is one DO (`idFromName`), and the `ProjectApi` a project
- * gets encodes each call (`encodeCall`), sends it to the DO's `call`, and
- * decodes the reply (`decodeReply`), so a refusal arrives as the same typed
+ * The project service's `Projects` port over the Project Durable Object
+ * namespace: each project name is one DO (`idFromName`), and the `ProjectApi` a
+ * project gets encodes each call (`encodeCall`), sends it to the DO's `call`,
+ * and decodes the reply (`decodeReply`), so a refusal arrives as the same typed
  * refusal it is in the DO.
  *
  * The DO answers `UnknownProject` itself before `initProject`, so `get`

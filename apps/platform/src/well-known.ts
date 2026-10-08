@@ -1,18 +1,17 @@
 /**
- * The projects' contribute skills where agents look for skills (issue 505,
- * spec D12): `/.well-known/agent-skills/index.json`, in the Agent Skills
- * discovery shape (`wellKnownSkills`), lists every project whose landed
- * tree holds `.agents/skills/<project>-contribute/SKILL.md`, with the
- * SHA-256 of the file's bytes, and
- * `/.well-known/agent-skills/<project>-contribute/SKILL.md` serves that
- * file as it landed. Nothing is generated here: the platform serves what
- * landed (W4 410 lands the regenerated skill). The web host forwards these
- * paths unchanged, and the index's URLs are path-absolute, so they work on
- * either host.
+ * The projects' contribute skills where agents look for skills:
+ * `/.well-known/agent-skills/index.json`, in the Agent Skills discovery shape
+ * (`wellKnownSkills`), lists every project whose landed tree holds
+ * `.agents/skills/<project>-contribute/SKILL.md`, with the SHA-256 of the
+ * file's bytes, and `/.well-known/agent-skills/<project>-contribute/SKILL.md`
+ * serves that file as it landed. Nothing is generated here: the platform serves
+ * what landed (a follow-up landing lands the regenerated skill). The web host
+ * forwards these paths unchanged, and the index's URLs are path-absolute, so
+ * they work on either host.
  *
  * Projects come from the front page (`listProjects` reads the same), each
  * read at its landed SHA: the mirror ref the platform moves after each of
- * its own landings (spec D22), or `main` for a project whose only landing
+ * its own landings, or `main` for a project whose only landing
  * is its initializer's first push, which writes no mirror.
  */
 import { describedIn } from "@repo/agent-kit/generated-file";

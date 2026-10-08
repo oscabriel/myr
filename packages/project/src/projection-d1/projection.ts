@@ -73,7 +73,7 @@ const lastOf = (events: readonly ProjectedEvent[]) =>
 /**
  * Each person a landing credits, once per role, by the key `sameHandle`
  * compares handles by (`handleKey`): the rule of
- * `creditsByArea` (`attention/credits.ts`, W2 220) for one landing, whose
+ * `creditsByArea` (`attention/credits.ts`) for one landing, whose
  * area the projection reads from D1. Only `credits` counts: `assisted` (the
  * `Assisted-by` trailers) names agents, never people.
  */

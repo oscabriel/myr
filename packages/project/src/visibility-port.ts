@@ -1,5 +1,5 @@
 /**
- * Typed visibility's neutral port (W6 609): everything the project service
+ * Typed visibility's neutral port: everything the project service
  * asks of layers, held-back checks, admission and the ledger, with a
  * default that is a project without any of it. The visibility cartridge
  * (`./visibility/**`, `@repo/visibility`, and the platform's
@@ -15,7 +15,7 @@
  * settled after it through `settle`, retried by the alarm until done.
  *
  * Nothing here names a layer's paths, a check, or a salt: the port
- * returns roots, area bits and public ledger entries only (spec D17).
+ * returns roots, area bits and public ledger entries only.
  */
 import { HeldBackResult } from "@repo/protocol/domain/answer";
 import type { ClaimView } from "@repo/protocol/domain/claim";
@@ -70,8 +70,8 @@ export type LayerAccess = typeof LayerAccess.Type;
 /**
  * A sealed suite's run, as the platform gives it to the Checker: the
  * layer's files under the sealed areas at the pinned commit, read by the
- * platform (no layer token or route ever reaches the sandbox; OSR §5.3
- * step 5), and one run per sealed check, the run block's `test` with its
+ * platform (no layer token or route ever reaches the sandbox),
+ * and one run per sealed check, the run block's `test` with its
  * `{path}` filled. It crosses the Project DO's boundary, so it is a schema.
  */
 export const HeldBackJob = Schema.Struct({
@@ -117,7 +117,7 @@ const unjudged: HeldBackJudgement = {
 };
 
 /**
- * One admission run of a layer push's sealed checks (OSR §5.5): an area's
+ * One admission run of a layer push's sealed checks: an area's
  * checks on main (green every time, `attempt` of the policy's count), or on
  * a known-bad tree (red at least once).
  */

@@ -4,7 +4,7 @@
  * metadata and `/token`, storing grants in `OAUTH_KV`; sign-in's pages
  * answer `/authorize`, `/signup` and the CLI's client metadata document,
  * and Google sign-in's answer `/oauth/google/*` when the platform has a
- * Google OAuth client (issue 419); every other request goes to the
+ * Google OAuth client; every other request goes to the
  * platform's own fetch untouched.
  *
  * The provider's role-based `OAuthAuthorizationServer` is used, not its
@@ -40,7 +40,7 @@ import type { OAuthEnv } from "./sign-in.ts";
 
 /**
  * The authorization server for one origin: the origin is its issuer and
- * its one resource, as the protected resource metadata names it (305), so
+ * its one resource, as the protected resource metadata names it, so
  * a token is good for every path the platform serves there. The CLI's and
  * an MCP client's Client ID Metadata Documents are fetched (the Worker
  * needs `global_fetch_strictly_public`); nothing registers dynamically.

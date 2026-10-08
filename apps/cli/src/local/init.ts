@@ -174,7 +174,7 @@ const READ = [
   /^\.pre-commit-config\.yaml$/u,
 ];
 
-/** Every tracked path, with contents for the files the finder reads (205 #5). */
+/** Every tracked path, with contents for the files the finder reads. */
 const trackedFiles = (root: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

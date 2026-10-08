@@ -1,7 +1,7 @@
 /**
  * Ratchets and lint-to-zero asks as a decider and two contributors live
- * them, through the platform's own fetch handler with real git (spec §5
- * steps 3, 7 (b), (e) and 8): a project that declares a `no-explicit-any`
+ * them, through the platform's own fetch handler with real git:
+ * a project that declares a `no-explicit-any`
  * ratchet opens a lint-to-zero ask red first by its count, an answer that
  * drives the count to zero lands and lowers the baseline with no one asked,
  * an answer elsewhere that raises the count is refused `Weakened`, and a

@@ -2,7 +2,7 @@
  * What setup installed, kept for the next check of the same project with the
  * same lockfile, so setup runs once per lockfile rather than once per check.
  * A snapshot is taken right after setup and never later: held-back files are
- * written only after it (OSR §5.3; `@repo/checks/phases`).
+ * written only after it (`@repo/checks/phases`).
  *
  * Adapters: `checker/sdk.ts` over Container snapshots; tests keep the keys in
  * memory (`test/fake-box.ts`).

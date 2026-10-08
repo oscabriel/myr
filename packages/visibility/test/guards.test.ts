@@ -43,7 +43,7 @@ describe("the private-path guard", () => {
     );
   });
 
-  // OSR §2.5, §5.4: the refusal names no layer path to someone who cannot
+  // The refusal names no layer path to someone who cannot
   // read the layer. It names every path they added or modified, all of them
   // their own, so which one collides stays unsaid.
   it("names every path a non-reader added or modified, not the colliding ones", () => {
@@ -178,7 +178,7 @@ describe("the write-down guard", () => {
     );
   });
 
-  // OSR §5.4: on someone who cannot read the layer it would be an oracle
+  // On someone who cannot read the layer it would be an oracle
   // for the layer's content, so it never runs.
   it("never refuses someone who cannot read the layer, even on an exact match", () => {
     expect(

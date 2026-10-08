@@ -1,5 +1,5 @@
 /**
- * The herdr view (`--view herdr`, issue 717): for the video, each
+ * The herdr view (`--view herdr`): for the video, each
  * contributor's harness runs interactively in a herdr pane of its own, six
  * tiled over a counter strip, and every prompt (the brief, each refusal,
  * the nudge) is typed into that pane's session through herdr's CLI. The
@@ -459,8 +459,8 @@ export const paneShell = (input: {
 }) =>
   [
     "#!/bin/sh",
-    "# One swarm contributor's herdr pane (issue 717): their harness's env from the",
-    "# swarm through a pipe, then a shell in their clone for herdr to start it in.",
+    "# One swarm contributor's herdr pane: their harness's env from the swarm",
+    "# through a pipe, then a shell in their clone for herdr to start it in.",
     `exec env -i ${[...PANE_OWNS, ...HERDR_NAMES].map((name) => `${name}="\${${name}-}"`).join(" ")} /bin/sh -c '`,
     "set -a",
     '. "$1"',

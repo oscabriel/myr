@@ -2,9 +2,9 @@
  * The platform's git endpoint as `gateway.test.ts` drives it: `serveGit`
  * served on a local port, in front of bare repos on disk, the way
  * `packages/git/test/world.ts` serves the gateway. Behind it run the real
- * pieces production runs, over local stand-ins: W2's `UpstreamRepoHost`
+ * pieces production runs, over local stand-ins: `UpstreamRepoHost`
  * over `RepoHostLocal` and the Worker's `fetch` (`WorkerFetch`), reaching
- * real `git http-backend` on a second port, and `Projects` over W2's memory
+ * real `git http-backend` on a second port, and `Projects` over its memory
  * adapter with a testkit scenario's policy.
  *
  * The world also writes down what a test checks beyond git's own output:

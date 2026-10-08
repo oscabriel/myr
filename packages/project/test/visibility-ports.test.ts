@@ -1,5 +1,5 @@
 /**
- * The project service through its visibility ports (W6 609): with
+ * The project service through its visibility ports: with
  * recording fakes of `ProjectVisibility` and `ProjectEnv` provided, every
  * delegation reaches the port, sees the project as the call has it, and
  * the service commits what the port plans: a landing's policy plan (its

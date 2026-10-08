@@ -1,7 +1,7 @@
 /**
- * The front page's reads (spec §3.2): the open asks across every project,
+ * The front page's reads: the open asks across every project,
  * and the list of projects (which the project page also reads, for its
- * posture and counts). Read once per page; issue 510 makes them live.
+ * posture and counts). Read once per page; `watch` makes them live.
  *
  * Each atom renders as waiting on the server (`withServerValueInitial`): the
  * browser calls `/rpc`, and a server render never fetches into the
@@ -14,7 +14,7 @@ import { Atom } from "effect/reactivity";
 import { ContractsClient } from "../surfaces.ts";
 import { keys } from "./keys.ts";
 
-/** The open asks `frontPage` returns for `filter`, as the anonymous viewer may take them until sign-in (513) names one. */
+/** The open asks `frontPage` returns for `filter`, as the anonymous viewer may take them until sign-in names one. */
 export const frontPageAtom = Atom.family(
   (filter: { readonly kind?: KindName; readonly reserved?: Reserve }) =>
     Atom.withServerValueInitial(

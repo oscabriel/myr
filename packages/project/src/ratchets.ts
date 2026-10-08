@@ -6,7 +6,7 @@
  * `measure`, an answer's counts are judged against these baselines there
  * (`judgeRatchets`, which `<cli> check` judges with too), and the baselines
  * live in the Project DO's `ratchets` rows (no suppressions file in the
- * tree; FE §8.4 B3).
+ * tree).
  */
 import { sameRatchet } from "@repo/checks/kinds/ratchet";
 import type {

@@ -1,5 +1,5 @@
 /**
- * The deployed web, as a browser shows it (issue 806): the front page, a
+ * The deployed web, as a browser shows it: the front page, a
  * project's page, an ask's page and the same ask as Markdown, and
  * `/llms.txt`, each asserted on its key text, each saved as one screenshot
  * in `e2e/out/` for the shot list.

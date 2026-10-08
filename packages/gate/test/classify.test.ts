@@ -34,7 +34,7 @@ const red: LaneEvidence = {
   rerun: Option.none(),
 };
 
-// The CAA §2.B table: the platform never charges the answerer for its own
+// The classification table: the platform never charges the answerer for its own
 // trouble, nor for a main that moved underneath them.
 const rows: readonly {
   readonly name: string;

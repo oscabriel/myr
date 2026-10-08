@@ -1,8 +1,8 @@
 /**
- * The platform's generator for a project's own agent files (spec D12, W4
- * 410): the contribute skill (`.agents/skills/<project>-contribute/SKILL.md`
+ * The platform's generator for a project's own agent files:
+ * the contribute skill (`.agents/skills/<project>-contribute/SKILL.md`
  * and its `.claude/skills/` copy) and the block in the project's AGENTS.md,
- * from `@repo/agent-kit`, which `@repo/project` may not import (spec §4.1).
+ * from `@repo/agent-kit`, which `@repo/project` may not import.
  *
  * The Project DO runs it after any landing that moved its landed SHA
  * (`@repo/project/generated`): when the policy read there changes what the

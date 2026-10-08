@@ -1,10 +1,10 @@
 /**
- * One project's whole world over memory adapters, for the service's
- * scenario test (and the shape W3 310 copies for the platform's core-loop
- * test): `RepoHostMemory`, the isomorphic-git `Lander` over it, a scripted
- * `CheckRunnerMemory`, a `RulesEvaluator` that returns the scenario's policy,
- * `AlarmsMemory`, `AnswerRunsInline`, `ProjectionMemory`, and the project
- * store in memory or on SQLite (sqlite-node).
+ * One project's whole world over memory adapters, for the service's scenario
+ * test (and the shape the platform's core-loop test copies): `RepoHostMemory`,
+ * the isomorphic-git `Lander` over it, a scripted `CheckRunnerMemory`, a
+ * `RulesEvaluator` that returns the scenario's policy, `AlarmsMemory`,
+ * `AnswerRunsInline`, `ProjectionMemory`, and the project store in memory or on
+ * SQLite (sqlite-node).
  *
  * The test drives only the service's methods; this file holds what stands
  * in for the outside world: pushes into forks as git would make them, and

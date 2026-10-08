@@ -1,5 +1,5 @@
 /**
- * The project service without the visibility cartridge (W6 609): over
+ * The project service without the visibility cartridge: over
  * memory adapters with the neutral ports `NoVisibility` and `NoEnv`, a
  * project is Open, declares no layer, keeps an empty ledger and an empty
  * env shape (its committed `.env.schema` notwithstanding), takes no

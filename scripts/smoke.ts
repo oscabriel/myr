@@ -11,7 +11,7 @@
  * platform (the web's probes then run only with `--web-url`). The probes live
  * in `infra/smoke.ts`.
  *
- * `--loop` (issue 806) runs the whole core loop after the probes, through the
+ * `--loop` runs the whole core loop after the probes, through the
  * CLI and git (`lib/smoke/loop.ts`): a throwaway project `smoke-<run>`, an
  * ask opened red first, a claim, an out-of-territory push git refuses with
  * `OutOfScope`, the fixed answer landed with its credit, and its verdict

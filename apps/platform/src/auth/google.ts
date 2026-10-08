@@ -1,5 +1,5 @@
 /**
- * Google sign-in (issue 419): a second way to prove who you are, beside a
+ * Google sign-in: a second way to prove who you are, beside a
  * password, offered only when the platform has a Google OAuth client
  * (`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`; human step H4).
  *

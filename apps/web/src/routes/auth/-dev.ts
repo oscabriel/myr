@@ -1,12 +1,12 @@
 /**
  * The dev sign-in, for `vite dev` and tests only: `GET /auth/dev?handle=<h>`
  * sets the session cookie to `dev-<h>`, the token the dev backend (`#backend`
- * under the `development` condition, issue 502) knows as that fictional
+ * under the `development` condition) knows as that fictional
  * person, so Today and decide can be tried with no platform.
  *
  * The leading `-` keeps this module out of the route tree; `$.ts` reaches
  * it through an `import()` that only a development build keeps, so the
- * production bundle carries none of it (W5 505's production-bundle test).
+ * production bundle carries none of it (`test/production-bundle.test.ts`).
  */
 import { Handle } from "@repo/protocol/ids";
 import { Option, Schema } from "effect";

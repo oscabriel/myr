@@ -1,9 +1,9 @@
 /**
- * The swarm's herdr view (issue 717): six contributors in six herdr panes
- * and a counter pane, for the video. The view decides only where a harness
- * runs and how a prompt reaches it; the verdict loop and its outcomes (from
- * `<cli> status --json`, never pane text) are 711's. The counter follows
- * the project's `watch` and counts claims, pushes and landings.
+ * The swarm's herdr view: six contributors in six herdr panes and a counter
+ * pane, for the video. The view decides only where a harness runs and how a
+ * prompt reaches it; the verdict loop and its outcomes (from
+ * `<cli> status --json`, never pane text) are `swarm-loop.test.ts`'s. The counter follows the
+ * project's `watch` and counts claims, pushes and landings.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";

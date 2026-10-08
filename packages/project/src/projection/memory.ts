@@ -3,7 +3,7 @@
  * keeps every event it was given once per `(project, event.seq)`, as the port
  * asks, in the order it first took them, and reads them back. Not once per
  * row id: every project's outbox names its rows `projected:<seq>`, so two
- * projects' rows share ids (502 found burrow's events dropped that way).
+ * projects' rows share ids (the dev world once dropped burrow's events that way).
  */
 import { Context, Effect, Layer, Ref, Schema } from "effect";
 

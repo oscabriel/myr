@@ -1,8 +1,8 @@
 /**
- * Write-only values over the platform's surfaces (W6 614): the handler the
+ * Write-only values over the platform's surfaces: the handler the
  * Worker serves, its Project DOs in process on SQLite, the platform's ports
  * in memory, and the visibility cartridge's env as the Worker composes it
- * (603's real parser and 610's WebCrypto vault) under the fake env's test
+ * (the real parser and the WebCrypto vault) under the fake env's test
  * `MASTER_KEY`. A decider sets datekit's token over `/rpc` with their
  * token; anyone reads the env shape over `/rpc` and sees who set it and
  * when. The value is in no response body, no log line and no event, and
@@ -85,7 +85,7 @@ const tokens = {
   "ines-v": "ines-env-values-token-0123456789abcdef",
 } as const;
 
-/** datekit's `.env.schema` (507) cut to its header, one public item and its one sensitive item. */
+/** datekit's `.env.schema` cut to its header, one public item and its one sensitive item. */
 const datekitSchema = [
   "# @currentEnv=$APP_ENV",
   "# @defaultRequired=infer @defaultSensitive=false",

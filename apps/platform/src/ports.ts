@@ -10,10 +10,10 @@
  * it is called, and whatever it keeps per isolate (the upstream's token
  * cache, the Project DO stubs it found) lives in the layer, never in the
  * module. `Alarms` and `AnswerRuns` are bound per project inside its Durable
- * Object (302); `Sessions` is the surfaces' (`platform.ts`).
+ * Object; `Sessions` is the surfaces' (`platform.ts`).
  *
  * Cartridges plug in over these ports (`plugIn`), one marked line each in
- * `cartridges.ts`. The visibility cartridge (W6 609) fills `LayerGate` for
+ * `cartridges.ts`. The visibility cartridge fills `LayerGate` for
  * the gateway, and `ProjectVisibility` and `ProjectEnv` for each Project
  * DO's service; without it they answer their defaults, a platform without
  * typed visibility. Every host takes its ports from here, so the one line
@@ -94,16 +94,16 @@ const memoryFrontPage = Layer.merge(
 /**
  * The ports for one stage's env, before any cartridge: Artifacts through
  * its binding, git's upstream and every repo read over it, each project's
- * Durable Object, the sandbox's Checker, the Lander `LANDER_ADAPTER` names
- * (spec §8 D6), config folders evaluated in the Worker Loader, the front
- * page in D1, the rate limits, lane logs in the `EVIDENCE` bucket (W4 418),
+ * Durable Object, the sandbox's Checker, the Lander `LANDER_ADAPTER` names,
+ * config folders evaluated in the Worker Loader, the front
+ * page in D1, the rate limits, lane logs in the `EVIDENCE` bucket,
  * and the `PROJECT` namespace again for `watch`'s relay of each project's
- * socket (issue 510).
+ * socket.
  */
 const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
   Layer.mergeAll(
     memoryFrontPage,
-    // The D1 cartridge (W3 309): the front page and its projection in
+    // The D1 cartridge: the front page and its projection in
     // `FRONT_PAGE`, in place of the memory one above. Delete this entry
     // (and its imports) and the platform falls back to the memory front page.
     Layer.merge(FrontPageD1, ProjectionD1).pipe(
@@ -119,7 +119,7 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
       Layer.provide(FinishersFromChecks)
     ),
     DoProjects(config.PROJECT),
-    // `watch` relays each project's DO socket (issue 510); without this
+    // `watch` relays each project's DO socket; without this
     // entry it follows each project's event log instead.
     Layer.succeed(ProjectSockets, Option.some(config.PROJECT)),
     WorkerRateLimits({

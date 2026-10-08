@@ -69,7 +69,7 @@ const requestOf = (
  * The production `Upstream`: each exchange goes to the repo's own remote in
  * the store, with a token the store minted for the exchange's scope. Tokens
  * are cached per (repo, scope) until a minute before they expire, in a cache
- * made when the layer is built: one per isolate in a Worker (S7 #2).
+ * made when the layer is built: one per isolate in a Worker.
  */
 export const UpstreamRepoHost: Layer.Layer<Upstream, never, RepoHost | Fetch> =
   Layer.effect(

@@ -1,7 +1,7 @@
 /**
- * Admission of held-back checks over the platform's Node world (W6 615;
- * OSR §5.5, SYN Q17): a maintainer's push to datekit's maintainers layer,
- * through the gateway (606), starts an admission run of the `Answer`
+ * Admission of held-back checks over the platform's Node world:
+ * a maintainer's push to datekit's maintainers layer,
+ * through the gateway, starts an admission run of the `Answer`
  * Workflow (tagged `Admission`); its steps ask the project for the plan,
  * run each changed area's checks on main three times and on the known-bad
  * tree the layer's manifest names, and hand the area bits back. An
@@ -14,7 +14,7 @@
  * over a private namespace of its own; admissions are queued instead of
  * started, and the test runs each over the Worker's ports with the steps
  * kept in memory, as the `Answer` Workflow runs one over the engine's. The
- * DO's rules read datekit's visibility config from its `visibility.ts` (608).
+ * DO's rules read datekit's visibility config from its `visibility.ts`.
  * The Checker answers lane jobs from a script, and held-back jobs with area
  * bits: green on main, red on the known-bad tree.
  */

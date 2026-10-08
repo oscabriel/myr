@@ -1,5 +1,5 @@
 /**
- * The demo folder (issue 713). On recording day the user opens `docs/demo/`
+ * The demo folder. On recording day the user opens `docs/demo/`
  * and finds a narration script timed to the video's seven beats, a shot list,
  * the swarm scenario and a rehearsal checklist that the live walk marks.
  *

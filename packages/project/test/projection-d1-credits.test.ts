@@ -40,7 +40,7 @@ const world = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
   Layer.provideMerge(migrated([frontPageMigration, projectsMigration]))
 );
 
-/** A database the front page's migration alone made, as W3 and W4 left it. */
+/** A database the front page's migration alone made, before the project list's. */
 const beforeProjects = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
   Layer.provideMerge(migrated([frontPageMigration]))
 );
@@ -256,7 +256,7 @@ describe("the project list and credits in D1", () => {
       Effect.gen(function* () {
         const sql = yield* SqlClient;
 
-        // The rows 309's projection wrote before the project list existed.
+        // The rows the first projection wrote before the project list existed.
         yield* sql`INSERT INTO cursor (project, seq) VALUES ('datekit', 4), ('burrow', 2)`;
         yield* sql`INSERT INTO front_page
             (project, ask, kind, reserve, want, territory, claimed, blocked_by, opened_at)

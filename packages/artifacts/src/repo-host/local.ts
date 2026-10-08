@@ -525,7 +525,7 @@ const make = (options: {
  * Artifacts on local disk, for tests that need real git over HTTP and for the
  * CLI's dev mode: each repo a bare git repo `<root>/<name>.git` with default
  * branch `main`, kept across layers over the same root. A push is a
- * compare-and-swap per ref with no atomicity across refs, as S1 found
+ * compare-and-swap per ref with no atomicity across refs, as probes found
  * Artifacts. `remote(name)` is `<remoteBase>/<name>.git`, so a test can serve
  * `root` with `git http-backend` under that base and drive real git at it.
  * Tokens are recorded, never checked.

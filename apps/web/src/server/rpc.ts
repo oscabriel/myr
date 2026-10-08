@@ -5,8 +5,8 @@
 
 /**
  * How the web reaches the platform. `#backend` picks one: under the
- * `development` condition an in-process world (`src/dev/backend.ts`, issue
- * 502), otherwise the `PLATFORM` service binding (`src/server/backend.ts`).
+ * `development` condition an in-process world (`src/dev/backend.ts`),
+ * otherwise the `PLATFORM` service binding (`src/server/backend.ts`).
  */
 export type Backend = (request: Request, env: Env) => Promise<Response>;
 

@@ -11,7 +11,7 @@ describe("a repo name", () => {
   });
 });
 
-// Artifacts' binding resolves short branch names and commit ids only (S1 #20),
+// Artifacts' binding resolves short branch names and commit ids only,
 // so a full ref name cannot be a revision.
 describe("a branch revision", () => {
   it.each(["main", "feature/parser", "asked-landed"])("takes %s", (name) => {

@@ -1,12 +1,12 @@
 /**
  * A project's env shape: every item its committed `.env.schema` declares,
- * parsed at the landed commit and never resolved (varlock.md §8.3 #6). Each
+ * parsed at the landed commit and never resolved (ADR 0009). Each
  * item shows its name, description, `@type` text, whether it is required,
  * whether it is sensitive, its `@proxy` hosts, docs and deprecation; a
  * sensitive item shows who set its value and when, or that nobody has.
  *
  * Never a value, and nothing that would take or show one: a value is set
- * only from a terminal (`setEnv` is RPC and CLI alone, spec §3.2), so the
+ * only from a terminal (`setEnv` is RPC and CLI alone), so the
  * page shows that command line instead of a form. The placeholder unlanded
  * code sees is not shown either: it is not a value, but it reads like one.
  *

@@ -1,7 +1,7 @@
 /**
  * `CheckLogs` as the sandbox Worker's own logs: each phase's log as one log
  * line, its tail only, annotated with its phase and name. The check's wire
- * carries no logs yet (W3 315, Comments), so this is where they go until the
+ * carries no logs yet, so this is where they go until the
  * platform stores them through `EvidenceStore`.
  */
 import { Effect, Layer } from "effect";

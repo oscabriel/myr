@@ -1,7 +1,7 @@
 /**
  * The `Box` port: the one container a Checker or a Lander Durable Object
  * runs its commands in. Both run through it, so their scripts are tested in
- * Node over local processes (W3 306, 315) and run in a container in the
+ * Node over local processes and run in a container in the
  * Worker (`box/sdk.ts`).
  */
 import { Context, Schema } from "effect";

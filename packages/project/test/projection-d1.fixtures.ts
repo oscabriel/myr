@@ -9,10 +9,10 @@ import { SqliteClient } from "@effect/sql-sqlite-node";
 import { Effect, FileSystem, Layer, Path } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 
-/** The front page's migration (W3 309; `FrontPageDdl`). */
+/** The front page's migration (`FrontPageDdl`). */
 export const frontPageMigration = "0001_front_page.sql";
 
-/** The project list's and the credits' migration (W5 514; `ProjectsCreditsDdl`). */
+/** The project list's and the credits' migration (`ProjectsCreditsDdl`). */
 export const projectsMigration = "0004_projects_credits.sql";
 
 /** A migration of the platform's D1 database, as its file holds it. */

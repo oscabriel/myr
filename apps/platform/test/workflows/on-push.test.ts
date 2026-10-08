@@ -55,17 +55,17 @@ import type { WorkflowSteps } from "../../src/workflows/step.ts";
 import { fakeEnv, without } from "../fake-env.ts";
 
 /**
- * One `cf.artifacts.repo.pushed` event as Artifacts delivered it to the S1
- * spike's Workflow (S1 #15, `results-s1workflow-1791317493.jsonl`, line 1),
- * verbatim but for the namespace and repo, renamed to a test project's.
+ * One `cf.artifacts.repo.pushed` event as Artifacts delivered it to a spike's
+ * Workflow (the first line of its recorded events), verbatim but for the
+ * namespace and repo, renamed to a test project's.
  */
 const deliveredLine =
   '{"id": "88018624-a405-49c4-ba41-7dc60e4a2c89", "type": "cf.artifacts.repo.pushed", "source": {"namespace": "projects-local", "repoName": "datekit"}, "payload": {"ref": "refs/heads/main", "before": "cfc3cc308874a348d38c7143c9093c17a196e4af", "after": "88359ce33219db41afafbcad7adc19f4f4d84381", "commits": [{"id": "88359ce33219db41afafbcad7adc19f4f4d84381", "message": "ev-0", "messageTruncated": false, "timestamp": "2026-10-06T20:10:48.000Z", "author": {"name": "probe", "email": "probe@invalid"}, "committer": {"name": "probe", "email": "probe@invalid"}, "parents": ["cfc3cc308874a348d38c7143c9093c17a196e4af"]}], "totalCommitsCount": 1, "commitsTruncated": false}}';
 
 /**
- * The event S1 saw for a custom ref pushed beside `main` (line 5): its
+ * The event the same spike saw for a custom ref pushed beside `main`: its
  * `before` is git's all-zero id, since the push created the ref, and it
- * lists no commits (S1 #13).
+ * lists no commits.
  */
 const createdLine =
   '{"id": "bc6f5f68-4f76-45a7-8258-ad4ffd465cae", "type": "cf.artifacts.repo.pushed", "source": {"namespace": "projects-local", "repoName": "datekit"}, "payload": {"ref": "refs/asked/ev", "before": "0000000000000000000000000000000000000000", "after": "8812c641c30d4a4633c6e77e3efe52c8f029f87d", "commits": [], "totalCommitsCount": 0, "commitsTruncated": false}}';

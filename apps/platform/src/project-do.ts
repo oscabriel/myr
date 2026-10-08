@@ -6,7 +6,7 @@
  * every alarm on that one runtime, which lives on the instance.
  *
  * Every project call goes through `call`, and the project's deadlines
- * through `alarm`. Its watchers (`watch`, issue 510) are hibernating
+ * through `alarm`. Its watchers (`watch`) are hibernating
  * WebSockets: `fetch` accepts one at `/watch?since=n`, and after each call
  * and alarm commits, the watch room sends every socket what it has not
  * been sent (`watch.ts`). It has no public route: only the Worker reaches
@@ -52,7 +52,7 @@ const Nameless = Layer.succeed(
  * Every port one Project DO's service runs on but its store: the stage's,
  * the DO's own alarm, the project's answer runs, and the platform's
  * generator for the project's own agent files, which the service runs after
- * a landing that changes what they say (W4 410).
+ * a landing that changes what they say.
  */
 export const doPorts = (input: {
   readonly config: PlatformConfig;

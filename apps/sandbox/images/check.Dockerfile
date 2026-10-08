@@ -1,5 +1,5 @@
 # The Checker's image: where an answer's checks run, with no credentials
-# (spec §4.3; `src/checker/run.ts` runs the phases). Debian trixie slim with
+# (`src/checker/run.ts` runs the phases). Debian trixie slim with
 # Node 24, Bun 1.4.2, git and corepack (pnpm and Yarn, fetched from the npm
 # registry during setup), plus the Sandbox SDK's `sandbox-shim`, which `Files`
 # runs. Nothing is copied from the build context, and no token, remote or

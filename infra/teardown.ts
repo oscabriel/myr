@@ -3,7 +3,7 @@
  * [--stage <s>] [--keep <project>]… [--apply]`. Prints which throwaways the
  * ledger (`infra/created.jsonl`) still has on the account, and with `--apply`
  * deletes exactly those; `infra/lib/teardown.ts` decides what may be deleted,
- * and `infra/stages.md` §4 says why.
+ * and `infra/stages.md` ("Teardown policy") says why.
  *
  * It reaches Artifacts with the infra token (`CLOUDFLARE_ACCOUNT_ID` and
  * `CLOUDFLARE_API_TOKEN`, from `varlock run --path infra/`): repos through

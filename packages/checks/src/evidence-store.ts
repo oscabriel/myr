@@ -1,10 +1,10 @@
 /**
  * The `EvidenceStore` port: where a lane's raw log goes, so a
  * `LaneResult.logRef` (and a `ChecksFailed.logRef`) names something real and
- * the log itself never travels to an answerer (spec §2.3 `LaneResult`).
+ * the log itself never travels to an answerer.
  *
  * Adapters: `/memory`, for tests and the web's dev backend, and `/r2` over
- * the stage's `evidence-<stage>` bucket (spec §4.4), which the Worker runs.
+ * the stage's `evidence-<stage>` bucket, which the Worker runs.
  */
 import { LaneName, ProjectName, RequestId } from "@repo/protocol/ids";
 import { Context, Option, Schema } from "effect";

@@ -1,5 +1,5 @@
 /**
- * The fence-shaped example's config folder (issue 508): the `/bun` adapter
+ * The fence-shaped example's config folder: the `/bun` adapter
  * evaluates `examples/burrow`'s config folder, with the facts the platform
  * reads from burrow's tree (its root files, its six workspace packages and
  * its vouch file), into the policy the ratchet and the six-way migrate demo

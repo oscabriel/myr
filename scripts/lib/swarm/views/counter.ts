@@ -1,17 +1,17 @@
 /**
  * The herdr view's counter: claims, pushes and landings in the swarm's
- * project as they happen, for the video's live tally (SYN §7.3, beat
+ * project as they happen, for the video's live tally (beat
  * 2:15–3:45). It follows the project's public `watch`, so it counts what
  * the platform recorded, never what a pane printed.
  *
- * `watch` streams over the platform's framed `/rpc` (NDJSON, issue 510).
+ * `watch` streams over the platform's framed `/rpc` (NDJSON).
  * The swarm's scripts reach the network only through processes (their
  * allow-list grants `effect/process`), so `curl` carries the call, as the
  * swarm's other steps run git, the CLI and herdr. A run counts from the last
  * event the project already holds (`lastHeld`), appends one line to the
  * counter file per claim, push and landing, and follows again from the
  * last event it heard whenever the stream ends (a held stream does end:
- * Bun's `fetch` at 361 s, spec §7.4).
+ * Bun's `fetch` at 361 s).
  */
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { ProjectName } from "@repo/protocol/ids";

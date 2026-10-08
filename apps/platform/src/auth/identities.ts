@@ -1,6 +1,6 @@
 /**
  * Identities: a person's account at an outside provider, linked to a
- * platform handle (issue 419). Only the provider's stable subject id is
+ * platform handle. Only the provider's stable subject id is
  * kept against the handle's key: no email, no name, no token. Google is
  * the one provider; the handle stays how the platform knows the person.
  */

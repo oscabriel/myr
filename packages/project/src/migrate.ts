@@ -1,5 +1,5 @@
 /**
- * A migrate ask's family (CAA §2.F): one ask that moves every use of a name
+ * A migrate ask's family: one ask that moves every use of a name
  * to another opens, when its callers sit in two or more of the project's
  * modules, as one child ask per module with callers, each with that module
  * as its territory and "no callers in this module" as its check, and a
@@ -84,7 +84,7 @@ const slug = (name: string) =>
 
 /**
  * The id of a family's child in `module`: `drop-legacy-fetch-p1`. It never
- * holds `--`, which repo names keep as their separator (spec §4.5).
+ * holds `--`, which repo names keep as their separator.
  */
 export const childId = (parent: AskId, module: string): AskId =>
   AskId.make(`${parent}-${slug(module) || "root"}`);

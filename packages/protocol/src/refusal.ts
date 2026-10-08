@@ -205,8 +205,8 @@ export class ChecksFailed extends Schema.TaggedError<ChecksFailed>()(
   }
 ) {
   /**
-   * The `logRef` of a lane whose log held a stored write-only value (W6
-   * 613; VL §8.6): the log was never kept, and nothing names the item.
+   * The `logRef` of a lane whose log held a stored write-only value: the log
+   * was never kept, and nothing names the item.
    */
   static readonly withheld = "withheld";
 }

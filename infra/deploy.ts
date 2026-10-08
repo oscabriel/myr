@@ -7,7 +7,7 @@
  * 3. `platform`, with `varlock-wrangler`, which resolves
  *    `apps/platform/.env.schema` and syncs its secrets with the Worker;
  * 4. `web`, built for the stage and deployed with Wrangler, once `apps/web`
- *    exists (W5);
+ *    exists;
  * 5. the push-event trigger, read back and compared (`bootstrap.ts
  *    --check-triggers`, with the infra token from `varlock run`);
  * 6. `scripts/smoke.ts` against the live stage;
@@ -23,10 +23,10 @@
  * with its own login, never the read-mostly infra token.
  *
  * `STAGE_SECRETS_FILE` names a dotenv file outside the repo whose values the
- * platform's deploy carries as its environment, which varlock reads before
- * any `.env` file: a stage's generated secrets, on every stage (spec §8.3
- * O1, extended to demo). Only the items `apps/platform/.env.schema` declares
- * are passed, to that one step, and no value is ever printed.
+ * platform's deploy carries as its environment, which varlock reads before any
+ * `.env` file: a stage's generated secrets, on every stage (`infra/stages.md`,
+ * "Secrets"). Only the items `apps/platform/.env.schema` declares are passed,
+ * to that one step, and no value is ever printed.
  *
  * Each step runs with its own folder's `node_modules/.bin` first on `PATH`,
  * since `varlock-wrangler` starts `wrangler` by name.
@@ -118,7 +118,7 @@ const stepsOf = (
   // The web builds with the Cloudflare Vite plugin, which takes the stage
   // from CLOUDFLARE_ENV and writes that stage's deploy config under `dist/`;
   // Wrangler deploys that build, and refuses an --env other than the one it
-  // was built for (checked in W5 501). NODE_ENV keeps a shell's own value
+  // was built for. NODE_ENV keeps a shell's own value
   // from making it a development build, whose `#backend` is the dev world.
   ...(options.web
     ? [
@@ -250,7 +250,7 @@ const decodeWorkersDev = Schema.decodeUnknownEffect(
 
 /**
  * The line naming the redirect URI a Google OAuth client registers for
- * `stage` (H4, W4 419): the platform's workers.dev origin from bootstrap's
+ * `stage` (H4): the platform's workers.dev origin from bootstrap's
  * record, or how to get one when bootstrap hasn't run.
  */
 const googleRedirectLine = (root: string, stage: Stage) =>

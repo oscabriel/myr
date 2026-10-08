@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * The Playwright check of a deployed web (issue 806), never part of verify:
+ * The Playwright check of a deployed web, never part of verify:
  * vitest runs only `test/`, and this runs only `e2e/*.e2e.ts`, against the stage
  * `WEB_URL` names (the spec skips itself without one). From `apps/web`:
  *

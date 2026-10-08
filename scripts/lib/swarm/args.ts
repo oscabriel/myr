@@ -10,7 +10,7 @@
  *   --allow-demo             required with --stage demo: its burrow family is the recorded take's
  *   --only <handle>…         run only these contributors (repeat, or comma-separate)
  *   --timeout-min <n>        each agent's run timeout, default 20
- *   --view headless|herdr    default headless; herdr runs each harness in a herdr pane (issue 717)
+ *   --view headless|herdr    default headless; herdr runs each harness in a herdr pane
  *   --url <origin>           the platform, when not the stage's workers.dev origin
  */
 import { Handle, ProjectName } from "@repo/protocol/ids";
@@ -176,7 +176,7 @@ export const optionsOf = (
 
     if (stage === "demo" && !argv.includes("--allow-demo")) {
       return yield* failed(
-        "--stage demo: its burrow family is for the recorded take (804); run it there only with --allow-demo"
+        "--stage demo: its burrow family is for the recorded take; run it there only with --allow-demo"
       );
     }
 

@@ -723,7 +723,7 @@ describe.each(["memory", "sqlite"] as const)(
         })
     );
 
-    // Live on dev-oscabriel (311): the Checker blocked every red-first run
+    // Live on dev-oscabriel: the Checker blocked every red-first run
     // with "the job carries no run block", since a job did not carry one.
     it.effect(
       "2. red first runs the ask's check twice on the composed commit, each run in the project's own setup",

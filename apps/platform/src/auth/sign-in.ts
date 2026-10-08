@@ -10,7 +10,7 @@
  * (`state.ts`), and its CSRF token in a `__Host-` cookie. Sign-in never says
  * whether a handle exists; sign-up must say a handle is taken.
  *
- * Google sign-in (`google.ts`, issue 419) is offered on the same page when
+ * Google sign-in (`google.ts`) is offered on the same page when
  * the platform has a Google OAuth client, and reuses these pages, rules and
  * the code's completion; this module knows of it only as `SignInOffers`.
  */
@@ -67,7 +67,7 @@ export class SignInKeys extends Context.Service<
 
 /**
  * What the sign-in page offers besides a password: Google's sign-in when
- * the platform has a Google OAuth client (issue 419), named by the origin
+ * the platform has a Google OAuth client, named by the origin
  * its forms may then send a person on to (`form-action`).
  */
 export class SignInOffers extends Context.Service<
@@ -77,7 +77,7 @@ export class SignInOffers extends Context.Service<
 
 /**
  * The handles named sessions already hold: the operator's and each one in
- * `SESSION_TOKENS` (spec §8 D9). Nobody signs up as one, or an account
+ * `SESSION_TOKENS`. Nobody signs up as one, or an account
  * would call as that person.
  */
 export class HeldHandles extends Context.Service<

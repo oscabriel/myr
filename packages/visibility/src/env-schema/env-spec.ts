@@ -1,10 +1,10 @@
 /**
  * The parser seam's adapter over `@env-spec/parser` 0.6.1 (MIT; varlock's
- * format), pinned exactly: its API is 0.x (VL §8.8). It reads the text into
+ * format), pinned exactly: its API is 0.x. It reads the text into
  * plain data and nothing else. The parser's own expansion only rewrites
  * syntax (`$APP_ENV` becomes the call `ref(APP_ENV)`, `$(…)` the call
  * `exec(…)`); nothing here runs a call, loads a `@plugin` or follows an
- * `@import`, and this module imports nothing that could (VL §8.3 #4).
+ * `@import`, and this module imports nothing that could.
  *
  * A static `undefined` (`@sensitive=undefined`, `KEY=undefined`) is read as
  * absent, which is what varlock makes of it: a flag so set leaves the

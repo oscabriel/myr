@@ -1,7 +1,7 @@
 /**
  * The Lander: the trusted container that merges answers, composes ask files,
  * lands checked trees on canonical `main` with a non-force push, and bundles
- * the config folder (spec §4.3). It runs no answer's code: only git, and
+ * the config folder. It runs no answer's code: only git, and
  * bun's bundler with macros off. The class name is frozen.
  *
  * One Lander Durable Object per project, named by the project's canonical
@@ -58,7 +58,7 @@ export const landerJobs = (
 /**
  * The Lander's container size: a whole vCPU. On the runtime's default
  * (`lite`, 1/16 vCPU) one landing took 32 s and a config bundle 20 s on
- * dev-oscabriel (311, against S6's 5 s).
+ * dev-oscabriel, against a target of 5 s.
  */
 export const landInstance = "standard-2";
 

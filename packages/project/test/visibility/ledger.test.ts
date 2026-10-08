@@ -1,6 +1,6 @@
 /**
- * The public ledger through the project service (W6 612; OSR §6.1, §7.1):
- * the `ledger` method is 602's `ledgerOf` over the project's rows and its
+ * The public ledger through the project service:
+ * the `ledger` method is `ledgerOf` over the project's rows and its
  * config, every row is also an event for watchers and the projection, and
  * neither the layer read log nor a salt ever reaches it.
  */

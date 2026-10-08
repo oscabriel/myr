@@ -98,7 +98,7 @@ export {
 const envSchemaTag = "envShape";
 
 /**
- * The surfaces each contract is served on (spec §3.2). Every contract's
+ * The surfaces each contract is served on. Every contract's
  * `Surfaces` annotation is read from this table, and `surfaced` types each
  * surface's group by it, so the type and the annotation cannot disagree.
  */

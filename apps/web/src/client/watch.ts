@@ -1,5 +1,5 @@
 /**
- * A page's live view (spec §3.4, issue 510): `watchAtom(project)` follows
+ * A page's live view: `watchAtom(project)` follows
  * the project's `watch` stream over the framed `/rpc` and invalidates the
  * keys each event changes (`keysOf`), so the page's own reads (`listAsks`,
  * `verdict`, the landings) fetch again. It keeps nothing but the last

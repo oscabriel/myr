@@ -4,8 +4,8 @@
  * answer stands; a run does the slow part (merge, checks, land) through the
  * project's answer queue, step by step, and reports each step back.
  *
- * Adapters: `/inline` here, which runs the steps in process (tests, W2), and
- * the Answer Workflow in `apps/platform` (W3 304), which runs each step as a
+ * Adapters: `/inline` here, which runs the steps in process (tests), and
+ * the Answer Workflow in `apps/platform`, which runs each step as a
  * durable Workflow step. Both drive the same two methods, `answer` and
  * `advanceAnswer`, with the same steps (`answer-runs/steps.ts`), so they
  * reach the same outcome.
@@ -46,9 +46,9 @@ import type { LandingCommand, LandingEffect } from "./landing.ts";
 const Attempt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
 /**
- * A `LandingCommand` as it crosses a boundary: what a step reports back to
- * the project (W3's Answer Workflow calls `advanceAnswer` over the Project
- * Durable Object's boundary with it).
+ * A `LandingCommand` as it crosses a boundary: what a step reports back to the
+ * project (the platform's Answer Workflow calls `advanceAnswer` over the
+ * Project Durable Object's boundary with it).
  */
 export const ReportedCommand = Schema.TaggedUnion({
   Blocked: { attempt: Attempt },
@@ -138,7 +138,7 @@ export const AnswerRun = Schema.Struct({
   run: Schema.optionalKey(RunBlock),
   /**
    * Whether a held-back suite judges the answer: its claim was pinned to
-   * one (W6). Its checks then end with the held-back run
+   * one. Its checks then end with the held-back run
    * (`ProjectApi.heldBackJob`, `recordHeldBack`). Absent, none does.
    */
   sealed: Schema.optionalKey(Schema.Boolean),
@@ -152,7 +152,7 @@ export type AnswerRun = typeof AnswerRun.Type;
 /**
  * The run block every check job of an answer's run carries: `VerifierBlocked`
  * while the project has none, since the Checker never guesses a project's
- * setup (live on dev-oscabriel, 311: a job without one was blocked).
+ * setup (live on dev-oscabriel, a job without one was blocked).
  */
 export const runBlockOf = (from: {
   readonly run?: RunBlock;
@@ -190,7 +190,7 @@ type NextStep = typeof NextStep.Type;
 /**
  * What one reported step changed: where the answer stands now, and the port
  * calls to run next. Only `NextStep`'s effects, so whatever the service
- * returns here crosses the Project DO's boundary (W3 302 #3).
+ * returns here crosses the Project DO's boundary.
  */
 export interface Advanced {
   readonly effects: readonly RunnableEffect[];

@@ -20,9 +20,9 @@ env.d.ts
 apps/web/src/routeTree.gen.ts
 
 # The build's spec and issues name local paths and the private plan, so they
-# stay out of the public repo (W8 899 asks the user before H3 whether to publish
-# a scrubbed copy). A worktree holds only tracked files, so every agent reads
-# them by absolute path in the main checkout.
+# stay out of the public repo unless the user publishes a scrubbed copy. A
+# worktree holds only tracked files, so every agent reads them by absolute path
+# in the main checkout.
 .scratch/build/
 
 # The swarm's per-run scratch: each agent's clone, CLI shims, harness sessions

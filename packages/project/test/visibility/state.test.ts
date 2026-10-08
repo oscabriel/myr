@@ -1,5 +1,5 @@
 /**
- * The visibility cartridge's project state (W6 612), through the project
+ * The visibility cartridge's project state, through the project
  * service over memory adapters with the live `ProjectVisibility`: a landing
  * that adds datekit's `visibility.ts` provisions the maintainers layer's
  * repo once and declares it in the ledger, and its narrowing waits for a
@@ -513,7 +513,7 @@ describe("two layers", () => {
   );
 });
 
-/** datekit's config with each person's own layer too: config only (spec D14). */
+/** datekit's config with each person's own layer too: config only. */
 const withPersonal = {
   ...datekitVisibility,
   layers: [

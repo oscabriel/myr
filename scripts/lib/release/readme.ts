@@ -1,5 +1,5 @@
 /**
- * The npm package's own README (issue 715): how to install the CLI, start
+ * The npm package's own README: how to install the CLI, start
  * it and use its sdk, every name from `Brand`. The repo's README is about
  * the platform; this one is what npm and pi show for the package.
  */

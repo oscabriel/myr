@@ -1,5 +1,5 @@
 /**
- * What a sealed suite's run discloses (spec D17; OSR §7.1): one result per
+ * What a sealed suite's run discloses: one result per
  * area, `passed` of `total` under the suite's root, and nothing else. The
  * Checker hands this module only how each held-back run ended, never what
  * it printed, so no name, path, case or line of output can reach a result:

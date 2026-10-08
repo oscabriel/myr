@@ -11,7 +11,7 @@ export interface SessionEntry {
 }
 
 /**
- * Sessions from tokens the stage was given (spec §8 D9): the operator's and
+ * Sessions from tokens the stage was given: the operator's and
  * each named one in `SESSION_TOKENS`. The first entry naming a token wins,
  * so the operator's goes first.
  */

@@ -51,12 +51,12 @@ const SessionTable = Schema.Record(Schema.String, Handle).check(
   )
 );
 
-/** A stage's name (spec §8 D13): `local`, never deployed; `dev-<user>`; `demo`. */
+/** A stage's name: `local`, never deployed; `dev-<user>`; `demo`. */
 export const StageName = Schema.String.check(
   Schema.isPattern(/^(?:local|demo|dev-[a-z0-9]+(?:-[a-z0-9]+)*)$/u)
 );
 
-/** Which Lander lands answers (spec §8 D6): the sandbox's container, or isomorphic-git here. */
+/** Which Lander lands answers: the sandbox's container, or isomorphic-git here. */
 export const LanderAdapter = Schema.Literals(["container", "isogit"]);
 
 /**
@@ -69,8 +69,8 @@ export const PlatformBindings = Schema.Struct({
   ANSWER: binding<Env["ANSWER"]>("the Answer Workflow"),
   ARTIFACTS: binding<Env["ARTIFACTS"]>("an Artifacts namespace"),
   /**
-   * The private namespace that holds every project's layer repos (W6; OSR
-   * §5.1). Only this Worker binds it: the Workers that serve public pages
+   * The private namespace that holds every project's layer repos. Only
+   * this Worker binds it: the Workers that serve public pages
    * bind no namespace at all (principle 7).
    */
   ARTIFACTS_PRIVATE: binding<Env["ARTIFACTS_PRIVATE"]>(
@@ -84,7 +84,7 @@ export const PlatformBindings = Schema.Struct({
   ON_PUSH: binding<Env["ON_PUSH"]>("the OnPush Workflow"),
   PROJECT: binding<Env["PROJECT"]>("the Project Durable Object"),
   PROPOSAL_LIMIT: binding<Env["PROPOSAL_LIMIT"]>("a rate limit"),
-  /** The CLI's releases, served at `/install.sh` and `/releases/*` (issue 420). */
+  /** The CLI's releases, served at `/install.sh` and `/releases/*`. */
   RELEASES: binding<Env["RELEASES"]>("an R2 bucket"),
   /**
    * A service binding to the sandbox Worker's default entrypoint. The
@@ -116,7 +116,7 @@ export const PlatformSecrets = Schema.Struct({
   /** Seals a sign-in in progress into its form (`auth/state.ts`). */
   COOKIE_KEY: Schema.RedactedFromValue(Token),
   /**
-   * Google sign-in's OAuth client (issue 419; human step H4), set with
+   * Google sign-in's OAuth client (human step H4), set with
    * `GOOGLE_CLIENT_SECRET` or not at all. Not secret: Google shows it to
    * everyone who signs in.
    */
@@ -126,14 +126,14 @@ export const PlatformSecrets = Schema.Struct({
     Schema.RedactedFromValue(Schema.NonEmptyString)
   ),
   /**
-   * Wraps the data key of every write-only env value (W6; VL §9). Losing it
+   * Wraps the data key of every write-only env value. Losing it
    * loses every value stored under it.
    */
   MASTER_KEY: Schema.RedactedFromValue(HexKey),
   OPERATOR_TOKEN: Schema.RedactedFromValue(Token),
   /** HMAC'd with every password before PBKDF2 (`auth/password.ts`). */
   PASSWORD_PEPPER: Schema.RedactedFromValue(Token),
-  /** Named sessions beside accounts (spec §8 D9): JSON, token → handle. */
+  /** Named sessions beside accounts: JSON, token → handle. */
   SESSION_TOKENS: Schema.optionalKey(
     Schema.RedactedFromValue(Schema.fromJsonString(SessionTable))
   ),
@@ -204,7 +204,7 @@ export const decodeEnv = (env: Env) =>
   );
 
 /**
- * Who may call (spec §8 D9, D23), as one `Sessions`: an access token the
+ * Who may call, as one `Sessions`: an access token the
  * platform's OAuth server issued names the person who signed in; otherwise
  * the operator's token names the operator, and each named session in
  * `SESSION_TOKENS` its handle (the operator's wins if both name one).

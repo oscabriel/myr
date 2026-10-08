@@ -4,12 +4,12 @@
  * `surfaces.ts` hands every such path here, outside the 401 gate, before the
  * RPC and MCP routes.
  *
- * Who may do what (spec D10, ADR 0004): anyone clones a project's canonical
+ * Who may do what (ADR 0004): anyone clones a project's canonical
  * repo; a fork is read by a signed-in person; a push needs one, and custody
  * (`adapters/custody.ts`) decides what it may move. A credential the
  * platform does not know is a 401 everywhere. A name the platform never
- * makes (spec §4.5) is a 404, unless `LayerGate` says it is a layer's repo
- * (W6), which only the layer's readers read and its writers push to. The
+ * makes is a 404, unless `LayerGate` says it is a layer's repo,
+ * which only the layer's readers read and its writers push to. The
  * client's credential never travels past this file: the gateway forwards
  * only the headers git's protocol needs, and the upstream adds the
  * platform's own.
@@ -186,13 +186,13 @@ const uploadOf = (request: Request) =>
   });
 
 /**
- * A git request to a project's layer repo (W6 606, ADR 0007): only the
+ * A git request to a project's layer repo (ADR 0007): only the
  * layer's readers clone it and only its writers push to it, all through the
  * private namespace's upstream. Someone not signed in is asked to sign in
  * (401, so the credential helper answers); a person the layer does not
  * admit gets 403 with one line git prints.
  *
- * Every read is logged with who and which commit (OSR §5.2): each
+ * Every read is logged with who and which commit: each
  * upload-pack request answered 200, but a v2 `ls-refs`, which lists refs
  * and reads nothing, so a clone is one read. A fetch that negotiates over
  * several requests logs each.

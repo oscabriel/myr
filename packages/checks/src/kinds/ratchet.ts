@@ -4,7 +4,7 @@
  * per territory, exactly as the project's own tool reports it, and the
  * judgement of an answer's counts against the counts it is held to. A lint
  * count splits by path, so it yields one count per territory (per-territory
- * baselines, so the children of a split land on their own; FE §8.4 B3); a
+ * baselines, so the children of a split land on their own); a
  * metric is one number, so it yields one. The command runs through the
  * runner it is given, never here. The platform's cheap stage and the Project
  * DO, and `<cli> check` before a push, all count and judge through here.

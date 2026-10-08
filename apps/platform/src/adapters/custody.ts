@@ -1,36 +1,36 @@
 /**
  * The `Custody` port (`@repo/git/custody`) for one push, by who pushes and
- * which repo the name says it is (spec §4.3, §5 steps 1 and 6; ADR 0004).
+ * which repo the name says it is (ADR 0004).
  *
  * `admit` is stage 0, before anything reaches the upstream: what the pusher
  * may move, from the project's own record through `ProjectApi`. A canonical
- * repo takes no push (`DirectPush`, spec D1) but its initializer's first
+ * repo takes no push (`DirectPush`) but its initializer's first
  * (`firstPusher`); a claim's fork takes its claimant's pushes while the claim
  * is live, and a decider's commits on top when they finish its answer; a
  * working fork takes its owner's. `ProjectApi` has no read of the push facts the gate's parse
  * stage takes (the policy, the ask, the claim), so `admit` asks the
  * claimant's own `status` and leaves the full parse to `review`, where
- * `recordPush` runs it (303's Comments).
+ * `recordPush` runs it.
  *
  * `custodyFor` reads what `admit` needs before the gateway starts, and
  * `admit` answers at once. The gateway makes the push's upstream body as
  * soon as it has read the command list, before it asks `admit`, and that
  * body locks the request's the moment the fiber yields: an `admit` that
  * waits on anything and then refuses finds the body locked, and the push
- * fails with a 500 (303's Comments ask `@repo/git/gateway` to make that
- * body only once the push is admitted).
+ * fails with a 500 (better: `@repo/git/gateway` reads that body only once
+ * the push is admitted).
  *
  * `review` runs after the upstream took the push. A first push becomes the
  * project's landed SHA. A claimant's push to their fork is reported to the
  * project (`recordPush`: liveness, then stages 0–1, every stage-1 refusal at
  * once); a clean one is offered as the answer (`submitAnswer`, the same path
  * as `<cli> submit`) and the pusher reads that it is being checked. The
- * gate's later stages never run inside the push (spec D5).
+ * gate's later stages never run inside the push.
  *
  * A harness that pushes names itself in the basic-auth username its
  * credential helper gives (`audit;harness=pi&model=…`, `@repo/protocol/audit`).
  * Custody logs it with the push and reports it with a claimant's push, so
- * the answer's landing discloses it as `Assisted-by:` (spec D18). It is
+ * the answer's landing discloses it as `Assisted-by:`. It is
  * audit metadata only: who pushes is the token's person, and the username is
  * never identity, credit or a score.
  */
@@ -365,7 +365,7 @@ export const custodyFor = (
   });
 
 /**
- * Custody of a push to a layer's repo (W6 609). The gateway lets only the
+ * Custody of a push to a layer's repo. The gateway lets only the
  * layer's writers push there (`git.ts`, through `LayerGate`), so every ref
  * goes through; once the upstream took the push, the project hears the
  * head `main` moved to (`recordLayerPush`), which it admits at once or
@@ -393,7 +393,7 @@ export const layerCustodyFor = (
   );
 
 /**
- * A clone or fetch of a layer's repo, for its read log (OSR §5.2): who
+ * A clone or fetch of a layer's repo, for its read log: who
  * read which layer, and the commit they asked for when their request named
  * one. A project never made logs nothing.
  */

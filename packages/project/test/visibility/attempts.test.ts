@@ -1,5 +1,5 @@
 /**
- * Attempts on held-back checks (W6 612; spec D17, OSR §4.1): the ISO week
+ * Attempts on held-back checks: the ISO week
  * they are counted in, whether one more failure may still be judged, and
  * the live `ProjectVisibility` judging held-back runs over datekit's
  * sealed suite: area bits only, three failures a claim and ten a person,

@@ -1,5 +1,5 @@
 /**
- * Classifying a failing lane (CAA §2.B): the gate never charges an answerer
+ * Classifying a failing lane: the gate never charges an answerer
  * for its own trouble, nor for a main that moved underneath them. Only a
  * lane that passes on main and fails on the merged tree, in a file the
  * answer changed or in none it can name, is the answer's failure.
@@ -39,7 +39,7 @@ const isTrouble = (result: LaneResult["result"]) =>
  * tree. A lane red on main too is `VerifierBlocked`. A checker that never
  * started on a tree whose main passes earns one fresh run (`Flake`); an
  * identical second failure means it was never a flake, so it counts as the
- * answer's (CAA §2.B). A failure only outside the diff is `StaleBase`.
+ * answer's. A failure only outside the diff is `StaleBase`.
  */
 export const classifyFailure = (
   evidence: LaneEvidence,

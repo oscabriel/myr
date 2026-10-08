@@ -1,6 +1,6 @@
 /**
- * The project service: every contract's server logic for one project
- * (spec §4.2), host-free, over ports. Each call hydrates the project from
+ * The project service: every contract's server logic for one project,
+ * host-free, over ports. Each call hydrates the project from
  * its store, moves its lifecycles by pure transitions, persists rows, outbox
  * and events in one commit, then settles the outbox (ADR 0012): forks,
  * projected events, answer runs and unwritten bookkeeping, each retried by
@@ -11,7 +11,7 @@
  * answer (merge, checks, land) runs outside that lock, in the answer's run,
  * which reports each step back through `advanceAnswer`. Every method checks
  * its arguments and its result against the contract's or the domain's
- * schemas (`MethodSchemas`, principle 2), which W3's Durable Object boundary
+ * schemas (`MethodSchemas`, principle 2), which the Durable Object boundary
  * reuses.
  */
 import {
@@ -300,7 +300,7 @@ export type ProjectPorts =
 /**
  * The platform's gateway, where every repo's git URL starts: what a claim's
  * and a project's `remote` name. Never an Artifacts URL. The platform's
- * Worker sets its own (W3); the default is the product's domain.
+ * Worker sets its own; the default is the product's domain.
  */
 export const GatewayUrl = Context.Reference<string>("project/GatewayUrl", {
   defaultValue: () => `https://${Brand.domain}`,
@@ -308,7 +308,7 @@ export const GatewayUrl = Context.Reference<string>("project/GatewayUrl", {
 
 /**
  * The rules evaluator's finishers from `@repo/checks`: the run-block finder
- * and the judge closure (spec §4.2 `rules`, which may not import `checks`).
+ * and the judge closure (`rules` may not import `checks`).
  * Every rules evaluator adapter needs it beside the project's ports.
  */
 export const FinishersFromChecks: Layer.Layer<Finishers> = Layer.succeed(
@@ -316,14 +316,14 @@ export const FinishersFromChecks: Layer.Layer<Finishers> = Layer.succeed(
   { findRunBlock, judgeClosure }
 );
 
-/** A push one repo took, as the gateway's custody reports it (W3 303). */
+/** A push one repo took, as the gateway's custody reports it. */
 export const PushReport = Schema.Struct({
   after: CommitSha,
   /**
    * The harness the push came through, as its credential helper's username
    * named it (`@repo/protocol/audit`): audit metadata, never who pushed. A
    * claimant's push keeps it on their claim, for the landing's
-   * `Assisted-by:` (spec D18).
+   * `Assisted-by:`.
    */
   audit: Schema.optionalKey(HarnessAudit),
   before: Schema.Option(CommitSha),
@@ -383,8 +383,8 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
     sha: CommitSha
   ) => Effect.Effect<{ readonly landing: LandingView }, UnknownCommit>;
   /**
-   * The log a failing lane left, by the name its verdict gives it (spec
-   * §2.3 `LaneResult.logRef`), for the project's deciders and the claimant
+   * The log a failing lane left, by the name its verdict gives it
+   * (`LaneResult.logRef`), for the project's deciders and the claimant
    * of the answer the name points at. A name `logRefOf` never makes, or one
    * that points at another project, is `UnknownProject` for anyone; past
    * that, anyone else is `NotDecider` whether or not a log is kept under the
@@ -413,7 +413,7 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   >;
   /**
    * Who may make the project's first push to its canonical `main`: its
-   * initializer, while the project awaits that push (spec §5 step 1); no
+   * initializer, while the project awaits that push; no
    * one once it has a landed SHA. The gateway's custody reads it before a
    * push reaches the canonical repo.
    */
@@ -472,7 +472,7 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   readonly recordPush: (input: PushReport) => Effect.Effect<readonly Refusal[]>;
   /**
    * Stages 0–1 over the answer, then its run starts and the receipt says it
-   * is being checked (spec D5). The same `requestId`, or the same head from
+   * is being checked. The same `requestId`, or the same head from
    * the same person while its first answer stands, returns the first receipt.
    * Of stage 1's refusals the first comes back; `recordPush` lists them all.
    */
@@ -491,7 +491,7 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
    * due run again.
    */
   readonly onAlarm: () => Effect.Effect<void>;
-  // visibility (W6 609): each delegates to `ProjectVisibility` or
+  // visibility: each delegates to `ProjectVisibility` or
   // `ProjectEnv`, whose defaults are a project without typed visibility.
   /**
    * How far `caller` may reach into `layer`, for the gateway; none when the
@@ -555,8 +555,8 @@ export interface MethodSchema {
 /**
  * Every `ProjectApi` method's schemas: contract methods take their success
  * and failure from `Contracts`, the rest from the domain. The service checks
- * each argument and each success against them; W3's Durable Object boundary
- * (302) encodes and decodes with the same ones.
+ * each argument and each success against them; the Durable Object boundary
+ * encodes and decodes with the same ones.
  */
 export const MethodSchemas = {
   [envSchemaMethod]: {
@@ -798,7 +798,7 @@ export const Measured = Schema.Struct({
 export type Measured = typeof Measured.Type;
 
 /**
- * A held-back run judged for one checked tree (W6): the refusals it earned,
+ * A held-back run judged for one checked tree: the refusals it earned,
  * and the `Held-back:` trailer's value when every area passed. Judged once
  * per tree, so a run reported again counts no attempt twice.
  */
@@ -902,7 +902,7 @@ const mainRef = RefName.make("refs/heads/main");
 
 const HOUR = 3_600_000;
 
-/** The claim deadlines before a project has a policy: the defaults (spec §2.5). */
+/** The claim deadlines before a project has a policy: the defaults. */
 const defaultClaims: Policy["claims"] = {
   lapseAfterMs: 24 * HOUR,
   warnAfterMs: 2 * HOUR,
@@ -1400,7 +1400,7 @@ const evidenceFor = (
 /**
  * A `lintToZero` check is red first by its count: twice on the composed
  * commit its rule reports something in its territory, the same number
- * both times (CAA E). Gives what the policy's ratchets count in the same
+ * both times. Gives what the policy's ratchets count in the same
  * lint, for their baselines at the ask's opening.
  */
 const redByCount = (input: {
@@ -1532,7 +1532,7 @@ const withAgent = (
 };
 
 /**
- * The agents an answer's landing discloses as `Assisted-by:` (spec D18):
+ * The agents an answer's landing discloses as `Assisted-by:`:
  * those its claim's pushes named, unless the project's policy says
  * `agents: "none"`.
  */
@@ -1564,7 +1564,7 @@ const heldBackTrailerOf = (
     ({ trailer }) => Option.fromUndefinedOr(trailer)
   );
 
-/** A landing's commit message, from the platform's own rows (spec §5 step 8). */
+/** A landing's commit message, from the platform's own rows. */
 const messageOf = (
   request: Request,
   ask: Option.Option<Ask>,
@@ -1602,7 +1602,7 @@ const byUpdated = Order.mapInput(
 /**
  * The verdict a landing carries: the one the checks gave, whose outcome
  * was the answer's when it was judged (a stage still to pass), now `Landed`
- * at the landing's SHA (W3 311 #9).
+ * at the landing's SHA.
  */
 const landedVerdict = (verdict: Option.Option<Verdict>, sha: LandedSha) =>
   Option.map(verdict, (made): Verdict => ({
@@ -1735,7 +1735,7 @@ export const projectService = (
     const alarms = Context.get(ports, Alarms);
     // Read once, as the ports are: a call runs in its caller's context.
     const generate = yield* ProjectGenerator;
-    // Typed visibility and the env (W6 609): the cartridge's when a host
+    // Typed visibility and the env: the cartridge's when a host
     // provides it, a project without them otherwise.
     const visibility = yield* ProjectVisibility;
     const envPort = yield* ProjectEnv;
@@ -1922,8 +1922,7 @@ export const projectService = (
     /**
      * Whether `who` reads every layer the project keeps a repo for, so every
      * layer stage 1's paths come from: only then may a refusal name which
-     * paths collide. Reading one layer never names another's paths (602
-     * review #3).
+     * paths collide. Reading one layer never names another's paths.
      */
     const readsEveryLayer = (who: Principal, snapshot: ProjectSnapshot) => {
       const readable = visibility.readableLayers(who, snapshot);
@@ -1943,7 +1942,7 @@ export const projectService = (
       }));
 
     /**
-     * A push's stage 0–1 facts with what visibility knows (W6): every
+     * A push's stage 0–1 facts with what visibility knows: every
      * layer path, and whether the pusher reads a layer. A project without
      * typed visibility has neither.
      */
@@ -2253,7 +2252,7 @@ export const projectService = (
     /**
      * The project row with the policy at `at`: the config folder bundled
      * there and evaluated. A Lander or evaluator that fails keeps the policy
-     * the row held (spec §5 step 2).
+     * the row held.
      */
     const withPolicyAt = (row: ProjectRow, at: LandedSha, now: DateTime.Utc) =>
       Effect.flatMap(evaluateAt(row, at, now), (policy) =>
@@ -2387,8 +2386,8 @@ export const projectService = (
      * After a call moved the landed SHA (the first adoption, an answer, a
      * decider's own landing, an ask opened, a vouch): the platform's own
      * landing of the regenerated contribute skill and AGENTS.md block on
-     * top, when the policy read at the new landed SHA changes what they say
-     * (spec D12, W4 410). It never joins the landing that changed the config
+     * top, when the policy read at the new landed SHA changes what they say.
+     * It never joins the landing that changed the config
      * ("land only the checked tree"), and it is recorded in the same commit
      * as the landing it follows, under the project's lock. It is
      * bookkeeping: one that cannot land is logged, and the landing it follows
@@ -2440,7 +2439,7 @@ export const projectService = (
       });
 
     /**
-     * After a call moved the landed SHA (W6 609): the env port hears the
+     * After a call moved the landed SHA: the env port hears the
      * move (a `ProxyWidened` decision for a widened proxy), and, when the
      * policy was read at the new SHA, the visibility port hears it (layers
      * provisioned and declared, a narrowing's `PostureChange`). Their plans
@@ -2745,7 +2744,7 @@ export const projectService = (
       new Map([...h.asks, ...writes.asks]);
 
     /**
-     * A migrate family once its child `landed` closed (CAA §2.F): each
+     * A migrate family once its child `landed` closed: each
      * child waiting on its siblings opens when the last of them lands, and
      * the parent closes on the landing that closes its last child.
      */
@@ -3041,7 +3040,7 @@ export const projectService = (
 
     /**
      * The checks' report on the tree under way, judged against the
-     * project's ratchets (spec §5 step 7 (b), (e)). Each of the policy's
+     * project's ratchets. Each of the policy's
      * ratchets the merged tree counts over its baseline is refused
      * `Weakened{ratchet}`, unless a reasoned escape the answer adds in its
      * territory asks to raise it (`RaiseRatchet`); each reasoned escape over
@@ -3689,7 +3688,7 @@ export const projectService = (
     /**
      * What a migrate (or `symbolAbsent`) ask's opening lands: red first by
      * its callers, then, when its callers sit in two or more of its
-     * modules, its family's files beside the decider's (CAA §2.F), every
+     * modules, its family's files beside the decider's, every
      * ask of the family, and the callers ratchet at the counted total.
      */
     const migrateOpening = (input: {
@@ -3814,7 +3813,7 @@ export const projectService = (
     /**
      * An ask opened from its files, red first, and landed as a platform
      * commit: what `openAsk` does for a decider, and what an accepted
-     * proposal does for its proposer (221). `opening.decider` must decide
+     * proposal does for its proposer. `opening.decider` must decide
      * for the ask's territory; `opening.asker` asks it and authors the
      * landing, which carries `opening.credits`.
      */
@@ -3996,7 +3995,7 @@ export const projectService = (
           files: input.files,
         });
 
-    /** Whether a person may claim an ask, by the trust rules (220), and the ask's race. */
+    /** Whether a person may claim an ask, by the trust rules, and the ask's race. */
     const trustOf = (
       h: Hydrated,
       policy: Policy,
@@ -4215,7 +4214,7 @@ export const projectService = (
      * Canonical `main` moved to a commit that is neither the landed SHA nor
      * a landing, or deleted, opens a `StrayPush` decision, in the same
      * commit as the push event's row, so an event reported again opens
-     * nothing (W3 313).
+     * nothing.
      */
     const strayOn = (
       h: Hydrated,
@@ -4657,7 +4656,7 @@ export const projectService = (
 
     // -------------------------------------------------------- visibility
     //
-    // Each delegates to `ProjectVisibility` or `ProjectEnv` (W6 609): the
+    // Each delegates to `ProjectVisibility` or `ProjectEnv`: the
     // service hydrates, the port decides over the project as the call has
     // it, and the service commits the port's rows with its own.
 
@@ -4835,7 +4834,7 @@ export const projectService = (
 
     // ---------------------------------------------------------- deciders
 
-    /** The decider-facing methods (221), over the same hydrate, write and helpers. */
+    /** The decider-facing methods, over the same hydrate, write and helpers. */
     const decided = deciders<Hydrated, Writes>({
       advance: (h, writes, now, requestId, command) =>
         advanceBody(requestId, command)(h, writes, now),

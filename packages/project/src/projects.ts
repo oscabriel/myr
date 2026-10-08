@@ -1,7 +1,7 @@
 /**
  * The `Projects` port: the one way a caller reaches a project by its name.
- * Each project is one service over its own store (one Durable Object in W3,
- * 302's `DoProjects`); this port finds it, or makes a new one. `creditsFor`
+ * Each project is one service over its own store (one Durable Object on a
+ * stage, `DoProjects`); this port finds it, or makes a new one. `creditsFor`
  * folds a person's credits over the projects it is given.
  *
  * Adapters: `/memory` here, which keeps one memory store per project.
@@ -33,7 +33,7 @@ export class Projects extends Context.Service<
  * project's own count (`credits`), joined in project order, as the public
  * `credits` contract answers them. A project not made is skipped. The port
  * finds projects by name and lists none, so the caller names them: the
- * platform's handler passes the projection's list (W3).
+ * platform's handler passes the projection's list.
  */
 export const creditsFor = (
   handle: Handle,

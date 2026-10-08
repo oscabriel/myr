@@ -1,6 +1,6 @@
 /**
  * The repo the CLI stands in: its root, the remote that reaches a platform,
- * and what that remote's repo name says it is (spec §4.5). Read once per
+ * and what that remote's repo name says it is. Read once per
  * command, from git itself.
  */
 import { AskId, Handle, LayerName, ProjectName } from "@repo/protocol/ids";

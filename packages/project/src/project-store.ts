@@ -38,20 +38,20 @@ export const keptEvents = 500;
 export interface ProjectSnapshot {
   readonly answers: readonly AnswerRow[];
   readonly asks: readonly AskRow[];
-  /** Failed held-back runs per claim, area and week (W6). */
+  /** Failed held-back runs per claim, area and week. */
   readonly attempts: readonly AttemptRow[];
   readonly budgetDays: readonly BudgetDayRow[];
   readonly claims: readonly ClaimRow[];
   readonly decisions: readonly DecisionRow[];
-  /** Write-only values, sealed, by env key (W6). */
+  /** Write-only values, sealed, by env key. */
   readonly envValues: readonly EnvValueRow[];
   /** The newest `snapshotLandings` landings, newest first. */
   readonly landings: readonly LandingRow[];
   /** The sequence number of the newest event, or 0 before the first. */
   readonly lastSeq: number;
-  /** The layers the project declared (W6). */
+  /** The layers the project declared. */
   readonly layers: readonly LayerRow[];
-  /** The public ledger, every entry (W6). */
+  /** The public ledger, every entry. */
   readonly ledger: readonly LedgerRow[];
   /** Side effects not yet acknowledged, in the order they were written. */
   readonly outbox: readonly OutboxRow[];

@@ -4,7 +4,7 @@
  * reactivity keys and the same `/rpc` path, answered by the dev world in
  * process instead of a platform. Each registry stands for one browser: its
  * client's requests carry that browser's session cookie, or none, which
- * the backend turns into the bearer the dev world reads (issue 513).
+ * the backend turns into the bearer the dev world reads.
  * Every test reads the one world the module's `backend` seeds, in order;
  * only the last changes it.
  */

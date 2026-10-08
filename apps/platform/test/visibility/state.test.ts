@@ -1,5 +1,5 @@
 /**
- * The cartridge's project state as the platform provides it (W6 612): salts
+ * The cartridge's project state as the platform provides it: salts
  * from WebCrypto's randomness, 32 fresh bytes each, and admissions started
  * as runs of the `Answer` Workflow, one instance per project, layer and
  * head, so a start the outbox runs again finds the first run.

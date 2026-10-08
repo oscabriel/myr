@@ -1,5 +1,5 @@
 /**
- * The README a judge reads first (issue 704), held to the tree: its
+ * The README a judge reads first, held to the tree: its
  * sections come in the order a reader needs them, the numbers table keeps
  * the markers the live runs fill by hand, and every path, command and check
  * it names exists, so a rename that leaves the README behind fails here.
@@ -42,7 +42,7 @@ const MARKERS = {
 } as const;
 
 /**
- * The checks the promises table names at least (issue 704): git's own
+ * The checks the promises table names at least: git's own
  * refusal, the closed union on every surface, the name in one file, deny
  * by default, deterministic rules and pure lifecycles.
  */

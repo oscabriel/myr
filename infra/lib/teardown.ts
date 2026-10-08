@@ -1,5 +1,5 @@
 /**
- * Teardown (issue 808): which throwaways a run may delete, and the run that
+ * Teardown: which throwaways a run may delete, and the run that
  * deletes them. `bun infra/teardown.ts` prints the plan; only `--apply`
  * deletes it, and never while a take is being recorded.
  *

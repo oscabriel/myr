@@ -299,7 +299,7 @@ export const describeRepoHost = (
       }).pipe(Effect.provide(host))
     );
 
-    // S1 #6: Artifacts refuses `--atomic`, so landing pushes main by itself and
+    // Artifacts refuses `--atomic`, so landing pushes main by itself and
     // treats each ref's outcome on its own.
     it.effect("applies each ref's compare-and-swap on its own", () =>
       Effect.gen(function* () {
@@ -357,7 +357,7 @@ export const describeRepoHost = (
       }).pipe(Effect.provide(host))
     );
 
-    // S1 #10 and #19: a fork shares what it inherited and nothing a sibling
+    // A fork shares what it inherited and nothing a sibling
     // adds later.
     it.effect("keeps each fork's own commits to itself", () =>
       Effect.gen(function* () {
@@ -396,7 +396,7 @@ export const describeRepoHost = (
       }).pipe(Effect.provide(host))
     );
 
-    // S1 #7 and #20: custom refs are kept and listed, but the binding's reads
+    // Custom refs are kept and listed, but the binding's reads
     // resolve branch names only, so the platform reads them from this list.
     it.effect("lists custom refs that no read can name", () =>
       Effect.gen(function* () {

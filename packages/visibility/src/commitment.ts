@@ -88,7 +88,7 @@ const roots = (salt: Uint8Array, files: readonly SuiteFile[]) =>
 
 /**
  * Each area's commitment: the salted SHA-256 Merkle root of its files'
- * leaves, sorted by path (OSR §5.4). Without the salt, nobody can test a
+ * leaves, sorted by path. Without the salt, nobody can test a
  * guess at a check against it; with the same salt and files it is the same
  * root, in any order.
  */

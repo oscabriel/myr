@@ -6,7 +6,7 @@
  * cartridge (`FrontPageD1`, `ProjectionD1`) over sqlite-node with the
  * platform's D1 migrations applied from their files; each project is a
  * project service in memory (`ProjectsMemory`) whose outbox feeds that
- * projection; the Lander is W2's `/isogit` over `RepoHostMemory`; and the
+ * projection; the Lander is the `/isogit` one over `RepoHostMemory`; and the
  * Checker fails every lane on a commit of main (an ask's check, red first)
  * and passes every lane on an answer's merged tree. The world's `Projects`
  * counts every call, so a test shows which reads never reach a project.

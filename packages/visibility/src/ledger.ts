@@ -19,7 +19,7 @@ const layersOf = (visibility: Option.Option<VisibilityPolicy>) =>
   });
 
 /**
- * A project's public ledger (OSR §6.1): every row the Project DO keeps, in
+ * A project's public ledger: every row the Project DO keeps, in
  * sequence order (the sort is stable, so nothing is dropped or reordered
  * under one number), the layers its config declares, and the posture
  * computed from that config and its licence.

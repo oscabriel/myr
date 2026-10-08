@@ -1,7 +1,7 @@
 /**
  * Weakening markers: text an answer adds that turns a check off. A marker
  * with no reason after ` -- ` is refused at shape; one with a reason is an
- * escape, counted against its territory's escape ratchet (FE §8.4).
+ * escape, counted against its territory's escape ratchet.
  */
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { RepoPath } from "@repo/protocol/ids";
@@ -23,7 +23,7 @@ export interface Marker {
     | "go";
 }
 
-/** The markers every project starts with (spec §4.2); a project may add more. */
+/** The markers every project starts with; a project may add more. */
 export const defaultMarkers: readonly Marker[] = [
   { family: "test", text: ".skip(" },
   { family: "test", text: ".only(" },

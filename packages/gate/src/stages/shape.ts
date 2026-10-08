@@ -129,8 +129,8 @@ const inLayers =
   };
 
 /**
- * The no-write-down guard by path (OSR §2.5, §5.4), the one rule stage 1
- * and the visibility cartridge's landing guard share (W6 699): added or
+ * The no-write-down guard by path, the one rule stage 1
+ * and the visibility cartridge's landing guard share: added or
  * changed paths a layer holds, as the path itself or under a folder the set
  * names. A deletion writes nothing. The refusal is no oracle on which paths
  * are a layer's: to a pusher who cannot read the layers it names every path

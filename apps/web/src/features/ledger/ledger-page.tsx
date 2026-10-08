@@ -1,5 +1,5 @@
 /**
- * A project's ledger, in its own terms (OSR §6.1): the posture label the
+ * A project's ledger, in its own terms: the posture label the
  * platform computed, each declared layer with its audience, kinds,
  * disclosure and reason, each sealed area folded from the entries (how many
  * sealed checks, how many people wrote them, the suite's salted root, when
@@ -153,7 +153,7 @@ export const areaSummaries = (ledger: Ledger): readonly AreaSummary[] => {
     }));
 };
 
-/** What people outside a layer's audience learn about what it holds (OSR §2.2). */
+/** What people outside a layer's audience learn about what it holds. */
 const disclosures = {
   counted: "counted: how many it holds, and when they open",
   declared: "declared: that it exists, with its kinds and reason",

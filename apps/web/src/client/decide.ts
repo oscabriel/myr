@@ -1,7 +1,7 @@
 /**
  * A decider's choice on one decision, as a mutation atom over the `decide`
- * contract (the browser's `/rpc` call carries the session cookie; spec
- * §3.3). A choice taken changes Today and the decision's project, so on
+ * contract (the browser's `/rpc` call carries the session cookie).
+ * A choice taken changes Today and the decision's project, so on
  * success both read again (`keys.today()`, `keys.project(project)`) and the
  * decision leaves Today. A choice that comes too late (`DecisionClosed`:
  * someone decided first, or it expired to its default) or names a decision
@@ -9,8 +9,8 @@
  * reads again so the stale decision leaves the list.
  *
  * Also here: the public reads a `Finish` decision's page shows beside the
- * diff, the ask and the verdict on the answer's head (issue 504's territory
- * holds no other client module; the same `ContractsClient.query` atoms
+ * diff, the ask and the verdict on the answer's head (no other client module
+ * holds them; the same `ContractsClient.query` atoms
  * serve any other page that asks for them with the same keys).
  */
 import type { Decide } from "@repo/protocol/contracts";

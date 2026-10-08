@@ -49,7 +49,7 @@ export const AskRow = Ask;
 export type AskRow = typeof AskRow.Type;
 
 /**
- * The held-back suite a claim was pinned to when it opened (W6): the root of
+ * The held-back suite a claim was pinned to when it opened: the root of
  * the sealed suite and the layer commit that holds it. An answer on the
  * claim is judged by this suite, whatever the layer holds later.
  */
@@ -164,7 +164,7 @@ export const OutboxRow = Schema.Struct({
 
 export type OutboxRow = typeof OutboxRow.Type;
 
-// The visibility tables (W6). The store keeps them for the visibility ports
+// The visibility tables. The store keeps them for the visibility ports
 // (`visibility-port.ts`, `env-port.ts`); the service reads none of them
 // itself, and without the cartridge they stay empty.
 

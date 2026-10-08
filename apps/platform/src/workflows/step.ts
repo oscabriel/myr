@@ -1,6 +1,6 @@
 /**
  * The seam between Effect programs and a Workflow's durable steps, shared by
- * the Answer (W3 304) and OnPush (313) Workflows. A program names each step
+ * the Answer and OnPush Workflows. A program names each step
  * and gives the schema of its value; over a Workflow, the engine records the
  * value encoded as JSON and a replay decodes the record instead of running
  * the step again (principle 8).
@@ -137,7 +137,7 @@ const memoStep =
       }
 
       // The engine throws a spent step's kept failure again without running
-      // it, and no process in a replay saw the typed failure (W3 313 #8).
+      // it, and no process in a replay saw the typed failure.
       const spent = (yield* Ref.get(failures)).get(name);
 
       if (spent !== undefined) {

@@ -8,8 +8,8 @@
  * `opencode models` for OpenCode's GPT model, `pi --offline --list-models`
  * for pi's (its ready provider is `opencode-go`), `amp --help` for Amp's
  * modes. tamsin ran `openai/gpt-5.5` on OpenCode's ChatGPT sign-in until
- * that account's usage limit ran out in the swarm's live rehearsal (804,
- * not back before Oct 16); OpenCode Go's `gpt-6-luna` ran headless in its
+ * that account's usage limit ran out in the swarm's live rehearsal (not
+ * back before Oct 16); OpenCode Go's `gpt-6-luna` ran headless in its
  * place, and putting the ChatGPT model back is tamsin's one line.
  */
 import { Handle } from "@repo/protocol/ids";

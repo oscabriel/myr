@@ -19,7 +19,7 @@ import { Option, Schema } from "effect";
 import { PushTarget } from "../src/facts.ts";
 import type { AddedLine, Change, PushFacts } from "../src/facts.ts";
 
-// The gate takes no brand dependency (spec §4.1), so the tests read the
+// The gate takes no brand dependency, so the tests read the
 // config folder's name where protocol's policy defaults put the vouch file.
 const { vouch } = Schema.decodeSync(
   Schema.Struct({ vouch: PolicyInput.fields.vouch })

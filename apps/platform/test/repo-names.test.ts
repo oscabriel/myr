@@ -27,7 +27,7 @@ const kinds: readonly (readonly [string, RepoKind])[] = [
     "datekit--me--alice",
     RepoKind.WorkingFork({ handle: Handle.make("alice"), project: datekit }),
   ],
-  // `layer` is no ask's name; a layer's repo is W6's.
+  // `layer` is no ask's name; a layer's repo is the visibility cartridge's.
   ["datekit--layer--alice", RepoKind.Unknown()],
   ["datekit--maintainers", RepoKind.Unknown()],
   // A stray `--` splits a name into parts no repo has.

@@ -1,6 +1,6 @@
 /**
  * The evaluator's side inside the sandbox (a `bun` subprocess here, a Dynamic
- * Worker in W3): it hands what the config folder's modules exported back as
+ * Worker on a stage): it hands what the config folder's modules exported back as
  * data, which the sandbox's main sends as JSON, so functions and
  * non-enumerable properties drop out and the host decodes the rest; and it
  * finds a function-valued rule to call. It imports only `effect` and the

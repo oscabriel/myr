@@ -3,7 +3,7 @@
  * the token up in `OAUTH_KV` by its hash and decrypts the grant's props,
  * which carry only `{ handle }`. A token the provider does not know, one
  * past its expiry, or one whose props name no handle verifies as nobody.
- * W3 317 puts these first in `firstOf`, before the operator and
+ * The Worker puts these first in `firstOf`, before the operator and
  * `SESSION_TOKENS` tables.
  */
 import { Handle } from "@repo/protocol/ids";

@@ -1,8 +1,7 @@
 /**
- * The visibility cartridge's project state (W6 612; OSR §2.6, §4.1, §5.4,
- * §5.5, §7.1): the `ProjectVisibility` port, over the private namespace's
- * repos (`LayerRepos`), a source of secret salts, and what starts an
- * admission.
+ * The visibility cartridge's project state: the `ProjectVisibility` port, over
+ * the private namespace's repos (`LayerRepos`), a source of secret salts, and
+ * what starts an admission.
  *
  * - A landing that declares layers provisions each one's repo,
  *   `<project>--<layer>` in the private namespace, once (an outbox effect,
@@ -25,7 +24,7 @@
  *   and week (`./claims.ts`), never against their record.
  *
  * Nothing it returns for the public names a layer's path, a check, or a
- * salt: roots, counts and area bits only (spec D17).
+ * salt: roots, counts and area bits only.
  */
 import { ObjectId, Revision } from "@repo/artifacts/repo-host";
 import type { RepoExists } from "@repo/artifacts/repo-host";
@@ -112,7 +111,7 @@ export class SaltSource extends Context.Service<
 
 /**
  * What starts the admission of a layer push's sealed checks: the `Answer`
- * Workflow's admission run (609 #8). Starting one twice runs it once.
+ * Workflow's admission run. Starting one twice runs it once.
  */
 export class AdmissionStarts extends Context.Service<
   AdmissionStarts,
@@ -150,7 +149,7 @@ const encodePlanned = Schema.encodeEffect(PlannedJson);
 const decodePlanned = Schema.decodeUnknownEffect(PlannedJson);
 
 // A pushed manifest may leave a check's clause out: admission refuses it
-// (`UnstatedRequirement`, Q17) rather than read the manifest as none.
+// (`UnstatedRequirement`) rather than read the manifest as none.
 const decodeManifest = Schema.decodeUnknownEffect(
   Schema.fromJsonString(PushedManifest)
 );
@@ -161,7 +160,7 @@ const repoFor = (project: ProjectName, layer: LayerName) =>
 
 /**
  * Whether a layer gets a repo of its own. A personal layer is each
- * person's own, and an embargo is config only (spec D14, 604 #3): neither
+ * person's own, and an embargo is config only: neither
  * has one, so neither is provisioned or reachable.
  */
 const ownsRepo = (layer: LayerDeclaration) =>
@@ -231,7 +230,7 @@ const rowFor = (
   );
 
 /**
- * The decision a narrowing landing opens (OSR §2.6): for the project's own
+ * The decision a narrowing landing opens: for the project's own
  * deciders but those who landed it, so a second decider countersigns; when
  * nobody else decides for the whole project, its deciders as they are.
  * Its default is decline, and it stays open through the notice period and
@@ -563,8 +562,8 @@ const live = Effect.gen(function* () {
   /**
    * The sealed checks a layer commit holds: its manifest's checks in the
    * policy's areas (a check in an area the policy does not name runs
-   * nowhere, 604 #3) that cite a clause (one that cites none never judges
-   * an answer, admission or not, Q17) and whose files the commit has,
+   * nowhere) that cite a clause (one that cites none never judges
+   * an answer, admission or not) and whose files the commit has,
    * sorted by path.
    */
   const sealedAt = (
@@ -958,7 +957,7 @@ const live = Effect.gen(function* () {
       const project = projectOf(snapshot);
       const visibility = visibilityIn(snapshot);
 
-      // The gateway lets only the layer's writers push (606); a push heard
+      // The gateway lets only the layer's writers push; a push heard
       // from anyone else, or to a layer the config no longer declares,
       // moves nothing.
       if (
@@ -986,7 +985,7 @@ const live = Effect.gen(function* () {
       const checks = checksIn(visibility, input.layer);
       const admits = Option.exists(checks, ({ admit }) => admit !== undefined);
 
-      // Admission decides (615): the head waits, proposed, for its runs. A
+      // Admission decides: the head waits, proposed, for its runs. A
       // push that changes no held-back check has none, and lands at once.
       const planned = admits
         ? yield* admissionOf({ head: input.head, layer: input.layer }, snapshot)

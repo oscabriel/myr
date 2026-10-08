@@ -1,10 +1,9 @@
 /**
- * `Assisted-by:` on an answer's landing (spec D18, synthesis §3.2 "Agent
- * trailer"): every harness that pushed to the claim, as each push's custody
- * named it, once each, in the order they first pushed; none when the
- * project's policy says `agents: "none"`, and none for a push no harness
- * named. The harness is audit metadata: the person who pushed stays the
- * landing's author and only credited name.
+ * `Assisted-by:` on an answer's landing: every harness that pushed to the
+ * claim, as each push's custody named it, once each, in the order they first
+ * pushed; none when the project's policy says `agents: "none"`, and none for a
+ * push no harness named. The harness is audit metadata: the person who pushed
+ * stays the landing's author and only credited name.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";

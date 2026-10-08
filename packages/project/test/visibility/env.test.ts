@@ -1,5 +1,5 @@
 /**
- * The visibility cartridge's env (W6 614), through the project service over
+ * The visibility cartridge's env, through the project service over
  * memory adapters: datekit's env shape at the landed SHA, write-only values
  * a decider sets and nobody reads back, placeholders and proxies for checks
  * of unlanded code, the scan that finds a stored value, and the decision a
@@ -80,7 +80,7 @@ const value = "sntrys_eyJpYXQiOjE3M";
 
 const envFile = RepoPath.make(".env.schema");
 
-/** datekit's committed `.env.schema` (507), as `@env-spec/parser` reads it (through 603's adapter). */
+/** datekit's committed `.env.schema`, as `@env-spec/parser` reads it (through the visibility package's adapter). */
 const datekitParsed: ParsedEnvSchema = {
   header: [
     {
@@ -209,7 +209,7 @@ const tokenPlaceholder = "__SENTRY_AUTH_TOKEN_PLACEHOLDER__";
 
 /**
  * The env a check of datekit's code runs with, as the check job carries it
- * (611's wire): the token's placeholder, and its one `@proxy` host with
+ * (on the wire): the token's placeholder, and its one `@proxy` host with
  * the path it allows and no method named.
  */
 const tokenRunEnv = {
@@ -233,7 +233,7 @@ const start = (schema: string): Files => [
 ];
 
 /**
- * 610's WebCrypto vault under a test master key, as the platform composes
+ * The WebCrypto vault under a test master key, as the platform composes
  * it: the store keeps only the sealed value.
  */
 const vault = WriteOnlyValuesWebCrypto(

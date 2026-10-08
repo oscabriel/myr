@@ -1,5 +1,5 @@
 /**
- * Admission of held-back checks, pure (W6 615; OSR §5.5, SYN Q17,
+ * Admission of held-back checks, pure (after
  * poteto's "prove each new check fails on a real past mistake"). A push to
  * the layer that holds a project's held-back checks is a proposal: the
  * suite it would make enters the layer's landed SHA only once each area it
@@ -132,7 +132,7 @@ export interface AdmissionResult {
   readonly refused: readonly AdmissionRefused[];
 }
 
-/** The counts a plan carries when the policy asks for no admission (and no run is planned): OSR §5.5's defaults. */
+/** The counts a plan carries when the policy asks for no admission (and no run is planned): the defaults. */
 const osrDefaults = { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 } as const;
 
 /** A suite's checks in order: by area, then path. */

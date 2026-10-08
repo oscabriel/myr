@@ -9,7 +9,7 @@ const hex = (bytes: ArrayBuffer) =>
     .join("");
 
 /**
- * An answer's patch id (spec D7): SHA-256 over its change set as sorted
+ * An answer's patch id: SHA-256 over its change set as sorted
  * `path\0before\0after\n` lines, an absent blob as the empty string. It
  * ignores order and moves exactly when a blob the answer touches moves. It
  * is the platform's own id, not `git patch-id`, so a Worker computes it with

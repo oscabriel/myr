@@ -1,5 +1,5 @@
 /**
- * W2 214's `AnswerRuns` port over the `Answer` Workflow (W3 304): starting
+ * The project service's `AnswerRuns` port over the `Answer` Workflow: starting
  * an answer's run makes the Workflow instance whose id is the request id,
  * with the project and the request as its params. The instance runs the
  * answer's steps through the project's DO (`Projects`), so the port's
@@ -9,7 +9,7 @@
  * already exists, so `create` refuses, and the adapter takes the instance it
  * finds instead. A run ends whenever the answer waits (the landing slot, a
  * finish, a decision, a retry), and the project starts the same request
- * again once it can go on (W3 304 #2), so an instance whose run has ended
+ * again once it can go on, so an instance whose run has ended
  * (complete, errored or terminated) is restarted from its first step; each
  * step re-reads the run from the DO, so a fresh run picks up where the
  * answer stands. An instance still running is left alone. Any other failure

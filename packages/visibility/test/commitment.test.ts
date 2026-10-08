@@ -31,7 +31,7 @@ const c = file("checks/parser/c.test.ts", parserArea, "3");
 
 const suite = [a, b, c];
 
-// The construction, written out by hand with WebCrypto (OSR §5.4):
+// The construction, written out by hand with WebCrypto:
 // leaf = H(salt ‖ 0x00 ‖ path ‖ 0x00 ‖ blob id), node = H(0x01 ‖ left ‖ right),
 // an odd one out promoted; the suite joins each area's root under its name,
 // H(0x02 ‖ area ‖ 0x00 ‖ area root), in the same tree, areas sorted.

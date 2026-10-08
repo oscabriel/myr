@@ -82,7 +82,7 @@ const of = (visibility: VisibilityPolicy, licence = mit) =>
 const postureUnder = (licence: string) =>
   of(policy([]), Option.some(licence)).posture;
 
-// OSR §2.6's table, one row at a time.
+// The posture table, one row at a time.
 describe("a project's posture", () => {
   it("is Open with no visibility config", () => {
     expect(
@@ -145,7 +145,7 @@ describe("a project's posture", () => {
     });
   });
 
-  // OSR §5.6: sponsorware is source that opens after a declared delay.
+  // Sponsorware is source that opens after a declared delay.
   it("is Open on schedule when the source layer opens within a declared delay", () => {
     expect(of(policy([{ ...enterprise, maxDays: 90 }]))).toStrictEqual({
       label: "Open on schedule · embargo ≤ 90 days",
@@ -246,7 +246,7 @@ describe("a project's posture", () => {
   });
 });
 
-// OSR §2.6's ratchet: narrowing is a `PostureChange` decision, widening is not.
+// The posture's ratchet: narrowing is a `PostureChange` decision, widening is not.
 describe("narrowing a posture", () => {
   const furtherFromOpen: readonly Posture[] = [
     "open",

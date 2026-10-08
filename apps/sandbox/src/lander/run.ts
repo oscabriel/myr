@@ -340,8 +340,8 @@ const committed = (
 
 /**
  * The merged tree as a commit on `main` and the head, pushed to the fork's
- * `mergeRef(tree)`, where a Checker's fetch of the fork's refs finds it
- * (W3 304 #1). It is dated at the epoch, so merging the same sides again
+ * `mergeRef(tree)`, where a Checker's fetch of the fork's refs finds it.
+ * It is dated at the epoch, so merging the same sides again
  * makes the same commit, and pushing it again changes nothing.
  */
 const keptForChecks = (
@@ -526,7 +526,7 @@ const rebuilt = (
     }
   );
 
-/** The mirror of canonical `main` (ADR 0005, spec D22). */
+/** The mirror of canonical `main` (ADR 0005). */
 const landedRef = `${Brand.refsPrefix}landed`;
 
 /** Where the copy keeps canonical's notes ref. */
@@ -608,7 +608,7 @@ const attempt = <A, E, R>(item: Bookkeeping, write: Effect.Effect<A, E, R>) =>
   );
 
 /**
- * What follows a landing on `main`, each in its own push (S1 #6): the
+ * What follows a landing on `main`, each in its own push: the
  * mirror ref, while the landing is still main's tip (a later landing's own
  * mirror supersedes it), then the verdict note. Neither fails the landing;
  * what was not written comes back pending, and landing the same job again

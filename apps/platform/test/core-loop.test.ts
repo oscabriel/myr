@@ -1,6 +1,6 @@
 /**
- * The product's core loop as a decider and two contributors live it (spec
- * §5, "The W3 acceptance test"), through the platform's own fetch handler
+ * The product's core loop as a decider and two contributors live it,
+ * through the platform's own fetch handler
  * with real git: a project made and first pushed, two asks opened red
  * first, claimed, an answer refused out of scope and then landed with its
  * credit, a second answer refused on a stale base, and a replayed request

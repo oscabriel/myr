@@ -1,7 +1,7 @@
 /**
  * bootstrap: `bun run bootstrap -- --stage dev-<user>|demo`. Makes a stage's
  * Cloudflare resources once, and is safe to run again: a second run creates
- * nothing (spec §4.4).
+ * nothing.
  *
  * 1. Reads what exists: the stage's two Artifacts namespaces, the public
  *    one and the private one the layers live in (over REST, with the infra
@@ -12,7 +12,7 @@
  * 3. Writes the D1 and KV ids into the stage's block of
  *    `apps/platform/wrangler.jsonc` (`writeIds`, comments untouched).
  * 4. Applies the front page's migrations, once `apps/platform/migrations`
- *    exists (309 owns them).
+ *    exists.
  * 5. Records the account's workers.dev subdomain in `infra/workers-dev.json`,
  *    so `scripts/smoke.ts` knows the stage's origin.
  * 6. Checks, by name only, that the deployed platform has every secret its
@@ -197,7 +197,7 @@ const Trigger = Schema.Struct({
 });
 
 /**
- * `GET /accounts/{id}/triggers/{script}` (S1 #24): each target carries
+ * `GET /accounts/{id}/triggers/{script}`: each target carries
  * `script_name`, which `wrangler.jsonc` does not.
  */
 export const TriggersResponse = Schema.Struct({
@@ -524,7 +524,7 @@ const create = (root: string, credentials: Credentials, step: Step) =>
     CreateNamespace: ({ name }) => {
       const route = "/artifacts/namespaces";
 
-      // S1 #1: `unrestricted` is cf's default jurisdiction, and S1's.
+      // `unrestricted` is cf's default jurisdiction, and the probes'.
       return call(credentials, route, {
         jurisdiction: "unrestricted",
         namespace: name,

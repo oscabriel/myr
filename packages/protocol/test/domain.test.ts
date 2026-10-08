@@ -222,7 +222,7 @@ describe("the domain schemas", () => {
 });
 
 describe("a project's visibility", () => {
-  // OSR §4.1's `visibility.ts`, as the data the sdk writes for it.
+  // A `visibility.ts`, as the data the sdk writes for it.
   const [stated] = wire.roundTrip.VisibilityPolicy;
 
   const [policy] = wire.roundTrip.Policy;
@@ -237,7 +237,7 @@ describe("a project's visibility", () => {
     ).toStrictEqual(withVisibility);
   });
 
-  // No `visibility.ts` means no layers and the posture Open (OSR §4.1).
+  // No `visibility.ts` means no layers and the posture Open.
   it("is absent from a policy whose config folder declares none", () => {
     expect(Schema.decodeUnknownSync(Policy)(policy)).not.toHaveProperty(
       "visibility"
@@ -282,8 +282,8 @@ describe("names and ids", () => {
   );
 
   // The web serves its own pages and files at these first path segments, so
-  // a project so named would be unreachable at `<web>/<project>` (503 #8,
-  // 505 #6). An ask may still take them: an ask's page is under its project.
+  // a project so named would be unreachable at `<web>/<project>`.
+  // An ask may still take them: an ask's page is under its project.
   it.each(["assets", "auth", "icons", "people", "releases", "rpc", "today"])(
     "a project may not be named %j, a path the web takes for itself",
     (name) => {

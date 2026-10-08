@@ -1,13 +1,13 @@
 /**
  * release: builds the CLI into its npm package and two single-file
  * binaries, uploads a release to a stage's own release storage, and
- * publishes the package only when a person runs it (issue 715).
+ * publishes the package only when a person runs it.
  *
  *   bun run release -- --build [--version <semver>] [--stage <s> | --origin <url>]
  *   bun run release -- --upload --stage dev-oscabriel|demo --version <semver>
  *   bun run release -- --publish --version <semver>
  *
- * `--build` runs 416's build with both targets, stages the npm package in
+ * `--build` runs the CLI's build with both targets, stages the npm package in
  * `apps/cli/release/npm/` (its `package.json` generated from `Brand`, the
  * platform's skill, a README and the licence), copies the binaries to
  * `apps/cli/release/<slug>-<target>`, and writes `install.sh` and
@@ -17,7 +17,7 @@
  * `--upload --stage <s>` puts the version's files into the stage's
  * `releases-<stage>` bucket with Wrangler's own login, and
  * `releases/manifest.json` last; the platform then serves `<origin>/install.sh`
- * and `<origin>/releases/…` (issue 420). Nothing goes to GitHub.
+ * and `<origin>/releases/…`. Nothing goes to GitHub.
  *
  * `--publish` runs `npm publish` only when a person runs it: under any
  * agent's env (`@repo/protocol/audit`'s table) the run still does every

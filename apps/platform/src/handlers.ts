@@ -1,6 +1,6 @@
 /**
  * The contracts' handlers: routing, the rate limit and the fan-out, nothing
- * more (spec §4.3 `src/handlers.ts`). A contract that names a project calls
+ * more. A contract that names a project calls
  * that project's `ProjectApi` (its Durable Object, through `Projects`) as
  * the caller `Authenticated` named; the cross-project reads (`listProjects`,
  * `frontPage`, `credits`) come from the front-page projection; `status` and

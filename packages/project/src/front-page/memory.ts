@@ -1,6 +1,6 @@
 /**
  * `FrontPage` in memory, seeded from data: what tests read the front page,
- * the project list and credits from (W3 312, 317). It filters as the D1
+ * the project list and credits from. It filters as the D1
  * adapter does and never changes.
  */
 import type {

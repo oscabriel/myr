@@ -1,5 +1,5 @@
 /**
- * The env gateway (W6; VL §8.5): the outbound entrypoint each `@proxy` host's
+ * The env gateway: the outbound entrypoint each `@proxy` host's
  * HTTPS requests reach from the Checker's container
  * (`interceptOutboundHttps(host, EnvGateway)`, `checker/sdk.ts`), as in
  * Cloudflare's "call an authenticated API from a sandbox": the credential
@@ -82,7 +82,7 @@ type Swap = readonly [from: string, to: string];
  * Refused, with the reason, when it is not HTTPS, matches no rule, matches
  * a `block` rule (which wins over any other), or matches two rules whose
  * one placeholder stands for two keys (the gateway would not know which
- * value goes; 610's review).
+ * value goes).
  */
 const swapsFor = (
   props: EnvGatewayProps,

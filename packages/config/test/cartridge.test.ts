@@ -1,5 +1,5 @@
 /**
- * The visibility cartridge, read as data (W6 609; SYN cut line 5): its
+ * The visibility cartridge, read as data (README's cut line 5): its
  * paths exist, one marked line plugs it in, and nothing outside it reaches
  * into it, so removing it is a deletion. The cartridge is its manifest's
  * folders, the marked composition line (the line under the marker
@@ -37,26 +37,26 @@ const TEST_HOMES = ["packages/project/test/visibility/"] as const;
 
 /**
  * Tests outside its folders that run the cartridge's world as a process,
- * by its path rather than an import (the CLI's end-to-end `env set`, W6
- * 616: apps never import apps), so no import reader sees them: they go
+ * by its path rather than an import (the CLI's end-to-end `env set`:
+ * apps never import apps), so no import reader sees them: they go
  * with it too.
  */
 const RUNS_ITS_WORLD = [
   "apps/cli/test/local/env-set-live.test.ts",
-  // The seed's layer step, over the world the cartridge plugs into (608).
+  // The seed's layer step, over the world the cartridge plugs into.
   "packages/config/test/seed-layer.test.ts",
 ] as const;
 
 /**
  * The examples' content that only a platform with the cartridge can seed:
- * datekit's maintainers layer (608). Without it the seed plans no layer.
+ * datekit's maintainers layer. Without it the seed plans no layer.
  */
 const ITS_CONTENT = ["examples/datekit/layers/"] as const;
 
 /**
  * Every folder, and every file, that goes when the cartridge goes. Deleting
- * it also takes the lines that name it (W6 699 did it in a scratch worktree
- * and verify stayed green): the marked line in `cartridges.ts`; the two
+ * it also takes the lines that name it (deleting it in a scratch worktree
+ * left verify green): the marked line in `cartridges.ts`; the two
  * `@repo/visibility` dependency lines; `ARTIFACTS_PRIVATE` and `MASTER_KEY`
  * in the platform's `wrangler.jsonc`, `.env.schema` and `platform.ts`, its
  * tests' fake env (`withPrivateNamespace` and its imports, and its use in

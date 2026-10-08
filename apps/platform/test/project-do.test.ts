@@ -251,7 +251,7 @@ describe("the Project DO class", () => {
   });
 
   it.effect(
-    "runs on ports that carry the platform's generator, so a landing that changes the config is followed (410)",
+    "runs on ports that carry the platform's generator, so a landing that changes the config is followed",
     () =>
       Effect.gen(function* () {
         const config = yield* decodeEnv(fakeEnv()).pipe(Effect.orDie);

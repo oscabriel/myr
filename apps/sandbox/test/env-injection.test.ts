@@ -1,5 +1,5 @@
 /**
- * The Checker's env (W6 611; VL §8.4–8.5): every `@sensitive` item reaches
+ * The Checker's env: every `@sensitive` item reaches
  * the container as its placeholder, and a `@proxy` host's requests go
  * through the env gateway, which swaps the placeholder for the value only in
  * a run of landed code. Over the fake `Box` (`fake-box.ts`), and the gateway

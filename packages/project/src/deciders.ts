@@ -1,15 +1,15 @@
 /**
- * The decider-facing half of the project service (221): a decider's Today,
+ * The decider-facing half of the project service: a decider's Today,
  * proposals and flags, decisions and the defaults their expiry applies,
  * finishes, a decider's own landing from their working fork, vouches and
  * denouncements, and a person's credits. The ledger, the env shape and
  * write-only values are declared here and answered by the visibility ports
- * (`visibility-port.ts`, `env-port.ts`; W6 609), in `project.ts`.
+ * (`visibility-port.ts`, `env-port.ts`), in `project.ts`.
  *
  * Every call has the core loop's shape (ADR 0012): the project service
  * lends its hydrate, its one-call `write` (hydrate, transition, persist,
  * settle under the project's lock) and the helpers it already has, as a
- * `DeciderKernel`; the attention rules (213, 220) decide, and this module
+ * `DeciderKernel`; the attention rules decide, and this module
  * settles what they return. Nothing here reimplements a rule.
  *
  * Two departures, each said where it happens: a decider's `land` runs its
@@ -142,7 +142,7 @@ import type {
  */
 export const envSchemaMethod = "envShape";
 
-/** The decider-facing methods of one project's service (spec §3.2's decider rows). */
+/** The decider-facing methods of one project's service. */
 export interface DeciderApi {
   /**
    * The project's env shape at its landed SHA, as `ProjectEnv` reads it
@@ -451,7 +451,7 @@ const overlaid = <K, V extends { readonly id: K }>(
 const minted = (prefix: string, taken: number) =>
   `${prefix}-${String(taken + 1).padStart(6, "0")}`;
 
-/** A person's working fork, `<project>--me--<handle in lowercase>` (spec §4.5). */
+/** A person's working fork, `<project>--me--<handle in lowercase>`. */
 const workingFork = (project: ProjectName, handle: Handle) =>
   RepoName.make(`${project}--me--${handle.toLowerCase()}`);
 
@@ -486,7 +486,7 @@ const pathsOf = (
 
 /**
  * Who decides on `paths`: their deciders, else the project's own (`**`),
- * else its initializer (spec D20). A decision always has someone.
+ * else its initializer. A decision always has someone.
  */
 export const decidersOn = (
   policy: Policy,
@@ -648,8 +648,8 @@ const vouchedText = (
 const zeroId = CommitSha.make("0".repeat(40));
 
 /**
- * The decision a move of canonical `main` the platform did not make opens
- * (W3 313, CM §4): `StrayPush`, whose default is revert, for the project's
+ * The decision a move of canonical `main` the platform did not make opens:
+ * `StrayPush`, whose default is revert, for the project's
  * own deciders (`**`), else its initializer, with `before` as git's zero id
  * when the push created `main`. The service mints the id; a `main` moved to
  * a landing or to the landed SHA is the platform's, and opens none.
@@ -1122,7 +1122,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       }
 
       // Putting a deleted main back is a ref update the Lander can't make
-      // yet (W3 313 #4); the landed SHA still names it.
+      // yet; the landed SHA still names it.
       if (after === zeroId) {
         yield* Effect.logError(
           `canonical ${ref} was deleted; put it back at ${before} by hand`
@@ -1442,7 +1442,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       OpenProposal: () => Effect.void,
       // The answer waiting on it is told (`answerWaits`).
       PostureChange: () => Effect.void,
-      // W6: the env proxy and the value store are the visibility cartridge's.
+      // The env proxy and the value store are the visibility cartridge's.
       ProxyWidened: () => Effect.void,
       RaiseRatchet: () => Effect.void,
       SecretInTree: () => Effect.void,
@@ -1574,7 +1574,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
           writes.decisions.set(defaulted.id, defaulted);
 
-          // A default is its subject's no (213's `defaultChoice`), so an
+          // A default is its subject's no (`defaultChoice`), so an
           // expiry never opens an ask, and opening's refusals never arise.
           return settleDecided(h, writes, now, {
             decision: defaulted,

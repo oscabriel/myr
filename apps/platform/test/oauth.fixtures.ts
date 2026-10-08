@@ -34,7 +34,7 @@ export const port = 43_123;
 
 export const redirectUri = `http://127.0.0.1:${port}/callback`;
 
-/** A person a named session holds (spec §8 D9), in the world's `SESSION_TOKENS`. */
+/** A person a named session holds, in the world's `SESSION_TOKENS`. */
 export const namedPerson = "carol";
 
 /** The fake env with one named session, as the demo's stages run. */
@@ -75,7 +75,7 @@ export const signInWorld = Effect.gen(function* () {
   const store = OAuthStoreMemory.make();
 
   // Google sign-in is off here (no Google client), so it reaches neither
-  // its links nor Google (W4 419).
+  // its links nor Google.
   const services = Layer.mergeAll(
     Layer.succeed(Accounts, accounts),
     Layer.succeed(OAuthStore, store),

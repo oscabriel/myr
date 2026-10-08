@@ -1,6 +1,6 @@
 /**
- * The outbound map (VL §8.5): what the Checker intercepts for each `@proxy`
- * item (611 hands each host to `interceptOutboundHttps`). A rule names a
+ * The outbound map: what the Checker intercepts for each `@proxy`
+ * item (the Checker hands each host to `interceptOutboundHttps`). A rule names a
  * host, the path and method a request must match, whether every request
  * is denied, the placeholder the process sees, and the item whose value
  * replaces it on the way out. Only `@sensitive` items hold values, so

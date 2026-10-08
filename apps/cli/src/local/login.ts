@@ -1,6 +1,6 @@
 /**
  * `login` and `logout`. A person logs in once, through the browser (PKCE
- * against the platform's own OAuth server, W3 316) or with a token piped to
+ * against the platform's own OAuth server) or with a token piped to
  * `--token-stdin`; the CLI checks the token with the platform, keeps it as
  * a profile (`Credentials`), and names `git-credential-<slug>` in git's
  * global config for the platform's url, so plain `git clone`, `fetch` and
@@ -56,8 +56,8 @@ const SIGN_IN_WAIT = "5 minutes";
 
 /**
  * The CLI's OAuth client id on a platform: the URL of the Client ID
- * Metadata Document the platform serves for it (W3 316,
- * `apps/platform/src/auth/cli-client.ts`). It asks for no scope.
+ * Metadata Document the platform serves for it
+ * (`apps/platform/src/auth/cli-client.ts`). It asks for no scope.
  */
 const clientIdOf = (origin: string) => `${origin}/oauth/cli`;
 

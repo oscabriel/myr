@@ -1,6 +1,6 @@
 /**
  * The `Answer` Workflow: carries one admitted answer through merge, checks
- * and landing, each a durable step (spec §5 steps 7–8). The class is thin:
+ * and landing, each a durable step. The class is thin:
  * it decodes its params, runs `runAnswer` with its steps over the engine's
  * `step.do`, and hands the engine the outcome encoded as JSON. The program
  * lives in `answer/program.ts`. The class name is frozen.
@@ -10,7 +10,7 @@
  * platform itself: its answer queue (`answer`, `advanceAnswer`) takes no
  * caller.
  *
- * The same Workflow admits a layer push's sealed checks (W6 609): params
+ * The same Workflow admits a layer push's sealed checks: params
  * tagged `Admission` run `admissionSteps`, so typed visibility adds no
  * Workflow binding. An admission's output is `null`.
  */

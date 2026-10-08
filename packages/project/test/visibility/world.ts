@@ -1,5 +1,5 @@
 /**
- * datekit's world for the visibility cartridge's tests (W6 612): the
+ * datekit's world for the visibility cartridge's tests: the
  * project service over memory adapters (`../world.ts`) with the live
  * `ProjectVisibility` plugged in, over a second `RepoHost` `/memory` as the
  * private namespace's `LayerRepos`, salts drawn from a counter, and
@@ -9,7 +9,7 @@
  * Its rules evaluator runs no config code: it returns the scenario's policy
  * at every commit, with datekit's visibility config (a maintainers layer;
  * sealed areas `export` and `parser`) whenever the commit's config folder
- * holds `visibility.ts`, as the real evaluator reads that file (608).
+ * holds `visibility.ts`, as the real evaluator reads that file.
  */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";

@@ -1,8 +1,8 @@
 /**
- * The one table of stages and of the Cloudflare resources each one owns
- * (spec §4.4). A stage is `dev-<user>`, one person's iteration, or `demo`,
- * the recording and the submission; there is no `prod` in the window (spec
- * §8 D13). Each resource is a job's name plus the stage, never the brand
+ * The one table of stages and of the Cloudflare resources each one owns.
+ * A stage is `dev-<user>`, one person's iteration, or `demo`,
+ * the recording and the submission; there is no `prod` before the deadline.
+ * Each resource is a job's name plus the stage, never the brand
  * (AGENTS.md principle 5).
  *
  * `bootstrap.ts`, `deploy.ts` and `scripts/smoke.ts` read stages and names
@@ -37,11 +37,11 @@ export interface Resources {
   readonly platform: string;
   /** The sandbox Worker: the Checker and the Lander. */
   readonly sandbox: string;
-  /** The web Worker (W5). */
+  /** The web Worker. */
   readonly web: string;
   /** The public Artifacts namespace. */
   readonly projects: string;
-  /** The private Artifacts namespace: every project's layer repos (W6). */
+  /** The private Artifacts namespace: every project's layer repos. */
   readonly layers: string;
   /** The D1 database behind the front page. */
   readonly frontPage: string;

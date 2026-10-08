@@ -1,11 +1,11 @@
 /**
- * `CheckRunner` over the sandbox Worker (spec §4.3): each run goes to the
+ * `CheckRunner` over the sandbox Worker: each run goes to the
  * Checker through the `SANDBOX` service binding, with one read token on the
  * repo it clones from and nothing else. The Checker's container never sees
- * the token (W3 315); its outcome comes back as the port's own `CheckRun` or
+ * the token; its outcome comes back as the port's own `CheckRun` or
  * `VerifierBlocked`.
  *
- * A job's sealed suite (W6 605, 613) crosses as the platform read it: the
+ * A job's sealed suite crosses as the platform read it: the
  * layer's files under the sealed areas, base64 on the wire, and one run per
  * sealed check. No layer repo, route or token goes with it, so the only
  * token is still the one on the answer's fork. Its area bits come back

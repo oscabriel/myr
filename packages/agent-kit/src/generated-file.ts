@@ -134,7 +134,7 @@ const DESCRIPTION = "description: ";
  * The `description` a skill's frontmatter gives, quoted as `frontmatter`
  * writes it or plain as a hand-written skill may: none without the
  * frontmatter, or without a description in it. The skills index lists a
- * landed skill by it (issue 505).
+ * landed skill by it.
  */
 export const describedIn = (file: string): Option.Option<string> =>
   Option.flatMap(sections(file), ({ head }) =>

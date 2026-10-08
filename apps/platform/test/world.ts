@@ -1,33 +1,33 @@
 /**
- * The core loop's world (spec §5, "The W3 acceptance test"): the platform's
+ * The core loop's world: the platform's
  * fetch handler composed as the Worker composes it (`platformOn`, the
  * surfaces over the ports), served on a local port so real git reaches it.
  * The ports are the ones `workerPorts` gives the Worker, each a Node
  * adapter here:
  *
- * - `RepoHost` is W2's `/local` (bare repos in a temporary folder), whose
- *   git is real `git http-backend` on a second port, and `Upstream` is W2's
+ * - `RepoHost` is the `/local` adapter (bare repos in a temporary folder), whose
+ *   git is real `git http-backend` on a second port, and `Upstream` is
  *   `UpstreamRepoHost` over it with the Worker's fetch (Node's, here).
  * - `Projects` is `DoProjects` over an in-process `PROJECT` namespace: each
- *   name is one Project DO, 302's `projectShell` over a sqlite-node database
+ *   name is one Project DO, its `projectShell` over a sqlite-node database
  *   of its own, on these ports with `Alarms` in memory and `AnswerRuns`
  *   queued in process.
- * - `CheckRunner` is W2's `/memory`, scripted by the test; `Lander` is W2's
- *   `/isogit`; `RulesEvaluator` is W2's `/bun`, over the config folder as
- *   committed; the front page, the rate limits and the evidence are kept in
+ * - `CheckRunner` is the `/memory` one, scripted by the test; `Lander` is the
+ *   `/isogit` one; `RulesEvaluator` is the `/bun` one, over the config folder
+ *   as committed; the front page, the rate limits and the evidence are kept in
  *   memory, the evidence unless the test gives the world its own store.
  *
- * `settle` carries every queued answer run: 304's `runAnswer` over the same
- * ports, its steps kept in memory, as the Answer Workflow runs it over the
- * engine's. People are `dora` (who makes the project, so its decider),
- * `alice` and `bob`, each a `SESSION_TOKENS` entry: git sends a person's
- * token as the Basic password its credential helper gives, and the RPC
- * client as a bearer token. Anyone else `sessions` names is a `person`.
+ * `settle` carries every queued answer run: the Workflow's `runAnswer` over the
+ * same ports, its steps kept in memory, as the Answer Workflow runs it over the
+ * engine's. People are `dora` (who makes the project, so its decider), `alice`
+ * and `bob`, each a `SESSION_TOKENS` entry: git sends a person's token as the
+ * Basic password its credential helper gives, and the RPC client as a bearer
+ * token. Anyone else `sessions` names is a `person`.
  *
  * A test may plug a cartridge in (`plugIn`), as `ports.ts` plugs one into
  * the Worker: over the Worker's ports and over each Project DO's, made
  * from a second store of bare repos behind a git http-backend of its own:
- * the private namespace's stand-in, for W6's layer repos.
+ * the private namespace's stand-in, for the visibility cartridge's layer repos.
  *
  * Every log line the Worker's handler writes is kept beside its usual
  * printing, with its annotations (`logged`), and each Project DO's SQLite
@@ -271,7 +271,7 @@ const helperScript = (token: string, username: string) =>
 /**
  * What a test may set in its world: where lane logs are kept, in memory by
  * default; the front page, which lists no project by default; the Checker,
- * W2's `/memory` scripted by the test unless given; and more people.
+ * the `/memory` one, scripted by the test unless given; and more people.
  */
 export interface WorldOptions {
   readonly evidence?: Layer.Layer<EvidenceStore>;
@@ -632,7 +632,7 @@ export const coreLoopWorld = (
         }
 
         // Each start runs over a fresh record of steps, as a restarted
-        // Workflow instance would (304's Comments, item 2).
+        // Workflow instance would.
         yield* Effect.forEach(
           due,
           (params) =>

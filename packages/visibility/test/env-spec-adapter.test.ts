@@ -43,7 +43,7 @@ const parserModules = import.meta.glob(
   { eager: true, exhaustive: true, import: "default", query: "?raw" }
 );
 
-// The adapter over @env-spec/parser 0.6.1 (issue 603; VL §2.3, §8.3).
+// The adapter over @env-spec/parser 0.6.1.
 describe("the /env-spec adapter", () => {
   // The /memory fake holds what this parser reads, so a test over the fake
   // says what the real parser says.
@@ -55,7 +55,7 @@ describe("the /env-spec adapter", () => {
       })
   );
 
-  // 507's datekit, as the env shape beat shows it: the Sentry token is
+  // datekit, as the env shape beat shows it: the Sentry token is
   // sensitive, required only in production, and sent only to sentry.io's
   // API; everything else is public.
   it.effect(
@@ -128,7 +128,7 @@ describe("the /env-spec adapter", () => {
   );
 });
 
-// VL §8.3 #4 and ADR 0009: the platform parses, never resolves.
+// ADR 0009: the platform parses, never resolves.
 describe("the /env-spec adapter never evaluates", () => {
   it.effect(
     "reads $(…) and exec(…) as text, and the shape carries no value",

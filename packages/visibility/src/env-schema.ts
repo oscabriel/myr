@@ -1,7 +1,7 @@
 /**
- * The parser seam (VL §8.3): the one place a project's `.env.schema` is
+ * The parser seam: the one place a project's `.env.schema` is
  * parsed, at a landed SHA. `@env-spec/parser` is reached only through an
- * adapter of this port (`./env-schema/env-spec`, issue 603), with a fake
+ * adapter of this port (`./env-schema/env-spec`), with a fake
  * beside it (`./env-schema/memory`). Parsing reads text and nothing else: no
  * value expression is evaluated, no plugin is loaded, and no import outside
  * the repo is followed.

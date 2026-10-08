@@ -11,8 +11,8 @@
  * - `cursor`: the last event applied per project. Events apply in their
  *   project's order, once each, so a replayed or late row changes nothing.
  *
- * A migration is never edited once it has run anywhere: W5 514 adds its
- * tables in `0004_projects_credits.sql` (`ProjectsCreditsDdl`).
+ * A migration is never edited once it has run anywhere: the project list adds
+ * its tables in `0004_projects_credits.sql` (`ProjectsCreditsDdl`).
  */
 import type { Handle } from "@repo/protocol/ids";
 
@@ -65,9 +65,9 @@ CREATE TABLE cursor (
  *
  * Its last statement lists the projects `cursor` already knows of, with
  * their open asks, so a database the front page's migration made keeps its
- * project list (W4 499's stopgap read it from `cursor`). Their credits and
+ * project list (an earlier stopgap read it from `cursor`). Their credits and
  * last landings come back only with a rebuild: clear the four tables and
- * replay each project's events from seq 1 (309 #10).
+ * replay each project's events from seq 1.
  */
 export const ProjectsCreditsDdl = `-- The project list and every person's credits, projected from each
 -- project's outbox by packages/project/src/projection-d1 beside the front

@@ -1,6 +1,6 @@
 /**
- * The paths the platform serves and the web host only passes on (issue
- * 505): the CLI's install script and releases (W4 420) and the projects'
+ * The paths the platform serves and the web host only passes on:
+ * the CLI's install script and releases and the projects'
  * skills (`/.well-known/agent-skills/*`). The request goes to the backend
  * as it came, for GET and for HEAD only: the platform only reads on these
  * paths (it answers any other method 405), so the web passes no other

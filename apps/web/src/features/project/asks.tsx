@@ -22,7 +22,7 @@ import type { ReactNode } from "react";
 /** A project's page. */
 export const projectPath = (project: ProjectName) => `/${project}`;
 
-/** An ask's page (issue 512's route). */
+/** An ask's page. */
 export const askPath = (project: ProjectName, ask: AskId) =>
   `/${project}/asks/${ask}`;
 

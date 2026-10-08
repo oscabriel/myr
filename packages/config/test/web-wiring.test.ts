@@ -1,9 +1,9 @@
 /**
- * The web Worker's wiring, read as data (issue 501): it reaches the platform
+ * The web Worker's wiring, read as data: it reaches the platform
  * only through the `PLATFORM` service binding and holds no storage binding of
  * any kind, in any stage (AGENTS.md principle 7); `#backend` picks the
  * in-process backend under `development` and the binding otherwise; the byte
- * alarm measures it; and the examples stay outside the workspaces (spec D21).
+ * alarm measures it; and the examples stay outside the workspaces.
  *
  * Each file's presence is asserted before it is read, so a missing file is a
  * failed assertion, not a load error.

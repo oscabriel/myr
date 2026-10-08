@@ -1,5 +1,5 @@
 /**
- * The `Answer` Workflow's landing guards (W6; OSR §5.4, VL §8.6): before
+ * The `Answer` Workflow's landing guards: before
  * any check runs on an answer's merged tree, the tree is checked again for
  * what may never enter a public tree, as it stands now (a layer may have
  * grown since the push was admitted at stage 1):

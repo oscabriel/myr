@@ -1,5 +1,5 @@
 /**
- * The visibility cartridge, whole (W6 609; SYN cut line 5): the gateway's
+ * The visibility cartridge, whole (README's cut line 5): the gateway's
  * layer repos (`layers.ts`), the project service's visibility state
  * (`state.ts`) and env (`env.ts`), and the `Answer` Workflow's landing
  * guards (`held-back.ts`), for one stage's config, over the platform's own

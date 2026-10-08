@@ -1,5 +1,5 @@
 /**
- * `watch` live (spec §3.4, issue 510). Over the Node platform world, a
+ * `watch` live. Over the Node platform world, a
  * watcher that speaks the framed `/rpc` (NDJSON) hears a project's kept
  * events in order and then each one as it is committed, until it goes
  * away; a watcher from a sequence number hears only what came after.

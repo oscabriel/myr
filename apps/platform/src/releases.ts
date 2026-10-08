@@ -1,7 +1,8 @@
 /**
- * The CLI's releases, served by the platform itself (issue 420): anyone,
+ * The CLI's releases, served by the platform itself: anyone,
  * with no account and no token, runs `curl -fsSL <origin>/install.sh | sh`.
- * W7 715 uploads each release into the stage's `RELEASES` bucket beside
+ * The release script (`scripts/release.ts`) uploads each release into the
+ * stage's `RELEASES` bucket beside
  * `releases/manifest.json`, which says what each version holds; nothing
  * about a release lives anywhere else.
  */
@@ -29,7 +30,7 @@ export interface ReleaseFile {
 /**
  * Where releases are kept: the stage's `RELEASES` bucket
  * (`releases/binding.ts`), or memory (`releases/memory.ts`). Read-only:
- * W7 715 uploads.
+ * the release script uploads.
  */
 export class ReleaseStore extends Context.Service<
   ReleaseStore,
@@ -43,7 +44,7 @@ export class ReleaseStore extends Context.Service<
 const Sha256 = Schema.String.check(Schema.isPattern(/^[0-9a-f]{64}$/u));
 
 /**
- * A version as W7 715 numbers releases: semver, with an optional
+ * A version as the release script numbers releases: semver, with an optional
  * pre-release, and so never `latest`, a `/` or a `..`.
  */
 const VERSION =
@@ -54,7 +55,7 @@ const FILE_NAME = /^[0-9A-Za-z][0-9A-Za-z._-]*$/u;
 
 /**
  * Every key of a record matches `pattern`. Checked whole: a record with a
- * refined key would drop a bad entry without a word (spec §7.4).
+ * refined key would drop a bad entry without a word.
  */
 const keysMatch = (pattern: RegExp, what: string) =>
   Schema.makeFilter((record: Readonly<Record<string, unknown>>) =>
@@ -81,9 +82,9 @@ const Release = Schema.Struct({
 type Release = typeof Release.Type;
 
 /**
- * `releases/manifest.json`, as W7 715's `releaseManifest` writes it: every
- * version released, by version, and which one is latest. Decoded at the
- * boundary (principle 2), so a version or a file name from it never leaves
+ * `releases/manifest.json`, as the release script's `releaseManifest` writes
+ * it: every version released, by version, and which one is latest. Decoded at
+ * the boundary (principle 2), so a version or a file name from it never leaves
  * `releases/<version>/`.
  */
 export const ReleaseManifest = Schema.Struct({
@@ -100,7 +101,7 @@ export const ReleaseManifest = Schema.Struct({
 export type ReleaseManifest = typeof ReleaseManifest.Type;
 
 /**
- * What a release is built for (W7 715's targets, without Bun's `bun-`
+ * What a release is built for (the release script's targets, without Bun's `bun-`
  * prefix). A binary is named for the slug and its target, and nothing else
  * is served as one.
  */
@@ -147,7 +148,7 @@ const unavailable = HttpServerResponse.empty({
   status: 503,
 });
 
-/** Releases are only read here: W7 715 uploads them with Wrangler. */
+/** Releases are only read here: the release script uploads them with Wrangler. */
 const readOnly = HttpServerResponse.empty({
   headers: { allow: "GET, HEAD", "cache-control": NO_STORE },
   status: 405,

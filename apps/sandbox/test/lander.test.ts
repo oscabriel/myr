@@ -182,7 +182,7 @@ const mirrorRefused = (inner: Box["Service"]): Box["Service"] => ({
 /**
  * The Lander's container, where Artifacts is busy with another push to the
  * repo when the Lander pushes `main`: one side-band error packet and no
- * report, as S2 #9 recorded it.
+ * report, as a probe of Artifacts recorded it.
  */
 const busyOnMain = (inner: Box["Service"]): Box["Service"] => ({
   ...inner,
@@ -973,7 +973,7 @@ describe("the land image", () => {
       }).pipe(Effect.provide(TestServices))
   );
 
-  // Live on dev-oscabriel (311): the land image ended on debian's own
+  // Live on dev-oscabriel: the land image ended on debian's own
   // `bash`, which exits at once with no stdin, so the container stopped and
   // the first `exec` of every job was killed (exit 137).
   it.effect.each(["check", "land"])(
@@ -1233,7 +1233,7 @@ describe("the Lander's Durable Objects", () => {
         );
 
         expect(merged).toStrictEqual(Exit.fail(new VerifierBlocked({})));
-        // A whole vCPU (live on dev-oscabriel, 311: on the default `lite`,
+        // A whole vCPU (live on dev-oscabriel: on the default `lite`,
         // 1/16 vCPU, one landing took 32 s and a config bundle 20 s).
         expect(started).toStrictEqual([
           { enableInternet: true, image: "land-image", instance: "standard-2" },

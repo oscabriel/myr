@@ -1,5 +1,5 @@
 /**
- * smoke's core loop (issue 806): `bun scripts/smoke.ts --stage <s> --loop`
+ * smoke's core loop: `bun scripts/smoke.ts --stage <s> --loop`
  * makes a throwaway project, opens an ask red first, claims it, pushes an
  * answer that reaches outside the ask's territory and hears `OutOfScope`
  * in git's own output, pushes the fix, and reads back its landing and its

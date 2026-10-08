@@ -1,6 +1,6 @@
 /**
  * What a clone's or fetch's upload-pack request reads, as the platform's
- * read log sees it (W6 606): a table of requests as git writes them over
+ * read log sees it: a table of requests as git writes them over
  * protocol v0 and v2, and the requests it can't make out.
  */
 import { describe, expect, it } from "@effect/vitest";

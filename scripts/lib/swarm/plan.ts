@@ -51,7 +51,7 @@ export class NotEnoughAsks extends Schema.TaggedError<NotEnoughAsks>()(
 }
 
 /**
- * The refusals that end a contributor's claim, so the verdict loop (711)
+ * The refusals that end a contributor's claim, so the verdict loop
  * stops on them. It bounces every other refusal back into the same session:
  * `retryable: true` means only that the same push may pass if sent again
  * (`StaleBase`, `RepoBusy`, `Flake`), while `OutOfScope`, `Weakened` and

@@ -1,5 +1,5 @@
 /**
- * The web app manifest (issue 505), so Today installs on a phone. No file
+ * The web app manifest, so Today installs on a phone. No file
  * spells the name: `vite.config.ts` writes this into the client output as
  * `manifest.webmanifest` at each build, from `Brand.name`. The colours are
  * the paper's (`features/shared/theme.ts`); the icons are the files under

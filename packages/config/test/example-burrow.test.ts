@@ -1,5 +1,5 @@
 /**
- * The fence-shaped example (issue 508; spec D21): `examples/burrow` is a Bun
+ * The fence-shaped example: `examples/burrow` is a Bun
  * project of its own, and these cases run its own commands in its folder, as
  * its maintainers would. Its lint, run as its ratchet runs it, reports
  * exactly the six module-level `let`s the ratchet starts from, one in each
@@ -32,7 +32,7 @@ const PACKAGES = [
 ] as const;
 
 /**
- * What a migrate ask's count command prints (issue 506's `CallerCount` in
+ * What a migrate ask's count command prints (`CallerCount` in
  * `@repo/project/migrate`; `@repo/config` imports no workspace package, so
  * the shape is restated here).
  */

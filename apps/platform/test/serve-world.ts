@@ -15,17 +15,17 @@
  *   object from token to handle, as `SESSION_TOKENS` is) may call.
  * - Every answer run a push queues is carried a moment later, for as long
  *   as the world serves, as the `Answer` Workflow carries it on a stage:
- *   an answer pushed over git lands with nobody calling `settle` (W8 806's
- *   `smoke --loop` runs against this world).
+ *   an answer pushed over git lands with nobody calling `settle` (smoke's
+ *   `--loop` runs against this world).
  * - Every cartridge the platform plugs in (`cartridges.ts`) is plugged in
  *   here too, as `ports.ts` plugs them into the Worker, for a stage whose
  *   private namespace is the world's second store of bare repos: so a
  *   project that declares a layer gets its repo there, and its maintainers
- *   clone and push it through the gateway (W6 608). The `Answer` Workflow
+ *   clone and push it through the gateway. The `Answer` Workflow
  *   the cartridge starts an admission on keeps the instance and runs
  *   nothing: the world carries no Workflow.
  *
- * The seed's `--world node` runs it (W5 509, `scripts/lib/seed.ts`) and
+ * The seed's `--world node` runs it (`scripts/lib/seed.ts`) and
  * reaches it over HTTP and git, as it reaches a stage. A process, not an
  * import: apps never import apps, and no file outside the platform imports
  * its test world. The Worker's modules import `cloudflare:workers`, which

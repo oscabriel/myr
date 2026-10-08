@@ -202,7 +202,7 @@ interface Seen {
 
 /**
  * The sandbox Worker's entrypoint as the service binding reaches it, in
- * memory: each method decodes its wire with 301's schema, runs the memory
+ * memory: each method decodes its wire with its schema, runs the memory
  * `CheckRunner` or `Lander` it was built over, and encodes the `Exit`. It
  * keeps every wire it decoded, by method.
  */

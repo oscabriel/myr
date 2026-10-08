@@ -4,11 +4,11 @@
  * the check is a file), and the commits its people push. The projects and
  * their people are invented; any likeness to a real one is not meant.
  *
- * `datekit` is a small date library (the people of `examples/datekit`,
- * issue 507): `ines-v` decides everything, `okonkwo` the time zones, and
+ * `datekit` is a small date library (the people of
+ * `examples/datekit`): `ines-v` decides everything, `okonkwo` the time zones, and
  * `bram` is a vouched contributor. `burrow` is a six-package monorepo with
  * a legacy helper to migrate away from and a lint count to ratchet down
- * (`examples/burrow`, issue 508), decided by `okafor` and `lin-h`. These are
+ * (`examples/burrow`), decided by `okafor` and `lin-h`. These are
  * cut-down copies: just enough for every page of the web to have something
  * real to show.
  *
@@ -79,7 +79,7 @@ const spelled = (value: string | readonly string[]): string =>
 /**
  * The args an ask's kind takes for its check, as the ask file spells them.
  * No SDK call states a `SymbolAbsent` check (a migrate's split opens its
- * delete step, issue 506), so that file spells the nearest one: a migrate
+ * delete step), so that file spells the nearest one: a migrate
  * with no `to`, every use gone.
  */
 const checkArgs = (check: StatedAsk["check"]) =>
@@ -482,7 +482,7 @@ const PARENT = "drop-legacy-fetch";
 
 /**
  * The one ask burrow's decider opens: the migrate. Its callers sit in all
- * six packages, so the platform opens it as a family (issue 506): a child
+ * six packages, so the platform opens it as a family: a child
  * per package and a delete child waiting on the six, their files written
  * beside the parent's in the same landing.
  */

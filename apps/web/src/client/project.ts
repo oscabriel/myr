@@ -1,8 +1,8 @@
 /**
- * A project page's reads (spec §3.2): its open asks (`listAsks`) and its
- * recent landings, which come from the `watch` replay (spec §3.4), not a
+ * A project page's reads: its open asks (`listAsks`) and its
+ * recent landings, which come from the `watch` replay, not a
  * contract of their own. Both read again when the project's key is
- * invalidated, which the page's live view (`watch.ts`, issue 510) does on
+ * invalidated, which the page's live view (`watch.ts`) does on
  * each event. Each renders as waiting on the server, and the browser calls
  * `/rpc` (see `front.ts`).
  *

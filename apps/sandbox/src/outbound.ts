@@ -1,14 +1,12 @@
 /**
- * The Checker container's only ways out, as outbound entrypoints of this
- * Worker (spec §4.3; varlock VL §8.4–8.5: the outbound handler is the
- * credential boundary). The container starts with the internet off; its
- * Durable Object routes the clone's host to `CloneGateway` and every other
- * host to `EgressGateway` (`checker/sdk.ts`), each told what it may do
- * through its props, which the container never sees.
+ * The Checker container's only ways out, as outbound entrypoints of this Worker
+ * (the outbound handler is the credential boundary). The container starts with
+ * the internet off; its Durable Object routes the clone's host to
+ * `CloneGateway` and every other host to `EgressGateway` (`checker/sdk.ts`),
+ * each told what it may do through its props, which the container never sees.
  *
  * Both are reached through `ctx.exports`, which holds one loopback per export
- * of the Worker's main module, so `worker.ts` must export them (W3 315,
- * Comments).
+ * of the Worker's main module, so `worker.ts` must export them.
  */
 import { WorkerEntrypoint } from "cloudflare:workers";
 import { Option } from "effect";
@@ -38,7 +36,7 @@ export const refused = (text: string) =>
  * so the request that follows one goes through a gateway too.
  */
 export const forward = (request: Request): Promise<Response> =>
-  // @effect-diagnostics-next-line globalFetch:off -- an outbound entrypoint is the Worker's own network edge: workerd hands it a Request and takes back a Response, and its only way to the internet is the runtime's fetch; sandbox code may not use effect/http (spec §7.3).
+  // @effect-diagnostics-next-line globalFetch:off -- an outbound entrypoint is the Worker's own network edge: workerd hands it a Request and takes back a Response, and its only way to the internet is the runtime's fetch; sandbox code may not use effect/http.
   fetch(request, { redirect: "manual" });
 
 /**
@@ -97,7 +95,7 @@ const cloneRequestFor = (
  * The clone's way out: the container clones the job's repo from the clone
  * host with no credential, and this entrypoint sends each read on to the
  * repo's real remote with `Authorization: Bearer <token>` (as the Artifacts
- * probes sent it; W3 311 settles Bearer against Basic live). The token lives
+ * probes sent it, and as it works live). The token lives
  * in its props, on the Worker's side.
  */
 export class CloneGateway extends WorkerEntrypoint<Env, CloneProps> {

@@ -71,21 +71,21 @@ const DISCOVERY_PATH =
   /^\/\.well-known\/oauth-(?:protected-resource|authorization-server)(?:\/.*)?$/u;
 
 /**
- * Sign-in's own endpoints (W3 316 mounts them): `/authorize`, `/signup`,
+ * Sign-in's own endpoints: `/authorize`, `/signup`,
  * `/token` and `/oauth/*`.
  */
 const SIGN_IN_PATH = /^\/(?:authorize|signup|token|oauth(?:\/.*)?)$/u;
 
 /**
- * The CLI's install script and releases (issue 420, `releases.ts`):
+ * The CLI's install script and releases (`releases.ts`):
  * `/install.sh`, `/releases/manifest.json` and `/releases/:version/:asset`.
  */
 const RELEASE_PATH =
   /^\/(?:install\.sh|releases\/(?:manifest\.json|[^/]+\/[^/]+))$/u;
 
 /**
- * The projects' contribute skills and their index (issue 505,
- * `well-known.ts`), public as every landed tree is.
+ * The projects' contribute skills and their index
+ * (`well-known.ts`), public as every landed tree is.
  */
 const SKILLS_PATH = /^\/\.well-known\/agent-skills\/.+$/u;
 
@@ -281,7 +281,7 @@ const contribute = Layer.unwrap(
 /**
  * The MCP-surfaced contracts as tools at `/mcp`, beside each ask's brief
  * and the projects as resources and the skill as a prompt, for a signed-in
- * caller only (spec §8 D10: harnesses using MCP have tokens), each call
+ * caller only (harnesses using MCP have tokens), each call
  * made as that caller through one `Client`.
  */
 const mcp = Layer.mergeAll(
@@ -312,7 +312,7 @@ const rpcIn = (serialization: Layer.Layer<RpcSerialization.RpcSerialization>) =>
  * remote: a public read as anyone, every other contract as the caller. A
  * call posted as JSON is answered in one JSON body when it ends; one posted
  * as NDJSON is answered framed, each message as it is ready, so a stream
- * (`watch`) reaches its caller as it happens (issue 510).
+ * (`watch`) reaches its caller as it happens.
  */
 const rpc = HttpRouter.use((router) =>
   Effect.gen(function* () {
@@ -342,7 +342,7 @@ const health = HttpRouter.use((router) =>
  * The protected-resource document (RFC 9728), answered to anyone: where a
  * client learns that the platform is its own authorization server. The
  * authorization server's document is the sign-in provider's, which answers
- * its path before the surfaces see it (`auth/provider.ts`, W3 316).
+ * its path before the surfaces see it (`auth/provider.ts`).
  */
 const discovery = HttpRouter.use((router) =>
   router.add("GET", PROTECTED_RESOURCE_PATH, (request) =>

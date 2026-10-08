@@ -120,7 +120,7 @@ export const explain = (refusals: Array.NonEmptyReadonlyArray<Refusal>) =>
 
 /**
  * Where an answer's receipt stands, in one line for git's `remote:` output
- * and the CLI's `submit` (W4 404): the answer is checking, waits on a
+ * and the CLI's `submit`: the answer is checking, waits on a
  * decision, a finish or its parent ask, or landed. A refused answer gives
  * its refusals back, for `explain`.
  */

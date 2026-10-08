@@ -11,7 +11,7 @@ export const clockVariable = "RULES_CLOCK";
  * give values derived from the injected clock and seed, `fetch` is gone, and
  * config code's own logging goes to stderr so stdout carries only the
  * evaluator's one result. It is plain JavaScript written beside the modules:
- * source text here, not host code. W3's Worker prelude is its own module.
+ * source text here, not host code. The Worker's prelude is its own module.
  */
 export const bunPrelude = `
 const clock = JSON.parse(process.env.${clockVariable} ?? "{}");

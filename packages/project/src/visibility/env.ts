@@ -1,5 +1,5 @@
 /**
- * The visibility cartridge's env (W6 614; ADR 0009), as the `ProjectEnv`
+ * The visibility cartridge's env (ADR 0009), as the `ProjectEnv`
  * port:
  *
  * - The env shape: every `.env.schema` at the landed SHA (the repo's root
@@ -17,7 +17,7 @@
  * - The scan: the other place a stored value is opened, to find it in a
  *   text or a blob, and it answers with the item's key alone.
  * - After a landing: a `ProxyWidened` decision for each item whose value
- *   may now reach a host it could not before (Q20; VL §8.7 #4).
+ *   may now reach a host it could not before.
  */
 import { RepoHost, Revision } from "@repo/artifacts/repo-host";
 import type { EnvProxy } from "@repo/checks/check-runner";
@@ -270,7 +270,7 @@ const decodeSealed = Schema.decodeUnknownEffect(
 const nonEmpty = (text: Option.Option<string>) =>
   Option.getOrUndefined(Option.filter(text, (each) => each !== ""));
 
-/** A proxy rule as the check job carries it (611's `EnvProxy`): no key for a method or path the rule leaves open. */
+/** A proxy rule as the check job carries it (`EnvProxy`): no key for a method or path the rule leaves open. */
 const onTheWire = (rule: ProxyRule): EnvProxy => {
   const method = nonEmpty(rule.method);
   const path = nonEmpty(rule.path);
@@ -291,7 +291,7 @@ const hostsText = (hosts: readonly string[]) =>
 
 /**
  * The `ProjectEnv` port over the parser seam, the vault and the project's
- * repos (the public namespace's): the name 609's stub exported, so the
+ * repos (the public namespace's): the name the port's stub exported, so the
  * cartridge's `index.ts` and the platform compose it unchanged.
  */
 export const ProjectEnvLive: Layer.Layer<
@@ -447,9 +447,9 @@ export const ProjectEnvLive: Layer.Layer<
             writes: { decisions: [...decisions.values()] },
           };
         }),
-      // Every run sees placeholders and goes out through the proxy rules; a
-      // run of landed code alone also carries the values, opened here for
-      // the call that runs it (611's gateway swaps them in on the way out).
+      // Every run sees placeholders and goes out through the proxy rules; a run
+      // of landed code alone also carries the values, opened here for the call
+      // that runs it (the sandbox's env gateway swaps them in on the way out).
       runEnv: ({ landed }, snapshot) =>
         Effect.gen(function* () {
           const { schema } = yield* landedRead(snapshot);

@@ -7,7 +7,7 @@
   // The top level is stage `local`: it builds and types the Worker and is
   // never deployed. Each stage under `env` repeats every binding, since
   // wrangler does not inherit bindings into an environment. Resource names
-  // are jobs plus the stage (spec §4.4), never the brand. A `database_id` or
+  // are jobs plus the stage, never the brand. A `database_id` or
   // KV `id` of zeros is a placeholder that infra/bootstrap.ts replaces with
   // the id of the resource it made.
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -22,8 +22,8 @@
   // Rat Stack's byte limits are for a minified bundle (scripts/startup-budget.ts).
   "minify": true,
   // esbuild's name-keeping wraps every function and class in a helper call
-  // that restores its name after minifying: about 130 KB of the entry (W6
-  // 614 #1). Nothing here reads a name at run time: Effect's tagged errors
+  // that restores its name after minifying: about 130 KB of the entry.
+  // Nothing here reads a name at run time: Effect's tagged errors
   // set `name` from their tag, services are keyed by strings, and the
   // runtime finds Durable Objects, Workflows and entrypoints by export name,
   // which minifying keeps. A stack trace shows minified function names.
@@ -36,14 +36,14 @@
     // Until sign-in exists, one operator holds a session.
     "OPERATOR_HANDLE": "oscabriel",
     "STAGE": "local",
-    // "container" (apps/sandbox) or "isogit" (in this Worker): spec §8 D6.
+    // "container" (apps/sandbox) or "isogit" (in this Worker).
     "LANDER_ADAPTER": "container",
   },
   "secrets": {
     // Declared in .env.schema; the user sets the values. SESSION_TOKENS is
     // optional; sign-in's cookie key and pepper are not, since accounts are
     // the platform's own and need no third party. MASTER_KEY wraps every
-    // write-only env value (W6): without it none can be stored or opened.
+    // write-only env value: without it none can be stored or opened.
     "required": [
       "OPERATOR_TOKEN",
       "COOKIE_KEY",
@@ -59,7 +59,7 @@
     { "name": "on-push-local", "binding": "ON_PUSH", "class_name": "OnPush" },
   ],
   // The public namespace, and the private one that holds every project's
-  // layer repos (W6). Only this Worker binds the private one: the Workers
+  // layer repos. Only this Worker binds the private one: the Workers
   // that serve public pages bind neither (principle 7).
   "artifacts": [
     { "binding": "ARTIFACTS", "namespace": "projects-local" },
@@ -77,7 +77,7 @@
   "kv_namespaces": [
     { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
   ],
-  // Lane logs, and the CLI's releases the platform serves (issue 420).
+  // Lane logs, and the CLI's releases the platform serves.
   "r2_buckets": [
     { "binding": "EVIDENCE", "bucket_name": "evidence-local" },
     { "binding": "RELEASES", "bucket_name": "releases-local" },
@@ -97,7 +97,7 @@
       "namespace_id": "1002",
       "simple": { "limit": 5, "period": 60 },
     },
-    // Sign-in attempts per handle and per client address (W3 316): the
+    // Sign-in attempts per handle and per client address: the
     // sixth in a minute is refused before the password is checked.
     {
       "name": "SIGN_IN_LIMIT",

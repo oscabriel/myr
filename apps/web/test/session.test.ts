@@ -1,10 +1,10 @@
 /**
- * A decider's session on the web (issue 513). The platform's access token
+ * A decider's session on the web. The platform's access token
  * lives only in an HttpOnly cookie on the web's origin: sign-in sends the
  * browser to the platform's `/authorize` with PKCE, the callback trades the
  * code at the platform's `/token` over `PLATFORM` and sets the cookie, and
  * every forward to the platform turns that cookie into an HTTP
- * `Authorization` header (W3 305 #2) and drops the cookie itself. The
+ * `Authorization` header and drops the cookie itself. The
  * browser never chooses the credential, and never sees the token.
  */
 import { describe, expect, it } from "@effect/vitest";

@@ -2,7 +2,7 @@
  * The web takes some first path segments for its own pages and files, and
  * `/$project` takes every other one. A project named like one of the web's
  * would be unreachable at `<web>/<project>`, so `ProjectName` refuses each
- * such name (503 #8, 505 #6). This holds the protocol's list to the routes
+ * such name. This holds the protocol's list to the routes
  * and the public files the web really has.
  */
 import { describe, expect, it } from "@effect/vitest";

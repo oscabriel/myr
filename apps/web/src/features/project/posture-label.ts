@@ -2,7 +2,7 @@
  * A posture in the words GLOSSARY.md gives it ("Posture"). The project list
  * and the front page carry only the literal; the fuller label the platform
  * computes from a project's visibility config ("Open · sealed checks in
- * parser") arrives with W6, on the ledger. Until a listing carries that
+ * parser") is the ledger's. Until a listing carries that
  * label, each posture reads as its own name, never as a claim about what is
  * sealed.
  */

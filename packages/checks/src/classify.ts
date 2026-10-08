@@ -1,5 +1,5 @@
 /**
- * Red for the right reason (CAA D): what one run of a lane says happened.
+ * Red for the right reason: what one run of a lane says happened.
  * A failure by an assertion is told apart from a run that never got that
  * far (a load or compile error, or no tests at all), from the runner's JSON
  * report where there is one and from its output otherwise.

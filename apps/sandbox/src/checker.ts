@@ -1,6 +1,6 @@
 /**
  * The Checker: one container per check job, holding no credential, where an
- * answer's lanes run (spec §4.3; OSR §5.3). Each job gets a Durable Object of
+ * answer's lanes run. Each job gets a Durable Object of
  * its own (a unique id), whose container is destroyed when the job ends; the
  * phases are `checker/run.ts`. The class name is frozen.
  *

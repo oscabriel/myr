@@ -1,5 +1,5 @@
 /**
- * The command finder over the fence-shaped example (issue 508; spec D21):
+ * The command finder over the fence-shaped example:
  * `examples/burrow`'s tracked files, read as `init` reads a repo's, give the
  * run block burrow's config folder states. Its lanes come from the hooks in
  * `lefthook.yml`, which run its `package.json` scripts; its setup from its

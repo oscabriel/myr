@@ -725,7 +725,7 @@ describe(`${Brand.cli} check`, () => {
           "--json",
         ]).pipe(Effect.provide(services(unreachable)));
 
-        // What the platform said live of the same raise (spec §8.5): the
+        // What the platform said live of the same raise: the
         // ratchet, the module, and main's count before the answer's after.
         expect(Exit.isFailure(printed.exit)).toBeTruthy();
         expect(yield* decodedOf(printed.out)).toStrictEqual({

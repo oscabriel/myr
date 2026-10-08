@@ -1,11 +1,11 @@
 /**
- * The project's contribute skill kept current on the platform (W4 410): a
+ * The project's contribute skill kept current on the platform: a
  * landing that changes what the generated files say is followed by the
  * platform's own landing of only those files, regenerated with
  * `@repo/agent-kit` as the platform's Project DOs do it
  * (`workflows/generated.ts`), credited `Decided-by` the decider whose
  * landing changed the config. Node world, memory adapters: `RepoHostMemory`,
- * W2's isomorphic-git `Lander` over it, a scripted Checker, `ProjectsMemory`,
+ * the isomorphic-git `Lander` over it, a scripted Checker, `ProjectsMemory`,
  * and a rules evaluator whose run block is the config folder's `run.json`.
  */
 import { describe, expect, it } from "@effect/vitest";
@@ -152,7 +152,7 @@ class Mishaps extends Context.Service<
   { readonly next: (mishap: Mishap) => Effect.Effect<void> }
 >()("test/Mishaps") {}
 
-/** W2's isomorphic-git Lander, with the next follow-up's mishap played on its land. */
+/** The isomorphic-git Lander, with the next follow-up's mishap played on its land. */
 const mishapLander = Layer.effectContext(
   Effect.gen(function* () {
     const real = Context.get(yield* Layer.build(LanderIsogit), Lander);

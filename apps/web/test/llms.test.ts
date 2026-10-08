@@ -1,5 +1,5 @@
 /**
- * What an agent reads first on the web host (issue 505): `/llms.txt` for
+ * What an agent reads first on the web host: `/llms.txt` for
  * the platform and `/<project>/llms.txt` for one project, as Markdown, and
  * the MCP card at `/.well-known/mcp.json`. Each is a pure function of what
  * the platform lists and of the CLI's commands (`@repo/agent-kit`'s one

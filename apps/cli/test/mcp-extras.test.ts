@@ -1,5 +1,5 @@
 /**
- * `<cli> mcp` beside its tools (issue 408), forked over stdio as a harness
+ * `<cli> mcp` beside its tools, forked over stdio as a harness
  * spawns it, in MCP's stateless 2026-07-28 protocol: an ask's brief is a
  * resource read through the CLI's `Client`, and the platform's skill is the
  * prompt `contribute`.

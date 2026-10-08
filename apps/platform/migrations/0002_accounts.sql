@@ -1,4 +1,4 @@
--- Platform accounts (W3 316): a handle and a password hash, nothing else.
+-- Platform accounts: a handle and a password hash, nothing else.
 -- `handle_key` is the handle lowercased, the rule protocol's `sameHandle`
 -- compares by, so two handles that differ only in case are one account and
 -- a racing second sign-up fails on the key. `password_hash` is

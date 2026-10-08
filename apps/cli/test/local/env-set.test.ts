@@ -83,7 +83,7 @@ interface Ran {
 }
 
 interface Setup {
-  /** Who reads: 401's person at a terminal, or 404's agent policy. */
+  /** Who reads: a person at a terminal, or an agent under the agent policy. */
   readonly mode?: Mode;
   readonly stdin?: Stream.Stream<Uint8Array>;
   readonly stdinIsTerminal?: boolean;
@@ -115,7 +115,7 @@ const run = (args: readonly string[], setup: Setup = {}) =>
     const record = (method: Printed["method"], input: Printed["input"]) =>
       Ref.update(printed, (all) => [...all, { input, method }]);
 
-    // 401's plain output, recorded, as whichever reader `setup` names.
+    // The CLI's plain output, recorded, as whichever reader `setup` names.
     const output = Layer.effect(
       Output,
       Effect.gen(function* () {

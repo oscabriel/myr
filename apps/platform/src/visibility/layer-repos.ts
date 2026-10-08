@@ -1,5 +1,5 @@
 /**
- * The private namespace's repos (OSR §5.1): every project's layer repos,
+ * The private namespace's repos: every project's layer repos,
  * through the platform's second Artifacts binding, `ARTIFACTS_PRIVATE`, as
  * `LayerRepos` (a `RepoHost` under its own tag, so nothing that asks for the
  * public one is handed it). Only this Worker binds the namespace; the

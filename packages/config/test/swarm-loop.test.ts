@@ -1,5 +1,5 @@
 /**
- * The swarm's verdict loop (issue 711): each contributor's harness started
+ * The swarm's verdict loop: each contributor's harness started
  * headless on the brief, and every refusal their answer meets sent back into
  * the same session, at most three times. The loop reads outcomes only from
  * the contributor's `<cli> status --json`; a harness's output gives it the

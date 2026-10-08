@@ -1,6 +1,6 @@
 /**
  * Write-only values sealed through WebCrypto, so the same code runs in
- * workerd and in Node (VL §9; OSR §2.1: envelope-encrypted in the DO).
+ * workerd and in Node (envelope-encrypted in the DO).
  *
  * `put` makes a fresh AES-GCM-256 data key and a fresh 12-byte IV for each
  * value, seals the value under them, and wraps the data key with the

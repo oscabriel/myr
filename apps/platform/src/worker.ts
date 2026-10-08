@@ -21,7 +21,7 @@ const config = Effect.runSyncExit(decodeEnv(env));
 const platform = serve(Layer.unwrap(Effect.map(config, platformOf)));
 
 // OAuth and sign-in answer their own paths and hand the rest to the
-// platform (W3 316).
+// platform.
 const { handler } = oauthProvider(
   Layer.unwrap(Effect.map(config, signInServices)),
   (request) => platform.handler(request)

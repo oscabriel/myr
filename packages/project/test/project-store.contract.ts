@@ -190,7 +190,7 @@ const pushEventOf = (eventId: string) =>
     repo: "datekit--empty-date--bob",
   }) satisfies (typeof PushEventRow)["Encoded"];
 
-// The visibility tables (W6): a declared layer, attempts on its held-back
+// The visibility tables: a declared layer, attempts on its held-back
 // checks, the public ledger, a write-only value (sealed; the store never
 // reads into it) and the layer read log.
 

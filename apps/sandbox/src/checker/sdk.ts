@@ -1,7 +1,7 @@
 /**
  * `Network` and `Snapshots` over a Durable Object's own container, as the
  * Container API runs one (`ctx.container`; Sandbox SDK 1.0 leaves both to
- * it, W3 315 Comments):
+ * it):
  *
  * - the network is the container's outbound intercepts. The container starts
  *   with the internet off, so a request leaves only through an intercept:

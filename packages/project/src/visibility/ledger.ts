@@ -1,10 +1,10 @@
 /**
- * The public ledger as the Project DO keeps it (W6 612; OSR §2.6, §6.1):
+ * The public ledger as the Project DO keeps it:
  * its rows numbered in order, each one also told to watchers and the
  * projection as `LedgerAppended`, and the posture the public is shown.
  *
  * A change to the visibility config that narrows the posture is a
- * `PostureChange` decision (OSR §2.6's ratchet): until a decider accepts it
+ * `PostureChange` decision (the posture's ratchet): until a decider accepts it
  * and the config's notice period has run since it opened, the posture that
  * stood before stays in effect. Widening needs no decision, and a project's
  * first config stands at once: nothing was public before it existed.
@@ -219,7 +219,7 @@ const withRepos = (
 });
 
 /**
- * The public ledger: 602's `ledgerOf` over the project's rows and its
+ * The public ledger: `ledgerOf` over the project's rows and its
  * config (each layer with its repo), shown with the posture in effect at
  * `now`. The layer read log is the layers' readers' own, never in it.
  */

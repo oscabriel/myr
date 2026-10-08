@@ -31,7 +31,7 @@ interface Repo extends StoredRepo {
 }
 
 /**
- * Artifacts in memory, as S1 found it: each repo a bare git directory, a push
+ * Artifacts in memory, as probes found it: each repo a bare git directory, a push
  * a compare-and-swap per ref with no atomicity across refs, and reads that
  * resolve short branch names and commit ids only.
  */

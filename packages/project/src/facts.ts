@@ -45,7 +45,7 @@ const asHandle = Schema.decodeUnknownOption(Handle);
 const asLayer = Schema.decodeUnknownOption(LayerName);
 
 /**
- * Where a push goes, read from the repo's name (spec §4.5): `<project>`,
+ * Where a push goes, read from the repo's name: `<project>`,
  * `<project>--<ask>--<handle>`, `<project>--me--<handle>` or
  * `<project>--<layer>`. Any other name is read as canonical's, which takes
  * no push.
@@ -151,7 +151,7 @@ export interface PushInput {
  * The gate's facts for one push: its change list from `base` to `head` (by
  * subtree ids, through the port), the lines it added, where it goes, and
  * whether it moved the root manifest's scripts. No layer paths or ratchet
- * counts yet (W6, W4). A commit the repo lacks is `MissingCommit`.
+ * counts yet. A commit the repo lacks is `MissingCommit`.
  */
 export const pushFacts = (
   input: PushInput

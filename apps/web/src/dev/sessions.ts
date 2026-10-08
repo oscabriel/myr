@@ -5,7 +5,7 @@
  * any other credential names nobody, so the call is `Unauthenticated`; a
  * call with none is anyone, for a `public` contract only. The tokens are
  * literal and exist only under the `development` condition, which the
- * production build never resolves (505).
+ * production build never resolves.
  *
  * The world reads the credential from the call's headers, which the RPC
  * server fills from the HTTP request's own, so a browser's `Authorization`

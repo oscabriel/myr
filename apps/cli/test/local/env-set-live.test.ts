@@ -1,5 +1,5 @@
 /**
- * `<cli> env set` end to end (W6 616; spec §6.7's done-when for env): the
+ * `<cli> env set` end to end: the
  * CLI's real `env set`, `env shape` and `ledger` commands, over its remote
  * client as the stored profile, against the platform's Node world with the
  * visibility cartridge composed under the fake env's test `MASTER_KEY`

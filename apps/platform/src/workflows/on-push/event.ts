@@ -1,9 +1,9 @@
 /**
  * What Artifacts sends the `OnPush` Workflow for every ref a push moved in
- * the public namespace: S1 #15's `cf.artifacts.repo.pushed` event, verbatim
- * (S1 change 7). The Workflow decodes its params with it before anything
+ * the public namespace: the `cf.artifacts.repo.pushed` event, verbatim.
+ * The Workflow decodes its params with it before anything
  * else (principle 2); its `id` is the Workflow's instance id, so a
- * redelivered event cannot start a second run (S1 change 6).
+ * redelivered event cannot start a second run.
  */
 import { CommitSha, RepoName } from "@repo/protocol/ids";
 import { Schema } from "effect";
@@ -32,10 +32,10 @@ export const OnPushEvent = Schema.Struct({
     after: CommitSha,
     /** Where the ref pointed before: git's zero id when the push created it. */
     before: CommitSha,
-    /** Empty for a ref moved to a commit the repo already held (S1 #13). */
+    /** Empty for a ref moved to a commit the repo already held. */
     commits: Schema.Array(PushedCommit),
     commitsTruncated: Schema.Boolean,
-    /** The one ref this event is about: each ref a push moves fires its own (S1 #13). */
+    /** The one ref this event is about: each ref a push moves fires its own. */
     ref: Schema.NonEmptyString,
     totalCommitsCount: Schema.Int,
   }),

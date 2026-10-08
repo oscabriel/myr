@@ -58,7 +58,7 @@ const fatal = (message: string) => {
   return new Uint8Array([...new TextEncoder().encode(length), ...payload]);
 };
 
-/** Artifacts' whole reply to a push it is too busy for (S2 #9): no report, no flush. */
+/** Artifacts' whole reply to a push it is too busy for: no report, no flush. */
 const busyReply = () =>
   new Response(fatal("artifacts_git_receive_pack_busy\n"), {
     headers: { "content-type": "application/x-git-receive-pack-result" },
@@ -261,7 +261,7 @@ const seeded = (name: RepoName) =>
   });
 
 describe("the Workers binding's surprises, typed", () => {
-  // S1 #22: under `wrangler dev`, the binding throws plain `Error`s.
+  // Under `wrangler dev`, the binding throws plain `Error`s.
   it.live(
     "reads a missing repo as RepoNotFound when errors carry no code",
     () =>
@@ -297,7 +297,7 @@ describe("the Workers binding's surprises, typed", () => {
       )
   );
 
-  // S7 #2: under load a fork answers 500 after making the repo, and a retry
+  // Under load a fork answers 500 after making the repo, and a retry
   // answers 409. The fork's name is the claim's, so the retry converges.
   it.live.each([
     { codeless: false, label: "with codes" },
@@ -354,7 +354,7 @@ describe("the Workers binding's surprises, typed", () => {
     )
   );
 
-  // S2 #9: one side-band 3 packet and no report.
+  // One side-band 3 packet and no report.
   it.live("reads a busy receive-pack as HostBusy, and moves nothing", () =>
     within(({ intercept }) =>
       Effect.gen(function* () {
@@ -388,7 +388,7 @@ describe("the Workers binding's surprises, typed", () => {
     )
   );
 
-  // git's receive-pack checks the old value the push names (spec §7.4).
+  // git's receive-pack checks the old value the push names.
   it.live(
     "reports a ref that moved during the push as Stale at its new tip",
     () =>
@@ -429,7 +429,7 @@ describe("the Workers binding's surprises, typed", () => {
       )
   );
 
-  // S1 #4: Artifacts takes any update whose old value matches, and `/memory`
+  // Artifacts takes any update whose old value matches, and `/memory`
   // and `/local` apply it too: the compare-and-swap is the only check.
   it.live(
     "moves a ref whose tip is `from` to a `to` that is not a fast-forward",
@@ -498,7 +498,7 @@ describe("the Workers binding's surprises, typed", () => {
   );
 
   // Artifacts' `readTree` throws `INTERNAL_ERROR` for an object that is no
-  // tree; the other stores read no tree there (202 Comment 5).
+  // tree; the other stores read no tree there.
   it.live("reads no tree at a blob's id or a commit's id", () =>
     within(
       () =>

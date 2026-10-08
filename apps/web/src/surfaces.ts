@@ -2,7 +2,7 @@
  * The web's projection of the contracts (AGENTS.md principle 4): the only
  * place the web builds one.
  *
- * The data pattern every view follows (W5, W6):
+ * The data pattern every view follows:
  *
  * - `src/features/<name>/` holds views only: props in, markup out, and no
  *   transport import.
@@ -41,7 +41,7 @@ export class ContractsClient extends AtomRpc.Service<ContractsClient>()(
 /**
  * The web's contracts over the framed `/rpc` (NDJSON), which the platform
  * answers message by message, so a stream stays open for as long as the
- * page reads it: how a page follows `watch` (`client/watch.ts`, issue 510).
+ * page reads it: how a page follows `watch` (`client/watch.ts`).
  */
 export const framedClient = RpcClient.make(webContracts).pipe(
   Effect.provide(

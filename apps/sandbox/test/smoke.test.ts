@@ -30,9 +30,9 @@ const sandbox = new Sandbox(untouchable("ctx"), fakeEnv());
 const failureOf = Exit.findErrorOption;
 
 describe("the sandbox Worker's main module", () => {
-  // Live on dev-oscabriel (311): `ctx.exports` holds a loopback only for an
+  // Live on dev-oscabriel: `ctx.exports` holds a loopback only for an
   // export of the main module, and every check was blocked with "worker.ts
-  // does not export the outbound gateways" (315 #1).
+  // does not export the outbound gateways".
   it("exports the Checker's outbound gateways, so ctx.exports holds them", () => {
     expect({
       CloneGateway: ExportedClone,

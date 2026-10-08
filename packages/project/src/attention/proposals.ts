@@ -128,7 +128,7 @@ const opening = (policy: Policy, proposer: Proposer, now: DateTime.Utc) => ({
 
 /**
  * A new ask's proposal. A sealed answer keeps the first-answer slot only
- * when its proposer has a record in the area (spec D19): then it stays on the
+ * when its proposer has a record in the area: then it stays on the
  * proposal and is judged first once the ask opens. Without one it is
  * dropped, so the proposer is credited `Asked-by` only and the ask opens to
  * everyone.

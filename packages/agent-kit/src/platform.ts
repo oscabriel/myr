@@ -1,5 +1,5 @@
 /**
- * The platform's own skill and plugin (issue 409): the platform's skill,
+ * The platform's own skill and plugin: the platform's skill,
  * which the platform and the CLI serve as the MCP prompt `contribute`, the
  * Claude Code plugin with its three hooks, and the Agent Plugins bundle,
  * each as files at `skills/<slug>/` and `plugins/<slug>/`. The plugin is what

@@ -1,12 +1,12 @@
 /**
- * The Garden's "Promote" beat (CAA K): when deciders have finished two or
+ * The Garden's "Promote" beat: when deciders have finished two or
  * more answers in one area for the same reason, the same lint rule, that
  * class of mistake is put to them as one decision. Accepted, its proposal
  * opens a `lintToZero` ask for the rule in that territory, red first like
  * any ask (the run on main at `openAsk` is the proof the rule still finds
  * something; no rule is replayed against old trees). Its default is
  * `decline`, so ignoring it changes nothing, and nothing opens without a
- * person's yes (spec §1.4).
+ * person's yes.
  *
  * Pure over records: the service gives the finishes it knows, the project's
  * decisions so far, and ids minted from its sequence; it writes what comes

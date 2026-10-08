@@ -1,5 +1,5 @@
 /**
- * The env shape's fixtures (issue 603): each `.env.schema` beside it as
+ * The env shape's fixtures: each `.env.schema` beside it as
  * committed, the structure the parser reads it as (what the `/memory` fake
  * holds), and the env shape it gives. The same fixtures run through both
  * parsers (`env-shape.test.ts`), and the adapter's reading of each text is
@@ -7,7 +7,7 @@
  * the real parser says.
  *
  * Where varlock's own tests show its behaviour, an expectation cites the
- * test it mirrors (VL §8.8: "defaults must match"), from the varlock clone at
+ * test it mirrors (defaults must match), from the varlock clone at
  * `928e8e4b`, under `packages/varlock/src/env-graph/test/`.
  */
 import type { EnvSchemaView } from "@repo/protocol/domain/env";
@@ -328,7 +328,7 @@ export const fixtures: readonly EnvFixture[] = [
     view: {
       currentEnvKey: "APP_ENV",
       imports: [],
-      // ADR 0009 and VL §8.3 #3: a function-valued flag fails safe. Where the
+      // ADR 0009: a function-valued flag fails safe. Where the
       // flag is static, varlock decides: sensitive-decorator.test.ts,
       // "enabled=false toggles the item to not sensitive" (OFF public, ON
       // sensitive) and "opts an item out of leak detection while keeping it

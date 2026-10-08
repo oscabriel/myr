@@ -1,5 +1,5 @@
 /**
- * `watch` live (spec §3.4, issue 510): a project's events, replayed from a
+ * `watch` live: a project's events, replayed from a
  * sequence number and then heard as they are committed.
  *
  * The Project DO keeps the newest 500 events (`keptEvents`) and one

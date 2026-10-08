@@ -55,13 +55,13 @@ class GitFailure extends Data.TaggedError("GitFailure")<{
 /** isomorphic-git's no-commit id: a ref that is absent. */
 const ABSENT = "0".repeat(40);
 
-// What a receive-pack says when a ref moved under a push: Artifacts (S1 #5),
+// What a receive-pack says when a ref moved under a push: Artifacts,
 // git's own receive-pack (2.56), and a server set to refuse rewinding a ref.
 // `fetch first` is git's client-side word and never reaches a server.
 const MOVED = ["stale ref", "incorrect old value provided", "non-fast-forward"];
 
 // Artifacts' whole reply to a push it is too busy for: one side-band 3
-// (fatal) packet and no report (S2 #9).
+// (fatal) packet and no report.
 const BUSY = "artifacts_git_receive_pack_busy";
 
 // The remote names isomorphic-git files a push's and a fetch's tracking refs
@@ -274,7 +274,7 @@ const refsAt = (remote: string, http: HttpClient) =>
 
 /**
  * Every ref the remote lists, as `ls-remote` lists them: what reads by name
- * cannot reach (S1 #20).
+ * cannot reach.
  */
 export const listRefs = (
   remote: string,
@@ -304,7 +304,7 @@ const refusedAsMoved = ({ cause }: GitFailure, ref: RefName) =>
  * `Stale` at the tip a fresh listing shows.
  *
  * The old value is the only check, as on every store: `to` need not descend
- * from `from` (Artifacts takes such an update, S1 #4). So isomorphic-git's
+ * from `from` (Artifacts takes such an update). So isomorphic-git's
  * own fast-forward test is off (`force`), which also spares it walking the
  * history of `to` in a source that holds only the new objects.
  */
@@ -378,7 +378,7 @@ const pushOne = (
 
 /**
  * Pushes each update in order, one ref per push, since Artifacts has no
- * atomic push (S1 #6): each ref is updated or `Stale` on its own. Nothing is
+ * atomic push: each ref is updated or `Stale` on its own. Nothing is
  * retried; a `Stale` ref is the caller's to decide on. A busy store fails the
  * whole call with `HostBusy`, and refs before the busy one may have moved.
  */

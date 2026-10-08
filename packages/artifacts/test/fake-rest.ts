@@ -17,10 +17,10 @@
  * - a fork names its target in the body, `{name, default_branch_only}`, a
  *   field cf's schema lacks (cf #180); a body without `name` is refused;
  * - create, fork and import answer with the new repo's `remote` and a
- *   day-long write token (S1 #2); a token's mint answers `{id, plaintext,
+ *   day-long write token; a token's mint answers `{id, plaintext,
  *   scope, expires_at}`; a delete answers 202;
  * - under load, a fork answers HTTP 500 with code 10400 after making the
- *   repo, and a retry answers 409 with code 10201 (S7 #2):
+ *   repo, and a retry answers 409 with code 10201:
  *   `{ forkFailures: n }`; `{ forkLost: true }` makes those forks make
  *   nothing;
  * - revoking a token within about a second of its mint can be 404 (cf's
@@ -35,7 +35,7 @@
  * - a tree or a log is the binding's list, as the envelope's `result`;
  * - a tree or a commit read at an object of another kind is 500 (10400), as
  *   the binding throws `INTERNAL_ERROR` there;
- * - a ref is a short branch name or a commit id, as the binding's (S1 #20),
+ * - a ref is a short branch name or a commit id, as the binding's,
  *   and a log at a ref that names nothing is 404.
  */
 import { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
@@ -185,7 +185,7 @@ const objectNamed = (id: string) =>
     Effect.mapError(() => invalid(Codes.invalidInput, `invalid hash: ${id}`))
   );
 
-/** A short branch name or a commit id; anything else names nothing (S1 #20). */
+/** A short branch name or a commit id; anything else names nothing. */
 const revisionOf = (ref: string): Option.Option<Revision> =>
   Option.match(decodeObject(ref), {
     onNone: () =>
@@ -303,7 +303,7 @@ export const fakeRest = (
         };
       });
 
-    /** A new repo's reply, with its day-long write token (S1 #2). */
+    /** A new repo's reply, with its day-long write token. */
     const made = (name: RepoName, remote: string) =>
       mint(name, "write", DAY_SECONDS).pipe(
         Effect.map(({ plaintext }) => ({
@@ -353,7 +353,7 @@ export const fakeRest = (
           (left) => [left > 0, Math.max(left - 1, 0)] as const
         );
 
-        // S7 #2: the 500 comes after the repo is made, unless it is lost.
+        // The 500 comes after the repo is made, unless it is lost.
         if (failing) {
           if (options.forkLost !== true) {
             yield* host.fork(base, name).pipe(Effect.ignore);

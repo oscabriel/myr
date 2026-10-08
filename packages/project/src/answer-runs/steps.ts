@@ -6,7 +6,7 @@
  * `advanceAnswer`, and the gate classifies a failing lane.
  *
  * The inline adapter drives them in a loop (`drive`); the Answer Workflow
- * (W3 304) runs each as a durable step.
+ * runs each as a durable step.
  */
 import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import type { CheckLane, CheckRun } from "@repo/checks/check-runner";

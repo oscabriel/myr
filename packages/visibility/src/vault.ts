@@ -1,5 +1,5 @@
 /**
- * Write-only values (VL §8.4, §8.6; OSR §2.2 `writeOnly`): a decider sets a
+ * Write-only values (`writeOnly`): a decider sets a
  * value for a `@sensitive` item, and nobody reads it back, the decider and
  * the platform's contracts included. Each value is sealed under a random
  * data key, wrapped by the platform's `MASTER_KEY` (`./vault/webcrypto`).
@@ -9,8 +9,8 @@ import { ValueTooShort } from "@repo/protocol/refusal";
 import { Context, Effect, Redacted, Schema } from "effect";
 
 /**
- * The shortest value stored without the decider acknowledging it (VL §8.6,
- * varlock's own threshold): masking cannot protect a shorter one, and it may
+ * The shortest value stored without the decider acknowledging it
+ * (varlock's own threshold): masking cannot protect a shorter one, and it may
  * be guessed.
  */
 export const MIN_LENGTH = 12;

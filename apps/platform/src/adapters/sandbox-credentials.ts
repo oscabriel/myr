@@ -1,10 +1,10 @@
 /**
  * The only credentials a sandbox job carries, and the one way a job crosses
- * the `SANDBOX` service binding (spec §4.3): the sandbox Worker has no
+ * the `SANDBOX` service binding: the sandbox Worker has no
  * Artifacts binding, so each job takes a token the platform minted for it
- * alone, on one repo (tokens are per repo, S1 #10), with the narrowest scope
- * the job needs and a lifetime of minutes, revoked as soon as the job ends
- * (S1 change 2). A token never appears in a result, a refusal or a log: it
+ * alone, on one repo (tokens are per repo), with the narrowest scope
+ * the job needs and a lifetime of minutes, revoked as soon as the job ends.
+ * A token never appears in a result, a refusal or a log: it
  * crosses the binding in plain text, as the far side needs it, but decodes to
  * a `Redacted` on either side; refusals carry no free text (principle 3); and
  * what any failure log says, a failed revoke's included, is scrubbed of every
@@ -38,7 +38,7 @@ import {
 /**
  * How long a job's token lives: enough for a cold container to start and
  * fetch, short enough that a token outliving its job is dead within
- * minutes (S1 #2: an expired token gets 403). Each is revoked when its job
+ * minutes (an expired token gets 403). Each is revoked when its job
  * ends, so this bounds only a revoke that failed.
  */
 export const jobTokenTtl = Duration.minutes(5);

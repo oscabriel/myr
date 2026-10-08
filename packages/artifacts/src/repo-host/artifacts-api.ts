@@ -63,7 +63,7 @@ export const NO_SOURCE = [
   "UPSTREAM_UNAVAILABLE",
 ] as const satisfies readonly Code[];
 
-/** Artifacts' name for a revision: a short branch name or a commit id, never `refs/…` (S1 #20). */
+/** Artifacts' name for a revision: a short branch name or a commit id, never `refs/…`. */
 export const refOf = (at: Revision) =>
   Revision.$match(at, {
     Branch: ({ name }) => name,

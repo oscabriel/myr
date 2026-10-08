@@ -2,7 +2,7 @@
  * Scenario builders: a project, its people and its policy as plain values,
  * built the same way every run. `aProject()` starts one; `withAsk`, `withKind`
  * and `withVouches` add to it in a pipe; `sixChildren()` is the migrate family
- * six agents claim at once (CAA §2.F).
+ * six agents claim at once.
  *
  * Values, not services: every builder is a pure function. None reads the
  * clock or randomness; time comes from `now` (default `2026-10-07T12:00:00Z`)
@@ -180,8 +180,8 @@ const encodeCheck = Schema.encodeSync(CheckSpec);
 
 /**
  * A project at its first landed commit: the defaults the config folder
- * leaves out (spec §2.5), the kinds `fix` and `migrate`, and its deciders
- * (default `alice`) deciding everything (D20). `people` are everyone else.
+ * leaves out, the kinds `fix` and `migrate`, and its deciders
+ * (default `alice`) deciding everything. `people` are everyone else.
  */
 export const aProject = (
   options: {
@@ -375,7 +375,7 @@ const allSix = decodeTerritory({
 });
 
 /**
- * "Six agents claim six children" (CAA §2.F): the project `burrow` with a
+ * "Six agents claim six children": the project `burrow` with a
  * migrate ask `drop-<symbol>` over `packages/p1` … `packages/p6`, a child per
  * package (`drop-<symbol>-p1` …), each moving the symbol in its own package,
  * and a delete child (`drop-<symbol>-delete`) blocked by all six. The six

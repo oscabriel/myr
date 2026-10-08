@@ -1,5 +1,5 @@
 /**
- * The deploy lock for recording days (issue 806): `bun infra/recording.ts
+ * The deploy lock for recording days: `bun infra/recording.ts
  * on` writes `infra/.recording`, and while it is there `infra/deploy.ts`
  * refuses every deploy with `RecordingInProgress` before it spawns anything.
  * `off` is the only way out.

@@ -1,11 +1,11 @@
 /**
- * What one push event means to the platform (spec §5 step 9), as a pure
+ * What one push event means to the platform, as a pure
  * function of the event and what the project's Durable Object says about it.
  * Pushes the platform made (landings, the landed mirror, parked composes,
  * verdict notes) and claim-fork pushes the gateway already recorded are
  * ignored; a claim-fork push the gateway never saw keeps its claim alive;
  * canonical `main` moved any other way is stray, for the deciders to adopt
- * or revert (CM §4).
+ * or revert.
  */
 import { Brand } from "@repo/brand";
 import { notesRef } from "@repo/git/notes";
@@ -69,9 +69,9 @@ export interface PushFacts {
 export const mainRef = RefNameText.make("refs/heads/main");
 
 /**
- * A ref the platform writes beside `main`, in its own push after main's
- * (S1 change 1): the landed mirror and parked composes under its prefix,
- * and its verdict notes. Each fires its own event (S1 #13).
+ * A ref the platform writes beside `main`, in its own push after main's:
+ * the landed mirror and parked composes under its prefix,
+ * and its verdict notes. Each fires its own event.
  */
 export const isBookkeeping = (ref: string): boolean =>
   ref.startsWith(Brand.refsPrefix) || ref === notesRef;

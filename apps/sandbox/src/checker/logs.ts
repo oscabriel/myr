@@ -1,9 +1,9 @@
 /**
  * Where a check's raw output goes: to the platform's side, never into the
- * result an answerer reads (spec §2.3 `LaneResult`: the result names a log by
+ * result an answerer reads (a `LaneResult` names a log by
  * its `logRef`, and the platform writes it through `EvidenceStore`).
  *
- * The check's wire carries no logs yet (W3 315, Comments), so the Worker's
+ * The check's wire carries no logs yet, so the Worker's
  * adapter (`logs/worker.ts`) writes each one to the Worker's own logs, its
  * tail only; tests record them (`test/fake-box.ts`).
  */

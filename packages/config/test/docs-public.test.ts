@@ -1,15 +1,16 @@
 /**
- * The repo's own docs are the public record (issue 707): AGENTS.md,
- * GLOSSARY.md, the ADRs and the agent docs point at nothing outside the
- * repo, AGENTS.md says what holds today, every decision has a numbered ADR
- * with a status, and the glossary defines the terms the code is written in.
- * File reads and string checks only.
+ * The repo's own docs are the public record: AGENTS.md, GLOSSARY.md, the
+ * ADRs and the agent docs point at nothing outside the repo, AGENTS.md says
+ * what holds today, every decision has a numbered ADR with a status, and the
+ * glossary defines the terms the code is written in. No file the repo would
+ * commit cites the build's private plan either, code comments included.
+ * File reads and string checks only, beside one `git ls-files`.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Array, Effect, FileSystem, Order, Path, Schema } from "effect";
+import { Array, Effect, FileSystem, Option, Order, Path, Schema } from "effect";
 
-import { repoRoot } from "./root.ts";
+import { committable, repoRoot, textOf } from "./root.ts";
 
 /**
  * What a pointer to something only the maintainer can open looks like: a
@@ -26,10 +27,29 @@ const PRIVATE = [
 
 /**
  * What a reference into the build's private plan looks like, which a reader
- * with only the repo cannot follow: a section of its spec (`spec §8`) or one
- * of its issues by wave (`W3 313`).
+ * with only the repo cannot follow: a section of its spec (`spec §8`), one of
+ * its decisions (`spec D6`), one of its issues by wave (`W3 313`), or the
+ * research synthesis it was drawn from (`SYN`).
  */
-const PLAN_REFERENCES = [/\bspec §/u, /\bW\d \d{3}\b/u] as const;
+const PLAN_REFERENCES = [
+  /\bspec §/u,
+  /\bspec D\d/u,
+  /\bW\d \d{3}\b/u,
+  /\bSYN\b/u,
+] as const;
+
+/** The files a reader opens as text: source, config, docs and scripts. */
+const TEXT_FILE =
+  /(?:\.(?:css|html|json|jsonc|md|mjs|sh|sql|toml|ts|tsx|ya?ml)|(?:^|\/)(?:\.gitignore|\.env\.schema|[^/]*Dockerfile))$/u;
+
+/** This file, which spells the references out to find them. */
+const QUOTES_THE_REFERENCES = "packages/config/test/docs-public.test.ts";
+
+/** The plan references `text` makes, by their patterns. */
+const planReferencesIn = (text: string) =>
+  PLAN_REFERENCES.flatMap((reference) =>
+    reference.test(text) ? [reference.source] : []
+  );
 
 /** Terms the code uses in public names, each of which GLOSSARY.md defines. */
 const TERMS = [
@@ -121,13 +141,35 @@ describe("the repo's public docs", () => {
         docs.flatMap(({ path, text }) =>
           [
             ...PRIVATE.filter((pointer) => text.includes(pointer)),
-            ...PLAN_REFERENCES.flatMap((reference) =>
-              reference.test(text) ? [reference.source] : []
-            ),
+            ...planReferencesIn(text),
           ].map((found) => `${path}: ${found}`)
         )
       ).toStrictEqual([]);
     }).pipe(Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "and no file the repo would commit cites the private plan, comments included",
+    () =>
+      Effect.gen(function* () {
+        const files = (yield* committable).filter(
+          (file) => TEXT_FILE.test(file) && file !== QUOTES_THE_REFERENCES
+        );
+
+        const found = yield* Effect.forEach(files, (file) =>
+          Effect.map(textOf(file), (text) =>
+            Option.match(text, {
+              onNone: () => [],
+              onSome: (content) =>
+                planReferencesIn(content).map(
+                  (pattern) => `${file}: ${pattern}`
+                ),
+            })
+          )
+        );
+
+        expect(found.flat()).toStrictEqual([]);
+      }).pipe(Effect.provide(NodeServices.layer))
   );
 
   it.live("AGENTS.md describes today, with no Day 0 paragraph", () =>
