@@ -1,4 +1,8 @@
-import { RegistryProvider, useAtomValue } from "@effect/atom-react";
+import {
+  RegistryProvider,
+  useAtomMount,
+  useAtomValue,
+} from "@effect/atom-react";
 import { Client } from "@repo/protocol/contracts";
 import { Verdict } from "@repo/protocol/domain/answer";
 import { LandingView } from "@repo/protocol/domain/landing";
@@ -12,6 +16,7 @@ import { DateTime, Effect, Option, Predicate, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 
 import { landingAtom, verdictAtom } from "../../../client/answer.ts";
+import { watchAtom } from "../../../client/watch.ts";
 import { AnswerView } from "../../../features/answer/answer-page.tsx";
 import { answerPath } from "../../../features/ask/ask-page.tsx";
 import { CODE, LINK } from "../../../features/ask/fields.tsx";
@@ -132,6 +137,9 @@ const FreshAnswer = ({
   readonly atom: ReturnType<typeof verdictAtom>;
   readonly read: AnswerPageData;
 }) => {
+  // Live: a push, a verdict or a landing on the ask makes the verdict fetch again.
+  useAtomMount(watchAtom(read.project));
+
   const { verdict } = Option.getOrElse(
     AsyncResult.value(useAtomValue(atom)),
     () => read

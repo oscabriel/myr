@@ -33,7 +33,7 @@ import { ProjectionMemory } from "@repo/project/projection/memory";
 import type { Projects } from "@repo/project/projects";
 import type { RulesEvaluator } from "@repo/rules/rules-evaluator";
 import { RulesEvaluatorWorker } from "@repo/rules/rules-evaluator/worker";
-import { Layer } from "effect";
+import { Layer, Option } from "effect";
 
 import { CheckRunnerSandbox } from "./adapters/check-runner-sandbox.ts";
 import { DoProjects } from "./adapters/do-projects.ts";
@@ -42,6 +42,7 @@ import { LanderSandbox } from "./adapters/lander-sandbox.ts";
 import { WorkerRateLimits } from "./adapters/rate-limits.ts";
 import type { PlatformConfig } from "./platform.ts";
 import type { RateLimits } from "./rate-limits.ts";
+import { ProjectSockets } from "./watch.ts";
 
 /** What the Worker's code runs on, besides sessions and the contracts' handlers. */
 export type WorkerPorts =
@@ -71,7 +72,8 @@ const memoryFrontPage = Layer.merge(
  * upstream and every repo read over it, each project's Durable Object, the
  * sandbox's Checker, the Lander `LANDER_ADAPTER` names (spec §8 D6), config
  * folders evaluated in the Worker Loader, the front page in D1, the rate
- * limits, and lane logs in the `EVIDENCE` bucket (W4 418).
+ * limits, lane logs in the `EVIDENCE` bucket (W4 418), and the `PROJECT`
+ * namespace again for `watch`'s relay of each project's socket (issue 510).
  */
 export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
   Layer.mergeAll(
@@ -92,6 +94,9 @@ export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
       Layer.provide(FinishersFromChecks)
     ),
     DoProjects(config.PROJECT),
+    // `watch` relays each project's DO socket (issue 510); without this
+    // entry it follows each project's event log instead.
+    Layer.succeed(ProjectSockets, Option.some(config.PROJECT)),
     WorkerRateLimits({
       claim: config.CLAIM_LIMIT,
       proposal: config.PROPOSAL_LIMIT,

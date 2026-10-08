@@ -237,10 +237,17 @@ describe("the Answer Workflow as AnswerRuns", () => {
 });
 
 describe("the Project DO class", () => {
-  it("has only call and alarm: every project call goes through call", () => {
+  it("has call and alarm, and the hibernation API for its watchers: every project call goes through call", () => {
     expect(
       Object.getOwnPropertyNames(Project.prototype).toSorted()
-    ).toStrictEqual(["alarm", "call", "constructor"]);
+    ).toStrictEqual([
+      "alarm",
+      "call",
+      "constructor",
+      "fetch",
+      "webSocketClose",
+      "webSocketMessage",
+    ]);
   });
 
   it.effect(

@@ -1,4 +1,4 @@
-import { useAtomValue } from "@effect/atom-react";
+import { useAtomMount, useAtomValue } from "@effect/atom-react";
 import { Client } from "@repo/protocol/contracts";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { ProjectName } from "@repo/protocol/ids";
@@ -11,6 +11,7 @@ import { AsyncResult } from "effect/reactivity";
 
 import { projectsAtom } from "../../client/front.ts";
 import { asksAtom, recentLandingsAtom } from "../../client/project.ts";
+import { watchAtom } from "../../client/watch.ts";
 import { Reading, Unreachable } from "../../features/front/reading.tsx";
 import { ProjectView } from "../../features/project/project-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
@@ -78,6 +79,9 @@ const listingOf = (
 
 const ProjectBody = ({ project }: { readonly project: ProjectName }) => {
   const { platformUrl } = root.useLoaderData();
+
+  // Live: each event the project commits makes these reads fetch again.
+  useAtomMount(watchAtom(project));
 
   const read = AsyncResult.all({
     asks: useAtomValue(asksAtom(project)),

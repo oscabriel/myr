@@ -39,6 +39,7 @@ import type { GitServices } from "./git.ts";
 import { releaseRoutes } from "./releases.ts";
 import type { ReleaseStore } from "./releases.ts";
 import { Sessions } from "./sessions.ts";
+import { isFramed } from "./watch.ts";
 import { agentSkillRoutes } from "./well-known.ts";
 
 /** Which stage this Worker serves: `/health` says so. */
@@ -308,15 +309,27 @@ const mcp = Layer.mergeAll(
   )
 );
 
+/** The contracts' server over HTTP in one serialization, as one handler. */
+const rpcIn = (serialization: Layer.Layer<RpcSerialization.RpcSerialization>) =>
+  RpcServer.toHttpEffect(Contracts).pipe(Effect.provide(serialization));
+
 /**
  * The contracts over HTTP at `/rpc`, for the CLI, the web and anything else
- * remote: a public read as anyone, every other contract as the caller.
+ * remote: a public read as anyone, every other contract as the caller. A
+ * call posted as JSON is answered in one JSON body when it ends; one posted
+ * as NDJSON is answered framed, each message as it is ready, so a stream
+ * (`watch`) reaches its caller as it happens (issue 510).
  */
-const rpc = RpcServer.layerHttp({
-  group: Contracts,
-  path: "/rpc",
-  protocol: "http",
-}).pipe(Layer.provide([asCaller, RpcSerialization.layerJson]));
+const rpc = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const whole = yield* rpcIn(RpcSerialization.layerJson);
+    const framed = yield* rpcIn(RpcSerialization.layerNdjson);
+
+    yield* router.add("POST", "/rpc", (request) =>
+      isFramed(request.headers) ? framed : whole
+    );
+  })
+).pipe(Layer.provide(asCaller));
 
 /** `/health`: the Worker is up, and which stage it serves. */
 const health = HttpRouter.use((router) =>

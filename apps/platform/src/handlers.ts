@@ -8,7 +8,8 @@
  * merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
  * caller's rate limit first, so a call past it reaches no project.
  * `evidence` asks the project who may read a lane's log, which it reads
- * from the stage's `EvidenceStore`.
+ * from the stage's `EvidenceStore`. `watch` is served by `watch.ts`: live
+ * for a caller on the framed `/rpc`, replayed and ended over JSON.
  *
  * Every `remote` a caller gets back is the platform's git URL for the repo,
  * at the origin the caller reached the platform by: never a storage URL.
@@ -34,12 +35,10 @@ import { HttpServerRequest } from "effect/http";
 import type { Rpc, RpcGroup } from "effect/rpc";
 
 import { RateLimits } from "./rate-limits.ts";
+import { servedFramed, watchHandler } from "./watch.ts";
 
 /** How many projects a call without one asks at once. */
 const FAN_OUT = 8;
-
-/** How many events `watch` reads from its project at a time. */
-const EVENT_PAGE = 100;
 
 /** The caller, as the `Authenticated` server side named them. */
 const caller = Effect.service(CurrentPrincipal);
@@ -358,19 +357,11 @@ export const Handlers: Layer.Layer<
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.vouch(who, input))
         ),
-      watch: ({ project, since = 0 }) =>
+      // Live over a framed `/rpc`; replayed and ended over a buffered one.
+      watch: (payload) =>
         Stream.unwrap(
-          Effect.map(projects.get(project), (api) =>
-            Stream.paginate(since, (after) =>
-              Effect.map(api.events(after, EVENT_PAGE), (rows) => [
-                rows.map(({ event }) => event),
-                rows.length < EVENT_PAGE
-                  ? Option.none()
-                  : Option.fromUndefinedOr(rows.at(-1)?.seq),
-              ])
-            )
-          )
-        ),
+          Effect.map(servedFramed, (live) => watchHandler(payload, { live }))
+        ).pipe(Stream.provideService(Projects, projects)),
     };
   })
 );
