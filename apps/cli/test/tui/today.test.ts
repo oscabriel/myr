@@ -92,15 +92,23 @@ describe("the keys a decider presses on Today", () => {
       { choice: "revert", decision: stray.id, project: datekit },
     ]);
 
-    expect(press(start(today), ["a", "y"]).calls).toStrictEqual([
-      { choice: "adopt", decision: stray.id, project: datekit },
+    const adopting = press(start(today), ["a"]);
+    const adopt = { choice: "adopt", decision: stray.id, project: datekit };
+
+    expect([adopting.calls, adopting.state.confirming]).toStrictEqual([
+      [],
+      Option.some(adopt),
     ]);
+    expect(press(adopting.state, ["y"]).calls).toStrictEqual([adopt]);
   });
 
   it("keeps the cursor on Today's decisions, and closes on q", () => {
-    const { state } = press(start(today), ["up", "down", "down", "down"]);
+    const { state } = press(start(today), ["down", "down", "down"]);
 
-    expect(state.cursor).toBe(2);
+    expect([
+      press(start(today), ["up"]).state.cursor,
+      state.cursor,
+    ]).toStrictEqual([0, 2]);
     expect(reduce(state, "q").quit).toBeTruthy();
     expect(reduce(state, "down").quit).toBeFalsy();
   });
@@ -292,14 +300,19 @@ describe("who may open Today full-screen", () => {
   );
 });
 
-/** A screen that reads `keys` in turn (then `q`) and keeps every state it is shown. */
+/**
+ * A screen that reads `keys` in turn (then `q`) and keeps every state it is
+ * shown. The keys are pressed before any is read, so `forget` drops every
+ * one not read yet, as the terminal drops those pressed while a choice was
+ * on its way.
+ */
 const scripted = (keys: readonly string[]) =>
   Effect.gen(function* () {
     const left = yield* Ref.make(keys);
     const shown = yield* Ref.make<readonly TodayViewState[]>([]);
 
     const screen: Screen = {
-      forget: Effect.void,
+      forget: Ref.set(left, []),
       key: Ref.modify(left, ([next = "q", ...rest]) => [next, rest]),
       show: (state) => Ref.update(shown, (all) => [...all, state]),
     };
@@ -404,6 +417,27 @@ describe("Today full-screen, worked by a decider", () => {
           ["Decided: decline on datekit/dec-000003"],
           [proposal.id, stray.id],
           1,
+        ]);
+      })
+  );
+
+  it.effect(
+    "drops the keys pressed while a choice was on its way, so a second press decides nothing",
+    () =>
+      Effect.gen(function* () {
+        const { client, decided } = yield* platform(new Set());
+
+        // y accepts the vouch; the second a would accept the proposal that
+        // takes its place, at once, since accept is the proposal's default.
+        const { screen } = yield* scripted(["down", "a", "y", "a"]);
+
+        yield* atTerminal(
+          client,
+          screen
+        )(runTodayTui({ project: Option.none() }));
+
+        expect(yield* Ref.get(decided)).toStrictEqual([
+          { choice: "accept", decision: vouch.id, project: datekit },
         ]);
       })
   );

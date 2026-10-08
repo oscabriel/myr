@@ -29,7 +29,7 @@ import {
 } from "effect";
 
 import { Policy } from "../policy.ts";
-import { reduce, refreshed, start } from "./today.ts";
+import { placeOf, reduce, refreshed, start } from "./today.ts";
 import type { DecideCall, TodayViewState } from "./today.ts";
 
 /** What a script or an agent runs for Today instead. */
@@ -118,11 +118,9 @@ export const payloadFor = (project: Option.Option<ProjectName>) =>
     onSome: (name) => ({ project: name }),
   });
 
-const where = ({ decision, project }: DecideCall) => `${project}/${decision}`;
-
 /** What a choice the platform took came to, in one line. */
 const decidedLine = (call: DecideCall, decision: Decision) =>
-  `Decided: ${decision.decided?.choice ?? call.choice} on ${where(call)}`;
+  `Decided: ${decision.decided?.choice ?? call.choice} on ${placeOf(call.project, call.decision)}`;
 
 /**
  * `runTodayTui`: Today full-screen until the decider closes it. Arrows move,
@@ -148,7 +146,9 @@ export const runTodayTui = (input: {
       Effect.gen(function* () {
         yield* screen.show({
           ...state,
-          notice: [`Sending ${call.choice} on ${where(call)}…`],
+          notice: [
+            `Sending ${call.choice} on ${placeOf(call.project, call.decision)}…`,
+          ],
         });
 
         const notice = yield* client.decide(call).pipe(

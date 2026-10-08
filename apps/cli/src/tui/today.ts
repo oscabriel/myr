@@ -16,6 +16,7 @@
 import type { Decide } from "@repo/protocol/contracts";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
+import type { DecisionId, ProjectName } from "@repo/protocol/ids";
 import { Array as Arr, DateTime, Option, Order } from "effect";
 
 /** A choice on its way to `decide`: the contract's payload, without a note. */
@@ -38,8 +39,14 @@ export interface Step {
   readonly quit: boolean;
 }
 
-/** A decision's place in a Today that may hold several projects. */
-const keyOf = ({ id, project }: Decision) => `${project}/${id}`;
+/**
+ * A decision's place in a Today that may hold several projects, as the
+ * screen names it: ids are minted per project, so the project comes first.
+ */
+export const placeOf = (project: ProjectName, id: DecisionId) =>
+  `${project}/${id}`;
+
+const keyOf = ({ id, project }: Decision) => placeOf(project, id);
 
 /** Soonest to expire first, then oldest, then by project and id: one order every time. */
 const expiryOrder: Order.Order<Decision> = Order.combineAll([

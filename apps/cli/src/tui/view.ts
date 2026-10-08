@@ -15,7 +15,7 @@ import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import { DateTime, Option } from "effect";
 
-import { choicesFor, current, inOrder, soonIn } from "./today.ts";
+import { choicesFor, current, inOrder, placeOf, soonIn } from "./today.ts";
 import type { DecideCall, TodayViewState } from "./today.ts";
 
 const short = (sha: string) => sha.slice(0, 7);
@@ -58,8 +58,6 @@ const plural = (count: number, one: string, many: string) =>
 
 const capitalized = (word: string) =>
   `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`;
-
-const where = ({ decision, project }: DecideCall) => `${project}/${decision}`;
 
 const box = (props: BoxProps, ...children: readonly JSX.Element[]) =>
   createElement("box", props, ...children);
@@ -111,7 +109,7 @@ const Entry = ({
   box(
     { flexDirection: "column" },
     line(
-      `${here ? ">" : " "} ${soon ? "!" : " "} ${decision.project}/${decision.id}  ${about(decision.subject)}`,
+      `${here ? ">" : " "} ${soon ? "!" : " "} ${placeOf(decision.project, decision.id)}  ${about(decision.subject)}`,
       here ? { attributes: TextAttributes.BOLD } : {}
     ),
     line(
@@ -136,7 +134,7 @@ const Decisions = ({ state }: { readonly state: TodayViewState }) => {
           createElement(Entry, {
             decision,
             here: index === state.cursor,
-            key: `${decision.project}/${decision.id}`,
+            key: placeOf(decision.project, decision.id),
             soon: isSoon(decision),
           })
         )
@@ -150,7 +148,7 @@ const Newcomers = ({ state }: { readonly state: TodayViewState }) =>
 
 /** The question a choice other than the default waits on. */
 const question = (call: DecideCall, fallback: Choice) =>
-  `${capitalized(call.choice)} ${where(call)}? Its default is ${fallback}. y to send it, n to keep it open.`;
+  `${capitalized(call.choice)} ${placeOf(call.project, call.decision)}? Its default is ${fallback}. y to send it, n to keep it open.`;
 
 /** The keys the decision under the cursor takes, or the confirmation waiting. */
 const Keys = ({ state }: { readonly state: TodayViewState }) => {
