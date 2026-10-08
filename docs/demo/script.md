@@ -20,9 +20,9 @@ On screen: S01, then S02.
 
 > "Open source has one front door: the pull request." Then agents made writing a change nearly free, and reading one costs what it always did. So projects started closing the door.
 >
-> Myr, said "meer", is a prototype git platform that turns the door around. The project asks for what it wants: a sentence, the files it may touch, and a check that fails today. A person answers, or an agent working for one. A passing answer lands. Unasked work has nowhere to go.
+> Myr, said "meer", is a prototype git platform that turns the door around. A project asks for what it wants: a sentence, the files it may touch, a check that fails today. Anyone answers, or their agent does; passing answers land. Unasked work has nowhere to go.
 >
-> Some of this can't be a forge setting: the judge comes from the last landing, some checks are sealed, refusals are typed, and credit goes to whoever asked.
+> No setting adds this: answers can't touch their judge, sealed checks say one bit per area, refusals are typed in git's output, claims hold slots, and credit, the asker's too, follows people across projects.
 
 Caption on S02: "An ask: a want, a territory, a check that fails on main."
 
@@ -72,7 +72,7 @@ On screen: S15, S16, S17, S18, S19, S20.
 
 > datekit's maintainers keep checks of their own, in a layer only they can read. The layer is declared in public, with its reason. Two clones of the same project: bram, a contributor, gets a 403 on the layer. ines-v, a maintainer, gets the sealed checks.
 >
-> bram's answer passes every check he can see. It was written to break one rule the public tests don't cover. The refusal reaches his terminal: HeldBackFailed, area export. One bit per area, never a check's name or its output, and three attempts a week. He fixes it, and the landing carries a trailer: Held-back, export seven of seven, at the suite's published root. That means checked against seven sealed checks, not proven good. They're hidden from people and agents, not from the code under test, so they aren't a security boundary. The ledger says which kind of open this is: Open with sealed evidence.
+> bram's answer passes every check he can see. It was written to break one rule the public tests don't cover. The refusal reaches his terminal: HeldBackFailed, area export. One bit per area, never a check's name or its output, and at most three failures per claim in a week. He fixes it, and the landing carries a trailer: Held-back, export seven of seven, at the suite's published root. That means checked against seven sealed checks, not proven good. They're hidden from people and agents, not from the code under test, so they aren't a security boundary. The ledger says which kind of open this is: Open with sealed evidence.
 >
 > Why can't we commit .env files? Commit the shape. Deciders set the values. Nobody reads them back. An answer's code only ever sees a placeholder.
 
@@ -94,7 +94,7 @@ On screen: S21, S22, S23.
 
 On screen: S24, S25, then S26.
 
-> These numbers come from live runs on this stage, each with its date.
+> These numbers come from live runs, each with its stage and date.
 >
 > [Read the rows of the README's Numbers table as they stand on the day. Say no number that isn't in it.]
 >

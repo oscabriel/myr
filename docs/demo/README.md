@@ -13,4 +13,4 @@ Three rules hold for every take:
 - **What is staged is labelled as staged**, in the script and in a caption: the README line in the zero-install beat, two of the six agents' nudges, and one answer written to fail a sealed check. Nothing else is planted, and every outcome is read from the platform.
 - **The people and projects are fictional.** datekit and burrow, and everyone in them, are examples made up to show the platform; no real project or person is staged.
 
-Every command in these files is checked against what exists: a test reads each `sh` block and the shot list, and fails on a root script, a file or a CLI command that isn't there.
+Every command in these files is checked against what exists: a test reads each shell block, the shot list and every CLI command named in prose or a table, and fails on a root script, a file, a CLI command or a flag that isn't there. It also holds each shot to its beat in the script, and the rehearsal to one checkbox per shot.

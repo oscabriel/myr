@@ -12,7 +12,7 @@ Six of the people burrow's `.myr/vouched.td` vouches for, each with one harness 
 | --- | --- | --- | --- | --- | --- |
 | 1 | wren | Claude Code, as it ships | an Anthropic model | none | `drop-legacy-fetch-burrow-auth` |
 | 2 | tamsin | OpenCode | a GPT model (`openai/…`) | none | `drop-legacy-fetch-burrow-billing` |
-| 3 | ivo | Amp | its default mode | none | `drop-legacy-fetch-burrow-catalog` |
+| 3 | ivo | Amp | one of its modes | none | `drop-legacy-fetch-burrow-catalog` |
 | 4 | marisol | pi | `kimi-k3` | none | `drop-legacy-fetch-burrow-kit` |
 | 5 | dagny | pi | `glm-5.3` | none | `drop-legacy-fetch-burrow-notify` |
 | 6 | pell | pi | a Gemini flash model | the pi adapter (`-e`): the brief, the scope guard and a verdict gate | `drop-legacy-fetch-burrow-search` |

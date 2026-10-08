@@ -3,12 +3,14 @@
  * and finds a narration script timed to the video's seven beats, a shot list,
  * the swarm scenario and a rehearsal checklist that the live walk marks.
  *
- * Every command those files show is one that exists: each line of a `sh`
+ * Every command those files show is one that exists: each line of a shell
  * block runs Bun, git, the CLI or one of the harnesses; each `bun run <x>`
  * is a root script and each `bun <file>` a file in the repo; each CLI line is
  * a command in `commandDocs(Contracts)`, the CLI's one command list, with
- * flags it takes. The shot list's own commands obey the same rules, every
- * shot is on the `demo` stage, and the rehearsal has one checkbox per shot.
+ * flags it takes, and so is each CLI command named in prose or in a table
+ * cell (a shot's fallback). The shot list's own commands obey the same
+ * rules, every shot is on the `demo` stage and named in its beat of the
+ * script, and the rehearsal has one checkbox per shot.
  *
  * Each file's presence is asserted before it is read, so a missing file is a
  * failed assertion, not a load error.
@@ -136,10 +138,15 @@ const clockBreaks = (beats: readonly Beat[]) =>
     ];
   });
 
-// A fenced `sh` block, possibly indented under a list item.
-const SH_FENCE = /^[ \t]*```sh\n(?<body>[\s\S]*?)^[ \t]*```[ \t]*$/gmu;
+// A fenced shell block, possibly indented under a list item. `bash`, `shell`
+// and `zsh` count as `sh`, so no command slips past the rules by its tag.
+const SH_FENCE =
+  /^[ \t]*```(?:sh|bash|shell|zsh)\n(?<body>[\s\S]*?)^[ \t]*```[ \t]*$/gmu;
 
-/** Every non-blank line of every `sh` block in `text`, trimmed. */
+// Any fenced block, whatever its language.
+const ANY_FENCE = /^[ \t]*```[\s\S]*?^[ \t]*```[ \t]*$/gmu;
+
+/** Every non-blank line of every shell block in `text`, trimmed. */
 const shLines = (text: string) =>
   [...text.matchAll(SH_FENCE)].flatMap((match) =>
     (match.groups?.body ?? "")
@@ -170,8 +177,8 @@ const PROGRAMS = new Set([
   Brand.cli,
 ]);
 
-/** Shell that would run a second command the rules never read. */
-const CHAINED = /&&|\|\||\s\|\s/u;
+/** Shell that would run a second command the rules never read: `&&`, `||`, a pipe or `;`. */
+const CHAINED = /&&|\|\||\s\|\s|;/u;
 
 /** A line's first word, the program it runs. */
 const programOf = (line: string) => commandOf(line).split(/\s+/u)[0] ?? "";
@@ -312,11 +319,36 @@ const shotsOf = (list: string) =>
       };
     });
 
-/** The inline code spans of a table cell. */
-const spansIn = (cell: string) =>
-  [...cell.matchAll(/`(?<code>[^`]+)`/gu)].map(
+/** The inline code spans of a table cell or a line of prose. */
+const spansIn = (text: string) =>
+  [...text.matchAll(/`(?<code>[^`\n]+)`/gu)].map(
     (match) => match.groups?.code ?? ""
   );
+
+/** The inline code spans of `text` outside its fenced blocks. */
+const proseSpans = (text: string) => spansIn(text.replace(ANY_FENCE, ""));
+
+/** Whether a span runs the CLI: its name, then a command. */
+const runsCli = (span: string) => span.startsWith(`${Brand.cli} `);
+
+/** One beat's part of the script: its title, and everything to the next H2. */
+interface BeatSection {
+  readonly text: string;
+  readonly title: string;
+}
+
+/** The script, cut at its H2s, keeping the parts that are beats. */
+const beatSections = (script: string) =>
+  script.split(/^(?=## )/mu).flatMap((part): readonly BeatSection[] => {
+    const [heading = "", ...body] = part.split("\n");
+    const title = BEAT.exec(heading)?.groups?.title;
+
+    return title === undefined ? [] : [{ text: body.join("\n"), title }];
+  });
+
+/** The shot ids `text` names: `S01`, `S26`. */
+const shotIdsIn = (text: string) =>
+  [...text.matchAll(/\bS\d{2}\b/gu)].map(([id]) => id);
 
 /** The rehearsal's per-shot checkboxes, by shot id, ticked or not. */
 const checkboxIds = (rehearsal: string) =>
@@ -425,6 +457,67 @@ describe("the demo folder", () => {
           }
 
           expect(problems).toStrictEqual([]);
+        })
+      )
+  );
+
+  it.live(
+    "names only CLI commands and flags the CLI has, in prose and tables too",
+    () =>
+      live(
+        Effect.gen(function* () {
+          const docs = commandDocs(Contracts);
+          const spans: string[] = [];
+
+          for (const file of yield* demoMarkdown) {
+            spans.push(...proseSpans(yield* presentText(file)).filter(runsCli));
+          }
+
+          expect(
+            spans.length,
+            "the demo files name CLI commands outside their shell blocks"
+          ).toBeGreaterThan(0);
+          expect(spans.flatMap((span) => cliProblem(docs, span))).toStrictEqual(
+            []
+          );
+        })
+      )
+  );
+
+  it.live(
+    "names each shot in its own beat of the script, and no shot the list lacks",
+    () =>
+      live(
+        Effect.gen(function* () {
+          const sections = beatSections(
+            yield* presentText(`${DEMO}/script.md`)
+          );
+
+          const shots = shotsOf(yield* presentText(`${DEMO}/shot-list.md`)).map(
+            ({ shot }) => shot
+          );
+
+          const listed = new Set(shots.map((shot) => shot.id));
+
+          const unlisted = sections
+            .flatMap(({ text }) => shotIdsIn(text))
+            .filter((id) => !listed.has(id));
+
+          const unnamed = shots
+            .filter(
+              (shot) =>
+                !sections.some(
+                  ({ text, title }) =>
+                    title === shot.beat && shotIdsIn(text).includes(shot.id)
+                )
+            )
+            .map((shot) => `${shot.id} in ${shot.beat}`);
+
+          expect(shots.length, "the shot list has shots").toBeGreaterThan(0);
+          expect({ unlisted, unnamed }).toStrictEqual({
+            unlisted: [],
+            unnamed: [],
+          });
         })
       )
   );
