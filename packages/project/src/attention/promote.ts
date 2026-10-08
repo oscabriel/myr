@@ -72,25 +72,37 @@ export interface PromotionInput {
 
 /** The evidence labels a promotion is found again by. */
 const labels = {
+  area: "area",
   finished: "finished",
   promotedFrom: "promoted from",
   rule: "rule",
-  territory: "territory",
   want: "want",
   why: "why",
 } as const;
 
 /**
- * A lint rule as its id is written: `no-date-equality`,
+ * A lint rule as its id is written, in lowercase: `no-date-equality`,
  * `typescript/no-explicit-any`, `@typescript-eslint/no-explicit-any`.
  */
 const ruleId = /^@?[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/u;
 
+/** Words joined as a rule's id joins them, by a dash or a slash. */
+const joined = /[-/]/u;
+
 /** A backticked span in a note: `` `no-date-equality` ``. */
 const backticked = /`(?<span>[^`]+)`/gu;
 
+/**
+ * `text` as the rule a note names. It is taken as written, and it must join
+ * two words or more, so a one-word note (`typo`) or a code span
+ * (`startOfDay`) names no rule; a one-word rule (`eqeqeq`) comes from the
+ * lanes.
+ */
 const asRule = (text: string): Option.Option<string> =>
-  Option.liftPredicate(text.trim().toLowerCase(), (word) => ruleId.test(word));
+  Option.liftPredicate(
+    text.trim(),
+    (word) => ruleId.test(word) && joined.test(word)
+  );
 
 /**
  * The rule a decider's note names: the note itself when it is one rule id,
@@ -166,7 +178,7 @@ const promotedFor = (existing: readonly Decision[], group: Group) =>
     (decision) =>
       DecisionSubject.guards.OpenProposal(decision.subject) &&
       Option.isSome(valueOf(decision, labels.promotedFrom)) &&
-      Option.contains(valueOf(decision, labels.territory), group.area) &&
+      Option.contains(valueOf(decision, labels.area), group.area) &&
       Option.contains(valueOf(decision, labels.rule), group.rule)
   );
 
@@ -411,8 +423,8 @@ const promotionOf = (
   }
 
   const finishers = Arr.dedupeWith(
-    Arr.map(Arr.make(first, second, ...more), ({ decider }): string => decider),
-    (one: string, other: string) => one.toLowerCase() === other.toLowerCase()
+    Arr.map(Arr.make(first, second, ...more), ({ decider }) => decider),
+    sameHandle
   );
 
   const touched = fresh.flatMap(({ paths }) => paths);
@@ -438,7 +450,7 @@ const promotionOf = (
 
     const evidence: readonly Evidence[] = [
       { label: labels.want, value: want },
-      { label: labels.territory, value: area },
+      { label: labels.area, value: area },
       { label: labels.rule, value: rule },
       {
         label: labels.why,
@@ -466,7 +478,7 @@ const promotionOf = (
       project: input.project,
       proposer: platformHandle,
       state: "open",
-      territory: area,
+      territory: describePlace(place),
       want,
     };
 

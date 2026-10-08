@@ -129,6 +129,14 @@ const shown = ({ decision, proposal }: Promotion) =>
     ({ label }) => !proposal.files.some((path) => path === label)
   );
 
+/** The files a proposal holds, read back from its decision's evidence by path, as an accepted proposal's are. */
+const heldFiles = ({ decision, proposal }: Promotion) =>
+  proposal.files.flatMap((path) =>
+    decision.evidence.flatMap(({ label, value }) =>
+      label === path ? [{ content: value, path }] : []
+    )
+  );
+
 describe("promoting a repeated finish", () => {
   it("puts two finishes in one area for the same rule to their decider as one decision, declined by default", () => {
     const made = promote(pair);
@@ -151,7 +159,7 @@ describe("promoting a repeated finish", () => {
             value:
               "The lint rule `no-date-equality` reports nothing in src/date/**",
           },
-          { label: "territory", value: "src/date" },
+          { label: "area", value: "src/date" },
           { label: "rule", value: rule },
           {
             label: "why",
@@ -177,7 +185,7 @@ describe("promoting a repeated finish", () => {
           project: scenario.project,
           proposer: platformHandle,
           state: "open",
-          territory: "src/date",
+          territory: "src/date/**",
           want: "The lint rule `no-date-equality` reports nothing in src/date/**",
         },
         subject: DecisionSubject.cases.OpenProposal.make({
@@ -203,6 +211,13 @@ const declined = (decision: Decision): Decision => ({
 });
 
 const carol = Handle.make("carol");
+
+/** Two finishes in `src/date` whose notes both say `note`. */
+const twice = (note: string) =>
+  promote([
+    finish("compare-days", "2026-10-01", { note: Option.some(note) }),
+    finish("diff-months", "2026-10-05", { note: Option.some(note) }),
+  ]);
 
 describe("what a promotion is made from", () => {
   it("takes the rule a finish's lanes name, when its note names none", () => {
@@ -242,6 +257,25 @@ describe("what a promotion is made from", () => {
     ]).toStrictEqual([[], [], []]);
   });
 
+  it("reads no rule in a one-word note or a code span that is not a rule's id", () => {
+    expect([
+      twice("typo"),
+      twice("Renamed `startOfDay`"),
+      twice("`No-Date-Equality`"),
+    ]).toStrictEqual([[], [], []]);
+  });
+
+  it("puts a rule the lanes name and the same rule a note names in one group", () => {
+    const made = promote([
+      finish("compare-days", "2026-10-01", { rule: Option.some(rule) }),
+      diffMonths,
+    ]);
+
+    expect(lineOf(made, "promoted from")).toStrictEqual([
+      "compare-days diff-months",
+    ]);
+  });
+
   it("promotes nothing for the same rule in two areas", () => {
     expect(
       promote([
@@ -265,6 +299,39 @@ describe("what a promotion is made from", () => {
       promote(pair, { policy: short }),
       promote(pair, { now: at("2026-10-03T12:00:00Z") }),
     ]).toStrictEqual([[], []]);
+  });
+
+  it("holds the repo-wide area to the folders the finishes touched", () => {
+    const made = promote([
+      finish("compare-days", "2026-10-01", {
+        area: ".",
+        paths: [RepoPath.make("src/date/compare.ts")],
+        rule: Option.some(rule),
+      }),
+      finish("parse-zone", "2026-10-05", {
+        area: ".",
+        paths: [RepoPath.make("src/tz/parse.ts")],
+        rule: Option.some(rule),
+      }),
+    ]);
+
+    expect(
+      made.map(({ decision, proposal }) => ({
+        area: lineOf([{ decision, proposal }], "area"),
+        proposal: Struct.pick(proposal, ["files", "territory", "want"]),
+      }))
+    ).toStrictEqual([
+      {
+        area: ["."],
+        proposal: {
+          files: [
+            RepoPath.make(`${Brand.configDir}/asks/no-date-equality.ask.ts`),
+          ],
+          territory: "src/date/**, src/tz/**",
+          want: "The lint rule `no-date-equality` reports nothing in src/date/**, src/tz/**",
+        },
+      },
+    ]);
   });
 
   it("holds a module area to its package", () => {
@@ -328,6 +395,21 @@ describe("whom a promotion is put to", () => {
     ]);
   });
 
+  it("names a finisher once, however their handle is cased", () => {
+    const made = promote([
+      compareDays,
+      { ...diffMonths, decider: Handle.make("Alice") },
+    ]);
+
+    expect([
+      made.map(({ decision }) => decision.deciders),
+      lineOf(made, "why"),
+    ]).toStrictEqual([
+      [[alice]],
+      ["alice finished 2 answers for the same thing (no-date-equality)"],
+    ]);
+  });
+
   it("promotes nothing when no finisher decides any more", () => {
     expect(
       promote(pair.map((each) => ({ ...each, decider: carol })))
@@ -366,7 +448,7 @@ describe("when a project cannot hold the ask", () => {
       withKind(lintToZeroKind),
       withAsk({
         check: CheckSpec.cases.LintToZero.make({
-          command: lint,
+          command: Command.make("oxlint --format json"),
           rule: "no-explicit-any",
         }),
         id: "no-any",
@@ -376,8 +458,12 @@ describe("when a project cannot hold the ask", () => {
     );
 
     expect(
-      lineOf(promote(pair, { policy: asked.policy }), "promoted from")
-    ).toStrictEqual(["compare-days diff-months"]);
+      promote(pair, { policy: asked.policy }).flatMap((made) =>
+        heldFiles(made).flatMap(({ content }) =>
+          content.split("\n").filter((line) => line.includes("command:"))
+        )
+      )
+    ).toStrictEqual(['  command: "oxlint --format json",']);
   });
 });
 
@@ -423,14 +509,6 @@ describe("promoting again", () => {
     ).toStrictEqual([[], ["add-weeks start-of-day"]]);
   });
 });
-
-/** The files a proposal holds, read back from its decision's evidence by path, as an accepted proposal's are. */
-const heldFiles = ({ decision, proposal }: Promotion) =>
-  proposal.files.flatMap((path) =>
-    decision.evidence.flatMap(({ label, value }) =>
-      label === path ? [{ content: value, path }] : []
-    )
-  );
 
 describe("accepting a promotion", () => {
   it("opens its ask through openAsk's input: the ask's id and its one file", () => {
