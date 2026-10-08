@@ -42,9 +42,15 @@ const spelled = (repo: string): Option.Option<LayerTarget> => {
     : Option.all({ layer: asLayer(second), project: asProject(first) });
 };
 
-/** git's upstream over the private namespace, its tokens minted and cached there. */
+/**
+ * git's upstream over the private namespace, its tokens minted and cached
+ * there. Fresh: the core ports build `UpstreamRepoHost` over the public
+ * namespace, and a layer built twice in one memo map is shared, so without
+ * it the gate would ask the public namespace for every layer repo (found
+ * live by 699: every layer clone on a stage answered "no repo").
+ */
 const privateUpstream: Layer.Layer<Upstream, never, LayerRepos | Fetch> =
-  UpstreamRepoHost.pipe(
+  Layer.fresh(UpstreamRepoHost).pipe(
     Layer.provide(Layer.effect(RepoHost, LayerRepos.useSync(RepoHost.of)))
   );
 

@@ -49,10 +49,37 @@ const TEST_HOMES = ["packages/project/test/visibility/"] as const;
  * 616: apps never import apps), so no import reader sees them: they go
  * with it too.
  */
-const RUNS_ITS_WORLD = ["apps/cli/test/local/env-set-live.test.ts"] as const;
+const RUNS_ITS_WORLD = [
+  "apps/cli/test/local/env-set-live.test.ts",
+  // The seed's layer step, over the world the cartridge plugs into (608).
+  "packages/config/test/seed-layer.test.ts",
+] as const;
 
-/** Every folder, and every file, that goes when the cartridge goes. */
-const CARTRIDGE = [...MANIFEST, ...TEST_HOMES, ...RUNS_ITS_WORLD];
+/**
+ * The examples' content that only a platform with the cartridge can seed:
+ * datekit's maintainers layer (608). Without it the seed plans no layer.
+ */
+const ITS_CONTENT = ["examples/datekit/layers/"] as const;
+
+/**
+ * Every folder, and every file, that goes when the cartridge goes. Deleting
+ * it also takes the lines that name it (W6 699 did it in a scratch worktree
+ * and verify stayed green): the marked line in `cartridges.ts`; the two
+ * `@repo/visibility` dependency lines; `ARTIFACTS_PRIVATE` and `MASTER_KEY`
+ * in the platform's `wrangler.jsonc`, `.env.schema` and `platform.ts`, its
+ * tests' fake env (`withPrivateNamespace` and its imports, and its use in
+ * `serve-world.ts`), `bindings.test.ts`, `platform.test.ts` and
+ * `env.test-d.ts`, then `bun run types`; the private namespace and
+ * `MASTER_KEY` rows in `bootstrap.test.ts`; and datekit's three `Layer`
+ * lines in `seed.test.ts`. Bootstrap still plans the stage's `layers-<s>`
+ * namespace (`infra/stages.ts`), which nothing binds then.
+ */
+const CARTRIDGE = [
+  ...MANIFEST,
+  ...TEST_HOMES,
+  ...RUNS_ITS_WORLD,
+  ...ITS_CONTENT,
+];
 
 /**
  * Where the line that plugs the cartridge in lives (`ports.ts` merges every
@@ -643,7 +670,7 @@ describe("the visibility cartridge's reader", () => {
 
 describe("the visibility cartridge", () => {
   it.effect(
-    "has every folder of its manifest, and every test outside it that runs its world",
+    "has every folder of its manifest, every test outside it that runs its world, and the example content only it can seed",
     () =>
       provided(
         Effect.gen(function* () {
@@ -652,7 +679,7 @@ describe("the visibility cartridge", () => {
           const root = yield* repoRoot;
 
           const missing = yield* Effect.filter(
-            [...MANIFEST, ...RUNS_ITS_WORLD],
+            [...MANIFEST, ...RUNS_ITS_WORLD, ...ITS_CONTENT],
             (each) =>
               Effect.map(fs.exists(path.join(root, each)), (found) => !found)
           );

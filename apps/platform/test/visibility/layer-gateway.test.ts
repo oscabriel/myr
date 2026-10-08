@@ -20,6 +20,7 @@ import { RefName, RepoName } from "@repo/artifacts/repo-host";
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { CheckAt } from "@repo/checks/check-runner";
+import { Exchange } from "@repo/git/upstream";
 import {
   noPlan,
   noVisibility,
@@ -41,7 +42,16 @@ import { explain } from "@repo/protocol/render";
 import { git } from "@repo/testkit/git";
 import type { Ran } from "@repo/testkit/git";
 import { LayerRepos } from "@repo/visibility/layer-repos";
-import { Array, Effect, FileSystem, Layer, Option, Redacted } from "effect";
+import {
+  Array,
+  Cause,
+  Effect,
+  Exit,
+  FileSystem,
+  Layer,
+  Option,
+  Redacted,
+} from "effect";
 
 import { LayerGate, noLayers } from "../../src/layer-gate.ts";
 import { decodeEnv } from "../../src/platform.ts";
@@ -627,5 +637,30 @@ describe("a project's layer repos, through the gateway", () => {
 
       expect(gate === noLayers).toBeFalsy();
     })
+  );
+
+  // Found live (699): the gate's upstream was memoized with the public
+  // namespace's, so every layer clone on a stage answered "no repo".
+  it.effect(
+    "the stage's layer gate asks the private namespace for a layer repo, never the public one",
+    () =>
+      Effect.gen(function* () {
+        const config = yield* decodeEnv(fakeEnv()).pipe(Effect.orDie);
+
+        const exit = yield* LayerGate.use((gate) =>
+          gate.upstream.exchange(
+            layerRepo,
+            Exchange.Advertise({
+              headers: new Headers(),
+              service: "git-upload-pack",
+            })
+          )
+        ).pipe(Effect.provide(workerPorts(config)), Effect.exit);
+
+        // Both fake bindings refuse every call, each naming itself.
+        expect(Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "").toContain(
+          "a test touched ARTIFACTS_PRIVATE."
+        );
+      })
   );
 });

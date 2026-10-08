@@ -39,6 +39,7 @@ import { untouchable } from "@repo/testkit/untouchable";
 import { Console, Effect, FileSystem, Layer, Stdio, Stream } from "effect";
 
 import type * as Cartridges from "../src/cartridges.ts";
+import type { Cartridge } from "../src/cartridges.ts";
 import type { decodeEnv, PlatformConfig } from "../src/platform.ts";
 import type { WorkerPorts } from "../src/ports.ts";
 import { fakeEnv, withPrivateNamespace } from "./fake-env.ts";
@@ -109,14 +110,21 @@ const keptAdmissions = untouchable<Env["ANSWER"]>("ANSWER", {
     Promise.resolve(untouchable<WorkflowInstance>("an admission", { id })),
 });
 
-/** Every cartridge in `plugged`, for one stage's config, merged. */
+/**
+ * Every cartridge in `plugged`, for one stage's config, merged. Typed as
+ * `ports.ts` types them, so a platform whose `cartridges.ts` names none (a
+ * cartridge deleted) still typechecks here.
+ */
 const pluggedFor =
   (plugged: typeof Cartridges) =>
-  (config: PlatformConfig): Layer.Layer<never, never, WorkerPorts> =>
-    Layer.mergeAll(
+  (config: PlatformConfig): Layer.Layer<never, never, WorkerPorts> => {
+    const each: readonly Cartridge[] = Object.values(plugged);
+
+    return Layer.mergeAll(
       Layer.empty,
-      ...Object.values(plugged).map((cartridge) => cartridge(config))
+      ...each.map((cartridge) => cartridge(config))
     );
+  };
 
 /**
  * Every cartridge in `plugged`, over the world's ports, for a stage whose

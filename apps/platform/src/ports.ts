@@ -48,6 +48,7 @@ import { WorkerFetch } from "./adapters/fetch.ts";
 import { LanderSandbox } from "./adapters/lander-sandbox.ts";
 import { WorkerRateLimits } from "./adapters/rate-limits.ts";
 import * as cartridges from "./cartridges.ts";
+import type { Cartridge } from "./cartridges.ts";
 import type { PlatformConfig } from "./platform.ts";
 import type { RateLimits } from "./rate-limits.ts";
 import { ProjectSockets } from "./watch.ts";
@@ -65,15 +66,6 @@ export type WorkerPorts =
   | RepoHost
   | RulesEvaluator
   | Upstream;
-
-/**
- * A cartridge: its layer for one stage's config, over the platform's own
- * ports. What it provides are ports with defaults, so its layer adds no
- * service a host must name.
- */
-type Cartridge = (
-  config: PlatformConfig
-) => Layer.Layer<never, never, WorkerPorts>;
 
 /**
  * Every cartridge `cartridges.ts` names, merged over `ports`. Deleting a
