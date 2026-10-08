@@ -1,0 +1,10 @@
+[install]
+exact = true
+linker = "isolated"
+# Nothing younger than a day is installed (one day, in seconds).
+minimumReleaseAge = 86400
+
+[test]
+# The packages' tests. The lint rule's own test runs under Node
+# (`bun run lint:rules`): oxlint's RuleTester needs it.
+root = "packages"

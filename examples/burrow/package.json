@@ -1,0 +1,23 @@
+{
+  "name": "burrow",
+  "private": true,
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "lint": "oxlint",
+    "lint:rules": "node --test tools/oxlint/burrow/rule.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "debt": "bun scripts/debt.ts"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.87.0",
+    "@types/node": "26.6.4",
+    "oxlint": "1.87.0",
+    "typescript": "7.0.2",
+    "ultracite": "7.12.4"
+  }
+}
