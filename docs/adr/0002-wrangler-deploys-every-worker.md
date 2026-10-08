@@ -47,3 +47,8 @@ Watch cf #179, #180, #192, #197, #198 and #204.
 - **Frozen Durable Object names:** Alchemy deletes a removed Durable Object by default, so a rename is a delete and loses data. A test pins the class list.
 
 Watch [#1950](https://github.com/alchemy-run/alchemy/pull/1950) (an events-trigger resource) and [#1916](https://github.com/alchemy-run/alchemy/pull/1916) (Artifacts reads).
+
+## Amended (2026-10-08)
+
+- The push-event trigger is declared in `apps/platform/wrangler.jsonc` (`triggers.events`), and Wrangler deploys it with the platform. `infra/bootstrap.ts --check-triggers`, which `infra/deploy.ts` runs after the deploy, reads it back (`GET /triggers/platform-<stage>`) and compares; Artifacts adds a `script_name` to each target, which the comparison expects.
+- The hook that refused cf's project commands is gone (ADR 0011's note). The rule stands in AGENTS.md's Boundaries and is held by review: cf runs only as `bun run ops -- …`, and any `delete` or `revoke` goes to the maintainer. In a non-interactive shell `wrangler delete` answers its own prompt yes, and cf's deletes abort unless given `--force`.

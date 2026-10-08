@@ -20,6 +20,14 @@ _Avoid_: pull request, PR, patch, attempt, submission
 One person's exclusive, expiring right to answer an ask, made of a fork and a scoped token; kept alive only by pushes.
 _Avoid_: lease, lock, assignment
 
+**Claim fork**:
+The fork a claim is made of, named `<project>--<ask>--<handle>`, to which the claimant pushes answers.
+_Avoid_: branch, feature branch
+
+**Working fork**:
+A person's own fork of a project, named `<project>--me--<handle>`, that holds a decider's own changes before they land and a proposer's sealed answers.
+_Avoid_: personal fork, scratch repo
+
 **Check**:
 The predicate that judges an answer: the ask's own check plus the project's checks, run by the platform on the exact merged tree.
 _Avoid_: test (when the whole judgement is meant), CI, eval
@@ -29,7 +37,11 @@ The rule that an ask opens only if its check fails on main twice in the same way
 _Avoid_: failing test requirement
 
 **Check kind**:
-The shape of an ask's check: redThenGreen, lintToZero, ratchet or migrate.
+The shape of an ask's check: redThenGreen, lintToZero, ratchet, migrate, or symbolAbsent (a family's delete child).
+
+**Family**:
+A migrate ask opened as one child ask per module that still uses the old name, each with that module as its territory, plus a delete child that waits on every child and checks the name is gone; the parent closes when its last child lands.
+_Avoid_: epic, subtasks, batch
 
 **Territory**:
 The module (by default a workspace package) an answer may change.
@@ -40,7 +52,7 @@ One or more members of the closed, typed union the platform returns instead of l
 _Avoid_: rejection, error, failure, CI failure
 
 **Proposal**:
-A request to open an ask, from anyone not denounced, that expires unless a decider accepts it.
+A request to open an ask, or to flag an existing one, from anyone not denounced; it expires unless a decider accepts it.
 _Avoid_: feature request, suggestion
 
 **Sealed answer**:
@@ -61,8 +73,12 @@ The platform's commit of a checked tree to main, written by the platform with cr
 _Avoid_: merge, ship
 
 **Landed SHA**:
-The commit the platform itself last landed; the only place rules are read from.
+The commit the platform itself last landed on main; the only commit a project's rules are read from.
 _Avoid_: HEAD, tip of main
+
+**Outcome**:
+Where an offered answer stands: Checking, Landed, WaitingOnParent, AwaitingFinish, AwaitingDecision or Refused; only Refused carries refusals, and waiting is not a refusal.
+_Avoid_: result, build state, CI status
 
 **Judge closure**:
 Every file that decides what the checks do (check files, test and lint config including lint plugin sources and rule fixture tests, CI files, git and harness hook configs, scripts, the config folder, .env.schema and committed .env.* files); no answer may change it.
@@ -76,8 +92,12 @@ A counted budget per territory, recorded at landing and lowered automatically, t
 _Avoid_: baseline (alone), suppression file
 
 **Verdict**:
-The record of one check run: base, head, patch-id, level and the platform as verifier, kept with the landing.
+The record of one check run: base, head, patch id, level and the platform as verifier, kept with the landing.
 _Avoid_: approval, review
+
+**Patch id**:
+The platform's own fingerprint of an answer's change set: a hash over each path the answer changes, with its content before and after, so the same change gives the same id however its commits were made.
+_Avoid_: git patch-id, diff hash
 
 ## People and attention
 
@@ -92,12 +112,16 @@ _Avoid_: contributor (when meaning this role), agent identity
 A person whose decisions open asks, accept proposals and finish answers for an area.
 _Avoid_: reviewer, approver, owner
 
+**Decision**:
+One choice put to a project's deciders, with its evidence and a safe default that is taken if nobody decides before it expires.
+_Avoid_: approval, vote, review request
+
 **Today**:
-A decider's daily page of decisions with evidence and safe defaults, held to a budget.
+A decider's daily page of open decisions, ordered by expiry and held to their budget; the overflow waits for a later day.
 _Avoid_: inbox, queue, dashboard
 
 **Budget**:
-The number of decisions a decider takes per day; overflow waits and expires.
+The number of decisions a decider takes per day; a decision past it waits, and one that expires undecided takes its default.
 
 **Vouch**:
 A line in the project's vouch file by which a member admits a person to claim and to submit sealed answers.
@@ -166,6 +190,10 @@ _Avoid_: dummy value, mock secret
 **Config folder**:
 The .myr/ folder on main holding the project's process as TypeScript: project.ts, kinds, asks, visibility.ts, the vouch file.
 _Avoid_: settings, workflow files
+
+**Policy**:
+A project's rules as the platform evaluated them from the config folder at one landed SHA, or the defaults when the project has no config folder.
+_Avoid_: settings, config (when meaning the evaluated result)
 
 **Run block**:
 The config folder's declaration of the project's own commands: setup, doctor, test, checks.
