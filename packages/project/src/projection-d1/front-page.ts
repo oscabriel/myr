@@ -25,6 +25,7 @@ import { SqlClient } from "effect/sql/SqlClient";
 
 import { FrontPage } from "../front-page.ts";
 import type { FrontPageFilter } from "../front-page.ts";
+import { handleKey } from "./tables.ts";
 
 const AskIds = Schema.fromJsonString(Schema.Array(AskId));
 
@@ -137,7 +138,7 @@ export const FrontPageD1: Layer.Layer<FrontPage, never, SqlClient> =
       const credits = (handle: Handle) =>
         sql`SELECT project, area, role, count
           FROM credits
-          WHERE handle_key = ${handle.toLowerCase()}
+          WHERE handle_key = ${handleKey(handle)}
           ORDER BY project, area, role`.pipe(
           Effect.flatMap(decodeCredits),
           Effect.orDie

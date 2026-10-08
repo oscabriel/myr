@@ -4,8 +4,6 @@
  * through `ProjectionD1`, and `FrontPageD1` reads every open ask back out,
  * as the anonymous viewer may take it.
  */
-import { NodeServices } from "@effect/platform-node";
-import { SqliteClient } from "@effect/sql-sqlite-node";
 import { describe, expect, it } from "@effect/vitest";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { ProjectEvent } from "@repo/protocol/domain/event";
@@ -17,7 +15,7 @@ import {
   LandedSha,
   ProjectName,
 } from "@repo/protocol/ids";
-import { DateTime, Effect, FileSystem, Layer, Path } from "effect";
+import { DateTime, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 
 import { FrontPage } from "../src/front-page.ts";
@@ -28,41 +26,19 @@ import { FrontPageD1 } from "../src/projection-d1/front-page.ts";
 import { ProjectionD1 } from "../src/projection-d1/projection.ts";
 import { FrontPageDdl } from "../src/projection-d1/tables.ts";
 import { Projection, ProjectionFailed } from "../src/projection.ts";
-
-/** A migration the platform's D1 database applies, as its file holds it. */
-const migration = (file: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-
-    return yield* fs.readFileString(
-      yield* path.fromFileUrl(
-        new URL(`../../../apps/platform/migrations/${file}`, import.meta.url)
-      )
-    );
-  }).pipe(Effect.provide(NodeServices.layer));
+import {
+  frontPageMigration,
+  migrated,
+  migration,
+  projectsMigration,
+} from "./projection-d1.fixtures.ts";
 
 /**
  * A fresh in-memory database each time, with the projection's migration
  * files applied in order: the front page's, then the project list's and
  * the credits'.
  */
-const database = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const sql = yield* SqlClient;
-
-    for (const file of ["0001_front_page.sql", "0004_projects_credits.sql"]) {
-      for (const statement of (yield* migration(file)).split(";")) {
-        if (statement.trim().length > 0) {
-          yield* sql.unsafe(statement);
-        }
-      }
-    }
-  })
-).pipe(
-  Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
-  Layer.orDie
-);
+const database = migrated([frontPageMigration, projectsMigration]);
 
 const world = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
   Layer.provideMerge(database)
@@ -408,7 +384,7 @@ describe("the front page's D1 projection", () => {
 
   it.effect("reads the migration the platform's D1 applies", () =>
     Effect.gen(function* () {
-      expect(yield* migration("0001_front_page.sql")).toBe(FrontPageDdl);
+      expect(yield* migration(frontPageMigration)).toBe(FrontPageDdl);
     })
   );
 

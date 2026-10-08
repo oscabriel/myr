@@ -14,6 +14,15 @@
  * A migration is never edited once it has run anywhere: W5 514 adds its
  * tables in `0004_projects_credits.sql` (`ProjectsCreditsDdl`).
  */
+import type { Handle } from "@repo/protocol/ids";
+
+/**
+ * The key `credits.handle_key` holds a person by: the handle lowercased,
+ * the rule protocol's `sameHandle` compares by. The projection writes it and
+ * the credits query reads by it, so both take it from here.
+ */
+export const handleKey = (handle: Handle): string => handle.toLowerCase();
+
 export const FrontPageDdl = `-- The front page: every open ask of every project, projected from each
 -- project's outbox by packages/project/src/projection-d1 (its tables.ts
 -- holds this text). The projection is the only writer.
@@ -52,7 +61,7 @@ CREATE TABLE cursor (
  *   (counted from `front_page` whenever an ask opens or closes), and when
  *   it last landed (null before its first landing).
  * - `credits`: how many landings credit a person (by `handle_key`, the
- *   handle lowercased) in one role, in one area of one project.
+ *   handle lowercased: `handleKey`) in one role, in one area of one project.
  *
  * Its last statement lists the projects `cursor` already knows of, with
  * their open asks, so a database the front page's migration made keeps its

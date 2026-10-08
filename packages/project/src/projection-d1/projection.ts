@@ -42,6 +42,7 @@ import type { Statement } from "effect/sql/Statement";
 
 import type { OutboxRow } from "../project-store/rows.ts";
 import { Projection, ProjectedEvent, ProjectionFailed } from "../projection.ts";
+import { handleKey } from "./tables.ts";
 
 const decodeProjected = Schema.decodeUnknownEffect(
   Schema.toCodecJson(ProjectedEvent)
@@ -71,7 +72,7 @@ const lastOf = (events: readonly ProjectedEvent[]) =>
 
 /**
  * Each person a landing credits, once per role, by the key `sameHandle`
- * compares handles by (the handle lowercased): the rule of
+ * compares handles by (`handleKey`): the rule of
  * `creditsByArea` (`attention/credits.ts`, W2 220) for one landing, whose
  * area the projection reads from D1. Only `credits` counts: `assisted` (the
  * `Assisted-by` trailers) names agents, never people.
@@ -79,10 +80,10 @@ const lastOf = (events: readonly ProjectedEvent[]) =>
 const creditedOn = (landing: Pick<LandingView, "credits">) =>
   Array.dedupeWith(
     landing.credits.map(({ handle, role }) => ({
-      handleKey: handle.toLowerCase(),
+      person: handleKey(handle),
       role,
     })),
-    (one, other) => one.handleKey === other.handleKey && one.role === other.role
+    (one, other) => one.person === other.person && one.role === other.role
   );
 
 export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
@@ -133,9 +134,9 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
           ask === undefined || landing.project !== project
             ? []
             : creditedOn(landing).map(
-                ({ handleKey, role }) =>
+                ({ person, role }) =>
                   sql`INSERT INTO credits (handle_key, project, area, role, count)
-                    SELECT ${handleKey}, ${project}, page.territory, ${role}, 1
+                    SELECT ${person}, ${project}, page.territory, ${role}, 1
                     FROM front_page AS page
                     WHERE page.project = ${project} AND page.ask = ${ask} AND ${next}
                     ON CONFLICT (handle_key, project, area, role)

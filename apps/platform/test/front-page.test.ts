@@ -42,7 +42,7 @@ import { RulesEvaluator } from "@repo/rules/rules-evaluator";
 import { advanceTo, at } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
 import type { Scope } from "effect";
-import { Array, Context, Effect, FileSystem, Layer, Path } from "effect";
+import { Array, Context, Effect, FileSystem, Layer, Order, Path } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 
 import { WorkerFetch } from "../src/adapters/fetch.ts";
@@ -70,21 +70,36 @@ const alice = Handle.make("alice");
 
 const noon = "2026-10-07T12:00:00Z";
 
-/** The front page's migrations, read from the platform's own folder in order and run statement by statement. */
+/**
+ * The platform's D1 database: every migration in its own folder, in
+ * file-name order as `wrangler d1 migrations apply` runs them, statement by
+ * statement. Comment lines go before the split: a comment may hold a `;`
+ * (`0002_accounts.sql`'s does).
+ */
 const migrated = Layer.effectDiscard(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const sql = yield* SqlClient;
 
-    for (const file of ["0001_front_page.sql", "0004_projects_credits.sql"]) {
-      const text = yield* fs.readFileString(
-        yield* path.fromFileUrl(
-          new URL(`../migrations/${file}`, import.meta.url)
-        )
-      );
+    const folder = yield* path.fromFileUrl(
+      new URL("../migrations", import.meta.url)
+    );
 
-      for (const statement of text.split(";")) {
+    const files = Array.sort(
+      (yield* fs.readDirectory(folder)).filter((file) => file.endsWith(".sql")),
+      Order.String
+    );
+
+    for (const file of files) {
+      const text = yield* fs.readFileString(path.join(folder, file));
+
+      const code = text
+        .split("\n")
+        .filter((line) => !line.trimStart().startsWith("--"))
+        .join("\n");
+
+      for (const statement of code.split(";")) {
         if (statement.trim().length > 0) {
           yield* sql.unsafe(statement);
         }

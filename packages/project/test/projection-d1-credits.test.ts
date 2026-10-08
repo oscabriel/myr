@@ -5,8 +5,6 @@
  * one person's credits by project, area and role, back out in one query
  * each.
  */
-import { NodeServices } from "@effect/platform-node";
-import { SqliteClient } from "@effect/sql-sqlite-node";
 import { describe, expect, it } from "@effect/vitest";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import type { Credit } from "@repo/protocol/domain/credit";
@@ -20,7 +18,7 @@ import {
   LandedSha,
   ProjectName,
 } from "@repo/protocol/ids";
-import { DateTime, Effect, FileSystem, Layer, Path } from "effect";
+import { DateTime, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 
 import { FrontPage } from "../src/front-page.ts";
@@ -30,56 +28,21 @@ import { FrontPageD1 } from "../src/projection-d1/front-page.ts";
 import { ProjectionD1 } from "../src/projection-d1/projection.ts";
 import { ProjectsCreditsDdl } from "../src/projection-d1/tables.ts";
 import { Projection } from "../src/projection.ts";
-
-/** A migration of the platform's D1 database, as its file holds it. */
-const migration = (file: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-
-    return yield* fs.readFileString(
-      yield* path.fromFileUrl(
-        new URL(`../../../apps/platform/migrations/${file}`, import.meta.url)
-      )
-    );
-  }).pipe(Effect.provide(NodeServices.layer), Effect.orDie);
-
-/** Runs a migration's statements in order, as `wrangler d1 migrations apply` does. */
-const applied = (file: string) =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient;
-
-    for (const statement of (yield* migration(file)).split(";")) {
-      if (statement.trim().length > 0) {
-        yield* sql.unsafe(statement);
-      }
-    }
-  }).pipe(Effect.orDie);
-
-const frontPageMigration = "0001_front_page.sql";
-
-const projectsMigration = "0004_projects_credits.sql";
-
-/** A fresh in-memory database each time, with the projection's migrations applied. */
-const database = Layer.effectDiscard(
-  Effect.andThen(applied(frontPageMigration), applied(projectsMigration))
-).pipe(
-  Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
-  Layer.orDie
-);
+import {
+  applied,
+  frontPageMigration,
+  migrated,
+  migration,
+  projectsMigration,
+} from "./projection-d1.fixtures.ts";
 
 const world = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
-  Layer.provideMerge(database)
+  Layer.provideMerge(migrated([frontPageMigration, projectsMigration]))
 );
 
 /** A database the front page's migration alone made, as W3 and W4 left it. */
 const beforeProjects = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
-  Layer.provideMerge(
-    Layer.effectDiscard(applied(frontPageMigration)).pipe(
-      Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
-      Layer.orDie
-    )
-  )
+  Layer.provideMerge(migrated([frontPageMigration]))
 );
 
 const datekit = ProjectName.make("datekit");
@@ -388,6 +351,41 @@ describe("the project list and credits in D1", () => {
         ]);
         expect(yield* front.credits(ines)).toStrictEqual([]);
         expect(yield* front.credits(bram)).toStrictEqual([]);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "credits nothing for a landing that names another project than the one whose outbox carried it",
+    () =>
+      Effect.gen(function* () {
+        // Ask ids are unique only within a project: datekit's `parse-iso`
+        // is no area of burrow's.
+        yield* apply(
+          rows(datekit, 1, [
+            opened(listing(parseIso, "src"), 1),
+            (seq) =>
+              ProjectEvent.cases.Landed.make({
+                at: at(30),
+                landing: {
+                  ask: parseIso,
+                  assisted: [],
+                  author: bram,
+                  credits: parseIsoCredits,
+                  landedAt: at(30),
+                  project: burrow,
+                  sha: landing,
+                },
+                seq,
+              }),
+          ])
+        );
+
+        const front = yield* FrontPage;
+
+        expect({
+          bram: yield* front.credits(bram),
+          ines: yield* front.credits(ines),
+        }).toStrictEqual({ bram: [], ines: [] });
       }).pipe(Effect.provide(world))
   );
 
