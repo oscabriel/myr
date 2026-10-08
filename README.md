@@ -131,7 +131,7 @@ Wrangler deploys the three Workers; cf is our ops CLI. Cloudflare's cf can't dep
    ./node_modules/.bin/varlock run --path apps/platform/ -- bun scripts/smoke.ts --stage dev-<you> --loop
    ```
 
-`infra/stages.md` lists every resource a stage owns, the secrets, and how a person tears a stage down by hand; no script deletes anything.
+`infra/stages.md` lists every resource a stage owns, the secrets, and how a person tears a stage down by hand; no script deletes a stage's own resources. Every throwaway a smoke loop, a swarm run or a `seed --as` copy makes is recorded in `infra/created.jsonl`. `bunx varlock run --path infra/ -- bun infra/teardown.ts` prints which of them still exist, and adding `--apply` deletes exactly those.
 
 ### Install the CLI
 
@@ -223,6 +223,7 @@ Each promise names the check that holds it, and `bun run verify` runs every one.
 | Visibility plugs in by one marked line, and nothing else reaches into it. | `packages/config/test/cartridge.test.ts` |
 | Each Worker's bundle stays under its byte budget. | `bun run bytes:check` |
 | A deploy names its stage, runs `verify` first and smoke after, and none runs while a take is recorded (`bun infra/recording.ts on`). | `packages/config/test/deploy.test.ts`, `packages/config/test/recording.test.ts` |
+| Teardown deletes only the throwaways the ledger records, never a stage's namespaces, the seeded examples or their forks, or anything in `witness`, and never while a take is recorded. | `packages/config/test/teardown.test.ts` |
 | Every path and command in this README exists. | `packages/config/test/readme.test.ts` |
 
 What it does not promise:
@@ -275,7 +276,7 @@ packages/
   testkit/      scenario builders, golden git transcripts, process fakes
   brand/        the name, and every identifier made from it
   config/       the vitest preset and the repo's own tests
-infra/          bootstrap, deploy, the recording lock, the stage table, smoke's probes
+infra/          bootstrap, deploy, the recording lock, the stage table, smoke's probes, teardown
 scripts/        brand and byte checks, seed, smoke, swarm, release
 examples/       datekit and burrow, fictional projects for the demo
 tools/oxlint/   the vendored anti-slop lint plugins

@@ -11,7 +11,7 @@ This file has six parts, then how to run a stage:
 5. [Human steps status](#5-human-steps-status)
 6. [URLs](#6-urls)
 
-Sections 1 to 6 hold the state as of 2026-10-08, 16:00 UTC, read from the account with read-only calls.
+Sections 1 to 6 hold the state as of 2026-10-08, 18:00 UTC, read from the account with read-only calls.
 
 ## 1. Stages
 
@@ -82,27 +82,29 @@ Every resource in the two tables below belongs to its stage. The times are the a
 
 ## 3. Throwaway ledger summary
 
-A throwaway is something a smoke run, a swarm run or a `seed --as` copy makes on a stage, beside the stage's own resources. Each run appends one JSON line for each throwaway to `infra/created.jsonl` (`infra/created.ts`), and teardown acts only on those lines.
+A throwaway is something a smoke run, a swarm run or a `seed --as` copy makes on a stage, beside the stage's own resources. Each run appends one JSON line for each throwaway to `infra/created.jsonl` (`infra/created.ts`), and teardown acts only on those lines. When teardown deletes one, it appends a `deleted` line naming it (`deletedAt`, then its kind, name, namespace and stage). No line is ever rewritten or removed.
 
-On 2026-10-08 at 17:00 UTC the ledger holds 57 entries, all on `dev-oscabriel`, and each still exists:
+On 2026-10-08 at 18:00 UTC the ledger holds 69 entries, all on `dev-oscabriel`: 16 projects and 53 repos. None is marked deleted yet. A read-only listing found every one of the 53 repos still there:
 
 | When (UTC) | By | Kind | Name | Where |
 | --- | --- | --- | --- | --- |
-| 2026-10-08 12:37 | swarm | repo | `burrow--drop-legacy-fetch-burrow-auth--wren` (a released claim's fork) | `projects-dev-oscabriel` |
+| 2026-10-08 12:37 | swarm | repo | `burrow--drop-legacy-fetch-burrow-auth--wren` (a released claim's fork of the stage's `burrow`) | `projects-dev-oscabriel` |
 | 2026-10-08 14:40 to 14:58 | smoke | project, repo, repo | four core-loop runs, `smoke-20261008-143944`, `smoke-20261008-144139`, `smoke-20261008-145551` and `smoke-20261008-145715`: each one's project, its repo, and its claim's fork `<project>--parse-year--bram` | `projects-dev-oscabriel` |
 | 2026-10-08 14:52 to 14:54 | seed | project, repo, repo | `burrow-lint-807`, a `seed --as` copy of burrow that proved the Checker runs burrow's lint lane, with its repo and wren's claim fork `burrow-lint-807--drop-legacy-fetch-burrow-auth--wren` | `projects-dev-oscabriel` |
 | 2026-10-08 16:07 to 16:21 | seed, swarm | 2 projects, 8 repos | the harness checks' copies: `datekit-803` (its repo, its layer repo `datekit-803--maintainers`, and bram's claim forks `--parse-iso-week--bram`, `--format-ordinal--bram` and `--add-months-clamp--bram`) and `burrow-803` (its repo, and tamsin's and ivo's claim forks) | `projects-dev-oscabriel`, the layer in `layers-dev-oscabriel` |
 | 2026-10-08 16:29 to 16:41 | seed, swarm | 2 projects, 14 repos | the swarm's two live runs: `burrow-swarm-1` and `burrow-swarm-2`, each a `seed --as` copy of burrow with its repo and the six contributors' claim forks `<project>--drop-legacy-fetch-burrow-<package>--<handle>` | `projects-dev-oscabriel` |
 | 2026-10-08 16:49 to 16:57 | smoke | 5 projects, 10 repos | five core-loop runs, `smoke-20261008-164858`, `smoke-20261008-165040`, `smoke-20261008-165218`, `smoke-20261008-165400` and `smoke-20261008-165645`, each with its repo and its claim's fork `<project>--parse-year--bram` | `projects-dev-oscabriel` |
+| 2026-10-08 17:12 to 17:39 | seed, swarm | 2 projects, 10 repos | the rehearsal's copies: `datekit-805` (its repo, its layer repo `datekit-805--maintainers`, and bram's three claim forks) and `burrow-805` (its repo, and the claim forks of tamsin, ivo, marisol and dagny) | `projects-dev-oscabriel`, the layer in `layers-dev-oscabriel` |
 
-The live runs before the ledger existed left throwaways that it doesn't hold, all on `dev-oscabriel`. Teardown lists them separately and checks each one still exists before it deletes anything:
+The live runs before the ledger existed left throwaways that it doesn't hold, all on `dev-oscabriel`. A read-only listing on 2026-10-08 at 18:00 UTC found each one still there:
 
-- In `projects-dev-oscabriel`, 25 repos on 2026-10-08. Two of them, `datekit` and `burrow`, are the stage's seeded examples, and their working and claim forks (`datekit--me--ines-v`, `datekit--format-ordinal--bram`, `datekit--add-months-clamp--bram`) belong to them. The rest are test projects and their forks: `w3live-muyjz31t`, `w3live-muyk0528`, `w3live-muyk72qm`, `w3live-muykamf1`, `w3live-muyklikt` (with `--parse-iso--alice`), `w3live-muyl0wps` (with `--parse-iso--alice`), `w3live-muyl2z12` (with `--parse-iso--alice`), `scratch-onpush-muykseuk`, `w4-rehearsal` (with `--first-day--alice`, `--canada-sunday--alice`, `--brazil-sunday--alice` and `--mexico-sunday--alice`), and `w4-ratchet` (with `--no-any-in-parser--alice` and `--pad-day--bob`).
+- In `projects-dev-oscabriel`, 75 repos. Of these, 53 are the ledger's. `datekit` and `burrow` are the stage's seeded examples, and their forks `datekit--me--ines-v`, `datekit--format-ordinal--bram` and `datekit--add-months-clamp--bram` belong to them. The other 19 are test projects and their forks: `w3live-muyjz31t`, `w3live-muyk0528`, `w3live-muyk72qm`, `w3live-muykamf1`, `w3live-muyklikt` (with `--parse-iso--alice`), `w3live-muyl0wps` (with `--parse-iso--alice`), `w3live-muyl2z12` (with `--parse-iso--alice`), `scratch-onpush-muykseuk`, `w4-rehearsal` (with `--first-day--alice`, `--canada-sunday--alice`, `--brazil-sunday--alice` and `--mexico-sunday--alice`), and `w4-ratchet` (with `--no-any-in-parser--alice` and `--pad-day--bob`).
+- In `layers-dev-oscabriel`, 3 repos: datekit's `datekit--maintainers` and the ledger's two copies' layers.
 - The secret `S8B_PROBE` on `platform-dev-oscabriel`.
-- The test accounts `w3tester-muyk9zdx` and `w5web-muz3airr` in `front-page-dev-oscabriel`, and the latter's OAuth grant in `oauth-dev-oscabriel`.
+- The test accounts `w3tester-muyk9zdx` and `w5web-muz3airr` in `front-page-dev-oscabriel` (no identity or credit rows), and their OAuth grants in `oauth-dev-oscabriel`: one for `w5web-muz3airr` and two for `w3tester-muyk9zdx`.
 - The Project Durable Objects and front-page rows of those test projects. They are harmless and are not deleted.
 
-`demo` has no throwaways, and nothing that makes them is meant to run there: the core-loop smoke and the swarm's rehearsals run on the dev stage, the swarm on a `seed --as` copy.
+`demo` has no throwaways: `projects-demo` holds `datekit` and `burrow`, and `layers-demo` holds `datekit--maintainers`. Nothing that makes throwaways is meant to run there before the take: the core-loop smoke and the swarm's rehearsals run on the dev stage, the swarm on a `seed --as` copy. The take's swarm on demo's `burrow` will record its claim forks in the ledger; teardown never selects them (section 4).
 
 ## 4. Teardown policy
 
@@ -111,6 +113,41 @@ The live runs before the ledger existed left throwaways that it doesn't hold, al
 - It never touches `witness`.
 
 No agent deletes a Cloudflare resource itself. Teardown first prints its plan: the ledger's entries that still exist, minus every stage's own names and `witness`. The deletes in that plan, together with the pre-ledger leftovers in section 3 that still exist, are written into one script that the user reads and then runs in their own terminal. A stage itself is torn down only by hand, by the user, as [Tear down a stage](#tear-down-a-stage) says.
+
+### The teardown tool
+
+```sh
+bunx varlock run --path infra/ -- bun infra/teardown.ts                 # print the plan
+bunx varlock run --path infra/ -- bun infra/teardown.ts --apply         # delete exactly that plan
+bunx varlock run --path infra/ -- bun infra/teardown.ts --keep burrow-805 --stage dev-oscabriel
+```
+
+It reads the ledger, asks the account which of its repos and namespaces still exist (with the infra token, one name at a time), and prints the plan: what it would delete, what is already gone, and what the ledger holds but no plan may select. Without `--stage` it covers every declared stage the ledger names. `--keep <project>` leaves a `seed --as` copy's repo and every `<project>--…` fork out of the plan. Only `--apply` deletes, repos first and newest first, so a fork goes before what it forks, and a namespace last, since Artifacts deletes only an empty one. Repos go through `@repo/artifacts`' REST adapter. Each one deleted gets its `deleted` line at once, so a run that stops partway is finished by running it again. While `infra/.recording` exists, `--apply` is refused with `RecordingInProgress` before anything is read.
+
+No plan ever holds:
+
+- a name the ledger doesn't hold, whatever it is called;
+- either Artifacts namespace of any declared stage (`projects-<s>`, `layers-<s>`), or anything in `witness`, which is never even read;
+- the seeded examples `datekit`, `datekit--maintainers` and `burrow`, or any fork of `datekit` or `burrow`. A claim made on demo's `burrow` during the take is recorded in the ledger and has to outlive teardown;
+- a Worker, a D1 database, a KV namespace or an R2 bucket. Those are not Artifacts, so no listing names them;
+- a project's Durable Object or front-page row. A project entry stays, and the plan says so.
+
+### The teardown record
+
+| When (UTC) | What |
+| --- | --- |
+| 2026-10-08 18:00 | `bun infra/teardown.ts` printed the plan for `dev-oscabriel`: **52 repos to delete**. These are all of the ledger's repos except `burrow--drop-legacy-fetch-burrow-auth--wren`, a fork of the stage's `burrow` that is never selectable. 50 are in `projects-dev-oscabriel`: nine smoke runs' repos and forks, `burrow-lint-807`, `burrow-803`, `datekit-803`, `burrow-swarm-1`, `burrow-swarm-2`, `burrow-805` and `datekit-805`, each with its claim forks. 2 are in `layers-dev-oscabriel`: `datekit-803--maintainers` and `datekit-805--maintainers`. The 16 projects' Durable Objects and front-page rows stay. Nothing was deleted. |
+| 2026-10-08 18:00 | The build's agent wrote the user's teardown script. It runs the plan with `--apply`. It also deletes the 19 pre-ledger test repos in section 3, wren's fork of `burrow` (only while dev's web still shows that ask open and unclaimed), `S8B_PROBE`, the two test accounts and their three OAuth grants. Each one is checked again just before its delete. The script refuses to run while `infra/.recording` exists. |
+| when the user runs it | The ledger's `deleted` lines record each repo the tool deleted, and when. Commit `infra/created.jsonl` afterwards. |
+
+Kept, and why:
+
+- **The demo stage, whole.** It holds the recording and the submission.
+- **The dev stage's own resources** (section 2) and its seeded `datekit` (with `datekit--maintainers`) and `burrow`. The user decides whether to tear the stage down after submission.
+- **Dev's forks of datekit.** `datekit--me--ines-v` is ines-v's working fork. `datekit--format-ordinal--bram` holds bram's landed answer and its verdict notes. `datekit--add-months-clamp--bram` belongs to a claim that is open again.
+- **Every project's Durable Object and front-page row.** They are harmless, and not billed at this size. A test project's row stays on dev's front page after its repo is gone.
+- **Finished `Answer` Workflow instances** on `platform-dev-oscabriel`. They are records, not resources.
+- **Any `--as` copy the user still wants.** Add `--keep <project>` to the script's two teardown lines.
 
 ## 5. Human steps status
 
@@ -129,7 +166,7 @@ As of 2026-10-08, after the demo's bootstrap. "Agent" is the build's agent.
 | H9: `docker login` | Not needed so far. No image pull has been rate-limited. | Nothing. | Only if a deploy's image pull is rate-limited: run `docker login` in your own terminal. |
 | ChatGPT usage for the swarm's tamsin | Not blocking: the fallback was taken on 2026-10-08. | OpenCode's ChatGPT sign-in hit its usage limit during the swarm's live rehearsal, and Codex says it is back on Oct 16, after the deadline. The roster now runs tamsin on `opencode-go/gpt-6-luna` (OpenCode Go, signed in). | Nothing. To show `openai/gpt-5.5` in the take instead, raise the ChatGPT plan's limit (a purchase, yours to make) and swap the roster's one line back. |
 | OpenCode Zen key for the swarm's pell | Not blocking: the fallback was taken on 2026-10-08. | pi here still has no OpenCode Zen key, so the roster now runs pell on `opencode-go/qwen3.8-flash`, as it ran in the swarm's live rehearsal on `dev-oscabriel`. | Nothing. To show Gemini flash in the take instead, add OpenCode Zen's key to pi and swap the roster's one line back. |
-| Deleting the throwaways | Open, after the rehearsal. | The teardown plan (section 4). | Read the teardown script and run it in your own terminal. |
+| Deleting the throwaways | Open: the script is ready, and nothing is deleted yet (section 4, [The teardown record](#the-teardown-record)). | `bun infra/teardown.ts` printed the plan (52 repos on `dev-oscabriel`), and the user's script runs it with `--apply`. The script also removes the pre-ledger leftovers that still exist and skips any that are already gone. | After the last take and before Oct 14, read the teardown script and run it in your own terminal. Then commit `infra/created.jsonl`, which now carries a `deleted` line for each repo removed. |
 
 ## 6. URLs
 

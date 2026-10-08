@@ -45,7 +45,7 @@ import {
   Stdio,
 } from "effect";
 
-import { readLedger, recordCreated } from "../infra/created.ts";
+import { isRecorded, readLedger, recordCreated } from "../infra/created.ts";
 import {
   platformOrigin,
   recordedSubdomain,
@@ -309,13 +309,12 @@ const recordFork = (stage: Stage, claim: ClaimView) =>
   Effect.gen(function* () {
     const namespace = resources(stage).projects;
 
-    const known = (yield* readLedger).some(
-      (entry) =>
-        entry.kind === "repo" &&
-        entry.name === claim.fork &&
-        entry.namespace === namespace &&
-        entry.stage === stage
-    );
+    const known = isRecorded(yield* readLedger, {
+      kind: "repo",
+      name: claim.fork,
+      namespace,
+      stage,
+    });
 
     if (!known) {
       yield* recordCreated({
