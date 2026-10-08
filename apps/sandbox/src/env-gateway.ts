@@ -19,14 +19,15 @@
  * l.145). A compressed or binary body comes back as it is.
  */
 import type { EnvProxy } from "@repo/checks/check-runner";
+import type { EnvKey } from "@repo/protocol/ids";
 import { WorkerEntrypoint } from "cloudflare:workers";
-import { Effect, Option, Result, Stream } from "effect";
+import { Effect, Option, Order, Result, Stream } from "effect";
 
-import { forward } from "./outbound.ts";
+import { forward, refused, resent } from "./outbound.ts";
 
 /** A value the gateway may swap in, with the placeholder the process sees for it. */
 export interface EnvSwapProps {
-  readonly key: string;
+  readonly key: EnvKey;
   readonly placeholder: string;
   readonly value: string;
 }
@@ -37,12 +38,6 @@ export interface EnvGatewayProps {
   /** Empty unless the job runs landed code. */
   readonly values: readonly EnvSwapProps[];
 }
-
-const refused = (text: string) =>
-  new Response(`${text}\n`, {
-    headers: { "content-type": "text/plain; charset=utf-8" },
-    status: 403,
-  });
 
 const escaped = (text: string) =>
   text.replaceAll(/[.+?^${}()|[\]\\]/gu, String.raw`\$&`);
@@ -135,11 +130,21 @@ const swapsFor = (
   );
 };
 
-/** `text` with every `[from, to]` pair's `from` replaced by its `to`. */
+/** Longest `from` first, so a value that holds another is replaced whole. */
+const longestFirst = Order.mapInput(
+  Order.flip(Order.Number),
+  ([from]: Swap) => from.length
+);
+
+/**
+ * `text` with every `[from, to]` pair's `from` replaced by its `to`, the
+ * longest first: a `DATABASE_URL` that holds a `DB_PASSWORD` goes whole,
+ * not as the rest of the URL around the password's placeholder.
+ */
 const replaced = (text: string, pairs: readonly Swap[]) => {
   let done = text;
 
-  for (const [from, to] of pairs) {
+  for (const [from, to] of pairs.toSorted(longestFirst)) {
     done = done.replaceAll(from, to);
   }
 
@@ -158,18 +163,8 @@ const headersReplaced = (headers: Headers, pairs: readonly Swap[]) => {
 };
 
 /** The request that goes on: the container's, its headers swapped. */
-const sent = (request: Request, swaps: readonly Swap[]) => {
-  // Node sends a streamed body only with `duplex: "half"`; the Workers types
-  // lack the key, and workerd ignores it.
-  const init = {
-    body: request.body,
-    duplex: "half",
-    headers: headersReplaced(request.headers, swaps),
-    method: request.method,
-  };
-
-  return new Request(request.url, init);
-};
+const sent = (request: Request, swaps: readonly Swap[]) =>
+  resent(request.url, request, headersReplaced(request.headers, swaps));
 
 /** A body the gateway can read as text and scrub: text-like, and not compressed. */
 const scrubbable = (headers: Headers) => {
@@ -279,7 +274,7 @@ const scrubbed = (response: Response, props: EnvGatewayProps): Response => {
 /** What the gateway answers one request from the container with. */
 const answer = (props: EnvGatewayProps, request: Request) =>
   Result.match(swapsFor(props, request), {
-    onFailure: (reason) => Effect.succeed(refused(reason)),
+    onFailure: (reason) => Effect.succeed(refused(`${reason}\n`)),
     onSuccess: (swaps) =>
       Effect.map(
         Effect.promise(() => forward(sent(request, swaps))),

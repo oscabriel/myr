@@ -96,20 +96,29 @@ const checked = (wire: CheckWire) =>
     return { calls: fake.calls, outcome };
   });
 
+/** A job of landed code, carrying the value its gateway swaps in. */
+const landedJob = () =>
+  jobWith({
+    landed: true,
+    values: [{ key: SENTRY, value: Redacted.make(VALUE) }],
+  });
+
 describe("the Checker's env", () => {
   it.effect(
-    "sets each placeholder in the env of setup and of every lane, and no value",
+    "sets each placeholder in the env of setup and of every lane, and no value, even in a landed job",
     () =>
       Effect.gen(function* () {
-        const { calls } = yield* checked(jobWith());
+        for (const wire of [jobWith(), landedJob()]) {
+          const { calls } = yield* checked(wire);
 
-        const envs = [...envsOf(calls, SETUP), ...envsOf(calls, UNIT)];
+          const envs = [...envsOf(calls, SETUP), ...envsOf(calls, UNIT)];
 
-        expect(envs).toHaveLength(2);
+          expect(envs).toHaveLength(2);
 
-        for (const env of envs) {
-          expect(env[SENTRY]).toBe(PLACEHOLDER);
-          expect(Object.values(env)).not.toContain(VALUE);
+          for (const env of envs) {
+            expect(env[SENTRY]).toBe(PLACEHOLDER);
+            expect(Object.values(env)).not.toContain(VALUE);
+          }
         }
       })
   );
@@ -295,7 +304,7 @@ const fetched = (gateway: EnvGateway, request: Request) =>
     )
   );
 
-describe(EnvGateway, () => {
+describe("the env gateway", () => {
   it.effect(
     "for an unlanded job, sends a request its rules allow on with the placeholder unchanged, adding no header",
     () =>
@@ -456,6 +465,40 @@ describe(EnvGateway, () => {
         expect(sent).toStrictEqual([]);
       })
   );
+
+  it.effect(
+    "scrubs a value that holds another whole, leaving no part of it in the response",
+    () =>
+      Effect.gen(function* () {
+        const password = "hunter2-0123456789abcdef";
+        const url = `postgres://ci:${password}@db.example.com/app`;
+
+        yield* upstream(() => Response.json({ connected: url }));
+
+        const answered = yield* fetched(
+          gatewayFor({
+            values: [
+              {
+                key: EnvKey.make("DB_PASSWORD"),
+                placeholder: "__DB_PASSWORD_PLACEHOLDER__",
+                value: password,
+              },
+              {
+                key: EnvKey.make("DATABASE_URL"),
+                placeholder: "__DATABASE_URL_PLACEHOLDER__",
+                value: url,
+              },
+            ],
+          }),
+          releaseRequest()
+        );
+
+        expect(answered).toStrictEqual({
+          status: 200,
+          text: JSON.stringify({ connected: "__DATABASE_URL_PLACEHOLDER__" }),
+        });
+      })
+  );
 });
 
 /**
@@ -500,12 +543,6 @@ const inContainer = (wire: CheckWire) =>
     return { calls: box.calls, outcome };
   });
 
-const landedJob = () =>
-  jobWith({
-    landed: true,
-    values: [{ key: SENTRY, value: Redacted.make(VALUE) }],
-  });
-
 describe("the Checker's container", () => {
   it.effect(
     "intercepts each proxied host ahead of the catch-all, with the egress gateway until egress is off and the env gateway after",
@@ -539,7 +576,7 @@ describe("the Checker's container", () => {
   );
 
   it.effect(
-    "for a landed job, puts no value in the container: not in a command, its env, a file or its start",
+    "for a landed job, puts no value in the container: not in a command, its env, or a gateway's description of its props",
     () =>
       Effect.gen(function* () {
         const { calls } = yield* inContainer(landedJob());
@@ -608,6 +645,22 @@ describe("a check job's env part", () => {
           [{ host: "sentry.io", kind: "intercept", values: 1 }]
         );
         expect(JSON.stringify(calls)).not.toContain(VALUE);
+      })
+  );
+
+  it.effect(
+    "hands the env gateway no value for a job that is not landed, even one that reached the Checker carrying values",
+    () =>
+      Effect.gen(function* () {
+        // Past the codec, which refuses such a job: the Checker's own
+        // filter still keeps the value from the gateway.
+        const { calls } = yield* checked(
+          jobWith({ values: [{ key: SENTRY, value: Redacted.make(VALUE) }] })
+        );
+
+        expect(calls.filter((call) => call.kind === "intercept")).toStrictEqual(
+          [{ host: "sentry.io", kind: "intercept", values: 0 }]
+        );
       })
   );
 });

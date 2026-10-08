@@ -67,8 +67,9 @@ const interceptHost = (host: string): Result.Result<string, string> => {
 
 /**
  * The values a landed job's gateway may swap in: each one whose key a rule
- * that is not `block` names, with the placeholder the process sees for it
- * (the one scrubbed back into a response). None in any other job.
+ * that is not `block` names, with that rule's placeholder, the one the
+ * gateway swaps out of a request and scrubs back into a response. None in
+ * any other job.
  */
 const swapsOf = (
   job: CheckJob,
@@ -83,13 +84,9 @@ const swapsOf = (
   return (job.values ?? []).flatMap(({ key, value }) => {
     const rule = sent.find((each) => each.key === key);
 
-    if (rule === undefined) {
-      return [];
-    }
-
-    const seen = job.placeholders.find((each) => each.key === key);
-
-    return [{ key, placeholder: seen?.placeholder ?? rule.placeholder, value }];
+    return rule === undefined
+      ? []
+      : [{ key, placeholder: rule.placeholder, value }];
   });
 };
 
