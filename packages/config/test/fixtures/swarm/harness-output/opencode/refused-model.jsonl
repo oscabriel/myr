@@ -1,0 +1,2 @@
+{"type":"step_start","timestamp":1791459681667,"sessionID":"ses_ee4ae9e95ffehty1k3fLpMFlH3","part":{"id":"prt_11b516583001j0731LRAm8aoey","sessionID":"ses_ee4ae9e95ffehty1k3fLpMFlH3","messageID":"msg_11b51633e0012hHj2Hi8WtjPzj","type":"step-start","snapshot":"1766483793937eed1e3b0926a5a74633da742b85"}}
+{"type":"error","timestamp":1791459681678,"sessionID":"ses_ee4ae9e95ffehty1k3fLpMFlH3","error":{"type":"provider.invalid-request","message":"The 'gpt-6.1-sol' model is not supported when using Codex with a ChatGPT account."}}

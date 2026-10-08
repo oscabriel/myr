@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","cwd":"/work/.swarm/r1/ivo/clone","session_id":"T-01a11b51-90f5-7698-8967-0e0ffb165412","agent_mode":"medium"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"What word did you reply with? Reply with that word again."}]},"parent_tool_use_id":null,"session_id":"T-01a11b51-90f5-7698-8967-0e0ffb165412"}
+{"type":"assistant","message":{"type":"message","role":"assistant","content":[{"type":"text","text":"ready"}],"stop_reason":"end_turn","usage":{"input_tokens":4,"cache_creation_input_tokens":50914,"cache_read_input_tokens":0,"output_tokens":4,"service_tier":"standard"}},"parent_tool_use_id":null,"session_id":"T-01a11b51-90f5-7698-8967-0e0ffb165412"}
+{"type":"result","subtype":"success","duration_ms":4026,"is_error":false,"num_turns":1,"result":"ready","session_id":"T-01a11b51-90f5-7698-8967-0e0ffb165412"}
