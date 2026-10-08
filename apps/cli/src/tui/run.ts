@@ -28,7 +28,7 @@ import {
   Stdio,
 } from "effect";
 
-import { Policy } from "../policy.ts";
+import { CurrentMode, Policy } from "../policy.ts";
 import { placeOf, reduce, refreshed, start } from "./today.ts";
 import type { DecideCall, TodayViewState } from "./today.ts";
 
@@ -86,11 +86,24 @@ export const OpenScreen = Context.Reference<
 >("cli/tui/OpenScreen", { defaultValue: () => terminal });
 
 /**
+ * The invocation policy given, or else this process's own: the tree's
+ * commands take the policy as `program` does, as a service that may be
+ * absent.
+ */
+const invocation = Effect.flatMap(
+  Effect.serviceOption(Policy),
+  Option.match({
+    onNone: () => Effect.provide(Effect.service(Policy), CurrentMode),
+    onSome: Effect.succeed,
+  })
+);
+
+/**
  * A person at a terminal, by the CLI's invocation policy, who can type
  * there too: anything else is refused before the platform is called.
  */
 const aPersonAtATerminal = Effect.gen(function* () {
-  const { mode, reason } = yield* Policy;
+  const { mode, reason } = yield* invocation;
 
   const typing = yield* Effect.flatMap(
     Stdio.Stdio,

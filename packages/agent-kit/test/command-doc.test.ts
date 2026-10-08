@@ -99,6 +99,7 @@ describe("every command row", () => {
       "logout",
       "mcp",
       "schema",
+      "today",
       "why",
     ]);
   });

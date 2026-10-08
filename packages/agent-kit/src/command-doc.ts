@@ -162,6 +162,17 @@ export const localCommandDocs: readonly CommandDoc[] = [
     source: "local",
     summary: "Print the JSON Schema of a command's payload.",
   },
+  {
+    contract: "today",
+    flags: ["--project", "--tui", "--json"],
+    needsApproval: false,
+    path: ["today"],
+    positional: [],
+    readOnly: true,
+    source: "local",
+    summary:
+      "Show your Today: the decisions to take, each with its evidence and a safe default; --tui opens it full-screen at a terminal.",
+  },
 ];
 
 /**

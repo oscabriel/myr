@@ -8,12 +8,14 @@ import { createTestRenderer } from "@opentui/core/testing";
 import { createElement } from "@opentui/react";
 import { testRender } from "@opentui/react/test-utils";
 import { Brand } from "@repo/brand";
-import { Client, Contracts } from "@repo/protocol/contracts";
+import { toCommand } from "@repo/protocol/cli";
+import { Client, Contracts, TodayOf } from "@repo/protocol/contracts";
 import type { Decide } from "@repo/protocol/contracts";
 import { DecisionClosed, NotDecider } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import {
+  ConfigProvider,
   DateTime,
   Effect,
   Exit,
@@ -27,9 +29,10 @@ import { Command } from "effect/cli";
 import { RpcTest } from "effect/rpc";
 import { TestConsole } from "effect/testing";
 
-import { OutputLive } from "../../src/output.ts";
+import { Output, OutputLive } from "../../src/output.ts";
 import { policyFor } from "../../src/policy.ts";
 import type { Policy } from "../../src/policy.ts";
+import { refusalsIn, views } from "../../src/render.ts";
 import { today as todayCommand } from "../../src/tui/command.ts";
 import { OpenScreen, runTodayTui, TuiRefused } from "../../src/tui/run.ts";
 import type { Screen } from "../../src/tui/run.ts";
@@ -114,14 +117,14 @@ describe("the keys a decider presses on Today", () => {
   });
 });
 
-/** The screen `TodayView` draws for `state`, one string per terminal row. */
-const screenOf = (state: TodayViewState) =>
+/**
+ * The screen `TodayView` draws for `state` on a terminal `height` rows tall
+ * (40 unless given), one string per row.
+ */
+const screenOf = (state: TodayViewState, height = 40) =>
   Effect.acquireUseRelease(
     Effect.promise(() =>
-      testRender(createElement(TodayView, { state }), {
-        height: 40,
-        width: 120,
-      })
+      testRender(createElement(TodayView, { state }), { height, width: 120 })
     ),
     (setup) =>
       Effect.promise(() => setup.renderOnce()).pipe(
@@ -212,6 +215,24 @@ describe("Today as the terminal shows it", () => {
   );
 
   it.live(
+    "keeps the decision under the cursor on a short terminal, counting those above it",
+    () =>
+      Effect.gen(function* () {
+        const rows = yield* screenOf(
+          press(start(today), ["down", "down"]).state,
+          12
+        );
+
+        expect(rows.filter((row) => row.startsWith(">"))).toStrictEqual([
+          ">   datekit/dec-000001  open the ask prop-000001 proposes",
+        ]);
+        expect(rowsWith(rows, "above")).toStrictEqual([
+          "2 decisions above; up to read them",
+        ]);
+      })
+  );
+
+  it.live(
     "names the keys the decision under the cursor takes, and asks before a non-default",
     () =>
       Effect.gen(function* () {
@@ -297,6 +318,37 @@ describe("who may open Today full-screen", () => {
         next: `${Brand.cli} today --json`,
       });
     })
+  );
+});
+
+describe("Today full-screen with no policy given", () => {
+  it.effect(
+    "reads the process's own, as the CLI's tree runs it: an agent's env refuses",
+    () =>
+      Effect.gen(function* () {
+        const exit = yield* Effect.exit(
+          runTodayTui({ project: Option.none() }).pipe(
+            Effect.provide(
+              Layer.mergeAll(
+                ConfigProvider.layer(
+                  ConfigProvider.fromEnv({ env: { CLAUDECODE: "1" } })
+                ),
+                Stdio.layerTest({
+                  stdinIsTerminal: Effect.succeed(true),
+                  stdoutIsTerminal: Effect.succeed(true),
+                }),
+                Layer.mock(Client)({})
+              )
+            )
+          )
+        );
+
+        expect(
+          Option.map(Exit.findErrorOption(exit), (failed) =>
+            Schema.is(TuiRefused)(failed) ? failed.reason : failed
+          )
+        ).toStrictEqual(Option.some("the env names the harness claude-code"));
+      })
   );
 });
 
@@ -520,24 +572,37 @@ const lines = (chunks: readonly unknown[]) =>
   chunks.flatMap((chunk) => String(chunk).split("\n"));
 
 /**
- * `today` as the tree will hold it, run on `args` as the process would:
- * the mode from `env`, a terminal on both ends, and the platform `client`;
- * no screen opens. Returns what it printed on stdout and stderr, and how it
- * ended.
+ * The `today` contract as the CLI would project it, were the hand-written
+ * command not standing in for it: what that command prints without `--tui`
+ * is held to it.
+ */
+const projectedToday = toCommand(TodayOf, Effect.service(Client), {
+  output: Effect.service(Output),
+  refusalsIn,
+  render: views.today,
+});
+
+/**
+ * A `today` command (the tree's own unless given), run on `args` as the
+ * process would: the mode from `env`, a terminal on both ends, and the
+ * platform `client`; no screen opens. Returns what it printed on stdout and
+ * stderr, and how it ended.
  */
 const runToday = (
   args: readonly string[],
   input: {
     readonly client: Layer.Layer<Client>;
+    readonly command?: typeof projectedToday;
     readonly env: Readonly<Record<string, string>>;
   }
 ) => {
   const policy = policyFor({ env: input.env, isTTY: true });
 
   return Effect.gen(function* () {
-    const exit = yield* Effect.exit(
-      Command.runWith(todayCommand, { version: "0.0.0" })(args)
-    );
+    // Either command's failures, read alike.
+    const exit: Exit.Exit<void, unknown> = yield* input.command === undefined
+      ? Effect.exit(Command.runWith(todayCommand, { version: "0.0.0" })(args))
+      : Effect.exit(Command.runWith(input.command, { version: "0.0.0" })(args));
 
     return {
       err: lines(yield* TestConsole.errorLines),
@@ -577,6 +642,25 @@ describe("the today command, with and without --tui", () => {
             Schema.is(TuiRefused)(failed) ? failed.next : failed
           )
         ).toStrictEqual(Option.some(`${Brand.cli} today --json`));
+      })
+  );
+
+  it.effect(
+    "is the CLI's today: under an agent, --tui ends in one line and exit 2",
+    () =>
+      Effect.gen(function* () {
+        const { code, err, out } = yield* runProgram(["today", "--tui"], {
+          env: { CLAUDECODE: "1" },
+          handlers: unanswered,
+        });
+
+        expect({ code, err, out }).toStrictEqual({
+          code: 2,
+          err: [
+            `${Brand.cli} today --tui needs a person at a terminal, but the env names the harness claude-code: run ${Brand.cli} today --json instead`,
+          ],
+          out: [],
+        });
       })
   );
 
@@ -626,9 +710,12 @@ describe("the today command, with and without --tui", () => {
           Contracts.toLayerHandler("today", () => Effect.succeed(today))
         );
 
-        const projected = yield* runProgram(["today", ...flags], {
+        const projected = yield* runToday(flags, {
+          client: Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
+            Layer.provide([handlers, asTester])
+          ),
+          command: projectedToday,
           env: {},
-          handlers,
         });
 
         const ours = yield* runToday(flags, { client, env: {} });

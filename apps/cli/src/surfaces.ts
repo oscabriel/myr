@@ -41,6 +41,7 @@ import { local } from "./local/index.ts";
 import { Output } from "./output.ts";
 import { refusalsIn, views } from "./render.ts";
 import { repoContext } from "./repo-context.ts";
+import { today } from "./tui/command.ts";
 
 /** The folder the CLI stands in: the process's own, unless a test says otherwise. */
 export const WorkingDirectory = Context.Reference<string>(
@@ -77,10 +78,11 @@ export interface CommandEntry {
 
 /**
  * Contracts that a hand-written command wraps: `init` creates the project
- * after its local work, and `env set` reads the value from stdin so it never
- * passes through an argument list or a transcript.
+ * after its local work, `env set` reads the value from stdin so it never
+ * passes through an argument list or a transcript, and `today` takes
+ * `--tui`, which opens Today full-screen for a person at a terminal.
  */
-const wrapped = ["initProject", "setEnv"];
+const wrapped = ["initProject", "setEnv", "today"];
 
 /** Every contract served on the CLI, but those wrapped, as a command. */
 const projected = toCommands(Contracts, Effect.service(Client), {
@@ -256,13 +258,15 @@ export const entries: readonly CommandEntry[] = [
   ...projected,
   ...local,
   { command: schema, path: ["schema"] },
+  { command: today, path: ["today"] },
 ];
 
 /** Any command in the tree: what it may fail with, and what it needs. */
 type Every =
   | (typeof projected)[number]["command"]
   | (typeof local)[number]["command"]
-  | typeof schema;
+  | typeof schema
+  | typeof today;
 
 /**
  * A command at the top of the tree. Merging erases each command's own type,

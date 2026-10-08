@@ -1,7 +1,8 @@
 /**
  * Today on a terminal screen, drawn by OpenTUI's React renderer from the
  * state alone: whose Today it is and the budget; the decisions in the order
- * a decider takes them, each with what it is about, when it expires (marked
+ * a decider takes them, from the one under the cursor on (those above it
+ * counted), each with what it is about, when it expires (marked
  * when that is within the day), its default and its evidence; the newcomers
  * to welcome; what the last choice came to; and the keys the decision under
  * the cursor takes. Written with `createElement`, so the CLI's `.ts` build
@@ -59,11 +60,16 @@ const plural = (count: number, one: string, many: string) =>
 const capitalized = (word: string) =>
   `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`;
 
+/**
+ * Boxes and lines keep their own height: on a terminal shorter than Today
+ * the screen is cut at its foot, never squeezed into rows drawn over each
+ * other.
+ */
 const box = (props: BoxProps, ...children: readonly JSX.Element[]) =>
-  createElement("box", props, ...children);
+  createElement("box", { flexShrink: 0, ...props }, ...children);
 
 const line = (content: string, props: TextProps = {}) =>
-  createElement("text", { wrapMode: "word", ...props }, content);
+  createElement("text", { flexShrink: 0, wrapMode: "word", ...props }, content);
 
 const muted = { attributes: TextAttributes.DIM } as const satisfies TextProps;
 
@@ -120,9 +126,15 @@ const Entry = ({
     )
   );
 
+/**
+ * The decisions from the one under the cursor on, those above it only
+ * counted: whatever the terminal's height, the decision a key would take is
+ * drawn just below the budget, never cut off at the foot of the screen.
+ */
 const Decisions = ({ state }: { readonly state: TodayViewState }) => {
   const ordered = inOrder(state.today);
   const isSoon = soonIn(state.today);
+  const above = state.cursor;
 
   return ordered.length === 0
     ? line(
@@ -130,10 +142,18 @@ const Decisions = ({ state }: { readonly state: TodayViewState }) => {
       )
     : box(
         { flexDirection: "column", gap: 1 },
-        ...ordered.map((decision, index) =>
+        ...(above === 0
+          ? []
+          : [
+              line(
+                `${plural(above, "decision", "decisions")} above; up to read them`,
+                muted
+              ),
+            ]),
+        ...ordered.slice(above).map((decision, index) =>
           createElement(Entry, {
             decision,
-            here: index === state.cursor,
+            here: index === 0,
             key: placeOf(decision.project, decision.id),
             soon: isSoon(decision),
           })
