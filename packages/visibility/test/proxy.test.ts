@@ -1,8 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import { EnvItem } from "@repo/protocol/domain/env";
-import { EnvKey } from "@repo/protocol/ids";
-import { Option, Schema } from "effect";
+import { EnvKey, LandedSha, ProjectName, RepoPath } from "@repo/protocol/ids";
+import { Effect, Option, Schema } from "effect";
 
+import committed from "../../../examples/datekit/.env.schema?raw";
+import { EnvSchemaParser } from "../src/env-schema.ts";
+import { EnvSchemaParserEnvSpec } from "../src/env-schema/env-spec.ts";
+import { envSchemaViewOf } from "../src/env-shape.ts";
 import { placeholderFor, proxyMap } from "../src/proxy.ts";
 
 const item = Schema.decodeUnknownSync(EnvItem);
@@ -67,6 +71,31 @@ describe("the outbound map", () => {
       },
     ]);
   });
+
+  // 603 x 610: the map above is fed datekit's items as written by hand; this
+  // one reads the committed file through the real parser, so a drift in
+  // either half (a lost path, a rule read as blocked) changes the rule.
+  it.effect(
+    "maps datekit's committed .env.schema, as the parser reads it, onto that same rule",
+    () =>
+      Effect.gen(function* () {
+        const file = RepoPath.make(".env.schema");
+        const parser = yield* EnvSchemaParser;
+        const parsed = yield* parser.parse(file, committed);
+
+        const shown = envSchemaViewOf({
+          at: LandedSha.make("b2".repeat(20)),
+          file,
+          parsed,
+          project: ProjectName.make("datekit"),
+        });
+
+        expect(proxyMap(shown)).toStrictEqual(proxyMap(datekit));
+        expect(
+          proxyMap(shown).map(({ host, path }) => ({ host, path }))
+        ).toStrictEqual([{ host: "sentry.io", path: Option.some("/api/**") }]);
+      }).pipe(Effect.provide(EnvSchemaParserEnvSpec))
+  );
 
   it("gives a blocked item a rule that denies", () => {
     expect(
