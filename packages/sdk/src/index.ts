@@ -1,8 +1,9 @@
 /**
- * What maintainers import in the config folder (its `project.ts` and
- * `asks/<id>.ask.ts`): object literals and named helpers that evaluate
- * to plain policy data. It runs inside a network-off sandbox, so it reads no
- * file, clock or randomness; the rules evaluator does the rest.
+ * What maintainers import in the config folder (its `project.ts`,
+ * `asks/<id>.ask.ts` and `visibility.ts`, and a layer's `layer.ts`): object
+ * literals and named helpers that evaluate to plain policy data. It runs
+ * inside a network-off sandbox, so it reads no file, clock or randomness;
+ * the rules evaluator does the rest.
  */
 export { check, type CheckSpecInput, type RatchetMeasure } from "./check.ts";
 
@@ -63,6 +64,28 @@ export {
   territory,
   type TerritoryInput,
 } from "./territory.ts";
+
+export {
+  type AreaOf,
+  deciders,
+  embargo,
+  flows,
+  type FlowsDefinition,
+  layer,
+  type LayerConfig,
+  type LayerDefinition,
+  type LayerHolds,
+  layerManifest,
+  type LayerManifestDefinition,
+  type MembersInput,
+  personal,
+  type SealedCheckInput,
+  sealedChecks,
+  type SealedChecksDefinition,
+  visibility,
+  type VisibilityConfig,
+  type VisibilityDefinition,
+} from "./visibility.ts";
 
 /**
  * The version of these rules, part of every check version

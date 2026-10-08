@@ -1,11 +1,13 @@
 /**
  * The package's `./rules` export: the sdk a maintainer imports in the config
- * folder (`project.ts`, `asks/<id>.ask.ts`), inlined at build time so the
- * published package names no workspace package. It names every export of
- * `@repo/sdk`; `test/build.test.ts` fails when the two drift apart.
+ * folder (`project.ts`, `asks/<id>.ask.ts`, `visibility.ts`; a layer's
+ * `layer.ts`), inlined at build time so the published package names no
+ * workspace package. It names every export of `@repo/sdk`;
+ * `test/build.test.ts` fails when the two drift apart.
  */
 export {
   type Admit,
+  type AreaOf,
   type ArgFields,
   type AskArgs,
   type AskDefinition,
@@ -17,9 +19,13 @@ export {
   ClaimantFacts,
   type CheckSpecInput,
   type Days,
+  deciders,
   type DeclaredKind,
   defaults,
   type DeriveTerritory,
+  embargo,
+  flows,
+  type FlowsDefinition,
   FromWorkspaces,
   Functions,
   functionsOf,
@@ -29,9 +35,17 @@ export {
   type KindFunctions,
   type KindHandle,
   kinds,
+  layer,
+  type LayerConfig,
+  type LayerDefinition,
+  type LayerHolds,
+  layerManifest,
+  type LayerManifestDefinition,
+  type MembersInput,
   type ModulesInput,
   type OpensAlone,
   packageDir,
+  personal,
   project,
   type ProjectConfig,
   type ProjectDefinition,
@@ -43,6 +57,9 @@ export {
   type RunBlockInput,
   type RunInput,
   sdkVersion,
+  type SealedCheckInput,
+  sealedChecks,
+  type SealedChecksDefinition,
   type Span,
   territory,
   type TerritoryInput,
@@ -50,6 +67,9 @@ export {
   type TestCommand,
   toAskInput,
   toPolicyInput,
+  visibility,
+  type VisibilityConfig,
+  type VisibilityDefinition,
   type VouchMode,
   type WithFunctions,
 } from "@repo/sdk";
