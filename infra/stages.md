@@ -2,20 +2,33 @@
 
 A stage is one full copy of the platform on Cloudflare: its own Workers, Workflows, Artifacts namespaces (public and private), database, KV namespace and buckets. `infra/stages.ts` is the one table of stage names and resource names. Every other file, both `wrangler.jsonc` files included, matches it, and `packages/config/test/bootstrap.test.ts` checks that they do.
 
-| Stage | What it is for |
-| --- | --- |
-| `dev-<user>` | One person's iteration. Today there is one, `dev-oscabriel`. Deploy it as often as you like. |
-| `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). |
+This file has six parts, then how to run a stage:
 
-There is no `prod` stage before the deadline (spec §8 D13). The top level of each `wrangler.jsonc` is stage `local`, for tests and `wrangler dev`, and it is never deployed. A new person's stage is added to `stages` in `stages.ts` and gets an `env` block in each `wrangler.jsonc`, in the same change.
+1. [Stages](#1-stages)
+2. [Resources per stage](#2-resources-per-stage)
+3. [Throwaway ledger summary](#3-throwaway-ledger-summary)
+4. [Teardown policy](#4-teardown-policy)
+5. [Human steps status](#5-human-steps-status)
+6. [URLs](#6-urls)
 
-## What a stage owns
+Sections 1 to 6 hold the state as of 2026-10-08, 14:00 UTC, read from the account with read-only calls.
+
+## 1. Stages
+
+| Stage | What it is for | State on 2026-10-08 |
+| --- | --- | --- |
+| `dev-oscabriel` | One person's iteration. Deploy it as often as you like. | Bootstrapped 2026-10-07 and deployed (platform, sandbox, web). Re-checked 2026-10-08: bootstrap created nothing, and the platform holds every required secret. |
+| `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). | Bootstrapped 2026-10-08: six resources created, migrations `0001` to `0004` applied, and a second run created nothing. Its secrets are set. Its Workers aren't deployed yet. |
+
+There is no `prod` stage before the deadline. The top level of each `wrangler.jsonc` is stage `local`, for tests and `wrangler dev`, and it is never deployed. A new person's stage is added to `stages` in `stages.ts` and gets an `env` block in each `wrangler.jsonc`, in the same change.
+
+## 2. Resources per stage
 
 Every name is a job name plus the stage, never the brand. For stage `<s>`:
 
 | Resource | Name | Made by |
 | --- | --- | --- |
-| Workers | `platform-<s>`, `sandbox-<s>`, `web-<s>` (once `apps/web` exists) | deploy |
+| Workers | `platform-<s>`, `sandbox-<s>`, `web-<s>` | deploy |
 | Workflows | `answer-<s>`, `on-push-<s>` | deploy (they live in `platform-<s>`) |
 | Artifacts namespace (public) | `projects-<s>` | bootstrap |
 | Artifacts namespace (private: every project's layer repos, bound only by the platform) | `layers-<s>` | bootstrap |
@@ -27,13 +40,112 @@ Every name is a job name plus the stage, never the brand. For stage `<s>`:
 
 The `witness` namespace belongs to another project. Nothing here reads, writes or deletes it, and neither should you.
 
-## Before the first run
+Every resource in the two tables below belongs to its stage. The times are the account's own creation times, in UTC. A KV namespace has no creation time, so its row gives the bootstrap run that made it.
 
-1. **Log Wrangler in**, once per machine: `apps/platform/node_modules/.bin/wrangler login`. Deploys and the D1, KV and R2 creates use this login, never the infra token.
+### `dev-oscabriel`
+
+| Resource | Name | Created by | When | Keep? |
+| --- | --- | --- | --- | --- |
+| Artifacts namespace | `projects-dev-oscabriel` | bootstrap | 2026-10-07 20:17 | keep (needs the user to delete) |
+| D1 | `front-page-dev-oscabriel` | bootstrap | 2026-10-07 20:17 | keep (needs the user to delete) |
+| KV | `oauth-dev-oscabriel` | bootstrap | 2026-10-07 (first run) | keep (needs the user to delete) |
+| R2 | `evidence-dev-oscabriel` | bootstrap | 2026-10-07 20:17 | keep (needs the user to delete) |
+| Worker | `sandbox-dev-oscabriel` | deploy | 2026-10-07 20:19 | keep (needs the user to delete) |
+| Worker | `platform-dev-oscabriel` | deploy | 2026-10-07 20:19 | keep (needs the user to delete) |
+| Workflow | `answer-dev-oscabriel` | deploy | 2026-10-07 20:19 | keep (needs the user to delete) |
+| Workflow | `on-push-dev-oscabriel` | deploy | 2026-10-07 20:19 | keep (needs the user to delete) |
+| Push-event trigger | `projects-dev-oscabriel` → `on-push-dev-oscabriel` | deploy | 2026-10-07 | keep (needs the user to delete) |
+| R2 | `releases-dev-oscabriel` | bootstrap | 2026-10-08 01:02 | keep (needs the user to delete) |
+| Worker | `web-dev-oscabriel` | deploy | 2026-10-08 05:17 | keep (needs the user to delete) |
+| Artifacts namespace | `layers-dev-oscabriel` | bootstrap | 2026-10-08 09:58 | keep (needs the user to delete) |
+| Secrets on `platform-dev-oscabriel` | `OPERATOR_TOKEN`, `SESSION_TOKENS`, `COOKIE_KEY`, `PASSWORD_PEPPER`, `MASTER_KEY` | generated, carried by deploy (see [Secrets](#secrets)) | 2026-10-07 and 2026-10-08 | keep (needs the user to delete); rotate before going public |
+| Seeded projects | `datekit` (with its `datekit--maintainers` layer repo) and `burrow` in `projects-dev-oscabriel` | seed | 2026-10-07 and 2026-10-08 | keep while the dev stage is used |
+
+### `demo`
+
+| Resource | Name | Created by | When | Keep? |
+| --- | --- | --- | --- | --- |
+| Artifacts namespace | `projects-demo` | bootstrap | 2026-10-08 13:57 | keep (needs the user to delete) |
+| Artifacts namespace | `layers-demo` | bootstrap | 2026-10-08 13:57 | keep (needs the user to delete) |
+| D1 | `front-page-demo`, with migrations `0001` to `0004` | bootstrap | 2026-10-08 13:57 | keep (needs the user to delete) |
+| KV | `oauth-demo` | bootstrap | 2026-10-08 13:57 (the run) | keep (needs the user to delete) |
+| R2 | `evidence-demo` | bootstrap | 2026-10-08 13:57 | keep (needs the user to delete) |
+| R2 | `releases-demo` | bootstrap | 2026-10-08 13:57 | keep (needs the user to delete) |
+| Worker | `platform-demo`: a placeholder with no code and no workers.dev route, made by the first `wrangler secret put` to hold the secrets. The first deploy replaces its code. | `wrangler secret put` | 2026-10-08 13:58 | keep (needs the user to delete) |
+| Secrets on `platform-demo` | `OPERATOR_TOKEN`, `SESSION_TOKENS`, `COOKIE_KEY`, `PASSWORD_PEPPER`, `MASTER_KEY` | generated, set with `wrangler secret put` (see [Secrets](#secrets)) | 2026-10-08 13:58 | keep (needs the user to delete); rotate before going public |
+| Workers, Workflows and trigger | `sandbox-demo`, `web-demo`, `answer-demo`, `on-push-demo`, the push-event trigger | deploy | not yet: the demo's first deploy | keep (needs the user to delete) |
+
+## 3. Throwaway ledger summary
+
+A throwaway is something a smoke run, a swarm run or a `seed --as` copy makes on a stage, beside the stage's own resources. Each run appends one JSON line for each throwaway to `infra/created.jsonl` (`infra/created.ts`), and teardown acts only on those lines.
+
+On 2026-10-08 the ledger holds one entry, which still exists:
+
+| When | By | Kind | Name | Where |
+| --- | --- | --- | --- | --- |
+| 2026-10-08 12:37 | swarm | repo | `burrow--drop-legacy-fetch-burrow-auth--wren` (a released claim's fork) | `projects-dev-oscabriel` |
+
+The live runs before the ledger existed left throwaways that it doesn't hold, all on `dev-oscabriel`. Teardown lists them separately and checks each one still exists before it deletes anything:
+
+- In `projects-dev-oscabriel`, 25 repos on 2026-10-08. Two of them, `datekit` and `burrow`, are the stage's seeded examples, and their working and claim forks (`datekit--me--ines-v`, `datekit--format-ordinal--bram`, `datekit--add-months-clamp--bram`) belong to them. The rest are test projects and their forks: `w3live-muyjz31t`, `w3live-muyk0528`, `w3live-muyk72qm`, `w3live-muykamf1`, `w3live-muyklikt` (with `--parse-iso--alice`), `w3live-muyl0wps` (with `--parse-iso--alice`), `w3live-muyl2z12` (with `--parse-iso--alice`), `scratch-onpush-muykseuk`, `w4-rehearsal` (with `--first-day--alice`, `--canada-sunday--alice`, `--brazil-sunday--alice` and `--mexico-sunday--alice`), and `w4-ratchet` (with `--no-any-in-parser--alice` and `--pad-day--bob`).
+- The secret `S8B_PROBE` on `platform-dev-oscabriel`.
+- The test accounts `w3tester-muyk9zdx` and `w5web-muz3airr` in `front-page-dev-oscabriel`, and the latter's OAuth grant in `oauth-dev-oscabriel`.
+- The Project Durable Objects and front-page rows of those test projects. They are harmless and are not deleted.
+
+`demo` has no throwaways, and nothing that makes them is meant to run there: the core-loop smoke and the swarm's rehearsals run on the dev stage, the swarm on a `seed --as` copy.
+
+## 4. Teardown policy
+
+- This build deletes only throwaway resources recorded in `infra/created.jsonl` that it no longer needs.
+- It never deletes a stage's Workers, namespaces, D1, KV or R2 without the user.
+- It never touches `witness`.
+
+No agent deletes a Cloudflare resource itself. Teardown first prints its plan: the ledger's entries that still exist, minus every stage's own names and `witness`. The deletes in that plan, together with the pre-ledger leftovers in section 3 that still exist, are written into one script that the user reads and then runs in their own terminal. A stage itself is torn down only by hand, by the user, as [Tear down a stage](#tear-down-a-stage) says.
+
+## 5. Human steps status
+
+As of 2026-10-08, after the demo's bootstrap. "Agent" is the build's agent.
+
+| Step | Status | What the agent prepared | What the user does next |
+| --- | --- | --- | --- |
+| H1: a custom domain | Not done, and optional. The stages live on workers.dev. | Nothing needs it. | If wanted, buy the domain and say so. The agent then adds `routes` to each `wrangler.jsonc` and redeploys `demo`. |
+| H2: the npm org and publishing the CLI | Open. | `bun run release -- --build` stages the npm package in `apps/cli/release/npm/`. `--publish` runs every other step and prints the publish command. | Create the npm org, run `npm login`, then `npm publish apps/cli/release/npm --access public` in your own terminal. |
+| H3: the GitHub org and the public repo | Open, due before submission (Oct 14). | Every commit is on local `main`. No remote exists and nothing has been pushed. | Create the org and an empty public repo, then `git remote add origin …` and push. Before that, rotate the generated secrets (the H5 row). |
+| H4: a Google OAuth client | Not done, and optional. Sign-in works with platform accounts (a handle and a password). | The redirect URIs are in [section 6](#6-urls). Migrations `0003_identities.sql` and later are applied on both stages. | Only if Google sign-in is wanted: create a Web client with the stage's redirect URI, set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` together, then redeploy. |
+| H5: secret values | Done by the agent on both stages, under a recorded decision that extends generated secrets to `demo` (see [Secrets](#secrets)). Not blocking. | Five values per stage, generated and kept only in that stage's secrets file outside the repo (mode 600), never printed or committed. `SESSION_TOKENS` on `demo` holds bram, ines-v, okafor, okonkwo, lin-h and the swarm's six (wren, tamsin, ivo, marisol, dagny, pell). | **Rotate both stages' generated secrets before the repo goes public**, and keep a copy of each stage's `MASTER_KEY` somewhere other than this machine. Rotating `PASSWORD_PEPPER` breaks every stored password, rotating `MASTER_KEY` loses every stored env value unless they are re-wrapped first, and rotating `SESSION_TOKENS` means each CLI profile logs in again. |
+| H6: Workers Paid | Confirmed. | The account's subscriptions, read again on 2026-10-08, list `workers_paid` as Paid. The sandbox (containers) and both Workflows have run on `dev-oscabriel` since 2026-10-07. | Nothing. |
+| H7: the recording | Open (Oct 13). | `docs/demo/` holds the script, the shot list and the rehearsal checklist. The demo stage is bootstrapped. Its deploy, seed, rehearsal and a recording lock for deploys come next. | Record with no deploys during takes. |
+| H8: submitting | Open, due Oct 14 by noon PDT. | Nothing yet. The demo URL comes after the demo's deploy (section 6). | Submit the repo URL, the video and the demo URL. |
+| H9: `docker login` | Not needed so far. No image pull has been rate-limited. | Nothing. | Only if a deploy's image pull is rate-limited: run `docker login` in your own terminal. |
+| OpenCode Zen key for the swarm's pell | Open. | pell is planned on `opencode/gemini-3.8-flash`. The fallback, a one-line swap to `opencode-go/qwen3.8-flash`, is recorded. | Add OpenCode Zen's key to pi, or accept the fallback. |
+| Deleting the throwaways | Open, after the rehearsal. | The teardown plan (section 4). | Read the teardown script and run it in your own terminal. |
+
+## 6. URLs
+
+The account's workers.dev subdomain is in `infra/workers-dev.json`. The demo's rows are filled in when it is deployed.
+
+| Stage | What | URL | State on 2026-10-08 |
+| --- | --- | --- | --- |
+| `dev-oscabriel` | platform | `https://platform-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/health` answers 200) |
+| `dev-oscabriel` | web | `https://web-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/` answers 200) |
+| `dev-oscabriel` | CLI install | `https://platform-dev-oscabriel.oscargabriel.workers.dev/install.sh` | served from `releases-dev-oscabriel` |
+| `dev-oscabriel` | Google redirect URI (H4) | `https://platform-dev-oscabriel.oscargabriel.workers.dev/oauth/google/callback` | not registered |
+| `dev-oscabriel` | sandbox | none: it has no workers.dev route, and only the platform reaches it | deployed |
+| `demo` | platform | `https://platform-demo.oscargabriel.workers.dev` | not deployed: a placeholder that holds the secrets, with no route (404) |
+| `demo` | web | `https://web-demo.oscargabriel.workers.dev` | not deployed |
+| `demo` | CLI install | `https://platform-demo.oscargabriel.workers.dev/install.sh` | after the deploy and a `release --upload --stage demo` |
+| `demo` | Google redirect URI (H4) | `https://platform-demo.oscargabriel.workers.dev/oauth/google/callback` | not registered |
+| `demo` | sandbox | none: it has no workers.dev route | not deployed |
+
+## Running a stage
+
+### Before the first run
+
+1. **Log Wrangler in**, once per machine: `apps/platform/node_modules/.bin/wrangler login`. Deploys and the D1, KV and R2 creates use this login, never the infra token. Once the login is stale, `wrangler d1 list` fails with `Authentication error [code: 10000]`, and `wrangler whoami` refreshes it.
 2. **Set the infra credentials**, `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`, as `infra/.env.schema` describes. The token uses the "Read all resources" template plus Account › Artifacts › Edit. `bun run bootstrap` and `bun run ops` get them through `varlock run --path infra/`. To check they are set without seeing them, run `bun run env:check`.
-3. **Confirm the plan**: Containers and Workflows need Workers Paid (H6; confirmed on this account, spec §8.3 O2).
+3. **Confirm the plan**: Containers and Workflows need Workers Paid (H6, confirmed on this account in section 5).
 
-## Bootstrap a stage
+### Bootstrap a stage
 
 ```sh
 bun run bootstrap -- --stage dev-oscabriel
@@ -44,35 +156,35 @@ It refuses a stage that `stages.ts` doesn't declare. Then it:
 1. reads what exists: the stage's two Artifacts namespaces (`projects-<s>` and `layers-<s>`) over REST, and the account's D1 databases, KV namespaces and R2 buckets through Wrangler;
 2. creates only what is missing, so a second run creates nothing;
 3. writes the new D1 and KV ids into the stage's block of `apps/platform/wrangler.jsonc`, touching nothing else in the file (commit that change);
-4. applies the front page's migrations (`wrangler d1 migrations apply front-page-<s> --remote --env <s>`), once `apps/platform/migrations/` exists;
+4. applies the front page's migrations (`wrangler d1 migrations apply front-page-<s> --remote --env <s>`);
 5. records the account's workers.dev subdomain in `infra/workers-dev.json`, so smoke knows where the stage lives;
-6. checks by name that the deployed platform holds every secret its `.env.schema` requires. Before the first deploy there is no Worker to hold them, so it says which ones that deploy has to carry.
+6. checks by name that the platform Worker holds every secret its `.env.schema` requires. Before the platform exists there is nothing to hold them, so it says which ones the first deploy has to carry.
 
 It never deletes anything and never prints or reads a secret's value.
 
-`bun run bootstrap -- --stage <s> --dry-run` does only the first step and lists what the run would create. It creates nothing and writes no file.
+`bun run bootstrap -- --stage <s> --dry-run` does only the first step and lists what the run would create. It creates nothing and writes no file. On a stage that is complete it prints `would create 0`.
 
-## Secrets
+### Secrets
 
 `apps/platform/.env.schema` names them. Values never go in the repo.
 
 | Name | Needed |
 | --- | --- |
 | `OPERATOR_TOKEN` | Always. The operator's bearer token, at least 32 characters. |
-| `SESSION_TOKENS` | Optional. A JSON object from token to handle, for the demo's named people (spec §8 D9). |
+| `SESSION_TOKENS` | Optional. A JSON object from token to handle, for the demo's named people (the seed's deciders, the on-screen people and the swarm's contributors). |
 | `COOKIE_KEY` | Always. Seals a sign-in in progress into its form (HMAC-SHA-256), at least 32 characters. |
 | `PASSWORD_PEPPER` | Always. Every password is HMAC'd with it before PBKDF2, at least 32 characters. Changing it makes every stored password fail to verify. |
-| `MASTER_KEY` | Always (W6). 64 hex characters: the 256-bit key that wraps every write-only env value. Losing it loses every stored value, so keep a copy outside the machine. |
+| `MASTER_KEY` | Always. 64 hex characters: the 256-bit key that wraps every write-only env value. Losing it loses every stored value, so keep a copy outside the machine. |
 
 To set them for a stage, do one of these:
 
+- **A generated secrets file (both stages).** Keep a dotenv file for the stage outside the repo with mode 600, holding crypto-random values (32 bytes in base64url each, and `MASTER_KEY` as 64 hex characters). Deploy with `STAGE_SECRETS_FILE=<that file> bun run deploy -- --stage <s>`. The platform's deploy step gets only the names `.env.schema` declares, as its environment, and that environment overrides any `.env` value. Nothing prints them. `dev-oscabriel` has used one since its first deploy. `demo` has had one since 2026-10-08, by a recorded decision made under the user's blanket approval, and the same values were set on `platform-demo` with `wrangler secret put` before its first deploy. Both stages' values were generated by the build's agent, so rotate them before the repo goes public (section 5).
 - **varlock (H5).** Write `NAME=varlock(prompt)` for each one into `apps/platform/.env.local`, run `./node_modules/.bin/varlock load --path apps/platform/` in your own terminal, then deploy. `varlock-wrangler` hands the values to the Worker.
-- **A secrets file (dev stages only, spec §8.3 O1).** Keep a dotenv file outside the repo with mode 600, and deploy with `STAGE_SECRETS_FILE=<that file> bun run deploy -- --stage dev-<user>`. The platform's deploy step gets only the names `.env.schema` declares, as its environment, and that environment overrides any `.env` value. Nothing prints them. A deploy to `demo` refuses the file before it runs anything.
-- **By hand**, one at a time: `apps/platform/node_modules/.bin/wrangler secret put <NAME> --env <s>` in `apps/platform`, with the value on stdin.
+- **By hand**, one at a time: `apps/platform/node_modules/.bin/wrangler secret put <NAME> --env <s>` in `apps/platform`, with the value on stdin. On a stage whose platform isn't deployed yet, this makes `platform-<s>` as an empty placeholder Worker that the first deploy replaces. A deploy still needs the values through one of the two ways above, since varlock-wrangler resolves every required name.
 
 Sign-in uses the platform's own accounts (handle and password), so no stage needs a third-party OAuth app. A stage's platform lives at `https://platform-<s>.<subdomain>.workers.dev`; the subdomain is in `infra/workers-dev.json` once bootstrap has run.
 
-## Deploy a stage
+### Deploy a stage
 
 ```sh
 bun run deploy -- --stage dev-oscabriel
@@ -83,7 +195,7 @@ Without `--stage`, or with a stage `stages.ts` doesn't declare, it refuses befor
 1. `bun run verify`. If the gate is red, nothing after it runs.
 2. The `sandbox` deploy (`wrangler deploy --env <s>`), first, because the platform's `SANDBOX` binding names it.
 3. The `platform` deploy (`varlock-wrangler deploy --env <s>`), which resolves `.env.schema` and sends the secrets.
-4. The `web` build and deploy, once `apps/web` exists.
+4. The `web` build and deploy.
 5. A read-back of the push-event trigger (`bun run bootstrap -- --stage <s> --check-triggers`), because Wrangler's output doesn't prove it exists.
 6. `bun scripts/smoke.ts --stage <s>`.
 
@@ -91,7 +203,7 @@ Then it prints the redirect URI a Google OAuth client registers for the stage (`
 
 Every command runs with `WRANGLER_SEND_METRICS=false`, and with its own folder's `node_modules/.bin` first on `PATH`, so each app deploys with its pinned Wrangler. The first failing step stops the deploy and names that step.
 
-## Smoke-test a stage
+### Smoke-test a stage
 
 ```sh
 bun run smoke -- --stage dev-oscabriel
@@ -112,11 +224,11 @@ Smoke only reads, from the platform and then the web. Every probe runs even when
 | `web-front-page` | the web's `GET /` answers 200 with HTML |
 | `web-llms-txt` | the web's `GET /llms.txt` answers 200 with Markdown that opens with its title; the web builds it from the platform's project list, so it passes only when the web reaches the platform through its service binding |
 
-## Tear down a stage
+### Tear down a stage
 
-None of this is automated: the scripts never delete, and nobody runs `wrangler delete` or cf's `delete` without the user's OK (`wrangler delete` auto-confirms in a non-interactive shell). Tear down only what this build created, which means only names from the table above, and never `witness`. A person runs these in their own terminal. Wrangler's commands run from the app's folder with that app's `node_modules/.bin/wrangler`.
+None of this is automated, and it is the user's alone (section 4): no script deletes a stage's resources, and nobody runs `wrangler delete` or cf's `delete` without the user's OK (`wrangler delete` auto-confirms in a non-interactive shell). Tear down only what this build created, which means only names from section 2, and never `witness`. A person runs these in their own terminal. Wrangler's commands run from the app's folder with that app's `node_modules/.bin/wrangler`.
 
-1. The Workers: `wrangler delete --env <s>` in `apps/web` (if deployed), then `apps/platform`, then `apps/sandbox`. Then `wrangler workflows delete answer-<s>` and `wrangler workflows delete on-push-<s>`, if they remain.
+1. The Workers: `wrangler delete --env <s>` in `apps/web`, then `apps/platform`, then `apps/sandbox`. Then `wrangler workflows delete answer-<s>` and `wrangler workflows delete on-push-<s>`, if they remain.
 2. The Artifacts repos, then the namespaces, `projects-<s>` and `layers-<s>` alike. List a namespace's repos with `bun run ops -- artifacts namespaces repos list --namespace <namespace>`, delete each one with `bun run ops -- artifacts namespaces repos delete <repo> --namespace <namespace> --force`, then `bun run ops -- artifacts namespaces delete --namespace <namespace>`. A namespace has to be empty before it can be deleted.
 3. The database: `wrangler d1 delete front-page-<s>`.
 4. The KV namespace: `wrangler kv namespace delete --namespace-id <id>`. The id is in the stage's block of `apps/platform/wrangler.jsonc`.

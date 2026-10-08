@@ -21,10 +21,9 @@
  *
  * `STAGE_SECRETS_FILE` names a dotenv file outside the repo whose values the
  * platform's deploy carries as its environment, which varlock reads before
- * any `.env` file (spec §8.3 O1: the dev stage's generated secrets). Only the
- * items `apps/platform/.env.schema` declares are passed, to that one step,
- * and no value is ever printed. With `--stage demo` it refuses the file
- * before it spawns anything: demo's secrets are a person's to set (H5).
+ * any `.env` file: a stage's generated secrets, on every stage (spec §8.3
+ * O1, extended to demo). Only the items `apps/platform/.env.schema` declares
+ * are passed, to that one step, and no value is ever printed.
  *
  * Each step runs with its own folder's `node_modules/.bin` first on `PATH`,
  * since `varlock-wrangler` starts `wrangler` by name.
@@ -72,19 +71,6 @@ export class SecretsFileUnreadable extends Schema.TaggedError<SecretsFileUnreada
 ) {
   override get message() {
     return `STAGE_SECRETS_FILE names ${this.file}, which can't be read`;
-  }
-}
-
-/**
- * `STAGE_SECRETS_FILE` was given for `demo`: generated secrets are the dev
- * stage's alone, and `demo`'s are a person's to set (spec §8.3 O1, H5).
- */
-export class SecretsFileNotForStage extends Schema.TaggedError<SecretsFileNotForStage>()(
-  "SecretsFileNotForStage",
-  { stage: Schema.String }
-) {
-  override get message() {
-    return `STAGE_SECRETS_FILE is for dev stages only: set ${this.stage}'s secrets with varlock (infra/stages.md)`;
   }
 }
 
@@ -160,9 +146,9 @@ const stepsOf = (
 
 /**
  * The values `STAGE_SECRETS_FILE` holds for the items the platform's
- * `.env.schema` declares: none when it isn't set. Only a dev stage takes one.
+ * `.env.schema` declares: none when it isn't set.
  */
-const platformSecrets = (root: string, stage: Stage) =>
+const platformSecrets = (root: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -173,10 +159,6 @@ const platformSecrets = (root: string, stage: Stage) =>
 
     if (Option.isNone(file)) {
       return {};
-    }
-
-    if (stage === "demo") {
-      return yield* new SecretsFileNotForStage({ stage });
     }
 
     const contents = yield* fs
@@ -286,11 +268,7 @@ export const deploy = (
   argv: readonly string[]
 ): Effect.Effect<
   void,
-  | NoStage
-  | UnknownStage
-  | StepFailed
-  | SecretsFileUnreadable
-  | SecretsFileNotForStage,
+  NoStage | UnknownStage | StepFailed | SecretsFileUnreadable,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
 > =>
   Effect.gen(function* () {
@@ -303,7 +281,7 @@ export const deploy = (
       .exists(path.join(root, "apps/web/wrangler.jsonc"))
       .pipe(Effect.orDie);
 
-    const platformEnv = yield* platformSecrets(root, stage);
+    const platformEnv = yield* platformSecrets(root);
 
     yield* Effect.forEach(
       stepsOf(stage, { platformEnv, web }),

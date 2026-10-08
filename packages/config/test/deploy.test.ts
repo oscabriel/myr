@@ -17,7 +17,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import {
   deploy,
   NoStage,
-  SecretsFileNotForStage,
   StepFailed,
   UnknownStage,
 } from "../../../infra/deploy.ts";
@@ -390,14 +389,14 @@ describe("what a failed deploy prints", () => {
     })
   );
 
-  it.live("says where demo's secrets come from instead", () =>
+  it.live("names the secrets file it could not read", () =>
     Effect.gen(function* () {
       const message = yield* messageOf(["--stage", "demo"], {
         env: { STAGE_SECRETS_FILE: "/nowhere/demo.secrets" },
       });
 
       expect(message).toBe(
-        "STAGE_SECRETS_FILE is for dev stages only: set demo's secrets with varlock (infra/stages.md)"
+        "STAGE_SECRETS_FILE names /nowhere/demo.secrets, which can't be read"
       );
     })
   );
@@ -405,17 +404,50 @@ describe("what a failed deploy prints", () => {
 
 describe("a deploy to demo", () => {
   it.live(
-    "refuses STAGE_SECRETS_FILE, whose generated values are the dev stage's alone, before it spawns anything",
+    "hands the platform's deploy the values in STAGE_SECRETS_FILE, as a dev stage's does: demo's secrets are generated too",
     () =>
       Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const dir = yield* fs.makeTempDirectoryScoped();
+        const file = path.join(dir, "demo.secrets");
+
+        yield* fs.writeFileString(
+          file,
+          [
+            "# generated for demo",
+            "OPERATOR_TOKEN=operator-token-that-is-long-enough-000",
+            "MASTER_KEY=00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+          ].join("\n")
+        );
+
         const { result, spawned } = yield* run(["--stage", "demo"], {
-          env: { STAGE_SECRETS_FILE: "/nowhere/demo.secrets" },
+          env: { STAGE_SECRETS_FILE: file },
         });
 
-        expect(result).toStrictEqual(
-          Result.fail(new SecretsFileNotForStage({ stage: "demo" }))
-        );
-        expect(spawned).toStrictEqual([]);
-      })
+        expect(Result.isSuccess(result)).toBeTruthy();
+        expect(spawned.map(line)).toStrictEqual([
+          ".$ bun run verify",
+          "apps/sandbox$ wrangler deploy --env demo",
+          "apps/platform$ varlock-wrangler deploy --env demo",
+          "apps/web$ bun run build",
+          "apps/web$ wrangler deploy --env demo",
+          ".$ bun run bootstrap --stage demo --check-triggers",
+          ".$ bun scripts/smoke.ts --stage demo",
+        ]);
+        expect(
+          spawned.map(({ env }) =>
+            ["MASTER_KEY", "OPERATOR_TOKEN"].filter((name) => name in env)
+          )
+        ).toStrictEqual([
+          [],
+          [],
+          ["MASTER_KEY", "OPERATOR_TOKEN"],
+          [],
+          [],
+          [],
+          [],
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 });
