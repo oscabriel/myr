@@ -51,4 +51,6 @@ export const declarations = (
 export default defineConfig([
   { ...shared, dts: false, entry: { bin: "src/bin.ts" } },
   { ...shared, dts: false, entry: library },
+  // The pi extension (W7 706), which the publish manifest's `"pi"` key names.
+  { ...shared, dts: false, entry: { pi: "src/pi.ts" } },
 ]);
