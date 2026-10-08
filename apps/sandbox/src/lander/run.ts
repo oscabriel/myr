@@ -916,12 +916,12 @@ const built = (
   });
 
 /**
- * The config folder at `at`, for the rules evaluator: its project module and
- * ask files each bundled by bun into plain ES modules with the sdk and
- * `effect` inlined (shared code in chunks beside them), its other files
- * (`policy.json`, the vouch file) as committed, and the version of the sdk
- * the image carries. A folder that is missing gives no modules: the project
- * runs on the defaults. Nothing in the folder runs here.
+ * The config folder at `at`, for the rules evaluator: its project module,
+ * visibility module and ask files each bundled by bun into plain ES modules
+ * with the sdk and `effect` inlined (shared code in chunks beside them), its
+ * other files (`policy.json`, the vouch file) as committed, and the version
+ * of the sdk the image carries. A folder that is missing gives no modules:
+ * the project runs on the defaults. Nothing in the folder runs here.
  */
 export const bundleRules = (wire: typeof BundleWire.Type) =>
   Effect.gen(function* () {

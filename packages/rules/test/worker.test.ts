@@ -509,7 +509,49 @@ const readsTheClock = bundleOf({
   ].join("\n"),
 });
 
+/**
+ * A folder with a `visibility.ts` beside its project module: one layer of
+ * held-back checks, as the sdk writes it.
+ */
+const withVisibility = bundleOf({
+  "project.ts": `export default ${JSON.stringify(baseEncoded)};\n`,
+  "visibility.ts": `export default ${JSON.stringify({
+    env: { setters: "deciders" },
+    flows: { noWriteDown: true, release: "deciders" },
+    layers: [
+      {
+        audience: "maintainers",
+        disclose: "sealed",
+        holds: ["checks", "notes"],
+        name: "maintainers",
+        readers: "deciders",
+        reason: "Held-back checks",
+        writers: "deciders",
+      },
+    ],
+    notice: { narrowingDays: 7 },
+  })};\n`,
+});
+
 describe("the /worker adapter's modules, run", () => {
+  it.live("read visibility.ts into the policy, as /bun reads it", () =>
+    Effect.gen(function* () {
+      const viaWorker = yield* evaluated(withVisibility).pipe(
+        Effect.provide(yield* running)
+      );
+
+      const viaBun = yield* evaluated(withVisibility).pipe(
+        Effect.provide(bunEvaluator())
+      );
+
+      assert(Result.isSuccess(viaWorker), "the worker gave no policy");
+      expect(
+        viaWorker.success.visibility?.layers.map(({ name }) => name)
+      ).toStrictEqual(["maintainers"]);
+      expect(viaWorker).toStrictEqual(viaBun);
+    }).pipe(Effect.provide(NodeServices.layer))
+  );
+
   it.live("evaluate a folder to the policy /bun gives", () =>
     Effect.gen(function* () {
       const worker = yield* running;

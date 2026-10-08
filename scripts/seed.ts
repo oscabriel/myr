@@ -16,7 +16,9 @@
  *
  * Each project is made, and main's first commit pushed, as the operator;
  * each ask is opened as the decider the project's config names, red first
- * on the platform's own Checker. It prints one line per step, one per
+ * on the platform's own Checker; then each layer the example keeps under
+ * `layers/` (datekit's maintainers layer) is pushed by that decider to its
+ * repo in the private namespace. It prints one line per step, one per
  * project, and a summary. The seed's core lives in `lib/seed.ts`.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";

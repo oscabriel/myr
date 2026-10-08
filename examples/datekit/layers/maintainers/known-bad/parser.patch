@@ -1,0 +1,19 @@
+parser: round the digits past the millisecond
+
+parseISO reads 14:30:15.9999 as 14:30:16.000, carrying into the next
+second, where the README says those digits are dropped. The public
+tests pass; admission needs a held-back check in parser to fail here.
+
+diff --git a/src/parse.ts b/src/parse.ts
+index 0ed8e1a..f4bb9c7 100644
+--- a/src/parse.ts
++++ b/src/parse.ts
+@@ -104,7 +104,7 @@ const readTime = (text: string): number | undefined => {
+   }
+ 
+   // Digits past the millisecond are dropped, not rounded.
+-  const millisecond = whole((groups.fraction ?? "").padEnd(3, "0").slice(0, 3));
++  const millisecond = Math.round(Number(`0.${groups.fraction ?? "0"}`) * 1000);
+ 
+   return (
+     hour * MS_PER_HOUR +

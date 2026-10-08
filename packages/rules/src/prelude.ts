@@ -198,6 +198,8 @@ export interface MainModules {
   readonly asks: readonly string[];
   /** The project module, when the folder has one. */
   readonly project?: string | undefined;
+  /** The visibility module, when the folder has one. */
+  readonly visibility?: string | undefined;
 }
 
 /** A module the main imports on first use, by a literal specifier. */
@@ -210,8 +212,9 @@ const importer = (path: string) =>
  * folder's modules (once, while the worker stays warm) and answers the
  * request's job with one JSON document, as `/bun`'s main prints one:
  *
- * - `{}` → `Collected {asks: [{ask, path}], project?}`, each module's default
- *   export as data (functions and the sdk's symbol drop out);
+ * - `{}` → `Collected {asks: [{ask, path}], project?, visibility?}`, each
+ *   module's default export as data (functions and the sdk's symbol drop
+ *   out);
  * - `{rule, facts}` → `Called {result}`, the project module's rule called
  *   with the facts (`false` when it has none);
  * - either → `Failed {reason: "load" | "threw", detail}`.
@@ -225,6 +228,8 @@ import { frozen } from "./${preludeName}";
 const project = ${modules.project === undefined ? "undefined" : importer(modules.project)};
 
 const asks = [${modules.asks.map(importer).join(", ")}];
+
+const visibility = ${modules.visibility === undefined ? "undefined" : importer(modules.visibility)};
 
 const functions = Symbol.for(${JSON.stringify(Symbol.keyFor(Functions) ?? "")});
 
@@ -300,13 +305,22 @@ const run = async (job) => {
     exported.push(each.exported);
   }
 
+  const stated = visibility === undefined ? undefined : await imported(visibility);
+
+  if (stated?.failure !== undefined) {
+    return stated.failure;
+  }
+
   frozen.settle();
 
   const collected = exported.map(({ definition, path }) => ({ ask: dataOf(definition), path }));
 
-  return loaded === undefined
-    ? { _tag: "Collected", asks: collected }
-    : { _tag: "Collected", asks: collected, project: dataOf(loaded.exported.definition) };
+  return {
+    _tag: "Collected",
+    asks: collected,
+    ...(loaded === undefined ? {} : { project: dataOf(loaded.exported.definition) }),
+    ...(stated === undefined ? {} : { visibility: dataOf(stated.exported.definition) }),
+  };
 };
 
 const encoded = (result) => {

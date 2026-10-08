@@ -78,6 +78,43 @@ describe(findLeaks, () => {
     expect(findLeaks([{ content, path }])).toStrictEqual([]);
   });
 
+  it("allows the config folder of an example's layer, at the layer repo's root", () => {
+    const content = `import { layerManifest } from "${Brand.npmScope}/cli/rules";`;
+
+    expect(
+      findLeaks([
+        {
+          content,
+          path: `examples/datekit/layers/maintainers/${Brand.configDir}/layer.ts`,
+        },
+        {
+          content,
+          path: `examples/datekit/layers/maintainers/checks/${Brand.configDir}/a.test.ts`,
+        },
+        {
+          content,
+          path: "examples/datekit/layers/maintainers/checks/a.test.ts",
+        },
+        {
+          content,
+          path: `examples/datekit/layers/${Brand.configDir}/layer.ts`,
+        },
+      ]).map((leak) => [leak.path, leak.line])
+    ).toStrictEqual([
+      [
+        `examples/datekit/layers/maintainers/checks/${Brand.configDir}/a.test.ts`,
+        0,
+      ],
+      [
+        `examples/datekit/layers/maintainers/checks/${Brand.configDir}/a.test.ts`,
+        1,
+      ],
+      ["examples/datekit/layers/maintainers/checks/a.test.ts", 1],
+      [`examples/datekit/layers/${Brand.configDir}/layer.ts`, 0],
+      [`examples/datekit/layers/${Brand.configDir}/layer.ts`, 1],
+    ]);
+  });
+
   it("still flags the name in an example's own code", () => {
     const content = `const cli = "${Brand.cli}";`;
 

@@ -1,5 +1,7 @@
 import { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
+import { fakeArtifactsBinding } from "@repo/testkit/fake-artifacts-binding";
+import type { HostLike } from "@repo/testkit/fake-artifacts-binding";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Exit, Schema } from "effect";
 
@@ -169,6 +171,17 @@ export const fakeEnv = (): Env => ({
   SANDBOX: untouchable("SANDBOX"),
   SIGN_IN_LIMIT: untouchable("SIGN_IN_LIMIT"),
   STAGE: "local",
+});
+
+/**
+ * `env` whose private namespace is `host`, a store of bare repos a test
+ * keeps (the Node world's second store): the visibility cartridge's layer
+ * repos, through the binding the cartridge reads. Remotes are the store's
+ * own, so git reaches the store's server.
+ */
+export const withPrivateNamespace = (env: Env, host: HostLike): Env => ({
+  ...env,
+  ARTIFACTS_PRIVATE: fakeArtifactsBinding(host),
 });
 
 /** `env` without `key`, as a Worker missing that binding, var or secret sees it. */

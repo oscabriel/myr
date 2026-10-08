@@ -1,0 +1,19 @@
+export: unescape only the first pair of quotes in quoted text
+
+format prints 'it''s 7 o''clock' as it's 7 o''clock. Every public test
+quotes one apostrophe at a time, so they all pass; admission needs a
+held-back check in export to fail here.
+
+diff --git a/src/format.ts b/src/format.ts
+index 43d6a78..99fc98b 100644
+--- a/src/format.ts
++++ b/src/format.ts
+@@ -92,7 +92,7 @@ const show = (piece: string, parts: ZonedParts): string => {
+   if (piece.startsWith("'")) {
+     return piece === "''"
+       ? "'"
+-      : piece.slice(1, piece.endsWith("'") ? -1 : undefined).replaceAll("''", "'");
++      : piece.slice(1, piece.endsWith("'") ? -1 : undefined).replace("''", "'");
+   }
+ 
+   if (!/^[A-Za-z]/u.test(piece)) {

@@ -1,4 +1,5 @@
 import { AskInput, PolicyInput } from "@repo/protocol/domain/policy";
+import { VisibilityPolicy } from "@repo/protocol/domain/visibility";
 import { AskId, Handle, RepoPath } from "@repo/protocol/ids";
 import { Effect, Option, Schema, Struct } from "effect";
 
@@ -29,6 +30,25 @@ export const projectModule = (bundle: ConfigBundle): string | undefined =>
   SCRIPT.test(bundle.entry) && Object.hasOwn(bundle.modules, bundle.entry)
     ? bundle.entry
     : undefined;
+
+// The visibility module: `visibility.ts`, or the `.js` a bundler writes for it.
+const VISIBILITY_FILE = /^visibility\.[cm]?[jt]s$/u;
+
+/**
+ * The bundle's visibility module (`<folder>/visibility.ts`), when it has
+ * one: the project's layers and held-back checks (OSR §4.1).
+ */
+export const visibilityModule = (bundle: ConfigBundle): string | undefined => {
+  const folder = folderOf(bundle);
+
+  return Object.keys(bundle.modules)
+    .toSorted()
+    .find(
+      (path) =>
+        path.startsWith(folder) &&
+        VISIBILITY_FILE.test(path.slice(folder.length))
+    );
+};
 
 /** The bundle's ask files, in path order so evaluation is the same every time. */
 export const askModules = (bundle: ConfigBundle): readonly string[] => {
@@ -98,6 +118,8 @@ export const Collected = Schema.Struct({
   asks: Schema.Array(Schema.Struct({ ask: Schema.Json, path: Schema.String })),
   /** Absent when the bundle has no project module; `null` when it exports nothing. */
   project: Schema.optionalKey(Schema.Json),
+  /** Absent when the bundle has no visibility module; `null` when it exports nothing. */
+  visibility: Schema.optionalKey(Schema.Json),
 });
 
 export type Collected = typeof Collected.Type;
@@ -112,8 +134,13 @@ const AskFile = Schema.Struct({
   blockedBy: Schema.optionalKey(Schema.Array(AskId)),
 });
 
-/** A project module's data: its asks are the ask files, its source the folder. */
-const ProjectFile = PolicyInput.mapFields(Struct.omit(["asks", "source"]));
+/**
+ * A project module's data: its asks are the ask files, its source the
+ * folder, and its visibility the visibility module's.
+ */
+const ProjectFile = PolicyInput.mapFields(
+  Struct.omit(["asks", "source", "visibility"])
+);
 
 /** An ask's id: its file's name less `.ask.ts`. */
 const idOf = (path: string) =>
@@ -148,16 +175,42 @@ const askInputOf = (path: string, data: Schema.Json, initializer: Handle) =>
   });
 
 /**
+ * The visibility module's data as the project's `VisibilityPolicy`, when
+ * the folder has one; a module that exports nothing, or no policy, fails
+ * naming it.
+ */
+const visibilityOf = (
+  data: Schema.Json | undefined,
+  path: string | undefined
+): Effect.Effect<Option.Option<VisibilityPolicy>, RulesFailed> => {
+  if (data === undefined) {
+    return Effect.succeedNone;
+  }
+
+  const where = path ?? "visibility.ts";
+
+  return data === null
+    ? Effect.fail(noDefault(where, "a visibility policy"))
+    : Schema.decodeUnknownEffect(VisibilityPolicy)(data).pipe(
+        Effect.map(Option.some),
+        Effect.mapError(failedAt(where))
+      );
+};
+
+/**
  * The policy input the config folder's modules give: the project module's
  * data, or `fallback` when the folder has no project module (its
  * `policy.json`, or the defaults), with every ask file's ask after the
- * fallback's own. Its source is the config folder.
+ * fallback's own, and the visibility module's policy when the folder has
+ * one (else the fallback's). Its source is the config folder.
  */
 export const fromCollected = (input: {
   readonly collected: Collected;
   readonly entry: string;
   readonly fallback: PolicyInput;
   readonly initializer: Handle;
+  /** The visibility module's path, which a failure names. */
+  readonly visibility?: string | undefined;
 }): Effect.Effect<PolicyInput, RulesFailed> =>
   Effect.gen(function* () {
     const { collected, entry, fallback, initializer } = input;
@@ -183,5 +236,18 @@ export const fromCollected = (input: {
       asks.push(yield* askInputOf(path, ask, initializer));
     }
 
-    return { ...base, asks, source: "config" };
+    const visibility = yield* visibilityOf(
+      collected.visibility,
+      input.visibility
+    );
+
+    return Option.match(visibility, {
+      onNone: () => ({ ...base, asks, source: "config" as const }),
+      onSome: (stated) => ({
+        ...base,
+        asks,
+        source: "config" as const,
+        visibility: stated,
+      }),
+    });
   });

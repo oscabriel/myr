@@ -18,6 +18,7 @@ import {
   fromCollected,
   projectModule,
   statedWithoutCode,
+  visibilityModule,
 } from "../config-folder.ts";
 import { defaultPolicyInput } from "../defaults.ts";
 import { Finishers, finishPolicy } from "../finish.ts";
@@ -84,6 +85,7 @@ interface Job {
   readonly facts?: Schema.Json;
   readonly project?: Written;
   readonly rule?: string;
+  readonly visibility?: Written;
 }
 
 /** The frozen clock and seed the prelude installs. */
@@ -130,22 +132,26 @@ const tailOf = <E>(bytes: Stream.Stream<Uint8Array, E>, limit: number) =>
     Effect.map((kept) => kept.slice(-limit))
   );
 
-/** The project module and ask files, as the main imports them. */
+/** The project module, the visibility module and the ask files, as the main imports them. */
 const modulesOf = (
   written: ReadonlyMap<string, string>,
   project: string | undefined,
-  asks: readonly string[]
+  asks: readonly string[],
+  visibility?: string
 ) => {
   const at = (file: string): Written => ({
     file: written.get(file) ?? file,
     path: file,
   });
 
-  const asksWritten = asks.map(at);
+  const withProject: Omit<Job, "entry"> =
+    project === undefined
+      ? { asks: asks.map(at) }
+      : { asks: asks.map(at), project: at(project) };
 
-  return project === undefined
-    ? { asks: asksWritten }
-    : { asks: asksWritten, project: at(project) };
+  return visibility === undefined
+    ? withProject
+    : { ...withProject, visibility: at(visibility) };
 };
 
 /**
@@ -154,8 +160,8 @@ const modulesOf = (
  * pointed at the sdk's own entry), runs `bun --preload <prelude> <main>`
  * with no inherited env beyond `PATH`, frozen time and randomness, and a
  * time limit, and reads one JSON document from its stdout. A bundle with no
- * project module and no asks reads `policy.json`, or gets the defaults,
- * without a subprocess. Then `finishPolicy`, with the caller's `Finishers`.
+ * project module, no asks and no visibility module reads `policy.json`, or
+ * gets the defaults, without a subprocess. Then `finishPolicy`, with the caller's `Finishers`.
  */
 export const rulesEvaluatorBun = (options: BunOptions = {}) =>
   Layer.effect(
@@ -356,6 +362,7 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
           Effect.gen(function* () {
             const project = projectModule(modules);
             const asks = askModules(modules);
+            const visibility = visibilityModule(modules);
 
             const clock: Clock = {
               now: DateTime.formatIso(facts.now),
@@ -370,11 +377,13 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
                 : defaultPolicyInput;
 
             const policy =
-              project === undefined && asks.length === 0
+              project === undefined &&
+              asks.length === 0 &&
+              visibility === undefined
                 ? fallback
                 : yield* limited(
                     run(modules, clock, (written) =>
-                      modulesOf(written, project, asks)
+                      modulesOf(written, project, asks, visibility)
                     )
                   ).pipe(
                     Effect.flatMap(
@@ -386,6 +395,7 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
                             entry: project ?? modules.entry,
                             fallback,
                             initializer: facts.initializer,
+                            visibility,
                           }),
                         Failed: (output) => Effect.fail(fromFailed(output)),
                       })
