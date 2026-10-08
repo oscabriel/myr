@@ -1,9 +1,10 @@
 /**
- * The repo's own `skills/<slug>/` and `plugins/<slug>/`, which `bun run gen`
- * writes (issue 409): the platform's skill, the Claude Code plugin with its
- * three hooks, and the Agent Plugins bundle. The plugin is what a person
- * installs, so it is the only place executable hooks ship; a project's own
- * generated files are data.
+ * The platform's own skill and plugin (issue 409): the platform's skill,
+ * which the platform and the CLI serve as the MCP prompt `contribute`, the
+ * Claude Code plugin with its three hooks, and the Agent Plugins bundle,
+ * each as files at `skills/<slug>/` and `plugins/<slug>/`. The plugin is what
+ * a person installs, so it is the only place executable hooks ship; a
+ * project's own generated files are data.
  *
  * Both plugin manifests share one directory: Claude Code reads
  * `.claude-plugin/plugin.json`, `.mcp.json` and `hooks/hooks.json`, Agent
@@ -22,7 +23,7 @@ import { loopSteps, unfencedSection } from "./sections.ts";
 import { code, page, printJson, table } from "./text.ts";
 
 export interface PlatformInput {
-  /** Every CLI command, as `docs/reference/commands.json` lists them. */
+  /** Every CLI command, as `commandDocs` lists them. */
   readonly commands: readonly CommandDoc[];
   /** The platform's origin, for its MCP endpoint; without it, MCP runs through the CLI. */
   readonly platformUrl?: string;

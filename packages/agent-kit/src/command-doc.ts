@@ -1,8 +1,9 @@
 /**
- * One row per CLI command, the list `docs/reference/commands.json`, the
- * platform's skill and `llms.txt` all render from (SYN §14). Contract rows
+ * One row per CLI command, the list the platform's skill, the CLI's MCP
+ * prompt and the web's `llms.txt` all render from (SYN §14). Contract rows
  * come from each contract's annotations; the hand-written commands are
- * listed here, and issue 409's test holds the list to the CLI.
+ * listed here, and `apps/cli/test/commands-doc.test.ts` holds the list to
+ * the CLI.
  */
 import {
   Cli,
@@ -12,7 +13,7 @@ import {
   Surfaces,
 } from "@repo/protocol/contracts";
 import type { Contracts } from "@repo/protocol/contracts";
-import { Context, Schema, SchemaAST } from "effect";
+import { Array as Arr, Context, Order, Schema, SchemaAST } from "effect";
 
 export const CommandDoc = Schema.Struct({
   /** The contract it calls: always for a contract's row, sometimes for a local one. */
@@ -230,3 +231,17 @@ export const contractCommandDocs = (
       },
     ];
   });
+
+const byWords = Order.mapInput(Order.String, (doc: CommandDoc) =>
+  doc.path.join(" ")
+);
+
+/**
+ * Every command the CLI has, one row each, sorted by its words (so `ask`
+ * and its subcommands come before `asks`): the contracts it projects and the
+ * commands written by hand in it. The platform's skill, the CLI's MCP
+ * prompt and the web's `llms.txt` all read this list;
+ * `apps/cli/test/commands-doc.test.ts` holds it to the CLI's real tree.
+ */
+export const commandDocs = (group: typeof Contracts): readonly CommandDoc[] =>
+  Arr.sort([...contractCommandDocs(group), ...localCommandDocs], byWords);

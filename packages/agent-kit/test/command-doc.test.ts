@@ -4,6 +4,7 @@ import { Schema } from "effect";
 
 import {
   CommandDoc,
+  commandDocs,
   contractCommandDocs,
   localCommandDocs,
 } from "../src/command-doc.ts";
@@ -100,5 +101,77 @@ describe("every command row", () => {
       "schema",
       "why",
     ]);
+  });
+});
+
+/** Each row that calls `tag`, by its words and where it comes from. */
+const calling = (docs: readonly CommandDoc[], tag: string) =>
+  docs.flatMap((doc) =>
+    doc.contract === tag ? [`${doc.path.join(" ")} (${doc.source})`] : []
+  );
+
+// The one list the platform's skill, the CLI's MCP prompt and the web's
+// `llms.txt` read: every command once, in the order a person scans for one.
+describe(commandDocs, () => {
+  const docs = commandDocs(Contracts);
+  const words = docs.map(({ path }) => path.join(" "));
+
+  it("lists every command the CLI has, from a contract or written by hand", () => {
+    const byName = new Map(docs.map((doc) => [doc.path.join(" "), doc]));
+
+    expect(docs).toHaveLength(contract.length + localCommandDocs.length);
+    expect(byName.get("asks")).toMatchObject({
+      contract: "listAsks",
+      needsApproval: false,
+      positional: [],
+      readOnly: true,
+      source: "contract",
+    });
+    expect(
+      [
+        "check",
+        "credential",
+        "env set",
+        "hook",
+        "init",
+        "login",
+        "logout",
+        "mcp",
+        "schema",
+        "why",
+      ].map((name) => [name, byName.get(name)?.source])
+    ).toStrictEqual([
+      ["check", "local"],
+      ["credential", "local"],
+      ["env set", "local"],
+      ["hook", "local"],
+      ["init", "local"],
+      ["login", "local"],
+      ["logout", "local"],
+      ["mcp", "local"],
+      ["schema", "local"],
+      ["why", "local"],
+    ]);
+  });
+
+  it("sorts the commands by their words, so a command's subcommands follow it", () => {
+    expect(
+      words.filter((name) => name.startsWith("ask") || name.startsWith("env"))
+    ).toStrictEqual([
+      "ask",
+      "ask flag",
+      "ask open",
+      "asks",
+      "env set",
+      "env shape",
+    ]);
+    expect(words.slice(0, 3)).toStrictEqual(["ask", "ask flag", "ask open"]);
+  });
+
+  // `init` and `env set` do local work around the contract they call, so
+  // their hand-written rows stand for those contracts.
+  it("gives a contract a hand-written command calls no row of its own", () => {
+    expect(calling(docs, "initProject")).toStrictEqual(["init (local)"]);
+    expect(calling(docs, "setEnv")).toStrictEqual(["env set (local)"]);
   });
 });

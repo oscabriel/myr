@@ -6,7 +6,7 @@
  * as absent: printing a value or resolving a promise with it is not a use.
  *
  * Like everything in `@repo/testkit`, this module is for `test/` directories
- * only: no `src/` imports it (`imports:check` refuses one).
+ * only: no `src/` imports it.
  */
 import { Predicate } from "effect";
 

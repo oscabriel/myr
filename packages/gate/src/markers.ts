@@ -59,7 +59,7 @@ export interface MarkerHit {
   readonly reason: Option.Option<string>;
 }
 
-// The ` -- ` that starts a reason, as the debt ledger reads it.
+// The ` -- ` that starts a reason after an escape directive.
 const REASON_MARK = /\s--(?=\s|$)/u;
 
 // What closes a comment after its reason: `*/`, `-->`.

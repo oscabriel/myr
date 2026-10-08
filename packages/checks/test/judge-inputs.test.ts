@@ -51,14 +51,14 @@ const tree: readonly RepoFile[] = [
         PreToolUse: [
           {
             hooks: [
-              { command: "bun scripts/hooks/vcs-policy.ts", type: "command" },
+              { command: "bun scripts/hooks/shell-policy.ts", type: "command" },
             ],
           },
         ],
       },
     })
   ),
-  file("scripts/hooks/vcs-policy.ts", "export {};\n"),
+  file("scripts/hooks/shell-policy.ts", "export {};\n"),
   file("tsconfig.base.json", JSON.stringify({ compilerOptions: {} })),
   file("packages/a/package.json", JSON.stringify({ name: "@kit/a" })),
   file(
@@ -142,7 +142,7 @@ describe(judgeInputs, () => {
             "scripts/pre-commit.sh",
             "scripts/hooks/guard.ts",
             "scripts/hooks/lib/policy.ts",
-            "scripts/hooks/vcs-policy.ts",
+            "scripts/hooks/shell-policy.ts",
             "tsconfig.base.json",
             "packages/a/build.json",
             "tools/lint/plugin.ts",

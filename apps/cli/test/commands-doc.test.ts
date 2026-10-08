@@ -1,16 +1,13 @@
 /**
- * The command rows every reference renders from (`commands.json`, `cli.md`,
- * the platform's skill) against the CLI itself: the tree `root` builds, and
- * what each command's `--help` says it takes. A command without a row, a row
- * without a command, or a row naming flags the command doesn't take fails
- * here, before `bun run gen` writes the docs from the rows.
+ * The command rows every listing renders from (the platform's skill, the
+ * CLI's MCP prompt, the web's `llms.txt`) against the CLI itself: the tree
+ * `root` builds, and what each command's `--help` says it takes. A command
+ * without a row, a row without a command, or a row naming flags the command
+ * doesn't take fails here, before any listing tells an agent so.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import {
-  contractCommandDocs,
-  localCommandDocs,
-} from "@repo/agent-kit/command-doc";
+import { commandDocs, contractCommandDocs } from "@repo/agent-kit/command-doc";
 import type { CommandDoc } from "@repo/agent-kit/command-doc";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { toJsonSchema } from "@repo/protocol/mcp";
@@ -132,10 +129,7 @@ const runnable = below(root, []).pipe(
   )
 );
 
-const rows: readonly CommandDoc[] = [
-  ...contractCommandDocs(Contracts),
-  ...localCommandDocs,
-];
+const rows: readonly CommandDoc[] = commandDocs(Contracts);
 
 const words = ({ path }: CommandDoc) => path.join(" ");
 
@@ -162,7 +156,7 @@ const declared = (row: CommandDoc, takes: Takes) => {
   );
 };
 
-/** A payload's JSON Schema, as cli.md reads it: its fields and the required ones. */
+/** A payload's JSON Schema, as this test reads it: its fields and the required ones. */
 const PayloadFields = Schema.Struct({
   properties: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
   required: Schema.optionalKey(Schema.Array(Schema.String)),
@@ -186,8 +180,8 @@ const isSwitch = (field: Schema.Json | undefined) =>
   field !== undefined && isBoolean(field);
 
 /**
- * The required fields the CLI fills from the repo it stands in, which cli.md
- * writes as optional: the same list as `filledFromRepo` in scripts/lib/gen.ts.
+ * The required fields the CLI fills from the repo it stands in, so a person
+ * there may leave them out (`fromRepoContext` in `apps/cli/src/surfaces.ts`).
  */
 const filledFromRepo = new Set(["project"]);
 
@@ -238,10 +232,10 @@ describe("the command rows against the CLI", () => {
     30_000
   );
 
-  // cli.md marks a contract's flag required when its payload field is,
-  // unless it is a switch or the CLI fills it from the repo it stands in:
-  // `project`, as `filledFromRepo` in scripts/lib/gen.ts says. A field the
-  // CLI starts filling, or stops filling, fails here until gen says so too.
+  // A contract's flag is required when its payload field is, unless it is a
+  // switch or the CLI fills it from the repo it stands in: `project`, as
+  // `filledFromRepo` above says. A field the CLI starts filling, or stops
+  // filling, fails here until that list says so too.
   it.effect(
     "require a contract's required fields as flags, all but the --project the repo fills",
     () =>
@@ -268,7 +262,7 @@ describe("the command rows against the CLI", () => {
         });
 
         // Known fills, so a CLI that requires `--project` everywhere and a
-        // gen that fills nothing can't agree.
+        // list that fills nothing can't agree.
         expect(
           contractCommandDocs(Contracts).filter((row) =>
             (payloadOf(row).required ?? []).includes("project")

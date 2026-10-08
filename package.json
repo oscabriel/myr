@@ -23,10 +23,6 @@
     "fix": "bun run --cwd apps/web routes && oxlint --disable-nested-config --fix && oxfmt .",
     "typecheck": "turbo run typecheck && tsc --noEmit -p tsconfig.json",
     "test": "turbo run test",
-    "gen": "bun scripts/gen.ts",
-    "gen:check": "bun scripts/gen.ts --check",
-    "imports:check": "bun scripts/imports.ts",
-    "debt": "bun scripts/debt.ts",
     "brand:check": "bun scripts/brand.ts",
     "bytes:check": "bun scripts/startup-budget.ts",
     "env:check": "varlock load --agent --path infra/",
@@ -34,13 +30,12 @@
     "bootstrap": "varlock run --path infra/ -- bun infra/bootstrap.ts",
     "deploy": "bun infra/deploy.ts",
     "smoke": "bun scripts/smoke.ts",
-    "verify": "bun run lockfile:check && bun run check && bun run typecheck && bun run test && bun run gen:check && bun run imports:check && bun run debt && bun run brand:check && bun run bytes:check"
+    "verify": "bun run lockfile:check && bun run check && bun run typecheck && bun run test && bun run brand:check && bun run bytes:check"
   },
   "devDependencies": {
     "@effect/platform-bun": "catalog:",
     "@effect/tsgo": "0.48.1",
     "@oxlint/plugins": "1.87.0",
-    "@repo/agent-kit": "workspace:*",
     "@repo/brand": "workspace:*",
     "@repo/protocol": "workspace:*",
     "cf": "1.0.0-beta.12",

@@ -43,7 +43,7 @@ const repo = RepoName.make(project);
 /**
  * A tree whose judge reaches past the root and the CI folders: lefthook
  * runs `scripts/pre-commit.sh`, which runs a hook script with a helper;
- * Claude Code's settings run `scripts/hooks/vcs-policy.ts`; a package's
+ * Claude Code's settings run `scripts/hooks/shell-policy.ts`; a package's
  * tsconfig extends the root base and a file of its own; oxlint loads a
  * plugin that imports a helper; a test outside the plugin's folder names
  * it; and product code nothing reaches.
@@ -67,14 +67,14 @@ const tree: Files = [
         PreToolUse: [
           {
             hooks: [
-              { command: "bun scripts/hooks/vcs-policy.ts", type: "command" },
+              { command: "bun scripts/hooks/shell-policy.ts", type: "command" },
             ],
           },
         ],
       },
     }),
   ],
-  ["scripts/hooks/vcs-policy.ts", "export {};\n"],
+  ["scripts/hooks/shell-policy.ts", "export {};\n"],
   ["tsconfig.base.json", JSON.stringify({ compilerOptions: {} })],
   ["packages/a/package.json", JSON.stringify({ name: "@kit/a" })],
   [
@@ -143,7 +143,7 @@ describe(evaluationFacts, () => {
             "scripts/pre-commit.sh",
             "scripts/hooks/guard.ts",
             "scripts/hooks/lib/policy.ts",
-            "scripts/hooks/vcs-policy.ts",
+            "scripts/hooks/shell-policy.ts",
             "tsconfig.base.json",
             "packages/a/build.json",
             "tools/lint/plugin.ts",
@@ -238,14 +238,14 @@ const hooked: Files = [
         PreToolUse: [
           {
             hooks: [
-              { command: "bun scripts/hooks/vcs-policy.ts", type: "command" },
+              { command: "bun scripts/hooks/shell-policy.ts", type: "command" },
             ],
           },
         ],
       },
     }),
   ],
-  ["scripts/hooks/vcs-policy.ts", "export {};\n"],
+  ["scripts/hooks/shell-policy.ts", "export {};\n"],
 ];
 
 /**
@@ -287,9 +287,9 @@ const hookScriptPushed = Effect.gen(function* () {
 
   const head = yield* Pusher.use((pusher) =>
     pusher.push(bobFork, Option.some(landed), [
-      ...hooked.filter(([path]) => path !== "scripts/hooks/vcs-policy.ts"),
+      ...hooked.filter(([path]) => path !== "scripts/hooks/shell-policy.ts"),
       ...askFiles.map(({ content, path }) => [path, content] as const),
-      ["scripts/hooks/vcs-policy.ts", "process.exit(0);\n"],
+      ["scripts/hooks/shell-policy.ts", "process.exit(0);\n"],
     ])
   );
 
@@ -310,7 +310,7 @@ describe("a claimant's push, judged by these facts", () => {
       Effect.map(hookScriptPushed, (refusals) => {
         expect(refusals).toStrictEqual([
           new TouchedJudge({
-            paths: [RepoPath.make("scripts/hooks/vcs-policy.ts")],
+            paths: [RepoPath.make("scripts/hooks/shell-policy.ts")],
           }),
         ]);
       }),

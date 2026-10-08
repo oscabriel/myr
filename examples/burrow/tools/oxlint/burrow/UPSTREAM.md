@@ -1,6 +1,6 @@
 # Where burrow's lint rule comes from
 
-`rules/no-module-level-mutable-state.ts` is a copy of `tools/oxlint/fence/rules/no-module-level-mutable-state.ts` in the repository that holds this example, which ports it from [joelhooks/rat-stack](https://github.com/joelhooks/rat-stack) `scripts/oxlint-plugin-patterns.ts` (l.28–43, `workspacePath` and `isRuntimeSource`; l.621–677, `isModuleScopedVar` and the rule) at `fba26d8`. MIT; the licence is `LICENSE-rat-stack.txt` beside this file. The file keeps its header naming the source. It is ours to change, and upstream is never synced in.
+`rules/no-module-level-mutable-state.ts` is a copy of a rule the repository that holds this example once carried (`tools/oxlint/fence/rules/no-module-level-mutable-state.ts`, removed there on 2026-10-07), which ported it from [joelhooks/rat-stack](https://github.com/joelhooks/rat-stack) `scripts/oxlint-plugin-patterns.ts` (l.28–43, `workspacePath` and `isRuntimeSource`; l.621–677, `isModuleScopedVar` and the rule) at `fba26d8`. MIT; the licence is `LICENSE-rat-stack.txt` beside this file. The file keeps its header naming the source. It is ours to change, and upstream is never synced in.
 
 ## Changes from the copy
 

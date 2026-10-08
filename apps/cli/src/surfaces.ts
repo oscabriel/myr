@@ -4,10 +4,7 @@
  * prints a command's payload as JSON Schema; and `mcp`, the contracts as
  * tools over stdio. The only place the CLI's projections are built.
  */
-import {
-  contractCommandDocs,
-  localCommandDocs,
-} from "@repo/agent-kit/command-doc";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { platformSkill } from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
 import { commandName, toCommands } from "@repo/protocol/cli";
@@ -171,9 +168,9 @@ const WRITE_ONLY =
 const decodeJson = Schema.decodeUnknownEffect(Schema.Json);
 
 /**
- * A contract's payload as one JSON Schema document, made the way `bun run
- * gen` makes `protocol.schema.json` (each root as JSON encodes it), with
- * every write-only field marked `writeOnly` and described as such.
+ * A contract's payload as one JSON Schema document (the root as JSON
+ * encodes it, as `Schema.toJsonSchemaDocument` does), with every
+ * write-only field marked `writeOnly` and described as such.
  */
 export const payloadJsonSchema = (rpc: CommandRpc) => {
   const payload = rpc.payloadSchema;
@@ -285,14 +282,10 @@ export const commands: readonly TreeCommand[] = merge(entries);
 const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 
 /**
- * The platform's skill, made from the rows `bun run gen` writes
- * `skills/<slug>/SKILL.md` from, so the prompt and the file say the same.
+ * The platform's skill, made from agent-kit's command list, the one the
+ * platform's prompt and the web's `llms.txt` read, so they say the same.
  */
-const skill = skillIn(
-  platformSkill({
-    commands: [...contractCommandDocs(Contracts), ...localCommandDocs],
-  })
-);
+const skill = skillIn(platformSkill({ commands: commandDocs(Contracts) }));
 
 /**
  * The MCP-surfaced contracts as tools over stdio, beside each ask's brief

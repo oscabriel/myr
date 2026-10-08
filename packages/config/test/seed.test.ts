@@ -14,7 +14,6 @@ import {
   Schema,
 } from "effect";
 
-import { Brand } from "../../../scripts/lib/gen.ts";
 import {
   planSeed,
   ready,
@@ -32,6 +31,7 @@ import {
   SeedWhere,
   stepLine,
 } from "../../../scripts/seed.ts";
+import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
 /** The config folder's name, from the brand (`Brand.configDir`). */

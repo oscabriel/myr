@@ -1,7 +1,7 @@
 /**
  * Time for tests, on top of the TestClock `@effect/vitest`'s `it.effect`
  * provides. Like everything in `@repo/testkit`, this module is for `test/`
- * directories only: no `src/` imports it (`imports:check` refuses one).
+ * directories only: no `src/` imports it.
  */
 import { DateTime, Duration } from "effect";
 import type { Effect } from "effect";

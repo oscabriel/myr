@@ -51,7 +51,7 @@ const llms = (request: Request, name: string) =>
     return markdown(
       projectLlms({
         asks: asks.value,
-        commands: yield* commands,
+        commands,
         listing: listing.value,
         platformUrl: env.PUBLIC_PLATFORM_URL,
         webUrl,

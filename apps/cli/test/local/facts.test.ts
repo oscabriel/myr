@@ -171,7 +171,7 @@ describe(localFacts, () => {
  * A tree whose judge reaches past the root and the CI folders, as
  * `packages/project/test/facts.test.ts` gives the platform: lefthook runs a
  * shell script that runs a hook script with a helper, Claude Code's settings
- * run `scripts/hooks/vcs-policy.ts`, a package's tsconfig extends the base
+ * run `scripts/hooks/shell-policy.ts`, a package's tsconfig extends the base
  * and a file of its own, oxlint loads a plugin that imports a helper, and a
  * test outside the plugin's folder names it.
  */
@@ -181,7 +181,7 @@ const wideTree = {
       PreToolUse: [
         {
           hooks: [
-            { command: "bun scripts/hooks/vcs-policy.ts", type: "command" },
+            { command: "bun scripts/hooks/shell-policy.ts", type: "command" },
           ],
         },
       ],
@@ -205,7 +205,7 @@ const wideTree = {
   "scripts/hooks/guard.ts":
     'import { policy } from "./lib/policy.ts";\n\npolicy();\n',
   "scripts/hooks/lib/policy.ts": "export const policy = () => 0;\n",
-  "scripts/hooks/vcs-policy.ts": "export {};\n",
+  "scripts/hooks/shell-policy.ts": "export {};\n",
   "scripts/pre-commit.sh": "#!/bin/sh\nbun scripts/hooks/guard.ts\n",
   "src/app.ts": 'import { a } from "@kit/a";\n\nexport const app = a;\n',
   "test/plugin-cases.test.ts":
@@ -243,7 +243,7 @@ describe(localPolicy, () => {
             "scripts/pre-commit.sh",
             "scripts/hooks/guard.ts",
             "scripts/hooks/lib/policy.ts",
-            "scripts/hooks/vcs-policy.ts",
+            "scripts/hooks/shell-policy.ts",
             "packages/a/build.json",
             "tools/lint/helper.ts",
             "test/plugin-cases.test.ts",

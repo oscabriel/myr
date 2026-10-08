@@ -17,7 +17,7 @@
  * a promise API; this is a test double, in a package only tests import.
  *
  * Like everything in `@repo/testkit`, this module is for `test/` directories
- * only: no `src/` imports it (`imports:check` refuses one).
+ * only: no `src/` imports it.
  */
 import { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
 import {

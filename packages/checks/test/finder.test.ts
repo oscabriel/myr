@@ -145,13 +145,13 @@ describe(findRunBlock, () => {
       run: {
         checks: {
           format: "ruff format --check .",
-          "gen-check": "npm run gen:check",
+          "schema-check": "npm run schema:check",
         },
         setup: "npm ci",
       },
       sources: [
         "setup from .github/workflows/ci.yml",
-        "checks.gen-check from .github/workflows/ci.yml",
+        "checks.schema-check from .github/workflows/ci.yml",
         "checks.format from .github/workflows/ci.yml",
       ],
     });

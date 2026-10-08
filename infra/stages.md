@@ -110,7 +110,7 @@ Smoke only reads, from the platform and then the web. Every probe runs even when
 
 ## Tear down a stage
 
-None of this is automated: the scripts never delete, and the hook policy refuses `wrangler delete` and cf's `delete`. Tear down only what this build created, which means only names from the table above, and never `witness`. A person runs these in their own terminal. Wrangler's commands run from the app's folder with that app's `node_modules/.bin/wrangler`.
+None of this is automated: the scripts never delete, and nobody runs `wrangler delete` or cf's `delete` without the user's OK (`wrangler delete` auto-confirms in a non-interactive shell). Tear down only what this build created, which means only names from the table above, and never `witness`. A person runs these in their own terminal. Wrangler's commands run from the app's folder with that app's `node_modules/.bin/wrangler`.
 
 1. The Workers: `wrangler delete --env <s>` in `apps/web` (if deployed), then `apps/platform`, then `apps/sandbox`. Then `wrangler workflows delete answer-<s>` and `wrangler workflows delete on-push-<s>`, if they remain.
 2. The Artifacts repos, then the namespace. List the repos with `bun run ops -- artifacts namespaces repos list --namespace projects-<s>`, delete each one with `bun run ops -- artifacts namespaces repos delete <repo> --namespace projects-<s> --force`, then `bun run ops -- artifacts namespaces delete --namespace projects-<s>`. A namespace has to be empty before it can be deleted.

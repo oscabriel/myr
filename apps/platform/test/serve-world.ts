@@ -16,8 +16,8 @@
  *
  * The seed's `--world node` runs it (W5 509, `scripts/lib/seed.ts`) and
  * reaches it over HTTP and git, as it reaches a stage. A process, not an
- * import: no file outside the platform may import its test world
- * (`imports:check`). The Worker's modules import `cloudflare:workers`, which
+ * import: apps never import apps, and no file outside the platform imports
+ * its test world. The Worker's modules import `cloudflare:workers`, which
  * this file serves from `workers-shim.ts` through Bun's runtime plugins,
  * before it loads them, as vitest's alias does for the platform's tests.
  */

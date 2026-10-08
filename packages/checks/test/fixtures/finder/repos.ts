@@ -206,7 +206,7 @@ export const mixedWorkflow: readonly RepoFile[] = [
       scripts: {
         deploy: "vite build && wrangler deploy",
         dev: "vitest",
-        "gen:check": "node scripts/gen.js --check",
+        "schema:check": "node scripts/schema.js --check",
       },
     })
   ),
@@ -217,7 +217,7 @@ export const mixedWorkflow: readonly RepoFile[] = [
     "    steps:",
     "      - run: npm ci",
     "      - run: npx prettier --write .",
-    "      - run: npm run gen:check",
+    "      - run: npm run schema:check",
     "      - run: npm run deploy",
     "      - run: npm run dev",
     "      - run: ruff format .",

@@ -1,7 +1,7 @@
 /**
  * `RepoHost` over the Artifacts REST API, with a Cloudflare API token: for
- * code that runs outside a Worker, such as infra scripts, the bench and the
- * seed script. It passes the contract the binding passes, and types the same
+ * code that runs outside a Worker, such as infra scripts and the seed
+ * script. It passes the contract the binding passes, and types the same
  * surprises (S1, S7):
  *
  * - a fork names its target (`{name, default_branch_only: true}`), which
@@ -45,7 +45,7 @@
  * saw 10201 and 10400 live. A refusal that names no code at all, such as a
  * proxy's, is read by its status: 404 is not found, 5xx internal. One that
  * names only Cloudflare's own codes (7000, an unknown route) is a defect.
- * ASSUMPTIONs, for a live run (W3 308, W7's bench) to settle:
+ * ASSUMPTIONs, for a live run (W3 308) to settle:
  *
  * - a commit is the binding's metadata, spelled in snake case
  *   (`tree_hash`) as the API's other fields are, or in camel case as the
@@ -817,7 +817,7 @@ const make = (options: {
   });
 
 /**
- * Artifacts over its REST API, for scripts and the bench: the same `RepoHost`
+ * Artifacts over its REST API, for scripts: the same `RepoHost`
  * the platform reaches through the binding. The API token is the caller's
  * (scripts get it from `varlock run`), and goes only into the
  * `Authorization` header of requests to the API. Delete only repos the

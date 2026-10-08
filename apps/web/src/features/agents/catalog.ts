@@ -1,17 +1,10 @@
 /**
- * The CLI's commands as `bun run gen` writes them, read at build time, so
- * `llms.txt` lists what the CLI has rather than a copy (issue 505).
+ * The CLI's commands, from `@repo/agent-kit`'s one list (the contracts the
+ * CLI projects, then the commands written by hand in it), so `llms.txt`
+ * lists what the CLI has rather than a copy (issue 505).
  */
-import { Effect, Schema } from "effect";
+import { commandDocs } from "@repo/agent-kit/command-doc";
+import type { CommandDoc } from "@repo/agent-kit/command-doc";
+import { Contracts } from "@repo/protocol/contracts";
 
-import catalog from "../../../../../docs/reference/commands.json";
-import { CommandsJson } from "./commands.ts";
-
-/**
- * `docs/reference/commands.json`, decoded. `gen:check` keeps the file in
- * this shape, so a catalog that does not decode is a defect of the build,
- * not of a request.
- */
-export const commands = Schema.decodeUnknownEffect(CommandsJson)(catalog).pipe(
-  Effect.orDie
-);
+export const commands: readonly CommandDoc[] = commandDocs(Contracts);

@@ -1,7 +1,4 @@
-import {
-  contractCommandDocs,
-  localCommandDocs,
-} from "@repo/agent-kit/command-doc";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { platformSkill } from "@repo/agent-kit/platform";
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
@@ -270,16 +267,12 @@ const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 
 /**
  * The platform's skill as the prompt `contribute`, made when the server
- * starts from the rows `bun run gen` writes `skills/<slug>/SKILL.md` from,
- * so the prompt and the file say the same.
+ * starts from agent-kit's command list, the one the CLI's prompt and the
+ * web's `llms.txt` read, so they say the same.
  */
 const contribute = Layer.unwrap(
   Effect.map(
-    skillIn(
-      platformSkill({
-        commands: [...contractCommandDocs(Contracts), ...localCommandDocs],
-      })
-    ),
+    skillIn(platformSkill({ commands: commandDocs(Contracts) })),
     skillPrompt
   )
 );

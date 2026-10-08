@@ -10,7 +10,7 @@
  * as it is built, so a scenario the domain would refuse throws here.
  *
  * Like everything in `@repo/testkit`, this module is for `test/` directories
- * only: no `src/` imports it (`imports:check` refuses one).
+ * only: no `src/` imports it.
  */
 import { Brand } from "@repo/brand";
 import { Ask } from "@repo/protocol/domain/ask";

@@ -60,7 +60,7 @@ A refusal is a typed value with a reason, a place, a next command and whether re
 ## Evidence on Hand
 
 - The examples `examples/datekit` and `examples/burrow` are fictional projects with fictional people (`ines-v`, `okonkwo`, `okafor`, `lin-h`); pages showing them must not pass them off as real users.
-- Measured numbers come only from `bench/results/`. No testimonials, customers or adoption figures exist; none may be invented.
+- Measured numbers come only from a recorded live run on a stage (smoke's timings, a live check's log). No testimonials, customers or adoption figures exist; none may be invented.
 
 ## Product Principles
 

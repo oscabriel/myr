@@ -1,8 +1,8 @@
 /**
  * smoke's probes: read-only requests to a live stage's platform and web, each
  * of which a misbehaving public surface fails. Every probe runs, whatever the
- * others did, so one run names every surface that broke; each one is timed,
- * for the benches (311).
+ * others did, so one run names every surface that broke; each one is timed
+ * (311).
  *
  * 1. `health`: `GET /health` answers `200 {ok: true, stage}`, and names the
  *    stage smoke was pointed at, when it was told one;

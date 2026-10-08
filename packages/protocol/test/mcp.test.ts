@@ -16,6 +16,7 @@ import { listTools, toJsonSchema, toToolkit } from "../src/mcp.ts";
 import { StaleBase } from "../src/refusal.ts";
 import { unanswered } from "../src/testing.ts";
 import { ask, base, main, path } from "./examples.ts";
+import { leaks } from "./leaks.ts";
 import { serve } from "./mcp.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
@@ -120,20 +121,23 @@ describe("the contracts as MCP tools", () => {
       })
   );
 
-  // A stream has no tool form, and a write-only value must never pass
-  // through an agent's transcript.
-  it.effect("offers no tool for watching a project or setting a value", () =>
-    Effect.gen(function* () {
-      const mcp = yield* serve(unanswered);
+  // A stream has no tool form, and a write-only value or a lane's log must
+  // never pass through an agent's transcript.
+  it.effect(
+    "offers no tool for watching a project, setting a value or reading a log",
+    () =>
+      Effect.gen(function* () {
+        const mcp = yield* serve(unanswered);
 
-      const { tools } = yield* mcp.call("tools/list", {}, ToolList);
+        const { tools } = yield* mcp.call("tools/list", {}, ToolList);
 
-      const names = tools.map(({ name }) => name);
+        const names = tools.map(({ name }) => name);
 
-      expect(names).toContain("listProjects");
-      expect(names).not.toContain("watch");
-      expect(names).not.toContain("setEnv");
-    })
+        expect(names).toContain("listProjects");
+        expect(names).not.toContain("watch");
+        expect(names).not.toContain("setEnv");
+        expect(names).not.toContain("evidence");
+      })
   );
 
   it.effect(
@@ -171,8 +175,9 @@ describe("the contracts as MCP tools", () => {
       })
   );
 
-  // The generated reference reads `listTools`, so it says what a client sees.
-  it.effect("lists each tool exactly as the reference describes it", () =>
+  // `listTools` is what the CLI's stdio server and `/mcp` both list, so it
+  // says what a client sees.
+  it.effect("lists each tool exactly as listTools describes it", () =>
     Effect.gen(function* () {
       const mcp = yield* serve(unanswered);
 
@@ -183,6 +188,42 @@ describe("the contracts as MCP tools", () => {
       );
     })
   );
+
+  it("finds both of Effect's known JSON Schema leaks", () => {
+    const leaky = Schema.toJsonSchemaDocument(
+      Schema.Struct({
+        count: Schema.Number,
+        note: Schema.optional(Schema.String),
+      })
+    );
+
+    expect(
+      leaks(Schema.decodeUnknownSync(Schema.Json)(leaky.schema))
+    ).toStrictEqual([
+      "null under optional key note",
+      "non-finite string Infinity",
+      "non-finite string -Infinity",
+      "non-finite string NaN",
+    ]);
+  });
+
+  // A harness reads each schema as JSON: a bare `Schema.Number` or
+  // `Schema.optional` in a contract would put "Infinity" or `null` there.
+  it("gives every tool an input and an output schema, with no leak in either", () => {
+    const tools = listTools(
+      toToolkit(surfaced("mcp"), Effect.service(Client)).toolkit
+    );
+
+    const schemas = tools.flatMap(({ inputSchema, outputSchema }) =>
+      [inputSchema, outputSchema].map((schema) =>
+        Schema.decodeUnknownSync(Schema.Json)(schema)
+      )
+    );
+
+    expect(tools.length).toBeGreaterThan(20);
+    expect(schemas).toHaveLength(2 * tools.length);
+    expect(schemas.flatMap(leaks)).toStrictEqual([]);
+  });
 
   it("inlines a named root schema, since MCP wants an object at the root", () => {
     expect(

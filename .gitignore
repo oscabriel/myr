@@ -6,9 +6,6 @@ coverage/
 *.log
 .DS_Store
 
-# Pinned source mirrors for agents (scripts/vendor-agent-sources.sh)
-.agent_sources/
-
 # varlock: keep .env.schema; local values stay out of git
 .env
 .env.local

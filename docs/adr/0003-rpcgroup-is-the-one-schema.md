@@ -24,6 +24,7 @@ status: accepted
 ## Consequences
 
 - The CLI-flag and MCP-tool algorithms are ported from [Rat Stack](https://github.com/joelhooks/rat-stack) at `fba26d8` (MIT): `to-command.ts` l.20–207 and `to-toolkit.ts` l.59–94, about 220 lines, into `protocol/{cli,mcp}`. They are recorded in `PROVENANCE.md` (ADR 0013).
+  - Amended (2026-10-07): that record is gone (ADR 0013's note); `protocol/{cli,mcp}` each carry Rat Stack's MIT notice in their own header.
 - Wire schemas use `Schema.Int` or `Schema.Finite`, never bare `Schema.Number`, and `Schema.optionalKey`, never `Schema.optional`. Effect's `Schema.toJsonSchemaDocument`, which `McpServer` uses for tool schemas, turns `Schema.Number` into an `anyOf` that admits the strings `"Infinity"`, `"-Infinity"` and `"NaN"`, and turns `Schema.optional(Schema.String)` into string-or-`null`.
 - Every `effect/rpc` API is marked `@stability unstable`, so each package that uses one allows it explicitly in `allowedUnstableApis`.
 - A public REST SDK, if one is wanted later, comes from an `HttpApi` projection of the `RpcGroup`, not from a second source.

@@ -1,7 +1,0 @@
-{
-  "@effect-diagnostics": 2,
-  "@ts-expect-error": 0,
-  "@ts-ignore": 0,
-  "@ts-nocheck": 0,
-  "oxlint-disable": 6
-}

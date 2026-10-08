@@ -1,1 +1,0 @@
-../../../.agents/skills/add-refusal/SKILL.md

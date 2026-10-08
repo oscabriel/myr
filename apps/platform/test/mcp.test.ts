@@ -7,10 +7,7 @@
  * MCP's stateless 2026-07-28 ones, built as `harness.ts` builds a tool call.
  */
 import { describe, expect, it, layer } from "@effect/vitest";
-import {
-  contractCommandDocs,
-  localCommandDocs,
-} from "@repo/agent-kit/command-doc";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { readManaged } from "@repo/agent-kit/generated-file";
 import { platformSkill } from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
@@ -333,12 +330,10 @@ const briefUri = (of: ProjectName, ask: AskId) =>
   `${Brand.urlScheme}ask/${of}/${ask}`;
 
 /**
- * The platform's skill body, as `bun run gen` writes its `SKILL.md` from
- * the same rows: the contracts' commands and the hand-written ones.
+ * The platform's skill body, from agent-kit's command list: the contracts'
+ * commands and the hand-written ones.
  */
-const skillBody = platformSkill({
-  commands: [...contractCommandDocs(Contracts), ...localCommandDocs],
-}).pipe(
+const skillBody = platformSkill({ commands: commandDocs(Contracts) }).pipe(
   Effect.map(([file]) =>
     Option.match(
       Option.flatMap(Option.fromNullishOr(file), ({ content }) =>

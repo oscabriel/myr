@@ -2,7 +2,7 @@
  * smoke: `bun scripts/smoke.ts --stage dev-<user>|demo [--url <origin>]
  * [--web-url <origin>]`. Read-only probes against a live stage's platform and
  * web; it fails loudly, naming
- * every probe that broke, and prints how long each took (the benches' input).
+ * every probe that broke, and prints how long each took.
  * `infra/deploy.ts` runs it last (AGENTS.md principle 11).
  *
  * The stage's origins are `https://platform-<s>.<subdomain>.workers.dev` and

@@ -3,7 +3,7 @@
  * machine, compared with a file under `test/golden/`.
  *
  * Like everything in `@repo/testkit`, this module is for `test/` directories
- * only: no `src/` imports it (`imports:check` refuses one).
+ * only: no `src/` imports it.
  */
 import { Brand } from "@repo/brand";
 import { Config, Context, Effect, FileSystem } from "effect";

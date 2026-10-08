@@ -19,7 +19,7 @@ const llms = (request: Request) =>
 
     return markdown(
       frontLlms({
-        commands: yield* commands,
+        commands,
         platformUrl: env.PUBLIC_PLATFORM_URL,
         projects,
         webUrl: new URL(request.url).origin,

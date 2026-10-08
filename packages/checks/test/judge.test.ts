@@ -925,17 +925,19 @@ const thisRepo = Layer.effect(
 layer(thisRepo, { excludeTestServices: true })(
   "the judge closure of this repo, as the fixture",
   (repo) => {
-    repo.effect("holds the lint plugin folders its oxlint config loads", () =>
-      Effect.gen(function* () {
-        const { closure: judge } = yield* ThisRepo;
+    repo.effect(
+      "holds the lint plugin folders its oxlint configs load, an example's included",
+      () =>
+        Effect.gen(function* () {
+          const { closure: judge } = yield* ThisRepo;
 
-        expect(judge.paths).toStrictEqual(
-          expect.arrayContaining([
-            "tools/oxlint/anti-slop/**",
-            "tools/oxlint/fence/**",
-          ])
-        );
-      })
+          expect(judge.paths).toStrictEqual(
+            expect.arrayContaining([
+              "tools/oxlint/anti-slop/**",
+              "examples/burrow/tools/oxlint/burrow/**",
+            ])
+          );
+        })
     );
 
     repo.effect(
@@ -950,27 +952,24 @@ layer(thisRepo, { excludeTestServices: true })(
               "tsconfig.json",
               "tsconfig.base.json",
               "oxlint.config.ts",
-              "oxlint.debt.config.ts",
               "oxfmt.config.ts",
               "turbo.json",
               "bunfig.toml",
               ".claude/settings.json",
-              ".cursor/hooks.json",
             ].filter((path) => !isJudged(judge, path))
           ).toStrictEqual([]);
         })
     );
 
     repo.effect(
-      "holds every file of pi's extension, the hook scripts and the fence's fixtures",
+      "holds every file of the vendored lint plugin, and the example's rule with its fixtures and test",
       () =>
         Effect.gen(function* () {
           const { closure: judge, tracked } = yield* ThisRepo;
 
           for (const folder of [
-            ".pi/",
-            "scripts/hooks/",
-            "tools/oxlint/fence/fixtures/",
+            "tools/oxlint/anti-slop/",
+            "examples/burrow/tools/oxlint/burrow/",
           ]) {
             const inside = tracked.filter((path) => path.startsWith(folder));
 
@@ -979,18 +978,6 @@ layer(thisRepo, { excludeTestServices: true })(
               inside.filter((path) => !isJudged(judge, path))
             ).toStrictEqual([]);
           }
-        })
-    );
-
-    repo.effect(
-      "holds the rule fixture test that imports the fence's rules",
-      () =>
-        Effect.gen(function* () {
-          const { closure: judge } = yield* ThisRepo;
-
-          expect(judge.paths).toContain(
-            "packages/config/test/oxlint-fence.test.ts"
-          );
         })
     );
 
@@ -1040,7 +1027,7 @@ layer(thisRepo, { excludeTestServices: true })(
               "packages/checks/src/finder.ts",
               "packages/protocol/src/refusal.ts",
               "apps/platform/src/surfaces.ts",
-              "scripts/gen.ts",
+              "scripts/seed.ts",
             ].filter((path) => isJudged(judge, path))
           ).toStrictEqual([]);
           expect(judge.pointers).toContain("package.json#/scripts");

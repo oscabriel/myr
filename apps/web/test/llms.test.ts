@@ -2,18 +2,18 @@
  * What an agent reads first on the web host (issue 505): `/llms.txt` for
  * the platform and `/<project>/llms.txt` for one project, as Markdown, and
  * the MCP card at `/.well-known/mcp.json`. Each is a pure function of what
- * the platform lists and of `docs/reference/commands.json`; every name in
- * them comes from `Brand`.
+ * the platform lists and of the CLI's commands (`@repo/agent-kit`'s one
+ * list); every name in them comes from `Brand`.
  */
 import { describe, expect, it } from "@effect/vitest";
+import type { CommandDoc } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { AskId, KindName, ProjectName } from "@repo/protocol/ids";
-import { Effect, Option } from "effect";
+import { Option } from "effect";
 
-import { commands as catalogCommands } from "../src/features/agents/catalog.ts";
-import type { CommandsJson } from "../src/features/agents/commands.ts";
+import { commands as catalog } from "../src/features/agents/catalog.ts";
 import {
   frontLlms,
   mcpCard,
@@ -29,64 +29,61 @@ const datekit = ProjectName.make("datekit");
 
 const burrow = ProjectName.make("burrow");
 
-/** A command row as `docs/reference/commands.json` holds it. */
+/** A command row as `@repo/agent-kit`'s command list holds it. */
 const row = (
   path: readonly [string, ...string[]],
-  description: string,
-  more: Partial<CommandsJson["commands"][number]> = {}
-): CommandsJson["commands"][number] => ({
-  description,
+  summary: string,
+  more: Partial<CommandDoc> = {}
+): CommandDoc => ({
   flags: ["--json"],
   needsApproval: false,
   path,
   positional: [],
   readOnly: true,
   source: "contract",
+  summary,
   ...more,
 });
 
-const commands: CommandsJson = {
-  commands: [
-    row(
-      ["ask"],
-      "Show one ask in full, with its brief in Markdown for an answerer to read first.",
-      { flags: ["--project", "--json"], positional: ["ask"] }
-    ),
-    row(["asks"], "List a project's open asks.", {
-      flags: ["--project", "--json"],
-    }),
-    row(["check"], "Run the gate's checks on your answer locally.", {
-      flags: ["--ask", "--project", "--json"],
-      source: "local",
-    }),
-    row(["claim"], "Claim an ask: an exclusive, expiring right to answer it.", {
-      flags: ["--project", "--json", "--dry-run"],
-      positional: ["ask"],
-      readOnly: false,
-    }),
-    row(["env", "set"], "Set a sensitive env item's value from stdin.", {
-      flags: ["--project", "--yes"],
-      needsApproval: true,
-      positional: ["key"],
-      readOnly: false,
-      source: "local",
-    }),
-    row(["front"], "List the open asks across every project."),
-    row(["login"], "Sign in to a platform.", {
-      flags: ["--url", "--json"],
-      readOnly: false,
-      source: "local",
-    }),
-    row(["mcp"], "Serve the platform's tools over MCP on stdio.", {
-      flags: [],
-      source: "local",
-    }),
-    row(["verdict"], "Show the verdict on an answer to an ask.", {
-      flags: ["--ask", "--head", "--project", "--json"],
-    }),
-  ],
-  version: 1,
-};
+const commands: readonly CommandDoc[] = [
+  row(
+    ["ask"],
+    "Show one ask in full, with its brief in Markdown for an answerer to read first.",
+    { flags: ["--project", "--json"], positional: ["ask"] }
+  ),
+  row(["asks"], "List a project's open asks.", {
+    flags: ["--project", "--json"],
+  }),
+  row(["check"], "Run the gate's checks on your answer locally.", {
+    flags: ["--ask", "--project", "--json"],
+    source: "local",
+  }),
+  row(["claim"], "Claim an ask: an exclusive, expiring right to answer it.", {
+    flags: ["--project", "--json", "--dry-run"],
+    positional: ["ask"],
+    readOnly: false,
+  }),
+  row(["env", "set"], "Set a sensitive env item's value from stdin.", {
+    flags: ["--project", "--yes"],
+    needsApproval: true,
+    positional: ["key"],
+    readOnly: false,
+    source: "local",
+  }),
+  row(["front"], "List the open asks across every project."),
+  row(["login"], "Sign in to a platform.", {
+    flags: ["--url", "--json"],
+    readOnly: false,
+    source: "local",
+  }),
+  row(["mcp"], "Serve the platform's tools over MCP on stdio.", {
+    flags: [],
+    source: "local",
+  }),
+  row(["verdict"], "Show the verdict on an answer to an ask.", {
+    flags: ["--ask", "--head", "--project", "--json"],
+  }),
+];
 
 const projects: readonly ProjectListing[] = [
   { openAsks: 3, posture: "open", project: datekit },
@@ -206,12 +203,7 @@ describe(frontLlms, () => {
 
   it("leaves out a step whose command the catalog lacks", () => {
     const withoutVerdict = frontLlms({
-      commands: {
-        ...commands,
-        commands: commands.commands.filter(
-          ({ path }) => path.join(" ") !== "verdict"
-        ),
-      },
+      commands: commands.filter(({ path }) => path.join(" ") !== "verdict"),
       platformUrl,
       projects,
       webUrl,
@@ -309,27 +301,27 @@ describe(missingProjectLlms, () => {
 });
 
 describe("the command catalog", () => {
-  it.effect(
-    "is docs/reference/commands.json, and every row reaches llms.txt",
-    () =>
-      Effect.gen(function* () {
-        const catalog = yield* catalogCommands;
+  it("is every command the CLI has, and every row reaches llms.txt", () => {
+    const text = frontLlms({
+      commands: catalog,
+      platformUrl,
+      projects,
+      webUrl,
+    });
 
-        const text = frontLlms({
-          commands: catalog,
-          platformUrl,
-          projects,
-          webUrl,
-        });
+    const words = catalog.map(({ path }) => path.join(" "));
 
-        expect(catalog.commands.length).toBeGreaterThan(20);
-        expect(
-          catalog.commands.filter(
-            ({ path }) => !text.includes(`- \`${cli} ${path.join(" ")}`)
-          )
-        ).toStrictEqual([]);
-      })
-  );
+    expect(catalog.length).toBeGreaterThan(20);
+    // A contract the CLI projects, and commands written by hand in it.
+    expect(words).toContain("asks");
+    expect(words).toContain("env set");
+    expect(words).toContain("login");
+    expect(
+      catalog.filter(
+        ({ path }) => !text.includes(`- \`${cli} ${path.join(" ")}`)
+      )
+    ).toStrictEqual([]);
+  });
 });
 
 describe(mcpCard, () => {

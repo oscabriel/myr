@@ -48,22 +48,27 @@ describe(findLeaks, () => {
         { content, path: "packages/brand/src/other.ts" },
         { content, path: "AGENTS.md" },
         { content, path: "docs/adr/0001-x.md" },
-        { content, path: "LICENSES/x.MIT.txt" },
+        { content, path: "apps/web/src/components/ui/LICENSE" },
+        { content, path: "apps/web/src/assets/fonts/LICENSE-x.txt" },
         { content, path: "LICENSE" },
       ])
     ).toStrictEqual([]);
   });
 
-  it("allows generated output: skills, plugins and the reference docs", () => {
+  // Nothing in the repo is written from the brand any more, so no folder
+  // outside the brand package and prose may spell it.
+  it("flags the name in a plugin's or a skill's JSON like any other file", () => {
     const content = `${Brand.cli} asks`;
 
     expect(
       findLeaks([
         { content, path: "skills/contribute/hooks.json" },
         { content, path: "plugins/claude-code/plugin.json" },
-        { content, path: "docs/reference/commands.json" },
-      ])
-    ).toStrictEqual([]);
+      ]).map(({ path }) => path)
+    ).toStrictEqual([
+      "skills/contribute/hooks.json",
+      "plugins/claude-code/plugin.json",
+    ]);
   });
 
   it("allows an example's config folder, name and all", () => {

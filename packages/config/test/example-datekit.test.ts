@@ -14,7 +14,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Path, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { Brand } from "../../../scripts/lib/gen.ts";
+import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
 /** The example, from the repo root. */

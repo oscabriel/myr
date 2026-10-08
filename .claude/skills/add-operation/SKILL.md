@@ -1,1 +1,0 @@
-../../../.agents/skills/add-operation/SKILL.md

@@ -1,5 +1,0 @@
-{
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "description": "The Myr CLI's skill and MCP server: find an ask, claim it, check your answer locally, push it, and read the verdict.",
-  "name": "myr"
-}

@@ -73,17 +73,6 @@
             }
           },
           {
-            "include": ["scripts/gen.ts", "scripts/lib/gen.ts"],
-            "options": {
-              "allowedUnstableApis": [
-                "effect/ai",
-                "effect/cli",
-                "effect/process",
-                "effect/rpc"
-              ]
-            }
-          },
-          {
             "include": ["scripts/seed.ts", "scripts/lib/seed.ts"],
             "options": {
               "allowedUnstableApis": [

@@ -8,10 +8,11 @@
  * `/.well-known/mcp.json`.
  *
  * Pure: the routes hand in what the platform lists and the CLI's commands
- * as `docs/reference/commands.json` holds them, so no command is written
- * here by hand. A step names a command only when the catalog has it. Every
+ * as `@repo/agent-kit`'s one list holds them, so no command is written here
+ * by hand. A step names a command only when the catalog has it. Every
  * name comes from `Brand`.
  */
+import type { CommandDoc } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
@@ -19,9 +20,9 @@ import type { ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
 import { Array as Arr, Option } from "effect";
 
-import type { CommandsJson } from "./commands.ts";
+type Command = CommandDoc;
 
-type Command = CommandsJson["commands"][number];
+type Commands = readonly CommandDoc[];
 
 /** The MCP protocol the platform serves over HTTP (spec §8 D16). */
 const MCP_PROTOCOL = "2026-07-28";
@@ -49,8 +50,8 @@ interface Known {
 }
 
 /** The command whose words are `words`, if the catalog has it. */
-const commandOf = (commands: CommandsJson, words: string) =>
-  Arr.findFirst(commands.commands, ({ path }) => path.join(" ") === words);
+const commandOf = (commands: Commands, words: string) =>
+  Arr.findFirst(commands, ({ path }) => path.join(" ") === words);
 
 /**
  * A command as typed: the CLI's name, its words, its arguments, then
@@ -80,7 +81,7 @@ const usage = (
 
 /** `words` as typed, with `flags`, when the catalog has the command. */
 const typed = (
-  commands: CommandsJson,
+  commands: Commands,
   words: string,
   known: Known,
   flags: readonly ("ask" | "project")[] = []
@@ -100,7 +101,7 @@ const withCommand = (
  * read, claim, change and check, push and read the verdict. Numbered in
  * order, whatever steps the catalog leaves out.
  */
-const takeAnAsk = (commands: CommandsJson, known: Known) => {
+const takeAnAsk = (commands: Commands, known: Known) => {
   const front = typed(commands, "front", known);
   const asks = typed(commands, "asks", known, ["project"]);
 
@@ -150,12 +151,12 @@ const notes = ({ needsApproval, readOnly }: Command) => [
 ];
 
 /** Every command, one line each, in the catalog's order. */
-const commandList = (commands: CommandsJson) => [
+const commandList = (commands: Commands) => [
   "## Commands",
   "",
-  ...commands.commands.map(
+  ...commands.map(
     (command) =>
-      `- ${code(usage(command))}: ${[command.description, ...notes(command)].join(" ")}`
+      `- ${code(usage(command))}: ${[command.summary, ...notes(command)].join(" ")}`
   ),
   "",
 ];
@@ -169,7 +170,7 @@ const projectLine = (webUrl: string, listing: ProjectListing) =>
 /** `/llms.txt`: the platform, the CLI, MCP, taking an ask, the commands and the projects. */
 export const frontLlms = (input: {
   readonly projects: readonly ProjectListing[];
-  readonly commands: CommandsJson;
+  readonly commands: Commands;
   readonly platformUrl: string;
   readonly webUrl: string;
 }) => {
@@ -240,7 +241,7 @@ const askLine = (webUrl: string, project: string, listing: AskListing) =>
 export const projectLlms = (input: {
   readonly listing: ProjectListing;
   readonly asks: readonly AskListing[];
-  readonly commands: CommandsJson;
+  readonly commands: Commands;
   readonly platformUrl: string;
   readonly webUrl: string;
 }) => {

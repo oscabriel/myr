@@ -19,23 +19,6 @@
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/apps/platform/migrations/**"],
       "outputs": []
     },
-    "@repo/web#test": {
-      "dependsOn": ["types", "^types"],
-      "env": ["UPDATE_GOLDEN"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/docs/reference/commands.json"
-      ],
-      "outputs": []
-    },
-    "@repo/web#typecheck": {
-      "dependsOn": ["types", "^types"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/docs/reference/commands.json"
-      ],
-      "outputs": []
-    },
     "@repo/checks#test": {
       "dependsOn": ["types", "^types"],
       "env": ["UPDATE_GOLDEN"],
