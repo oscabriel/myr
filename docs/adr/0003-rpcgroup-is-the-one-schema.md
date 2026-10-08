@@ -28,3 +28,7 @@ status: accepted
 - Wire schemas use `Schema.Int` or `Schema.Finite`, never bare `Schema.Number`, and `Schema.optionalKey`, never `Schema.optional`. Effect's `Schema.toJsonSchemaDocument`, which `McpServer` uses for tool schemas, turns `Schema.Number` into an `anyOf` that admits the strings `"Infinity"`, `"-Infinity"` and `"NaN"`, and turns `Schema.optional(Schema.String)` into string-or-`null`.
 - Every `effect/rpc` API is marked `@stability unstable`, so each package that uses one allows it explicitly in `allowedUnstableApis`.
 - A public REST SDK, if one is wanted later, comes from an `HttpApi` projection of the `RpcGroup`, not from a second source.
+
+## Amended (2026-10-08)
+
+There is no `bun run gen` and no generated `skills/`, `plugins/` or `docs/reference/` (ADR 0011's note). Every surface still derives from the group, in code: the platform's handlers and the web's client from the contracts, the CLI's commands and the MCP tools through the ported projections in `protocol/{cli,mcp}`, and the CLI's command list as `commandDocs` in `@repo/agent-kit`, which the platform's skill, the CLI's MCP prompt and the web's `/llms.txt` all read. `packages/protocol/test/mcp.test.ts` holds every MCP tool's schemas free of JSON Schema leaks. The `capability` fallback was never needed: the port passed within its first quarter hour.

@@ -1,16 +1,10 @@
 # Myr
 
-Myr is a whole Git platform on Cloudflare. Everything a project ships is public, the contribution process is typed code, and a push lands only by passing a typed gate. It is our entry to Cloudflare's "Build the next GitHub" competition, which closes Wed Oct 14, 11:59 PM PDT.
+Myr is a Git platform on Cloudflare. Everything a project ships is public, its contribution process is typed code on main, and a push lands only by passing a typed gate. It is our entry to Cloudflare's "Build the next GitHub" competition, which closes Wed Oct 14, 11:59 PM PDT.
+
+The core loop runs on Cloudflare today: a person claims an ask, pushes an answer through the platform's git gateway, and the platform checks it and lands it, or refuses it: the cheap stages answer in git's own output, and the rest arrive later in `status`, `watch`, MCP and the verdict note. The CLI, MCP and the web all serve the same contracts, and typed visibility (layers, held-back checks, posture, the ledger and write-only env values) plugs in as one cartridge. `README.md` says how to run it, check it and cut it; `docs/adr/` records each decision and why; `GLOSSARY.md` defines the words.
 
 `bun run verify` is the gate. The principles table names the check that holds each rule; a rule marked "No fence" is held by review.
-
-The plan is the synthesis: `~/Developer/projects/wanted-explainer/notes/git-platform-research/zoom-out/synthesis.md`, published at https://plans.gneiss.run/wanted-explainer/zoom-out/synthesis.html. Read the section your task touches:
-
-- the concept: §3;
-- the repo tree and stack: §4, with the final tree in §13.3;
-- dependency versions: §4.4;
-- the day plan and cut lines: §7.2;
-- the GLOSSARY.md and ADR drafts: §8.
 
 ## Principles
 
@@ -25,7 +19,7 @@ A check wins over prose: if this file and a check disagree, fix this file.
 | 5 | **The name lives only in `packages/brand`.** Internal packages use `@repo/*`. DO classes, Workflows, queues and databases carry job names. | `brand:check` (`scripts/brand.ts`, tested by `packages/brand/test/leaks.test.ts`) |
 | 6 | **Pure core, thin hosts.** Only `@repo/artifacts` calls Artifacts. Each beta dependency sits behind one job-named port with a `/memory` adapter in the owning package. Apps import packages only. Worker code stays free of `node:child_process`, `@effect/platform-bun` and OpenTUI. `rules` and `gate` run in both Workers and Bun. `alchemy/*` stays in `infra/`. No module-level mutable state in a package's `src/`. | Scoped `allowedUnstableApis`; `packages/artifacts/test/repo-host-contract.ts` (one RepoHost contract every adapter passes); `apps/platform/test/bindings.test.ts` and `apps/platform/test/worker-init.test.ts` (the Worker starts on its real adapters, composed in `apps/platform/src/ports.ts`); `apps/web/test/production-bundle.test.ts` (no dev-world module in the web's production build); `packages/config/test/cartridge.test.ts` (the visibility cartridge is plugged in by one marked line and reached by nothing else, so removing it is a deletion). No fence: import direction and module-level state |
 | 7 | **Deny by default for visibility.** Land the answer's tree, never the composed tree. Nothing from a layer enters a public tree. Snapshot before held-back files are written. Public-serving Workers have no private-namespace binding. Public commits, trailers, notes and errors name public paths only. | `PrivatePathInPublicTree`, one rule for the gate's stage 1 and the landing guard (`packages/gate/test/shape.test.ts`, `packages/visibility/test/guards.test.ts`); `apps/platform/test/visibility/layer-gateway.test.ts` (only a layer's readers clone it, every read is logged, a fork push cannot carry its paths); `apps/sandbox/test/held-back.test.ts` (egress off and the snapshot taken before any sealed file is written; one bit per area, no output); `apps/platform/test/visibility/held-back.test.ts` (the `Held-back:` trailer, the landing guards, no stored value in a note or a kept log); `apps/platform/test/bindings.test.ts`; `apps/sandbox/test/checker.test.ts` (no snapshot once the held-back slot is reached); `apps/web/test/env.test-d.ts` (the web's Env has no private-namespace or Artifacts binding) and `apps/platform/test/env.test-d.ts` (only the platform's has both) |
-| 8 | **Deterministic and idempotent.** Rule evaluation sees frozen time and randomness and only injected facts. Re-running an operation converges. Check results are keyed by (tree SHA, check version), push events deduped by (repo, sha), and land requests carry a `requestId`. | `globalDate`, `globalRandom`, `globalTimers` and `cryptoRandomUUID` at error, with their in-Effect twins; `packages/rules/test/replay.test.ts`; `packages/project/test/project-store.contract.ts`; `packages/project/test/claim.model.test.ts` and `packages/project/test/landing.model.test.ts`; `apps/platform/test/workflows/answer.test.ts`; `apps/platform/test/workflows/on-push.test.ts`; `apps/platform/test/core-loop.test.ts`. No fence yet: one push deduped by (repo, sha) across the gateway's record and OnPush's (W3 313 #2) |
+| 8 | **Deterministic and idempotent.** Rule evaluation sees frozen time and randomness and only injected facts. Re-running an operation converges. Check results are keyed by (tree SHA, check version), push events deduped by (repo, sha), and land requests carry a `requestId`. | `globalDate`, `globalRandom`, `globalTimers` and `cryptoRandomUUID` at error, with their in-Effect twins; `packages/rules/test/replay.test.ts`; `packages/project/test/project-store.contract.ts`; `packages/project/test/claim.model.test.ts` and `packages/project/test/landing.model.test.ts`; `apps/platform/test/workflows/answer.test.ts`; `apps/platform/test/workflows/on-push.test.ts`; `apps/platform/test/core-loop.test.ts`. No fence: one push deduped by (repo, sha) across the gateway's record and OnPush's |
 | 9 | **Effect v4 only.** Read `node_modules/effect/src` as API truth. Off limits: `effect/unstable/*`, v3 `@effect/platform` and `@effect/cli`, and `effect/workflow` or `effect/cluster` on Workers. | `outdatedApi`; `no-restricted-imports` |
 | 10 | **Escapes need a reason.** Every `oxlint-disable`, `@effect-diagnostics` or `@ts-expect-error` carries its reason after `--`, and is added only where no idiomatic code does the job. | `check` fails on an unused directive. No fence: the reason |
 | 11 | **`bun run verify` is the authority.** Deploy only to an explicit stage, after `verify`, with smoke after. A red gate is fixed, never deployed around. | `packages/config/test/verify.test.ts` (verify's steps); `infra/deploy.ts` refuses without a known stage, runs `verify` first and `scripts/smoke.ts` after (`packages/config/test/deploy.test.ts`, `packages/config/test/smoke.test.ts`) |
@@ -46,7 +40,7 @@ A check wins over prose: if this file and a check disagree, fix this file.
 
 **Needs the user's sign-off:**
 
-- a dependency outside the synthesis §4.4 adopt list;
+- a dependency that no `package.json` in the repo has yet;
 - any version change to effect, wrangler or pi;
 - loosening `oxlint.config.ts`, `tsconfig.base.json` (map, overrides, allow-lists), `bunfig.toml`, `turbo.json` or `package.json` scripts;
 - renaming or removing a DO class;
@@ -55,7 +49,7 @@ A check wins over prose: if this file and a check disagree, fix this file.
 
 ## Commands
 
-Run each as `bun run <name>` from the repo root.
+Run each as `bun run <name>` from the repo root; `--` passes flags to the script.
 
 - `verify`: the gate (see Verify).
 - `check`: lints and checks formatting; an unused escape directive fails it.
@@ -65,8 +59,15 @@ Run each as `bun run <name>` from the repo root.
 - `brand:check`: fails when the name appears outside `packages/brand` and prose.
 - `bytes:check`: fails when a Worker's bundle grows past its byte budget.
 - `lockfile:check`: fails when `bun.lock` is out of date with the manifests.
+- `prepare`: runs on `bun install` and patches TypeScript with the Effect language service.
 - `env:check`: shows the env with its values redacted.
 - `ops -- <command>`: runs cf with the ops credentials (see Boundaries).
+- `bootstrap -- --stage <stage>`: makes a stage's Cloudflare resources; a second run creates nothing, and `--dry-run` only prints the plan.
+- `deploy -- --stage <stage>`: the one way to deploy. It runs `verify`, deploys the three Workers with Wrangler, reads the push trigger back, then runs `smoke`.
+- `smoke -- --stage <stage>`: read-only probes against a live stage.
+- `seed`: puts the two example projects on a platform (`--world node` on this machine, or `--stage <stage>`); a second run changes nothing.
+- `swarm`: not built yet, so it says so and exits 1. Once built, it runs fictional contributors, on several harnesses, against one split family on a stage.
+- `release`: not built yet, so it says so and exits 1. Once built, it builds the CLI's package and binaries, which the platform serves from its own bucket. Only a person publishes.
 
 ## Nouns
 
