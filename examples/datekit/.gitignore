@@ -1,0 +1,6 @@
+node_modules/
+
+# Values stay on each machine; .env.schema and .env.test are committed.
+.env
+.env.local
+.env.*.local

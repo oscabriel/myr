@@ -1,0 +1,24 @@
+{
+  "name": "datekit",
+  "version": "0.4.2",
+  "description": "Small, dependency-free date helpers for TypeScript: read ISO 8601, format with patterns, add and diff in whole units, in UTC or any time zone.",
+  "keywords": [
+    "date",
+    "format",
+    "iso8601",
+    "parse",
+    "time",
+    "timezone"
+  ],
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}
