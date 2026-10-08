@@ -72,7 +72,7 @@ export const SiteHeader = ({
           </a>
         ))}
       </nav>
-      <div className="ml-auto flex items-center text-sm">{session}</div>
+      <div className="ml-auto flex min-w-0 items-center text-sm">{session}</div>
     </div>
   </header>
 );

@@ -280,7 +280,7 @@ const seedDatekit = Effect.gen(function* () {
   return api;
 });
 
-/** burrow: the migrate family opened, its delete step waiting on the other two. */
+/** burrow: the migrate ask opened as its family, six children and a delete child waiting on them. */
 const seedBurrow = Effect.flatMap(
   started(burrow.project, burrowPeople.decider, burrow.files, 15),
   (api) => opened(api, burrowPeople.decider, burrow.asks, 17)

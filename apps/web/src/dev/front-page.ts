@@ -6,8 +6,10 @@
  * claim marks it claimed until it lapses or is released. An entry is what
  * the anonymous viewer sees: takeable when no live claim holds it, nothing
  * it waits on is still on the page, and it is held for nobody; newest first.
- * Every posture reads `open`, as D1's does until W6. A person's credits are
- * each project's own count, joined (`creditsFor`).
+ * A project is listed from its first event, `open` until a `PostureChanged`
+ * ledger entry moves it, with when it last landed (W5 514's `projects`
+ * table). A person's credits are each project's own count, joined
+ * (`creditsFor`): the rule D1's `credits` table is fed by, read at the source.
  */
 import { FrontPage } from "@repo/project/front-page";
 import type { FrontPageFilter } from "@repo/project/front-page";
@@ -19,7 +21,9 @@ import type {
   FrontPageEntry,
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
+import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { ProjectName } from "@repo/protocol/ids";
+import type { Posture } from "@repo/protocol/posture";
 import { Array, DateTime, Effect, Layer, Order } from "effect";
 
 import { DevProjected } from "./projection.ts";
@@ -30,6 +34,12 @@ interface Row {
   readonly claims: number;
   readonly openedAt: DateTime.Utc;
   readonly project: ProjectName;
+}
+
+/** A project as D1's `projects` row holds it, but for its open asks, which the page counts. */
+interface Listed {
+  readonly landedAt?: DateTime.Utc;
+  readonly posture: Posture;
 }
 
 const keyOf = (project: ProjectName, ask: string) => `${project}/${ask}`;
@@ -88,16 +98,68 @@ const step = (
     Warned: () => rows,
   });
 
+/** The project list after one project's event, as D1's statements change it. */
+const listedStep = (
+  listed: ReadonlyMap<ProjectName, Listed>,
+  { event, project }: ProjectedEvent
+): ReadonlyMap<ProjectName, Listed> => {
+  const was: Listed = listed.get(project) ?? { posture: "open" };
+
+  if (ProjectEvent.guards.Landed(event)) {
+    return new Map(listed).set(project, {
+      ...was,
+      landedAt: event.landing.landedAt,
+    });
+  }
+
+  if (
+    ProjectEvent.guards.LedgerAppended(event) &&
+    LedgerEntry.guards.PostureChanged(event.entry)
+  ) {
+    return new Map(listed).set(project, { ...was, posture: event.entry.to });
+  }
+
+  return new Map(listed).set(project, was);
+};
+
 const empty: ReadonlyMap<string, Row> = new Map();
 
-/** The page's rows after `events`, and every project they came from. */
-const fold = (events: readonly ProjectedEvent[]) => ({
-  projects: Array.sort(
-    Array.dedupe(events.map(({ project }) => project)),
-    Order.String
-  ),
-  rows: [...Array.reduce(Array.sort(events, inOrder), empty, step).values()],
-});
+const unlisted: ReadonlyMap<ProjectName, Listed> = new Map();
+
+/** The page's rows after `events`, and every project they came from, by name. */
+const fold = (events: readonly ProjectedEvent[]) => {
+  const ordered = Array.sort(events, inOrder);
+
+  return {
+    listed: Array.reduce(ordered, unlisted, listedStep),
+    projects: Array.sort(
+      Array.dedupe(events.map(({ project }) => project)),
+      Order.String
+    ),
+    rows: [...Array.reduce(ordered, empty, step).values()],
+  };
+};
+
+type Folded = ReturnType<typeof fold>;
+
+/** A project's posture as the list holds it: `open` until a ledger entry moves it. */
+const postureOf = (folded: Folded, project: ProjectName): Posture =>
+  folded.listed.get(project)?.posture ?? "open";
+
+/** One project as `listProjects` answers it. */
+const listingOf =
+  (folded: Folded) =>
+  (project: ProjectName): ProjectListing => {
+    const listing = {
+      openAsks: folded.rows.filter((row) => row.project === project).length,
+      posture: postureOf(folded, project),
+      project,
+    };
+
+    const landedAt = folded.listed.get(project)?.landedAt;
+
+    return landedAt === undefined ? listing : { ...listing, landedAt };
+  };
 
 /** Newest first, then by project and ask, as D1's query orders them. */
 const newestFirst = Order.combineAll([
@@ -108,10 +170,10 @@ const newestFirst = Order.combineAll([
 
 /** A row as the anonymous viewer sees it. */
 const entryOf =
-  (rows: readonly Row[]) =>
+  (folded: Folded) =>
   (row: Row): FrontPageEntry => {
     const onPage = (ask: string) =>
-      rows.some(
+      folded.rows.some(
         (other) => other.project === row.project && other.ask.ask === ask
       );
 
@@ -120,7 +182,7 @@ const entryOf =
 
     return {
       ask: { ...row.ask, blockedBy, claimed },
-      posture: "open",
+      posture: postureOf(folded, row.project),
       project: row.project,
       takeable:
         !claimed && blockedBy.length === 0 && row.ask.reserve === undefined,
@@ -153,20 +215,13 @@ export const DevFrontPage: Layer.Layer<
           )
         ),
       entries: (filter) =>
-        Effect.map(page, ({ rows }) =>
-          Array.sort(rows.filter(matches(filter)), newestFirst).map(
-            entryOf(rows)
+        Effect.map(page, (folded) =>
+          Array.sort(folded.rows.filter(matches(filter)), newestFirst).map(
+            entryOf(folded)
           )
         ),
       projects: () =>
-        Effect.map(page, (folded) =>
-          folded.projects.map((project): ProjectListing => ({
-            openAsks: folded.rows.filter((row) => row.project === project)
-              .length,
-            posture: "open",
-            project,
-          }))
-        ),
+        Effect.map(page, (folded) => folded.projects.map(listingOf(folded))),
     });
   })
 );

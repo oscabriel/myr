@@ -24,7 +24,7 @@ import { Command, SymbolName } from "@repo/protocol/domain/common";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import { PolicyInput } from "@repo/protocol/domain/policy";
 import { AskId, Handle, ProjectName, RepoPath } from "@repo/protocol/ids";
-import { Array, Predicate, Schema } from "effect";
+import { Array, Number, Predicate, Schema } from "effect";
 
 import type { Files } from "./git.ts";
 
@@ -480,23 +480,12 @@ const migrateCheck = encodeCheck(
 
 const PARENT = "drop-legacy-fetch";
 
-/** One step of the migrate family: moving one package off `legacyFetch`. */
-const child = (pkg: string): StatedAsk => ({
-  askedBy: burrowPeople.decider,
-  blockedBy: [],
-  brief: {
-    want: `@burrow/${pkg} calls http.get wherever it called legacyFetch.`,
-  },
-  check: migrateCheck,
-  file: `${dir}/asks/${PARENT}-${pkg}.ask.ts`,
-  id: `${PARENT}-${pkg}`,
-  kind: "migrate",
-  parent: PARENT,
-  territory: { module: `@burrow/${pkg}`, paths: [`packages/${pkg}/**`] },
-});
-
-const CHILDREN = ["auth", "billing"];
-
+/**
+ * The one ask burrow's decider opens: the migrate. Its callers sit in all
+ * six packages, so the platform opens it as a family (issue 506): a child
+ * per package and a delete child waiting on the six, their files written
+ * beside the parent's in the same landing.
+ */
 const burrowAsks: readonly StatedAsk[] = [
   {
     askedBy: burrowPeople.decider,
@@ -512,23 +501,6 @@ const burrowAsks: readonly StatedAsk[] = [
       module: ".",
       paths: Array.map(PACKAGES, (pkg) => `packages/${pkg}/**`),
     },
-  },
-  ...CHILDREN.map(child),
-  {
-    askedBy: burrowPeople.decider,
-    blockedBy: CHILDREN.map((pkg) => `${PARENT}-${pkg}`),
-    brief: { want: "Delete legacyFetch: nothing calls it any more." },
-    check: encodeCheck(
-      CheckSpec.cases.SymbolAbsent.make({
-        count: Command.make(COUNT),
-        symbol: SymbolName.make("legacyFetch"),
-      })
-    ),
-    file: `${dir}/asks/${PARENT}-delete.ask.ts`,
-    id: `${PARENT}-delete`,
-    kind: "migrate",
-    parent: PARENT,
-    territory: { module: "@burrow/kit", paths: ["packages/kit/**"] },
   },
 ];
 
@@ -667,3 +639,36 @@ export const burrow = {
   files: monorepo,
   project: ProjectName.make("burrow"),
 } as const;
+
+/** How many times `text` calls `symbol`, as burrow's `scripts/count-callers.ts` counts. */
+const callsIn = (text: string, symbol: string) =>
+  text.split(`${symbol}(`).length - 1;
+
+/** What burrow's count command prints on its first commit: each package's calls of `legacyFetch`. */
+const burrowCallers = () => {
+  const byModule = Object.fromEntries(
+    PACKAGES.map((pkg) => [
+      `@burrow/${pkg}`,
+      Number.sumAll(
+        [...monorepo].flatMap(([path, text]) =>
+          path.startsWith(`packages/${pkg}/src/`)
+            ? [callsIn(text, "legacyFetch")]
+            : []
+        )
+      ),
+    ])
+  );
+
+  return JSON.stringify({
+    byModule,
+    total: Number.sumAll(Object.values(byModule)),
+  });
+};
+
+/**
+ * What each count command of the examples prints, by the command: the dev
+ * Checker runs none, so a count lane prints this wherever it runs.
+ */
+export const printedBy: ReadonlyMap<string, string> = new Map([
+  [COUNT, burrowCallers()],
+]);

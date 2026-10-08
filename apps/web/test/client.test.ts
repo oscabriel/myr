@@ -3,7 +3,8 @@
  * `development` condition: the same `ContractsClient` group, the same
  * reactivity keys and the same `/rpc` path, answered by the dev world in
  * process instead of a platform. Each registry stands for one browser: its
- * client's requests carry that browser's HTTP `Authorization`, or none.
+ * client's requests carry that browser's session cookie, or none, which
+ * the backend turns into the bearer the dev world reads (issue 513).
  * Every test reads the one world the module's `backend` seeds, in order;
  * only the last changes it.
  */
@@ -22,6 +23,8 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 import { backend } from "#backend";
 
 import { keys } from "../src/client/keys.ts";
+import { serverClientOver } from "../src/server/client.ts";
+import { SESSION_COOKIE, whoamiHandler } from "../src/server/session.ts";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 
 const WEB_URL = "http://localhost:3000";
@@ -34,7 +37,7 @@ const DECIDER = "dev-ines-v";
 /**
  * `ContractsClient` as one browser runs it: its HTTP protocol posts to the
  * web's `/rpc`, which hands the request to `backend` in process, with
- * `token` as the request's bearer when there is one.
+ * `token` in the session cookie when there is one.
  */
 const browser = (token?: string) =>
   Layer.effect(
@@ -46,7 +49,11 @@ const browser = (token?: string) =>
         transformClient: HttpClient.mapRequest((request) =>
           token === undefined
             ? request
-            : HttpClientRequest.bearerToken(request, token)
+            : HttpClientRequest.setHeader(
+                request,
+                "cookie",
+                `${SESSION_COOKIE}=${token}`
+              )
         ),
         url: `${WEB_URL}/rpc`,
       })
@@ -83,7 +90,13 @@ const todayAtom = ContractsClient.query(
   { reactivityKeys: keys.today() }
 );
 
-describe("the dev world, through the web's atoms", () => {
+/**
+ * The first test waits for the module's world to be seeded, cold, while
+ * turbo runs every package's tests at once (near vitest's 5 s default).
+ */
+const seededWorld = { timeout: 30_000 };
+
+describe("the dev world, through the web's atoms", seededWorld, () => {
   it.live(
     "lists every open ask of both projects on the front page, the newcomers' one untakeable",
     () =>
@@ -111,10 +124,13 @@ describe("the dev world, through the web's atoms", () => {
             )
             .toSorted()
         ).toStrictEqual([
-          "burrow/drop-legacy-fetch true",
-          "burrow/drop-legacy-fetch-auth true",
-          "burrow/drop-legacy-fetch-billing true",
-          "burrow/drop-legacy-fetch-delete false",
+          "burrow/drop-legacy-fetch false",
+          "burrow/drop-legacy-fetch-burrow-auth true",
+          "burrow/drop-legacy-fetch-burrow-billing true",
+          "burrow/drop-legacy-fetch-burrow-catalog true",
+          "burrow/drop-legacy-fetch-burrow-kit true",
+          "burrow/drop-legacy-fetch-burrow-notify true",
+          "burrow/drop-legacy-fetch-burrow-search true",
           "datekit/add-months-clamp true",
           "datekit/format-ordinal false",
           "datekit/parse-iso-week false",
@@ -182,6 +198,24 @@ describe("the dev world, through the web's atoms", () => {
 
       expect(Schema.is(Unauthenticated)(refused)).toBeTruthy();
     })
+  );
+
+  it.live(
+    "signs a browser in as the person whose dev token its session cookie holds, as /auth/dev sets it",
+    () =>
+      Effect.gen(function* () {
+        const response = yield* Effect.promise(() =>
+          whoamiHandler((request) => serverClientOver(backend)(env, request))({
+            request: new Request(`${WEB_URL}/auth/whoami`, {
+              headers: { cookie: `${SESSION_COOKIE}=${DECIDER}` },
+            }),
+          })
+        );
+
+        expect(
+          JSON.parse(yield* Effect.promise(() => response.text()))
+        ).toStrictEqual({ handle: "ines-v" });
+      })
   );
 
   it.live("shows the decider their Today, with the seed's decisions", () =>

@@ -143,13 +143,32 @@ const landedAnswer = inFreshWorld((as) =>
   })
 );
 
-describe("the dev seed", () => {
+/** The project list beside datekit's landed answer, as anyone reads them. */
+const listedWithLanding = inFreshWorld((as) =>
+  Effect.gen(function* () {
+    const anyone = yield* clientOf(as());
+    const ines = yield* clientOf(as(decider));
+    const { projects } = yield* anyone.listProjects({});
+    const { unattended } = yield* ines.today({});
+
+    return { landedAt: unattended.map(({ landedAt }) => landedAt), projects };
+  })
+);
+
+/**
+ * Each test seeds whole worlds, the first one cold, while turbo runs every
+ * package's tests at once: about 0.5 s alone, near vitest's 5 s default
+ * under that load once burrow's migrate opens as a family of eight asks.
+ */
+const seededWorlds = { timeout: 30_000 };
+
+describe("the dev seed", seededWorlds, () => {
   it.live("gives two fresh worlds equal front pages and project lists", () =>
     Effect.gen(function* () {
       const first = yield* pages;
       const second = yield* pages;
 
-      expect(first.entries).toHaveLength(7);
+      expect(first.entries).toHaveLength(10);
       expect(first.projects.map(({ project }) => project)).toStrictEqual(
         PROJECTS
       );
@@ -171,6 +190,22 @@ describe("the dev seed", () => {
         expect(since % minute).toBe(0);
       }
     })
+  );
+
+  it.live(
+    "lists each project with when it last landed, as D1's project list does",
+    () =>
+      Effect.gen(function* () {
+        const { landedAt, projects } = yield* listedWithLanding;
+
+        expect(
+          projects.map(({ landedAt: at, project }) => [project, at])
+        ).toStrictEqual([
+          ["burrow", undefined],
+          ["datekit", landedAt[0]],
+        ]);
+        expect(landedAt).toHaveLength(1);
+      })
   );
 
   it.live("lands bram's answer to datekit with its credit trailers", () =>
