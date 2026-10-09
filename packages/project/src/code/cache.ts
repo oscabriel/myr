@@ -12,8 +12,14 @@
  * entries bounds the memory they take: trees and commits are light (a few
  * KiB), while a file's text, a commit's path list or changes and a page of
  * the log are heavy (up to hundreds of KiB), and an isolate holds 128 MB.
+ *
+ * One view's walk (`asOneView`) also shares its light reads among its own
+ * fibers while they are under way, and reads its repo through one session:
+ * only for the view, never in the isolate's state.
  */
-import { Cache, Context, Effect, Layer, Option } from "effect";
+import { inRepoSession } from "@repo/artifacts/repo-host";
+import { Cache, Context, Deferred, Effect, Exit, Layer, Option } from "effect";
+import type { Cause, Scope } from "effect";
 
 /** How a read's value is kept. */
 export interface Keeping<A> {
@@ -116,5 +122,78 @@ export const CodeCacheLive = (
       };
 
       return reads;
+    })
+  );
+
+/** What a read under way came to, as the read that joins it: typed as it is. */
+const joined = <B, F>(
+  under: Deferred.Deferred<Exit.Exit<unknown, unknown>>
+): Effect.Effect<B, F> =>
+  Effect.flatMap(Deferred.await(under), (exit) => {
+    if (Exit.isSuccess(exit)) {
+      // SAFETY: every key names one kind of read (`<repo>:<kind>:<id>`), so
+      // the read under it was typed as the one that joins it.
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one view shares every kind of read, so its map holds `unknown`; see SAFETY.
+      return Effect.succeed(exit.value as B);
+    }
+
+    // SAFETY: as above, for the read's failure.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one view shares every kind of read, so its map holds `unknown`; see SAFETY.
+    return Effect.failCause(exit.cause as Cause.Cause<F>);
+  });
+
+/**
+ * `effect` as one view: a light read one of its fibers began (a tree, a
+ * commit) is joined by the others rather than read again, its result kept
+ * for the rest of the view, and every repo read runs in one `RepoSession`.
+ * A walk's lookups run many at once, and two commits whose folders are the
+ * same read each folder once. The reads under way live in the view's own
+ * scope: a read the view started runs on whichever of its fibers asked for
+ * it first gave up, and ends with the view, so nothing outlives the
+ * request. Heavy reads, and reads a `keep` may turn down, go
+ * straight through.
+ */
+export const asOneView = <A, E, R>(
+  effect: Effect.Effect<A, E, R>
+): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
+  inRepoSession(
+    Effect.gen(function* () {
+      const outer = yield* CodeCache;
+      const scope = yield* Effect.scope;
+
+      const reading = new Map<
+        string,
+        Deferred.Deferred<Exit.Exit<unknown, unknown>>
+      >();
+
+      const shared: CodeReads = {
+        through: <B, F, S>(
+          key: string,
+          read: Effect.Effect<B, F, S>,
+          keeping: Keeping<B> = {}
+        ) =>
+          keeping.heavy === true || keeping.keep !== undefined
+            ? outer.through(key, read, keeping)
+            : Effect.suspend(() => {
+                const found = reading.get(key);
+
+                if (found !== undefined) {
+                  return joined<B, F>(found);
+                }
+
+                const done = Deferred.makeUnsafe<Exit.Exit<unknown, unknown>>();
+
+                reading.set(key, done);
+
+                return Effect.forkIn(
+                  Effect.exit(outer.through(key, read, keeping)).pipe(
+                    Effect.flatMap((exit) => Deferred.succeed(done, exit))
+                  ),
+                  scope
+                ).pipe(Effect.andThen(joined<B, F>(done)));
+              }),
+      };
+
+      return yield* Effect.provideService(effect, CodeCache, shared);
     })
   );

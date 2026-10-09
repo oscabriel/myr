@@ -19,12 +19,15 @@ import { commitAt, resolveRev } from "./revision.ts";
 
 /**
  * How many commits a walk over history (a path's log, why each line is
- * there) reads at once. A live store answers each read in tens of
- * milliseconds, so one at a time a 200-commit walk took a minute on
- * dev-oscabriel; sixteen at once stays far under the store's 2,000
- * requests per 10 s per repo.
+ * there) has under way at once, in one ordered pass with no batch to wait
+ * on. A live store answers each read in tens to hundreds of milliseconds,
+ * and a path four folders deep chains five reads per commit, so one at a
+ * time a 200-commit walk took a minute on dev-oscabriel and sixteen at
+ * once in batches still 14-28 s. Forty-eight at once, at a few
+ * hundred milliseconds each, stays under the store's 2,000 requests per
+ * 10 s per repo for one viewer.
  */
-export const READS_AT_ONCE = 16;
+export const READS_AT_ONCE = 48;
 
 /** The entries of the tree `id`; a tree a commit or a tree names is always there. */
 export const entriesOf = (

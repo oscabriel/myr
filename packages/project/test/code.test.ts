@@ -30,6 +30,7 @@ import {
 import { CodeCache, CodeCacheLive } from "../src/code/cache.ts";
 import { filesUnder } from "../src/code/paths.ts";
 import { compareTags } from "../src/code/refs.ts";
+import { READS_AT_ONCE } from "../src/code/tree.ts";
 import {
   big,
   datekit,
@@ -455,10 +456,10 @@ describe("a path's log, read live", () => {
           expect(commits.map(({ sha }) => sha)).toStrictEqual([shas[0]]);
         }).pipe(Effect.provide(overlappingTrees(reading, peak)));
 
-        // 64 commits, two trees each: one at a time a live store took a
-        // minute for 200; sixteen commits at once, each its two trees.
-        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(8);
-        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(32);
+        // 64 commits, each its one root tree: one at a time a live store
+        // took a minute for 200; `READS_AT_ONCE` commits at once now.
+        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(32);
+        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(READS_AT_ONCE);
       }),
     long
   );

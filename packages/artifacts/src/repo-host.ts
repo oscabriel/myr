@@ -1,14 +1,15 @@
 import { CommitSha, RepoName } from "@repo/protocol/ids";
 import type { RepoPath } from "@repo/protocol/ids";
-import { Context, Data, Schema } from "effect";
-import type {
-  Array,
-  DateTime,
-  Duration,
+import {
+  Context,
+  Data,
   Effect,
   Option,
-  Redacted,
+  Schema,
+  Scope,
+  Semaphore,
 } from "effect";
+import type { Array, DateTime, Duration, Redacted } from "effect";
 import type { FsClient } from "isomorphic-git";
 
 /** A repo's name in its namespace: the one `RepoName`, from the domain. */
@@ -238,3 +239,70 @@ export class RepoHost extends Context.Service<
     ) => Effect.Effect<readonly RefOutcome[], RepoNotFound | HostBusy>;
   }
 >()("artifacts/RepoHost") {}
+
+/**
+ * What the reads of one session may share: a host keeps what it opens on a
+ * repo (the binding's handle) under `key` until the session ends, rather
+ * than opening and closing it for each read. One opening at a time, and
+ * only a finished value is kept, so no read waits on another's opening
+ * past its own session.
+ */
+export interface RepoSessionApi {
+  readonly hold: <A, E>(
+    key: string,
+    open: Effect.Effect<A, E, Scope.Scope>
+  ) => Effect.Effect<A, E>;
+}
+
+/**
+ * The session reads run in, if any. A `Context.Reference` whose default is
+ * none, so each read opens and closes what it needs, as a host without a
+ * session does. It lives in one request's context, never in an isolate's
+ * state: a Worker whose client goes away is cancelled where it stands, so
+ * nothing a request holds may outlive it.
+ */
+export const RepoSession = Context.Reference<Option.Option<RepoSessionApi>>(
+  "artifacts/RepoSession",
+  { defaultValue: Option.none }
+);
+
+/**
+ * `effect` with its reads in one session: what a host holds for them is
+ * released when `effect` ends, whatever it came to.
+ */
+export const inRepoSession = <A, E, R>(
+  effect: Effect.Effect<A, E, R>
+): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const scope = yield* Effect.scope;
+      const opening = yield* Semaphore.make(1);
+      const held = new Map<string, unknown>();
+
+      const session: RepoSessionApi = {
+        hold: <B, F>(key: string, open: Effect.Effect<B, F, Scope.Scope>) =>
+          opening.withPermits(1)(
+            Effect.suspend(() => {
+              if (held.has(key)) {
+                // SAFETY: each key names one kind of value, which a caller
+                // opens with one effect, so what it holds is a `B`.
+                // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one session holds every kind of value, so its map is typed `unknown`; see SAFETY.
+                return Effect.succeed(held.get(key) as B);
+              }
+
+              return Effect.tap(Scope.provide(open, scope), (value) =>
+                Effect.sync(() => {
+                  held.set(key, value);
+                })
+              );
+            })
+          ),
+      };
+
+      return yield* Effect.provideService(
+        effect,
+        RepoSession,
+        Option.some(session)
+      );
+    })
+  );
