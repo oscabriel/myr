@@ -4,17 +4,19 @@
  * reader lists it: folders first, then by name, each entry by its kind,
  * with its README by GitLab's precedence, any case.
  */
-import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
-import type { RepoNotFound, TreeEntry } from "@repo/artifacts/repo-host";
+import { ObjectId, RepoHost, TreeEntry } from "@repo/artifacts/repo-host";
+import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import type { CodeEntry, Rev, TreeListing } from "@repo/protocol/domain/code";
 import { BlobSha, RepoPath } from "@repo/protocol/ids";
 import type { CommitSha, RepoName } from "@repo/protocol/ids";
 import { UnknownPath } from "@repo/protocol/refusal";
 import type { UnknownRevision } from "@repo/protocol/refusal";
-import { Array, Effect, Match, Option, Order } from "effect";
+import { Array, Effect, Match, Option, Order, Schema } from "effect";
 
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
+import { throughStore, TREE_VERSION } from "./history.ts";
+import type { Kept } from "./history.ts";
 import { commitAt, resolveRev } from "./revision.ts";
 
 /**
@@ -29,7 +31,21 @@ import { commitAt, resolveRev } from "./revision.ts";
  */
 export const READS_AT_ONCE = 48;
 
-/** The entries of the tree `id`; a tree a commit or a tree names is always there. */
+/** A tree's entries as the code store keeps them: names, modes and ids. */
+const treeKept: Kept<readonly TreeEntry[]> = {
+  kind: "tree",
+  schema: Schema.Array(TreeEntry),
+  version: TREE_VERSION,
+};
+
+/**
+ * The entries of the tree `id`; a tree a commit or a tree names is always
+ * there. Read through the isolate's cache, then the code store under
+ * `<repo>/tree/v<TREE_VERSION>/<id>`, then the repo: a tree's id fixes its
+ * entries, so a tree one view read is never read from the repo again by
+ * any isolate. Every root tree a walk reads is shared by every other path's
+ * walk over the same commits, so a repo's first walk pays for them once.
+ */
 export const entriesOf = (
   repo: RepoName,
   id: string
@@ -39,12 +55,16 @@ export const entriesOf = (
 
     return yield* cache.through(
       `${repo}:tree:${id}`,
-      RepoHost.use((host) => host.readTree(repo, ObjectId.make(id))).pipe(
-        Effect.flatMap(
-          Option.match({
-            onNone: () => Effect.die(`${repo} has no tree ${id}`),
-            onSome: Effect.succeed,
-          })
+      throughStore(
+        treeKept,
+        `${repo}/${treeKept.kind}/v${treeKept.version}/${id}`,
+        RepoHost.use((host) => host.readTree(repo, ObjectId.make(id))).pipe(
+          Effect.flatMap(
+            Option.match({
+              onNone: () => Effect.die(`${repo} has no tree ${id}`),
+              onSome: Effect.succeed,
+            })
+          )
         )
       )
     );
