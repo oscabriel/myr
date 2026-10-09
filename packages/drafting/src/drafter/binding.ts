@@ -29,12 +29,21 @@ export interface ChatMessage {
 }
 
 /**
- * What the drafter sends: the messages, the JSON Schema the reply must
- * match, and the sampling it asks for. A type alias, not an interface, so
- * it fits the binding's open `Record` of inputs.
+ * How hard a reasoning model thinks before it answers, in the key a Workers
+ * AI chat call takes it (glm-5.3: max, high or low; gpt-oss-120b: low,
+ * medium or high; `@cloudflare/workers-types` 5.20261006.1).
  */
-// oxlint-disable-next-line typescript/consistent-type-definitions -- an interface has no implicit index signature, so it would not fit the generated Ai's `Record<string, unknown>` inputs
-export type ChatInputs = {
+export interface ReasoningInputs {
+  readonly reasoning_effort: "low";
+}
+
+/**
+ * What the drafter sends: the messages, the JSON Schema the reply must
+ * match, the sampling it asks for, and the model's own settings
+ * (`modelSettings`). A type alias, not an interface, so it fits the
+ * binding's open `Record` of inputs.
+ */
+export type ChatInputs = Partial<ReasoningInputs> & {
   readonly max_completion_tokens: number;
   readonly messages: readonly ChatMessage[];
   readonly response_format: {
@@ -44,6 +53,38 @@ export type ChatInputs = {
   readonly seed: number;
   readonly temperature: number;
 };
+
+/** What a model is asked with beyond the prompt: its output cap, and how hard it reasons. */
+export interface ModelSettings {
+  readonly max_completion_tokens: number;
+  /** The model's own reasoning input, sent as it stands; none sends nothing. */
+  readonly reasoning?: ReasoningInputs;
+}
+
+/** What a model not in `MODEL_SETTINGS` is asked with: `DRAFT_MODEL`'s settings. */
+const DEFAULT_SETTINGS: ModelSettings = { max_completion_tokens: 12_000 };
+
+/**
+ * The fallback models reason before they answer, and spent 12,000 tokens
+ * doing so on the drafting prompt before the JSON was done. Each
+ * gets more room and a low effort, in the key its Workers AI input schema
+ * takes for a chat call (`ReasoningInputs`).
+ */
+const FALLBACK_SETTINGS: ModelSettings = {
+  max_completion_tokens: 32_000,
+  reasoning: { reasoning_effort: "low" },
+};
+
+/** Settings by Workers AI model id; `DRAFT_MODEL` (kimi-k2.7-code) takes the defaults. */
+const MODEL_SETTINGS: ReadonlyMap<string, ModelSettings> = new Map([
+  ["@cf/moonshotai/kimi-k2.7-code", DEFAULT_SETTINGS],
+  ["@cf/zai-org/glm-5.3", FALLBACK_SETTINGS],
+  ["@cf/openai/gpt-oss-120b", FALLBACK_SETTINGS],
+]);
+
+/** What `model` is asked with beyond the prompt; the defaults for a model not listed. */
+export const modelSettings = (model: string): ModelSettings =>
+  MODEL_SETTINGS.get(model) ?? DEFAULT_SETTINGS;
 
 /** `DraftedAsk` as JSON Schema, for `response_format`: an object root, no `$ref`. */
 const responseSchema = (() => {
@@ -120,12 +161,14 @@ const seedOf = (input: DraftInput) =>
     )
   );
 
-/** The drafter over `ai`, asking `model` (the platform's `DRAFT_MODEL`). */
+/** The drafter over `ai`, asking `model` (the platform's `DRAFT_MODEL`) with its settings. */
 export const DrafterWorkersAi = (
   ai: AiLike,
   model: string
-): Layer.Layer<Drafter> =>
-  Layer.succeed(
+): Layer.Layer<Drafter> => {
+  const settings = modelSettings(model);
+
+  return Layer.succeed(
     Drafter,
     Drafter.of({
       draft: (input) =>
@@ -142,7 +185,8 @@ export const DrafterWorkersAi = (
               ),
             try: () =>
               ai.run(model, {
-                max_completion_tokens: 12_000,
+                ...settings.reasoning,
+                max_completion_tokens: settings.max_completion_tokens,
                 messages: [
                   {
                     content: systemPrompt(input.context.policy),
@@ -167,3 +211,4 @@ export const DrafterWorkersAi = (
         }),
     })
   );
+};

@@ -115,6 +115,50 @@ describe("the Workers AI drafter", () => {
       })
   );
 
+  it.effect(
+    "gives each model its own room: the fallbacks more tokens and low reasoning, anything else the defaults",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Effect.forEach(
+          [
+            "@cf/moonshotai/kimi-k2.7-code",
+            "@cf/zai-org/glm-5.3",
+            "@cf/openai/gpt-oss-120b",
+            model,
+          ],
+          (name) =>
+            Effect.gen(function* () {
+              const { ai, calls } = fakeAi(chat(json));
+
+              yield* Drafter.use(({ draft }) => draft(input)).pipe(
+                Effect.provide(DrafterWorkersAi(ai, name))
+              );
+
+              const call = yield* Effect.fromNullishOr(calls[0]);
+
+              return {
+                max: call.inputs.max_completion_tokens,
+                model: call.model,
+                reasoning: Object.hasOwn(call.inputs, "reasoning_effort")
+                  ? call.inputs.reasoning_effort
+                  : "none sent",
+              };
+            })
+        );
+
+        expect(asked).toStrictEqual([
+          {
+            max: 12_000,
+            model: "@cf/moonshotai/kimi-k2.7-code",
+            reasoning: "none sent",
+          },
+          { max: 32_000, model: "@cf/zai-org/glm-5.3", reasoning: "low" },
+          { max: 32_000, model: "@cf/openai/gpt-oss-120b", reasoning: "low" },
+          { max: 12_000, model, reasoning: "none sent" },
+        ]);
+      })
+  );
+
   it.effect("asks for JSON Schema with no null and no Infinity in it", () =>
     Effect.gen(function* () {
       const { response_format: format } = (yield* callOf).inputs;

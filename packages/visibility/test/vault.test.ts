@@ -6,6 +6,7 @@ import {
   Cause,
   Effect,
   Exit,
+  Layer,
   Option,
   Predicate,
   Redacted,
@@ -144,6 +145,18 @@ describe("write-only values over WebCrypto", () => {
         ]);
       })
   );
+
+  it("is built at once, awaiting nothing: the master key is imported per call", () => {
+    // The platform builds its router at module load and refuses a build
+    // that awaits (`router-build.ts`), so the vault's layer must build synchronously.
+    const built = Effect.runSyncExit(
+      Layer.build(masterKey).pipe(Effect.scoped)
+    );
+
+    expect(Exit.isFailure(built) ? Cause.pretty(built.cause) : "built").toBe(
+      "built"
+    );
+  });
 
   it.effect("does not open a value under another master key", () =>
     Effect.gen(function* () {

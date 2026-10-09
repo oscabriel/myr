@@ -14,8 +14,11 @@ export { OnPush } from "./workflows/on-push.ts";
 // Built once per isolate, at module load, touching no binding: the env is
 // decoded once for the fetch handler, and both the platform's services and
 // sign-in's are made from what it decoded to; an env that fails to decode
-// fails them both, on use. (Each Project DO and Workflow decodes the same
-// env the same way, for its own ports.)
+// fails them both, on use. Both routers are built here, before any request,
+// and their builds await nothing (`router-build.ts` refuses one that does),
+// so no request ever waits on a build another request started. (Each
+// Project DO and Workflow decodes the same env the same way, for its own
+// ports.)
 const config = Effect.runSyncExit(decodeEnv(env));
 
 const platform = serve(Layer.unwrap(Effect.map(config, platformOf)));

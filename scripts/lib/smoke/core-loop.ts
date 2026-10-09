@@ -21,8 +21,14 @@ import { Decision, DecisionSubject } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { DraftState, Proposal } from "@repo/protocol/domain/proposal";
 import { Envelope } from "@repo/protocol/envelope";
-import { AskId, CommitSha, Handle, LandedSha } from "@repo/protocol/ids";
-import type { ProjectName, ProposalId } from "@repo/protocol/ids";
+import {
+  AskId,
+  CommitSha,
+  Handle,
+  LandedSha,
+  ProjectName,
+} from "@repo/protocol/ids";
+import type { ProposalId } from "@repo/protocol/ids";
 import { explain } from "@repo/protocol/render";
 import {
   Array,
@@ -453,6 +459,27 @@ const commit = (
       yield* gitOk(step, person, cwd, ["rev-parse", "HEAD"])
     );
   });
+
+const Listed = Schema.Struct({
+  projects: Schema.Array(Schema.Struct({ project: ProjectName })),
+});
+
+/**
+ * Whether `project` is free on the platform, as `person` lists every
+ * project (`<cli> projects`): a taken name fails the step, before
+ * anything is made.
+ */
+export const projectIsFree = (person: LoopPerson, project: ProjectName) =>
+  Effect.flatMap(cli("init", person, ["projects"], Listed), ({ projects }) =>
+    projects.some((listed) => listed.project === project)
+      ? Effect.fail(
+          failed(
+            "init",
+            `${project} is on the platform already, so nothing was made or recorded: a run a second later takes another name`
+          )
+        )
+      : Effect.void
+  );
 
 const Inited = Schema.Struct({
   pushed: Schema.Boolean,

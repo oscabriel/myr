@@ -99,13 +99,20 @@ const platformBody = (input: PlatformInput) =>
     ...unfencedSection(),
   ]);
 
+/**
+ * The platform's skill as the prompt `contribute` serves it: its name, its
+ * description and its Markdown, made at once. The platform builds the
+ * prompt where nothing may be awaited (its router, at module load), and
+ * `SKILL.md`'s frontmatter hashes the body through WebCrypto, a promise.
+ */
+export const platformSkillParts = (input: PlatformInput) => ({
+  body: platformBody(input),
+  description,
+  name: Brand.slug,
+});
+
 const skillFile = (input: PlatformInput) =>
-  frontmatter({
-    body: platformBody(input),
-    description,
-    landed: Option.none(),
-    name: Brand.slug,
-  });
+  frontmatter({ ...platformSkillParts(input), landed: Option.none() });
 
 /** `skills/<slug>/SKILL.md`: the platform's skill, which comes from no landing. */
 export const platformSkill = (

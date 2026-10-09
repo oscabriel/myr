@@ -1,5 +1,5 @@
 import { commandDocs } from "@repo/agent-kit/command-doc";
-import { platformSkill } from "@repo/agent-kit/platform";
+import { platformSkillParts } from "@repo/agent-kit/platform";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { Upstream } from "@repo/git/upstream";
@@ -11,11 +11,7 @@ import { authenticated, bearerToken } from "@repo/protocol/authenticate";
 import { Client, Contracts, surfaced } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
 import { toToolkit } from "@repo/protocol/mcp";
-import {
-  briefResources,
-  skillIn,
-  skillPrompt,
-} from "@repo/protocol/mcp-extras";
+import { briefResources, skillPrompt } from "@repo/protocol/mcp-extras";
 import { Authenticated } from "@repo/protocol/principal";
 import type { Person } from "@repo/protocol/principal";
 import { Context, Effect, Layer, Option, Schema } from "effect";
@@ -42,6 +38,7 @@ import { LayerGate } from "./layer-gate.ts";
 import { rawResponse } from "./raw.ts";
 import { releaseRoutes } from "./releases.ts";
 import type { ReleaseStore } from "./releases.ts";
+import { buildHandler } from "./router-build.ts";
 import { Sessions } from "./sessions.ts";
 import { isFramed } from "./watch.ts";
 import { agentSkillRoutes } from "./well-known.ts";
@@ -289,13 +286,12 @@ const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 /**
  * The platform's skill as the prompt `contribute`, made when the server
  * starts from agent-kit's command list, the one the CLI's prompt and the
- * web's `llms.txt` read, so they say the same.
+ * web's `llms.txt` read, so they say the same. Made from the skill's parts,
+ * not its `SKILL.md`, whose hash is a promise the router's build may not
+ * await (`router-build.ts`).
  */
-const contribute = Layer.unwrap(
-  Effect.map(
-    skillIn(platformSkill({ commands: commandDocs(Contracts) })),
-    skillPrompt
-  )
+const contribute = skillPrompt(
+  platformSkillParts({ commands: commandDocs(Contracts) })
 );
 
 /**
@@ -469,9 +465,12 @@ const git = HttpRouter.use((router) =>
   })
 );
 
-/** The platform's fetch handler over `services`. */
+/**
+ * The platform's fetch handler over `services`, its router built now,
+ * before any request, awaiting nothing (`router-build.ts`).
+ */
 export const serve = <E>(services: Layer.Layer<Services, E>) =>
-  HttpRouter.toWebHandler(
+  buildHandler(
     Layer.mergeAll(
       home,
       health,
@@ -483,6 +482,5 @@ export const serve = <E>(services: Layer.Layer<Services, E>) =>
       releaseRoutes,
       agentSkillRoutes,
       identifyCaller
-    ).pipe(Layer.provide(services)),
-    { disableLogger: true }
+    ).pipe(Layer.provide(services))
   );
