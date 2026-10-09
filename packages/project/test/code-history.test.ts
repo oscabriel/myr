@@ -26,7 +26,7 @@ import { DateTime, Duration, Effect, Layer, Option, Ref, Schema } from "effect";
 
 import { CodeStore } from "../src/code-store.ts";
 import { CodeStoreCounts, CodeStoreMemory } from "../src/code-store/memory.ts";
-import { logOf, whyOf } from "../src/code.ts";
+import { fileOf, logOf, whyOf } from "../src/code.ts";
 import type { CodeProject } from "../src/code.ts";
 import { CodeCache, CodeCacheLive } from "../src/code/cache.ts";
 import type { CodeReads } from "../src/code/cache.ts";
@@ -882,6 +882,48 @@ describe("a cold walk over a file", () => {
             { end: 2, sha: c2, start: 2 },
           ]);
           expect((yield* Ref.get(seen)).files).toBeLessThanOrEqual(1);
+        })
+      )
+  );
+});
+
+describe("a file's view", () => {
+  it.effect(
+    "reads the file in one call on a cold isolate, and nothing again on the same isolate",
+    () =>
+      within(({ seen }) =>
+        Effect.gen(function* () {
+          const { grown } = yield* history;
+          const { code } = yield* recordOf(grown);
+
+          yield* Ref.set(seen, none);
+
+          const { first, again, cold } = yield* onIsolate(
+            Effect.gen(function* () {
+              const read = yield* fileOf(code, Option.none(), format);
+              const coldReads = yield* Ref.get(seen);
+
+              yield* Ref.set(seen, none);
+
+              return {
+                again: yield* fileOf(code, Option.none(), format),
+                cold: coldReads,
+                first: read,
+              };
+            })
+          );
+
+          const { blobs, commits, files, trees } = cold;
+
+          expect(first.text).toBe("a\nx\ny\niso, changed\nb\nweek\n");
+          expect(again).toStrictEqual(first);
+          expect({ blobs, commits, files, trees }).toStrictEqual({
+            blobs: 0,
+            commits: 0,
+            files: 1,
+            trees: 0,
+          });
+          expect(yield* Ref.get(seen)).toStrictEqual(none);
         })
       )
   );

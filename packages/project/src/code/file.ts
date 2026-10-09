@@ -9,13 +9,14 @@ import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
 import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import type { FileView, Rev } from "@repo/protocol/domain/code";
 import { BlobSha } from "@repo/protocol/ids";
-import type { RepoName, RepoPath } from "@repo/protocol/ids";
+import type { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
 import { UnknownPath } from "@repo/protocol/refusal";
 import type { UnknownRevision } from "@repo/protocol/refusal";
 import { Effect, Option, Schema } from "effect";
 
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
+import { versionAt } from "./file-walk.ts";
 import { commitAt, resolveRev } from "./revision.ts";
 import { entryAt } from "./tree.ts";
 
@@ -113,7 +114,56 @@ export const contentsOf = (
     );
   });
 
-/** One file at `at`: its text, or that it is binary or too large. */
+/** A file's view from its blob id and contents. */
+const viewOf = (
+  commit: CommitSha,
+  path: RepoPath,
+  sha: BlobSha,
+  contents: Contents
+): FileView => ({
+  at: commit,
+  binary: contents.binary,
+  path,
+  sha,
+  size: contents.size,
+  truncated: contents.truncated,
+  ...Option.match(contents.text, {
+    onNone: () => ({}),
+    onSome: (text) => ({ text }),
+  }),
+});
+
+/**
+ * The file at `path` in `commit` read whole, one call, kept by the commit
+ * and path in the isolate's cache (when within `KEPT_TEXT`); none when no
+ * file is there or it is too large to hold, so the view looks it up by its
+ * folders. ASSUMPTION: Artifacts' `readFile` gives a symlink's own blob, as
+ * the tree does, rather than following it.
+ */
+const wholeAt = (repo: RepoName, commit: CommitSha, path: RepoPath) =>
+  Effect.gen(function* () {
+    const cache = yield* CodeCache;
+
+    return yield* cache.through(
+      `${repo}:file:${commit}:${path}`,
+      unlessTooLarge(versionAt(repo, commit, path), Option.none),
+      {
+        heavy: true,
+        keep: (read) =>
+          Option.match(read, {
+            onNone: () => false,
+            onSome: ({ bytes }) => bytes.byteLength <= KEPT_TEXT,
+          }),
+      }
+    );
+  });
+
+/**
+ * One file at `at`: its text, or that it is binary or too large. A file
+ * is read whole in one call (on a cold isolate its folders took one call
+ * each, one after another); a folder, a submodule, a missing path or a
+ * file too large to hold is looked up by its folders.
+ */
 export const fileView = (
   project: CodeProject,
   at: Option.Option<Rev>,
@@ -121,6 +171,17 @@ export const fileView = (
 ): Effect.Effect<FileView, UnknownRevision | UnknownPath, RepoHost> =>
   Effect.gen(function* () {
     const commit = yield* resolveRev(project, at);
+
+    const whole = yield* wholeAt(project.repo, commit, path).pipe(Effect.orDie);
+
+    if (Option.isSome(whole)) {
+      return viewOf(
+        commit,
+        path,
+        whole.value.blob,
+        contentsOfBytes(whole.value.bytes)
+      );
+    }
 
     const { tree } = yield* commitAt(project.repo, commit).pipe(
       Effect.flatMap(Effect.fromOption),
@@ -141,16 +202,5 @@ export const fileView = (
       Effect.orDie
     );
 
-    return {
-      at: commit,
-      binary: contents.binary,
-      path,
-      sha,
-      size: contents.size,
-      truncated: contents.truncated,
-      ...Option.match(contents.text, {
-        onNone: () => ({}),
-        onSome: (text) => ({ text }),
-      }),
-    };
+    return viewOf(commit, path, sha, contents);
   });
