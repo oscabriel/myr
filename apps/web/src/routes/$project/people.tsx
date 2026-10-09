@@ -4,13 +4,13 @@ import {
   useAtomValue,
 } from "@effect/atom-react";
 import { Client } from "@repo/protocol/contracts";
-import { PublicPolicy } from "@repo/protocol/domain/policy";
+import { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
 import { Ledger } from "@repo/protocol/domain/visibility";
 import { ProjectName } from "@repo/protocol/ids";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Schema, Struct } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 
 import { ledgerAtom } from "../../client/ledger.ts";
@@ -27,10 +27,15 @@ import { serverClient } from "../../server/client.ts";
 // and an address naming no project is a 404; in the browser each reads
 // again as the platform lands changes and appends entries.
 
-/** What the page's loader carries from the server, encoded: the policy (absent until evaluated) and the ledger. */
+/**
+ * What the page's loader carries from the server, encoded: the policy
+ * (absent until evaluated), why it has not evaluated (absent before the
+ * first landing and once it has), and the ledger.
+ */
 const PeoplePageData = Schema.Struct({
   ledger: Ledger,
   policy: Schema.optionalKey(PublicPolicy),
+  unevaluated: Schema.optionalKey(PolicyPending),
 });
 
 type PeoplePageData = typeof PeoplePageData.Type;
@@ -44,14 +49,12 @@ export const readPeople = (name: string) =>
 
     const client = yield* Client;
 
-    const [{ policy }, ledger] = yield* Effect.all(
+    const [read, ledger] = yield* Effect.all(
       [client.projectPolicy({ project }), client.ledger({ project })],
       { concurrency: 2 }
     ).pipe(Effect.catchTag("UnknownProject", () => Effect.fail(notFound())));
 
-    return yield* Schema.encodeEffect(PeoplePageData)(
-      policy === undefined ? { ledger } : { ledger, policy }
-    );
+    return yield* Schema.encodeEffect(PeoplePageData)({ ...read, ledger });
   });
 
 const peoplePage = createServerFn({ method: "GET" })
@@ -71,7 +74,7 @@ const FreshPeople = ({
   // Live: a landing re-reads the policy, a ledger entry the layers.
   useAtomMount(watchAtom(project));
 
-  const { policy } = Option.getOrElse(
+  const { policy, unevaluated } = Option.getOrElse(
     AsyncResult.value(useAtomValue(policyAtom(project))),
     () => read
   );
@@ -86,6 +89,7 @@ const FreshPeople = ({
       ledger={ledger}
       policy={Option.fromUndefinedOr(policy)}
       project={project}
+      unevaluated={Option.fromUndefinedOr(unevaluated)}
     />
   );
 };
@@ -99,9 +103,7 @@ const PeoplePage = () => {
       initialValues={[
         Atom.initialValue(
           policyAtom(project),
-          AsyncResult.success(
-            read.policy === undefined ? {} : { policy: read.policy }
-          )
+          AsyncResult.success(Struct.pick(read, ["policy", "unevaluated"]))
         ),
         Atom.initialValue(
           ledgerAtom(project),

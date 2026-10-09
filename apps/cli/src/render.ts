@@ -13,6 +13,7 @@ import {
   LedgerOf,
   ListAsks,
   ListProjects,
+  PolicyOf,
   ShowAsk,
   Status,
   SubmitAnswer,
@@ -24,6 +25,7 @@ import { LandReceipt } from "@repo/protocol/domain/answer";
 import type { AnswerReceipt } from "@repo/protocol/domain/answer";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
+import type { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { Refusal } from "@repo/protocol/refusal";
 import { receiptLine } from "@repo/protocol/render";
@@ -73,6 +75,18 @@ const table = (
       padded(headers.map((header) => header.toUpperCase())),
       ...rows.map(padded),
     ].join("\n"),
+  };
+};
+
+/** Labelled values, one a line: a Markdown list, and padded for a person. */
+const fields = (rows: readonly (readonly [string, string])[]): View => {
+  const width = Math.max(0, ...rows.map(([label]) => label.length));
+
+  return {
+    markdown: rows.map(([label, value]) => `- ${label}: ${value}`).join("\n"),
+    text: rows
+      .map(([label, value]) => `${label.padEnd(width)}  ${value}`)
+      .join("\n"),
   };
 };
 
@@ -291,6 +305,127 @@ const today = viewOf(TodayOf.successSchema, (page) =>
   )
 );
 
+const plural = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+/** How many a vouch file names, as the people page says none: "nobody". */
+const countOf = (count: number) => (count === 0 ? "nobody" : `${count}`);
+
+const HOUR_MS = 3_600_000;
+
+/** A claim timing as the people page says it: whole hours up to two days, then days. */
+const spanOf = (ms: number) => {
+  if (ms % HOUR_MS !== 0) {
+    return plural(Math.round(ms / 60_000), "minute", "minutes");
+  }
+
+  const hours = ms / HOUR_MS;
+
+  return hours > 48 && hours % 24 === 0
+    ? plural(hours / 24, "day", "days")
+    : plural(hours, "hour", "hours");
+};
+
+/** The config folder's `project.ts`. */
+const PROJECT_FILE = `${Brand.configDir}/project.ts`;
+
+/** What a vouch gates, in the people page's words. */
+const vouchModes = {
+  all: "For everything: claiming an ask, offering a sealed answer and proposing an ask all need a vouch.",
+  bansOnly:
+    "Bans only: nobody needs a vouch, but a denounced person still may not claim, push or propose.",
+  forCode:
+    "For code: claiming an ask or offering a sealed answer needs a vouch; anyone not denounced may propose an ask.",
+} as const satisfies Record<PublicPolicy["vouch"]["mode"], string>;
+
+/** A policy at its landed commit, section by section, as the people page shows it. */
+const evaluated = (policy: PublicPolicy) => {
+  const { agents, budget, caps, claims, record, vouch, vouches } = policy;
+  const denounced = vouches.filter((line) => line.denounced).length;
+
+  return joined(
+    prose(
+      policy.source === "config"
+        ? `As of ${short(policy.at)}, the landed commit, from ${PROJECT_FILE}.`
+        : `As of ${short(policy.at)}, the landed commit. This project has no ${PROJECT_FILE}: the person who set it up decides everything, under the platform's defaults.`
+    ),
+    prose("Deciders by path:"),
+    table(
+      ["paths", "deciders"],
+      policy.deciders.map(({ handles, paths }) => [paths, handles.join(", ")]),
+      "Nobody decides."
+    ),
+    prose(
+      `Vouching: ${vouchModes[vouch.mode]} ${vouch.file} vouches for ${countOf(vouches.length - denounced)} and denounces ${countOf(denounced)}.`
+    ),
+    prose("Limits:"),
+    fields([
+      [
+        "Claims",
+        `${plural(caps.claimsPerPerson, "claim", "claims")} per person at once`,
+      ],
+      [
+        "Proposals",
+        caps.proposalsPerPerson === 0
+          ? "Proposals are off"
+          : `${plural(caps.proposalsPerPerson, "proposal", "proposals")} per person at once`,
+      ],
+      [
+        "Budget",
+        `${plural(budget.decisionsPerDay, "decision", "decisions")} a day per decider; an undecided one takes its default after ${plural(budget.expireDays, "day", "days")}`,
+      ],
+      [
+        "Claim timing",
+        `warned after ${spanOf(claims.warnAfterMs)} without a push; lapses after ${spanOf(claims.lapseAfterMs)}`,
+      ],
+      [
+        "Record",
+        `a landing counts ${
+          record.countsAfterDays === 0
+            ? "from the day it lands"
+            : `once it has stood ${plural(record.countsAfterDays, "day", "days")}`
+        }, for ${plural(record.windowDays, "day", "days")}`,
+      ],
+    ]),
+    prose(
+      agents === "trailer"
+        ? "Agents: each landing names the agents its people worked through, in an Assisted-by: trailer."
+        : "Agents: landings carry no Assisted-by: trailer."
+    )
+  );
+};
+
+/** Why the config at the landed commit has not evaluated, and what makes it, in the people page's words. */
+const pendingText = ({ at, reason }: PolicyPending) => {
+  const notEvaluated = `The config at the landed commit ${short(at)} has not been evaluated`;
+
+  return reason === "noConfig"
+    ? [
+        `${notEvaluated}: the project has no ${Brand.configDir}/ folder, and the defaults need a test command that the platform could not find in its CI or package files.`,
+        `To make it evaluate, a decider lands a ${PROJECT_FILE} that names the test command (\`${Brand.cli} init --dry-run\` in a clone prints the one the CLI proposes); it is evaluated again at every landing.`,
+      ]
+    : [
+        `${notEvaluated}: ${Brand.configDir}/ at ${short(at)} did not evaluate.`,
+        `Fix it by landing a change to ${Brand.configDir}/; it is evaluated again at every landing.`,
+      ];
+};
+
+const policy = viewOf(PolicyOf.successSchema, (read) => {
+  if (read.policy !== undefined) {
+    return evaluated(read.policy);
+  }
+
+  if (read.unevaluated === undefined) {
+    return prose(
+      "Nothing has landed yet. The config is evaluated at every landing."
+    );
+  }
+
+  const lines = pendingText(read.unevaluated);
+
+  return { markdown: lines.join("\n\n"), text: lines.join("\n") };
+});
+
 const ledger = viewOf(LedgerOf.successSchema, (book) =>
   joined(
     prose(`${book.project}: ${book.postureLabel}.`),
@@ -385,6 +520,7 @@ export const views = {
   ledger,
   listAsks: asks,
   listProjects: projects,
+  projectPolicy: policy,
   showAsk: ask,
   status,
   submitAnswer: submitted,

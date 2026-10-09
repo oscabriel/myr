@@ -7,12 +7,15 @@
  * links the file it comes from at that commit.
  *
  * Props in, markup out: the route reads `projectPolicy` and `ledger`
- * (`src/client/{policy,ledger}.ts`) and hands them here. The page is
+ * (`src/client/{policy,ledger}.ts`) and hands them here. With no policy at
+ * the landed commit, the page says why (`unevaluated`: no config folder, or
+ * one that did not evaluate), names the commit and says what makes it
+ * evaluate; with no reason either, nothing has landed yet. The page is
  * read-only: the one way to change any of it is to land a change to the
  * config folder, and it says so with the commands.
  */
 import { Brand } from "@repo/brand";
-import type { PublicPolicy } from "@repo/protocol/domain/policy";
+import type { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
 import type { Layer, Ledger, Members } from "@repo/protocol/domain/visibility";
 import type { Handle, ProjectName } from "@repo/protocol/ids";
 import { Option } from "effect";
@@ -66,6 +69,13 @@ const short = (sha: string) => sha.slice(0, 7);
 /** A file at a commit, on the code browser. */
 const blobPath = (project: ProjectName, at: string, path: string) =>
   `/${project}/blob/${at}/${path}`;
+
+/** A folder at a commit, on the code browser. */
+const treePath = (project: ProjectName, at: string, path: string) =>
+  `/${project}/tree/${at}/${path}`;
+
+/** The config folder as a reader writes it: `<configDir>/`. */
+const CONFIG_DIR = `${Brand.configDir}/`;
 
 /** What a vouch gates, in words. */
 const vouchModes = {
@@ -358,14 +368,96 @@ const Evaluated = ({
   );
 };
 
+/** The landed commit, short and linked: "The config at the landed commit <sha> has not been evaluated". */
+const NotEvaluated = ({
+  at,
+  project,
+}: {
+  readonly at: string;
+  readonly project: ProjectName;
+}) => (
+  <>
+    {"The config at the landed commit "}
+    <a className={`${LINK} ${CODE}`} href={`/${project}/commit/${at}`}>
+      {short(at)}
+    </a>
+    {" has not been evaluated"}
+  </>
+);
+
+/**
+ * Why the config at the landed commit has not been evaluated, and what
+ * makes it evaluate: a `project.ts` naming the test command, or a fix to
+ * the folder that did not evaluate. Either way, it evaluates again at
+ * every landing.
+ */
+const Pending = ({
+  pending,
+  project,
+}: {
+  readonly pending: PolicyPending;
+  readonly project: ProjectName;
+}) => (
+  <div
+    className="border-rule flex flex-col gap-3 border border-dashed px-4 py-5"
+    data-unevaluated={pending.reason}
+  >
+    {pending.reason === "noConfig" ? (
+      <>
+        <p className="max-w-[70ch] text-sm font-medium">
+          <NotEvaluated at={pending.at} project={project} />
+          {": the project has no "}
+          <Code>{CONFIG_DIR}</Code>
+          {
+            " folder, and the defaults need a test command that the platform could not find in its CI or package files."
+          }
+        </p>
+        <p className="max-w-[70ch] text-sm">
+          {"To make it evaluate, a decider lands a "}
+          <Code>{PROJECT_FILE}</Code>
+          {
+            " that names the test command. In a clone, this prints the file the CLI proposes from the repo's own files; add the test command to it, commit it, and land it with the commands below."
+          }
+        </p>
+        <CommandLine
+          command={`${Brand.cli} init --project ${project} --dry-run`}
+        />
+      </>
+    ) : (
+      <>
+        <p className="max-w-[70ch] text-sm font-medium">
+          <NotEvaluated at={pending.at} project={project} />
+          {": "}
+          <a
+            className={`${LINK} ${CODE}`}
+            href={treePath(project, pending.at, Brand.configDir)}
+          >
+            {CONFIG_DIR}
+          </a>
+          {` at ${short(pending.at)} did not evaluate.`}
+        </p>
+        <p className="max-w-[70ch] text-sm">
+          {`Fix it by landing a change to ${CONFIG_DIR}.`}
+        </p>
+      </>
+    )}
+    <p className="text-muted-foreground text-sm">
+      It is evaluated again at every landing.
+    </p>
+  </div>
+);
+
 export const PeopleView = ({
   ledger,
   policy,
   project,
+  unevaluated,
 }: {
   readonly ledger: Ledger;
   readonly policy: Option.Option<PublicPolicy>;
   readonly project: ProjectName;
+  /** Why there is no policy at the landed commit; none before the first landing. */
+  readonly unevaluated: Option.Option<PolicyPending>;
 }): ReactNode => (
   <PageShell title={`${project}: people`}>
     <ProjectNav current="people" project={project} />
@@ -373,7 +465,11 @@ export const PeopleView = ({
       <Evaluated ledger={ledger} policy={policy.value} project={project} />
     ) : (
       <>
-        <EmptyState title="The config at the landed commit has not been evaluated yet. It is evaluated once per landing; this page shows it once that is done." />
+        {Option.isSome(unevaluated) ? (
+          <Pending pending={unevaluated.value} project={project} />
+        ) : (
+          <EmptyState title="Nothing has landed yet. The config is evaluated at every landing; this page shows it once the first one lands." />
+        )}
         <Layers ledger={ledger} project={project} />
       </>
     )}

@@ -17,6 +17,7 @@
  */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { Brand } from "@repo/brand";
 import { Config, Console, Effect, Option } from "effect";
 
 /** One imported project: where its pages look, and what they must show. */
@@ -360,7 +361,12 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
         "people",
         evaluated
           ? { selectors: ['tr[data-paths="**"]'] }
-          : { texts: ["has not been evaluated"] }
+          : {
+              texts: [
+                "has not been evaluated",
+                `the project has no ${Brand.configDir}/ folder`,
+              ],
+            }
       )
     ));
 
