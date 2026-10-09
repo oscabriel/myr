@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { LogRef } from "@repo/checks/evidence-store";
 import { envSchemaMethod } from "@repo/project/deciders";
+import { DraftResult } from "@repo/project/draft-runs";
 import { LandingCommand } from "@repo/project/landing";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
@@ -15,7 +16,11 @@ import {
   ProposalId,
   RequestId,
 } from "@repo/protocol/ids";
-import { ProjectExists, UnknownProject } from "@repo/protocol/refusal";
+import {
+  NotRedFirst,
+  ProjectExists,
+  UnknownProject,
+} from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import { Effect, Layer, Option, Redacted, Schema } from "effect";
 
@@ -89,6 +94,22 @@ const everyMethod = (api: ProjectApi) =>
       "draftAsk",
       api.draftAsk(carol, { proposal: ProposalId.make("prop-000001") })
     ),
+    draftContext: settled(
+      "draftContext",
+      api.draftContext(ProposalId.make("prop-000001"), 1)
+    ),
+    draftSettled: settled(
+      "draftSettled",
+      api.draftSettled(
+        ProposalId.make("prop-000001"),
+        1,
+        DraftResult.cases.Failed.make({
+          attempts: 1,
+          model: "test-model",
+          refusal: new NotRedFirst({}),
+        })
+      )
+    ),
     [envSchemaMethod]: settled(envSchemaMethod, api[envSchemaMethod](anyone)),
     events: settled("events", api.events(0, 100)),
     evidence: settled(
@@ -157,6 +178,7 @@ const everyMethod = (api: ProjectApi) =>
         repo: forkOf(bob),
       })
     ),
+    rehearseOpen: settled("rehearseOpen", api.rehearseOpen(askFiles())),
     release: settled("release", api.release(bob, parseIso)),
     scanForValues: settled(
       "scanForValues",
@@ -257,13 +279,8 @@ describe("Projects over the Project DO namespace", () => {
           projectMethods.toSorted()
         );
         expect(throughDo).toStrictEqual(inProcess);
-        // Only a step reported for an answer request that never was dies,
-        // and the drafting stubs, until 909 builds them.
-        expect(died).toStrictEqual([
-          "advanceAnswer",
-          "draftAsk",
-          "showProposal",
-        ]);
+        // Only a step reported for an answer request that never was dies.
+        expect(died).toStrictEqual(["advanceAnswer"]);
       })
   );
 });

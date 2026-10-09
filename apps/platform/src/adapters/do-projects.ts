@@ -92,6 +92,9 @@ const apiOf = (
     credits: (caller, handle) => on("credits", [caller, handle]),
     decide: (caller, input) => assumingMade(on("decide", [caller, input])),
     draftAsk: (caller, input) => assumingMade(on("draftAsk", [caller, input])),
+    draftContext: (proposal, round) => on("draftContext", [proposal, round]),
+    draftSettled: (proposal, round, result) =>
+      on("draftSettled", [proposal, round, result]),
     events: (since, limit) => on("events", [since, limit]),
     // A name pointing at another project is the service's own
     // `UnknownProject`, so it crosses as the refusal it is.
@@ -123,6 +126,7 @@ const apiOf = (
     recordLayerPush: (caller, input) => on("recordLayerPush", [caller, input]),
     recordLayerRead: (caller, input) => on("recordLayerRead", [caller, input]),
     recordPush: (input) => on("recordPush", [input]),
+    rehearseOpen: (files) => on("rehearseOpen", [files]),
     release: (caller, ask) => assumingMade(on("release", [caller, ask])),
     scanForValues: (input) => on("scanForValues", [input]),
     setEnv: (caller, input) => assumingMade(on("setEnv", [caller, input])),

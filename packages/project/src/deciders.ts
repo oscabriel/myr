@@ -28,14 +28,15 @@ import { formatLanding } from "@repo/git/trailers";
 import type { AnswerReceipt, LandReceipt } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { RefNameText } from "@repo/protocol/domain/common";
-import type { Evidence } from "@repo/protocol/domain/common";
-import type { Credit } from "@repo/protocol/domain/credit";
+import type { ConfigFile, Evidence } from "@repo/protocol/domain/common";
+import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
 import type { EnvSchemaView } from "@repo/protocol/domain/env";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { Policy } from "@repo/protocol/domain/policy";
+import { DraftState } from "@repo/protocol/domain/proposal";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import type { CreditSummary } from "@repo/protocol/domain/record";
 import type { RunBlock } from "@repo/protocol/domain/run";
@@ -63,13 +64,16 @@ import {
   StaleBase,
   TouchedJudge,
   UnknownAsk,
+  UnknownProposal,
 } from "@repo/protocol/refusal";
 import type {
   CapReached,
   DecisionClosed,
+  DraftInProgress,
   IncompleteBrief,
   NotRedFirst,
   NotSensitive,
+  ProposalClosed,
   Refusal,
   UnknownDecision,
   UnknownEnvItem,
@@ -104,6 +108,8 @@ import {
 import type { Decided } from "./attention/decisions.ts";
 import { AttentionEffect, platformHandle } from "./attention/effects.ts";
 import {
+  draft,
+  DraftCommand,
   expire as expireProposals,
   propose,
   ProposalCommand,
@@ -113,6 +119,7 @@ import { recordOf } from "./attention/record.ts";
 import { today } from "./attention/today.ts";
 import { standing } from "./attention/vouch.ts";
 import { ClaimState } from "./claim.ts";
+import { DraftResult } from "./draft-runs.ts";
 import type { UnlandedRunEnv } from "./env-port.ts";
 import { ProjectEventInput } from "./events.ts";
 import { pushFacts } from "./facts.ts";
@@ -126,7 +133,7 @@ import {
   transition,
 } from "./landing.ts";
 import type { Request, Step } from "./landing.ts";
-import { OutboxBody, outboxRow, startRow } from "./outbox.ts";
+import { draftRow, OutboxBody, outboxRow, startRow } from "./outbox.ts";
 import type {
   AnswerRow,
   BudgetDayRow,
@@ -260,6 +267,29 @@ export interface DeciderApi {
     },
     NotDecider | UnknownEnvItem | NotSensitive | ValueTooShort
   >;
+  /**
+   * Has the platform's agent draft an open proposal's ask, or draft it
+   * again with a note, for its proposer or a decider of its paths; at most
+   * `DRAFT_ROUNDS` rounds. The decision a round settles into goes up then.
+   */
+  readonly draftAsk: (
+    caller: Person,
+    input: { readonly note?: string; readonly proposal: ProposalId }
+  ) => Effect.Effect<
+    { readonly proposal: Proposal },
+    UnknownProposal | ProposalClosed | NotDecider | DraftInProgress | CapReached
+  >;
+  /**
+   * The public face of a proposal: its state, its draft's, and the files
+   * it holds until a decider accepts it.
+   */
+  readonly showProposal: (
+    caller: Principal,
+    proposal: ProposalId
+  ) => Effect.Effect<
+    { readonly files: readonly ConfigFile[]; readonly proposal: Proposal },
+    UnknownProposal
+  >;
   /** The caller's Today, held to their budget; a person who decides nothing has none. */
   readonly today: (caller: Person) => Effect.Effect<Today, NotDecider>;
   /** A platform landing of the vouch file with the person vouched for, or denounced. */
@@ -312,6 +342,8 @@ export interface Opening {
   readonly ask: AskId;
   /** Who asks it: `askedBy`, and the landing's author. */
   readonly asker: Handle;
+  /** The agents the landing discloses (`Assisted-by:`): the platform's drafter, for a drafted ask. */
+  readonly assisted: readonly AgentTrailer[];
   readonly credits: readonly Credit[];
   /** Who must decide for its territory. */
   readonly decider: Person;
@@ -472,7 +504,7 @@ const moduleOf = (policy: Policy, territory: string) =>
  * rule); without a territory, its files outside the config folder, where
  * its check lives. The ask file's own place says nothing of its territory.
  */
-const pathsOf = (
+export const pathsOf = (
   policy: Policy,
   files: readonly RepoPath[],
   territory: Option.Option<string>
@@ -505,6 +537,29 @@ export const decidersOn = (
 };
 
 const proposedLabel = "want";
+
+/** The evidence line that names the model a proposal's files were drafted by. */
+const draftedByLabel = "drafted by";
+
+/** The platform's drafter, as the landing of an ask it drafted discloses it. */
+export const drafterOf = (model: string): AgentTrailer => ({
+  harness: `${Brand.cli}-drafter`,
+  model,
+  verified: true,
+});
+
+/**
+ * The agents an accepted proposal's landing discloses: the drafter, when
+ * its decision's evidence says the files were drafted (`drafted by:
+ * <model>, attempt <n> of 3`), else none.
+ */
+const assistedBy = (evidence: readonly Evidence[]): readonly AgentTrailer[] =>
+  Option.toArray(
+    Option.map(
+      Array.findFirst(evidence, ({ label }) => label === draftedByLabel),
+      ({ value }) => drafterOf(value.split(", attempt ")[0] ?? value)
+    )
+  );
 
 /**
  * A proposal's evidence: its want, its territory, and each file it would
@@ -555,7 +610,7 @@ const askFolder = `${configFolder}asks/`;
 const askSuffix = ".ask.ts";
 
 /** The ask a proposal's files open: the one whose ask file they hold. */
-const askIdOf = (files: readonly ComposedFile[]): Option.Option<AskId> =>
+export const askIdOf = (files: readonly ComposedFile[]): Option.Option<AskId> =>
   Array.findFirst(files, ({ path }) =>
     path.startsWith(askFolder) && path.endsWith(askSuffix)
       ? Schema.decodeOption(AskId)(
@@ -699,6 +754,32 @@ export const deciderDeadlines = (h: DeciderState): readonly DateTime.Utc[] => [
 const unlanded = (handle: Handle, refused: NotDecider | StaleBase) =>
   Effect.logWarning(`the vouch for ${handle} did not land`, refused);
 
+/** Who may have a proposal drafted again: its proposer, or a decider of its paths. */
+const mayDraft = (
+  policy: Policy,
+  row: ProjectRow,
+  proposal: Proposal,
+  handle: Handle
+) =>
+  sameHandle(proposal.proposer, handle) ||
+  decidersOn(
+    policy,
+    pathsOf(policy, proposal.files, Option.fromUndefinedOr(proposal.territory)),
+    row.initializer
+  ).some((each) => sameHandle(each, handle));
+
+/** The events among `effects`, written; the alarm is set once settled, from every deadline. */
+const emitted = (
+  writes: DeciderWrites,
+  effects: readonly AttentionEffect[]
+) => {
+  for (const effect of effects) {
+    if (AttentionEffect.$is("Emit")(effect)) {
+      writes.events.push(effect.event);
+    }
+  }
+};
+
 // ------------------------------------------------------------ the bodies
 
 /**
@@ -823,15 +904,220 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
     writes.proposals.set(proposed.proposal.id, proposed.proposal);
     writes.decisions.set(decision.id, decision);
-
-    for (const effect of proposed.effects) {
-      if (AttentionEffect.$is("Emit")(effect)) {
-        writes.events.push(effect.event);
-      }
-    }
+    emitted(writes, proposed.effects);
 
     return { proposal: proposed.proposal };
   };
+
+  /**
+   * A proposal's next draft round started: the proposal drafting, the
+   * events `effects` emit, and the row that starts its run, with the note
+   * for the agent. No decision goes up until the round settles.
+   */
+  const startDraft = (
+    h: H,
+    writes: W,
+    now: DateTime.Utc,
+    input: {
+      readonly by: Handle;
+      readonly effects: readonly AttentionEffect[];
+      readonly note: Option.Option<string>;
+      readonly proposal: Proposal;
+    }
+  ) =>
+    Effect.gen(function* () {
+      const started = yield* Effect.fromResult(
+        draft(input.proposal, DraftCommand.DraftStarted({ by: input.by }), now)
+      );
+
+      const proposal = Option.getOrElse(
+        Option.map(started, (moved) => moved.proposal),
+        () => input.proposal
+      );
+
+      writes.proposals.set(proposal.id, proposal);
+      emitted(writes, input.effects);
+
+      if (
+        proposal.draft !== undefined &&
+        DraftState.guards.Drafting(proposal.draft)
+      ) {
+        writes.outbox.push(
+          yield* draftRow(
+            {
+              ...Option.match(input.note, {
+                onNone: () => ({}),
+                onSome: (note) => ({ note }),
+              }),
+              project: name,
+              proposal: proposal.id,
+              round: proposal.draft.round,
+            },
+            now
+          )
+        );
+      }
+
+      return { proposal };
+    });
+
+  /** The proposal by `id` as this call has it. */
+  const proposalNow = (h: H, writes: W, id: ProposalId) =>
+    Array.findFirst(proposalsNow(h, writes), (each) => each.id === id);
+
+  /** The decision that puts `proposal` to its deciders, the last one when several did. */
+  const decisionOf = (h: H, writes: W, proposal: ProposalId) =>
+    Array.findLast(
+      decisionsNow(h, writes),
+      ({ subject }) =>
+        DecisionSubject.guards.OpenProposal(subject) &&
+        subject.proposal === proposal
+    );
+
+  const draftBody =
+    (caller: Person, input: Parameters<DeciderApi["draftAsk"]>[1]) =>
+    (h: H, writes: W, now: DateTime.Utc) =>
+      Effect.gen(function* () {
+        const found = Option.all({
+          live: liveOf(h),
+          proposal: proposalNow(h, writes, input.proposal),
+        });
+
+        if (Option.isNone(found)) {
+          return yield* new UnknownProposal({ proposal: input.proposal });
+        }
+
+        const { live, proposal } = found.value;
+
+        if (!mayDraft(live.policy, live.row, proposal, caller.handle)) {
+          return yield* new NotDecider({});
+        }
+
+        return yield* startDraft(h, writes, now, {
+          by: caller.handle,
+          effects: [],
+          note: Option.fromUndefinedOr(input.note),
+          proposal,
+        });
+      });
+
+  /**
+   * A draft's round settled, by the pure rules: the proposal moves, and its
+   * decision goes up with the files (or the want alone) and what the draft
+   * says, or, when one is open already, takes that evidence in its place.
+   * A stale round or a closed proposal changes nothing.
+   */
+  const settledBody =
+    (input: {
+      readonly proposal: ProposalId;
+      readonly result: DraftResult;
+      readonly round: number;
+    }) =>
+    (h: H, writes: W, now: DateTime.Utc) =>
+      Effect.gen(function* () {
+        const found = Option.all({
+          live: liveOf(h),
+          proposal: proposalNow(h, writes, input.proposal),
+        });
+
+        if (Option.isNone(found)) {
+          return;
+        }
+
+        const { live, proposal } = found.value;
+
+        const moved = yield* Effect.fromResult(
+          draft(
+            proposal,
+            DraftCommand.DraftSettled({
+              result: input.result,
+              round: input.round,
+            }),
+            now
+          )
+        ).pipe(Effect.orDie);
+
+        if (Option.isNone(moved)) {
+          return;
+        }
+
+        const settled = moved.value.proposal;
+        const territory = Option.fromUndefinedOr(settled.territory);
+
+        const files = DraftResult.match(input.result, {
+          Failed: (): readonly ComposedFile[] => [],
+          Red: ({ files: drafted }) => drafted,
+        });
+
+        const evidence = [
+          ...evidenceOf({
+            files,
+            sealed: false,
+            territory,
+            want: settled.want,
+          }),
+          ...moved.value.lines,
+        ];
+
+        writes.proposals.set(settled.id, settled);
+        emitted(writes, moved.value.effects);
+
+        const open = Option.filter(
+          decisionOf(h, writes, settled.id),
+          ({ decided }) => decided === undefined
+        );
+
+        if (Option.isSome(open)) {
+          writes.decisions.set(open.value.id, { ...open.value, evidence });
+
+          return;
+        }
+
+        const decision = openDecision({
+          deciders: decidersOn(
+            live.policy,
+            pathsOf(live.policy, settled.files, territory),
+            live.row.initializer
+          ),
+          evidence,
+          expireDays: live.policy.budget.expireDays,
+          id: DecisionId.make(minted("dec", decisionsNow(h, writes).length)),
+          now,
+          project: name,
+          subject: DecisionSubject.cases.OpenProposal.make({
+            proposal: settled.id,
+          }),
+        });
+
+        writes.decisions.set(decision.id, decision);
+      });
+
+  /** A proposal, and the files its decision holds for it (none before one goes up). */
+  const proposalOf = (proposal: ProposalId) =>
+    Effect.gen(function* () {
+      const h = yield* kernel.read;
+
+      const found = Array.findFirst(h.proposals, ({ id }) => id === proposal);
+
+      if (Option.isNone(found)) {
+        return yield* new UnknownProposal({ proposal });
+      }
+
+      const evidence = Option.match(
+        Array.findLast(
+          h.decisions,
+          ({ subject }) =>
+            DecisionSubject.guards.OpenProposal(subject) &&
+            subject.proposal === proposal
+        ),
+        { onNone: () => [], onSome: (decision) => decision.evidence }
+      );
+
+      return {
+        files: filesOf(found.value, evidence),
+        proposal: found.value,
+      };
+    });
 
   /** How many of `handle`'s proposals are open. */
   const openCountOf = (h: H, writes: W, handle: Handle) =>
@@ -901,6 +1187,19 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
             now
           )
         );
+
+        // A drafted proposal reaches its deciders once its draft settles.
+        if (input.draft === true) {
+          // A proposal just opened drafts its first round: nothing refuses it.
+          return yield* Effect.orDie(
+            startDraft(h, writes, now, {
+              by: caller.handle,
+              effects: proposed.effects,
+              note: Option.none(),
+              proposal: proposed.proposal,
+            })
+          );
+        }
 
         return putUp(h, writes, {
           evidence: evidenceOf({
@@ -1397,6 +1696,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
               .open(h, writes, now, {
                 ask,
                 asker: proposal.proposer,
+                assisted: assistedBy(input.decision.evidence),
                 credits: [
                   { handle: proposal.proposer, role: "Asked-by" },
                   { handle: input.by, role: "Decided-by" },
@@ -2054,6 +2354,19 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       caller: Person,
       input: Parameters<DeciderApi["decide"]>[1]
     ) => kernel.write(queue, decideBody(caller, input)),
+    draftAsk: (
+      queue: AnswerQueue,
+      caller: Person,
+      input: Parameters<DeciderApi["draftAsk"]>[1]
+    ) => kernel.write(queue, draftBody(caller, input)),
+    draftSettled: (
+      queue: AnswerQueue,
+      input: {
+        readonly proposal: ProposalId;
+        readonly result: DraftResult;
+        readonly round: number;
+      }
+    ) => kernel.write(queue, settledBody(input)),
     expire,
     finish: (
       queue: AnswerQueue,
@@ -2077,6 +2390,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       caller: Person,
       input: Parameters<DeciderApi["proposeAsk"]>[1]
     ) => kernel.write(queue, proposeBody(caller, input)),
+    showProposal: proposalOf,
     today: todayOf,
     vouch: (
       queue: AnswerQueue,

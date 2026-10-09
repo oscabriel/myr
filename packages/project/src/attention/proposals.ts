@@ -9,20 +9,31 @@
  * `OpenProposal` decision beside it, and only a decider's `accept` opens the
  * ask (`OpenAsk`), red first like any other.
  */
+import type { Evidence } from "@repo/protocol/domain/common";
 import type { Policy } from "@repo/protocol/domain/policy";
+import { DraftState } from "@repo/protocol/domain/proposal";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import type {
   AskId,
   CommitSha,
+  Handle,
   ProjectName,
   ProposalId,
   RepoName,
   RepoPath,
 } from "@repo/protocol/ids";
 import type { Person } from "@repo/protocol/principal";
-import { CapReached, Denounced, NotVouched } from "@repo/protocol/refusal";
+import {
+  CapReached,
+  Denounced,
+  DraftInProgress,
+  NotVouched,
+  ProposalClosed,
+} from "@repo/protocol/refusal";
+import { explain } from "@repo/protocol/render";
 import { Data, DateTime, Option, Result } from "effect";
 
+import { DRAFT_ROUNDS, DraftResult } from "../draft-runs.ts";
 import { ProjectEventInput } from "../events.ts";
 import { AttentionEffect } from "./effects.ts";
 
@@ -69,6 +80,20 @@ export type ProposalCommand = Data.TaggedEnum<{
 
 /** Constructors for proposal commands. */
 export const ProposalCommand = Data.taggedEnum<ProposalCommand>();
+
+/**
+ * What moves an open proposal's draft. `DraftStarted`: the platform's
+ * agent starts drafting its ask, at `by`'s request, in its first round or
+ * one more (at most `DRAFT_ROUNDS`). `DraftSettled`: a round ended, as its
+ * run reports it.
+ */
+export type DraftCommand = Data.TaggedEnum<{
+  DraftSettled: { readonly result: DraftResult; readonly round: number };
+  DraftStarted: { readonly by: Handle };
+}>;
+
+/** Constructors for draft commands. */
+export const DraftCommand = Data.taggedEnum<DraftCommand>();
 
 type Propose = Data.TaggedEnum.Value<ProposalCommand, "Propose">;
 
@@ -230,3 +255,139 @@ export const expire = (
       : proposal
   ),
 });
+
+/**
+ * A proposal's draft moved: the proposal after it, what the service does
+ * next, and, once a round settles, the lines its decision's evidence adds
+ * to the want, the territory and the files.
+ */
+export interface Drafted {
+  readonly effects: readonly AttentionEffect[];
+  readonly lines: readonly Evidence[];
+  readonly proposal: Proposal;
+}
+
+/** The round a proposal's next draft takes: one after its last, or the first. */
+const nextRound = (proposal: Proposal) =>
+  proposal.draft === undefined ? 1 : proposal.draft.round + 1;
+
+/**
+ * A round that started drafting and has not settled: the proposal's
+ * current one, still open.
+ */
+const drafting = (proposal: Proposal, round: number) =>
+  proposal.state === "open" &&
+  proposal.draft !== undefined &&
+  DraftState.guards.Drafting(proposal.draft) &&
+  proposal.draft.round === round;
+
+/** What a settled round's decision says beside the want: red first and who drafted, or why it failed. */
+const settledLines = (result: DraftResult): readonly Evidence[] =>
+  DraftResult.match(result, {
+    Failed: ({ refusal }): readonly Evidence[] => [
+      { label: "draft failed", value: explain([refusal])[0] ?? refusal._tag },
+    ],
+    Red: ({ attempts, lane, model, rationale, signature }) => [
+      { label: "red first", value: `${lane}: ${signature}` },
+      {
+        label: "drafted by",
+        value: `${model}, attempt ${attempts} of ${DRAFT_ROUNDS}`,
+      },
+      { label: "why this test", value: rationale },
+    ],
+  });
+
+/** The proposal once a round settled: its files and `Ready`, or no files and `Failed`. */
+const settledProposal = (
+  proposal: Proposal,
+  round: number,
+  result: DraftResult
+): Proposal =>
+  DraftResult.match(result, {
+    Failed: ({ attempts, model, refusal }): Proposal => ({
+      ...proposal,
+      draft: DraftState.cases.Failed.make({
+        attempts,
+        model,
+        refusal: refusal._tag,
+        round,
+      }),
+      files: [],
+    }),
+    Red: ({ attempts, files, lane, model, signature }): Proposal => ({
+      ...proposal,
+      draft: DraftState.cases.Ready.make({
+        attempts,
+        model,
+        red: { lane, signature },
+        round,
+      }),
+      files: files.map(({ path }) => path),
+    }),
+  });
+
+/**
+ * A proposal's draft, moved. `DraftStarted` drafts an open proposal in its
+ * next round, refused while a round drafts, once the proposal is closed,
+ * and past `DRAFT_ROUNDS`. `DraftSettled` settles the round drafting now
+ * and nothing else: a stale round, a settled one, or a closed proposal
+ * gives none, so a report that comes twice changes nothing.
+ */
+export const draft = (
+  proposal: Proposal,
+  command: DraftCommand,
+  now: DateTime.Utc
+): Result.Result<
+  Option.Option<Drafted>,
+  ProposalClosed | DraftInProgress | CapReached
+> =>
+  DraftCommand.$match(command, {
+    DraftSettled: ({ result, round }) =>
+      Result.succeed(
+        drafting(proposal, round)
+          ? Option.some({
+              effects: [
+                AttentionEffect.Emit({
+                  event: ProjectEventInput.ProposalDrafted({
+                    at: now,
+                    proposal: proposal.id,
+                    ready: DraftResult.guards.Red(result),
+                  }),
+                }),
+              ],
+              lines: settledLines(result),
+              proposal: settledProposal(proposal, round, result),
+            })
+          : Option.none()
+      ),
+    DraftStarted: () => {
+      if (proposal.state !== "open") {
+        return Result.fail(new ProposalClosed({ proposal: proposal.id }));
+      }
+
+      if (
+        proposal.draft !== undefined &&
+        DraftState.guards.Drafting(proposal.draft)
+      ) {
+        return Result.fail(DraftInProgress.of(proposal.id));
+      }
+
+      const round = nextRound(proposal);
+
+      return round > DRAFT_ROUNDS
+        ? Result.fail(new CapReached({ cap: DRAFT_ROUNDS }))
+        : Result.succeed(
+            Option.some({
+              effects: [],
+              lines: [],
+              proposal: {
+                ...proposal,
+                draft: DraftState.cases.Drafting.make({
+                  round,
+                  startedAt: now,
+                }),
+              },
+            })
+          );
+    },
+  });
