@@ -2,8 +2,8 @@
  * The code browser's, the people page's and drafting's contracts and
  * routes, wired end to end through the platform's fetch
  * handler: the policy read answers, the code reads reach the façade
- * (`why` names the issue that builds it; the others are
- * `code-reads.test.ts`'), a draft needs a person, and `/` and a project's
+ * (`why` here; the others are `code-reads.test.ts`'), a draft needs a
+ * person, and `/` and a project's
  * raw files have their routes, open to a stale credential as every public
  * path is (a raw file at no revision is a 404).
  */
@@ -66,7 +66,7 @@ describe("the code, policy and drafting contracts over /rpc", () => {
     })
   );
 
-  it.effect("reach the code façade, which names the issue that builds it", () =>
+  it.effect("reach the code façade, whose why answers without dying", () =>
     Effect.gen(function* () {
       const { handler } = yield* platform;
       const anyone = yield* rpcClient(handler);
@@ -75,7 +75,7 @@ describe("the code, policy and drafting contracts over /rpc", () => {
         yield* diedWith(
           anyone.why({ path: RepoPath.make("package.json"), project })
         )
-      ).toStrictEqual(Option.some("not built: 912"));
+      ).toStrictEqual(Option.none());
     })
   );
 
