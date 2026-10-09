@@ -261,6 +261,7 @@ Smoke only reads, from the platform and then the web. Every probe runs even when
 | `mcp-needs-credential` | `POST /mcp` without a credential answers 401 |
 | `anonymous-unknown-project` | an anonymous `/rpc` `listAsks` for `no-such-project` answers with a typed `UnknownProject` |
 | `missing-repo-404` | `GET /no-such-project.git/info/refs?service=git-upload-pack` answers 404 |
+| `platform-root` | the platform's `GET /` answers 200 with a page that names its MCP endpoint (`/mcp`) and the CLI's `install.sh` |
 | `web-front-page` | the web's `GET /` answers 200 with HTML |
 | `web-llms-txt` | the web's `GET /llms.txt` answers 200 with Markdown that opens with its title; the web builds it from the platform's project list, so it passes only when the web reaches the platform through its service binding |
 
