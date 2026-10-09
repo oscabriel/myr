@@ -12,14 +12,14 @@ This file has five parts, then how to run a stage, and it ends with what is left
 6. [Running a stage](#running-a-stage)
 7. [Human steps: status and next action](#human-steps-status-and-next-action)
 
-Sections 1 to 5 hold the state as of 2026-10-08, 18:00 UTC, read from the account with read-only calls; the demo stage and the teardown plan were read again at 18:15 UTC and had not changed. The human steps at the end hold their status as of 2026-10-08, 18:30 UTC.
+Sections 1 to 5 hold the state as of 2026-10-08, 18:00 UTC, read from the account with read-only calls; the demo stage and the teardown plan were read again at 18:15 UTC and had not changed. The W9 deploys of 2026-10-09 (06:39 to 07:22 UTC, issue 914) are added to sections 1, 3 and 5; the teardown record is unchanged. The human steps at the end hold their status as of 2026-10-08, 18:30 UTC.
 
 ## 1. Stages
 
 | Stage | What it is for | State on 2026-10-08 |
 | --- | --- | --- |
-| `dev-oscabriel` | One person's iteration. Deploy it as often as you like. | Bootstrapped 2026-10-07 and deployed (platform, sandbox, web). Re-checked 2026-10-08: bootstrap created nothing, and the platform holds every required secret. The feature-frozen build was deployed at 14:51 UTC on 2026-10-08, and the whole core loop (`bun scripts/smoke.ts --stage dev-oscabriel --loop`) passed on it twice in a row. |
-| `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). | Bootstrapped 2026-10-08: six resources created, migrations `0001` to `0004` applied, and a second run created nothing. Its secrets are set. Deployed at 15:39 UTC on 2026-10-08 (the build the dev stage proved), and smoke passed. Seeded at 15:44 UTC with `datekit` (its maintainers layer and both sealed suites admitted) and `burrow` (the `drop-legacy-fetch` family), nothing claimed. The rehearsal (17:08 to 17:39 UTC) only read it, apart from ines-v's `env set SENTRY_AUTH_TOKEN` with a made-up value, which stays set for the take. At 18:13 UTC smoke passed 7 of 7, the deployed web's Playwright check passed 5 of 5, and burrow's six `drop-legacy-fetch-burrow-*` children were open and unclaimed. Each later deploy is listed, with its reason, in [Deploys of demo](#deploys-of-demo). |
+| `dev-oscabriel` | One person's iteration. Deploy it as often as you like. | Bootstrapped 2026-10-07 and deployed (platform, sandbox, web). Re-checked 2026-10-08: bootstrap created nothing, and the platform holds every required secret. The feature-frozen build was deployed at 14:51 UTC on 2026-10-08, and the whole core loop (`bun scripts/smoke.ts --stage dev-oscabriel --loop`) passed on it twice in a row. **W9** (2026-10-09): deployed at 06:41 UTC (`a4543f6`), 06:57 (`177ee96`, the code cache fix) and 07:12 UTC (`ecc2107`, the drafter fix), smoke 8 of 8 each time (`platform-root` included). The deployed-web checks pass on datekit (12 of 12) and on burrow (11 of 12: burrow has no answer landing on dev, so `why.e2e.ts` has no ask to name). `smoke --loop --draft` passed once at 07:15 UTC on `smoke-20261009-071255`: `@cf/moonshotai/kimi-k2.7-code`, red first on attempt 1 of 3, 59 s from proposal to draft, 160 s for the whole loop; estimated Workers AI cost about $0.01 per attempt (about 1.6k tokens in and 1 to 2k out, 480 to 750 neurons on the same call replayed). |
+| `demo` | The recording and the submission. Deploy it deliberately, and never while a take is being recorded (H7). | Bootstrapped 2026-10-08: six resources created, migrations `0001` to `0004` applied, and a second run created nothing. Its secrets are set. Deployed at 15:39 UTC on 2026-10-08 (the build the dev stage proved), and smoke passed. Seeded at 15:44 UTC with `datekit` (its maintainers layer and both sealed suites admitted) and `burrow` (the `drop-legacy-fetch` family), nothing claimed. The rehearsal (17:08 to 17:39 UTC) only read it, apart from ines-v's `env set SENTRY_AUTH_TOKEN` with a made-up value, which stays set for the take. At 18:13 UTC smoke passed 7 of 7, the deployed web's Playwright check passed 5 of 5, and burrow's six `drop-legacy-fetch-burrow-*` children were open and unclaimed. Each later deploy is listed, with its reason, in [Deploys of demo](#deploys-of-demo). **W9** (2026-10-09): deployed at 07:18 UTC (`ecc2107`; smoke failed only `platform-root`, a 404 from the W8 version as the upload finished, and passed 8 of 8 a minute later) and again at 07:22 UTC (`1a7bb89`, the same Worker code; smoke 8 of 8). The deployed-web checks pass 11 of 12 on datekit: `why.e2e.ts` needs an answer landing and demo has none, by design. Nothing was seeded, drafted, claimed or imported; it still holds `datekit` and `burrow`, and burrow's `drop-legacy-fetch` and its seven children are unclaimed. |
 
 There is no `prod` stage before the deadline. The top level of each `wrangler.jsonc` is stage `local`, for tests and `wrangler dev`, and it is never deployed. A new person's stage is added to `stages` in `stages.ts` and gets an `env` block in each `wrangler.jsonc`, in the same change.
 
@@ -85,7 +85,7 @@ Every resource in the two tables below belongs to its stage. The times are the a
 
 A throwaway is something a smoke run, a swarm run or a `seed --as` copy makes on a stage, beside the stage's own resources. Each run appends one JSON line for each throwaway to `infra/created.jsonl` (`infra/created.ts`), and teardown acts only on those lines. When teardown deletes one, it appends a `deleted` line naming it (`deletedAt`, then its kind, name, namespace and stage). No line is ever rewritten or removed.
 
-On 2026-10-08 at 18:00 UTC the ledger holds 69 entries, all on `dev-oscabriel`: 16 projects and 53 repos. None is marked deleted yet. A read-only listing found every one of the 53 repos still there:
+On 2026-10-08 at 18:00 UTC the ledger held 69 entries, all on `dev-oscabriel`: 16 projects and 53 repos. 914's runs on 2026-10-09 added 8 (3 projects, 5 repos), so it holds 77, listed below. None is marked deleted yet. A read-only listing found every one of the 53 repos still there:
 
 | When (UTC) | By | Kind | Name | Where |
 | --- | --- | --- | --- | --- |
@@ -96,6 +96,7 @@ On 2026-10-08 at 18:00 UTC the ledger holds 69 entries, all on `dev-oscabriel`: 
 | 2026-10-08 16:29 to 16:41 | seed, swarm | 2 projects, 14 repos | the swarm's two live runs: `burrow-swarm-1` and `burrow-swarm-2`, each a `seed --as` copy of burrow with its repo and the six contributors' claim forks `<project>--drop-legacy-fetch-burrow-<package>--<handle>` | `projects-dev-oscabriel` |
 | 2026-10-08 16:49 to 16:57 | smoke | 5 projects, 10 repos | five core-loop runs, `smoke-20261008-164858`, `smoke-20261008-165040`, `smoke-20261008-165218`, `smoke-20261008-165400` and `smoke-20261008-165645`, each with its repo and its claim's fork `<project>--parse-year--bram` | `projects-dev-oscabriel` |
 | 2026-10-08 17:12 to 17:39 | seed, swarm | 2 projects, 10 repos | the rehearsal's copies: `datekit-805` (its repo, its layer repo `datekit-805--maintainers`, and bram's three claim forks) and `burrow-805` (its repo, and the claim forks of tamsin, ivo, marisol and dagny) | `projects-dev-oscabriel`, the layer in `layers-dev-oscabriel` |
+| 2026-10-09 06:59 to 07:13 | smoke | 3 projects, 5 repos | three `--loop --draft` runs (914): `smoke-20261009-065926` (its repo and `--parse-year--bram`; its draft failed on the model's JSON), `smoke-20261009-071213` (its repo only: init made it, then its first push answered 500 seconds after a deploy, so the loop wrote nothing and 914 added both lines through `infra/created.ts`) and `smoke-20261009-071255` (its repo and `--parse-year--bram`; the draft passed and its ask opened there) | `projects-dev-oscabriel` |
 
 The live runs before the ledger existed left throwaways that it doesn't hold, all on `dev-oscabriel`. A read-only listing on 2026-10-08 at 18:00 UTC found each one still there:
 
@@ -158,13 +159,13 @@ The account's workers.dev subdomain is in `infra/workers-dev.json`. The demo's r
 
 | Stage | What | URL | State on 2026-10-08 |
 | --- | --- | --- | --- |
-| `dev-oscabriel` | platform | `https://platform-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/health` answers 200); the core loop passed live twice on the 14:51 deploy |
-| `dev-oscabriel` | web | `https://web-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/` answers 200) |
+| `dev-oscabriel` | platform | `https://platform-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/health` answers 200); the core loop passed live twice on the 14:51 deploy; the W9 build since 2026-10-09 (`ecc2107` at 07:12), whose `/` answers 200 with HTML, or Markdown for `Accept: text/markdown` |
+| `dev-oscabriel` | web | `https://web-dev-oscabriel.oscargabriel.workers.dev` | deployed (`/` answers 200); W9's code browser, why, people and proposal pages pass the deployed-web checks |
 | `dev-oscabriel` | CLI install | `https://platform-dev-oscabriel.oscargabriel.workers.dev/install.sh` | served from `releases-dev-oscabriel` |
 | `dev-oscabriel` | Google redirect URI (H4) | `https://platform-dev-oscabriel.oscargabriel.workers.dev/oauth/google/callback` | not registered |
 | `dev-oscabriel` | sandbox | none: it has no workers.dev route, and only the platform reaches it | deployed; the Checker's containers start on `standard-3` (2 vCPU, 8 GiB), the Lander's on `standard-2` |
-| `demo` | platform | `https://platform-demo.oscargabriel.workers.dev` | deployed 2026-10-08 15:39 (`/health` answers 200), and smoke passed; seeded with `datekit` and `burrow`. An anonymous `git clone <platform>/datekit.git` works, and a contributor's token gets 403 on `datekit--maintainers.git`. |
-| `demo` | web | `https://web-demo.oscargabriel.workers.dev` | deployed (`/` answers 200); the Playwright check of the deployed web passes |
+| `demo` | platform | `https://platform-demo.oscargabriel.workers.dev` | deployed 2026-10-08 15:39 (`/health` answers 200), and smoke passed; seeded with `datekit` and `burrow`. An anonymous `git clone <platform>/datekit.git` works, and a contributor's token gets 403 on `datekit--maintainers.git`. Redeployed with the W9 build on 2026-10-09 07:22 (`1a7bb89`); `/` answers 200. |
+| `demo` | web | `https://web-demo.oscargabriel.workers.dev` | deployed (`/` answers 200); the Playwright check of the deployed web passes; after the W9 deploy, 11 of 12 (all but why, which needs an answer landing demo has not got) |
 | `demo` | CLI install | `https://platform-demo.oscargabriel.workers.dev/install.sh` | served from `releases-demo`: release `0.1.0-demo.802` (`bun run release -- --build --upload --stage demo --version 0.1.0-demo.802`, 2026-10-08 15:51), which installs and reads the demo |
 | `demo` | Google redirect URI (H4) | `https://platform-demo.oscargabriel.workers.dev/oauth/google/callback` | not registered; the demo's deploy printed it |
 | `demo` | sandbox | none: it has no workers.dev route | deployed; the Checker's containers start on `standard-3` (2 vCPU, 8 GiB), the Lander's on `standard-2` |
@@ -244,6 +245,7 @@ A stage's first deploy can stop in the `sandbox` step with Wrangler's "Timed out
 | When (UTC) | Build | Why |
 | --- | --- | --- |
 | 2026-10-08 15:39 | `c7b68ff`, the build that passed the core loop live on `dev-oscabriel` | The first deploy. It took three runs: twice (15:04 to 15:19 and 15:20 to 15:35) Cloudflare kept the new `sandbox-demo-lander-land` image's preparation pending past Wrangler's limit, though the same digest had been prepared for `dev-oscabriel` in about 30 s; the third run found it ready. |
+| 2026-10-09 07:18 and 07:22 (914) | `ecc2107`, then `1a7bb89` (the same Worker code; only smoke's `platform-root` patience changed) | The W9 build (the platform's `/` page, the code browser, why, people, drafted asks): the user approved W9 after the build closed, `infra/.recording` was absent, and `dev-oscabriel` passed smoke, the deployed-web checks and `smoke --loop --draft` on this Worker code first. The first run's smoke failed `platform-root` on a 404 the W8 version gave as the upload finished; the second passed 8 of 8. Nothing is seeded, drafted, claimed or imported on demo; burrow's children were checked unclaimed before and after. |
 
 ### Smoke-test a stage
 
@@ -254,7 +256,7 @@ bun run smoke -- --stage dev-oscabriel --url http://localhost:8787
 
 The second form points smoke at another origin, such as `wrangler dev --env dev-oscabriel` in `apps/platform`. Plain `wrangler dev` serves stage `local`, which no `--stage` names, so its `health` probe fails. Smoke finds the stage's web at `https://web-<s>.<subdomain>.workers.dev`; with `--url` it probes a web only when `--web-url <origin>` names one.
 
-Smoke only reads, from the platform and then the web. Every probe runs even when others fail, and the output names each probe that failed and why. It also prints how long each probe took. A probe the platform answers with its own failure (a 5xx, or an RPC defect) asks again every second for up to 30 s, since a fresh deploy gives those for its first seconds (seen on `dev-oscabriel`'s first deploy); any other wrong answer fails the probe at once.
+Smoke only reads, from the platform and then the web. Every probe runs even when others fail, and the output names each probe that failed and why. It also prints how long each probe took. A probe the platform answers with its own failure (a 5xx, or an RPC defect) asks again every second for up to 30 s, since a fresh deploy gives those for its first seconds (seen on `dev-oscabriel`'s first deploy). So does a 404 from the web's two probes and from `platform-root`: a first deploy's hostname, or the version before a deploy that adds a route, answers 404 for a moment (seen on demo's W9 deploy). Any other wrong answer fails the probe at once.
 
 | Probe | Passes when |
 | --- | --- |
