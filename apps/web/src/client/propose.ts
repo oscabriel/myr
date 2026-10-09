@@ -8,9 +8,9 @@
  */
 import type { ProposeAsk } from "@repo/protocol/contracts";
 import { RepoPath } from "@repo/protocol/ids";
-import type { ProjectName } from "@repo/protocol/ids";
+import type { ProjectName, ProposalId } from "@repo/protocol/ids";
 import { Array, Effect, Option, Order, Schema } from "effect";
-import { Atom, Reactivity } from "effect/reactivity";
+import { AsyncResult, Atom, Reactivity } from "effect/reactivity";
 
 import { ContractsClient } from "../surfaces.ts";
 import { keys } from "./keys.ts";
@@ -45,6 +45,18 @@ export const modulesAtom = Atom.family((project: ProjectName) =>
     )
   )
 );
+
+/**
+ * The proposal the last send made, once it answered. While a later send is
+ * on its way, or after it was refused, the atom still holds an earlier
+ * send's proposal, which names none here: the form never moves to it.
+ */
+export const proposalMade = (
+  result: AsyncResult.AsyncResult<typeof ProposeAsk.successSchema.Type, unknown>
+): Option.Option<ProposalId> =>
+  AsyncResult.isSuccess(result) && !result.waiting
+    ? Option.some(result.value.proposal.id)
+    : Option.none();
 
 /** Propose an ask: `proposeAsk`'s payload, answered with the proposal. */
 export const proposeAtom = ContractsClient.runtime.fn<

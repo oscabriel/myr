@@ -8,12 +8,26 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { ShowProposal } from "@repo/protocol/contracts";
+import { DRAFT_ROUNDS } from "@repo/project/draft-runs";
+import { Client, Contracts, ShowProposal } from "@repo/protocol/contracts";
+import { ProjectEvent } from "@repo/protocol/domain/event";
 import { DraftState } from "@repo/protocol/domain/proposal";
-import { DecisionId, LaneName, ProjectName } from "@repo/protocol/ids";
-import { DateTime, Option, Schema } from "effect";
+import { DecisionId, Handle, LaneName, ProjectName } from "@repo/protocol/ids";
+import { UnknownProject, UnknownProposal } from "@repo/protocol/refusal";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { isNotFound } from "@tanstack/react-router";
+import { DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
+import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
+import { RpcTest } from "effect/rpc";
 
-import { ProposalView } from "../src/features/proposal/proposal-view.tsx";
+import { projectTodayAtom } from "../src/client/proposal.ts";
+import { keysOf } from "../src/client/watch.ts";
+import {
+  DRAFT_ATTEMPTS,
+  ProposalView,
+} from "../src/features/proposal/proposal-view.tsx";
+import { readProposal } from "../src/routes/$project/proposals/$proposal.tsx";
+import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { markupOf, plainText } from "./ask-fixtures.ts";
 
 const datekit = ProjectName.make("datekit");
@@ -153,6 +167,10 @@ describe(ProposalView, () => {
     expect(markup).not.toMatch(DRAFT_AGAIN);
   });
 
+  it("counts attempts out of the platform's own number of draft attempts", () => {
+    expect(DRAFT_ATTEMPTS).toBe(DRAFT_ROUNDS);
+  });
+
   it("once accepted, offers no button", () => {
     const accepted: Shown = {
       ...ready,
@@ -164,4 +182,186 @@ describe(ProposalView, () => {
     expect(plainText(markup)).toContain("accepted");
     expect(markup).not.toContain("<button");
   });
+});
+
+/** A platform that knows datekit's prop-000007 only, counting what it is asked. */
+const platformHandlers = (
+  asked: Ref.Ref<{ proposal: number; today: number }>
+) =>
+  Layer.mergeAll(
+    unanswered,
+    Contracts.toLayerHandler("showProposal", ({ project, proposal }) =>
+      Effect.gen(function* () {
+        yield* Ref.update(asked, (seen) => ({
+          ...seen,
+          proposal: seen.proposal + 1,
+        }));
+
+        if (project !== datekit) {
+          return yield* new UnknownProject({ project });
+        }
+
+        if (proposal !== ready.proposal.id) {
+          return yield* new UnknownProposal({ proposal });
+        }
+
+        return ready;
+      })
+    ),
+    Contracts.toLayerHandler("today", () =>
+      Ref.update(asked, (seen) => ({ ...seen, today: seen.today + 1 })).pipe(
+        Effect.as({
+          budget: { finishes: 0, total: 5, used: 0 },
+          decider: Handle.make("okonkwo"),
+          decisions: [],
+          expiringSoon: [],
+          newcomers: [],
+          overflow: 0,
+          unattended: [],
+        })
+      )
+    ),
+    asTester
+  );
+
+const counted = () => Ref.make({ proposal: 0, today: 0 });
+
+describe(readProposal, () => {
+  it.effect("reads the proposal and its files, encoded for the page", () =>
+    Effect.gen(function* () {
+      const asked = yield* counted();
+
+      const read = yield* readProposal("datekit", "prop-000007").pipe(
+        Effect.provide(
+          Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+            Layer.provide(platformHandlers(asked))
+          )
+        )
+      );
+
+      expect(decodeShown(read).files.map(({ path }) => path)).toStrictEqual([
+        askFile,
+        testFile,
+      ]);
+    })
+  );
+
+  it.effect(
+    "is a not-found for a proposal or a project the platform does not know",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* counted();
+
+        const platform = Layer.effect(
+          Client,
+          RpcTest.makeClient(Contracts)
+        ).pipe(Layer.provide(platformHandlers(asked)));
+
+        const noProposal = yield* Effect.flip(
+          readProposal("datekit", "prop-000099").pipe(Effect.provide(platform))
+        );
+
+        const noProject = yield* Effect.flip(
+          readProposal("burrow", "prop-000007").pipe(Effect.provide(platform))
+        );
+
+        expect(isNotFound(noProposal)).toBeTruthy();
+        expect(isNotFound(noProject)).toBeTruthy();
+        expect((yield* Ref.get(asked)).proposal).toBe(2);
+      })
+  );
+
+  it.effect(
+    "is a not-found, asking nothing, for an address that names no proposal",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* counted();
+
+        const refused = yield* Effect.flip(
+          readProposal("datekit", "not a proposal").pipe(
+            Effect.provide(
+              Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+                Layer.provide(platformHandlers(asked))
+              )
+            )
+          )
+        );
+
+        expect(isNotFound(refused)).toBeTruthy();
+        expect((yield* Ref.get(asked)).proposal).toBe(0);
+      })
+  );
+});
+
+/** Lets the atoms' fibers run until `done` holds, or long enough that it would have. */
+const runUntil = (done: Effect.Effect<boolean>) =>
+  Effect.yieldNow.pipe(
+    Effect.andThen(done),
+    Effect.repeat({ times: 200, until: (held) => held })
+  );
+
+describe("the proposal page's Today", () => {
+  it.effect(
+    "reads again when the proposal's draft settles, so its new decision is linked",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* counted();
+
+        // One browser tab whose `ContractsClient` reaches the stub platform in process.
+        const registry = yield* Effect.acquireRelease(
+          Effect.sync(() =>
+            AtomRegistry.make({
+              initialValues: [
+                Atom.initialValue(
+                  ContractsClient.runtime.layer,
+                  Layer.effect(
+                    ContractsClient,
+                    RpcTest.makeClient(webContracts, { flatten: true })
+                  ).pipe(
+                    Layer.provide(platformHandlers(asked)),
+                    Layer.provideMerge(Reactivity.layer)
+                  )
+                ),
+              ],
+            })
+          ),
+          (made) =>
+            Effect.sync(() => {
+              made.dispose();
+            })
+        );
+
+        const today = projectTodayAtom(datekit);
+
+        registry.mount(today);
+        yield* AtomRegistry.getResult(registry, today, {
+          suspendOnWaiting: true,
+        });
+
+        // What the watch does on `ProposalDrafted` (`keysOf` in `watch.ts`).
+        yield* AtomRegistry.getResult(
+          registry,
+          ContractsClient.runtime.atom(
+            Reactivity.invalidate(
+              keysOf(
+                datekit,
+                ProjectEvent.cases.ProposalDrafted.make({
+                  at: DateTime.makeUnsafe("2026-10-07T09:05:00Z"),
+                  proposal: ready.proposal.id,
+                  ready: true,
+                  seq: 4,
+                })
+              )
+            )
+          ),
+          { suspendOnWaiting: true }
+        );
+
+        expect(
+          yield* runUntil(
+            Ref.get(asked).pipe(Effect.map(({ today: seen }) => seen > 1))
+          )
+        ).toBeTruthy();
+      })
+  );
 });

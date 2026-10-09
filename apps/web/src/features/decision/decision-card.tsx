@@ -123,9 +123,10 @@ const isDraftingNow = DraftState.isAnyOf(["Drafting"]);
 
 /**
  * Whether an evidence line holds a file: its label is a path (one word with
- * a slash, as the ask file's), where every other label is words.
+ * a slash or a dot, as the ask file under the config folder, or a check
+ * at the root, `offset.test.ts`), where every other label is words.
  */
-export const isFileFact = ({ label }: Fact) => /^\S+\/\S+$/u.test(label);
+const isFileFact = ({ label }: Fact) => /^\S*[./]\S*$/u.test(label);
 
 /** The files an `OpenProposal` decision holds, shown as code; none for any other subject. */
 const filesOf = (decision: Decision): readonly Fact[] =>

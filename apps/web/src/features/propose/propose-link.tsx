@@ -11,10 +11,7 @@ import { AsyncResult } from "effect/reactivity";
 import { MessageSquarePlus } from "lucide-react";
 
 import { whoAtom } from "../auth/who.ts";
-
-/** The form's address for `project`. */
-export const proposeFormPath = (project: ProjectName) =>
-  `/${project}/proposals/new`;
+import { proposeFormPath } from "./propose-view.tsx";
 
 export const ProposeLink = ({ project }: { readonly project: ProjectName }) => (
   <a

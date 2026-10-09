@@ -30,7 +30,8 @@ import { DraftedCode } from "./client-file.tsx";
 
 /**
  * How many attempts a draft round makes before it fails: the platform's
- * `DRAFT_ROUNDS` (`@repo/project/draft-runs`), which the web cannot import.
+ * `DRAFT_ROUNDS` (`@repo/project/draft-runs`), which the web's production
+ * code does not import; `test/proposal.test.tsx` holds the two equal.
  */
 export const DRAFT_ATTEMPTS = 3;
 

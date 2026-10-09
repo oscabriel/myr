@@ -358,6 +358,27 @@ describe("DecisionCard for an OpenProposal", () => {
     expect(markup).not.toContain("Drafting…");
   });
 
+  it("shows a check at the repo's root as code too", () => {
+    const markup = markupOf(
+      <DecisionCard
+        decision={{
+          ...opening,
+          evidence: [
+            ...opening.evidence,
+            { label: "offset.test.ts", value: "test('keeps +02:00');\n" },
+          ],
+        }}
+        draft={ready}
+        now={now}
+        onDecide={() => {}}
+      />
+    );
+
+    expect(markup).toMatch(/<h4[^>]*>offset\.test\.ts<\/h4>/u);
+    expect(markup).not.toMatch(/<dt[^>]*>offset\.test\.ts<\/dt>/u);
+    expect(markup).toMatch(/<dt[^>]*>want<\/dt>/u);
+  });
+
   it("links the proposal's page", () => {
     expect(card(ready)).toContain('href="/datekit/proposals/prop-000007"');
   });

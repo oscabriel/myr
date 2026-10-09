@@ -5,7 +5,11 @@ import { Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { useEffect, useState } from "react";
 
-import { modulesAtom, proposeAtom } from "../../../client/propose.ts";
+import {
+  modulesAtom,
+  proposalMade,
+  proposeAtom,
+} from "../../../client/propose.ts";
 import { whoAtom } from "../../../features/auth/who.ts";
 import { ProjectNav } from "../../../features/project/project-nav.tsx";
 import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
@@ -69,9 +73,7 @@ const Propose = ({ project }: { readonly project: ProjectName }) => {
   // earlier visit never moves the page.
   const [sent, setSent] = useState(false);
 
-  const made = sent
-    ? Option.getOrUndefined(AsyncResult.value(proposed))?.proposal.id
-    : undefined;
+  const made = sent ? Option.getOrUndefined(proposalMade(proposed)) : undefined;
 
   useEffect(() => {
     if (made !== undefined) {

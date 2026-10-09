@@ -7,7 +7,8 @@
  *
  * The decider's Today in one project lives here too, as the proposal page
  * reads it: it holds the open decision on the proposal (within the day's
- * budget), and it answers only a decider (`NotDecider` otherwise). Each read
+ * budget), and it answers only a decider (`NotDecider` otherwise); it reads
+ * again when the project's keys change, as a settled draft changes them. Each read
  * renders as waiting on the server, so the Worker reads none of them for a
  * page that draws them in the browser.
  */
@@ -18,7 +19,6 @@ import { Atom, Reactivity } from "effect/reactivity";
 
 import { ContractsClient } from "../surfaces.ts";
 import { keys } from "./keys.ts";
-import { todayAtom } from "./today.ts";
 
 /** One proposal and the files it holds: `proposalAtom(project)(proposal)`. */
 export const proposalAtom = Atom.family((project: ProjectName) =>
@@ -33,9 +33,19 @@ export const proposalAtom = Atom.family((project: ProjectName) =>
   )
 );
 
-/** The reader's Today in `project`, when they decide there. */
+/**
+ * The reader's Today in `project`, when they decide there. A draft that
+ * settles puts its decision up, so the project's keys (which a
+ * `ProposalDrafted` changes, through `keys.proposal`) read it again too.
+ */
 export const projectTodayAtom = Atom.family((project: ProjectName) =>
-  Atom.withServerValueInitial(todayAtom(project))
+  Atom.withServerValueInitial(
+    ContractsClient.query(
+      "today",
+      { project },
+      { reactivityKeys: [...keys.today(), ...keys.project(project)] }
+    )
+  )
 );
 
 /**

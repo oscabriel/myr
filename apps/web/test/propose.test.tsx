@@ -7,10 +7,14 @@
  * sends is the `proposeAsk` contract's own payload.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { ProposeAsk } from "@repo/protocol/contracts";
 import { CommitSha, ProjectName, RepoPath } from "@repo/protocol/ids";
+import { CapReached } from "@repo/protocol/refusal";
 import { Option, Schema } from "effect";
+import { AsyncResult } from "effect/reactivity";
 
+import { proposalMade, topFolders } from "../src/client/propose.ts";
 import {
   ProposeView,
   proposalPayload,
@@ -113,5 +117,95 @@ describe(proposalPayload, () => {
       want: "formatISO keeps the offset.",
     });
     expect(Object.hasOwn(payload, "draft")).toBeFalsy();
+  });
+});
+
+describe(topFolders, () => {
+  it("offers each top folder once, sorted, and no dot folder or root file", () => {
+    expect(
+      topFolders(
+        [
+          "src/format.ts",
+          "README.md",
+          `${Brand.configDir}/asks/x.ask.ts`,
+          "test/format.test.ts",
+          "src/parse/iso.ts",
+          ".github/workflows/ci.yml",
+          "docs/guide.md",
+        ].map((path) => RepoPath.make(path))
+      )
+    ).toStrictEqual(["docs", "src", "test"]);
+  });
+});
+
+/** `proposeAsk`'s answer: the proposal `id`, made. */
+const made = (id: string) =>
+  Schema.decodeUnknownSync(ProposeAsk.successSchema)({
+    proposal: {
+      expiresAt: "2026-10-21T09:00:00.000Z",
+      files: [],
+      id,
+      openedAt: "2026-10-07T09:00:00.000Z",
+      project: "datekit",
+      proposer: "lin-h",
+      state: "open",
+      want: "formatISO keeps the offset.",
+    },
+  });
+
+describe(proposalMade, () => {
+  const earlier = AsyncResult.success(made("prop-000004"));
+
+  it("names the proposal a send made, once it answered", () => {
+    expect(
+      proposalMade(AsyncResult.success(made("prop-000005")))
+    ).toStrictEqual(Option.some("prop-000005"));
+  });
+
+  it("names none while a later send is on its way, or after it was refused", () => {
+    expect(proposalMade(AsyncResult.waiting(earlier))).toStrictEqual(
+      Option.none()
+    );
+    expect(
+      proposalMade(
+        AsyncResult.fail(new CapReached({ cap: 3 }), {
+          previousSuccess: Option.some(earlier),
+        })
+      )
+    ).toStrictEqual(Option.none());
+  });
+});
+
+describe("the sign-in link", () => {
+  it("comes back to the form, at the line a why page named", () => {
+    const markup = markupOf(
+      <ProposeView
+        about={Option.some({
+          at,
+          line: 12,
+          path: RepoPath.make("src/format.ts"),
+        })}
+        modules={modules}
+        project={datekit}
+        signedIn={false}
+      />
+    );
+
+    const href = /href="(?<href>\/auth\/signin[^"]*)"/u
+      .exec(markup)
+      ?.groups?.href?.replaceAll("&amp;", "&");
+
+    const back = new URL(href ?? "/", "https://web.test").searchParams.get(
+      "return"
+    );
+
+    const there = new URL(back ?? "/", "https://web.test");
+
+    expect(there.pathname).toBe("/datekit/proposals/new");
+    expect(Object.fromEntries(there.searchParams)).toStrictEqual({
+      about: "src/format.ts",
+      at,
+      line: "12",
+    });
   });
 });

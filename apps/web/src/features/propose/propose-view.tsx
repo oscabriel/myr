@@ -60,12 +60,29 @@ export const proposalPayload = (form: {
 export const wantAbout = ({ at, line, path }: About) =>
   `In \`${path}\` line ${line} at ${at.slice(0, 7)}: `;
 
-/** The form's own address, for sign-in to come back to. */
-const proposePath = (project: ProjectName) => `/${project}/proposals/new`;
+/**
+ * The form's address for `project`, at the line a why page names when it
+ * names one: where the project page links, and where sign-in comes back to.
+ */
+export const proposeFormPath = (
+  project: ProjectName,
+  about: Option.Option<About> = Option.none()
+) =>
+  Option.match(about, {
+    onNone: () => `/${project}/proposals/new`,
+    onSome: ({ at, line, path }) =>
+      `/${project}/proposals/new?${new URLSearchParams({ about: path, at, line: String(line) }).toString()}`,
+  });
 
 const LABEL = "text-muted-foreground text-xs font-medium";
 
-const SignInFirst = ({ project }: { readonly project: ProjectName }) => (
+const SignInFirst = ({
+  about,
+  project,
+}: {
+  readonly about: Option.Option<About>;
+  readonly project: ProjectName;
+}) => (
   <section
     aria-label="Sign in to propose"
     className="border-rule flex flex-col gap-3 border-t pt-4"
@@ -76,7 +93,7 @@ const SignInFirst = ({ project }: { readonly project: ProjectName }) => (
         Proposing an ask is for signed-in members.{" "}
         <a
           className="decoration-rule font-medium underline hover:decoration-current"
-          href={`/auth/signin?${new URLSearchParams({ return: proposePath(project) }).toString()}`}
+          href={`/auth/signin?${new URLSearchParams({ return: proposeFormPath(project, about) }).toString()}`}
         >
           Sign in
         </a>{" "}
@@ -118,7 +135,7 @@ export const ProposeView = ({
   const [draft, setDraft] = useState(true);
 
   if (!signedIn) {
-    return <SignInFirst project={project} />;
+    return <SignInFirst about={about} project={project} />;
   }
 
   const chosen = modules.find((module) => module === territory);
