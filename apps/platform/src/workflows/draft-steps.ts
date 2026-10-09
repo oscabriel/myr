@@ -1,6 +1,6 @@
 /**
  * One round of a proposal's draft, as steps of the `Answer` Workflow
- * (W9-D14): the program is `@repo/drafting/run`'s `runDraft`, shared with
+ * (ADR 0018): the program is `@repo/drafting/run`'s `runDraft`, shared with
  * the in-process run, over the Workflow's `StepRunner`. Its steps are
  * `context`, then `draft-<n>` and `rehearse-<n>` per attempt, then
  * `settle`, inside the instance `draft-<project>-<proposal>-r<round>`.

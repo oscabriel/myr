@@ -233,8 +233,8 @@ describe("smoke against a live stage", () => {
     "asks / again while the version before a deploy still answers it with 404, and passes once it settles",
     () =>
       Effect.gen(function* () {
-        // demo's W9 deploy (914): smoke ran as the upload finished, and the
-        // W8 version, which has no `/`, answered it once more with 404.
+        // a demo deploy that added `/`: smoke ran as the upload finished, and the
+        // version before, which has no `/`, answered it once more with 404.
         const asked = { root: 0 };
 
         const origin = yield* fakePlatform((seen) => {

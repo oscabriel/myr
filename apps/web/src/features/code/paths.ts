@@ -30,7 +30,7 @@ export const blobHref = (project: ProjectName, rev: string, path: string) =>
 export const rawHref = (project: ProjectName, rev: string, path: string) =>
   under(`/${project}/raw/${revSegment(rev)}`, path);
 
-/** Why each line of a file at `rev` is there (912's page). */
+/** Why each line of a file at `rev` is there (the why page). */
 export const whyHref = (project: ProjectName, rev: string, path: string) =>
   under(`/${project}/why/${revSegment(rev)}`, path);
 

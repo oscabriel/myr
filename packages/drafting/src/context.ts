@@ -1,6 +1,6 @@
 /**
  * What the drafter reads: files picked from the project's canonical tree at
- * the landed commit, deterministically, within a byte budget (W9 §14.7).
+ * the landed commit, deterministically, within a byte budget (ADR 0018).
  * The caller hands the tree and a reader over the canonical repo only, so
  * no layer's repo can be read here; a path that looks like a layer's or a
  * held-back check's is refused anyway, as is an env file.

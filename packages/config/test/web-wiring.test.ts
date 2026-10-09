@@ -220,14 +220,15 @@ describe("the byte alarm", () => {
     expect(workers.map(({ dir }) => dir)).toContain("apps/web");
   });
 
-  // Each Worker grows on its own, so each has limits of its own: the
-  // platform's and the web's JavaScript at the ceilings the code browser
-  // and drafting land under.
+  // Each Worker grows on its own, so each has limits of its own, about
+  // 15% above its bundle as measured once the code browser and drafting
+  // landed (the platform's entry stays at the ceiling they landed under,
+  // 14% above it).
   it("holds each Worker it measures to limits of its own", () => {
     expect(budgets).toStrictEqual({
-      "apps/platform": { entry: 1_900_000, javascript: 2_500_000 },
-      "apps/sandbox": { entry: 1_665_000, javascript: 2_500_000 },
-      "apps/web": { entry: 1_665_000, javascript: 4_500_000 },
+      "apps/platform": { entry: 1_900_000, javascript: 1_918_000 },
+      "apps/sandbox": { entry: 656_000, javascript: 656_000 },
+      "apps/web": { entry: 818_000, javascript: 4_075_000 },
     });
     expect(Object.keys(budgets).toSorted()).toStrictEqual(
       workers.map(({ dir }) => dir).toSorted()

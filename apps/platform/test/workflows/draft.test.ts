@@ -1,5 +1,5 @@
 /**
- * A draft's run as the `Answer` Workflow takes it (W9-D14): the program's
+ * A draft's run as the `Answer` Workflow takes it (ADR 0018): the program's
  * steps over memory steps that record and replay as the engine does
  * (`memoSteps`), the memory drafter scripted per attempt, and a project in
  * memory whose rehearsals run on the scripted Checker. The Workflow's own

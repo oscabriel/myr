@@ -12,7 +12,7 @@
  *
  * For one round of a proposal's draft: the run (`@repo/drafting/run`) is
  * steps of the same Workflow under params tagged `Draft`, so drafting adds
- * no Workflow binding (W9-D14). Its instance id is `draftId`, one per
+ * no Workflow binding (ADR 0018). Its instance id is `draftId`, one per
  * project, proposal and round, so a round started twice runs once.
  */
 import { DraftParams as DraftRun } from "@repo/project/draft-runs";
@@ -60,10 +60,6 @@ export type WorkflowParams = typeof WorkflowParams.Type;
 /** How long a Workflow instance id may be. */
 const ID_LENGTH = 100;
 
-/** The instance an admission runs as: one per project, layer and pushed head. */
-export const admissionId = (params: AdmissionParams) =>
-  `admit-${params.project}-${params.layer}-${params.head}`.slice(0, ID_LENGTH);
-
 /** A modulus for `tagOf`: the Mersenne prime 2^31 - 1, so every step stays a safe integer. */
 const TAG_MODULUS = 2_147_483_647;
 
@@ -79,22 +75,32 @@ const tagOf = (text: string) => {
 };
 
 /**
- * The instance a draft's round runs as: one per project, proposal and
- * round. The proposal and round are kept whole: a project name too long for
- * the engine's id is cut, and tagged with a hash of the whole name, so no
- * two rounds share an instance (a complete one is never run again).
+ * An instance id of `named` then `suffix`, within the engine's length. The
+ * suffix is kept whole; a name too long is cut and tagged with a hash of the
+ * whole name, so two runs with different suffixes or names never share an
+ * instance (one that exists is never started again).
  */
-export const draftId = (
-  params: Pick<DraftParams, "project" | "proposal" | "round">
-) => {
-  const suffix = `-${params.proposal}-r${params.round}`;
-  const whole = `draft-${params.project}${suffix}`;
+const instanceId = (named: string, suffix: string) => {
+  const whole = `${named}${suffix}`;
 
   if (whole.length <= ID_LENGTH) {
     return whole;
   }
 
-  const tag = `-${tagOf(params.project)}`;
+  const tag = `-${tagOf(named)}`;
 
-  return `${whole.slice(0, ID_LENGTH - tag.length - suffix.length)}${tag}${suffix}`;
+  return `${named.slice(0, ID_LENGTH - tag.length - suffix.length)}${tag}${suffix}`;
 };
+
+/** The instance an admission runs as: one per project, layer and pushed head. */
+export const admissionId = (params: AdmissionParams) =>
+  instanceId(`admit-${params.project}-${params.layer}`, `-${params.head}`);
+
+/**
+ * The instance a draft's round runs as: one per project, proposal and
+ * round, the proposal and round kept whole.
+ */
+export const draftId = (
+  params: Pick<DraftParams, "project" | "proposal" | "round">
+) =>
+  instanceId(`draft-${params.project}`, `-${params.proposal}-r${params.round}`);

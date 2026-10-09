@@ -1,5 +1,5 @@
 /**
- * One draft run, as a program over named steps (W9-D14): the platform's
+ * One draft run, as a program over named steps (ADR 0018): the platform's
  * `Answer` Workflow runs it with durable steps (`apps/platform`'s
  * `workflows/draft-steps.ts`), and `draft-runs/inline.ts` runs it in
  * process, so both reach the same end.
@@ -107,7 +107,7 @@ const Attempted = Schema.TaggedUnion({
 
 type Attempted = typeof Attempted.Type;
 
-/** The kind a draft is: W9 drafts `fix` asks only (W9-D13). */
+/** The kind a draft is: drafts are `fix` asks only, for now (ADR 0018). */
 const draftedKind = "fix";
 
 /** A proposal's territory as the paths whose files the drafter reads. */

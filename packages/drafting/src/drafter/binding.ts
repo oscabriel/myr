@@ -1,6 +1,6 @@
 /**
  * The `Drafter` over Workers AI, through the platform's `AI` binding
- * (W9-D12): one chat call that asks for JSON matching `DraftedAsk`'s JSON
+ * (ADR 0018): one chat call that asks for JSON matching `DraftedAsk`'s JSON
  * Schema. Workers AI can't promise the model keeps to the schema, so the
  * reply is decoded with Effect Schema whatever the model claims
  * (principle 2). Nothing here logs: a prompt carries the project's files.

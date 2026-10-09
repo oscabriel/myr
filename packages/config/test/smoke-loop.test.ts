@@ -270,7 +270,7 @@ describe("smokeLoop --draft, against the Node world", () => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "smoke-910-" });
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "drafting-" });
 
         const report = yield* Effect.scoped(
           Effect.gen(function* () {

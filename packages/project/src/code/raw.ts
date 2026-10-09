@@ -1,5 +1,5 @@
 /**
- * A project's raw bytes, `GET /<project>/raw/<rev>/<path…>` (spec W9-D6),
+ * A project's raw bytes, `GET /<project>/raw/<rev>/<path…>` (ADR 0019),
  * as one pure response both the platform (`apps/platform/src/raw.ts`) and
  * the web's dev world serve. Both origins hold a session cookie, so no file
  * may run as script there: every answer carries `nosniff` and a sandboxing
@@ -40,7 +40,7 @@ const IMAGES = new Map([
 
 const TEXT = "text/plain; charset=utf-8";
 
-/** What every raw answer carries, a refusal too (spec W9-D6). */
+/** What every raw answer carries, a refusal too (ADR 0019). */
 const SAFE = {
   "content-security-policy": SANDBOX,
   "x-content-type-options": "nosniff",

@@ -3,7 +3,7 @@
  * web: the file was read at one commit, in one directory, so a relative
  * URL names a path in that commit's tree, as GitHub resolves a README's
  * links. The result always names the SHA, never `main`, so it reads the
- * same tree forever (and a raw image caches forever, W9-D6).
+ * same tree forever (and a raw image caches forever, ADR 0019).
  *
  * Pure, so the rules are table-tested on their own; `pipeline.ts` runs it
  * over the rendered tree before the sanitizer sees it.

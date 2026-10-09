@@ -1,6 +1,6 @@
 /**
  * A revision as a reader names it, resolved to the commit it means in the
- * project's canonical repo (spec W9-D3): absent or `main` is main's landed
+ * project's canonical repo (ADR 0019): absent or `main` is main's landed
  * commit, from the project's record and never from a ref; 40 hex digits are
  * that commit, if the repo holds it; anything else is a tag's exact name,
  * found among the repo's tags and never joined into a ref path, so

@@ -1,6 +1,6 @@
 /**
  * The plugin chain that turns a project's Markdown into a safe tree, in
- * the one order that makes it safe (W9-D5). It is the security property
+ * the one order that makes it safe (ADR 0019). It is the security property
  * of the README renderer, so it lives here alone and is tested whole
  * (`test/markdown.test.tsx`):
  *
@@ -39,10 +39,13 @@ export type MarkdownAt = Omit<RepoUrlContext, "kind">;
 
 /**
  * GitHub's allow-list (`hast-util-sanitize`'s `defaultSchema`), with a
- * code block's `language-…` class kept on `code`, and nothing else added.
+ * code block's `language-…` class kept on `code`, and a `style` element
+ * dropped with its CSS (the default drops only a `script` whole, so a
+ * style's rules would show as text).
  */
 export const schema: Schema = {
   ...defaultSchema,
+  strip: [...(defaultSchema.strip ?? []), "style"],
   attributes: {
     ...defaultSchema.attributes,
     code: [

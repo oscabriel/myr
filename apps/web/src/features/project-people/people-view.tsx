@@ -13,12 +13,7 @@
  */
 import { Brand } from "@repo/brand";
 import type { PublicPolicy } from "@repo/protocol/domain/policy";
-import type {
-  Disclosure,
-  Layer,
-  Ledger,
-  Members,
-} from "@repo/protocol/domain/visibility";
+import type { Layer, Ledger, Members } from "@repo/protocol/domain/visibility";
 import type { Handle, ProjectName } from "@repo/protocol/ids";
 import { Option } from "effect";
 import { Fragment } from "react";
@@ -37,6 +32,7 @@ import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
 import { ledgerPath } from "../ledger/path.ts";
 import { ProjectNav } from "../project/project-nav.tsx";
 import { CommandLine } from "../shared/command.tsx";
+import { disclosureWords } from "../shared/disclosure.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
@@ -79,16 +75,6 @@ const vouchModes = {
   forCode:
     "For code: claiming an ask or offering a sealed answer needs a vouch; anyone not denounced may propose an ask.",
 } as const satisfies Record<PublicPolicy["vouch"]["mode"], string>;
-
-/** What people outside a layer's audience learn about what it holds. */
-const disclosures = {
-  counted: "counted: how many it holds, and when they open",
-  declared: "declared: that it exists, with its kinds and reason",
-  hidden: "hidden: nothing beyond its name",
-  public: "public: everything",
-  sealed: "sealed: counts, authors and a salted root, never contents",
-  writeOnly: "write-only: who set each value and when, never a value",
-} as const satisfies Record<Disclosure, string>;
 
 const Code = ({ children }: { readonly children: ReactNode }) => (
   <code className={CODE}>{children}</code>
@@ -224,7 +210,7 @@ const LayerBlock = ({ layer }: { readonly layer: Layer }) => (
       <Field label="Writers">
         <MembersOf members={layer.writers} />
       </Field>
-      <Field label="Disclosure">{disclosures[layer.disclose]}</Field>
+      <Field label="Disclosure">{disclosureWords[layer.disclose]}</Field>
       <Field label="Reason">{layer.reason}</Field>
       {layer.sunsetDays === undefined ? null : (
         <Field label="Sunset">{`released after ${plural(layer.sunsetDays, "day", "days")}`}</Field>

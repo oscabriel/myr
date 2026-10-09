@@ -71,7 +71,7 @@ export type DraftedAsk = typeof DraftedAsk.Type;
  * Sentences as a model may send them: a list, or one sentence alone, which
  * decodes as a list of one. Workers AI does not hold a model to the JSON
  * Schema it is asked for: kimi-k2.7-code sent `context` and `outOfScope` as
- * strings on every attempt (914, live on dev-oscabriel).
+ * strings on every attempt, live on dev-oscabriel.
  */
 const Sentences = Schema.Union([
   Schema.Array(Text),

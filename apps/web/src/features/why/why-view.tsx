@@ -1,5 +1,5 @@
 /**
- * Why each line of a file is there (spec W9-D9). The server sends a table
+ * Why each line of a file is there (ADR 0019). The server sends a table
  * of ranges (lines a–b → the landing or the commit that brought them)
  * beside the file's numbered lines; the browser then draws the file with
  * one row above each range (`code`, from `client-why.tsx`), where clicking

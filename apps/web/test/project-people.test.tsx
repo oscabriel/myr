@@ -216,6 +216,16 @@ describe("a project's people page", () => {
     ).toBeTruthy();
   });
 
+  it("says what a layer discloses in the ledger page's own words", () => {
+    const layers = plainText(
+      between(markupOf(page), 'id="layers"', 'id="limits"')
+    );
+
+    expect(layers).toContain(
+      "sealed: counts, authors and a salted root; never names, paths or contents"
+    );
+  });
+
   it("shows the caps, budget, claim timing and record window", () => {
     const limits = plainText(
       between(markupOf(page), 'id="limits"', 'id="agents"')

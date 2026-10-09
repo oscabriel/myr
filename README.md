@@ -44,6 +44,16 @@ The core loop, in six lines:
 5. The platform merges onto `main` and runs the ask's check, the project's checks and the held-back checks on that exact tree.
 6. It lands the checked tree on `main` as its own commit crediting every person, or answers with a refusal.
 
+Around the loop:
+
+- **A code browser on the web.** A project's page shows its clone line, its files and its README, rendered as GitHub-flavoured Markdown with links and images pointing into the repo at the commit. Beside it are a file tree, highlighted files with `#L` line links, raw bytes served under a sandboxing CSP, the history, each commit's diff, and one refs page (main, tags and claim forks). Every page names the commit it shows, so any page is a permalink.
+- **Why each line is there.** A file's why page attributes each line to the landing that put it on `main`, naming its ask, answer, people and verdict. Imported history reads "before adoption".
+- **Asks drafted for a want.** A member proposes a want with `--draft` (or the web's propose form). The platform's agent, a Workers AI model, drafts the ask file and its failing test, runs them red first on the Checker, and puts the draft to a decider with its evidence. Nothing lands until a decider accepts, and the landing discloses the agent with `Assisted-by` ([ADR 0018](docs/adr/0018-asks-are-drafted-in-a-workflow-and-put-to-a-decider.md)).
+- **A people page.** Who decides which paths, who is vouched for or denounced, each layer's readers, writers and disclosure, and the caps, budget and claim timing, all read from the config folder at the landed commit. It has no edit control: these change by landing a change to the config folder.
+- **The platform's own front page.** The platform's `/` says what the host serves (clone URLs, MCP, agent skills, sign-in, the CLI and the web app), in HTML for a browser and as Markdown for an agent.
+
+The web reads code only through public contracts the platform serves ([ADR 0019](docs/adr/0019-the-web-reads-repos-through-public-contracts.md)). On the dev stage, eight open-source repos are imported and kept for previewing it: anyhow, ky, gum, click, awesome, changesets, stb and fuzzel.
+
 ## Run it
 
 ### What you need
@@ -240,9 +250,13 @@ A cartridge is a cut line removed by deletion. Visibility is the one plugged in 
 
 | Cut line | What goes | What removes it |
 | --- | --- | --- |
+| 1 | Asks drafted by the platform's agent (`propose --draft`, `ask draft`, `proposal`; a proposal without a draft still goes to a decider) | `packages/drafting/`, `packages/project/src/draft-runs.ts`, `packages/project/test/{drafting.model,draft-settle,rehearse}.test.ts`, `apps/platform/src/workflows/draft-steps.ts`, `apps/platform/src/adapters/draft-runs-workflow.ts`, `apps/platform/test/workflows/draft.test.ts`; the `ai` binding, `DRAFT_MODEL` and `DRAFT_LIMIT` lines in `apps/platform/wrangler.jsonc` (then `bun run --cwd apps/platform types`) and their decode in `apps/platform/src/platform.ts`; the web's `apps/web/src/routes/$project/proposals/`, `apps/web/src/features/{propose,proposal}/`, `apps/web/src/client/{propose,proposal}.ts` and their tests; the `draftAsk` and `showProposal` handlers in `apps/platform/src/handlers.ts` and `apps/web/src/dev/handlers.ts`, and `proposeAsk`'s `draft` branch |
 | 1 | Today full-screen at a terminal, `myr today --tui` (`myr today` goes back to the contract's projected command, which prints the same) | `apps/cli/src/tui/`, `apps/cli/test/tui/`, the `@opentui/*` lines in `apps/cli/package.json`; `today` in `wrapped`, `entries` and `Every` in `apps/cli/src/surfaces.ts`, its row in `packages/agent-kit/src/command-doc.ts` and its word in `packages/agent-kit/test/command-doc.test.ts` |
 | 1 | Agent extras: the Markdown ask page, per-project well-known skills, and `myr schema` | `apps/web/src/features/ask/markdown.ts`, `apps/web/test/ask-markdown.test.ts`; `packages/agent-kit/src/well-known.ts`, `apps/platform/src/well-known.ts`, `apps/platform/test/well-known.test.ts`, `apps/web/src/routes/[.]well-known/agent-skills/$.ts`; `apps/cli/test/schema.test.ts` and the `schema` command in `apps/cli/src/surfaces.ts` |
 | 1 | The pi adapter | `apps/cli/src/pi.ts`, `apps/cli/test/pi.test.ts`, its entry and its `neverBundle` line in `apps/cli/tsdown.config.ts`, the pi dev dependency in `apps/cli/package.json`, and the adapter's line in the package manifest's `pi` key in `scripts/lib/release.ts` |
+| 2 | Why each line is there, on the web (the file toolbar's Why link goes) | `packages/git/src/blame.ts`, `packages/git/src/line-diff.ts` (with `tree-diff.ts` keeping its own diff), `packages/git/test/{blame,line-diff}.test.ts`, `packages/project/src/code/why.ts`, `packages/project/test/code-why.test.ts`, `whyOf` in `packages/project/src/code.ts`, the `why` contract's handlers, `apps/web/src/routes/$project/why/`, `apps/web/src/features/why/`, `apps/web/src/client/why.ts`, `apps/web/test/why.test.tsx`, `apps/web/e2e/why.e2e.ts` |
+| 2 | A README rendered as Markdown (it shows as plain text instead) | `apps/web/src/features/markdown/`, `apps/web/test/markdown.test.tsx`, `apps/web/test/markdown-resolve.test.ts`, and the `react-markdown`, `remark-gfm`, `rehype-*` and `@tailwindcss/typography` lines in `apps/web/package.json` |
+| 3 | The people page | `apps/web/src/routes/$project/people.tsx`, `apps/web/src/features/project-people/`, `apps/web/src/client/policy.ts`, `apps/web/test/project-people.test.tsx`, `apps/web/e2e/people.e2e.ts`, and its tab in the project nav |
 | 2 | `myr why`, verdicts as git notes, and the `ReachedInternals` stage | `apps/cli/src/local/why.ts`, `apps/cli/test/local/why.test.ts`; `packages/git/src/notes.ts`, `apps/platform/src/workflows/notes.ts`, `packages/git/test/notes.test.ts`, `apps/platform/test/notes.test.ts` (verdicts still reach `status`, `verdict` and MCP); `packages/gate/src/imports.ts`, `packages/gate/test/imports.test.ts` and its branch in `packages/gate/src/stages/shape.ts` |
 | 2 | The null-answer codemod: a check that passes against an answer whose exports do nothing is `WeakCheck` (built and tested; no ask runs it yet, since it needs a third check run and a step in the Checker's image) | `packages/checks/src/null-answer.ts`, `packages/checks/test/null-answer.test.ts`, `packages/checks/test/fixtures/null-answer/`, and its `./null-answer` export and `ts-morph` line in `packages/checks/package.json` |
 | 3 | Garden's Promote: a finish repeated across answers becomes a proposed `lintToZero` ask behind one decision (built and tested; no landing calls it yet, since no finish carries the rule it names) | `packages/project/src/attention/promote.ts`, `packages/project/test/attention/promote.test.ts` |
@@ -272,7 +286,8 @@ packages/
   git/          the gateway, smart HTTP, trailers, notes, tree diffs, patch ids
   artifacts/    the RepoHost port, the only caller of Artifacts
   visibility/   the cartridge: layers, posture, ledger, guards, env shape, write-only values
-  agent-kit/    generated agent files: the project skill, the AGENTS.md block, hooks, the command list
+  agent-kit/    generated agent files: the project skill, the AGENTS.md block, hooks, the command list, the host's front page
+  drafting/     the platform's agent: drafts an ask from a want through Workers AI, the ask file rendered by code
   testkit/      scenario builders, golden git transcripts, process fakes
   brand/        the name, and every identifier made from it
   config/       the vitest preset and the repo's own tests
@@ -289,7 +304,7 @@ Every internal package is `@repo/<name>`, and in code the product's name lives o
 
 | Worker | Holds | Reached by |
 | --- | --- | --- |
-| `platform` | `ARTIFACTS` (the public namespace) and `ARTIFACTS_PRIVATE` (layer repos), the `PROJECT` Durable Object, the `ANSWER` and `ON_PUSH` Workflows, the `FRONT_PAGE` database, `OAUTH_KV`, the `EVIDENCE` and `RELEASES` buckets, `LOADER` (a Worker Loader for config code), the `SANDBOX` service, rate limits, the push-event trigger and every secret | git, the CLI, MCP clients and the web |
+| `platform` | `ARTIFACTS` (the public namespace) and `ARTIFACTS_PRIVATE` (layer repos), the `PROJECT` Durable Object, the `ANSWER` and `ON_PUSH` Workflows, the `FRONT_PAGE` database, `OAUTH_KV`, the `EVIDENCE` and `RELEASES` buckets, `LOADER` (a Worker Loader for config code), `AI` (Workers AI, for drafting asks), the `SANDBOX` service, rate limits, the push-event trigger and every secret | git, the CLI, MCP clients and the web |
 | `sandbox` | the `CHECKER` and `LANDER` Durable Objects and their containers; no Artifacts binding: each job carries a short-lived token for one repo | only the platform's `SANDBOX` binding; it has no public URL |
 | `web` | `PLATFORM` (a service binding) and public vars; no storage and no secret | browsers, and agents reading Markdown |
 
@@ -341,6 +356,8 @@ Each credit names what we took and where it lives.
 - **anti-slop** ([dmmulroy/anti-slop](https://github.com/dmmulroy/anti-slop) at `c44ef22`, MIT). The oxlint plugins, generic and Effect, that lint this repo, vendored in `tools/oxlint/anti-slop/`.
 - **shadcn/ui** (MIT). The web's base components, in `apps/web/src/components/ui/`.
 - **Public Sans** and **JetBrains Mono** (SIL Open Font License). The web's two typefaces, self-hosted in `apps/web/src/assets/fonts/`.
+- **Pierre** (`@pierre/diffs` and `@pierre/trees`, Apache-2.0). The web's highlighted files, diffs and file tree, drawn in the browser.
+- **unified** (`react-markdown`, `remark-gfm`, `rehype-raw`, `rehype-sanitize`, `rehype-slug`, MIT). A README rendered as GitHub-flavoured Markdown, sanitized with GitHub's allow-list.
 - **Effect**. The product is written in Effect v4: its schemas, the one `RpcGroup`, the CLI, the MCP servers and the platform's HTTP.
 - **isomorphic-git**. git inside a Worker: the in-memory repo host, the smart-HTTP pushes of the Artifacts binding adapter, and the `/isogit` Lander.
 - **Cloudflare's cf** (ideas, no code). One merged command catalog for every surface (`commandDocs` in `packages/agent-kit/src/command-doc.ts`), and the rule that wire schemas use whole or finite numbers and optional keys, so the JSON Schema an MCP client reads holds no `"Infinity"` and no `null`.

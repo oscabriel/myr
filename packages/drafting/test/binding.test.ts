@@ -161,7 +161,7 @@ describe("the Workers AI drafter", () => {
     "takes one sentence where the schema asks for a list of them, as a list of one",
     () =>
       Effect.gen(function* () {
-        // kimi-k2.7-code on dev-oscabriel (914) answered every attempt with
+        // kimi-k2.7-code on dev-oscabriel answered every attempt with
         // `context` and `outOfScope` as strings, whatever the JSON Schema said.
         const reply = JSON.stringify({
           ...encoded,

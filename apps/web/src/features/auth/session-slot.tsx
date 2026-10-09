@@ -16,6 +16,16 @@ import { AsyncResult } from "effect/reactivity";
 import { HandleLink } from "../shared/handle.tsx";
 import { whoAtom } from "./who.ts";
 
+/**
+ * Where sign-in comes back to: the page the reader is on, without its
+ * `#fragment`. The server never sees a fragment, so a link that carried one
+ * would differ between the server's render and the browser's (`#L3`).
+ */
+export const hereOf = (location: {
+  readonly pathname: string;
+  readonly searchStr: string;
+}) => `${location.pathname}${location.searchStr}`;
+
 /** Sign-in, coming back to `here` afterwards. */
 const signInHref = (here: string) =>
   `/auth/signin?${new URLSearchParams({ return: here }).toString()}`;
@@ -64,7 +74,7 @@ export const SessionView = ({
   });
 
 export const SessionSlot = () => {
-  const here = useLocation({ select: (location) => location.href });
+  const here = useLocation({ select: hereOf });
   const who = useAtomValue(whoAtom);
 
   return (

@@ -1,5 +1,5 @@
 /**
- * Why each line of a file is there (spec W9-D9): a first-parent blame from
+ * Why each line of a file is there (ADR 0019): a first-parent blame from
  * a revision. The walk takes at most `WHY_SCAN` first-parent commits from
  * the log and the path's blob at each (trees kept by id through
  * `CodeCache`, `READS_AT_ONCE` commits read together), keeps the commits

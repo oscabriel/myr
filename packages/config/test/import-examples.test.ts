@@ -199,7 +199,7 @@ const ran = (
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "import-913-" });
+    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "importing-" });
     const ledgerFile = path.join(dir, "created.jsonl");
     const printed: string[] = [];
 
@@ -387,9 +387,7 @@ describe("bun scripts/import-examples.ts", () => {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
 
-        const dir = yield* fs.makeTempDirectoryScoped({
-          prefix: "import-913-",
-        });
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "importing-" });
 
         const ledgerFile = path.join(dir, "created.jsonl");
         const platform = yield* fakePlatform(["anyhow", "ky"]);

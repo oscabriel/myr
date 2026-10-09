@@ -26,10 +26,13 @@
  * in another's headroom. Code that is added before anything imports it
  * adds no bytes, so a limit is raised to its ceiling when a wave of work
  * starts, and tightened to about 15% above the measured bundle when the
- * wave ends: the platform's entry was 1,605,405 bytes before the code
- * browser and drafting, and its ceiling is 1,900,000 while they land; the
- * web's JavaScript was 2,364,955 bytes before the code browser and README
- * rendering, and its ceiling is 4,500,000 while they land. The web's
+ * wave ends. Before the code browser, README rendering and drafting the
+ * platform's entry was 1,605,405 bytes and the web's JavaScript 2,364,955;
+ * they landed under ceilings of 1,900,000 and 4,500,000. Measured once
+ * they had landed: the platform's entry (its only module) 1,667,814 bytes,
+ * held to 1,900,000 (the ceiling, 14% above) and 1,918,000 of JavaScript;
+ * the sandbox's 570,424, held to 656,000; the web's entry 710,962, held to
+ * 818,000, and its JavaScript 3,543,318, held to 4,075,000. The web's
  * JavaScript counts the Worker's server modules only: chunks the browser
  * alone loads (Pierre's) are assets.
  */
@@ -45,9 +48,9 @@ interface Budget {
 
 /** Each Worker's limits, by its folder. */
 export const budgets = {
-  "apps/platform": { entry: 1_900_000, javascript: 2_500_000 },
-  "apps/sandbox": { entry: 1_665_000, javascript: 2_500_000 },
-  "apps/web": { entry: 1_665_000, javascript: 4_500_000 },
+  "apps/platform": { entry: 1_900_000, javascript: 1_918_000 },
+  "apps/sandbox": { entry: 656_000, javascript: 656_000 },
+  "apps/web": { entry: 818_000, javascript: 4_075_000 },
 } as const satisfies Record<string, Budget>;
 
 /**

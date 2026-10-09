@@ -15,7 +15,7 @@
  * Workflow binding. An admission's output is `null`.
  *
  * So does a round of a proposal's draft: params tagged `Draft` run
- * `draftSteps` (W9-D14), over the Worker's ports and the drafter
+ * `draftSteps` (ADR 0018), over the Worker's ports and the drafter
  * (`draftPorts`), with each step's timeout handed to the engine. A draft's
  * output is `null` too.
  */

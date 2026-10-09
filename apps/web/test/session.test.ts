@@ -14,7 +14,7 @@ import { Effect, Option, Schema } from "effect";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { SessionView } from "../src/features/auth/session-slot.tsx";
+import { hereOf, SessionView } from "../src/features/auth/session-slot.tsx";
 import { devSignIn } from "../src/routes/auth/-dev.ts";
 import { backend } from "../src/server/backend.ts";
 import { serverClientOver } from "../src/server/client.ts";
@@ -823,5 +823,16 @@ describe("the header's session slot", () => {
     expect(markup).toContain('href="/auth/signin?return=%2Ftoday"');
     expect(markup).toContain(">Sign in<");
     expect(markup).not.toContain("/auth/signout");
+  });
+
+  it("comes back to the page without its #fragment, which the server never sees, so the link it renders matches in the browser", () => {
+    const location = {
+      hash: "L3",
+      href: "/datekit/blob/main/src/add.ts?plain=1#L3",
+      pathname: "/datekit/blob/main/src/add.ts",
+      searchStr: "?plain=1",
+    };
+
+    expect(hereOf(location)).toBe("/datekit/blob/main/src/add.ts?plain=1");
   });
 });

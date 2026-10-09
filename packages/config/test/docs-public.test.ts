@@ -27,13 +27,16 @@ const PRIVATE = [
 
 /**
  * What a reference into the build's private plan looks like, which a reader
- * with only the repo cannot follow: a section of its spec (`spec §8`), one of
- * its decisions (`spec D6`), one of its issues by wave (`W3 313`), or the
- * research synthesis it was drawn from (`SYN`).
+ * with only the repo cannot follow: a section of its spec (`spec §8`, or a
+ * wave's `W9 §14`), one of its decisions (`spec D6`, or a wave's `W9-D14`),
+ * one of its issues by wave (`W3 313`), or the research synthesis it was
+ * drawn from (`SYN`).
  */
 const PLAN_REFERENCES = [
   /\bspec §/u,
   /\bspec D\d/u,
+  /\bW\d+ §/u,
+  /\bW\d+-D\d/u,
   /\bW\d \d{3}\b/u,
   /\bSYN\b/u,
 ] as const;

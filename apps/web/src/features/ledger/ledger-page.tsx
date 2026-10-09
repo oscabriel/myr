@@ -12,11 +12,7 @@
  */
 import { Brand } from "@repo/brand";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
-import type {
-  Disclosure,
-  Layer,
-  Ledger,
-} from "@repo/protocol/domain/visibility";
+import type { Layer, Ledger } from "@repo/protocol/domain/visibility";
 import type { AreaName, SuiteRoot } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
 import type { ReactNode } from "react";
@@ -25,6 +21,7 @@ import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
 import { postureLabel } from "../project/posture-label.ts";
 import { ProjectNav } from "../project/project-nav.tsx";
 import { CommandLine } from "../shared/command.tsx";
+import { disclosureWords } from "../shared/disclosure.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
@@ -154,18 +151,6 @@ export const areaSummaries = (ledger: Ledger): readonly AreaSummary[] => {
     }));
 };
 
-/** What people outside a layer's audience learn about what it holds. */
-const disclosures = {
-  counted: "counted: how many it holds, and when they open",
-  declared: "declared: that it exists, with its kinds and reason",
-  hidden: "hidden: nothing beyond its name",
-  public: "public: everything",
-  sealed:
-    "sealed: counts, authors and a salted root; never names, paths or contents",
-  writeOnly:
-    "write-only: names, and who set each value and when; never a value",
-} as const satisfies Record<Disclosure, string>;
-
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
@@ -202,7 +187,7 @@ const LayerBlock = ({ layer }: { readonly layer: Layer }) => (
     <Fields label={`Layer ${layer.name}`}>
       <Field label="Audience">{layer.audience}</Field>
       <Field label="Holds">{layer.holds.join(", ")}</Field>
-      <Field label="Disclosure">{disclosures[layer.disclose]}</Field>
+      <Field label="Disclosure">{disclosureWords[layer.disclose]}</Field>
       <Field label="Reason">{layer.reason}</Field>
       {layer.sunsetDays === undefined ? null : (
         <Field label="Sunset">{`after ${plural(layer.sunsetDays, "day", "days")}`}</Field>

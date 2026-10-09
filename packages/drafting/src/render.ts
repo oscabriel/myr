@@ -1,5 +1,5 @@
 /**
- * The ask file, written by code from a draft's fields (W9-D13): the model
+ * The ask file, written by code from a draft's fields (ADR 0018): the model
  * never writes the `.ask.ts` source, so it cannot put code there. Every
  * string it gave enters the file through `JSON.stringify`, as a string
  * literal, and a field it left out (or gave empty) is left out. Only the
@@ -15,7 +15,7 @@ const text = (value: string) => JSON.stringify(value);
 
 const list = (values: readonly string[]) => `[${values.map(text).join(", ")}]`;
 
-/** Each drafted kind's handle in the rules package: W9 drafts `fix` only. */
+/** Each drafted kind's handle in the rules package: drafts are `fix` asks only, for now. */
 const kindHandle = { fix: "kinds.fix" } as const satisfies Record<
   DraftedAsk["kind"],
   string

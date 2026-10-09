@@ -86,6 +86,13 @@ describe("what a README cannot carry", () => {
     expect(markup).toContain("<p>after</p>");
   });
 
+  it("drops a style's CSS with the element, so no stray rules show as text", () => {
+    const markup = rendered("<style>body{display:none}</style>\n\nafter");
+
+    expect(markup).not.toContain("display:none");
+    expect(markup).toContain("<p>after</p>");
+  });
+
   it("prefixes a name the README sets, so it cannot clobber the page's own", () => {
     const markup = rendered('<a name="top">Top</a>');
 

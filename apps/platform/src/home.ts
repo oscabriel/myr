@@ -10,7 +10,7 @@
  * the page names them as the reader will type them. The projects are the
  * front page's, and nothing else: no layer and no fork is listed. Every
  * value that reaches the HTML is escaped. Not a redirect: the web app is a
- * link (W9-D11).
+ * link, so the host stays discoverable at its own address.
  */
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { frontLlms, MCP_PROTOCOL } from "@repo/agent-kit/host-doc";

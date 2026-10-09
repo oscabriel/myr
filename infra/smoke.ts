@@ -173,7 +173,7 @@ const serverError = (status: number) => status >= 500;
  * Worker's first deploy to workers.dev answers 404 for its first seconds
  * (once, smoke ran 4 s after the web's first deploy and got 404 twice), and
  * a deploy that adds a route can still be answered by the version before it
- * (demo's W9 deploy: `/` answered 404 once as the upload finished). The
+ * (a demo deploy that added `/`: it answered 404 once as the upload finished). The
  * web's probes and `platform-root` read a 404 so; the platform's
  * `missing-repo-404` expects one.
  */
