@@ -8,7 +8,9 @@
  * It runs only against `WEB_URL` (a stage's web origin) and is skipped
  * without it. `WEB_PROJECT` and `WEB_ASK` pick the project and the ask
  * (datekit's format-ordinal, which the seed opens on every stage, unless
- * given). It only reads.
+ * given), and `WEB_FILE` the file opened at line 3 (datekit's `src/add.ts`
+ * unless given; its first folder is the one the code page must list, so
+ * burrow's run names `packages/kit/src/http.ts`). It only reads.
  */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
@@ -21,6 +23,9 @@ const settings = Effect.runSync(
       ask: yield* Config.NonEmptyString("WEB_ASK").pipe(
         Config.withDefault("format-ordinal")
       ),
+      file: yield* Config.NonEmptyString("WEB_FILE").pipe(
+        Config.withDefault("src/add.ts")
+      ),
       project: yield* Config.NonEmptyString("WEB_PROJECT").pipe(
         Config.withDefault("datekit")
       ),
@@ -32,7 +37,10 @@ const settings = Effect.runSync(
   })
 );
 
-const { ask, project } = settings;
+const { ask, file: FILE, project } = settings;
+
+/** The root folder `FILE` sits in, which the project's code page lists. */
+const FOLDER = FILE.split("/")[0] ?? FILE;
 
 /** Where each page's screenshot goes: `e2e/out/<shot>.png`. */
 const out = decodeURIComponent(new URL("out/", import.meta.url).pathname);
@@ -42,9 +50,6 @@ const UNREACHABLE = "The platform did not answer";
 
 /** What a code page said before its view was built; a deployed page never says it. */
 const NOT_BUILT = "not built";
-
-/** A file every seeded datekit has, and the line its page is opened at. */
-const FILE = "src/add.ts";
 
 /** `url` on the web. */
 const at = (path: string) =>
@@ -180,7 +185,7 @@ test.describe("the deployed web", () => {
     page: browser,
   }) =>
     Effect.runPromise(
-      code(browser, `/${project}/tree/main`, "code-tree", ["src", "README.md"])
+      code(browser, `/${project}/tree/main`, "code-tree", [FOLDER, "README.md"])
     ));
 
   test(`${project}'s ${FILE} opens at line 3`, ({ page: browser }) =>
