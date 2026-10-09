@@ -4,6 +4,7 @@ import { Brand } from "@repo/brand";
 import type { CheckAt } from "@repo/checks/check-runner";
 import { parseTrailers } from "@repo/git/trailers";
 import { CheckSpec } from "@repo/protocol/domain/check";
+import { Glob } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { DraftState } from "@repo/protocol/domain/proposal";
@@ -177,6 +178,20 @@ const redOnMain = Effect.gen(function* () {
 });
 
 const firstDecision = DecisionId.make("dec-000001");
+
+/** datekit as above, with dave deciding the parser beside alice. */
+const parserByDave = {
+  policy: {
+    ...scenario.policy,
+    deciders: [
+      ...scenario.policy.deciders,
+      {
+        handles: Array.make(dave.handle),
+        paths: Glob.make("packages/parser/**"),
+      },
+    ],
+  },
+};
 
 describe("a proposal with a draft", () => {
   it.effect("puts up no decision, and starts one draft run", () =>
@@ -511,5 +526,45 @@ describe("a proposal with a draft", () => {
           new UnknownProposal({ proposal: ProposalId.make("prop-000009") })
         );
       }).pipe(Effect.provide(world))
+  );
+  it.effect(
+    "drafted again into files another decider decides, puts the open decision to them too",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-08T12:00:00Z");
+
+        const api = yield* projectService(project);
+
+        yield* api.initProject(alice, {});
+
+        const first = yield* Pusher.use((pusher) =>
+          pusher.push(repo, Option.none(), start, "Start")
+        );
+
+        yield* api.recordFirstPush(alice, first);
+        // No territory: the files a draft holds say whose the decision is.
+        yield* api.proposeAsk(carol, { draft: true, want });
+        yield* api.draftSettled(proposal, 1, failed);
+
+        const wantOnly = yield* openProposalDecisions;
+
+        yield* api.draftAsk(carol, { proposal });
+        yield* api.draftSettled(proposal, 2, red());
+
+        const drafted = yield* openProposalDecisions;
+
+        expect(
+          [wantOnly, drafted].map((decisions) =>
+            decisions.map(({ deciders, id }) => ({ deciders, id }))
+          )
+        ).toStrictEqual([
+          [{ deciders: [alice.handle], id: firstDecision }],
+          [{ deciders: [alice.handle, dave.handle], id: firstDecision }],
+        ]);
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(worldOf(parserByDave, "memory"), recorded)
+        )
+      )
   );
 });

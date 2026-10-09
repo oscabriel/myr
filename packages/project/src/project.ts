@@ -130,7 +130,7 @@ import {
   TreeSha,
   sameHandle,
 } from "@repo/protocol/ids";
-import type { DecisionId, ProjectName, LaneName } from "@repo/protocol/ids";
+import type { DecisionId, LaneName, ProjectName } from "@repo/protocol/ids";
 import { Person, Principal } from "@repo/protocol/principal";
 import {
   AskFull,
@@ -1013,8 +1013,6 @@ const forkOf = (state: ClaimState): Option.Option<ForkRef> =>
     Warned: (claim) => listedFork(claim, "warned"),
   });
 
-/** What a stub answers until the issue that builds it lands. */
-
 /** The most of a lane's log `evidence` gives back: its last 256 KiB. */
 const EVIDENCE_TAIL = 256 * 1024;
 
@@ -1805,7 +1803,6 @@ const startOther = (
     }
   );
 
-/** Whether an ask's check file has one of the five weak shapes. */
 /**
  * What sees an ask's check run twice as it opens: whether the lane prints
  * its output back, and both runs. Opening for real sees nothing; a
@@ -1910,16 +1907,17 @@ const rehearsalRefused = (
 
 /**
  * A red rehearsal's lane and signature: the check's own, or, for a check
- * red by its count, the lane's.
+ * red by its count, which has none, that it is.
  */
 const redOf = ({ lane, runs }: Seen) => ({
   lane,
   signature: Result.match(redFirstOfRuns(runs, lane), {
-    onFailure: () => `${lane}: red by its count`,
+    onFailure: () => "red by its count",
     onSuccess: ({ signature }) => signature,
   }),
 });
 
+/** Whether an ask's check file has one of the five weak shapes. */
 const weakness = (ask: Ask, files: readonly AskFile[]) => {
   const { check } = ask;
 

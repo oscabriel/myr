@@ -1004,7 +1004,8 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
   /**
    * A draft's round settled, by the pure rules: the proposal moves, and its
    * decision goes up with the files (or the want alone) and what the draft
-   * says, or, when one is open already, takes that evidence in its place.
+   * says, or, when one is open already, takes that evidence, and the
+   * deciders of the files it now holds, in its place.
    * A stale round or a closed proposal changes nothing.
    */
   const settledBody =
@@ -1067,18 +1068,25 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           ({ decided }) => decided === undefined
         );
 
+        // The drafted files may lie under other deciders than the want did.
+        const decidedBy = decidersOn(
+          live.policy,
+          pathsOf(live.policy, settled.files, territory),
+          live.row.initializer
+        );
+
         if (Option.isSome(open)) {
-          writes.decisions.set(open.value.id, { ...open.value, evidence });
+          writes.decisions.set(open.value.id, {
+            ...open.value,
+            deciders: decidedBy,
+            evidence,
+          });
 
           return;
         }
 
         const decision = openDecision({
-          deciders: decidersOn(
-            live.policy,
-            pathsOf(live.policy, settled.files, territory),
-            live.row.initializer
-          ),
+          deciders: decidedBy,
           evidence,
           expireDays: live.policy.budget.expireDays,
           id: DecisionId.make(minted("dec", decisionsNow(h, writes).length)),
