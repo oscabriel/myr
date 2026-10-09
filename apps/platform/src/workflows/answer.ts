@@ -1,6 +1,3 @@
-import type { RepoHost } from "@repo/artifacts/repo-host";
-import type { Drafter } from "@repo/drafting/drafter";
-import type { Projects } from "@repo/project/projects";
 /**
  * The `Answer` Workflow: carries one admitted answer through merge, checks
  * and landing, each a durable step. The class is thin:
@@ -22,6 +19,9 @@ import type { Projects } from "@repo/project/projects";
  * (`draftPorts`), with each step's timeout handed to the engine. A draft's
  * output is `null` too.
  */
+import type { RepoHost } from "@repo/artifacts/repo-host";
+import type { Drafter } from "@repo/drafting/drafter";
+import type { Projects } from "@repo/project/projects";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent } from "cloudflare:workers";
@@ -124,16 +124,22 @@ export class Answer extends WorkflowEntrypoint<
     step: EngineSteps
   ): Promise<OutcomeEncoded | null> {
     const config = decodeEnv(this.env);
-    const ports = Layer.unwrap(Effect.map(config, workerPorts));
     const { payload } = event;
 
     if (drafts(payload)) {
+      // The env decoded once: the Worker's ports and the drafter from it.
       return runDraftWorkflow(
-        Layer.merge(ports, Layer.unwrap(Effect.map(config, draftPorts))),
+        Layer.unwrap(
+          Effect.map(config, (decoded) =>
+            Layer.merge(workerPorts(decoded), draftPorts(decoded))
+          )
+        ),
         payload,
         step
       );
     }
+
+    const ports = Layer.unwrap(Effect.map(config, workerPorts));
 
     return admits(payload)
       ? runAdmission(ports, payload, step)

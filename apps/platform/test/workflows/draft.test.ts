@@ -26,6 +26,7 @@ import {
   AskId,
   LandedSha,
   LaneName,
+  ProjectName,
   ProposalId,
   RepoName,
   RepoPath,
@@ -34,7 +35,7 @@ import { Anonymous, Person } from "@repo/protocol/principal";
 import { CapReached } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
-import { Context, Effect, Layer, Option, Ref, Schema } from "effect";
+import { Array, Context, Effect, Layer, Option, Ref, Schema } from "effect";
 
 import { DraftRunsWorkflow } from "../../src/adapters/draft-runs-workflow.ts";
 import type { DraftWorkflow } from "../../src/adapters/draft-runs-workflow.ts";
@@ -302,6 +303,118 @@ describe("a draft's run, over steps that replay", () => {
   );
 
   it.effect(
+    "spends the attempt of a model still rate-limited once its step's retries are spent, and a replay ends the same way",
+    () =>
+      Effect.gen(function* () {
+        const { api, main } = yield* proposed;
+
+        yield* scripted(main, red, "failed");
+
+        const steps = yield* memoSteps();
+
+        yield* draftSteps(params).pipe(Effect.provide(steps));
+
+        const settled = {
+          asked: (yield* asked).map(({ attempt }) => attempt),
+          draft: yield* draftOfProposal(api),
+          feedback: (yield* asked)[5]?.feedback,
+        };
+
+        // The finished instance, run again: `draft-1` is thrown again,
+        // unrun, and its `gave-up` record says what the first run made of it.
+        yield* draftSteps(params).pipe(Effect.provide(steps));
+
+        expect({
+          replayed: {
+            asked: (yield* asked).length,
+            draft: yield* draftOfProposal(api),
+          },
+          settled,
+        }).toStrictEqual({
+          replayed: { asked: 6, draft: settled.draft },
+          settled: {
+            asked: [1, 1, 1, 1, 1, 2],
+            draft: DraftState.cases.Ready.make({
+              attempts: 2,
+              model,
+              red: {
+                lane: redThenGreen,
+                signature: "redThenGreen: expected 41, got undefined",
+              },
+              round: 1,
+            }),
+            feedback:
+              "Your reply gave no draft (rate-limited): answer with one JSON object that matches the schema, and nothing else.",
+          },
+        });
+      }).pipe(
+        Effect.provide(
+          worldDrafting([
+            ...Array.replicate(new DraftFailed({ reason: "rate-limited" }), 5),
+            red,
+          ])
+        )
+      )
+  );
+
+  it.effect(
+    "tells the next attempt the model erred, not that it was rate-limited, when the drafter dies",
+    () =>
+      Effect.gen(function* () {
+        const { api } = yield* proposed;
+
+        yield* draftSteps(params).pipe(Effect.provide(yield* memoSteps()));
+
+        const inputs = yield* asked;
+
+        expect({
+          asked: inputs.map(({ attempt }) => attempt),
+          draft: yield* draftOfProposal(api),
+          feedback: inputs[1]?.feedback,
+        }).toStrictEqual({
+          asked: [1, 2, 3],
+          draft: DraftState.cases.Failed.make({
+            attempts: 3,
+            model,
+            refusal: "IncompleteBrief",
+            round: 1,
+          }),
+          feedback:
+            "Your reply gave no draft (model-error): answer with one JSON object that matches the schema, and nothing else.",
+        });
+      }).pipe(Effect.provide(worldDrafting([])))
+  );
+
+  it.effect(
+    "ends the round Failed with VerifierBlocked, asking no other draft, when the Checker stays blocked past the rehearsal's retries",
+    () =>
+      Effect.gen(function* () {
+        const { api } = yield* proposed;
+
+        // Nothing scripted for the draft's commit: the Checker cannot run it.
+        const steps = yield* memoSteps();
+
+        yield* draftSteps(params).pipe(Effect.provide(steps));
+        yield* draftSteps(params).pipe(Effect.provide(steps));
+
+        expect({
+          asked: (yield* asked).length,
+          decisions: (yield* proposalDecisions(api)).length,
+          draft: yield* draftOfProposal(api),
+        }).toStrictEqual({
+          asked: 1,
+          decisions: 1,
+          draft: DraftState.cases.Failed.make({
+            attempts: 1,
+            model,
+            refusal: "VerifierBlocked",
+            round: 1,
+          }),
+        });
+      }).pipe(Effect.provide(worldDrafting([red])))
+  );
+
+  it.effect(
     "stops after its context when the proposal is gone: no attempt, no settling",
     () =>
       Effect.gen(function* () {
@@ -397,6 +510,31 @@ describe("the Workflow's draft runs", () => {
       })
   );
 
+  it("keeps every round of a long-named project's proposals its own instance, within the engine's 100 characters", () => {
+    const long = ProjectName.make(`${"a-long-project-name".repeat(6)}x`);
+    const longToo = ProjectName.make(`${"a-long-project-name".repeat(6)}y`);
+    const other = ProposalId.make("prop-000002");
+
+    const rounds = [
+      { project: long, proposal, round: 1 },
+      { project: long, proposal, round: 2 },
+      { project: long, proposal: other, round: 1 },
+      { project: longToo, proposal, round: 1 },
+    ];
+
+    const ids = rounds.map(draftId);
+
+    expect({
+      distinct: new Set(ids).size,
+      fit: ids.every(
+        (id) => id.length <= 100 && /^[a-zA-Z0-9_][a-zA-Z0-9-_]*$/u.test(id)
+      ),
+      named: rounds.every((round, at) =>
+        (ids[at] ?? "").endsWith(`-${round.proposal}-r${round.round}`)
+      ),
+    }).toStrictEqual({ distinct: 4, fit: true, named: true });
+  });
+
   it.effect(
     "starts an errored round's instance again, and never a complete one, which would ask the model again",
     () =>
@@ -470,9 +608,18 @@ describe("the Workflow's draft runs", () => {
           "settle",
         ]);
 
-        expect(new Map(configs).get("draft-1")).toStrictEqual({
-          retries: { backoff: "exponential", delay: 15_000, limit: 4 },
-          timeout: "10 minutes",
+        expect({
+          draft: new Map(configs).get("draft-1"),
+          rehearse: new Map(configs).get("rehearse-1"),
+        }).toStrictEqual({
+          draft: {
+            retries: { backoff: "exponential", delay: 15_000, limit: 4 },
+            timeout: "10 minutes",
+          },
+          rehearse: {
+            retries: { backoff: "exponential", delay: 60_000, limit: 3 },
+            timeout: "10 minutes",
+          },
         });
 
         expect(

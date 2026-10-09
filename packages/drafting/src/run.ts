@@ -246,12 +246,19 @@ export const runDraft = (
             ),
             rateLimitedRetry
           ).pipe(
-            Effect.catchCause(() =>
+            // A model still rate-limited once the retries are spent, or a
+            // drafter that died: either way a spent attempt, said as it was.
+            Effect.catchCause((cause) =>
               step(
                 `draft-${attempt}:gave-up`,
                 Attempted,
                 Effect.succeed(
-                  Attempted.cases.Spent.make({ reason: "rate-limited" })
+                  Attempted.cases.Spent.make({
+                    reason: Option.match(Cause.findErrorOption(cause), {
+                      onNone: () => "model-error" as const,
+                      onSome: ({ reason }) => reason,
+                    }),
+                  })
                 )
               )
             )

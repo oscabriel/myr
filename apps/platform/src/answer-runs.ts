@@ -64,11 +64,37 @@ const ID_LENGTH = 100;
 export const admissionId = (params: AdmissionParams) =>
   `admit-${params.project}-${params.layer}-${params.head}`.slice(0, ID_LENGTH);
 
-/** The instance a draft's round runs as: one per project, proposal and round. */
+/** A modulus for `tagOf`: the Mersenne prime 2^31 - 1, so every step stays a safe integer. */
+const TAG_MODULUS = 2_147_483_647;
+
+/** A polynomial hash of `text`'s code points, in base 36: a short, stable tag for a name cut short. */
+const tagOf = (text: string) => {
+  let hash = 0;
+
+  for (const unit of text) {
+    hash = (hash * 31 + (unit.codePointAt(0) ?? 0)) % TAG_MODULUS;
+  }
+
+  return hash.toString(36);
+};
+
+/**
+ * The instance a draft's round runs as: one per project, proposal and
+ * round. The proposal and round are kept whole: a project name too long for
+ * the engine's id is cut, and tagged with a hash of the whole name, so no
+ * two rounds share an instance (a complete one is never run again).
+ */
 export const draftId = (
   params: Pick<DraftParams, "project" | "proposal" | "round">
-) =>
-  `draft-${params.project}-${params.proposal}-r${params.round}`.slice(
-    0,
-    ID_LENGTH
-  );
+) => {
+  const suffix = `-${params.proposal}-r${params.round}`;
+  const whole = `draft-${params.project}${suffix}`;
+
+  if (whole.length <= ID_LENGTH) {
+    return whole;
+  }
+
+  const tag = `-${tagOf(params.project)}`;
+
+  return `${whole.slice(0, ID_LENGTH - tag.length - suffix.length)}${tag}${suffix}`;
+};
