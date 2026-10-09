@@ -89,9 +89,6 @@ export const kindOf = (entry: TreeEntry): CodeEntry["type"] =>
     Match.orElse(() => "blob" as const)
   );
 
-/** A file a reader may open: a blob or a symlink, never a folder or a submodule. */
-export const isFile = (entry: TreeEntry) => entry.type === "blob";
-
 /** Folders first, then by name. */
 const byKindThenName = Order.combine(
   Order.mapInput(Order.Boolean, (entry: CodeEntry) => entry.type !== "tree"),

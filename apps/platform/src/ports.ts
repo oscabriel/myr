@@ -55,11 +55,14 @@ import type { RateLimits } from "./rate-limits.ts";
 import { ProjectSockets } from "./watch.ts";
 
 /**
- * How many code reads (trees, commits, file texts, a commit's changes) an
- * isolate keeps by object id, the least recently used dropped first. Each
- * Artifacts read is billed; what an object id names never changes.
+ * How many code reads an isolate keeps by object id, the least recently
+ * used dropped first: light ones (trees, commits; a few KiB each) and
+ * heavy ones (a file's text up to 256 KiB, a path list, a commit's
+ * changes, a page of the log; up to about 1 MB each), so the cache stays
+ * well inside the isolate's 128 MB. Each Artifacts read is billed; what an
+ * object id names never changes.
  */
-const CODE_READS_KEPT = 2000;
+const CODE_READS_KEPT = { heavy: 40, light: 2000 };
 
 /** What the Worker's code runs on, besides sessions and the contracts' handlers. */
 export type WorkerPorts =
@@ -138,7 +141,7 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     EvidenceStoreR2(config.EVIDENCE),
     // The code reads' cache, one per isolate: a `Context.Reference`, so
     // without this entry every read goes to Artifacts.
-    CodeCacheLive(CODE_READS_KEPT)
+    CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy)
   ).pipe(
     Layer.provideMerge(RepoHostBinding.layer(config.ARTIFACTS)),
     Layer.provideMerge(WorkerFetch)

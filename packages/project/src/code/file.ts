@@ -98,15 +98,18 @@ export const contentsOf = (
             truncated: true,
           })
       ),
-      (contents) =>
-        Option.match(contents, {
-          onNone: () => false,
-          onSome: ({ text }) =>
-            Option.match(text, {
-              onNone: () => true,
-              onSome: (read) => read.length <= KEPT_TEXT,
-            }),
-        })
+      {
+        heavy: true,
+        keep: (contents) =>
+          Option.match(contents, {
+            onNone: () => false,
+            onSome: ({ text }) =>
+              Option.match(text, {
+                onNone: () => true,
+                onSome: (read) => read.length <= KEPT_TEXT,
+              }),
+          }),
+      }
     );
   });
 

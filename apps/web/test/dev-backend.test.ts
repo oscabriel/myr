@@ -236,3 +236,51 @@ describe("the dev seed", seededWorlds, () => {
       })
   );
 });
+
+/** Each of `paths` on a fresh world's own handler: its status, headers and body. */
+const fetched = (paths: readonly string[]) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { dispose, handler } = devServer();
+
+      yield* Effect.addFinalizer(() => Effect.promise(dispose));
+
+      return yield* Effect.forEach(paths, (path) =>
+        Effect.gen(function* () {
+          const response = yield* Effect.promise(() =>
+            handler(new Request(`http://localhost${path}`))
+          );
+
+          return {
+            cache: response.headers.get("cache-control"),
+            csp: response.headers.get("content-security-policy") ?? "",
+            nosniff: response.headers.get("x-content-type-options"),
+            status: response.status,
+            text: yield* Effect.promise(() => response.text()),
+          };
+        })
+      );
+    })
+  );
+
+describe("the dev world's raw files", seededWorlds, () => {
+  it.live(
+    "answer a project's file as the platform does, and a path that climbs out with a 404",
+    () =>
+      Effect.gen(function* () {
+        const [manifest, climbed] = yield* fetched([
+          "/datekit/raw/main/package.json",
+          "/datekit/raw/main/..%2F..%2Fpackage.json",
+        ]);
+
+        expect(manifest).toMatchObject({
+          cache: "public, max-age=60",
+          nosniff: "nosniff",
+          status: 200,
+        });
+        expect(manifest?.csp).toContain("sandbox");
+        expect(manifest?.text).toContain('"name": "datekit"');
+        expect([climbed?.status, climbed?.text]).toStrictEqual([404, ""]);
+      })
+  );
+});

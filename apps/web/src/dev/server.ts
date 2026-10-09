@@ -13,7 +13,7 @@ import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import { HttpRouter, HttpServerResponse } from "effect/http";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
 
 import { devHandlers } from "./handlers.ts";
@@ -40,12 +40,13 @@ const raw = Layer.unwrap(
       "/:project/raw/*",
       Effect.gen(function* () {
         const params = yield* HttpRouter.params;
+        const request = yield* HttpServerRequest.HttpServerRequest;
 
         return yield* Option.match(decodeProject(params.project), {
           onNone: () =>
             Effect.succeed(HttpServerResponse.empty({ status: 404 })),
           onSome: (project) =>
-            rawFor(project, params["*"] ?? "").pipe(
+            rawFor(project, request.url).pipe(
               Effect.provide(services),
               Effect.map(HttpServerResponse.fromWeb)
             ),

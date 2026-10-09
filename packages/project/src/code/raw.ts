@@ -40,6 +40,12 @@ const IMAGES = new Map([
 
 const TEXT = "text/plain; charset=utf-8";
 
+/** What every raw answer carries, a refusal too (spec W9-D6). */
+const SAFE = {
+  "content-security-policy": SANDBOX,
+  "x-content-type-options": "nosniff",
+} as const;
+
 /** `path`'s extension, lowercased; none without one. */
 const extensionOf = (path: string) => {
   const name = path.slice(path.lastIndexOf("/") + 1);
@@ -61,11 +67,10 @@ export const rawHeaders = (
   binary = false
 ): Headers => {
   const headers = new Headers({
-    "content-security-policy": SANDBOX,
+    ...SAFE,
     "content-type":
       IMAGES.get(extensionOf(path)) ??
       (binary ? "application/octet-stream" : TEXT),
-    "x-content-type-options": "nosniff",
   });
 
   if (rev === "sha") {
@@ -79,7 +84,10 @@ export const rawHeaders = (
 };
 
 /** A 404 that says nothing of the repo. */
-const notFound = () => new Response(null, { status: 404 });
+const notFound = () => new Response(null, { headers: SAFE, status: 404 });
+
+/** A 413: Artifacts said the blob is too large to hold. */
+const tooLarge = () => new Response(null, { headers: SAFE, status: 413 });
 
 /** The file `path` at `rev` of the project's canonical repo, as raw bytes. */
 export const rawOf = (
@@ -120,7 +128,7 @@ export const rawOf = (
         }),
     });
   }).pipe(
-    (read) => unlessTooLarge(read, () => new Response(null, { status: 413 })),
+    (read) => unlessTooLarge(read, tooLarge),
     Effect.catchTags({
       NoSuchElementError: () => Effect.succeed(notFound()),
       RepoNotFound: () => Effect.succeed(notFound()),
@@ -159,14 +167,24 @@ export const rawRequestOf = (
 };
 
 /**
- * The answer to `GET /<project>/raw/<rest>`: the project found by its
- * name, then its file. A project never made is a 404 too.
+ * Everything after `/<project>/raw/` in a request's URL (whole, or its path
+ * and query), still encoded. Read from the URL itself, not a router's
+ * parameter: a router decodes `%2F`, which would cut a tag's name
+ * (`%40datekit%2Fcore%402.0.0`) in two.
+ */
+export const rawRestOf = (url: string): string =>
+  new URL(url, "http://raw.invalid").pathname.split("/").slice(3).join("/");
+
+/**
+ * The answer to `GET /<project>/raw/<rest>` at `url` (whole, or its path
+ * and query): the project found by its name, then its file. A project
+ * never made is a 404 too.
  */
 export const rawFor = (
   project: ProjectName,
-  rest: string
+  url: string
 ): Effect.Effect<Response, never, RepoHost | Projects> =>
-  Option.match(rawRequestOf(rest), {
+  Option.match(rawRequestOf(rawRestOf(url)), {
     onNone: () => Effect.succeed(notFound()),
     onSome: ({ path, rev }) =>
       Projects.use((projects) => projects.get(project)).pipe(

@@ -32,6 +32,9 @@ export const DIFF_FILES = 300;
 /** The most text a commit's diff carries in all: 2 MiB. */
 export const DIFF_TEXT = 2 * 1024 * 1024;
 
+/** The longest list of changes the cache keeps. */
+const KEPT_CHANGES = 1000;
+
 /** A change, and whether each side is a submodule (whose id names no blob here). */
 interface Changed extends Change {
   readonly links: { readonly before: boolean; readonly after: boolean };
@@ -212,7 +215,9 @@ export const commitDiff = (
         Option.match(parent, {
           onNone: () => rootChanges(repo, commit.tree),
           onSome: ({ tree }) => changesBetween(repo, tree, commit.tree),
-        })
+        }),
+        // A longer list is listed again, over trees the cache keeps.
+        { heavy: true, keep: (all) => all.length <= KEPT_CHANGES }
       )
       .pipe(Effect.orDie);
 

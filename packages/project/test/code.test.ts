@@ -26,7 +26,8 @@ import {
   refsOf,
   treeOf,
 } from "../src/code.ts";
-import { CodeCacheLive } from "../src/code/cache.ts";
+import { CodeCache, CodeCacheLive } from "../src/code/cache.ts";
+import { filesUnder } from "../src/code/paths.ts";
 import { compareTags } from "../src/code/refs.ts";
 import {
   big,
@@ -317,6 +318,30 @@ describe("every path", () => {
   );
 });
 
+describe("every path past the cap", () => {
+  it.effect(
+    "is the first by path among the folders read before the cap, truncated",
+    () =>
+      Effect.gen(function* () {
+        const { c1, code } = yield* datekit;
+        const host = yield* RepoHost;
+        const commit = yield* host.readCommit(code.repo, c1);
+        const { tree } = Option.getOrThrow(commit);
+        const capped = yield* filesUnder(code.repo, tree, 3);
+
+        // The root alone holds nine files, so no folder below it is read.
+        expect({
+          paths: capped.files.map(({ path: at }) => at),
+          truncated: capped.truncated,
+        }).toStrictEqual({
+          paths: ["README.md", "big.txt", "feed.xml"],
+          truncated: true,
+        });
+        expect((yield* filesUnder(code.repo, tree, 12)).truncated).toBeFalsy();
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+});
+
 describe("the log", () => {
   it.effect(
     "is first parents from the revision, each landing with the platform's record and no other",
@@ -525,5 +550,33 @@ describe("reads by object id", () => {
         Effect.provide(Layer.merge(countedBy(reads), CodeCacheLive(100)))
       );
     })
+  );
+
+  it.effect("keep heavy reads apart, so many texts never push out a tree", () =>
+    Effect.gen(function* () {
+      const cache = yield* CodeCache;
+      const reads = yield* Ref.make<readonly string[]>([]);
+
+      const read = (key: string, heavy: boolean) =>
+        cache.through(
+          key,
+          Ref.update(reads, (all) => [...all, key]),
+          { heavy }
+        );
+
+      yield* read("datekit:tree:t", false);
+      yield* read("datekit:text:1", true);
+      yield* read("datekit:text:2", true);
+      yield* read("datekit:tree:t", false);
+      yield* read("datekit:text:2", true);
+      yield* read("datekit:text:1", true);
+
+      expect(yield* Ref.get(reads)).toStrictEqual([
+        "datekit:tree:t",
+        "datekit:text:1",
+        "datekit:text:2",
+        "datekit:text:1",
+      ]);
+    }).pipe(Effect.provide(CodeCacheLive(2, 1)))
   );
 });

@@ -1,8 +1,8 @@
 /**
  * Every file of a commit: each blob, symlink and submodule path under its
  * root tree, up to 50,000 (a file tree's sidebar), kept by the root tree's
- * id. The walk reads at most eight trees at once and stops descending once
- * the cap is passed.
+ * id. The walk reads at most eight trees at once, one depth at a time, and
+ * stops descending once the cap is passed.
  */
 import type {
   RepoHost,
@@ -14,7 +14,7 @@ import { RepoPath } from "@repo/protocol/ids";
 import type { RepoName } from "@repo/protocol/ids";
 import type { UnknownRevision } from "@repo/protocol/refusal";
 import type { Option } from "effect";
-import { Array, Effect, Order, Ref, Semaphore } from "effect";
+import { Array, Effect, Order } from "effect";
 
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
@@ -23,6 +23,9 @@ import { entriesOf } from "./tree.ts";
 
 /** The most paths a commit's list holds. */
 export const PATHS_CAP = 50_000;
+
+/** The longest path list the cache keeps: about 1 MB of paths. */
+const KEPT_PATHS = 10_000;
 
 // Store calls under way at once, however wide or deep the tree.
 const STORE_CALLS = 8;
@@ -33,9 +36,17 @@ export interface FileAt {
   readonly entry: TreeEntry;
 }
 
+/** A folder still to read: its path's prefix and its tree's id. */
+interface Folder {
+  readonly prefix: string;
+  readonly tree: string;
+}
+
 /**
  * Every file under the tree `root`, in path order; past `cap`, the walk
- * stops and says so.
+ * stops and says so. It reads one depth at a time, so which folders it
+ * reaches before it stops depends on the tree alone, never on which read
+ * came back first: the same tree gives the same list (principle 8).
  */
 export const filesUnder = (
   repo: RepoName,
@@ -47,49 +58,43 @@ export const filesUnder = (
   RepoHost
 > =>
   Effect.gen(function* () {
-    const calls = yield* Semaphore.make(STORE_CALLS);
-    const seen = yield* Ref.make(0);
+    const found: FileAt[] = [];
+    let depth: readonly Folder[] = [{ prefix: "", tree: root }];
 
-    const walk = (
-      prefix: string,
-      tree: string
-    ): Effect.Effect<readonly FileAt[], RepoNotFound, RepoHost> =>
-      Effect.gen(function* () {
-        if ((yield* Ref.get(seen)) > cap) {
-          return [];
+    while (depth.length > 0 && found.length <= cap) {
+      const read = yield* Effect.forEach(
+        depth,
+        ({ prefix, tree }) =>
+          Effect.map(entriesOf(repo, tree), (entries) => ({ entries, prefix })),
+        { concurrency: STORE_CALLS }
+      );
+
+      const deeper: Folder[] = [];
+
+      for (const { entries, prefix } of read) {
+        for (const entry of entries) {
+          if (entry.type === "tree") {
+            deeper.push({ prefix: `${prefix}${entry.name}/`, tree: entry.sha });
+          } else {
+            found.push({
+              entry,
+              path: RepoPath.make(`${prefix}${entry.name}`),
+            });
+          }
         }
+      }
 
-        const entries = yield* Semaphore.withPermit(
-          calls,
-          entriesOf(repo, tree)
-        );
-
-        const files = entries
-          .filter(({ type }) => type !== "tree")
-          .map((entry) => ({
-            entry,
-            path: RepoPath.make(`${prefix}${entry.name}`),
-          }));
-
-        yield* Ref.update(seen, (count) => count + files.length);
-
-        const nested = yield* Effect.forEach(
-          entries.filter(({ type }) => type === "tree"),
-          (entry) => walk(`${prefix}${entry.name}/`, entry.sha),
-          { concurrency: "unbounded" }
-        );
-
-        return [...files, ...nested.flat()];
-      });
+      depth = deeper;
+    }
 
     const all = Array.sort(
-      yield* walk("", root),
+      found,
       Order.mapInput(Order.String, (file: FileAt) => file.path)
     );
 
     return {
       files: all.slice(0, cap),
-      truncated: all.length > cap || (yield* Ref.get(seen)) > cap,
+      truncated: all.length > cap || depth.length > 0,
     };
   });
 
@@ -110,7 +115,9 @@ export const pathList = (
     const { files, truncated } = yield* cache
       .through(
         `${project.repo}:paths:${tree}`,
-        filesUnder(project.repo, tree, PATHS_CAP)
+        filesUnder(project.repo, tree, PATHS_CAP),
+        // A longer list is walked again, over trees the cache keeps.
+        { heavy: true, keep: (list) => list.files.length <= KEPT_PATHS }
       )
       .pipe(Effect.orDie);
 

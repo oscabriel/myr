@@ -7,13 +7,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
+import { CodeCacheLive } from "@repo/project/code/cache";
 import { Projects } from "@repo/project/projects";
 import { RepoName } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { advanceTo } from "@repo/testkit/clock";
 import { gitClient } from "@repo/testkit/git-client";
 import { aProject } from "@repo/testkit/scenarios";
-import { Effect, Layer, Option } from "effect";
+import { Context, Effect, Layer, Option, Ref } from "effect";
 
 import { Handlers } from "../src/handlers.ts";
 import { MemorySessions } from "../src/sessions/memory.ts";
@@ -28,46 +29,78 @@ const readme = "# datekit\n\nDates, parsed.\n";
 
 /**
  * The platform over a world where datekit was made and its first commit,
- * a README and a manifest, pushed to main; and that commit's id.
+ * a README and a manifest, pushed to main; and that commit's id. With
+ * `reads`, the platform has the isolate's code cache, as `ports.ts` gives
+ * it, and each tree its repo host is asked for is counted there.
  */
-const platform = Effect.gen(function* () {
-  yield* advanceTo("2026-10-07T12:00:00Z");
+const platformWith = (reads: Option.Option<Ref.Ref<number>>) =>
+  Effect.gen(function* () {
+    yield* advanceTo("2026-10-07T12:00:00Z");
 
-  const world = yield* Layer.build(worldOf([datekit]));
+    const world = yield* Layer.build(worldOf([datekit]));
 
-  const first = yield* Effect.gen(function* () {
-    const host = yield* RepoHost;
-    const api = yield* (yield* Projects).create(project);
-    const initializer = Person.make({ handle: datekit.initializer });
-    const client = yield* gitClient(memoryFs());
+    const first = yield* Effect.gen(function* () {
+      const host = yield* RepoHost;
+      const api = yield* (yield* Projects).create(project);
+      const initializer = Person.make({ handle: datekit.initializer });
+      const client = yield* gitClient(memoryFs());
 
-    yield* api.initProject(initializer, {});
+      yield* api.initProject(initializer, {});
 
-    const sha = yield* client.commit("Start", [
-      ["README.md", readme],
-      ["package.json", '{ "name": "datekit" }\n'],
-    ]);
+      const sha = yield* client.commit("Start", [
+        ["README.md", readme],
+        ["package.json", '{ "name": "datekit" }\n'],
+      ]);
 
-    yield* host.push(RepoName.make(project), client.source, [
-      { from: Option.none(), ref: RefName.make("refs/heads/main"), to: sha },
-    ]);
-    yield* api.recordFirstPush(initializer, sha);
+      yield* host.push(RepoName.make(project), client.source, [
+        { from: Option.none(), ref: RefName.make("refs/heads/main"), to: sha },
+        {
+          from: Option.none(),
+          ref: RefName.make("refs/tags/@datekit/core@1.0.0"),
+          to: sha,
+        },
+      ]);
+      yield* api.recordFirstPush(initializer, sha);
 
-    return sha;
-  }).pipe(Effect.orDie, Effect.provide(world));
+      return sha;
+    }).pipe(Effect.orDie, Effect.provide(world));
 
-  const ports = Layer.succeedContext(world);
+    const cached = yield* Option.match(reads, {
+      onNone: () => Effect.succeed(world),
+      onSome: (count) =>
+        Effect.map(Layer.build(CodeCacheLive(100)), (cache) => {
+          const host = Context.get(world, RepoHost);
 
-  const { fetch } = yield* served(
-    Layer.mergeAll(
-      Handlers.pipe(Layer.provide(ports)),
-      ports,
-      MemorySessions.layer({})
-    )
-  );
+          return Context.merge(world, cache).pipe(
+            Context.add(
+              RepoHost,
+              RepoHost.of({
+                ...host,
+                readTree: (name, tree) =>
+                  Effect.andThen(
+                    Ref.update(count, (n) => n + 1),
+                    host.readTree(name, tree)
+                  ),
+              })
+            )
+          );
+        }),
+    });
 
-  return { fetch, first };
-});
+    const ports = Layer.succeedContext(cached);
+
+    const { fetch } = yield* served(
+      Layer.mergeAll(
+        Handlers.pipe(Layer.provide(ports)),
+        ports,
+        MemorySessions.layer({})
+      )
+    );
+
+    return { fetch, first };
+  });
+
+const platform = platformWith(Option.none());
 
 const get = (
   fetch: (request: Request) => Effect.Effect<Response>,
@@ -130,6 +163,25 @@ describe("a project's raw files", () => {
   );
 
   it.effect(
+    "find a tag by its name, URL-encoded in one segment, slash and all",
+    () =>
+      Effect.gen(function* () {
+        const { fetch } = yield* platform;
+
+        const answer = yield* get(
+          fetch,
+          `/${project}/raw/${encodeURIComponent("@datekit/core@1.0.0")}/README.md`
+        );
+
+        expect([
+          answer.status,
+          answer.text,
+          answer.headers.get("cache-control"),
+        ]).toStrictEqual([200, readme, "public, max-age=60"]);
+      })
+  );
+
+  it.effect(
     "is a 404 with no body for a path that climbs out, a missing file or project",
     () =>
       Effect.gen(function* () {
@@ -149,6 +201,26 @@ describe("a project's raw files", () => {
 
         expect(answers).toStrictEqual(answers.map(() => [404, ""]));
       })
+  );
+
+  it.effect("read a tree once per isolate, by its id", () =>
+    Effect.gen(function* () {
+      const reads = yield* Ref.make(0);
+      const { fetch, first } = yield* platformWith(Option.some(reads));
+      const path = `/${project}/raw/${first}/README.md`;
+
+      const once = yield* get(fetch, path);
+      const counted = yield* Ref.get(reads);
+      const again = yield* get(fetch, path);
+
+      expect([once.status, again.status, again.text]).toStrictEqual([
+        200,
+        200,
+        readme,
+      ]);
+      expect(counted).toBeGreaterThan(0);
+      expect(yield* Ref.get(reads)).toBe(counted);
+    })
   );
 
   it.effect("leave git's own paths to git", () =>

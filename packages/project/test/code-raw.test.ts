@@ -12,7 +12,7 @@ import { RepoPath } from "@repo/protocol/ids";
 import { Effect, Option } from "effect";
 
 import { treeOf } from "../src/code.ts";
-import { rawOf, rawRequestOf } from "../src/code/raw.ts";
+import { rawOf, rawRequestOf, rawRestOf } from "../src/code/raw.ts";
 import { datekit, png, svg } from "./code-fixtures.ts";
 
 const read = (response: Response) =>
@@ -128,14 +128,14 @@ describe("a raw file", () => {
         ]);
 
         expect(
-          answers.map(({ body, status }) => [status, body.length])
-        ).toStrictEqual([
-          [404, 0],
-          [404, 0],
-          [404, 0],
-          [404, 0],
-          [404, 0],
-        ]);
+          answers.map(({ body, headers, status }) => [
+            status,
+            body.length,
+            headers["x-content-type-options"],
+            headers["content-security-policy"]?.endsWith("; sandbox"),
+          ])
+        ).toStrictEqual(answers.map(() => [404, 0, "nosniff", true]));
+        expect(answers).toHaveLength(5);
       }).pipe(Effect.provide(RepoHostMemory))
   );
 });
@@ -166,6 +166,22 @@ describe("a raw request's path", () => {
       Option.none(),
       Option.none(),
       Option.none(),
+    ]);
+  });
+});
+
+describe("a raw request's URL", () => {
+  it("gives everything after the project's raw/, still encoded", () => {
+    expect(
+      [
+        "https://host.example/datekit/raw/%40datekit%2Fcore%402.0.0/README.md",
+        "/datekit/raw/main/docs/a%20b.md?plain=1#L2",
+        "/datekit/raw/main",
+      ].map(rawRestOf)
+    ).toStrictEqual([
+      "%40datekit%2Fcore%402.0.0/README.md",
+      "main/docs/a%20b.md",
+      "main",
     ]);
   });
 });

@@ -102,7 +102,8 @@ const pageOf = (
       `${repo}:log:${sha}:${from}:${count}`,
       RepoHost.use((host) =>
         host.log(repo, Revision.Commit({ sha }), count, from)
-      )
+      ),
+      { heavy: true }
     );
   });
 
