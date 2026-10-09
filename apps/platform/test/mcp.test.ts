@@ -2,8 +2,9 @@
  * The platform's MCP surface beside its tools, through its fetch
  * handler composed as the Worker's is (the core loop's world), once dora has made
  * datekit and opened fix-week: an ask's brief is a resource, the projects
- * are one, the platform's skill is the prompt `contribute`, and every tool
- * whose contract can refuse returns its refusal as typed JSON. Requests are
+ * are one, the platform's skill is the prompt `contribute`, the capped code
+ * reads browse datekit for an agent without git, and every tool whose
+ * contract can refuse returns its refusal as typed JSON. Requests are
  * MCP's stateless 2026-07-28 ones, built as `harness.ts` builds a tool call.
  */
 import { describe, expect, it, layer } from "@effect/vitest";
@@ -36,7 +37,9 @@ import {
   UnknownAsk,
   UnknownCommit,
   UnknownDecision,
+  UnknownPath,
   UnknownProject,
+  UnknownRevision,
 } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
@@ -326,6 +329,12 @@ const ToolResult = Schema.Struct({
   isError: Schema.Boolean,
 });
 
+/** A tools/call result that answered: whether it failed, and its structured content. */
+const Answered = Schema.Struct({
+  isError: Schema.Boolean,
+  structuredContent: Schema.Unknown,
+});
+
 /** Where an ask's brief is read: `<scheme>ask/<project>/<ask>`. */
 const briefUri = (of: ProjectName, ask: AskId) =>
   `${Brand.urlScheme}ask/${of}/${ask}`;
@@ -380,6 +389,9 @@ const head = CommitSha.make("3333333333333333333333333333333333333333");
 const requestId = RequestId.make("mcp-refused-0001");
 
 const decision = DecisionId.make("dec-000001");
+
+/** A tag datekit never made. */
+const untagged = "v9.9.9";
 
 /**
  * Every contract MCP serves that can refuse, one call it refuses as the
@@ -436,6 +448,14 @@ const provoked = {
     args: { project: nowhere },
     refusal: new UnknownProject({ project: nowhere }),
   },
+  listRefs: {
+    args: { project: nowhere },
+    refusal: new UnknownProject({ project: nowhere }),
+  },
+  log: {
+    args: { at: untagged, project },
+    refusal: new UnknownRevision({ rev: untagged }),
+  },
   openAsk: {
     args: { ask: nope, files: askFiles, project },
     refusal: new NotDecider({}),
@@ -446,6 +466,14 @@ const provoked = {
   },
   proposeAsk: {
     args: { project: nowhere, want },
+    refusal: new UnknownProject({ project: nowhere }),
+  },
+  readFile: {
+    args: { at: untagged, path: RepoPath.make("README.md"), project },
+    refusal: new UnknownRevision({ rev: untagged }),
+  },
+  readTree: {
+    args: { project: nowhere },
     refusal: new UnknownProject({ project: nowhere }),
   },
   release: {
@@ -479,6 +507,10 @@ const provoked = {
   vouch: {
     args: { handle: Handle.make("alice"), project, verdict: "vouch" },
     refusal: new NotDecider({}),
+  },
+  why: {
+    args: { at: untagged, path: RepoPath.make("src/week.ts"), project },
+    refusal: new UnknownRevision({ rev: untagged }),
   },
 } satisfies {
   readonly [Tag in Refusing<ContractOn<"mcp">>]: Provoked<Tag>;
@@ -681,6 +713,129 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
           );
 
           expect(statuses).toStrictEqual([401, 401, 401]);
+        })
+    );
+
+    // A connector with no shell browses the canonical repo through these.
+    test.effect("reads a file at main as structured content", () =>
+      Effect.gen(function* () {
+        const world = yield* Seeded;
+        const { landed } = yield* world.rpc("anonymous").listRefs({ project });
+
+        const result = yield* resultOf(world.fetch, Answered, "tools/call", {
+          arguments: { path: "README.md", project },
+          name: "readFile",
+        });
+
+        const file = yield* Schema.decodeUnknownEffect(
+          Schema.Struct({
+            at: Schema.String,
+            binary: Schema.Boolean,
+            path: Schema.String,
+            text: Schema.String,
+            truncated: Schema.Boolean,
+          })
+        )(result.structuredContent);
+
+        expect(result.isError).toBeFalsy();
+        expect(file).toStrictEqual({
+          at: landed,
+          binary: false,
+          path: "README.md",
+          text: start["README.md"],
+          truncated: false,
+        });
+      })
+    );
+
+    test.effect("lists the root folder at main", () =>
+      Effect.gen(function* () {
+        const { fetch } = yield* Seeded;
+
+        const result = yield* resultOf(fetch, Answered, "tools/call", {
+          arguments: { project },
+          name: "readTree",
+        });
+
+        const listing = yield* Schema.decodeUnknownEffect(
+          Schema.Struct({
+            entries: Schema.Array(Schema.Struct({ name: Schema.String })),
+          })
+        )(result.structuredContent);
+
+        expect(result.isError).toBeFalsy();
+        expect(listing.entries.map(({ name }) => name)).toStrictEqual(
+          expect.arrayContaining([
+            Brand.configDir,
+            "README.md",
+            "package.json",
+            "src",
+          ])
+        );
+      })
+    );
+
+    test.effect(
+      "refuses a file main does not have with UnknownPath, its tag kept",
+      () =>
+        Effect.gen(function* () {
+          const world = yield* Seeded;
+          const missing = RepoPath.make("src/month.ts");
+
+          const { landed } = yield* world
+            .rpc("anonymous")
+            .listRefs({ project });
+
+          const commit = yield* Effect.fromNullishOr(landed);
+
+          const result = yield* resultOf(
+            world.fetch,
+            ToolResult,
+            "tools/call",
+            {
+              arguments: { path: missing, project },
+              name: "readFile",
+            }
+          );
+
+          const [{ text }] = result.content;
+
+          expect(result.isError).toBeTruthy();
+          expect(text).toHaveProperty("_tag", "UnknownPath");
+          expect(
+            yield* Schema.decodeUnknownEffect(UnknownPath)(text)
+          ).toStrictEqual(new UnknownPath({ commit, path: missing }));
+        })
+    );
+
+    // At most 100 commits a page reach a transcript.
+    test.effect(
+      "refuses a log page of more than 100 commits by its input",
+      () =>
+        Effect.gen(function* () {
+          const { fetch } = yield* Seeded;
+
+          const result = yield* resultOf(
+            fetch,
+            Schema.Struct({
+              content: Schema.Tuple([
+                Schema.Struct({
+                  text: Schema.String,
+                  type: Schema.Literal("text"),
+                }),
+              ]),
+              isError: Schema.Boolean,
+            }),
+            "tools/call",
+            { arguments: { limit: 101, project }, name: "log" }
+          );
+
+          const [{ text }] = result.content;
+
+          expect(result.isError).toBeTruthy();
+          expect(text).toMatch(/^Invalid parameters for tool 'log'/u);
+          expect(text).toContain("between 1 and 100");
+          expect(text).toContain('["limit"]');
         })
     );
 

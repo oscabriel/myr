@@ -137,7 +137,7 @@ const table = [
     cli: "none",
     errors: ["UnknownProject"],
     flags: "RI",
-    on: "RW",
+    on: "RMW",
     tag: "listRefs",
   },
   {
@@ -145,7 +145,7 @@ const table = [
     cli: "none",
     errors: ["UnknownProject", "UnknownRevision", "UnknownPath"],
     flags: "RI",
-    on: "RW",
+    on: "RMW",
     tag: "readTree",
   },
   {
@@ -161,7 +161,7 @@ const table = [
     cli: "none",
     errors: ["UnknownProject", "UnknownRevision", "UnknownPath"],
     flags: "RI",
-    on: "RW",
+    on: "RMW",
     tag: "readFile",
   },
   {
@@ -169,7 +169,7 @@ const table = [
     cli: "none",
     errors: ["UnknownProject", "UnknownRevision"],
     flags: "RI",
-    on: "RW",
+    on: "RMW",
     tag: "log",
   },
   {
@@ -185,7 +185,7 @@ const table = [
     cli: "none",
     errors: ["UnknownProject", "UnknownRevision", "UnknownPath"],
     flags: "RI",
-    on: "RW",
+    on: "RMW",
     tag: "why",
   },
   {
@@ -384,7 +384,7 @@ const table = [
 const decodes = (payload: typeof Schema.Json.Type) =>
   Schema.decodeUnknownOption(ProposeAsk.payloadSchema)(payload)._tag;
 
-/** The code reads: on RPC and the web only (git reads code locally). */
+/** The code reads: never a command, since git reads code locally. */
 type CodeRead =
   | "listPaths"
   | "listRefs"
@@ -393,6 +393,9 @@ type CodeRead =
   | "readTree"
   | "showCommit"
   | "why";
+
+/** The code reads whose output has no cap that fits a transcript: never MCP. */
+type UncappedRead = "listPaths" | "showCommit";
 
 /** Each surface's letter in the table's Surfaces column. */
 const letterOf = {
@@ -620,7 +623,7 @@ describe("the group a surface serves", () => {
   it("types each surface's group as the contracts on it", () => {
     expectTypeOf<TagOn<"rpc">>().toEqualTypeOf<Contract["_tag"]>();
     expectTypeOf<TagOn<"mcp">>().toEqualTypeOf<
-      Exclude<Contract["_tag"], CodeRead | "evidence" | "setEnv" | "watch">
+      Exclude<Contract["_tag"], UncappedRead | "evidence" | "setEnv" | "watch">
     >();
     expectTypeOf<TagOn<"cli">>().toEqualTypeOf<
       Exclude<Contract["_tag"], CodeRead | "watch">

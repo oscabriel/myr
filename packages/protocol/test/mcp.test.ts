@@ -175,6 +175,41 @@ describe("the contracts as MCP tools", () => {
       })
   );
 
+  // A claude.ai connector has no shell: these five, each capped, are how it
+  // browses a project. A commit's diff and every path wait for a cap that
+  // fits a transcript.
+  it.effect(
+    "offers the capped code reads as tools that only read, and neither a commit's diff nor every path",
+    () =>
+      Effect.gen(function* () {
+        const mcp = yield* serve(unanswered);
+
+        const { tools } = yield* mcp.call("tools/list", {}, HintedTools);
+
+        const names = tools.map(({ name }) => name);
+
+        expect(
+          tools
+            .filter(({ name }) =>
+              ["listRefs", "log", "readFile", "readTree", "why"].includes(name)
+            )
+            .map(({ annotations, name }) => ({
+              idempotentHint: annotations.idempotentHint,
+              name,
+              readOnlyHint: annotations.readOnlyHint,
+            }))
+        ).toStrictEqual(
+          ["listRefs", "readTree", "readFile", "log", "why"].map((name) => ({
+            idempotentHint: true,
+            name,
+            readOnlyHint: true,
+          }))
+        );
+        expect(names).not.toContain("showCommit");
+        expect(names).not.toContain("listPaths");
+      })
+  );
+
   // `listTools` is what the CLI's stdio server and `/mcp` both list, so it
   // says what a client sees.
   it.effect("lists each tool exactly as listTools describes it", () =>
