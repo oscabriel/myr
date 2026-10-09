@@ -39,6 +39,8 @@ import { Array, Effect, Option, Ref, Stream } from "effect";
 import type { CodeProject } from "../code.ts";
 import { MAX_LANDINGS } from "../project.ts";
 import { asOneView } from "./cache.ts";
+import { versionAt, walkableAt } from "./file-walk.ts";
+import type { FileVersion } from "./file-walk.ts";
 import { contentsOf, contentsOfBytes, unlessTooLarge } from "./file.ts";
 import {
   INCREMENT_REACH,
@@ -79,13 +81,16 @@ const blobAt = (repo: RepoName, commit: Commit, path: RepoPath) =>
   );
 
 /**
- * The file's blob in each of `commits` (first parents, newest first), up to
- * the first commit without the file. One pass with `READS_AT_ONCE` lookups
- * under way and no barrier: a slow lookup holds up only itself, not the
- * ones after it. Once a commit without the file is found, lookups further
- * back are skipped.
+ * The file's blob in each of `commits` (first parents, newest first), by
+ * `blobOf`, up to the first commit without the file. One pass with
+ * `READS_AT_ONCE` lookups under way and no barrier: a slow lookup holds up
+ * only itself, not the ones after it. Once a commit without the file is
+ * found, lookups further back are skipped.
  */
-const lookups = (repo: RepoName, path: RepoPath, commits: readonly Commit[]) =>
+const lookups = <E, R>(
+  commits: readonly Commit[],
+  blobOf: (commit: Commit) => Effect.Effect<Option.Option<BlobSha>, E, R>
+) =>
   Effect.gen(function* () {
     // Where the file was found missing: no lookup past it is needed.
     const missingAt = yield* Ref.make(commits.length);
@@ -98,7 +103,7 @@ const lookups = (repo: RepoName, path: RepoPath, commits: readonly Commit[]) =>
             return Option.none();
           }
 
-          const blob = yield* blobAt(repo, commit, path);
+          const blob = yield* blobOf(commit);
 
           if (Option.isNone(blob)) {
             yield* Ref.update(missingAt, (was) => Math.min(was, at));
@@ -332,44 +337,23 @@ const forward = (
   });
 
 /**
- * The why at `log[0]` by the whole walk. The head's blob and text are read
- * beside the other commits' lookups, so nothing waits on the head's
- * folders before the pass starts.
+ * The why at `head` from its file's text and the blobs `found` in the
+ * commits before it: the newest version is the file as read, and the
+ * older ones are read in order by `readText`, `READS_AT_ONCE` under way,
+ * only until every line has its commit.
  */
-const walked = (
-  repo: RepoName,
-  at: CommitSha,
-  path: RepoPath,
-  log: readonly Commit[],
-  head: Commit
-): Effect.Effect<StoredWhy, UnknownPath | RepoNotFound, RepoHost> =>
+const blamed = <R>(
+  head: Commit,
+  newest: BlobSha,
+  text: string,
+  found: readonly {
+    readonly blob: Option.Option<BlobSha>;
+    readonly commit: Commit;
+  }[],
+  readText: (blob: BlobSha) => Effect.Effect<string, RepoNotFound, R>
+): Effect.Effect<StoredWhy, RepoNotFound, R> =>
   Effect.gen(function* () {
-    const [headSide, found] = yield* Effect.all(
-      [
-        Effect.gen(function* () {
-          const blob = yield* blobAt(repo, head, path);
-
-          if (Option.isNone(blob)) {
-            return yield* new UnknownPath({ commit: at, path });
-          }
-
-          return {
-            blob: blob.value,
-            contents: yield* contentsOf(repo, blob.value),
-          };
-        }),
-        lookups(repo, path, log.slice(1)),
-      ],
-      { concurrency: 2 }
-    );
-
-    const newest = headSide.blob;
-    const { contents } = headSide;
     const none: StoredWhy = { blob: newest, ranges: [], shas: [] };
-
-    if (Option.isNone(contents) || Option.isNone(contents.value.text)) {
-      return none;
-    }
 
     const { stopped, versions } = versionsOf(
       { blob: newest, commit: head },
@@ -377,15 +361,11 @@ const walked = (
     );
 
     const [first = { blob: newest, commit: head }, ...older] = versions;
-    const text = contents.value.text.value;
 
-    // The newest version is the file as read: its text is at hand. The
-    // older ones are read in order, `READS_AT_ONCE` under way, only until
-    // every line has its commit.
     const tracing = yield* Stream.fromIterable(older).pipe(
       Stream.mapEffect(
         (version) =>
-          Effect.map(textOf(repo, version.blob), (read) => ({
+          Effect.map(readText(version.blob), (read) => ({
             sha: version.commit.sha,
             text: read,
           })),
@@ -410,6 +390,109 @@ const walked = (
     return stopped && reachedEnd && last !== undefined
       ? { ...none, ranges, shas, stoppedAt: last.commit.sha }
       : { ...none, ranges, shas };
+  });
+
+/**
+ * The why at `log[0]` by reading the file whole at each commit
+ * (`file-walk.ts`): one call a commit, and every version's text kept from
+ * those reads, so the blame reads nothing more.
+ */
+const walkedByFile = (
+  repo: RepoName,
+  path: RepoPath,
+  log: readonly Commit[],
+  head: Commit,
+  newest: FileVersion
+): Effect.Effect<StoredWhy, RepoNotFound, RepoHost> =>
+  Effect.gen(function* () {
+    const { text } = contentsOfBytes(newest.bytes);
+
+    if (Option.isNone(text)) {
+      return { blob: newest.blob, ranges: [], shas: [] };
+    }
+
+    // Each version's bytes, by its blob id: the commits that share one
+    // share its text.
+    const texts = new Map<string, Uint8Array>([[newest.blob, newest.bytes]]);
+
+    const found = yield* lookups(log.slice(1), (commit) =>
+      versionAt(repo, commit.sha, path).pipe(
+        Effect.map(
+          Option.map(({ blob, bytes }) => {
+            if (!texts.has(blob)) {
+              texts.set(blob, bytes);
+            }
+
+            return blob;
+          })
+        )
+      )
+    );
+
+    return yield* blamed(head, newest.blob, text.value, found, (blob) => {
+      const bytes = texts.get(blob);
+
+      return bytes === undefined
+        ? textOf(repo, blob)
+        : Effect.succeed(
+            Option.getOrElse(contentsOfBytes(bytes).text, () => "")
+          );
+    });
+  });
+
+/**
+ * The why at `log[0]` by the whole walk: by reading the file whole at each
+ * commit when it is small enough at the head, else by its folders. The
+ * head's blob and text are read beside the other commits' lookups, so
+ * nothing waits on the head's folders before the pass starts.
+ */
+const walked = (
+  repo: RepoName,
+  at: CommitSha,
+  path: RepoPath,
+  log: readonly Commit[],
+  head: Commit
+): Effect.Effect<StoredWhy, UnknownPath | RepoNotFound, RepoHost> =>
+  Effect.gen(function* () {
+    const whole = yield* walkableAt(repo, head.sha, path);
+
+    if (Option.isSome(whole)) {
+      return yield* walkedByFile(repo, path, log, head, whole.value);
+    }
+
+    const [headSide, found] = yield* Effect.all(
+      [
+        Effect.gen(function* () {
+          const blob = yield* blobAt(repo, head, path);
+
+          if (Option.isNone(blob)) {
+            return yield* new UnknownPath({ commit: at, path });
+          }
+
+          return {
+            blob: blob.value,
+            contents: yield* contentsOf(repo, blob.value),
+          };
+        }),
+        lookups(log.slice(1), (commit) => blobAt(repo, commit, path)),
+      ],
+      { concurrency: 2 }
+    );
+
+    const newest = headSide.blob;
+    const { contents } = headSide;
+
+    if (Option.isNone(contents) || Option.isNone(contents.value.text)) {
+      return { blob: newest, ranges: [], shas: [] };
+    }
+
+    return yield* blamed(
+      head,
+      newest,
+      contents.value.text.value,
+      found,
+      (blob) => textOf(repo, blob)
+    );
   });
 
 /** The why at `at`, computed: from a kept ancestor's when one is in reach. */

@@ -32,6 +32,7 @@ import { Array, DateTime, Effect, Equal, Option } from "effect";
 
 import type { CodeProject } from "../code.ts";
 import { asOneView, CodeCache } from "./cache.ts";
+import { versionAt, walkableAt } from "./file-walk.ts";
 import {
   INCREMENT_REACH,
   keyOf,
@@ -147,15 +148,44 @@ const pageWith = (
     onSome: (at) => ({ commits, next: at }),
   });
 
-/** What sits at `path` in each commit of `commits`, in order: one lookup each. */
-const idsOf = (
+/** What sits at a path in a commit, as a walk compares it with its parent's. */
+type IdOf = (
+  commit: Commit
+) => Effect.Effect<Option.Option<string>, RepoNotFound, RepoHost>;
+
+/**
+ * How a walk from `start` looks `path` up in each commit: a file small
+ * enough there is read whole, one call a commit (`file-walk.ts`), and
+ * named by its blob id, so a change of its mode alone is not seen; any
+ * other path by its folders, named by its mode and id.
+ */
+const idOfFrom = (
   repo: RepoName,
   path: RepoPath,
+  start: Commit
+): Effect.Effect<IdOf, RepoNotFound, RepoHost> =>
+  Effect.map(walkableAt(repo, start.sha, path), (whole) =>
+    Option.match(whole, {
+      onNone: () => (commit: Commit) => idAt(repo, commit.tree, path),
+      // The start's file is read already: each commit is read once.
+      onSome:
+        ({ blob: first }) =>
+        (commit: Commit) =>
+          commit.sha === start.sha
+            ? Effect.succeedSome(`blob ${first}`)
+            : Effect.map(
+                versionAt(repo, commit.sha, path),
+                Option.map(({ blob }) => `blob ${blob}`)
+              ),
+    })
+  );
+
+/** What sits at the path in each commit of `commits`, in order: one lookup each. */
+const idsOf = (
+  idOf: IdOf,
   commits: readonly Commit[]
 ): Effect.Effect<readonly Option.Option<string>[], RepoNotFound, RepoHost> =>
-  Effect.forEach(commits, ({ tree }) => idAt(repo, tree, path), {
-    concurrency: READS_AT_ONCE,
-  });
+  Effect.forEach(commits, idOf, { concurrency: READS_AT_ONCE });
 
 /**
  * The commits among the first `count` of `scan` that changed `path` from
@@ -165,13 +195,13 @@ const idsOf = (
  */
 const changedIn = (
   repo: RepoName,
-  path: RepoPath,
+  idOf: IdOf,
   scan: readonly Commit[],
   count: number
 ): Effect.Effect<readonly CommitSha[], RepoNotFound, RepoHost> =>
   Effect.gen(function* () {
     const looked = scan.slice(0, count + 1);
-    const ids = yield* idsOf(repo, path, looked);
+    const ids = yield* idsOf(idOf, looked);
 
     const changed = yield* Effect.forEach(
       looked.slice(0, count),
@@ -189,7 +219,7 @@ const changedIn = (
                     Effect.flatMap(
                       Option.match({
                         onNone: () => Effect.succeedNone,
-                        onSome: ({ tree }) => idAt(repo, tree, path),
+                        onSome: idOf,
                       })
                     )
                   ),
@@ -232,18 +262,27 @@ const historyOf = (
   Effect.gen(function* () {
     const scanned = scan.slice(0, PATH_SCAN);
     const reachedRoot = scan.length <= PATH_SCAN;
-    const kept = yield* nearestKept(repo, path, scan);
+    const [start] = scan;
+
+    if (start === undefined) {
+      return { reachedRoot, shas: [] };
+    }
+
+    const [kept, idOf] = yield* Effect.all(
+      [nearestKept(repo, path, scan), idOfFrom(repo, path, start)],
+      { concurrency: 2 }
+    );
 
     if (Option.isNone(kept)) {
       return {
         reachedRoot,
-        shas: yield* changedIn(repo, path, scan, scanned.length),
+        shas: yield* changedIn(repo, idOf, scan, scanned.length),
       };
     }
 
     const { back } = kept.value;
     const inScan = new Set<string>(scanned.map(({ sha }) => sha));
-    const between = yield* changedIn(repo, path, scan, back);
+    const between = yield* changedIn(repo, idOf, scan, back);
 
     return {
       reachedRoot,

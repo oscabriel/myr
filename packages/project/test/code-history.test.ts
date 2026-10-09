@@ -9,7 +9,7 @@
  * that no longer decodes is computed again and replaced.
  */
 import { describe, expect, it } from "@effect/vitest";
-import { RepoHost, RepoSession } from "@repo/artifacts/repo-host";
+import { RepoHost, RepoSession, Revision } from "@repo/artifacts/repo-host";
 import type { RepoSessionApi } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import type { LandingView } from "@repo/protocol/domain/landing";
@@ -30,6 +30,7 @@ import { logOf, whyOf } from "../src/code.ts";
 import type { CodeProject } from "../src/code.ts";
 import { CodeCache, CodeCacheLive } from "../src/code/cache.ts";
 import type { CodeReads } from "../src/code/cache.ts";
+import { FILE_WALK_CAP } from "../src/code/file-walk.ts";
 import { keyOf, StoredWhy, whyKept } from "../src/code/history.ts";
 import { WHY_SCAN } from "../src/code/why.ts";
 import { Content, writer } from "./code-fixtures.ts";
@@ -50,11 +51,13 @@ const text = (value: string) => Content.Text({ text: value });
 interface Seen {
   readonly trees: number;
   readonly blobs: number;
+  /** Files read whole at a commit (`readFile`). */
+  readonly files: number;
   readonly peak: number;
   readonly events: readonly string[];
 }
 
-const none: Seen = { blobs: 0, events: [], peak: 0, trees: 0 };
+const none: Seen = { blobs: 0, events: [], files: 0, peak: 0, trees: 0 };
 
 /** How long a read of the object `id` takes, once a test sets it. */
 type Delay = Option.Option<(id: string) => Duration.Duration>;
@@ -72,7 +75,7 @@ const counted = (seen: Ref.Ref<Seen>, delay: Ref.Ref<Delay>) =>
       const under = yield* Ref.make(0);
 
       const timed = <A, E>(
-        kind: "blobs" | "trees",
+        kind: "blobs" | "files" | "trees",
         id: string,
         read: Effect.Effect<A, E>
       ) =>
@@ -108,6 +111,16 @@ const counted = (seen: Ref.Ref<Seen>, delay: Ref.Ref<Delay>) =>
       return RepoHost.of({
         ...host,
         readBlob: (name, id) => timed("blobs", id, host.readBlob(name, id)),
+        // A file read at a commit is noted by the commit's id.
+        readFile: (name, at, path) =>
+          timed(
+            "files",
+            Revision.$match(at, {
+              Branch: ({ name: branch }) => branch,
+              Commit: ({ sha }) => sha,
+            }),
+            host.readFile(name, at, path)
+          ),
         readTree: (name, id) => timed("trees", id, host.readTree(name, id)),
       });
     })
@@ -461,28 +474,21 @@ describe("a cold walk", () => {
   );
 
   // Counted, not timed: a batch of 16 waits for its slowest read, so while
-  // one commit's folder takes a second, at most its 15 neighbours finish;
+  // one commit's file takes a second, at most its 15 neighbours finish;
   // with no barrier, every other commit does. Wall time under a loaded
   // machine says less than this count (the walk took about a quarter of
   // the batched walk's 1,250 ms when each read took 50 ms).
   it.live(
-    "goes on past a slow read: every other commit's folder is read while one takes a second",
+    "goes on past a slow read: every other commit's file is read while one takes a second",
     () =>
       within(({ delay, seen }) =>
         Effect.gen(function* () {
           const { head, shas } = yield* deepHistory(64);
           const { code } = yield* recordOf(head);
 
-          const roots = yield* Effect.forEach(shas, (sha) =>
-            RepoHost.use((host) => host.readCommit(repo, sha)).pipe(
-              Effect.flatMap(Effect.fromOption),
-              Effect.map(({ tree }) => tree),
-              Effect.orDie
-            )
-          );
-
-          // The commit after the head: the first the pass looks up.
-          const slow = roots[62] ?? "";
+          // The commit after the head: the first the pass looks up. A file
+          // read is noted by its commit's id.
+          const slow = shas[62] ?? "";
 
           yield* Ref.set(seen, none);
           yield* Ref.set(
@@ -499,7 +505,7 @@ describe("a cold walk", () => {
             events.indexOf(`-${slow}`)
           );
 
-          const others = new Set(roots.slice(0, 62).map((tree) => `-${tree}`));
+          const others = new Set(shas.slice(0, 62).map((sha) => `-${sha}`));
 
           expect(
             during.filter((event) => others.has(event)).length
@@ -510,7 +516,7 @@ describe("a cold walk", () => {
   );
 
   it.effect(
-    "looks each commit's entry up once in a path's log",
+    "reads each commit's file once in a path's log",
     () =>
       within(({ seen }) =>
         Effect.gen(function* () {
@@ -526,11 +532,68 @@ describe("a cold walk", () => {
             path: Option.some(RepoPath.make("count.txt")),
           });
 
+          const { files, trees } = yield* Ref.get(seen);
+
           expect(commits).toHaveLength(30);
-          // Each commit's root tree read once from the store. The view
-          // shares a tree read under way among its fibers, so this count
-          // holds the store's reads, not how often the walk asked.
-          expect((yield* Ref.get(seen)).trees).toBe(200);
+          expect({ files, trees }).toStrictEqual({ files: 200, trees: 0 });
+        })
+      ),
+    long
+  );
+
+  it.effect(
+    "looks each commit's folder up once in a folder's log",
+    () =>
+      within(({ seen }) =>
+        Effect.gen(function* () {
+          const { head } = yield* deepHistory(200);
+          const { code } = yield* recordOf(head);
+
+          yield* Ref.set(seen, none);
+
+          const { commits } = yield* logOf(code, {
+            at: Option.none(),
+            from: 0,
+            limit: 30,
+            path: Option.some(RepoPath.make("a/b")),
+          });
+
+          expect(commits).toHaveLength(1);
+          // Each commit's root tree read once from the store, and `a`, the
+          // same tree in every commit, once. The view shares a tree read
+          // under way among its fibers, so this count holds the store's
+          // reads, not how often the walk asked.
+          expect((yield* Ref.get(seen)).trees).toBe(201);
+        })
+      ),
+    long
+  );
+
+  it.live(
+    "keeps at least 40 folder reads under way in a folder's log when each takes 50 ms",
+    () =>
+      within(({ delay, seen }) =>
+        Effect.gen(function* () {
+          const { head } = yield* deepHistory(64);
+          const { code } = yield* recordOf(head);
+
+          yield* Ref.set(seen, none);
+          yield* Ref.set(
+            delay,
+            Option.some(() => Duration.millis(50))
+          );
+
+          yield* logOf(code, {
+            at: Option.none(),
+            from: 0,
+            limit: 30,
+            path: Option.some(RepoPath.make("a/b")),
+          });
+
+          const { files, peak } = yield* Ref.get(seen);
+
+          expect(files).toBe(1);
+          expect(peak).toBeGreaterThanOrEqual(40);
         })
       ),
     long
@@ -557,7 +620,9 @@ describe("a kept value that no longer decodes", () => {
         const view = yield* onIsolate(whyOf(code, Option.none(), format));
         const replaced = yield* store.get(key);
 
-        expect((yield* Ref.get(seen)).blobs).toBeGreaterThan(0);
+        const { blobs, files } = yield* Ref.get(seen);
+
+        expect(blobs + files).toBeGreaterThan(0);
         expect(view.ranges.length).toBeGreaterThan(0);
         expect(
           Option.flatMap(
@@ -599,6 +664,7 @@ const sessioned = (
           noted(host.log(name, at, limit, offset)),
         readBlob: (name, id) => noted(host.readBlob(name, id)),
         readCommit: (name, sha) => noted(host.readCommit(name, sha)),
+        readFile: (name, at, path) => noted(host.readFile(name, at, path)),
         readTree: (name, id) => noted(host.readTree(name, id)),
       });
     })
@@ -694,6 +760,98 @@ describe("kept history in the isolate's cache", () => {
 
           expect(kept.length).toBeGreaterThan(0);
           expect(kept.filter(([, heavy]) => !heavy)).toStrictEqual([]);
+        })
+      )
+  );
+});
+
+describe("a cold walk over a file", () => {
+  it.effect(
+    "reads the file once at each commit of a why and no folder past the head's",
+    () =>
+      within(({ seen }) =>
+        Effect.gen(function* () {
+          const { head } = yield* deepHistory(20);
+          const { code } = yield* recordOf(head);
+
+          yield* Ref.set(seen, none);
+          yield* whyOf(code, Option.none(), RepoPath.make("a/b/c/d/deep.txt"));
+
+          const { blobs, files, trees } = yield* Ref.get(seen);
+
+          // One read of the file per commit is one call each; the folders
+          // above it took five per commit.
+          expect({ blobs, files }).toStrictEqual({ blobs: 0, files: 20 });
+          expect(trees).toBeLessThanOrEqual(5);
+        })
+      )
+  );
+
+  it.effect(
+    "reads the file once at each commit of a path's log and no folder",
+    () =>
+      within(({ seen }) =>
+        Effect.gen(function* () {
+          const { head } = yield* deepHistory(20);
+          const { code } = yield* recordOf(head);
+
+          yield* Ref.set(seen, none);
+
+          const { commits } = yield* logOf(code, {
+            at: Option.none(),
+            from: 0,
+            limit: 30,
+            path: Option.some(RepoPath.make("a/b/c/d/deep.txt")),
+          });
+
+          const { files, trees } = yield* Ref.get(seen);
+
+          expect(commits).toHaveLength(1);
+          expect(files).toBeLessThanOrEqual(21);
+          expect(trees).toBe(0);
+        })
+      )
+  );
+
+  it.effect(
+    "looks a file past the cap up by its folders, never reading it whole at each commit",
+    () =>
+      within(({ seen }) =>
+        Effect.gen(function* () {
+          const git = yield* writer;
+          const big = "x".repeat(FILE_WALK_CAP);
+
+          const c1 = yield* git.commit(
+            "One",
+            [["big.txt", text(`${big}\n`)]],
+            [],
+            1
+          );
+
+          const c2 = yield* git.commit(
+            "Two",
+            [["big.txt", text(`${big}\nmore\n`)]],
+            [c1],
+            2
+          );
+
+          yield* git.push(repo, [["refs/heads/main", c2]]);
+
+          const { code } = yield* recordOf(c2);
+
+          yield* Ref.set(seen, none);
+
+          const view = yield* whyOf(
+            code,
+            Option.none(),
+            RepoPath.make("big.txt")
+          );
+
+          expect(view.ranges).toStrictEqual([
+            { end: 1, sha: c1, start: 1 },
+            { end: 2, sha: c2, start: 2 },
+          ]);
+          expect((yield* Ref.get(seen)).files).toBeLessThanOrEqual(1);
         })
       )
   );

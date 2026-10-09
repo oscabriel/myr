@@ -448,7 +448,7 @@ export const wide = (count: number) =>
 export const overlappingTrees = (
   reading: Ref.Ref<boolean>,
   peak: Ref.Ref<number>,
-  kind: "blob" | "tree" = "tree"
+  kind: "blob" | "file" | "tree" = "tree"
 ) =>
   Layer.effect(
     RepoHost,
@@ -476,6 +476,10 @@ export const overlappingTrees = (
           kind === "blob"
             ? Effect.andThen(slowed, host.readBlob(name, id))
             : host.readBlob(name, id),
+        readFile: (name, at, file) =>
+          kind === "file"
+            ? Effect.andThen(slowed, host.readFile(name, at, file))
+            : host.readFile(name, at, file),
         readTree: (name, id) =>
           kind === "tree"
             ? Effect.andThen(slowed, host.readTree(name, id))

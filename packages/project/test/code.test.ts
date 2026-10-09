@@ -437,7 +437,7 @@ describe("the log", () => {
 
 describe("a path's log, read live", () => {
   it.live(
-    "reads its commits' trees several at a time, not one after another",
+    "reads the file in its commits several at a time, not one after another",
     () =>
       Effect.gen(function* () {
         const reading = yield* Ref.make(false);
@@ -454,10 +454,10 @@ describe("a path's log, read live", () => {
           });
 
           expect(commits.map(({ sha }) => sha)).toStrictEqual([shas[0]]);
-        }).pipe(Effect.provide(overlappingTrees(reading, peak)));
+        }).pipe(Effect.provide(overlappingTrees(reading, peak, "file")));
 
-        // 64 commits, each its one root tree: one at a time a live store
-        // took a minute for 200; `READS_AT_ONCE` commits at once now.
+        // 64 commits, the file read whole in each: one at a time a live
+        // store took a minute for 200; `READS_AT_ONCE` commits at once now.
         expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(32);
         expect(yield* Ref.get(peak)).toBeLessThanOrEqual(READS_AT_ONCE);
       }),

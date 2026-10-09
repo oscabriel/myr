@@ -157,7 +157,10 @@ const history = Effect.gen(function* () {
   return { adopted, asked, code, iso, landings, readme, week };
 });
 
-/** The memory store, with each blob `readBlob` is asked for counted in `reads`. */
+/**
+ * The memory store, with each blob `readBlob` is asked for, and each file
+ * `readFile` reads whole at a commit, counted in `reads`.
+ */
 const countedBy = (reads: Ref.Ref<readonly string[]>) =>
   Layer.effect(
     RepoHost,
@@ -169,6 +172,10 @@ const countedBy = (reads: Ref.Ref<readonly string[]>) =>
         readBlob: (name, blob) =>
           Ref.update(reads, (all) => [...all, blob]).pipe(
             Effect.andThen(host.readBlob(name, blob))
+          ),
+        readFile: (name, at, file) =>
+          Ref.update(reads, (all) => [...all, file]).pipe(
+            Effect.andThen(host.readFile(name, at, file))
           ),
       });
     })
@@ -238,7 +245,7 @@ describe("why each line is there", () => {
   );
 
   it.effect(
-    "reads no blob the second time: the view is kept by (at, path)",
+    "reads no blob or file the second time: the view is kept by (at, path)",
     () =>
       Effect.gen(function* () {
         const reads = yield* Ref.make<readonly string[]>([]);
@@ -248,7 +255,8 @@ describe("why each line is there", () => {
           const first = yield* whyOf(code, Option.some(iso), format);
           const counted = (yield* Ref.get(reads)).length;
 
-          expect(counted).toBe(2);
+          // The file read whole at `iso` and at its two first parents.
+          expect(counted).toBe(3);
 
           const again = yield* whyOf(code, Option.some(iso), format);
 
@@ -261,7 +269,7 @@ describe("why each line is there", () => {
   );
 
   it.live(
-    "reads the file's blob in each commit several at a time, not one after another",
+    "reads the file in each commit several at a time, not one after another",
     () =>
       Effect.gen(function* () {
         const reading = yield* Ref.make(false);
@@ -272,7 +280,7 @@ describe("why each line is there", () => {
 
           yield* Ref.set(reading, true);
 
-          // `once.txt` never changes, so the walk reads its blob in all 64
+          // `once.txt` never changes, so the walk reads it whole in all 64
           // commits.
           const { ranges } = yield* whyView(
             code,
@@ -281,7 +289,7 @@ describe("why each line is there", () => {
           );
 
           expect(ranges).toStrictEqual([{ end: 1, sha: shas[0], start: 1 }]);
-        }).pipe(Effect.provide(overlappingTrees(reading, peak)));
+        }).pipe(Effect.provide(overlappingTrees(reading, peak, "file")));
 
         // `READS_AT_ONCE` lookups under way, and the head's own beside them.
         expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(32);
@@ -291,7 +299,7 @@ describe("why each line is there", () => {
   );
 
   it.live(
-    "reads the file's older versions several at a time, not one after another",
+    "reads the file's versions several at a time, not one after another",
     () =>
       Effect.gen(function* () {
         const reading = yield* Ref.make(false);
@@ -303,7 +311,8 @@ describe("why each line is there", () => {
           yield* Ref.set(reading, true);
 
           // Each of the 40 lines came with a commit of its own, so the
-          // blame reads every older version of `grow.txt`.
+          // blame takes every older version of `grow.txt` from the walk's
+          // reads of it.
           const { ranges } = yield* whyView(
             code,
             main,
@@ -313,7 +322,7 @@ describe("why each line is there", () => {
           expect(ranges).toStrictEqual(
             shas.map((sha, at) => ({ end: at + 1, sha, start: at + 1 }))
           );
-        }).pipe(Effect.provide(overlappingTrees(reading, peak, "blob")));
+        }).pipe(Effect.provide(overlappingTrees(reading, peak, "file")));
 
         // `READS_AT_ONCE` lookups under way, and the head's own beside them.
         expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(32);
