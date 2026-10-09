@@ -10,7 +10,7 @@ import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Array, Effect, FileSystem, Option, Order, Path, Schema } from "effect";
 
-import { committable, repoRoot, textOf } from "./root.ts";
+import { committable, readsAtOnce, repoRoot, textOf } from "./root.ts";
 
 /**
  * What a pointer to something only the maintainer can open looks like: a
@@ -159,16 +159,19 @@ describe("the repo's public docs", () => {
           (file) => TEXT_FILE.test(file) && file !== QUOTES_THE_REFERENCES
         );
 
-        const found = yield* Effect.forEach(files, (file) =>
-          Effect.map(textOf(file), (text) =>
-            Option.match(text, {
-              onNone: () => [],
-              onSome: (content) =>
-                planReferencesIn(content).map(
-                  (pattern) => `${file}: ${pattern}`
-                ),
-            })
-          )
+        const found = yield* Effect.forEach(
+          files,
+          (file) =>
+            Effect.map(textOf(file), (text) =>
+              Option.match(text, {
+                onNone: () => [],
+                onSome: (content) =>
+                  planReferencesIn(content).map(
+                    (pattern) => `${file}: ${pattern}`
+                  ),
+              })
+            ),
+          readsAtOnce
         );
 
         expect(found.flat()).toStrictEqual([]);

@@ -349,6 +349,9 @@ const nothingLanded = Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
 
 const decodePage = Schema.decodeEffect(ProjectPageData);
 
+/** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
+const seededWorld = { timeout: 30_000 };
+
 describe("the project's page as the server sends it", () => {
   it.effect(
     "carries datekit's README and its root entries, read on the server",
@@ -371,7 +374,8 @@ describe("the project's page as the server sends it", () => {
         expect(markupOf(sent)).toContain('data-readme="README.md"');
         expect(markupOf(sent)).toContain('href="/datekit/tree/main/src"');
         expect(textOf(sent)).toContain(`git clone ${platformUrl}/datekit.git`);
-      })
+      }),
+    seededWorld
   );
 
   it.effect(
@@ -434,7 +438,8 @@ describe("the project's page as the server sends it", () => {
         );
 
         expect(isNotFound(failed)).toBeTruthy();
-      })
+      }),
+    seededWorld
   );
 });
 

@@ -19,7 +19,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Array, Effect, FileSystem, Option, Path, Schema } from "effect";
 import type { ChildProcessSpawner } from "effect/process";
 
-import { committable, repoRoot, textOf } from "./root.ts";
+import { committable, readsAtOnce, repoRoot, textOf } from "./root.ts";
 
 /** The cartridge's folders, from the repo root; each ends with `/`, and each exists. */
 const MANIFEST = [
@@ -128,10 +128,13 @@ const isSource = (file: string) => /\.tsx?$/u.test(file);
 /** Every committable file with its text, `filter` deciding which. */
 const filesWhere = (filter: (file: string) => boolean) =>
   Effect.flatMap(committable, (files) =>
-    Effect.forEach(files.filter(filter), (file) =>
-      Effect.map(textOf(file), (text) =>
-        Option.map(text, (content) => ({ content, file }))
-      )
+    Effect.forEach(
+      files.filter(filter),
+      (file) =>
+        Effect.map(textOf(file), (text) =>
+          Option.map(text, (content) => ({ content, file }))
+        ),
+      readsAtOnce
     )
   ).pipe(Effect.map(Array.getSomes));
 

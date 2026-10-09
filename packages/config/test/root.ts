@@ -35,6 +35,13 @@ export const committable = Effect.gen(function* () {
   return listed.split("\n").filter((line) => line.length > 0);
 }).pipe(Effect.scoped);
 
+/**
+ * How many of the repo's files a whole-repo scan reads at once. One at a
+ * time, a scan of every source file waits on a thousand queued reads, which
+ * under verify's parallel test run takes longer than a test's timeout.
+ */
+export const readsAtOnce = { concurrency: 32 } as const;
+
 /** A file under the repo root, as text, if it is on disk. */
 export const textOf = (file: string) =>
   Effect.gen(function* () {
