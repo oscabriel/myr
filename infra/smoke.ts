@@ -12,8 +12,10 @@
  *    that doesn't exist answers 200 with a typed `UnknownProject` refusal;
  * 5. `missing-repo-404`: git's `info/refs` for a repo that doesn't exist
  *    answers 404;
- * 6. `web-front-page`: the web's `GET /` answers 200 with HTML;
- * 7. `web-llms-txt`: the web's `GET /llms.txt` answers 200 with Markdown,
+ * 6. `platform-root`: the platform's `GET /` answers 200 with a page that
+ *    names its MCP endpoint (`/mcp`) and the CLI's `install.sh`;
+ * 7. `web-front-page`: the web's `GET /` answers 200 with HTML;
+ * 8. `web-llms-txt`: the web's `GET /llms.txt` answers 200 with Markdown,
  *    which it builds from the platform's project list, so only a web that
  *    reaches the platform through its service binding passes.
  *
@@ -56,6 +58,7 @@ export const platformProbes = [
   "mcp-needs-credential",
   "anonymous-unknown-project",
   "missing-repo-404",
+  "platform-root",
 ] as const;
 
 /** The web's probes, run after the platform's when smoke has the web's origin. */
@@ -346,6 +349,24 @@ const missingRepo = (origin: string) => {
   ).pipe(Effect.flatMap(statusIs(label, 404)), Effect.asVoid);
 };
 
+/** The platform's own `/`: a page naming its MCP endpoint and the CLI's installer. */
+const platformRoot = (origin: string) => {
+  const label = "GET /";
+
+  return send(label, HttpClientRequest.get(`${origin}/`)).pipe(
+    Effect.flatMap(statusIs(label, 200)),
+    Effect.flatMap(({ text }) =>
+      text.includes("/mcp") && text.includes("install.sh")
+        ? Effect.void
+        : Effect.fail(
+            new Missed({
+              reason: `${label} answered 200 without naming /mcp and install.sh`,
+            })
+          )
+    )
+  );
+};
+
 /** `answer`, when its content type is `wanted` (by its media type alone). */
 const typeIs =
   (label: string, wanted: string, said: string) => (answer: Answer) =>
@@ -444,6 +465,7 @@ export const smoke = (
         ["mcp-needs-credential", mcpNeedsCredential(origin)],
         ["anonymous-unknown-project", anonymousUnknownProject(origin)],
         ["missing-repo-404", missingRepo(origin)],
+        ["platform-root", platformRoot(origin)],
         ...(options.web === undefined
           ? []
           : ([

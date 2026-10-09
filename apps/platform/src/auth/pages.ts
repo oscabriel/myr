@@ -56,7 +56,8 @@ button{margin-top:1rem;padding:.5rem 1rem;font:inherit}
 @media (prefers-color-scheme:dark){body{background:#1c1b19;color:#f6f5f2}.warn{background:#4a3b12}.error{color:#ff9b9b}}
 `;
 
-const page = (title: string, body: string) =>
+/** A page titled `title` around `body`, which is HTML already escaped. */
+export const page = (title: string, body: string) =>
   `<!doctype html>
 <html lang="en">
 <head>

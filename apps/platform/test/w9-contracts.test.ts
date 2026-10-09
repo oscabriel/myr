@@ -120,19 +120,13 @@ describe("the host page and raw files routes", () => {
         const raw = `/${project}/raw/${"4".repeat(40)}/README.md`;
 
         expect({
-          home: yield* read("/"),
-          homeStale: yield* read("/", stale),
+          home: (yield* read("/")).status,
+          homeStale: (yield* read("/", stale)).status,
           raw: yield* read(raw),
           rawStale: yield* read(raw, stale),
         }).toStrictEqual({
-          home: {
-            status: 501,
-            text: "not built: 906 (draft model test-model)",
-          },
-          homeStale: {
-            status: 501,
-            text: "not built: 906 (draft model test-model)",
-          },
+          home: 200,
+          homeStale: 200,
           raw: { status: 404, text: "" },
           rawStale: { status: 404, text: "" },
         });
