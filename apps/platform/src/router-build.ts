@@ -12,8 +12,23 @@
  * the Worker from starting (and a deploy from going out). Such work belongs
  * in the request path, per request. A build that fails otherwise (an env
  * that did not decode) fails every request with its error, as effect's does.
+ *
+ * Only the build's own fiber is run to its end here: a fiber the build forks
+ * (a layer built beside others) that outlasts its turn and yields is
+ * refused as if it had awaited. Both real compositions are built in
+ * `test/router-build.test.ts`, so such a build fails `verify`, never a
+ * deploy.
  */
-import { Cause, Context, Data, Effect, Exit, Layer, Scope } from "effect";
+import {
+  Cause,
+  Context,
+  Data,
+  Effect,
+  Exit,
+  Layer,
+  Scheduler,
+  Scope,
+} from "effect";
 import type { HttpServerRequest } from "effect/http";
 import { HttpEffect, HttpRouter } from "effect/http";
 
@@ -60,7 +75,19 @@ export const buildHandler = <
   >;
   /* oxlint-enable typescript/no-unsafe-type-assertion */
 
-  const built = Effect.runSyncExit(Layer.buildWithScope(routed, scope));
+  // `runSyncExit` runs its fiber on a scheduler of its own, which yields
+  // through microtasks and would ride along in any context a layer captures
+  // while it is built (`authenticated` verifies every credential in the
+  // one it captured). The build runs on the scheduler a fiber has by default
+  // instead; `runSyncExit` still drains what it schedules before it returns.
+  const built = Effect.runSyncExit(
+    Layer.buildWithScope(routed, scope).pipe(
+      Effect.provideService(
+        Scheduler.Scheduler,
+        Scheduler.Scheduler.defaultValue()
+      )
+    )
+  );
 
   const awaited =
     Exit.isFailure(built) &&

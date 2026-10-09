@@ -10,7 +10,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { untouchable } from "@repo/testkit/untouchable";
 import { env } from "cloudflare:workers";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Scheduler, Schema } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 
 import { oauthProvider, signInServices } from "../src/auth/provider.ts";
@@ -46,6 +46,25 @@ const awaiting = Layer.merge(
   Layer.effectDiscard(Effect.promise(() => Promise.resolve()))
 );
 
+/**
+ * `GET /scheduler`, answering the execution mode of the scheduler its
+ * effect runs on, in the context its layer captured while it was built (as
+ * `authenticated` does for each credential it verifies).
+ */
+const capturing = Layer.unwrap(
+  Effect.map(Effect.context(), (built) =>
+    HttpRouter.use((router) =>
+      router.add(
+        "GET",
+        "/scheduler",
+        Scheduler.Scheduler.useSync(({ executionMode }) =>
+          HttpServerResponse.text(executionMode)
+        ).pipe(Effect.provideContext(built))
+      )
+    )
+  )
+);
+
 const pinged = (handler: (request: Request) => Promise<Response>) =>
   Effect.promise(() => handler(new Request(`${origin}/ping`))).pipe(
     Effect.flatMap((response) => Effect.promise(() => response.text()))
@@ -78,6 +97,24 @@ describe("the router's build", () => {
   it("refuses a layer that awaits a promise while it is built, where the handler is made", () => {
     expect(() => buildHandler(awaiting)).toThrow(/awaited/u);
   });
+
+  it.effect(
+    "leaves a request that runs in a context captured at build on the default scheduler",
+    () =>
+      Effect.gen(function* () {
+        const { dispose, handler } = buildHandler(capturing);
+
+        const mode = yield* Effect.promise(() =>
+          handler(new Request(`${origin}/scheduler`))
+        ).pipe(
+          Effect.flatMap((response) => Effect.promise(() => response.text()))
+        );
+
+        expect(mode).toBe("async");
+
+        yield* Effect.promise(dispose);
+      })
+  );
 });
 
 /** What `/health` answers. */
