@@ -13,18 +13,7 @@
  * KiB), while a file's text, a commit's path list or changes and a page of
  * the log are heavy (up to hundreds of KiB), and an isolate holds 128 MB.
  */
-import {
-  Cache,
-  Context,
-  Duration,
-  Effect,
-  Equal,
-  Exit,
-  Hash,
-  Layer,
-  Option,
-  Ref,
-} from "effect";
+import { Cache, Context, Effect, Layer, Option } from "effect";
 
 /** How a read's value is kept. */
 export interface Keeping<A> {
@@ -51,97 +40,57 @@ export const CodeCache = Context.Reference<CodeReads>("project/CodeCache", {
   defaultValue: () => ({ through: (_key, read) => read }),
 });
 
-/** What one read gave, when it succeeded, and whether it may be kept. */
-interface Entry {
-  readonly value: Option.Option<unknown>;
-  readonly kept: boolean;
-}
-
-/**
- * One read and the key it is kept by: two are the same entry when their
- * keys are, whatever their reads (each a closure of its own).
- */
-class Keyed implements Equal.Equal {
-  readonly key: string;
-  readonly read: Effect.Effect<Entry>;
-
-  constructor(key: string, read: Effect.Effect<Entry>) {
-    this.key = key;
-    this.read = read;
-  }
-
-  [Equal.symbol](that: Equal.Equal): boolean {
-    return that instanceof Keyed && that.key === this.key;
-  }
-
-  [Hash.symbol](): number {
-    return Hash.string(this.key);
-  }
-}
-
 const always = () => true;
 
-/** How long an entry is kept: for good when its read succeeded and may be kept, else not at all. */
-const lifeOf = (exit: Exit.Exit<Entry>) =>
-  Exit.isSuccess(exit) && exit.value.kept ? Duration.infinity : Duration.zero;
-
-/** One cache of at most `capacity` reads. */
+/**
+ * One cache of at most `capacity` values, each kept for good once set. It
+ * never runs a lookup: a value enters only through `Cache.set`, once its
+ * read has finished, so no entry is ever a read still under way.
+ */
 const cacheOf = (capacity: number) =>
-  Cache.makeWith((key: Keyed) => key.read, {
+  Cache.make<string, unknown>({
     capacity,
-    timeToLive: lifeOf,
+    lookup: (key) => Effect.die(`the code cache never looks up ${key}`),
   });
 
-/** `read` through `cache`, kept by `key` when `keep` allows. */
+/**
+ * `read` through `cache`: what it kept for `key`, else `read` run by this
+ * caller, its value kept when `keep` allows. A read under way is never
+ * shared: a Worker whose client goes away is cancelled where it stands,
+ * with no interruption, so a read another request began may never end, and
+ * a caller that joined it would hang with it.
+ */
 const throughCache =
-  (cache: Cache.Cache<Keyed, Entry>) =>
+  (cache: Cache.Cache<string, unknown>) =>
   <A, E, R>(
     key: string,
     read: Effect.Effect<A, E, R>,
     keep: (value: A) => boolean
   ) =>
     Effect.gen(function* () {
-      const context = yield* Effect.context<R>();
-      const own = yield* Ref.make(Option.none<Exit.Exit<A, E>>());
+      const kept = yield* Cache.getSuccess(cache, key);
 
-      const entry = yield* Cache.get(
-        cache,
-        new Keyed(
-          key,
-          Effect.exit(Effect.provideContext(read, context)).pipe(
-            Effect.tap((exit) => Ref.set(own, Option.some(exit))),
-            Effect.map((exit): Entry => ({
-              kept: Exit.isSuccess(exit) && keep(exit.value),
-              value: Exit.isSuccess(exit)
-                ? Option.some(exit.value)
-                : Option.none(),
-            }))
-          )
-        )
-      );
-
-      const ran = yield* Ref.get(own);
-
-      if (Option.isSome(ran)) {
-        return yield* ran.value;
+      if (Option.isSome(kept)) {
+        // SAFETY: every key names one kind of read (`<repo>:<kind>:<id>`), so the
+        // value kept under it is what a read typed as this one gave.
+        // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one cache holds every kind of read, so its values are typed `unknown`; see SAFETY.
+        return kept.value as A;
       }
 
-      if (Option.isNone(entry.value)) {
-        return yield* read;
+      const value = yield* read;
+
+      if (keep(value)) {
+        yield* Cache.set(cache, key, value);
       }
 
-      // SAFETY: every key names one kind of read (`<repo>:<kind>:<id>`), so the
-      // value kept under it is what a read typed as this one gave.
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- one cache holds every kind of read, so its values are typed `unknown`; see SAFETY.
-      return entry.value.value as A;
+      return value;
     });
 
 /**
  * At most `capacity` light reads and `heavy` heavy ones, the least
- * recently used of each dropped first. Two calls with one key while the
- * first is under way share its read; a caller whose own read ran gets its
- * exit as it was, and one that waited on a read that failed reads for
- * itself.
+ * recently used of each dropped first. Only a finished read is kept: two
+ * calls with one key while neither has finished each read for themselves,
+ * and a failure is never kept.
  */
 export const CodeCacheLive = (
   capacity: number,

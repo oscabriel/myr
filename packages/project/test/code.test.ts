@@ -16,7 +16,8 @@ import {
   UnknownPath,
   UnknownRevision,
 } from "@repo/protocol/refusal";
-import { DateTime, Effect, Exit, Layer, Option, Ref } from "effect";
+import { DateTime, Effect, Exit, Fiber, Layer, Option, Ref } from "effect";
+import { TestClock } from "effect/testing";
 
 import {
   commitOf,
@@ -578,5 +579,31 @@ describe("reads by object id", () => {
         "datekit:text:1",
       ]);
     }).pipe(Effect.provide(CodeCacheLive(2, 1)))
+  );
+
+  it.effect(
+    "never make a caller wait on a read another caller left unfinished",
+    () =>
+      Effect.gen(function* () {
+        // A Worker whose client goes away is cancelled where it stands: its
+        // fibers are never interrupted, so a read it began never ends. The
+        // isolate's next request for that key must read for itself (on
+        // dev-oscabriel each such request hung, answering 1101).
+        const cache = yield* CodeCache;
+
+        yield* Effect.forkDetach(
+          cache.through("burrow:text:abandoned", Effect.never)
+        );
+
+        yield* Effect.yieldNow;
+
+        const next = yield* cache
+          .through("burrow:text:abandoned", Effect.succeed("read"))
+          .pipe(Effect.timeoutOption("1 second"), Effect.forkChild);
+
+        yield* TestClock.adjust("1 second");
+
+        expect(yield* Fiber.join(next)).toStrictEqual(Option.some("read"));
+      }).pipe(Effect.provide(CodeCacheLive(10, 10)))
   );
 });
