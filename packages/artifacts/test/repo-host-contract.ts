@@ -115,6 +115,13 @@ export interface RepoHostSuite {
   readonly importUrl?: (
     name: RepoName
   ) => Effect.Effect<string, never, RepoHost>;
+  /**
+   * Whether an import reads a remote made here whose HEAD names a branch it
+   * lacks. Over smart HTTP such a remote advertises no HEAD, which
+   * isomorphic-git cannot fetch at all, while a real remote whose default
+   * is `master` advertises HEAD → master: `binding.test.ts` imports one.
+   */
+  readonly danglingHead?: boolean;
 }
 
 /**
@@ -277,6 +284,35 @@ export const describeRepoHost = (
           ).toMatchObject([{ sha: second }, { sha: first }]);
         }).pipe(Effect.provide(host))
       );
+
+      if (suite.danglingHead === true) {
+        // A remote whose default branch is `master`, as anyhow's and stb's are:
+        // a store made here names `main` in its HEAD, so the import takes the
+        // remote's one branch, and keeps its name, as Artifacts does.
+        it.effect(
+          "imports a remote whose only branch is master, under its own name",
+          () =>
+            Effect.gen(function* () {
+              const repos = yield* RepoHost;
+              const client = yield* gitClient(memoryFs());
+              const first = yield* client.commit("first", [["a", "1"]]);
+              const remote = RepoName.make("import-master");
+              const name = RepoName.make("imported-master");
+              const master = RefName.make("refs/heads/master");
+
+              yield* repos.create(remote);
+              yield* repos.push(remote, client.source, [
+                { from: Option.none(), ref: master, to: first },
+              ]);
+
+              yield* repos.importFrom(name, { url: yield* importUrl(remote) });
+
+              expect(yield* repos.refs(name)).toStrictEqual(
+                new Map([[master, first]])
+              );
+            }).pipe(Effect.provide(host))
+        );
+      }
 
       it.effect("refuses to import over a repo that exists", () =>
         Effect.gen(function* () {

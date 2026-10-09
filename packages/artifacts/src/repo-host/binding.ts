@@ -17,8 +17,9 @@
  * adapter's own requests. The day-long write token a create, a fork or an
  * import hands back is revoked at once: any write token can force-push
  * `main`, and no caller needs it. A repo still being
- * created or imported is asked for again, from 250 ms apart, up to eight
- * times. Every repo handle is disposed after use.
+ * created is asked for again, from 250 ms apart, up to seven more times
+ * (about 32 s); one still being imported up to sixteen (about 3 minutes),
+ * each sleep at most 16 s. Every repo handle is disposed after use.
  */
 import {
   Data,
@@ -197,18 +198,36 @@ const entriesOf = (entries: readonly ArtifactsTreeEntry[]) =>
     })
   ).pipe(Effect.orDie);
 
-/** Whether `get` found the repo still being created or imported. */
-const stillMaking = (thrown: Thrown) =>
-  threw("CREATE_IN_PROGRESS")(thrown) || threw("IMPORT_IN_PROGRESS")(thrown);
+/**
+ * How many times `get` is asked again while the repo is still being made:
+ * a create about 32 s in all, and an import, which copies a whole history
+ * and may outlast `import()` itself, about 3 minutes. Anything else is
+ * never asked again.
+ */
+const asksWhileMaking = (thrown: Thrown) =>
+  Match.value(thrown).pipe(
+    Match.when(threw("CREATE_IN_PROGRESS"), () => 7),
+    Match.when(threw("IMPORT_IN_PROGRESS"), () => 16),
+    Match.orElse(() => 0)
+  );
+
+/**
+ * From 250 ms apart, doubling, each sleep at most 16 s: 250 ms … 16 s for a
+ * create's seven asks (31.75 s), then 16 s apart for an import's nine more
+ * (175.75 s in all).
+ */
+const whileMaking = Schedule.min([
+  Schedule.exponential(Duration.millis(250)),
+  Schedule.spaced(Duration.seconds(16)),
+]).pipe(
+  Schedule.setInputType<Thrown>(),
+  Schedule.while(({ attempt: asked, input }) => asked <= asksWhileMaking(input))
+);
 
 /** A handle to `name`, asked for again while the repo is still being made. */
 const handleOf = (binding: Artifacts, name: RepoName) =>
   attempt(() => binding.get(name)).pipe(
-    Effect.retry({
-      schedule: Schedule.exponential(Duration.millis(250)),
-      times: 7,
-      while: stillMaking,
-    }),
+    Effect.retry(whileMaking),
     Effect.catchTag("Thrown", (thrown) => fromArtifactsError(name, thrown))
   );
 

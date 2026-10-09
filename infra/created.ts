@@ -2,7 +2,10 @@
  * The ledger of throwaway resources: every namespace, repo or project a smoke
  * run, a swarm run or a `seed --as` copy makes on a stage is appended here as
  * one JSON line, so teardown acts only on what this build made, never on a
- * stage's own resources or on anything else in the account.
+ * stage's own resources or on anything else in the account. The imported
+ * preview repos (`by: "import"`) are recorded here too, as kept: the ledger
+ * stays the one record of what the build made, and teardown never selects
+ * them.
  *
  * The ledger is committed and holds names only, never a token. A throwaway is
  * named by the job that made it and its run (`smoke-<run>`, `swarm-<run>`),
@@ -30,9 +33,14 @@ const resourceFields = {
 const Made = Schema.Struct({
   /** When the run made it. */
   at: Schema.DateTimeUtcFromString,
-  /** The job whose run made it. */
-  by: Schema.Literals(["smoke", "swarm", "seed"]),
+  /**
+   * The job whose run made it. An `import` (`scripts/import-examples.ts`)
+   * is kept, not a throwaway: teardown lists it and never selects it.
+   */
+  by: Schema.Literals(["smoke", "swarm", "seed", "import"]),
   ...resourceFields,
+  /** What else the run did to it, said once: `tags backfilled` for an import's repo. */
+  note: Schema.optionalKey(Schema.NonEmptyString),
 });
 
 /** The line teardown appends when it deletes a throwaway. */

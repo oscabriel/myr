@@ -72,6 +72,7 @@ const served = (root: string) =>
 // Its test-only meaning of a public remote: another bare repo on disk, named
 // by its `file://` URL.
 describeRepoHost("local", freshStore, {
+  danglingHead: true,
   importUrl: (name) =>
     RepoHost.use((repos) => repos.remote(name)).pipe(Effect.orDie),
 });

@@ -167,6 +167,17 @@ export interface FakeOptions {
   readonly forkFailures?: number;
   /** Remotes are `<remoteBase>/<name>.git`, for a git server the test runs; else the host's. */
   readonly remoteBase?: string;
+  /**
+   * The default branch an import that names none reports, as the remote's
+   * own: `master` for a remote like anyhow's. `main` when not given.
+   */
+  readonly defaultBranch?: string;
+  /**
+   * How many of a just-imported repo's first `get`s answer
+   * `IMPORT_IN_PROGRESS`: an import Artifacts is still copying after
+   * `import()` returned, as a large one is.
+   */
+  readonly importing?: number;
 }
 
 /** A refusal the binding throws, before it becomes the thrown error. */
@@ -308,6 +319,8 @@ export const fakeArtifactsBinding = (
   const kept = new Map<RepoName, Kept>();
   let forkFailures = options.forkFailures ?? 0;
   let made = 0;
+  // Each imported repo's `get`s still to answer that the import runs on.
+  const importing = new Map<RepoName, number>();
 
   /** The thrown error: an `ArtifactsError`, or a plain one when codeless. */
   const thrown = ({ code, reason }: Refused) =>
@@ -611,6 +624,17 @@ export const fakeArtifactsBinding = (
 
           yield* host.remote(repoName);
 
+          const left = importing.get(repoName) ?? 0;
+
+          if (left > 0) {
+            importing.set(repoName, left - 1);
+
+            return yield* refuse(
+              "IMPORT_IN_PROGRESS",
+              `Import in progress: ${repoName}`
+            );
+          }
+
           return handle(repoName);
         })
       ),
@@ -631,8 +655,14 @@ export const fakeArtifactsBinding = (
             })
           );
 
+          importing.set(repoName, options.importing ?? 0);
+
           return yield* createdOf(
             keep(repoName, {
+              defaultBranch: Option.getOrElse(
+                branch,
+                () => options.defaultBranch ?? "main"
+              ),
               description: target.opts?.description ?? null,
               readOnly: target.opts?.readOnly ?? false,
               source: source.url,

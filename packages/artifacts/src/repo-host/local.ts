@@ -44,6 +44,7 @@ import type {
   RepoName,
 } from "../repo-host.ts";
 import {
+  defaultRefOf,
   initBare,
   mainRef,
   objectsAndRefs,
@@ -303,15 +304,22 @@ const make = (options: {
           return yield* noRepo;
         }
 
-        // A detached HEAD names no branch to take.
-        const ref = branch === undefined ? head.value : `refs/heads/${branch}`;
+        // Without a branch, what HEAD names, or the one branch when HEAD
+        // names none it has (`main` on a repo whose only branch is
+        // `master`). A detached HEAD with several branches names none.
+        const named =
+          branch === undefined
+            ? yield* defaultRefOf({ fs, gitdir })
+            : Option.some(`refs/heads/${branch}`);
 
-        if (ref === undefined) {
+        if (Option.isNone(named)) {
           return yield* new ImportRefused({
             name,
             reason: `${url} has no default branch`,
           });
         }
+
+        const ref = named.value;
 
         const tip = yield* tipOf({ fs, gitdir }, ref);
 

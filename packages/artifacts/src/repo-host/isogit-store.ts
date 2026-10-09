@@ -1,9 +1,20 @@
 import { CommitSha } from "@repo/protocol/ids";
-import { Array, Data, Effect, Equal, Match, Option, Schema } from "effect";
+import {
+  Array,
+  Data,
+  Effect,
+  Equal,
+  Match,
+  Option,
+  Predicate,
+  Schema,
+} from "effect";
 import type { Semaphore } from "effect";
 import {
   Errors,
+  currentBranch,
   init,
+  listBranches,
   listRefs,
   readBlob,
   readCommit,
@@ -93,6 +104,31 @@ export const tipOf = (repo: GitDir, ref: string) =>
   unlessMissing(() => resolveRef({ ...repo, ref })).pipe(
     Effect.map(Option.map((sha) => CommitSha.make(sha)))
   );
+
+/**
+ * The ref a remote's import takes when none is named: the branch its HEAD
+ * names, or, when HEAD names a branch it lacks (a store made here names
+ * `main`), its one branch, as a remote whose default is `master` has it.
+ * Otherwise what HEAD names, even a branch it lacks; `None` only for a
+ * detached HEAD.
+ */
+export const defaultRefOf = (repo: GitDir) =>
+  Effect.gen(function* () {
+    const head = Option.filter(
+      yield* unlessMissing(() => currentBranch({ ...repo, fullname: true })),
+      Predicate.isString
+    );
+
+    if (Option.isSome(head) && Option.isSome(yield* tipOf(repo, head.value))) {
+      return head;
+    }
+
+    const branches = yield* git(() => listBranches(repo)).pipe(Effect.orDie);
+
+    return branches.length === 1
+      ? Option.some(`refs/heads/${branches[0]}`)
+      : head;
+  });
 
 // The copies write children before parents, so every object in a repo has
 // everything it points to.
