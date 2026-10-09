@@ -25,6 +25,7 @@ import { DateTime, Effect, Exit, Layer, Option, Ref } from "effect";
 import { whyOf } from "../src/code.ts";
 import type { CodeProject } from "../src/code.ts";
 import { CodeCacheLive } from "../src/code/cache.ts";
+import { READS_AT_ONCE } from "../src/code/tree.ts";
 import { whyView } from "../src/code/why.ts";
 import {
   Content,
@@ -282,8 +283,9 @@ describe("why each line is there", () => {
           expect(ranges).toStrictEqual([{ end: 1, sha: shas[0], start: 1 }]);
         }).pipe(Effect.provide(overlappingTrees(reading, peak)));
 
-        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(8);
-        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(16);
+        // `READS_AT_ONCE` lookups under way, and the head's own beside them.
+        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(32);
+        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(READS_AT_ONCE + 1);
       }),
     { timeout: 30_000 }
   );
@@ -313,8 +315,9 @@ describe("why each line is there", () => {
           );
         }).pipe(Effect.provide(overlappingTrees(reading, peak, "blob")));
 
-        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(8);
-        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(16);
+        // `READS_AT_ONCE` lookups under way, and the head's own beside them.
+        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(32);
+        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(READS_AT_ONCE + 1);
       }),
     { timeout: 30_000 }
   );

@@ -9,7 +9,11 @@
  *   answers 409: pass `{ forkFailures: n }`;
  * - reads by ref resolve short branch names and commit ids only, never
  *   `refs/heads/main`;
- * - `info().lastPushAt` stays `null` after pushes.
+ * - `info().lastPushAt` stays `null` after pushes;
+ * - past 2,000 requests per 10 s a repo's reads are refused as rate limited:
+ *   pass `{ rateLimited: n }` to refuse the next `n` reads (ASSUMPTION: the
+ *   refusal names the limit in its message, as an HTTP 429's "Too Many
+ *   Requests" does; no live one has been seen yet).
  *
  * It takes its host structurally (`HostLike`), so `@repo/testkit` depends on
  * no adapter package: a `RepoHost` service value satisfies `HostLike`. Each
@@ -178,6 +182,8 @@ export interface FakeOptions {
    * `import()` returned, as a large one is.
    */
   readonly importing?: number;
+  /** How many of the next reads (a blob, a tree, a commit, a log) are refused as rate limited. */
+  readonly rateLimited?: number;
 }
 
 /** A refusal the binding throws, before it becomes the thrown error. */
@@ -318,6 +324,7 @@ export const fakeArtifactsBinding = (
 ): Artifacts => {
   const kept = new Map<RepoName, Kept>();
   let forkFailures = options.forkFailures ?? 0;
+  let rateLimited = options.rateLimited ?? 0;
   let made = 0;
   // Each imported repo's `get`s still to answer that the import runs on.
   const importing = new Map<RepoName, number>();
@@ -337,6 +344,27 @@ export const fakeArtifactsBinding = (
     Effect.runPromise(
       Effect.mapError(effect, (failure) => thrown(refusalOf(failure)))
     );
+
+  /** What a read past the rate limit throws (see the module's doc). */
+  const limited = () =>
+    options.codeless === true
+      ? new Error("ArtifactsError: Too many requests: rate limit exceeded")
+      : Object.assign(new Error("Too many requests: rate limit exceeded"), {
+          code: "RATE_LIMITED",
+          name: "ArtifactsError" as const,
+          numericCode: 0,
+        });
+
+  /** One read, refused while the scripted rate limit lasts. */
+  const read = <A>(effect: Effect.Effect<A, Refused | HostError>) => {
+    if (rateLimited > 0) {
+      rateLimited -= 1;
+
+      return Promise.reject(limited());
+    }
+
+    return run(effect);
+  };
 
   const remoteOf = (name: RepoName) =>
     options.remoteBase === undefined
@@ -495,7 +523,7 @@ export const fakeArtifactsBinding = (
         )
       ),
     log: (logOptions) =>
-      run(
+      read(
         Effect.gen(function* () {
           const ref = logOptions?.ref ?? "HEAD";
           const limit = Math.min(logOptions?.limit ?? 50, 1000);
@@ -516,14 +544,14 @@ export const fakeArtifactsBinding = (
         })
       ),
     readBlob: (hash) =>
-      run(
+      read(
         objectId(hash).pipe(
           Effect.flatMap((blob) => host.readBlob(name, blob)),
           Effect.map((bytes) => Option.getOrNull(Option.map(bytes, blobOf)))
         )
       ),
     readCommit: (hash) =>
-      run(
+      read(
         objectId(hash).pipe(
           Effect.flatMap((sha) => host.readCommit(name, CommitSha.make(sha))),
           Effect.map((commit) =>
@@ -532,7 +560,7 @@ export const fakeArtifactsBinding = (
         )
       ),
     readFile: ({ path, ref }) =>
-      run(
+      read(
         Effect.gen(function* () {
           const file = decodePath(path);
           const at = revisionOf(ref);
@@ -554,7 +582,7 @@ export const fakeArtifactsBinding = (
         })
       ),
     readTree: (hash) =>
-      run(
+      read(
         objectId(hash).pipe(
           Effect.flatMap((tree) => host.readTree(name, tree)),
           Effect.map((entries) =>

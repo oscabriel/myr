@@ -30,6 +30,7 @@ import {
   BranchName,
   ForkInProgress,
   HostBusy,
+  inRepoSession,
   ObjectId,
   RefName,
   RefOutcome,
@@ -997,6 +998,106 @@ describe("an import Artifacts is still copying", () => {
             expect(yield* liveTokens(fake, name)).toBe(1);
           }),
         { importing: 40 }
+      )
+  );
+});
+
+describe("reads in one session, and Artifacts' rate limit", () => {
+  const at = Revision.Branch({ name: BranchName.make("main") });
+
+  it.live(
+    "asks for one handle for every read of one session, and disposes it once",
+    () =>
+      within(({ counts }) =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("session");
+          const { first } = yield* seeded(name);
+          const before = { ...counts };
+
+          const read = yield* inRepoSession(
+            Effect.all(
+              [
+                repos.readCommit(name, first),
+                repos.log(name, at, 5),
+                repos.readFile(name, at, RepoPath.make("a.txt")),
+                repos.readCommit(name, first),
+              ],
+              { concurrency: 4 }
+            )
+          ).pipe(Effect.orDie);
+
+          expect(read[1].map(({ sha }) => sha)).toStrictEqual([first]);
+          expect([
+            counts.gets - before.gets,
+            counts.disposed - before.disposed,
+          ]).toStrictEqual([1, 1]);
+        })
+      )
+  );
+
+  it.live(
+    "reads in a session inside another over the outer session's handle",
+    () =>
+      within(({ counts }) =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("nested");
+          const { first } = yield* seeded(name);
+          const before = { ...counts };
+
+          yield* inRepoSession(
+            Effect.all([
+              repos.readCommit(name, first),
+              inRepoSession(repos.log(name, at, 5)),
+              repos.readFile(name, at, RepoPath.make("a.txt")),
+            ])
+          ).pipe(Effect.orDie);
+
+          expect([
+            counts.gets - before.gets,
+            counts.disposed - before.disposed,
+          ]).toStrictEqual([1, 1]);
+        })
+      )
+  );
+
+  it.effect(
+    "asks again after each of four rate-limited reads, then reads",
+    () =>
+      within(
+        () =>
+          Effect.gen(function* () {
+            const repos = yield* RepoHost;
+            const name = RepoName.make("limited");
+            const { first } = yield* seeded(name);
+            const read = yield* onTestClock(repos.readCommit(name, first));
+
+            expect(
+              Exit.map(
+                read,
+                Option.map(({ sha }) => sha)
+              )
+            ).toStrictEqual(Exit.succeed(Option.some(first)));
+          }),
+        { rateLimited: 4 }
+      )
+  );
+
+  it.effect(
+    "fails the read once four asks after the first were all rate limited",
+    () =>
+      within(
+        () =>
+          Effect.gen(function* () {
+            const repos = yield* RepoHost;
+            const name = RepoName.make("throttled");
+            const { first } = yield* seeded(name);
+            const read = yield* onTestClock(repos.readCommit(name, first));
+
+            expect(Exit.hasDies(read)).toBeTruthy();
+          }),
+        { rateLimited: 5 }
       )
   );
 });

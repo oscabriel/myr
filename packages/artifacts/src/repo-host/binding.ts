@@ -10,7 +10,10 @@
  *   `main`;
  * - reads name a branch by its short name and a commit by its id, never
  *   `refs/…`, so `refs` and `push` go over git smart HTTP instead;
- * - a busy receive-pack is `HostBusy`.
+ * - a busy receive-pack is `HostBusy`;
+ * - a call refused for Artifacts' rate limit (2,000 requests per 10 s per
+ *   repo) is asked again from 250 ms apart, doubling, at most four more
+ *   times; past that it fails as the call's own failure would.
  *
  * Refs and pushes use a token the adapter mints for the one call and revokes
  * after it; the token goes nowhere but the `Authorization` header of the
@@ -19,7 +22,9 @@
  * `main`, and no caller needs it. A repo still being
  * created is asked for again, from 250 ms apart, up to seven more times
  * (about 32 s); one still being imported up to sixteen (about 3 minutes),
- * each sleep at most 16 s. Every repo handle is disposed after use.
+ * each sleep at most 16 s. Every repo handle is disposed after use: after
+ * each read, or, for reads in one `RepoSession`, once when the session
+ * ends, so a view's many reads ask `get` for one handle.
  */
 import {
   Data,
@@ -44,6 +49,7 @@ import {
   RepoExists,
   RepoHost,
   RepoNotFound,
+  RepoSession,
   TreeEntry,
 } from "../repo-host.ts";
 import type {
@@ -88,7 +94,32 @@ class MaybeForked extends Data.TaggedError("MaybeForked")<{
   readonly thrown: Thrown;
 }> {}
 
-/** A promise of the binding's, failing with what it threw, read. */
+/**
+ * How Artifacts words a refusal for its rate limit. ASSUMPTION: none has
+ * been seen live and its error codes list none, so it is read from a code
+ * or a message that names the limit, as an HTTP 429's "Too Many Requests"
+ * does.
+ */
+const RATE_LIMITED = /rate[ _-]?limit|too[ _-]many[ _-]requests/iu;
+
+const isRateLimited = ({ error, message }: Thrown) =>
+  RATE_LIMITED.test(message) ||
+  (Predicate.hasProperty(error, "code") &&
+    Predicate.isString(error.code) &&
+    RATE_LIMITED.test(error.code));
+
+/** From 250 ms apart, doubling, four more asks while the limit refuses. */
+const whileLimited = Schedule.exponential(Duration.millis(250)).pipe(
+  Schedule.setInputType<Thrown>(),
+  Schedule.while(
+    ({ attempt: asked, input }) => asked <= 4 && isRateLimited(input)
+  )
+);
+
+/**
+ * A promise of the binding's, failing with what it threw, read; asked
+ * again while Artifacts' rate limit refuses it.
+ */
 const attempt = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({
     catch: (error) => {
@@ -104,7 +135,7 @@ const attempt = <A>(run: () => Promise<A>) =>
       return new Thrown({ code, error, message });
     },
     try: run,
-  });
+  }).pipe(Effect.retry(whileLimited));
 
 const threw =
   (code: Code) =>
@@ -231,6 +262,12 @@ const handleOf = (binding: Artifacts, name: RepoName) =>
     Effect.catchTag("Thrown", (thrown) => fromArtifactsError(name, thrown))
   );
 
+/** Gives a handle back: the binding's handles are RPC stubs. */
+const disposeOf = (repo: ArtifactsRepo) =>
+  Effect.sync(() => {
+    repo[Symbol.dispose]();
+  });
+
 /** `use` over a handle to `name`, disposed after, whatever `use` came to. */
 const withRepo = <A, E, R>(
   binding: Artifacts,
@@ -238,11 +275,9 @@ const withRepo = <A, E, R>(
   use: (repo: ArtifactsRepo) => Effect.Effect<A, E, R>
 ) =>
   Effect.scoped(
-    Effect.acquireRelease(handleOf(binding, name), (repo) =>
-      Effect.sync(() => {
-        repo[Symbol.dispose]();
-      })
-    ).pipe(Effect.flatMap(use))
+    Effect.acquireRelease(handleOf(binding, name), disposeOf).pipe(
+      Effect.flatMap(use)
+    )
   );
 
 /**
@@ -481,16 +516,32 @@ const make = (binding: Artifacts) =>
     // every call's finalizers would wait for the layer's end.
     const fetch = yield* Fetch;
 
-    /** A read of `name`'s, failing only with `RepoNotFound`. */
+    /**
+     * A read of `name`'s, failing only with `RepoNotFound`: over the
+     * session's handle to `name` when the read runs in a `RepoSession`,
+     * else over a handle of its own.
+     */
     const read = <A>(
       name: RepoName,
       use: (
         repo: ArtifactsRepo
       ) => Effect.Effect<A, RepoNotFound | RepoExists | ForkInProgress, Fetch>
     ) =>
-      onlyNotFound(withRepo(binding, name, use)).pipe(
-        Effect.provideService(Fetch, fetch)
-      );
+      Effect.gen(function* () {
+        const session = yield* RepoSession;
+
+        return yield* Option.match(session, {
+          onNone: () => withRepo(binding, name, use),
+          onSome: ({ hold }) =>
+            Effect.flatMap(
+              hold(
+                `binding:${name}`,
+                Effect.acquireRelease(handleOf(binding, name), disposeOf)
+              ),
+              use
+            ),
+        });
+      }).pipe(onlyNotFound, Effect.provideService(Fetch, fetch));
 
     return RepoHost.of({
       create: (name) =>
