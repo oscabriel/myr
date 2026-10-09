@@ -1,12 +1,16 @@
 /**
  * The deployed "why" page, as a browser shows it: a file a landing changed,
- * with at least one row naming the landing's ask, saved as
- * `e2e/out/why.png` for the shot list.
+ * with at least one row linking an ask, saved as `e2e/out/why.png` for the
+ * shot list. The ask a landing answers counts, and so does the ask an
+ * opening opened ("Open ask <id>"), so a stage whose landings are only
+ * openings (an import's, or demo's, where nothing is answered) passes on an
+ * opening's file.
  *
  * It runs only against `WEB_URL` (a stage's web origin) and is skipped
  * without it. `WEB_PROJECT` picks the project (datekit, which the seed puts
  * on every stage, unless given) and `WEB_WHY_PATH` the file (datekit's
- * `src/format.ts` unless given). It only reads.
+ * `src/format.ts` unless given; per stage, an opening's file such as
+ * the config folder's `asks/format-ordinal.ask.ts`). It only reads.
  */
 import { expect, test } from "@playwright/test";
 import { Config, Effect, Option } from "effect";
@@ -43,7 +47,7 @@ test.describe("the deployed why page", () => {
     "WEB_URL is not set: point it at a deployed web's origin to run this check"
   );
 
-  test(`${project}'s ${path} names the landing behind its lines, with its ask`, ({
+  test(`${project}'s ${path} names the landing behind its lines, with the ask it links`, ({
     page: browser,
   }) =>
     Effect.runPromise(
@@ -57,7 +61,7 @@ test.describe("the deployed why page", () => {
         expect(response?.status()).toBe(200);
 
         // A range's row, in the server's table or above the drawn lines,
-        // linking the ask its landing answered.
+        // linking the ask its landing answered or opened.
         yield* Effect.promise(() =>
           expect(
             browser.locator(`[data-range] a[href^="/${project}/asks/"]`).first()

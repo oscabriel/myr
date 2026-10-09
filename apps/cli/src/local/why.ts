@@ -1,7 +1,7 @@
 /**
  * `<cli> why <path>:<line>`: which landing put a line there, and why. git
- * blame names the commit; the platform's landing record names the ask, the
- * accountable author, every credit and the verdict. A commit the platform
+ * blame names the commit; the platform's landing record names the ask (the
+ * one it answers, or the one an ask's opening opened), the accountable author, every credit and the verdict. A commit the platform
  * did not land is said to be none of its landings, with the trailers its
  * author wrote. A verdict note fetched from the platform rides along, but
  * the landing record is the source.
@@ -261,10 +261,22 @@ const verdictRow = (verdict: Verdict): Row => ({
   ].join(", "),
 });
 
-const landingRows = (landing: LandingView): readonly Row[] => [
-  landing.ask === undefined
+/**
+ * The ask a landing links: the one it answers ("Ask"), else the one it
+ * opened ("Opened": an opening answers nothing), else none.
+ */
+const askRow = (landing: LandingView): Row => {
+  if (landing.ask !== undefined) {
+    return { code: true, label: "Ask", value: landing.ask };
+  }
+
+  return landing.opened === undefined
     ? { label: "Ask", value: "none (a decider's own landing)" }
-    : { code: true, label: "Ask", value: landing.ask },
+    : { code: true, label: "Opened", value: landing.opened };
+};
+
+const landingRows = (landing: LandingView): readonly Row[] => [
+  askRow(landing),
   { label: "Author", value: landing.author },
   ...landing.credits.map(({ handle, role }) => ({
     label: role,

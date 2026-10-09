@@ -6,7 +6,7 @@
 import type { CommitView, WhyRange, WhyView } from "@repo/protocol/domain/code";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import type { ProjectName } from "@repo/protocol/ids";
+import type { AskId, ProjectName } from "@repo/protocol/ids";
 import { Option } from "effect";
 
 import { whyHref } from "../code/paths.ts";
@@ -44,6 +44,27 @@ export const rowAt = (rows: readonly WhyRow[], line: number) =>
 /** A range as a reader says it: "line 4", or "lines 1–3". */
 export const linesWords = ({ end, start }: WhyRange) =>
   start === end ? `line ${start}` : `lines ${start}–${end}`;
+
+/**
+ * The ask a landing links, and how: the one it answers, or the one it
+ * opened (a migrate family's parent). An opening answers nothing, so it
+ * has no answer page and its link never reads as an answer.
+ */
+export type LandingAsk =
+  | { readonly kind: "answers"; readonly ask: AskId }
+  | { readonly kind: "opened"; readonly ask: AskId };
+
+/** Which ask `landing` links and how; none for a decider's own landing or an adoption. */
+export const askOf = (landing: LandingView): Option.Option<LandingAsk> => {
+  if (landing.ask !== undefined) {
+    return Option.some({ ask: landing.ask, kind: "answers" });
+  }
+
+  return Option.map(
+    Option.fromUndefinedOr(landing.opened),
+    (ask): LandingAsk => ({ ask, kind: "opened" })
+  );
+};
 
 /** A count of credit as a reader says it. */
 export const creditWords = (count: number) =>
