@@ -205,6 +205,182 @@ const refusing = Effect.gen(function* () {
   };
 });
 
+/**
+ * A platform scripted at the process boundary: `status` names the decider,
+ * `projects` lists `listed`, git does what it is asked, and `init` makes
+ * the project on the platform and then fails (as a push that answered 500
+ * after the project was made did on a dev stage). What was spawned is kept, git by
+ * its subcommand and the CLI by its command.
+ */
+const scripted = (listed: readonly string[]) =>
+  Effect.gen(function* () {
+    const asked = yield* Ref.make<readonly string[]>([]);
+
+    // Each CLI command's `--json` envelope, as the CLI prints it.
+    const replies = new Map([
+      [
+        "status",
+        {
+          code: 0,
+          stdout: JSON.stringify({
+            command: "status",
+            data: { handle: decider },
+            ok: true,
+            v: 1,
+          }),
+        },
+      ],
+      [
+        "projects",
+        {
+          code: 0,
+          stdout: JSON.stringify({
+            command: "projects",
+            data: {
+              projects: listed.map((project) => ({
+                openAsks: 0,
+                posture: "open",
+                project,
+              })),
+            },
+            ok: true,
+            v: 1,
+          }),
+        },
+      ],
+      ["init", { code: 1, stdout: "" }],
+    ]);
+
+    const spawner = ChildProcessSpawner.make((command) =>
+      Effect.gen(function* () {
+        const [program, args] = ChildProcess.isStandardCommand(command)
+          ? [command.command, command.args]
+          : ["a pipe", []];
+
+        // The CLI runs as `bun <entry> <command> … --json`.
+        const said =
+          program === "bun" ? (args[1] ?? "") : `${program} ${args[0] ?? ""}`;
+
+        yield* Ref.update(asked, (all) => [...all, said]);
+
+        const reply = replies.get(said) ?? { code: 0, stdout: "" };
+
+        return ChildProcessSpawner.makeHandle({
+          all: Stream.empty,
+          exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(reply.code)),
+          getInputFd: () => Sink.drain,
+          getOutputFd: () => Stream.empty,
+          isRunning: Effect.succeed(false),
+          kill: () => Effect.void,
+          pid: ChildProcessSpawner.ProcessId(1),
+          stderr: Stream.empty,
+          stdin: Sink.drain,
+          stdout: Stream.make(new TextEncoder().encode(reply.stdout)),
+          unref: Effect.succeed(Effect.void),
+        });
+      })
+    );
+
+    return {
+      asked: Ref.get(asked),
+      layer: Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner),
+    };
+  });
+
+/**
+ * The loop for run `r1` on the scripted platform, with the ledger in a file
+ * of its own: how it ended, the CLI commands it ran, and the ledger's lines.
+ */
+const loopOnScripted = (listed: readonly string[]) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const dir = yield* fs.makeTempDirectoryScoped({ prefix: "smoke-ledger-" });
+    const ledger = path.join(dir, "created.jsonl");
+    const platform = yield* scripted(listed);
+
+    const failure = yield* smokeLoop({
+      answerer: tokens.answerer,
+      decider: tokens.decider,
+      origin: "https://platform-dev.example.workers.dev",
+      run: "r1",
+      stage: "dev-example",
+    }).pipe(
+      Effect.catchTag("DemoStageRefused", Effect.die),
+      Effect.flip,
+      Effect.provide(platform.layer),
+      Effect.provideService(LedgerFile, ledger)
+    );
+
+    const lines = yield* readLedger.pipe(
+      Effect.provideService(LedgerFile, ledger)
+    );
+
+    return {
+      cli: (yield* platform.asked).filter((said) => !said.startsWith("git ")),
+      failure,
+      ledger: lines.map(({ by, kind, name, stage }) => ({
+        by,
+        kind,
+        name,
+        stage,
+      })),
+    };
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
+
+describe("smoke --loop's throwaway ledger", () => {
+  it.live(
+    "writes the project and its repo before init, so an init that made the project and then failed leaves them in the ledger",
+    () =>
+      Effect.gen(function* () {
+        const { cli, failure, ledger } = yield* loopOnScripted([]);
+
+        expect({ cli, ledger, step: failure.step }).toStrictEqual({
+          cli: ["status", "status", "projects", "init"],
+          ledger: [
+            {
+              by: "smoke",
+              kind: "project",
+              name: "smoke-r1",
+              stage: "dev-example",
+            },
+            {
+              by: "smoke",
+              kind: "repo",
+              name: "smoke-r1",
+              stage: "dev-example",
+            },
+          ],
+          step: "init",
+        });
+      })
+  );
+
+  it.live(
+    "stops before init on a name the platform already lists, and writes nothing",
+    () =>
+      Effect.gen(function* () {
+        const { cli, failure, ledger } = yield* loopOnScripted([
+          "datekit",
+          "smoke-r1",
+        ]);
+
+        expect({
+          cli,
+          ledger,
+          reason: failure.reason,
+          step: failure.step,
+        }).toStrictEqual({
+          cli: ["status", "status", "projects"],
+          ledger: [],
+          reason:
+            "smoke-r1 is on the platform already, so nothing was made or recorded: a run a second later takes another name",
+          step: "init",
+        });
+      })
+  );
+});
+
 describe("smoke --loop on demo", () => {
   it.live(
     "is refused with DemoStageRefused before any request or process: a throwaway project would show on demo's front page",

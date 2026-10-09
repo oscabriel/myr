@@ -4,8 +4,8 @@
  * steps):
  *
  * 1. `people`: who the decider's and the answerer's tokens name;
- * 2. `init`: the decider makes a throwaway project, `smoke-<run>`, and
- *    pushes its first commit;
+ * 2. `init`: the decider checks `smoke-<run>` is free, records it, then
+ *    makes it a throwaway project and pushes its first commit;
  * 3. `open-ask`: the decider opens an ask, red twice on main first;
  * 4. `claim`: the answerer claims it, and gets a fork;
  * 5. `out-of-scope`: an answer that reaches outside the ask's territory is
@@ -25,10 +25,14 @@
  *     credits the answerer as its asker.
  *
  * Each step is timed and printed as it passes; the first that fails ends
- * the run. The throwaway project, its repo and the claim's fork are written
- * to the throwaway ledger (`infra/created.ts`, by `smoke`) as soon as each
- * exists. It never runs on `demo`: a throwaway project would show on the
- * front page the user records.
+ * the run. Every throwaway is written to the throwaway ledger
+ * (`infra/created.ts`, by `smoke`): the project and its repo before `init`
+ * makes them, once the platform's list of projects shows the name free (a
+ * taken name stops the run, recording nothing), so an `init` that fails
+ * after making the project still leaves it recorded; the claim's fork just
+ * after the claim, since its name is known only then. It never runs on
+ * `demo`: a throwaway project would show on the front page the user
+ * records.
  */
 import { Brand } from "@repo/brand";
 import { ProjectName } from "@repo/protocol/ids";
@@ -57,6 +61,7 @@ import {
   LoopFailed,
   openAsk,
   personAt,
+  projectIsFree,
   proposeDraft,
   pushAnswer,
   pushOutOfScope,
@@ -247,23 +252,25 @@ export const smokeLoop = (
       })
     );
 
+    // The name is checked free, then recorded, then made: an init that
+    // makes the project and then fails still leaves it in the ledger, and
+    // a name someone else holds never enters teardown's plan.
     const [, init] = yield* timed(
       stage,
       "init"
     )(
-      initProject({
-        answerer: answerer.handle,
-        decider,
-        dir: `${dir}/start`,
-        project,
-      }).pipe(
-        Effect.tap(() =>
-          Effect.andThen(
-            recordThrowaway(stage, "project", project),
-            recordThrowaway(stage, "repo", project)
-          )
-        )
-      )
+      Effect.gen(function* () {
+        yield* projectIsFree(decider, project);
+        yield* recordThrowaway(stage, "project", project);
+        yield* recordThrowaway(stage, "repo", project);
+
+        return yield* initProject({
+          answerer: answerer.handle,
+          decider,
+          dir: `${dir}/start`,
+          project,
+        });
+      })
     );
 
     const [, opened] = yield* timed(

@@ -78,23 +78,29 @@ const unpadded = (bytes: Uint8Array) => {
     : Option.none();
 };
 
-/** The master key as an AES-KW key that can only wrap and unwrap. */
-const importMasterKey = (masterKey: Redacted.Redacted) =>
+/** The master key's 32 bytes, decoded from its hex; a defect for any other form. */
+const masterKeyBytes = (masterKey: Redacted.Redacted) =>
   Schema.decodeEffect(Schema.Uint8ArrayFromHex)(Redacted.value(masterKey)).pipe(
     Effect.mapError(() => new MasterKeyUnusable()),
     Effect.filterOrFail(
       (bytes) => bytes.length === KEY_BYTES,
       () => new MasterKeyUnusable()
     ),
-    Effect.flatMap((bytes) =>
-      Effect.promise(() =>
-        crypto.subtle.importKey("raw", owned(bytes), "AES-KW", false, [
-          "wrapKey",
-          "unwrapKey",
-        ])
-      )
-    ),
+    Effect.map(owned),
     Effect.orDie
+  );
+
+/**
+ * The master key as an AES-KW key that can only wrap and unwrap, imported
+ * for each call: WebCrypto's import is a promise, and the layer is built
+ * where nothing may be awaited (the platform's router, at module load).
+ */
+const importMasterKey = (bytes: Uint8Array<ArrayBuffer>) =>
+  Effect.promise(() =>
+    crypto.subtle.importKey("raw", bytes, "AES-KW", false, [
+      "wrapKey",
+      "unwrapKey",
+    ])
   );
 
 /** A fresh data key, from WebCrypto's random bytes, extractable only to be wrapped. */
@@ -210,11 +216,17 @@ export const WriteOnlyValuesWebCrypto = (
 ): Layer.Layer<WriteOnlyValues> =>
   Layer.effect(
     WriteOnlyValues,
-    importMasterKey(masterKey).pipe(
-      Effect.map((master) =>
+    masterKeyBytes(masterKey).pipe(
+      Effect.map((bytes) =>
         WriteOnlyValues.of({
-          open: (sealed) => unseal(master, sealed),
-          put: (input) => seal(master, input),
+          open: (sealed) =>
+            Effect.flatMap(importMasterKey(bytes), (master) =>
+              unseal(master, sealed)
+            ),
+          put: (input) =>
+            Effect.flatMap(importMasterKey(bytes), (master) =>
+              seal(master, input)
+            ),
         })
       )
     )

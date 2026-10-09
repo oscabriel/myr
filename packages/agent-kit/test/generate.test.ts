@@ -1,10 +1,14 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 
 import { agentsBlock, upsertAgentsBlock } from "../src/agents-block.ts";
-import { contentHash } from "../src/generated-file.ts";
+import {
+  contentHash,
+  describedIn,
+  readManaged,
+} from "../src/generated-file.ts";
 import type { GeneratedFile } from "../src/generated-file.ts";
 import type { HookEvent } from "../src/hook-events.ts";
 import { claudeEventOf } from "../src/hook-events.ts";
@@ -12,6 +16,7 @@ import {
   agentPluginsBundle,
   claudePlugin,
   platformSkill,
+  platformSkillParts,
 } from "../src/platform.ts";
 import { projectSkill } from "../src/project-skill.ts";
 import { wellKnownSkills } from "../src/well-known.ts";
@@ -19,6 +24,10 @@ import { commands, landed, platformUrl, policy, project } from "./fixtures.ts";
 import { expectGolden, transcript } from "./golden.ts";
 
 const plugin = `plugins/${Brand.slug}`;
+
+/** The `name:` line of a file's frontmatter; none without one. */
+const frontmatterName = (content: string) =>
+  Option.fromNullishOr(/^name: (?<name>.+)$/mu.exec(content)?.groups?.name);
 
 const skill = `${project}-contribute`;
 
@@ -282,6 +291,26 @@ describe("every SKILL.md", () => {
         "managed-by",
         "content-hash",
       ]);
+    })
+  );
+});
+
+describe("the platform's skill as the prompt contribute serves it", () => {
+  it.effect("has the name, description and body its SKILL.md gives", () =>
+    Effect.gen(function* () {
+      const [own] = yield* platformSkill({ commands, platformUrl });
+      const content = own?.content ?? "";
+      const parts = platformSkillParts({ commands, platformUrl });
+
+      expect({
+        body: Option.map(readManaged(content), ({ body }) => body),
+        description: describedIn(content),
+        name: frontmatterName(content),
+      }).toStrictEqual({
+        body: Option.some(parts.body),
+        description: Option.some(parts.description),
+        name: Option.some(parts.name),
+      });
     })
   );
 });

@@ -15,13 +15,13 @@
 import { OAuthAuthorizationServer } from "@cloudflare/workers-oauth-provider";
 import { D1Client } from "@effect/sql-d1";
 import { Context, Layer, Option, Redacted } from "effect";
-import { HttpRouter } from "effect/http";
 
 import { AccountsD1 } from "../adapters/accounts-d1.ts";
 import { WorkerFetch } from "../adapters/fetch.ts";
 import { IdentitiesD1 } from "../adapters/identities-d1.ts";
 import type { TokenReader } from "../adapters/sessions-oauth.ts";
 import type { PlatformConfig } from "../platform.ts";
+import { buildHandler } from "../router-build.ts";
 import { SignInAttemptsBinding } from "./attempts/binding.ts";
 import { GOOGLE_ACCOUNTS, GoogleClient, googleRoutes } from "./google.ts";
 import type { GoogleServices } from "./google.ts";
@@ -75,8 +75,9 @@ export type PlatformFetch = (
 
 /**
  * The Worker's fetch: OAuth and sign-in in front of `platformFetch`. The
- * sign-in routes are built once from `services` (a failure to build them
- * answers 500 on those paths only); each origin's authorization server is
+ * sign-in routes are built once from `services`, now, awaiting nothing
+ * (`router-build.ts`; a failure to build them answers 500 on those paths
+ * only); each origin's authorization server is
  * made on its first request and kept for the isolate's life (a Worker is
  * reached only on its own hostnames).
  */
@@ -84,9 +85,8 @@ export const oauthProvider = <E>(
   services: Layer.Layer<GoogleServices, E>,
   platformFetch: PlatformFetch
 ) => {
-  const { dispose, handler } = HttpRouter.toWebHandler(
-    Layer.mergeAll(signInRoutes, googleRoutes).pipe(Layer.provide(services)),
-    { disableLogger: true }
+  const { dispose, handler } = buildHandler(
+    Layer.mergeAll(signInRoutes, googleRoutes).pipe(Layer.provide(services))
   );
 
   const servers = new Map<string, OAuthAuthorizationServer<OAuthEnv>>();
