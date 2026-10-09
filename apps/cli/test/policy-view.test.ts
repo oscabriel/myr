@@ -84,6 +84,16 @@ describe("policy's text view", () => {
     );
   });
 
+  it("writes each decider glob as code in Markdown, so `**` reads as a glob, not emphasis", () => {
+    const markdown = Option.match(views.projectPolicy(datekit), {
+      onNone: () => "",
+      onSome: (view) => view.markdown,
+    });
+
+    expect(markdown).toContain("| `**` | ines-v |");
+    expect(markdown).toContain("| `src/tz.ts` | okonkwo, bram |");
+  });
+
   it("says which commit it is as of, and where it comes from", () => {
     const text = textOf(datekit);
 

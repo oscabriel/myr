@@ -259,6 +259,30 @@ describe("the why page's row for an ask's opening", () => {
     ).toStrictEqual([]);
   });
 
+  it('says "Open ask" once when the commit\'s subject already says it, still linking the ask', () => {
+    const said = Schema.decodeSync(WhyView)({
+      ...Schema.encodeSync(WhyView)(opening),
+      commits: Schema.encodeSync(WhyView)(opening).commits.map((commit) =>
+        commit.sha === OPENED
+          ? { ...commit, subject: "Open ask format-ordinal" }
+          : commit
+      ),
+    });
+
+    const row = rowOf(
+      markupOf(
+        <WhyLines project={datekit} rev="main" text={TEXT} view={said} />
+      ),
+      "2-3"
+    );
+
+    expect(textOf(row).split("Open ask format-ordinal")).toHaveLength(2);
+    expect(hrefsOf(row)).toContain("/datekit/asks/format-ordinal");
+    expect(
+      hrefsOf(row).filter((href) => href.includes("/answers/"))
+    ).toStrictEqual([]);
+  });
+
   it("keeps an answering landing's ask and answer links, and an adopted commit's words", () => {
     const markup = markupOf(opened);
 

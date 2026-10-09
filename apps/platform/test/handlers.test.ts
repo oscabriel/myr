@@ -180,9 +180,12 @@ describe("project reads", () => {
           bob.watch({ project: datekit.project, since: 1 })
         );
 
+        // Each ask's opening lands, so each is heard opened, then landed.
         expect(all.map(({ _tag }) => _tag)).toStrictEqual([
           "AskOpened",
+          "Landed",
           "AskOpened",
+          "Landed",
         ]);
         expect(later).toStrictEqual(all.slice(1));
         expect(
@@ -198,7 +201,8 @@ describe("project reads", () => {
       const api = yield* (yield* Projects).get(datekit.project);
       const bobs = Person.make({ handle: Handle.make("bob") });
 
-      // 60 claims, each released: 120 events after datekit's two asks opened.
+      // 60 claims, each released: 120 events after datekit's two asks
+      // opened, each heard opened and landed.
       yield* Effect.forEach(
         Array.range(1, 60),
         () =>
@@ -216,14 +220,14 @@ describe("project reads", () => {
       );
 
       const tail = yield* Stream.runCollect(
-        bob.watch({ project: datekit.project, since: 120 })
+        bob.watch({ project: datekit.project, since: 122 })
       );
 
       expect({
         count: all.length,
         first: all[0]?._tag,
         last: all.at(-1)?._tag,
-      }).toStrictEqual({ count: 122, first: "AskOpened", last: "Released" });
+      }).toStrictEqual({ count: 124, first: "AskOpened", last: "Released" });
       expect(tail.map(({ _tag }) => _tag)).toStrictEqual([
         "Claimed",
         "Released",

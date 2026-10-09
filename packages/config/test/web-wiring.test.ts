@@ -221,12 +221,11 @@ describe("the byte alarm", () => {
   });
 
   // Each Worker grows on its own, so each has limits of its own, about
-  // 15% above its bundle as measured once the code browser and drafting
-  // landed (the platform's entry stays at the ceiling they landed under,
-  // 14% above it).
+  // 15% above its bundle as last measured (the platform's entry, its only
+  // module, 1,679,675: both its limits at 1,900,000, 13% above).
   it("holds each Worker it measures to limits of its own", () => {
     expect(budgets).toStrictEqual({
-      "apps/platform": { entry: 1_900_000, javascript: 1_918_000 },
+      "apps/platform": { entry: 1_900_000, javascript: 1_900_000 },
       "apps/sandbox": { entry: 656_000, javascript: 656_000 },
       "apps/web": { entry: 818_000, javascript: 4_075_000 },
     });

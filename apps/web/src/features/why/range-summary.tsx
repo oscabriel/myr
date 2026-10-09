@@ -49,22 +49,34 @@ const AskLink = ({
   </a>
 );
 
+/** The words an opening's own commit subject says, which its row need not say again. */
+const openingWords = (ask: string) => `Open ask ${ask}`;
+
 /**
  * The ask a landing links: "<ask> answer" for the one it answers, with its
- * answer's page; "Open ask <ask>" for the one it opened, which has none.
+ * answer's page; "Open ask <ask>" for the one it opened, which has none, or
+ * the ask alone when the commit's subject (`subject`) already says so.
  */
 const AskLinks = ({
   linked,
   project,
+  subject,
 }: {
   readonly linked: LandingAsk;
   readonly project: ProjectName;
+  readonly subject?: string;
 }) => {
   const ask = <AskLink linked={linked} project={project} />;
 
-  return linked.kind === "opened" ? (
-    <span>Open ask {ask}</span>
-  ) : (
+  if (linked.kind === "opened") {
+    return subject === openingWords(linked.ask) ? (
+      ask
+    ) : (
+      <span>Open ask {ask}</span>
+    );
+  }
+
+  return (
     <>
       {ask}
       <a className={LINK} href={answerPath(project, linked.ask)}>
@@ -91,9 +103,11 @@ const Adopted = ({ author }: { readonly author: string }) => (
 const Landed = ({
   landing,
   project,
+  subject,
 }: {
   readonly landing: LandingView;
   readonly project: ProjectName;
+  readonly subject: string;
 }) => {
   const verdict = Option.getOrUndefined(verdictWords(landing));
   const linked = Option.getOrUndefined(askOf(landing));
@@ -103,7 +117,7 @@ const Landed = ({
       {linked === undefined ? null : (
         <>
           {DOT}
-          <AskLinks linked={linked} project={project} />
+          <AskLinks linked={linked} project={project} subject={subject} />
         </>
       )}
       {DOT}
@@ -143,7 +157,7 @@ export const RangeSummary = ({
       {landing === undefined ? (
         <Adopted author={commit?.author.name ?? "unknown"} />
       ) : (
-        <Landed landing={landing} project={project} />
+        <Landed landing={landing} project={project} subject={subject} />
       )}
     </span>
   );

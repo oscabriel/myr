@@ -6,33 +6,56 @@
  * as one screenshot in `e2e/out/` for the shot list.
  *
  * It runs only against `WEB_URL` (a stage's web origin) and is skipped
- * without it. `WEB_PROJECT` and `WEB_ASK` pick the project and the ask
- * (datekit's format-ordinal, which the seed opens on every stage, unless
- * given), and `WEB_FILE` the file opened at line 3 (datekit's `src/add.ts`
- * unless given; its first folder is the one the code page must list, so
- * burrow's run names `packages/kit/src/http.ts`). `WEB_README_PHRASE` is
- * a phrase of the project's README, which its page must carry as the
- * server sends it (datekit's opening words unless given). It only reads.
+ * without it. `WEB_PROJECT` picks the project (datekit unless given) and
+ * `WEB_ASK` the ask, `WEB_FILE` the file opened at line 3 (its first folder
+ * is the one the code page must list) and `WEB_README_PHRASE` a phrase of
+ * the project's README, which its page must carry as the server sends it.
+ * Each defaults to the seeded example's own (`examples`: datekit's
+ * format-ordinal, `src/add.ts` and opening words; burrow's
+ * drop-legacy-fetch, `packages/kit/src/http.ts` and "six small TypeScript
+ * packages"), so `WEB_PROJECT=burrow` alone checks burrow. It only reads.
  */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { Config, Effect, Option } from "effect";
 
+/**
+ * What the check looks at in each seeded example unless told otherwise: an
+ * ask the seed opens, a file whose first folder the code page lists, and a
+ * phrase of its README.
+ */
+const examples = {
+  burrow: {
+    ask: "drop-legacy-fetch",
+    file: "packages/kit/src/http.ts",
+    readme: "six small TypeScript packages",
+  },
+  datekit: {
+    ask: "format-ordinal",
+    file: "src/add.ts",
+    readme: "Small, dependency-free date helpers",
+  },
+} as const;
+
 /** What the check reads of its env: where the web lives, and which ask to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
+    const project = yield* Config.NonEmptyString("WEB_PROJECT").pipe(
+      Config.withDefault("datekit")
+    );
+
+    const example = project === "burrow" ? examples.burrow : examples.datekit;
+
     return {
       ask: yield* Config.NonEmptyString("WEB_ASK").pipe(
-        Config.withDefault("format-ordinal")
+        Config.withDefault(example.ask)
       ),
       file: yield* Config.NonEmptyString("WEB_FILE").pipe(
-        Config.withDefault("src/add.ts")
+        Config.withDefault(example.file)
       ),
-      project: yield* Config.NonEmptyString("WEB_PROJECT").pipe(
-        Config.withDefault("datekit")
-      ),
+      project,
       readme: yield* Config.NonEmptyString("WEB_README_PHRASE").pipe(
-        Config.withDefault("Small, dependency-free date helpers")
+        Config.withDefault(example.readme)
       ),
       web: Option.map(
         yield* Config.option(Config.NonEmptyString("WEB_URL")),

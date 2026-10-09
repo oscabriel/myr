@@ -8,7 +8,6 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { packageOf } from "@repo/project/code/refs";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { Contract } from "@repo/protocol/contracts";
 import {
@@ -46,7 +45,6 @@ import { BlobView } from "../src/features/code/blob-view.tsx";
 import { CommitView } from "../src/features/code/commit-view.tsx";
 import { LOG_PAGE, LogView } from "../src/features/code/log-view.tsx";
 import {
-  packageOfTag,
   packageParamOf,
   RefsView,
   TAGS_PAGE,
@@ -433,6 +431,49 @@ describe(LogView, () => {
     expect(hrefsOf(row)).toContain("/people/ines-v");
   });
 
+  it("links the ask an opening's landing opened, and reads it as an opening", () => {
+    const [opening] = decodeCommits([
+      {
+        author: signature("Okonkwo", "2026-10-06T15:00:00.000Z"),
+        body: "",
+        committer: signature("platform", "2026-10-06T15:00:00.000Z"),
+        landing: {
+          assisted: [],
+          author: "okonkwo",
+          credits: [{ handle: "okonkwo", role: "Decided-by" }],
+          landedAt: "2026-10-06T15:00:00.000Z",
+          opened: "parse-iso-week",
+          parent: IMPORTED,
+          project: "datekit",
+          sha: LANDED,
+        },
+        parents: [IMPORTED],
+        sha: LANDED,
+        subject: "Open ask parse-iso-week",
+        trailers: [{ key: "Decided-by", value: "okonkwo" }],
+        tree: "4".repeat(40),
+      },
+    ]);
+
+    const row = slice(
+      markupOf(
+        <LogView
+          commits={opening === undefined ? [] : [opening]}
+          from={0}
+          now={now}
+          project={datekit}
+          rev="main"
+        />
+      ),
+      "data-commit",
+      LANDED
+    );
+
+    expect(hrefsOf(row)).toContain("/datekit/asks/parse-iso-week");
+    expect(row).toContain("Opened");
+    expect(row).not.toContain(">Ask<");
+  });
+
   it("says an imported commit came before adoption", () => {
     const row = slice(markupOf(page), "data-commit", IMPORTED);
 
@@ -611,6 +652,37 @@ describe(CommitView, () => {
     expect(hrefsOf(markup)).toContain("/datekit/asks/parse-iso-week");
     expect(hrefsOf(markup)).toContain("/datekit/answers/parse-iso-week");
     expect(markup).toContain('data-outcome="Landed"');
+  });
+
+  it("links the ask an opening opened, and no answer, since it answers none", () => {
+    const markup = markupOf(
+      <CommitView
+        diff={decodeDiff({
+          commit: {
+            ...landedCommit,
+            landing: {
+              assisted: [],
+              author: "okonkwo",
+              credits: [{ handle: "okonkwo", role: "Decided-by" }],
+              landedAt: "2026-10-06T15:00:00.000Z",
+              opened: "parse-iso-week",
+              parent: IMPORTED,
+              project: "datekit",
+              sha: LANDED,
+            },
+            subject: "Open ask parse-iso-week",
+          },
+          files: [],
+          truncated: false,
+        })}
+        now={now}
+        project={datekit}
+      />
+    );
+
+    expect(hrefsOf(markup)).toContain("/datekit/asks/parse-iso-week");
+    expect(hrefsOf(markup)).not.toContain("/datekit/answers/parse-iso-week");
+    expect(markup).toContain("Opened");
   });
 
   it("links its parent, and counts and names the files it changed", () => {
@@ -849,14 +921,6 @@ describe("a monorepo's refs page", () => {
       Option.none(),
       Option.none(),
     ]);
-  });
-
-  it("groups by the same package as the platform's order", () => {
-    const names = ["v1.0.0", "@scope@1", "@scope", "a@b@1.0.0", "pkg@2"];
-
-    expect(names.map(packageOfTag)).toStrictEqual(
-      names.map((name) => Option.getOrUndefined(packageOf(name)))
-    );
   });
 });
 

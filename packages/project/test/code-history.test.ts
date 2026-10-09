@@ -668,6 +668,47 @@ describe("a kept value that no longer decodes", () => {
   );
 });
 
+describe("what the store keeps", () => {
+  it.effect(
+    "is keyed under the project's own repo alone, and holds no landing",
+    () =>
+      Effect.gen(function* () {
+        const kept = yield* Ref.make<ReadonlyMap<string, string>>(new Map());
+
+        const recording = Layer.succeed(CodeStore, {
+          get: (key) =>
+            Effect.map(Ref.get(kept), (all) =>
+              Option.fromUndefinedOr(all.get(key))
+            ),
+          put: (key, value) =>
+            Ref.update(kept, (all) => new Map([...all, [key, value]])),
+        });
+
+        yield* Effect.gen(function* () {
+          const { grown } = yield* history;
+          const { code, landed } = yield* recordOf(grown);
+
+          yield* Ref.set(landed, [landingOf(grown, "grow-format")]);
+          yield* onIsolate(whyOf(code, Option.none(), format));
+          yield* onIsolate(logOf(code, formatLog(grown)));
+        }).pipe(Effect.provide(Layer.merge(RepoHostMemory, recording)));
+
+        const all = [...(yield* Ref.get(kept))];
+
+        expect(all.length).toBeGreaterThan(0);
+        expect(
+          all.filter(([key]) => !key.startsWith(`${repo}/`))
+        ).toStrictEqual([]);
+        expect(
+          all.filter(
+            ([, value]) =>
+              value.includes("grow-format") || value.includes("landedAt")
+          )
+        ).toStrictEqual([]);
+      })
+  );
+});
+
 /**
  * The memory store, the session each commit, tree, blob and log read ran
  * in noted in `sessions`, in order.

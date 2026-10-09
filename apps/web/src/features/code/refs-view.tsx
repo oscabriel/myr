@@ -10,9 +10,10 @@
  * tag and its count, sits above the tags, and `?package=` lists one
  * package's tags alone.
  */
+import { packageOf } from "@repo/protocol/domain/code";
 import type { RefsView as Refs, TagRef } from "@repo/protocol/domain/code";
 import { defaultStringifySearch } from "@tanstack/react-router";
-import { Schema } from "effect";
+import { Option, Schema } from "effect";
 
 import { answerPath } from "../ask/ask-page.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
@@ -21,17 +22,6 @@ import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
 import { Pager } from "./pager.tsx";
 import { commitHref, shortSha, treeHref } from "./paths.ts";
-
-/**
- * The package a tag versions, by the platform's rule (`packageOf` in
- * `@repo/project/code/refs`, which orders the tags; a test holds the two
- * equal): the name before its last `@` past the first character.
- */
-export const packageOfTag = (tag: string): string | undefined => {
-  const at = tag.lastIndexOf("@");
-
-  return at > 0 ? tag.slice(0, at) : undefined;
-};
 
 /** A `?package=` from the address, decoded; none for anything but a name. */
 export const packageParamOf = Schema.decodeUnknownOption(
@@ -53,7 +43,7 @@ const packagesOf = (tags: readonly TagRef[]): readonly PackageRun[] => {
   const runs = new Map<string, PackageRun>();
 
   for (const tag of tags) {
-    const name = packageOfTag(tag.name);
+    const name = Option.getOrUndefined(packageOf(tag.name));
 
     if (name !== undefined) {
       const run = runs.get(name);
@@ -149,7 +139,9 @@ export const RefsView = ({
   const tags =
     only === undefined
       ? refs.tags
-      : refs.tags.filter((tag) => packageOfTag(tag.name) === only);
+      : refs.tags.filter(
+          (tag) => Option.getOrUndefined(packageOf(tag.name)) === only
+        );
 
   const shown = tags.slice(from, from + TAGS_PAGE);
   const claims = forks.filter((fork) => fork.kind === "claim");

@@ -4382,7 +4382,7 @@ export const projectService = (
           }
         }
 
-        writes.landings.push({
+        const landing: LandingView = {
           assisted: opening.assisted,
           author: opening.asker,
           credits: landed.credits,
@@ -4393,7 +4393,12 @@ export const projectService = (
           project: name,
           requestId: landed.requestId,
           sha: landed.sha,
-        });
+        };
+
+        writes.landings.push(landing);
+        // Heard as every landing is (main moved), so a list of landings
+        // shows the opening; it answers no ask, so it credits nothing.
+        writes.events.push(ProjectEventInput.Landed({ at: now, landing }));
         writes.project.set(
           "row",
           yield* withPolicyAt({ ...row, landed: landed.sha }, landed.sha, now)

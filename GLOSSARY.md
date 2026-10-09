@@ -73,7 +73,7 @@ The cost-ordered chain of stages that narrows a push to a checked tree or a refu
 _Avoid_: CI, pipeline, merge queue
 
 **Landing**:
-The platform's commit of a checked tree to main, written by the platform with credit trailers.
+The platform's commit of a checked tree to main, written by the platform with credit trailers. An ask's opening is a landing too: it opens an ask and answers none.
 _Avoid_: merge, ship
 
 **Landed SHA**:
@@ -100,7 +100,7 @@ The record of one check run: base, head, patch id, level and the platform as ver
 _Avoid_: approval, review
 
 **Why**:
-A line's landing: the ask, the answer, the people and the verdict that put that line on main.
+A line's landing: the ask it answered (with its answer and verdict) or the ask it opened, and the people, that put that line on main.
 _Avoid_: blame
 
 **Patch id**:

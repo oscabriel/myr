@@ -27,7 +27,7 @@ export const hereOf = (location: {
 }) => `${location.pathname}${location.searchStr}`;
 
 /** Sign-in, coming back to `here` afterwards. */
-const signInHref = (here: string) =>
+export const signInHref = (here: string) =>
   `/auth/signin?${new URLSearchParams({ return: here }).toString()}`;
 
 /** The nav's own action style: muted text, ink on hover. */

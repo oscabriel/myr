@@ -4,7 +4,7 @@
  * payload names a repo). Every read names the 40-hex commit it resolved
  * to (`at`), so any page can become a permalink.
  */
-import { Schema } from "effect";
+import { Option, Schema } from "effect";
 
 import {
   AskId,
@@ -26,6 +26,19 @@ export const TagName = Schema.NonEmptyString.check(
 ).pipe(Schema.brand("TagName"));
 
 export type TagName = typeof TagName.Type;
+
+/**
+ * The package a tag versions: the name before its last `@`, when that `@`
+ * is past the first character (`@changesets/cli@2.27.1` versions
+ * `@changesets/cli`, `get-workspaces@1.0.11` versions `get-workspaces`).
+ * A tag with no such `@` (`v1.2.3`, a bare scope) versions no package. The
+ * platform orders tags by it and the refs page groups them by it.
+ */
+export const packageOf = (tag: string): Option.Option<string> => {
+  const at = tag.lastIndexOf("@");
+
+  return at > 0 ? Option.some(tag.slice(0, at)) : Option.none();
+};
 
 /**
  * A revision as a reader names it: `main` (the landed commit), a full

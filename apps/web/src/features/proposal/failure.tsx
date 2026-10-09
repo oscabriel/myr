@@ -9,13 +9,10 @@ import { Unauthenticated } from "@repo/protocol/principal";
 import { Cause, Option, Schema } from "effect";
 import { LogIn } from "lucide-react";
 
-import { FailureView } from "../today/today-page.tsx";
+import { signInHref } from "../auth/session-slot.tsx";
+import { FailureView, Notice } from "../today/today-page.tsx";
 
 const isUnauthenticated = Schema.is(Unauthenticated);
-
-/** Sign-in, coming back to `here` afterwards. */
-const signInHref = (here: string) =>
-  `/auth/signin?${new URLSearchParams({ return: here }).toString()}`;
 
 export const ProposalFailure = ({
   cause,
@@ -29,19 +26,18 @@ export const ProposalFailure = ({
   readonly here: string;
 }) =>
   Option.exists(Cause.findErrorOption(cause), isUnauthenticated) ? (
-    <output className="border-rule flex items-start gap-2 border-t border-b py-3 text-sm">
-      <LogIn aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <span>
-        You are not signed in, or your session has ended.{" "}
-        <a
-          className="decoration-rule font-medium underline hover:decoration-current"
-          href={signInHref(here)}
-        >
-          Sign in
-        </a>{" "}
-        to {doing}; you come back to this page.
-      </span>
-    </output>
+    <Notice
+      icon={<LogIn aria-hidden="true" className="mt-0.5 size-4 shrink-0" />}
+    >
+      You are not signed in, or your session has ended.{" "}
+      <a
+        className="decoration-rule font-medium underline hover:decoration-current"
+        href={signInHref(here)}
+      >
+        Sign in
+      </a>{" "}
+      to {doing}; you come back to this page.
+    </Notice>
   ) : (
     <FailureView cause={cause} />
   );

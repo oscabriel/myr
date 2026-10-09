@@ -6,6 +6,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { CheckSpec } from "@repo/protocol/domain/check";
+import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import {
   AskId,
@@ -107,6 +108,10 @@ const read = Effect.gen(function* () {
 
   const { claim } = yield* api.claim(bob, parseIso.id);
 
+  const landedEvents = (yield* api.events(0, 100)).flatMap(({ event }) =>
+    ProjectEvent.guards.Landed(event) ? [event.landing] : []
+  );
+
   return {
     adopted,
     after: {
@@ -118,12 +123,25 @@ const read = Effect.gen(function* () {
     before,
     claim,
     landed,
+    landedEvents,
   };
 });
 
 const world = Layer.mergeAll(worldOf(scenario, "memory"), NoVisibility, NoEnv);
 
 describe("a project's reads for its code and its people", () => {
+  it.effect(
+    "hear an ask's opening as a landing, naming the ask it opened, so a list of landings shows it",
+    () =>
+      Effect.map(read.pipe(Effect.provide(world)), (got) => {
+        expect(
+          got.landedEvents.map(({ ask, opened, sha }) => ({ ask, opened, sha }))
+        ).toStrictEqual([
+          { ask: undefined, opened: parseIso.id, sha: got.landed },
+        ]);
+      })
+  );
+
   it.effect(
     "say where main landed, which commits are landings, the forks and the public policy",
     () =>

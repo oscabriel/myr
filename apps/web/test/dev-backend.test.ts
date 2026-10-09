@@ -151,8 +151,23 @@ const listedWithLanding = inFreshWorld((as) =>
     const ines = yield* clientOf(as(decider));
     const { projects } = yield* anyone.listProjects({});
     const { unattended } = yield* ines.today({});
+    const burrow = ProjectName.make("burrow");
 
-    return { landedAt: unattended.map(({ landedAt }) => landedAt), projects };
+    const landed = yield* Effect.orDie(
+      Effect.fromNullishOr((yield* anyone.listRefs({ project: burrow })).landed)
+    );
+
+    // burrow has only its asks' openings, each a landing; the last is main.
+    const { landing: opening } = yield* anyone.landing({
+      project: burrow,
+      sha: landed,
+    });
+
+    return {
+      landedAt: unattended.map(({ landedAt }) => landedAt),
+      opening,
+      projects,
+    };
   })
 );
 
@@ -197,14 +212,15 @@ describe("the dev seed", seededWorlds, () => {
     "lists each project with when it last landed, as D1's project list does",
     () =>
       Effect.gen(function* () {
-        const { landedAt, projects } = yield* listedWithLanding;
+        const { landedAt, opening, projects } = yield* listedWithLanding;
 
         expect(
           projects.map(({ landedAt: at, project }) => [project, at])
         ).toStrictEqual([
-          ["burrow", undefined],
+          ["burrow", opening.landedAt],
           ["datekit", landedAt[0]],
         ]);
+        expect(opening.opened).toBeDefined();
         expect(landedAt).toHaveLength(1);
       })
   );

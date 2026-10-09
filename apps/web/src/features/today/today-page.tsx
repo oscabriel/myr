@@ -105,7 +105,8 @@ const TITLE = "text-lg font-semibold";
 
 const LABEL = "text-muted-foreground text-xs font-medium";
 
-const Notice = ({
+/** A one-line notice under a rule: an icon, then what to know. */
+export const Notice = ({
   children,
   icon,
 }: {

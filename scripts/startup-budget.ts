@@ -34,7 +34,12 @@
  * the sandbox's 570,424, held to 656,000; the web's entry 710,962, held to
  * 818,000, and its JavaScript 3,543,318, held to 4,075,000. The web's
  * JavaScript counts the Worker's server modules only: chunks the browser
- * alone loads (Pierre's) are assets.
+ * alone loads (Pierre's) are assets. Once the code store, the README on
+ * the server and the people page's reasons had landed, no limit was raised:
+ * the platform's entry, its only module, measured 1,679,675 (both its
+ * limits now 1,900,000, 13% above); the sandbox's 570,582 (656,000, 15%);
+ * the web's entry 711,006 (818,000, 15%) and its JavaScript 3,567,682
+ * (4,075,000, 14%).
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, Path, pipe } from "effect";
@@ -48,7 +53,7 @@ interface Budget {
 
 /** Each Worker's limits, by its folder. */
 export const budgets = {
-  "apps/platform": { entry: 1_900_000, javascript: 1_918_000 },
+  "apps/platform": { entry: 1_900_000, javascript: 1_900_000 },
   "apps/sandbox": { entry: 656_000, javascript: 656_000 },
   "apps/web": { entry: 818_000, javascript: 4_075_000 },
 } as const satisfies Record<string, Budget>;

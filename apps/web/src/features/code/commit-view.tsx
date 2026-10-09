@@ -16,7 +16,7 @@ import type {
 import { CreditRole } from "@repo/protocol/domain/credit";
 import { Handle } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
-import { Match, Schema } from "effect";
+import { Match, Option, Schema } from "effect";
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
@@ -27,6 +27,7 @@ import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
 import { OutcomeView } from "../shared/outcome.tsx";
 import { When } from "../shared/time.tsx";
+import { askOf } from "../why/rows.ts";
 import { blobHref, commitHref, shortSha, treeHref } from "./paths.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
@@ -176,6 +177,10 @@ export const CommitView = ({
 }) => {
   const { commit, files, truncated } = diff;
   const { landing } = commit;
+
+  const linked =
+    landing === undefined ? undefined : Option.getOrUndefined(askOf(landing));
+
   const body = bodyWithoutTrailers(commit);
   const here = commitHref(project, commit.sha);
 
@@ -250,27 +255,34 @@ export const CommitView = ({
         >
           <h2 className="text-lg font-semibold">Landing</h2>
           <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-            {landing.ask === undefined ? null : (
+            {linked === undefined ? null : (
               <>
                 <div>
-                  <dt className={LABEL}>Ask</dt>
+                  <dt className={LABEL}>
+                    {linked.kind === "opened" ? "Opened" : "Ask"}
+                  </dt>
                   <dd>
                     <a
                       className={`${ID} ${LINK}`}
-                      href={askPath(project, landing.ask)}
+                      href={askPath(project, linked.ask)}
                     >
-                      {landing.ask}
+                      {linked.ask}
                     </a>
                   </dd>
                 </div>
-                <div>
-                  <dt className={LABEL}>Answer</dt>
-                  <dd>
-                    <a className={LINK} href={answerPath(project, landing.ask)}>
-                      The answer and its checks
-                    </a>
-                  </dd>
-                </div>
+                {linked.kind === "opened" ? null : (
+                  <div>
+                    <dt className={LABEL}>Answer</dt>
+                    <dd>
+                      <a
+                        className={LINK}
+                        href={answerPath(project, linked.ask)}
+                      >
+                        The answer and its checks
+                      </a>
+                    </dd>
+                  </div>
+                )}
               </>
             )}
             <div>

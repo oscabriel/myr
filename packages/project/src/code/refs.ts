@@ -6,7 +6,7 @@
  * compose refs, notes) and no branch but main ever shows.
  */
 import { RepoHost } from "@repo/artifacts/repo-host";
-import { TagName } from "@repo/protocol/domain/code";
+import { packageOf, TagName } from "@repo/protocol/domain/code";
 import type { RefsView, TagRef } from "@repo/protocol/domain/code";
 import { Array, Effect, Option, Schema } from "effect";
 
@@ -75,18 +75,6 @@ export const compareTags = (one: string, other: string): number => {
   const leftIsLonger = left.length > right.length;
 
   return leftIsLonger === longerIsNewer ? -1 : 1;
-};
-
-/**
- * The package a tag versions: the name before its last `@`, when that `@`
- * is past the first character (`@changesets/cli@2.27.1` versions
- * `@changesets/cli`, `get-workspaces@1.0.11` versions `get-workspaces`).
- * A tag with no such `@` (`v1.2.3`, a bare scope) versions no package.
- */
-export const packageOf = (tag: string): Option.Option<string> => {
-  const at = tag.lastIndexOf("@");
-
-  return at > 0 ? Option.some(tag.slice(0, at)) : Option.none();
 };
 
 /**

@@ -7,12 +7,13 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
+import { packageOf } from "@repo/protocol/domain/code";
 import { ProjectName, RepoName } from "@repo/protocol/ids";
 import { Effect, Option } from "effect";
 
 import { refsOf } from "../src/code.ts";
 import type { CodeProject } from "../src/code.ts";
-import { packageOf, sortTags } from "../src/code/refs.ts";
+import { sortTags } from "../src/code/refs.ts";
 import { writer } from "./code-fixtures.ts";
 
 /** Changesets' kinds of tag, shuffled: plain, scoped and unscoped. */

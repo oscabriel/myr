@@ -42,14 +42,30 @@ const yesNo = (value: boolean) => (value ? "yes" : "no");
 const cell = (text: string) =>
   text.replaceAll("|", "\\|").replaceAll(/\s*\n\s*/gu, " ");
 
+/** `text` as a Markdown code span, fenced by one more backtick than its longest run. */
+const codeSpan = (text: string) => {
+  const longest = Math.max(
+    0,
+    ...(text.match(/`+/gu) ?? []).map((run) => run.length)
+  );
+
+  const fence = "`".repeat(longest + 1);
+  const pad = text.startsWith("`") || text.endsWith("`") ? " " : "";
+
+  return `${fence}${pad}${text}${pad}${fence}`;
+};
+
 /**
  * Rows as a Markdown table, and as a padded plain table for a person.
- * `empty` stands in for both when there are no rows.
+ * `empty` stands in for both when there are no rows. The columns in `code`
+ * hold literal text (a glob, a path) that Markdown shows as code, so `**`
+ * never reads as emphasis; the plain table shows it as it is.
  */
 const table = (
   headers: readonly string[],
   rows: readonly (readonly string[])[],
-  empty: string
+  empty: string,
+  code: readonly number[] = []
 ): View => {
   if (rows.length === 0) {
     return { markdown: empty, text: empty };
@@ -69,7 +85,14 @@ const table = (
     markdown: [
       `| ${headers.join(" | ")} |`,
       `| ${headers.map(() => "---").join(" | ")} |`,
-      ...rows.map((row) => `| ${row.map(cell).join(" | ")} |`),
+      ...rows.map(
+        (row) =>
+          `| ${row
+            .map((text, column) =>
+              code.includes(column) ? cell(codeSpan(text)) : cell(text)
+            )
+            .join(" | ")} |`
+      ),
     ].join("\n"),
     text: [
       padded(headers.map((header) => header.toUpperCase())),
@@ -353,7 +376,8 @@ const evaluated = (policy: PublicPolicy) => {
     table(
       ["paths", "deciders"],
       policy.deciders.map(({ handles, paths }) => [paths, handles.join(", ")]),
-      "Nobody decides."
+      "Nobody decides.",
+      [0]
     ),
     prose(
       `Vouching: ${vouchModes[vouch.mode]} ${vouch.file} vouches for ${countOf(vouches.length - denounced)} and denounces ${countOf(denounced)}.`

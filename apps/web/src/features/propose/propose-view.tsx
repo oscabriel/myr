@@ -23,6 +23,7 @@ import { Checkbox } from "../../components/ui/checkbox.tsx";
 import { Label } from "../../components/ui/label.tsx";
 import { Spinner } from "../../components/ui/spinner.tsx";
 import { Textarea } from "../../components/ui/textarea.tsx";
+import { signInHref } from "../auth/session-slot.tsx";
 import { CommandLine } from "../shared/command.tsx";
 
 /** What `proposeAsk` takes, from its one schema. */
@@ -93,7 +94,7 @@ const SignInFirst = ({
         Proposing an ask is for signed-in members.{" "}
         <a
           className="decoration-rule font-medium underline hover:decoration-current"
-          href={`/auth/signin?${new URLSearchParams({ return: proposeFormPath(project, about) }).toString()}`}
+          href={signInHref(proposeFormPath(project, about))}
         >
           Sign in
         </a>{" "}

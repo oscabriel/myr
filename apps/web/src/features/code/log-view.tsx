@@ -8,7 +8,7 @@
 import type { CommitView } from "@repo/protocol/domain/code";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { ProjectName, RepoPath } from "@repo/protocol/ids";
-import { DateTime } from "effect";
+import { DateTime, Option } from "effect";
 
 import { askPath } from "../project/asks.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
@@ -17,6 +17,7 @@ import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
 import { When } from "../shared/time.tsx";
+import { askOf } from "../why/rows.ts";
 import { Pager } from "./pager.tsx";
 import { blobHref, commitHref, commitsHref, shortSha } from "./paths.ts";
 import { revLabel } from "./tree-view.tsx";
@@ -65,6 +66,9 @@ const Row = ({
 }) => {
   const { landing } = commit;
 
+  const linked =
+    landing === undefined ? undefined : Option.getOrUndefined(askOf(landing));
+
   return (
     <li
       className="border-rule flex flex-col gap-2 border-t py-3"
@@ -92,16 +96,16 @@ const Row = ({
       ) : (
         <div className="flex flex-col gap-2 text-sm">
           <p className="flex flex-wrap gap-x-4 gap-y-1">
-            {landing.ask === undefined ? null : (
+            {linked === undefined ? null : (
               <span>
                 <span className="text-muted-foreground text-xs font-medium">
-                  Ask
+                  {linked.kind === "opened" ? "Opened" : "Ask"}
                 </span>{" "}
                 <a
                   className={`${ID} ${LINK}`}
-                  href={askPath(project, landing.ask)}
+                  href={askPath(project, linked.ask)}
                 >
-                  {landing.ask}
+                  {linked.ask}
                 </a>
               </span>
             )}
