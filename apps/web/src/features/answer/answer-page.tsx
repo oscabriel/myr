@@ -4,7 +4,9 @@
  * gate's stages in a strip with the outcome under it (a refusal reads as
  * `git push` printed it), each lane's result and time, the held-back checks
  * as one line per area, and, once it landed, the landing's credit trailers
- * and its commit.
+ * and its commit. The base and the landing link their commit pages; the
+ * head and the merged tree stay plain, since they live in the claim's fork,
+ * which the code browser never reads (ADR 0019).
  *
  * Held-back checks show only what `HeldBackResult` carries: an area, how
  * many passed of how many, and the suite's root. A lane's log is
@@ -39,6 +41,7 @@ import {
 } from "../../components/ui/table.tsx";
 import { askPath } from "../ask/ask-page.tsx";
 import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
+import { commitHref } from "../code/paths.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { CreditTrailers } from "../shared/credits.tsx";
 import { EmptyState } from "../shared/empty.tsx";
@@ -197,7 +200,9 @@ export const AnswerView = ({
           <Sha sha={verdict.head} />
         </Field>
         <Field label="Base">
-          <Sha sha={verdict.base} />
+          <a className={LINK} href={commitHref(verdict.project, verdict.base)}>
+            <Sha sha={verdict.base} />
+          </a>
         </Field>
         <Field label="Merged tree">
           <Sha sha={verdict.tree} />
@@ -238,9 +243,15 @@ export const AnswerView = ({
               ? {}
               : { heldBack: landing.heldBackTrailer })}
           />
+          <a
+            className={`${LINK} self-start text-sm font-medium`}
+            href={commitHref(landing.project, landing.sha)}
+          >
+            The landing commit
+          </a>
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="text-muted-foreground text-xs font-medium">
-              The landing commit, in a clone of {landing.project}
+              In a clone of {landing.project}
             </span>
             <CommandLine command={`git show ${landing.sha}`} />
           </div>
