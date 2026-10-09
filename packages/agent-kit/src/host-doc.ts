@@ -27,7 +27,7 @@ type Command = CommandDoc;
 type Commands = readonly CommandDoc[];
 
 /** The MCP protocol the platform serves over HTTP. */
-const MCP_PROTOCOL = "2026-07-28";
+export const MCP_PROTOCOL = "2026-07-28";
 
 /** Each posture as GLOSSARY.md names it. */
 const postureWords = {

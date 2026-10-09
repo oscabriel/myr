@@ -160,6 +160,53 @@ describe("the platform's /", () => {
     })
   );
 
+  it.effect(
+    "gives an agent the platform's own Markdown on a host with no web app",
+    () =>
+      Effect.gen(function* () {
+        const { text, type } = yield* home(
+          projects,
+          { headers: { accept: "text/markdown" } },
+          Option.none()
+        );
+
+        expect({ text, type }).toStrictEqual({
+          text: frontLlms({
+            commands: commandDocs(Contracts),
+            platformUrl: origin,
+            projects,
+          }),
+          type: "text/markdown; charset=utf-8",
+        });
+      })
+  );
+
+  it.effect.each([
+    { accept: undefined, wants: "html" },
+    { accept: "*/*", wants: "html" },
+    {
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      wants: "html",
+    },
+    { accept: "text/html, text/markdown;q=0.5", wants: "html" },
+    { accept: "text/html;q=0.5, text/markdown", wants: "markdown" },
+    { accept: "text/plain, text/html", wants: "markdown" },
+    { accept: "text/markdown;q=0, text/html;q=0.1", wants: "html" },
+  ])("answers Accept $accept with $wants", ({ accept, wants }) =>
+    Effect.gen(function* () {
+      const { type } = yield* home(
+        projects,
+        accept === undefined ? {} : { headers: { accept } }
+      );
+
+      expect(type).toBe(
+        wants === "html"
+          ? "text/html; charset=utf-8"
+          : "text/markdown; charset=utf-8"
+      );
+    })
+  );
+
   it.effect("answers a stale credential, as every public path does", () =>
     Effect.gen(function* () {
       const { status, text } = yield* home(projects, {

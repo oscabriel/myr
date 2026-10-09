@@ -13,7 +13,7 @@
  * link (W9-D11).
  */
 import { commandDocs } from "@repo/agent-kit/command-doc";
-import { frontLlms } from "@repo/agent-kit/host-doc";
+import { frontLlms, MCP_PROTOCOL } from "@repo/agent-kit/host-doc";
 import { Brand } from "@repo/brand";
 import { FrontPage } from "@repo/project/front-page";
 import { Contracts } from "@repo/protocol/contracts";
@@ -23,16 +23,13 @@ import { Effect, Option } from "effect";
 import { escapeHtml, page } from "./auth/pages.ts";
 import { HostInfo } from "./host-info.ts";
 
-/** The MCP protocol the platform serves over HTTP. */
-const MCP_PROTOCOL = "2026-07-28";
-
 /** A minute: the page changes only when a project is made. */
 const BRIEFLY = "public, max-age=60";
 
 /** The CLI's commands, as the platform's skill and the web's `llms.txt` list them. */
 const commands = commandDocs(Contracts);
 
-/** One media range of an `Accept` header: its type and its quality. */
+/** The media ranges of an `Accept` header, each its type and its quality. */
 const rangesOf = (accept: string) =>
   accept.split(",").map((range) => {
     const [type = "", ...params] = range.split(";").map((part) => part.trim());
@@ -50,7 +47,7 @@ const rangesOf = (accept: string) =>
     return { quality, type: type.toLowerCase() };
   });
 
-/** The quality `ranges` give the first of `types` they name exactly; 0 for none. */
+/** The highest quality `ranges` give any of `types` by name; 0 for none. */
 const qualityOf = (
   ranges: ReturnType<typeof rangesOf>,
   types: readonly string[]
