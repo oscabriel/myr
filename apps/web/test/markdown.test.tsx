@@ -210,6 +210,62 @@ describe("GitHub-flavoured Markdown", () => {
     expect(rendered("## Hello World")).toContain('<h2 id="hello-world">');
   });
 
+  describe("a footnote", () => {
+    const markup = rendered("Text[^1]\n\n[^1]: Note.");
+
+    /** The `href` of the anchor carrying `attribute`, without its `#`. */
+    const targetOf = (attribute: string) =>
+      anchorsOf(markup)
+        .find((anchor) => anchor.includes(attribute))
+        ?.match(/href="#(?<id>[^"]+)"/u)?.groups?.id;
+
+    /** The `id` of the element whose opening tag carries `attribute`. */
+    const idOf = (attribute: string) =>
+      new RegExp(`<[a-z]+\\b[^>]*${attribute}[^>]*>`, "u")
+        .exec(markup)?.[0]
+        .match(/\bid="(?<id>[^"]+)"/u)?.groups?.id;
+
+    it("is referenced by a link that jumps to it", () => {
+      const target = targetOf("data-footnote-ref");
+
+      expect(target).toBeDefined();
+      expect(markup).toContain(`<li id="${target}">`);
+    });
+
+    it("links back to its reference", () => {
+      const back = targetOf("data-footnote-backref");
+
+      expect(back).toBeDefined();
+      expect(back).toBe(idOf("data-footnote-ref"));
+    });
+
+    it("keeps its ids prefixed once, as a README's own are", () => {
+      expect(idOf("data-footnote-ref")).toBe("user-content-fnref-1");
+      expect(markup).not.toContain("user-content-user-content-");
+    });
+  });
+
+  it("prefixes an id the README sets, and points a link to it there", () => {
+    const markup = rendered('<a id="top">Top</a>\n\n[up](#top)');
+
+    expect(markup).toContain('id="user-content-top"');
+    expect(markup).not.toContain('id="top"');
+    expect(anchorsOf(markup)).toContain('<a href="#user-content-top">');
+  });
+
+  it("prefixes an anchor's name the README sets, and points a link to it there", () => {
+    const markup = rendered('<a name="top">Top</a>\n\n[up](#top)');
+
+    expect(markup).toContain('name="user-content-top"');
+    expect(anchorsOf(markup)).toContain('<a href="#user-content-top">');
+  });
+
+  it("keeps a link to a heading pointing at the heading", () => {
+    const markup = rendered("## Usage\n\n[u](#usage)");
+
+    expect(anchorsOf(markup)).toContain('<a href="#usage">');
+  });
+
   it("keeps a code block's language and draws it in mono", () => {
     const markup = rendered("```ts\nconst a = 1;\n```");
 

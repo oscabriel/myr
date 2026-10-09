@@ -1,4 +1,3 @@
-import { Client } from "@repo/protocol/contracts";
 import { FileView, TreeListing } from "@repo/protocol/domain/code";
 import { ProjectName } from "@repo/protocol/ids";
 import { createFileRoute, notFound } from "@tanstack/react-router";
@@ -17,6 +16,7 @@ import { CodeNotFound } from "../../../../features/code/not-found.tsx";
 import { TreeView } from "../../../../features/code/tree-view.tsx";
 import { pageTitle } from "../../../../features/shared/layout.tsx";
 import { serverClient } from "../../../../server/client.ts";
+import { readFolderWithReadme } from "../../../../server/folder.ts";
 
 // A folder at a revision: its breadcrumb, its entries and its README, read
 // on the server, so the page arrives whole; the file tree beside it is the
@@ -42,32 +42,18 @@ export const readTreePage = (params: TreeParams) =>
     const project = yield* Effect.fromOption(projectOf(params.project));
     const rev = yield* Effect.fromOption(revisionOf(params.rev));
     const path = repoPathOf(params._splat);
-    const client = yield* Client;
 
-    const listing = yield* client
-      .readTree({
-        at: rev,
-        project,
-        ...Option.match(path, {
-          onNone: () => ({}),
-          onSome: (at) => ({ path: at }),
-        }),
+    const { listing, readme } = yield* readFolderWithReadme({
+      path,
+      project,
+      rev,
+    }).pipe(
+      Effect.catchTags({
+        UnknownPath: notFoundFor,
+        UnknownProject: notFoundFor,
+        UnknownRevision: notFoundFor,
       })
-      .pipe(
-        Effect.catchTags({
-          UnknownPath: notFoundFor,
-          UnknownProject: notFoundFor,
-          UnknownRevision: notFoundFor,
-        })
-      );
-
-    // A README that cannot be read leaves the folder's page without it.
-    const readme =
-      listing.readme === undefined
-        ? Option.none()
-        : yield* client
-            .readFile({ at: listing.at, path: listing.readme.path, project })
-            .pipe(Effect.option);
+    );
 
     return yield* Schema.encodeEffect(TreePageData)({
       listing,

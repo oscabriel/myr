@@ -1,5 +1,5 @@
 import { useAtomMount, useAtomValue } from "@effect/atom-react";
-import { Client } from "@repo/protocol/contracts";
+import { FileView, TreeListing } from "@repo/protocol/domain/code";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
@@ -13,50 +13,86 @@ import { projectCodeAtom } from "../../client/code.ts";
 import { projectsAtom } from "../../client/front.ts";
 import { asksAtom, recentLandingsAtom } from "../../client/project.ts";
 import { watchAtom } from "../../client/watch.ts";
-import { Reading, Unreachable } from "../../features/front/reading.tsx";
-import { ProjectView } from "../../features/project/project-page.tsx";
+import { Unreachable } from "../../features/front/reading.tsx";
+import {
+  ProjectReadingView,
+  ProjectView,
+} from "../../features/project/project-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
 import { pageTitle } from "../../features/shared/layout.tsx";
 import { serverClient } from "../../server/client.ts";
+import { readFolderWithReadme } from "../../server/folder.ts";
 
-// A project's page. The loader asks the platform, on the server, whether the
+// A project's page. The loader asks the platform, on the server, for the
+// project's root folder at main and its README, so the page arrives with
+// its code and a crawler reads the README; the same read says whether the
 // project exists, so an address naming none is a 404 that shows the
-// platform's `UnknownProject` refusal; the page's own reads (asks, landings,
-// the listing) are atoms the browser calls.
-
-const decodeProject = Schema.decodeEffect(ProjectName);
+// platform's `UnknownProject` refusal. The page's other reads (asks,
+// landings, the listing) are atoms the browser calls, and the code's atom
+// keeps it live once it has a value.
 
 const decodeName = Schema.decodeUnknownOption(ProjectName);
 
 const isUnknownProject = Schema.is(UnknownProject);
 
+/** What the loader hands the page: the project's code, when it could be read. */
+export const ProjectPageData = Schema.Struct({
+  code: Schema.optionalKey(
+    Schema.Struct({
+      readme: Schema.optionalKey(FileView),
+      root: TreeListing,
+    })
+  ),
+});
+
+const encodePage = Schema.encodeEffect(ProjectPageData);
+
 /**
- * Whether the platform knows the project `name`, asked over `#backend` in
- * process. A name that is none, and `UnknownProject`, say no; when the
- * platform cannot be reached, the page renders and says so itself.
+ * The project's page data, read over `Client`, or a not-found for a name
+ * that is none or a project the platform does not know. A project whose
+ * main has not landed, or whose code the platform cannot read now, has a
+ * page without its code; when the platform did not answer, the page's own
+ * reads say so.
  */
-const projectKnown = createServerFn({ method: "GET" })
+export const readProjectPage = (name: string) =>
+  Effect.gen(function* () {
+    const project = yield* Effect.fromOption(decodeName(name));
+
+    const code = yield* readFolderWithReadme({
+      path: Option.none(),
+      project,
+      rev: "main",
+    }).pipe(
+      Effect.map(({ listing, readme }) =>
+        Option.some({
+          root: listing,
+          ...Option.match(readme, {
+            onNone: () => ({}),
+            onSome: (file) => ({ readme: file }),
+          }),
+        })
+      ),
+      Effect.catchTag("UnknownProject", () => Effect.fail(notFound())),
+      Effect.catchTag(
+        ["RpcClientError", "Unauthenticated", "UnknownPath", "UnknownRevision"],
+        () => Effect.succeedNone
+      )
+    );
+
+    // What the platform sent decoded, so it encodes; a failure is a defect.
+    return yield* encodePage(
+      Option.match(code, {
+        onNone: () => ({}),
+        onSome: (read) => ({ code: read }),
+      })
+    ).pipe(Effect.orDie);
+  }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));
+
+const projectPage = createServerFn({ method: "GET" })
   .validator((name: string) => name)
   .handler(({ data }) =>
     Effect.runPromise(
-      Effect.gen(function* () {
-        const name = decodeName(data);
-
-        if (Option.isNone(name)) {
-          return false;
-        }
-
-        const project = name.value;
-        const client = yield* Client;
-
-        return yield* client.listAsks({ project }).pipe(
-          Effect.as(true),
-          Effect.catchTag("UnknownProject", () => Effect.succeed(false))
-        );
-      }).pipe(
-        Effect.provide(serverClient(env)),
-        Effect.orElseSucceed(() => true)
-      )
+      readProjectPage(data).pipe(Effect.provide(serverClient(env)))
     )
   );
 
@@ -78,25 +114,31 @@ const listingOf = (
     project,
   };
 
+const decodePage = Schema.decodeSync(ProjectPageData);
+
 const ProjectBody = ({ project }: { readonly project: ProjectName }) => {
   const { platformUrl } = root.useLoaderData();
+  const read = decodePage(Route.useLoaderData());
 
   // Live: each event the project commits makes these reads fetch again.
   useAtomMount(watchAtom(project));
 
-  const read = AsyncResult.all({
+  const reads = AsyncResult.all({
     asks: useAtomValue(asksAtom(project)),
     landings: useAtomValue(recentLandingsAtom(project)),
     listed: useAtomValue(projectsAtom),
   });
 
-  // The root folder and README: a project whose main has not landed (or
-  // whose code cannot be read now) shows its page without them.
-  const code = Option.getOrUndefined(
-    AsyncResult.value(useAtomValue(projectCodeAtom(project)))
+  // The root folder and README: the loader's, read on the server, until the
+  // atom has its own (it reads again on each landing). A project whose main
+  // has not landed (or whose code cannot be read now) shows its page
+  // without them.
+  const code = Option.getOrElse(
+    AsyncResult.value(useAtomValue(projectCodeAtom(project))),
+    () => read.code
   );
 
-  return AsyncResult.matchWithError(read, {
+  return AsyncResult.matchWithError(reads, {
     onDefect: () => <Unreachable title={project} />,
     onError: (error) =>
       isUnknownProject(error) ? (
@@ -104,7 +146,13 @@ const ProjectBody = ({ project }: { readonly project: ProjectName }) => {
       ) : (
         <Unreachable title={project} />
       ),
-    onInitial: () => <Reading title={project} />,
+    onInitial: () => (
+      <ProjectReadingView
+        code={code}
+        platformUrl={platformUrl}
+        project={project}
+      />
+    ),
     onSuccess: ({ value: { asks, landings, listed } }) => (
       <ProjectView
         asks={asks.asks}
@@ -137,19 +185,6 @@ const Unknown = () => {
 export const Route = createFileRoute("/$project/")({
   component: ProjectPage,
   head: ({ params }) => ({ meta: [{ title: pageTitle(params.project) }] }),
-  loader: ({ params }) =>
-    Effect.runPromise(
-      decodeProject(params.project).pipe(
-        Effect.mapError(() => notFound()),
-        Effect.flatMap((project) =>
-          Effect.promise(() => projectKnown({ data: project }))
-        ),
-        Effect.filterOrFail(
-          (known): known is true => known,
-          () => notFound()
-        ),
-        Effect.asVoid
-      )
-    ),
+  loader: ({ params }) => projectPage({ data: params.project }),
   notFoundComponent: Unknown,
 });

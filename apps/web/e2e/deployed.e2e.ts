@@ -10,7 +10,9 @@
  * (datekit's format-ordinal, which the seed opens on every stage, unless
  * given), and `WEB_FILE` the file opened at line 3 (datekit's `src/add.ts`
  * unless given; its first folder is the one the code page must list, so
- * burrow's run names `packages/kit/src/http.ts`). It only reads.
+ * burrow's run names `packages/kit/src/http.ts`). `WEB_README_PHRASE` is
+ * a phrase of the project's README, which its page must carry as the
+ * server sends it (datekit's opening words unless given). It only reads.
  */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
@@ -29,6 +31,9 @@ const settings = Effect.runSync(
       project: yield* Config.NonEmptyString("WEB_PROJECT").pipe(
         Config.withDefault("datekit")
       ),
+      readme: yield* Config.NonEmptyString("WEB_README_PHRASE").pipe(
+        Config.withDefault("Small, dependency-free date helpers")
+      ),
       web: Option.map(
         yield* Config.option(Config.NonEmptyString("WEB_URL")),
         (url) => url.replace(/\/+$/u, "")
@@ -37,7 +42,7 @@ const settings = Effect.runSync(
   })
 );
 
-const { ask, file: FILE, project } = settings;
+const { ask, file: FILE, project, readme: README_PHRASE } = settings;
 
 /** The root folder `FILE` sits in, which the project's code page lists. */
 const FOLDER = FILE.split("/")[0] ?? FILE;
@@ -162,6 +167,25 @@ test.describe("the deployed web", () => {
   test(`${project}'s page shows the project`, ({ page: browser }) =>
     Effect.runPromise(
       page(browser, `/${project}`, "project-page", [project, ask])
+    ));
+
+  // A request, not a page: no browser script runs, so this is the HTML the
+  // server sent, as a crawler or `curl` reads it.
+  test(`${project}'s page arrives with its README rendered by the server`, ({
+    page: browser,
+  }) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const response = yield* Effect.promise(() =>
+          browser.request.get(at(`/${project}`))
+        );
+
+        const body = yield* Effect.promise(() => response.text());
+
+        expect(response.status()).toBe(200);
+        expect(body).toContain(README_PHRASE);
+        expect(body).toContain('data-readme="');
+      })
     ));
 
   test(`${project}/${ask}'s page shows the ask`, ({ page: browser }) =>

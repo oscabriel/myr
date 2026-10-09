@@ -7,19 +7,33 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { Client, Contracts } from "@repo/protocol/contracts";
 import { AskListing } from "@repo/protocol/domain/ask";
 import { FileView, TreeListing } from "@repo/protocol/domain/code";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { AskId, Handle, LandedSha } from "@repo/protocol/ids";
-import { DateTime, Schema } from "effect";
+import { UnknownRevision } from "@repo/protocol/refusal";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { isNotFound } from "@tanstack/react-router";
+import { DateTime, Effect, Layer, Schema } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { RpcClient, RpcSerialization, RpcTest } from "effect/rpc";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { recentLandings } from "../src/client/project.ts";
-import { ProjectView } from "../src/features/project/project-page.tsx";
+import { devServer } from "../src/dev/server.ts";
+import {
+  ProjectReadingView,
+  ProjectView,
+} from "../src/features/project/project-page.tsx";
 import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
+import {
+  ProjectPageData,
+  readProjectPage,
+} from "../src/routes/$project/index.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -287,6 +301,141 @@ describe("the project's code on its page", () => {
   it("shows no code section before the code is read", () => {
     expect(markupOf(page)).not.toContain("data-readme=");
   });
+});
+
+/** The contracts over HTTP, each request answered by `answer`. */
+const clientOver = (answer: (request: Request) => Promise<Response>) =>
+  Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
+    Layer.provide(RpcClient.layerProtocolHttp({ url: "http://localhost/rpc" })),
+    Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson]),
+    Layer.provide(
+      Layer.succeed(FetchHttpClient.Fetch, (input, init) =>
+        answer(new Request(input, init))
+      )
+    )
+  );
+
+/**
+ * The contracts over a fresh dev world, as the Worker's loader reaches
+ * them in process; the world ends with the scope.
+ */
+const devWorld = Layer.unwrap(
+  Effect.gen(function* () {
+    const { dispose, handler } = devServer();
+
+    yield* Effect.addFinalizer(() => Effect.promise(dispose));
+
+    return clientOver(handler);
+  })
+);
+
+/** A platform that does not answer: every call comes back a 503. */
+const unanswering = clientOver(() =>
+  Promise.resolve(new Response("", { status: 503 }))
+);
+
+/** A platform that knows every project and has landed nothing on any. */
+const nothingLanded = Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+  Layer.provide([
+    Layer.mergeAll(
+      unanswered,
+      Contracts.toLayerHandler("readTree", ({ at }) =>
+        Effect.fail(new UnknownRevision({ rev: at ?? "main" }))
+      )
+    ),
+    asTester,
+  ])
+);
+
+const decodePage = Schema.decodeEffect(ProjectPageData);
+
+describe("the project's page as the server sends it", () => {
+  it.effect(
+    "carries datekit's README and its root entries, read on the server",
+    () =>
+      Effect.gen(function* () {
+        const { code } = yield* readProjectPage("datekit").pipe(
+          Effect.flatMap(decodePage),
+          Effect.provide(devWorld)
+        );
+
+        const sent = (
+          <ProjectReadingView
+            code={code}
+            platformUrl={platformUrl}
+            project={listing.project}
+          />
+        );
+
+        expect(textOf(sent)).toContain("Small, dependency-free date helpers");
+        expect(markupOf(sent)).toContain('data-readme="README.md"');
+        expect(markupOf(sent)).toContain('href="/datekit/tree/main/src"');
+        expect(textOf(sent)).toContain(`git clone ${platformUrl}/datekit.git`);
+      })
+  );
+
+  it.effect(
+    "shows a project whose main has not landed with no code, and no error",
+    () =>
+      Effect.gen(function* () {
+        const { code } = yield* readProjectPage("datekit").pipe(
+          Effect.flatMap(decodePage),
+          Effect.provide(nothingLanded)
+        );
+
+        expect(code).toBeUndefined();
+
+        const sent = (
+          <ProjectReadingView
+            code={code}
+            platformUrl={platformUrl}
+            project={listing.project}
+          />
+        );
+
+        const shown = (
+          <ProjectView
+            asks={asks}
+            code={code}
+            landings={[]}
+            listing={listing}
+            now={now}
+            platformUrl={platformUrl}
+          />
+        );
+
+        expect(markupOf(sent)).not.toContain('id="code"');
+        expect(markupOf(shown)).not.toContain('id="code"');
+        expect(rowOf(markupOf(shown), "fix-week-start")).toContain(
+          'href="/datekit/asks/fix-week-start"'
+        );
+      })
+  );
+
+  it.effect(
+    "is sent without its code, not as a not-found, when the platform does not answer",
+    () =>
+      Effect.gen(function* () {
+        const { code } = yield* readProjectPage("datekit").pipe(
+          Effect.flatMap(decodePage),
+          Effect.provide(unanswering)
+        );
+
+        expect(code).toBeUndefined();
+      })
+  );
+
+  it.effect.each(["no-such-project", "Not_A_Project"])(
+    "is a not-found for %s, which the platform does not know",
+    (name) =>
+      Effect.gen(function* () {
+        const failed = yield* Effect.flip(
+          readProjectPage(name).pipe(Effect.provide(devWorld))
+        );
+
+        expect(isNotFound(failed)).toBeTruthy();
+      })
+  );
 });
 
 describe(UnknownProjectView, () => {

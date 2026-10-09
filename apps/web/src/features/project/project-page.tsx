@@ -1,8 +1,9 @@
 /**
  * A project's page: its posture, how to take part, its open asks, and its
  * recent landings with their credit trailers. Props in, markup out: the
- * route reads the listing, the asks and the landings (`src/client/project.ts`)
- * and the platform URL (the root loader), and hands them here. "Propose an
+ * route reads the listing, the asks and the landings (`src/client/project.ts`),
+ * the code (its loader on the server, then `src/client/code.ts`) and the
+ * platform URL (the root loader), and hands them here. "Propose an
  * ask" shows for signed-in members only, once the browser knows who that is
  * (`features/propose/propose-link.tsx`).
  */
@@ -15,6 +16,7 @@ import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 
 import { EntriesTable, ReadmeSection } from "../code/tree-view.tsx";
+import { ReadingRows } from "../front/reading.tsx";
 import { SignedInProposeLink } from "../propose/propose-link.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
@@ -242,3 +244,27 @@ export const ProjectView = ({
     </PageShell>
   );
 };
+
+/**
+ * The page as the server sends it, while the browser reads the asks and
+ * landings: the clone line, rows holding their place, and the code the
+ * server read with the page (its root folder and README), so a reader
+ * without JavaScript, and a crawler, still gets the README.
+ */
+export const ProjectReadingView = ({
+  code,
+  platformUrl,
+  project,
+}: {
+  /** The root folder at main and its README, when the server could read them. */
+  readonly code?: ProjectCode | undefined;
+  readonly platformUrl: string;
+  readonly project: ProjectName;
+}) => (
+  <PageShell title={project}>
+    <ProjectNav current="overview" project={project} />
+    <CloneBox platformUrl={platformUrl} project={project} />
+    <ReadingRows />
+    {code === undefined ? null : <CodeSection code={code} project={project} />}
+  </PageShell>
+);

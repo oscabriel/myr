@@ -9,12 +9,21 @@
  *    becomes elements, so everything after sees it;
  * 3. `rehypeRepoUrls`: relative links and media point into the project at
  *    the SHA (`resolve.ts`), before the sanitizer judges them;
- * 4. `rehypeSanitize` with `schema`: GitHub's allow-list, the last gate on
+ * 4. `rehypeFootnoteIds`: the footnotes' ids and links lose the
+ *    `user-content-` remark-rehype gave them, since the sanitizer gives
+ *    every id that prefix next, and twice made `user-content-user-content-
+ *    fn-1` while the links named `user-content-fn-1`;
+ * 5. `rehypeSanitize` with `schema`: GitHub's allow-list, the last gate on
  *    what comes in (no script, no handler, no `javascript:` or `data:`
- *    URL, no iframe, style or form; a README's `id` and `name` prefixed
- *    `user-content-`);
- * 5. `rehypeSlug`: heading ids, after the sanitizer, so `#usage` finds
- *    `## Usage` unprefixed.
+ *    URL, no iframe, style or form; every `id` and `name` prefixed
+ *    `user-content-`, so a README cannot clobber the page's own globals);
+ * 6. `rehypeSlug`: heading ids, after the sanitizer, so `#usage` finds
+ *    `## Usage` unprefixed;
+ * 7. `rehypeFragmentLinks`: last, once every id is final, a `#x` link with
+ *    no `x` in the file points at `user-content-x` when that is there (a
+ *    footnote, a README's own `<a id>` or `<a name>`), as GitHub's page
+ *    script does. It only changes where a link inside the file points,
+ *    never an id.
  *
  * react-markdown's `defaultUrlTransform` stays on as a second net.
  */
@@ -111,12 +120,103 @@ export const rehypeRepoUrls = (at: MarkdownAt) => (tree: Root) => {
   });
 };
 
+/** The prefix the sanitizer puts on every `id` and `name` (`hast-util-sanitize`'s default). */
+const CLOBBER = schema.clobberPrefix ?? "user-content-";
+
+const unprefixed = (value: string, lead = "") =>
+  value.startsWith(`${lead}${CLOBBER}`)
+    ? `${lead}${value.slice(lead.length + CLOBBER.length)}`
+    : value;
+
+/** Drop the prefix from one property, when the element carries it as a string. */
+const unprefix = (properties: Properties, key: "href" | "id", lead = "") => {
+  const value = properties[key];
+
+  if (Predicate.isString(value)) {
+    properties[key] = unprefixed(value, lead);
+  }
+};
+
+/**
+ * A rehype plugin: the footnotes remark-rehype made (a reference, a
+ * footnote's item, a back-reference) lose the prefix it gave their ids and
+ * links, so the sanitizer's prefix is their only one.
+ */
+export const rehypeFootnoteIds = () => (tree: Root) => {
+  visit(tree, "element", (node, _index, parent) => {
+    const { properties } = node;
+
+    if (node.tagName === "a" && properties.dataFootnoteRef !== undefined) {
+      unprefix(properties, "id");
+      unprefix(properties, "href", "#");
+    }
+
+    if (node.tagName === "a" && properties.dataFootnoteBackref !== undefined) {
+      unprefix(properties, "href", "#");
+    }
+
+    if (
+      node.tagName === "ol" &&
+      parent?.type === "element" &&
+      parent.properties.dataFootnotes !== undefined
+    ) {
+      for (const item of node.children) {
+        if (item.type === "element" && item.tagName === "li") {
+          unprefix(item.properties, "id");
+        }
+      }
+    }
+  });
+};
+
+/**
+ * A rehype plugin, run last: a link to `#x` where the file has no `x` but
+ * has `user-content-x` (the sanitizer's prefix) points there, so a
+ * footnote and a README's own anchor jump. A target is an element's `id`
+ * or an anchor's `name`, the two a browser scrolls to for a fragment.
+ */
+export const rehypeFragmentLinks = () => (tree: Root) => {
+  const ids = new Set<string>();
+
+  visit(tree, "element", (node) => {
+    const { id, name } = node.properties;
+
+    if (Predicate.isString(id)) {
+      ids.add(id);
+    }
+
+    if (node.tagName === "a" && Predicate.isString(name)) {
+      ids.add(name);
+    }
+  });
+
+  visit(tree, "element", (node) => {
+    const { href } = node.properties;
+
+    if (node.tagName !== "a" || !Predicate.isString(href)) {
+      return;
+    }
+
+    if (!href.startsWith("#")) {
+      return;
+    }
+
+    const target = href.slice(1);
+
+    if (!ids.has(target) && ids.has(`${CLOBBER}${target}`)) {
+      node.properties.href = `#${CLOBBER}${target}`;
+    }
+  });
+};
+
 export const remarkPlugins: PluggableList = [remarkGfm];
 
 /** The rehype half of the chain for one file, in its fixed order. */
 export const rehypePluginsFor = (at: MarkdownAt): PluggableList => [
   rehypeRaw,
   [rehypeRepoUrls, at],
+  rehypeFootnoteIds,
   [rehypeSanitize, schema],
   rehypeSlug,
+  rehypeFragmentLinks,
 ];
