@@ -11,6 +11,7 @@
  * package's tags alone.
  */
 import type { RefsView as Refs, TagRef } from "@repo/protocol/domain/code";
+import { defaultStringifySearch } from "@tanstack/react-router";
 import { Schema } from "effect";
 
 import { answerPath } from "../ask/ask-page.tsx";
@@ -77,15 +78,16 @@ const ID = "font-mono text-[0.8125rem]";
 
 const SECTION = "text-lg font-semibold tracking-[-0.01em]";
 
-/** The refs page from the `from`th tag, of one package's tags or all. */
-const refsHref = (project: string, from: number, only?: string) => {
-  const search = [
-    ...(only === undefined ? [] : [`package=${encodeURIComponent(only)}`]),
-    ...(from > 0 ? [`from=${from}`] : []),
-  ].join("&");
-
-  return search === "" ? `/${project}/refs` : `/${project}/refs?${search}`;
-};
+/**
+ * The refs page from the `from`th tag, of one package's tags or all. The
+ * router writes the search, so a name it would read back as JSON (a
+ * package called `2048`) is quoted and arrives as the name.
+ */
+const refsHref = (project: string, from: number, only?: string) =>
+  `/${project}/refs${defaultStringifySearch({
+    package: only,
+    from: from > 0 ? from : undefined,
+  })}`;
 
 const Packages = ({
   packages,
@@ -122,7 +124,7 @@ const Packages = ({
             >
               {newest.name}
             </a>
-            <span title="Tags">{count}</span>
+            <span>{count === 1 ? "1 tag" : `${count} tags`}</span>
           </span>
         </li>
       ))}

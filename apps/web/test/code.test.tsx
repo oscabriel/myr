@@ -34,7 +34,7 @@ import {
 import type { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { isNotFound } from "@tanstack/react-router";
+import { defaultParseSearch, isNotFound } from "@tanstack/react-router";
 import { DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
 import { RpcTest } from "effect/rpc";
 import type { Rpc } from "effect/rpc";
@@ -744,13 +744,13 @@ describe("a monorepo's refs page", () => {
       CORE,
       `/datekit/tree/${TAG_SEGMENT.replace("1.0.0", "2.0.0")}`,
     ]);
-    expect(core).toContain(">2<");
+    expect(textOf(<RefsView refs={monorepo} />)).toContain("2 tags");
     // The last package's slice runs on to the page's end: its first two links.
     expect(hrefsOf(fmt).slice(0, 2)).toStrictEqual([
       "/datekit/refs?package=fmt",
       "/datekit/tree/fmt%400.1.0",
     ]);
-    expect(fmt).toContain(">1<");
+    expect(fmt).toContain("1 tag<");
   });
 
   it("puts the packages above the tags", () => {
@@ -808,6 +808,33 @@ describe("a monorepo's refs page", () => {
     expect(markupOf(element)).not.toContain("data-tag=");
     expect(textOf(element)).toContain("No tags for @datekit/none.");
     expect(hrefsOf(markupOf(element))).toContain("/datekit/refs");
+  });
+
+  it("links each package so the router reads its name back, even one that reads as a number", () => {
+    const odd = Schema.decodeSync(Refs)({
+      forks: [],
+      project: "datekit",
+      tags: [
+        { name: "2048@1.0.0", sha: OLDER },
+        { name: "true@1.0.0", sha: OLDER },
+        { name: "@datekit/core@1.0.0", sha: OLDER },
+      ],
+    });
+
+    const read = hrefsOf(markupOf(<RefsView refs={odd} />))
+      .filter((href) => href.includes("package="))
+      .map((href) => {
+        // What the router hands the route's `validateSearch`.
+        const search = defaultParseSearch(new URL(href, "https://web").search);
+
+        return packageParamOf("package" in search ? search.package : undefined);
+      });
+
+    expect(read).toStrictEqual([
+      Option.some("2048"),
+      Option.some("true"),
+      Option.some("@datekit/core"),
+    ]);
   });
 
   it("reads a package from the address only when it names one", () => {
