@@ -1,9 +1,10 @@
 /**
  * One range's line of "why", shared by the server's table and the
- * browser's annotation rows: for a landing, "<subject> · <author> · <n>
- * credits · <verdict>", linking the commit, the ask, its answer and the
- * author; for a commit the project adopted, "<subject> · <author> · before
- * adoption". Then where to go from here: the file before this commit, and
+ * browser's annotation rows: for a landing, "<subject> · <ask> answer ·
+ * <author> · <n> credits · <verdict>", linking the commit, the ask, its
+ * answer and the author (an ask's opening reads "Open ask <ask>" instead,
+ * linking the ask alone: it answers nothing); for a commit the project
+ * adopted, "<subject> · <author> · before adoption". Then where to go from here: the file before this commit, and
  * the propose form about the range's first line. `LandingDetails` is the
  * whole landing, for the line dialog.
  */
@@ -16,8 +17,14 @@ import { answerPath, askPath } from "../ask/ask-page.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
 import { CreditTrailers } from "../shared/credits.tsx";
 import { HandleLink } from "../shared/handle.tsx";
-import { creditWords, priorHref, proposeHref, verdictWords } from "./rows.ts";
-import type { WhyRow } from "./rows.ts";
+import {
+  askOf,
+  creditWords,
+  priorHref,
+  proposeHref,
+  verdictWords,
+} from "./rows.ts";
+import type { LandingAsk, WhyRow } from "./rows.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
@@ -29,24 +36,43 @@ const DOT = (
   </span>
 );
 
-/** The ask a landing answers, with its answer's page. */
-const AskLinks = ({
-  landing,
+/** The ask a landing links, as its id linking the ask's page. */
+const AskLink = ({
+  linked,
   project,
 }: {
-  readonly landing: LandingView;
+  readonly linked: LandingAsk;
   readonly project: ProjectName;
-}) =>
-  landing.ask === undefined ? null : (
+}) => (
+  <a className={`${ID} ${LINK}`} href={askPath(project, linked.ask)}>
+    {linked.ask}
+  </a>
+);
+
+/**
+ * The ask a landing links: "<ask> answer" for the one it answers, with its
+ * answer's page; "Open ask <ask>" for the one it opened, which has none.
+ */
+const AskLinks = ({
+  linked,
+  project,
+}: {
+  readonly linked: LandingAsk;
+  readonly project: ProjectName;
+}) => {
+  const ask = <AskLink linked={linked} project={project} />;
+
+  return linked.kind === "opened" ? (
+    <span>Open ask {ask}</span>
+  ) : (
     <>
-      <a className={`${ID} ${LINK}`} href={askPath(project, landing.ask)}>
-        {landing.ask}
-      </a>
-      <a className={LINK} href={answerPath(project, landing.ask)}>
+      {ask}
+      <a className={LINK} href={answerPath(project, linked.ask)}>
         answer
       </a>
     </>
   );
+};
 
 /** "· <author> · before adoption", for a commit the project adopted. */
 const Adopted = ({ author }: { readonly author: string }) => (
@@ -58,7 +84,10 @@ const Adopted = ({ author }: { readonly author: string }) => (
   </>
 );
 
-/** "· <ask> answer · <author> · <n> credits · <verdict>", for a landing. */
+/**
+ * "· <ask> answer · <author> · <n> credits · <verdict>" for a landing, or
+ * "· Open ask <ask> · …" for an ask's opening.
+ */
 const Landed = ({
   landing,
   project,
@@ -67,13 +96,14 @@ const Landed = ({
   readonly project: ProjectName;
 }) => {
   const verdict = Option.getOrUndefined(verdictWords(landing));
+  const linked = Option.getOrUndefined(askOf(landing));
 
   return (
     <>
-      {landing.ask === undefined ? null : (
+      {linked === undefined ? null : (
         <>
           {DOT}
-          <AskLinks landing={landing} project={project} />
+          <AskLinks linked={linked} project={project} />
         </>
       )}
       {DOT}
@@ -167,15 +197,22 @@ export const LandingDetails = ({
   readonly project: ProjectName;
 }) => {
   const verdict = verdictWords(landing);
+  const linked = Option.getOrUndefined(askOf(landing));
 
   return (
     <div className="flex flex-col gap-3 text-sm">
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-        {landing.ask === undefined ? null : (
+        {linked === undefined ? null : (
           <>
-            <dt className={LABEL}>Ask</dt>
+            <dt className={LABEL}>
+              {linked.kind === "opened" ? "Opened ask" : "Ask"}
+            </dt>
             <dd className="flex gap-2">
-              <AskLinks landing={landing} project={project} />
+              {linked.kind === "opened" ? (
+                <AskLink linked={linked} project={project} />
+              ) : (
+                <AskLinks linked={linked} project={project} />
+              )}
             </dd>
           </>
         )}

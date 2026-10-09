@@ -35,6 +35,7 @@ import {
   Ref,
   Runtime,
   Schema,
+  Struct,
 } from "effect";
 import { CliOutput } from "effect/cli";
 import { RpcTest } from "effect/rpc";
@@ -303,6 +304,47 @@ describe(`${Brand.cli} why`, () => {
             "- Signed-off-by: alice",
             "- Assisted-by: claude-code (claimed)",
           ])
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    'names the ask a line\'s landing opened in an "Opened" row, and no ask it answers',
+    () =>
+      Effect.gen(function* () {
+        const { dir } = yield* aRepo;
+
+        const opening = platform(({ sha }) =>
+          Effect.succeed({
+            landing: {
+              ...Struct.omit(landingOf(sha), ["ask"]),
+              opened: AskId.make("format-ordinal"),
+            },
+          })
+        );
+
+        const agent = yield* run(
+          dir,
+          ["src/week.ts:3", "--project", "datekit"],
+          opening,
+          OutputForAgent
+        );
+
+        expect(agent.code).toBe(0);
+        expect(agent.out.split("\n")).toStrictEqual(
+          expect.arrayContaining(["- Opened: `format-ordinal`"])
+        );
+        expect(agent.out).not.toContain("- Ask:");
+
+        const person = yield* run(
+          dir,
+          ["src/week.ts:3", "--project", "datekit"],
+          opening
+        );
+
+        expect(person.code).toBe(0);
+        expect(person.out.split("\n").map((line) => line.trim())).toStrictEqual(
+          expect.arrayContaining(["Opened: format-ordinal"])
         );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );

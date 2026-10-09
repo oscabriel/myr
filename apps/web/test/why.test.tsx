@@ -7,13 +7,15 @@
  * (`<diffs-container>`), loaded only there.
  */
 import { describe, expect, it } from "@effect/vitest";
-import { WhyView } from "@repo/protocol/domain/code";
+import { CommitView, WhyView } from "@repo/protocol/domain/code";
+import { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { LandedSha, ProjectName } from "@repo/protocol/ids";
 import { Schema } from "effect";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { LandingDetails } from "../src/features/why/range-summary.tsx";
 import { WhyCode } from "../src/features/why/why-code.tsx";
 import { WhyLines } from "../src/features/why/why-view.tsx";
 
@@ -191,6 +193,107 @@ describe("the why page's fallback", () => {
     expect(
       textOf(markupOf(<WhyLines project={datekit} rev="main" view={binary} />))
     ).toContain("binary or too large");
+  });
+});
+
+const OPENED = "6".repeat(40);
+
+/**
+ * `src/format.ts` where lines 1–2 came from an ask's opening: a landing
+ * with `opened` and no `ask`, so it answers nothing.
+ */
+const opening = Schema.decodeSync(WhyView)({
+  at: AT,
+  commits: [
+    {
+      author: signature("Ines", "2026-10-07T10:00:00.000Z"),
+      body: "",
+      committer: signature("platform", "2026-10-07T10:00:00.000Z"),
+      parents: [LANDED],
+      sha: OPENED,
+      subject: "Open format-ordinal",
+      trailers: [],
+      tree: "9".repeat(40),
+    },
+    ...view.commits.map((commit) => Schema.encodeSync(CommitView)(commit)),
+  ],
+  landings: [
+    ...view.landings.map((landing) => Schema.encodeSync(LandingView)(landing)),
+    {
+      assisted: [],
+      author: "ines-v",
+      credits: [{ handle: "ines-v", role: "Signed-off-by" }],
+      landedAt: "2026-10-07T10:00:00.000Z",
+      opened: "format-ordinal",
+      parent: LANDED,
+      project: "datekit",
+      sha: OPENED,
+    },
+  ],
+  path: "src/format.ts",
+  ranges: [
+    { end: 1, sha: LANDED, start: 1 },
+    { end: 3, sha: OPENED, start: 2 },
+    { end: 4, sha: IMPORTED, start: 4 },
+  ],
+});
+
+const opened = (
+  <WhyLines project={datekit} rev="main" text={TEXT} view={opening} />
+);
+
+describe("the why page's row for an ask's opening", () => {
+  it('links the ask it opened and reads "Open ask", with no answer link', () => {
+    const row = rowOf(markupOf(opened), "2-3");
+
+    expect(textOf(row)).toContain("Open ask format-ordinal");
+    expect(textOf(row)).toContain("ines-v");
+    expect(textOf(row)).toContain("1 credit");
+    expect(hrefsOf(row)).toContain("/datekit/asks/format-ordinal");
+    expect(
+      hrefsOf(row).filter((href) => href.includes("/answers/"))
+    ).toStrictEqual([]);
+  });
+
+  it("keeps an answering landing's ask and answer links, and an adopted commit's words", () => {
+    const markup = markupOf(opened);
+
+    expect(hrefsOf(rowOf(markup, "1-1"))).toStrictEqual(
+      expect.arrayContaining([
+        "/datekit/asks/parse-iso-week",
+        "/datekit/answers/parse-iso-week",
+      ])
+    );
+    expect(textOf(rowOf(markup, "1-1"))).not.toContain("Open ask");
+    expect(textOf(rowOf(markup, "4-4"))).toContain("before adoption");
+  });
+});
+
+/** The line dialog's landing, rendered; nothing for no landing. */
+const detailsOf = (landing: LandingView | undefined) =>
+  landing === undefined
+    ? ""
+    : markupOf(<LandingDetails landing={landing} project={datekit} />);
+
+describe("a line's landing, in the line dialog", () => {
+  it("names the ask an opening opened, linking it, and no answer", () => {
+    const markup = detailsOf(
+      opening.landings.find(({ sha }) => sha === OPENED)
+    );
+
+    expect(textOf(markup)).toContain("Opened ask format-ordinal");
+    expect(hrefsOf(markup)).toContain("/datekit/asks/format-ordinal");
+    expect(
+      hrefsOf(markup).filter((href) => href.includes("/answers/"))
+    ).toStrictEqual([]);
+  });
+
+  it("names the ask an answering landing answers, with its answer", () => {
+    const markup = detailsOf(view.landings[0]);
+
+    expect(textOf(markup)).toContain("Ask parse-iso-week");
+    expect(textOf(markup)).not.toContain("Opened ask");
+    expect(hrefsOf(markup)).toContain("/datekit/answers/parse-iso-week");
   });
 });
 
