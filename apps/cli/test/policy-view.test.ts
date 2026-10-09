@@ -9,6 +9,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Contracts, PolicyOf } from "@repo/protocol/contracts";
+import type { PublicPolicy } from "@repo/protocol/domain/policy";
 import { Envelope } from "@repo/protocol/envelope";
 import { unanswered } from "@repo/protocol/testing";
 import { Effect, Layer, Option, Schema } from "effect";
@@ -20,34 +21,35 @@ const sha = "4c2e6a8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c";
 
 const decodeSuccess = Schema.decodeSync(PolicyOf.successSchema);
 
-/** datekit's evaluated config folder at `sha`, as `projectPolicy` returns it. */
-const datekit = decodeSuccess({
-  policy: {
-    agents: "trailer",
-    at: sha,
-    budget: { decisionsPerDay: 5, expireDays: 14 },
-    caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
-    claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
-    deciders: [
-      { handles: ["ines-v"], paths: "**" },
-      { handles: ["okonkwo", "bram"], paths: "src/tz.ts" },
-    ],
-    judge: { paths: [`${Brand.configDir}/**`], pointers: [] },
-    kinds: [],
-    modules: [],
-    ratchets: [],
-    record: { countsAfterDays: 30, windowDays: 365 },
-    run: { checks: { unit: "bun test" }, test: "bun test {path}" },
-    source: "config",
-    vouch: { file: `${Brand.configDir}/vouched.td`, mode: "forCode" },
-    vouches: [
-      { denounced: false, handle: "bram", note: "first answer landed" },
-      { denounced: false, handle: "ines-v" },
-      { denounced: true, handle: "spam-bot" },
-    ],
-    weakening: { markers: [] },
-  },
-});
+/** datekit's evaluated config folder at `sha`, encoded. */
+const datekitPolicy = {
+  agents: "trailer",
+  at: sha,
+  budget: { decisionsPerDay: 5, expireDays: 14 },
+  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
+  claims: { lapseAfterMs: 86_400_000, warnAfterMs: 7_200_000 },
+  deciders: [
+    { handles: ["ines-v"], paths: "**" },
+    { handles: ["okonkwo", "bram"], paths: "src/tz.ts" },
+  ],
+  judge: { paths: [`${Brand.configDir}/**`], pointers: [] },
+  kinds: [],
+  modules: [],
+  ratchets: [],
+  record: { countsAfterDays: 30, windowDays: 365 },
+  run: { checks: { unit: "bun test" }, test: "bun test {path}" },
+  source: "config",
+  vouch: { file: `${Brand.configDir}/vouched.td`, mode: "forCode" },
+  vouches: [
+    { denounced: false, handle: "bram", note: "first answer landed" },
+    { denounced: false, handle: "ines-v" },
+    { denounced: true, handle: "spam-bot" },
+  ],
+  weakening: { markers: [] },
+} as const satisfies typeof PublicPolicy.Encoded;
+
+/** datekit's policy as `projectPolicy` returns it. */
+const datekit = decodeSuccess({ policy: datekitPolicy });
 
 const noConfig = decodeSuccess({
   unevaluated: { at: sha, reason: "noConfig" },
@@ -97,6 +99,16 @@ describe("policy's text view", () => {
     );
     expect(text).toContain(
       `${Brand.configDir}/vouched.td vouches for 2 and denounces 1`
+    );
+  });
+
+  it("says a vouch file that names nobody vouches for nobody and denounces nobody, as the people page does", () => {
+    const text = textOf(
+      decodeSuccess({ policy: { ...datekitPolicy, vouches: [] } })
+    );
+
+    expect(text).toContain(
+      `${Brand.configDir}/vouched.td vouches for nobody and denounces nobody`
     );
   });
 

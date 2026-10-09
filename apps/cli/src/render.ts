@@ -308,6 +308,9 @@ const today = viewOf(TodayOf.successSchema, (page) =>
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
+/** How many a vouch file names, as the people page says none: "nobody". */
+const countOf = (count: number) => (count === 0 ? "nobody" : `${count}`);
+
 const HOUR_MS = 3_600_000;
 
 /** A claim timing as the people page says it: whole hours up to two days, then days. */
@@ -353,7 +356,7 @@ const evaluated = (policy: PublicPolicy) => {
       "Nobody decides."
     ),
     prose(
-      `Vouching: ${vouchModes[vouch.mode]} ${vouch.file} vouches for ${vouches.length - denounced} and denounces ${denounced}.`
+      `Vouching: ${vouchModes[vouch.mode]} ${vouch.file} vouches for ${countOf(vouches.length - denounced)} and denounces ${countOf(denounced)}.`
     ),
     prose("Limits:"),
     fields([
