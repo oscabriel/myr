@@ -6,7 +6,8 @@
  * `frontPage`, `credits`) come from the front-page projection; `status` and
  * `today` without a project ask every project the projection lists and
  * merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
- * caller's rate limit first, so a call past it reaches no project.
+ * caller's rate limit first, so a call past it reaches no project; a
+ * proposal with a draft, and `draftAsk`, spend the draft limit too.
  * `evidence` asks the project who may read a lane's log, which it reads
  * from the stage's `EvidenceStore`. The code reads (`listRefs`, `readTree`,
  * `listPaths`, `readFile`, `log`, `showCommit`, `why`) run here, over the
@@ -349,6 +350,12 @@ export const Handlers: Layer.Layer<
       proposeAsk: ({ project, ...input }) =>
         Effect.gen(function* () {
           const who = yield* person;
+
+          // A draft spends the draft limit (model calls and Checker runs)
+          // first, then the proposal limit, as any proposal does.
+          if (input.draft === true) {
+            yield* rateLimits.check("draft", who.handle);
+          }
 
           yield* rateLimits.check("proposal", who.handle);
 

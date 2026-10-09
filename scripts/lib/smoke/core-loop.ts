@@ -17,10 +17,12 @@ import { Brand } from "@repo/brand";
 import { AnswerView } from "@repo/protocol/domain/answer";
 import { Ask } from "@repo/protocol/domain/ask";
 import { ClaimView } from "@repo/protocol/domain/claim";
+import { Decision, DecisionSubject } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
+import { DraftState, Proposal } from "@repo/protocol/domain/proposal";
 import { Envelope } from "@repo/protocol/envelope";
 import { AskId, CommitSha, Handle, LandedSha } from "@repo/protocol/ids";
-import type { ProjectName } from "@repo/protocol/ids";
+import type { ProjectName, ProposalId } from "@repo/protocol/ids";
 import { explain } from "@repo/protocol/render";
 import {
   Array,
@@ -48,6 +50,9 @@ export const LoopStep = Schema.Literals([
   "answer",
   "landing",
   "verdict-note",
+  "draft-propose",
+  "draft-ready",
+  "draft-accept",
 ]);
 
 export type LoopStep = typeof LoopStep.Type;
@@ -806,3 +811,194 @@ export const readVerdictNote = (input: {
       )
     )
   );
+
+// ------------------------------------------------------------------ drafts
+
+/** What the loop's draft proposal wants: a reader of ordinal dates beside `parse`. */
+const DRAFT_WANT =
+  "src/parse.ts exports parseOrdinal, which reads an ordinal date such as 2026-280.";
+
+const Proposed = Schema.Struct({ proposal: Proposal });
+
+const Shown = Schema.Struct({ proposal: Proposal });
+
+/** Proposes the draft's want as `proposer`, with `--draft`: the proposal, drafting. */
+export const proposeDraft = (proposer: LoopPerson, project: ProjectName) =>
+  Effect.map(
+    cli(
+      "draft-propose",
+      proposer,
+      ["propose", "--project", project, "--want", DRAFT_WANT, "--draft"],
+      Proposed
+    ),
+    ({ proposal }) => proposal.id
+  );
+
+/** The draft is still being drafted. */
+class StillDrafting extends Schema.TaggedError<StillDrafting>()(
+  "StillDrafting",
+  {}
+) {}
+
+/** A draft that went red first: the model that drafted it, and its attempts. */
+export interface DraftReady {
+  readonly model: string;
+  readonly attempts: number;
+}
+
+/**
+ * Asks `<cli> proposal <id>` as `reader` until the draft is settled: ready,
+ * or the step fails with the last refusal a failed draft names.
+ */
+export const awaitDraft = (input: {
+  readonly reader: LoopPerson;
+  readonly project: ProjectName;
+  readonly proposal: ProposalId;
+  readonly patience: Patience;
+}) =>
+  Effect.gen(function* () {
+    const { project, proposal, reader } = input;
+
+    /** Where the draft stands: settled, or still drafting, which is asked again. */
+    const settled = (
+      shown: Proposal
+    ): Effect.Effect<DraftState, LoopFailed | StillDrafting> =>
+      Option.match(Option.fromUndefinedOr(shown.draft), {
+        onNone: () =>
+          Effect.fail(
+            failed("draft-ready", `the proposal ${proposal} has no draft`)
+          ),
+        onSome: (state) =>
+          DraftState.guards.Drafting(state)
+            ? Effect.fail(new StillDrafting())
+            : Effect.succeed(state),
+      });
+
+    const draft = yield* cli(
+      "draft-ready",
+      reader,
+      ["proposal", proposal, "--project", project],
+      Shown
+    ).pipe(
+      Effect.flatMap(({ proposal: shown }) => settled(shown)),
+      Effect.retry({
+        schedule: Schedule.spaced(input.patience.every).pipe(
+          Schedule.upTo({ duration: input.patience.within })
+        ),
+        while: Schema.is(StillDrafting),
+      }),
+      Effect.catchTag("StillDrafting", () =>
+        Effect.fail(
+          failed(
+            "draft-ready",
+            `the proposal ${proposal} was still drafting after ${Duration.format(input.patience.within)}`
+          )
+        )
+      )
+    );
+
+    if (DraftState.guards.Ready(draft)) {
+      return {
+        attempts: draft.attempts,
+        model: draft.model,
+      } satisfies DraftReady;
+    }
+
+    return yield* failed(
+      "draft-ready",
+      DraftState.guards.Failed(draft)
+        ? `the draft of ${proposal} failed after ${draft.attempts} attempts, last refused ${draft.refusal}`
+        : `the proposal ${proposal} is still drafting`
+    );
+  });
+
+const TodayIs = Schema.Struct({ decisions: Schema.Array(Decision) });
+
+const Decided = Schema.Struct({ decision: Decision });
+
+/**
+ * Accepts the drafted proposal as `decider`, from their Today, and reads
+ * the landing that opened its ask on main, fetched from the platform at
+ * `origin` into the repo at `dir`: its
+ * trailers, which must disclose the drafter (`Assisted-by:`) and credit
+ * `proposer` as its asker.
+ */
+export const acceptDraft = (input: {
+  readonly decider: LoopPerson;
+  readonly proposer: Handle;
+  readonly project: ProjectName;
+  readonly proposal: ProposalId;
+  readonly dir: string;
+  readonly origin: string;
+}) =>
+  Effect.gen(function* () {
+    const { decider, dir, project, proposal } = input;
+
+    const { decisions } = yield* cli(
+      "draft-accept",
+      decider,
+      ["today", "--project", project],
+      TodayIs
+    );
+
+    const decision = yield* Effect.fromOption(
+      Array.findFirst(
+        decisions,
+        ({ subject }) =>
+          DecisionSubject.guards.OpenProposal(subject) &&
+          subject.proposal === proposal
+      )
+    ).pipe(
+      Effect.mapError(() =>
+        failed(
+          "draft-accept",
+          `${decider.handle}'s Today holds no decision on ${proposal}`
+        )
+      )
+    );
+
+    yield* cli(
+      "draft-accept",
+      decider,
+      [
+        "decide",
+        "--project",
+        project,
+        "--decision",
+        decision.id,
+        "--choice",
+        "accept",
+        "--yes",
+      ],
+      Decided
+    );
+
+    yield* gitOk("draft-accept", decider, dir, [
+      "fetch",
+      "--quiet",
+      `${input.origin}/${project}.git`,
+      "refs/heads/main",
+    ]);
+
+    const trailers = (yield* gitOk("draft-accept", decider, dir, [
+      "log",
+      "-1",
+      "--format=%(trailers:only,unfold)",
+      "FETCH_HEAD",
+    ]))
+      .split("\n")
+      .filter((line) => line.length > 0);
+
+    const missing = [
+      "Assisted-by: ",
+      `Asked-by: ${input.proposer} `,
+      "Ask: ",
+    ].filter((prefix) => !trailers.some((line) => line.startsWith(prefix)));
+
+    return missing.length === 0
+      ? trailers
+      : yield* failed(
+          "draft-accept",
+          `the landing that opened ${proposal}'s ask lacks ${missing.map((prefix) => prefix.trim()).join(" and ")}: its trailers are ${trailers.join("; ") || "none"}`
+        );
+  });

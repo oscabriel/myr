@@ -13,19 +13,29 @@
  * The same Workflow admits a layer push's sealed checks: params
  * tagged `Admission` run `admissionSteps`, so typed visibility adds no
  * Workflow binding. An admission's output is `null`.
+ *
+ * So does a round of a proposal's draft: params tagged `Draft` run
+ * `draftSteps` (W9-D14), over the Worker's ports and the drafter
+ * (`draftPorts`), with each step's timeout handed to the engine. A draft's
+ * output is `null` too.
  */
+import type { RepoHost } from "@repo/artifacts/repo-host";
+import type { Drafter } from "@repo/drafting/drafter";
+import type { Projects } from "@repo/project/projects";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import type { WorkflowEvent } from "cloudflare:workers";
 import { Effect, Layer, Schema } from "effect";
 
 import type { WorkflowParams } from "../answer-runs.ts";
-import { AdmissionParams, AnswerParams } from "../answer-runs.ts";
+import { AdmissionParams, AnswerParams, DraftParams } from "../answer-runs.ts";
 import { decodeEnv } from "../platform.ts";
-import { workerPorts } from "../ports.ts";
+import { draftPorts, workerPorts } from "../ports.ts";
 import { admissionSteps } from "./admission-steps.ts";
 import { runAnswer } from "./answer/program.ts";
 import type { AnswerPorts } from "./answer/program.ts";
+import { draftSteps, timedSteps } from "./draft-steps.ts";
+import type { EngineSteps } from "./draft-steps.ts";
 import { workflowSteps } from "./step.ts";
 import type { StepRunner, WorkflowSteps } from "./step.ts";
 
@@ -75,8 +85,31 @@ export const runAdmission = <E>(
     )
   );
 
+/**
+ * One draft round's run of the Workflow over `ports`, its params decoded
+ * first, each step handed its timeout.
+ */
+export const runDraftWorkflow = <E>(
+  ports: Layer.Layer<Projects | Drafter | RepoHost, E>,
+  payload: typeof DraftParams.Encoded,
+  steps: EngineSteps
+): Promise<null> =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      yield* draftSteps(yield* Schema.decodeEffect(DraftParams)(payload));
+
+      return null;
+    }).pipe(
+      Effect.provide(Layer.merge(ports, workflowSteps(timedSteps(steps)))),
+      Effect.orDie
+    )
+  );
+
 /** Whether the engine's params start an admission rather than an answer. */
 const admits = Schema.is(Schema.toEncoded(AdmissionParams));
+
+/** Whether the engine's params start a draft's round. */
+const drafts = Schema.is(Schema.toEncoded(DraftParams));
 
 export class Answer extends WorkflowEntrypoint<
   Env,
@@ -84,14 +117,29 @@ export class Answer extends WorkflowEntrypoint<
 > {
   /**
    * `step` is the engine's `WorkflowStep`; the run uses only its `do`
-   * (`WorkflowSteps`), so a test can hand it a fake engine.
+   * (`EngineSteps`), so a test can hand it a fake engine.
    */
   override run(
     event: Readonly<WorkflowEvent<typeof WorkflowParams.Encoded>>,
-    step: WorkflowSteps
+    step: EngineSteps
   ): Promise<OutcomeEncoded | null> {
-    const ports = Layer.unwrap(Effect.map(decodeEnv(this.env), workerPorts));
+    const config = decodeEnv(this.env);
     const { payload } = event;
+
+    if (drafts(payload)) {
+      // The env decoded once: the Worker's ports and the drafter from it.
+      return runDraftWorkflow(
+        Layer.unwrap(
+          Effect.map(config, (decoded) =>
+            Layer.merge(workerPorts(decoded), draftPorts(decoded))
+          )
+        ),
+        payload,
+        step
+      );
+    }
+
+    const ports = Layer.unwrap(Effect.map(config, workerPorts));
 
     return admits(payload)
       ? runAdmission(ports, payload, step)

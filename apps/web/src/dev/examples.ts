@@ -16,9 +16,11 @@
  * `/json` rules evaluator reads, with every ask it will open stated there;
  * an ask opens when a decider lands its files. Each ask file is written
  * from the ask `policy.json` states, as the SDK call a maintainer writes,
- * so the two never disagree.
+ * so the two never disagree. datekit's `policy.json` also states the ask
+ * the dev world's drafter drafts, which only an accepted draft opens.
  */
 import { Brand } from "@repo/brand";
+import { cannedDraft } from "@repo/drafting/draft-runs/canned";
 import { CheckSpec, RatchetMeasure } from "@repo/protocol/domain/check";
 import { Command, SymbolName } from "@repo/protocol/domain/common";
 import type { AskKind } from "@repo/protocol/domain/kind";
@@ -269,6 +271,25 @@ const datekitAsks: readonly DatekitAsk[] = [
   }),
 ];
 
+/**
+ * The ask the dev world's drafter drafts for any want (`cannedDraft`),
+ * stated beside datekit's own so the `/json` rules evaluator finds it once
+ * a draft's files are composed; nobody opens it in the seed. A decider who
+ * accepts the draft opens it.
+ */
+const draftedAsk: StatedAsk = {
+  askedBy: datekitPeople.decider,
+  blockedBy: [],
+  brief: { current: cannedDraft.current, want: cannedDraft.want },
+  check: encodeCheck(
+    CheckSpec.cases.RedThenGreen.make({ path: cannedDraft.test.path })
+  ),
+  file: `${dir}/asks/${cannedDraft.id}.ask.ts`,
+  id: cannedDraft.id,
+  kind: cannedDraft.kind,
+  territory: { module: ".", paths: [...cannedDraft.territory] },
+};
+
 const library: Files = new Map([
   [
     "README.md",
@@ -383,7 +404,7 @@ const library: Files = new Map([
   [
     `${dir}/policy.json`,
     policyJson({
-      asks: datekitAsks.map(({ stated }) => stated),
+      asks: [...datekitAsks.map(({ stated }) => stated), draftedAsk],
       deciders: [
         { handles: [datekitPeople.decider], paths: "**" },
         { handles: [datekitPeople.zones], paths: "src/tz.ts" },

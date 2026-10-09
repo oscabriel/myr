@@ -5,6 +5,7 @@
  * and every run), and an answer that landed with its credit.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Handle, ProjectName } from "@repo/protocol/ids";
@@ -281,6 +282,67 @@ describe("the dev world's raw files", seededWorlds, () => {
         expect(manifest?.csp).toContain("sandbox");
         expect(manifest?.text).toContain('"name": "datekit"');
         expect([climbed?.status, climbed?.text]).toStrictEqual([404, ""]);
+      })
+  );
+});
+
+/**
+ * bram proposes a want for datekit with a draft, and what follows: the
+ * proposal as anyone reads it, and ines-v's Today before and after.
+ */
+const drafted = inFreshWorld((as) =>
+  Effect.gen(function* () {
+    const anyone = yield* clientOf(as());
+    const ines = yield* clientOf(as(decider));
+    const bram = yield* clientOf(as(contributor));
+    const project = ProjectName.make("datekit");
+    const before = yield* ines.today({ project });
+
+    const { proposal } = yield* bram.proposeAsk({
+      draft: true,
+      project,
+      want: "datekit reads ordinal dates such as 2026-280.",
+    });
+
+    const shown = yield* anyone.showProposal({
+      project,
+      proposal: proposal.id,
+    });
+
+    return {
+      after: yield* ines.today({ project }),
+      before,
+      proposed: proposal,
+      shown,
+    };
+  })
+);
+
+describe("a draft in the dev world", seededWorlds, () => {
+  it.live(
+    "is drafted as it is proposed, red first on the scripted Checker, and its decision joins the decider's Today",
+    () =>
+      Effect.gen(function* () {
+        const { after, before, proposed, shown } = yield* drafted;
+
+        // The seeded decisions expire first and fill the day's budget, so
+        // the draft's decision waits on Today as its overflow.
+        expect({
+          files: shown.files.map(({ path }) => path),
+          overflow: [before.overflow, after.overflow],
+          proposed: proposed.draft?._tag,
+          ready: shown.proposal.draft?._tag,
+          shown: after.decisions.map(({ id }) => id),
+        }).toStrictEqual({
+          files: [
+            `${Brand.configDir}/asks/parse-ordinal.ask.ts`,
+            "test/asks/parse-ordinal.test.ts",
+          ],
+          overflow: [0, 1],
+          proposed: "Drafting",
+          ready: "Ready",
+          shown: before.decisions.map(({ id }) => id),
+        });
       })
   );
 });

@@ -27,6 +27,13 @@
  *
  * `--loop` refuses `--stage demo` before anything else: the throwaway would
  * show on the front page the user records.
+ *
+ * `--loop --draft` also has the platform's agent draft an ask on the
+ * throwaway project: the answerer proposes a want with `--draft`, the loop
+ * waits for the draft to go red first, and the decider accepts it; the
+ * landing that opens the ask must disclose the drafter (`Assisted-by:`).
+ * It prints the model, the attempts and the time. `--draft` without
+ * `--loop` is refused before any request.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Handle, sameHandle } from "@repo/protocol/ids";
@@ -50,6 +57,16 @@ import {
   subdomainFile,
 } from "../infra/stages.ts";
 import { DemoStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
+
+/** `--draft` was given without `--loop`: only the loop has a project to draft on. */
+export class DraftNeedsLoop extends Schema.TaggedError<DraftNeedsLoop>()(
+  "DraftNeedsLoop",
+  { flag: Schema.Literal("--draft") }
+) {
+  override get message() {
+    return `${this.flag} drafts an ask on the loop's throwaway project: run it with --loop`;
+  }
+}
 
 export {
   NoOrigin,
@@ -166,20 +183,45 @@ const loopMain = (argv: readonly string[]) =>
 
     yield* Console.log(`smoke ${stage}: loop smoke-${run} at ${origin}`);
 
-    const report = yield* smokeLoop({ ...tokens, origin, run, stage });
+    const report = yield* smokeLoop({
+      ...tokens,
+      draft: argv.includes("--draft"),
+      origin,
+      run,
+      stage,
+    });
+
     const total = report.timings.reduce((sum, { ms }) => sum + ms, 0);
 
     yield* Console.log(
       `smoke ${stage}: loop passed in ${total} ms: ${report.project} landed ${report.landed.slice(0, 12)} by ${report.author}, refused first with ${report.refusedWith.join(", ")}; trailers ${report.trailers.join("; ")}`
     );
+
+    if (report.draft !== undefined) {
+      const { attempts, model, ms, trailers } = report.draft;
+
+      yield* Console.log(
+        `smoke ${stage}: draft by ${model} went red first in ${attempts} of 3 attempts, ${ms} ms from proposal to draft; its ask opened with ${trailers.join("; ")}`
+      );
+    }
   });
 
 /**
- * `bun scripts/smoke.ts --stage <s> [--loop] …`: the probes, and with
- * `--loop` the core loop after them.
+ * `bun scripts/smoke.ts --stage <s> [--loop [--draft]] …`: the probes, and
+ * with `--loop` the core loop after them; `--draft` alone is refused.
  */
 export const main = (argv: readonly string[]) =>
-  argv.includes("--loop") ? loopMain(argv) : probeMain(argv);
+  Effect.gen(function* () {
+    if (argv.includes("--loop")) {
+      return yield* loopMain(argv);
+    }
+
+    if (argv.includes("--draft")) {
+      return yield* new DraftNeedsLoop({ flag: "--draft" });
+    }
+
+    return yield* probeMain(argv);
+  });
 
 if (import.meta.main) {
   BunRuntime.runMain(
