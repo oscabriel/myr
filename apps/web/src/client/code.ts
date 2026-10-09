@@ -25,7 +25,9 @@ const options = (project: ProjectName) => ({
 
 /** Main, the tags and the forks. */
 export const refsAtom = Atom.family((project: ProjectName) =>
-  ContractsClient.query("listRefs", { project }, options(project))
+  Atom.withServerValueInitial(
+    ContractsClient.query("listRefs", { project }, options(project))
+  )
 );
 
 /** One folder; the root at main when the payload names neither. */
@@ -51,27 +53,31 @@ export const commitAtom = (payload: PayloadOf<"showCommit">) =>
 /**
  * The project page's code: the root folder at main and, when it has one,
  * its README, read after it. A project with nothing landed yet refuses
- * the read, and its page shows no code.
+ * the read, and its page shows no code. Like the page's other reads
+ * (`project.ts`), it renders as waiting on the server, so the Worker
+ * never reads the code for a page that draws it only in the browser.
  */
 export const projectCodeAtom = Atom.family((project: ProjectName) =>
-  ContractsClient.runtime.factory.withReactivity(keys.code(project))(
-    ContractsClient.runtime.atom(
-      Effect.gen(function* () {
-        const client = yield* ContractsClient;
-        const root = yield* client("readTree", { at: "main", project });
+  Atom.withServerValueInitial(
+    ContractsClient.runtime.factory.withReactivity(keys.code(project))(
+      ContractsClient.runtime.atom(
+        Effect.gen(function* () {
+          const client = yield* ContractsClient;
+          const root = yield* client("readTree", { at: "main", project });
 
-        if (root.readme === undefined) {
-          return { root };
-        }
+          if (root.readme === undefined) {
+            return { root };
+          }
 
-        const readme = yield* client("readFile", {
-          at: root.at,
-          path: root.readme.path,
-          project,
-        });
+          const readme = yield* client("readFile", {
+            at: root.at,
+            path: root.readme.path,
+            project,
+          });
 
-        return { readme, root };
-      })
+          return { readme, root };
+        })
+      )
     )
   )
 );

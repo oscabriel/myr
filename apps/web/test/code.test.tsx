@@ -8,6 +8,8 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { Client, Contracts } from "@repo/protocol/contracts";
+import type { Contract } from "@repo/protocol/contracts";
 import {
   CommitDiff,
   CommitView as Commit,
@@ -16,16 +18,39 @@ import {
   TreeListing,
 } from "@repo/protocol/domain/code";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { LandedSha, ProjectName, RepoPath } from "@repo/protocol/ids";
-import { DateTime, Schema } from "effect";
+import {
+  CommitSha,
+  LandedSha,
+  ProjectName,
+  RepoPath,
+} from "@repo/protocol/ids";
+import {
+  UnknownCommit,
+  UnknownPath,
+  UnknownProject,
+  UnknownRevision,
+} from "@repo/protocol/refusal";
+import type { Refusal } from "@repo/protocol/refusal";
+import { explain } from "@repo/protocol/render";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { isNotFound } from "@tanstack/react-router";
+import { DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
+import { RpcTest } from "effect/rpc";
+import type { Rpc } from "effect/rpc";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import { Refusals } from "../src/features/ask/refused.tsx";
 import { BlobView } from "../src/features/code/blob-view.tsx";
 import { CommitView } from "../src/features/code/commit-view.tsx";
-import { LogView } from "../src/features/code/log-view.tsx";
+import { LOG_PAGE, LogView } from "../src/features/code/log-view.tsx";
 import { RefsView } from "../src/features/code/refs-view.tsx";
 import { TreeView } from "../src/features/code/tree-view.tsx";
+import { readBlobPage } from "../src/routes/$project/blob/$rev/$.tsx";
+import { readCommitPage } from "../src/routes/$project/commit/$sha.tsx";
+import { readLogPage } from "../src/routes/$project/commits/$rev.tsx";
+import { readRefsPage } from "../src/routes/$project/refs.tsx";
+import { readTreePage } from "../src/routes/$project/tree/$rev/$.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -193,6 +218,17 @@ describe(BlobView, () => {
     expect(markup).toContain("<pre");
     expect(anchors).toStrictEqual(["L1", "L2", "L3"]);
     expect(markup).not.toContain("<diffs-container");
+  });
+
+  it("anchors each line on an element that draws a box, so `#L2` scrolls to it without script", () => {
+    // A `display: contents` element draws no box, and a browser cannot
+    // scroll to it.
+    const anchored = /<(?<tag>\w+)\b(?<attributes>[^>]*)\bid="L2"[^>]*>/u.exec(
+      markupOf(page)
+    );
+
+    expect(anchored?.groups?.tag).toBe("span");
+    expect(anchored?.groups?.attributes).not.toMatch(/\bcontents\b/u);
   });
 
   it("links raw at the commit, why and history at the revision, and the permalink at the commit", () => {
@@ -428,6 +464,31 @@ describe(LogView, () => {
       "/datekit/commits/main?path=src%2Fparse.ts&from=60",
     ]);
   });
+
+  it("goes back to a path's newest commits from a later page, since a path's `from` counts commits scanned, not shown", () => {
+    // The platform scans 200 commits a call for a path, so the page that
+    // starts at 230 may follow one that started at 30 or at 0: only the
+    // first page is known to be newer.
+    const pager = navOf(
+      markupOf(
+        <LogView
+          commits={commits}
+          from={230}
+          next={430}
+          now={now}
+          path={RepoPath.make("src/parse.ts")}
+          project={datekit}
+          rev="main"
+        />
+      ),
+      'data-slot="pagination"'
+    );
+
+    expect(hrefsOf(pager)).toStrictEqual([
+      "/datekit/commits/main?path=src%2Fparse.ts",
+      "/datekit/commits/main?path=src%2Fparse.ts&from=430",
+    ]);
+  });
 });
 
 const decodeDiff = Schema.decodeSync(CommitDiff);
@@ -633,4 +694,274 @@ describe(RefsView, () => {
     expect(text).not.toContain("refs/notes");
     expect(text.toLowerCase()).not.toContain("release");
   });
+});
+
+/** A payload the platform was sent: one of the contracts'. */
+type Sent = Rpc.Payload<Contract>;
+
+/** Datekit, or the refusal for any other project. */
+const knownProject = (name: ProjectName) =>
+  name === datekit
+    ? Effect.void
+    : Effect.fail(new UnknownProject({ project: name }));
+
+/** Main, or its commit `AT`, or the refusal for any other revision. */
+const knownRevision = (at: string | undefined) =>
+  at === undefined || at === "main" || at === AT
+    ? Effect.void
+    : Effect.fail(new UnknownRevision({ rev: at }));
+
+/** Datekit's refs with main landed and no tags or forks. */
+const landedOnly = Schema.decodeSync(Refs)({
+  forks: [],
+  landed: LANDED,
+  project: "datekit",
+  tags: [],
+});
+
+/** The refusal for a path datekit lacks at `AT`. */
+const noPath = (path: RepoPath) =>
+  new UnknownPath({ commit: CommitSha.make(AT), path });
+
+/**
+ * A platform that holds datekit at main (commit `AT`): its root (with a
+ * README), the folder `src/format/locale`, the README, a page of the log
+ * and one commit. Every payload it is sent is kept, in order.
+ */
+const platformOf = (calls: Ref.Ref<readonly Sent[]>) => {
+  const sent = (payload: Sent) => Ref.update(calls, (all) => [...all, payload]);
+
+  return Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+    Layer.provide([
+      Layer.mergeAll(
+        unanswered,
+        Contracts.toLayerHandler("readTree", (payload) =>
+          Effect.gen(function* () {
+            yield* sent(payload);
+            yield* knownProject(payload.project);
+            yield* knownRevision(payload.at);
+
+            if (payload.path === undefined) {
+              return root;
+            }
+
+            if (payload.path === nested.path) {
+              return nested;
+            }
+
+            return yield* noPath(payload.path);
+          })
+        ),
+        Contracts.toLayerHandler("readFile", (payload) =>
+          Effect.gen(function* () {
+            yield* sent(payload);
+            yield* knownProject(payload.project);
+            yield* knownRevision(payload.at);
+
+            if (payload.path === readme.path) {
+              return readme;
+            }
+
+            return yield* noPath(payload.path);
+          })
+        ),
+        Contracts.toLayerHandler("log", (payload) =>
+          Effect.gen(function* () {
+            yield* sent(payload);
+            yield* knownProject(payload.project);
+            yield* knownRevision(payload.at);
+
+            return { commits, next: (payload.from ?? 0) + LOG_PAGE };
+          })
+        ),
+        Contracts.toLayerHandler("showCommit", (payload) =>
+          Effect.gen(function* () {
+            yield* sent(payload);
+            yield* knownProject(payload.project);
+
+            if (payload.sha !== LANDED) {
+              return yield* new UnknownCommit({ sha: payload.sha });
+            }
+
+            return diff;
+          })
+        ),
+        Contracts.toLayerHandler("listRefs", (payload) =>
+          Effect.gen(function* () {
+            yield* sent(payload);
+            yield* knownProject(payload.project);
+
+            return landedOnly;
+          })
+        )
+      ),
+      asTester,
+    ])
+  );
+};
+
+/** What a page's read that ended in a not-found asked and carried. */
+interface Refused {
+  /** Every payload it sent the platform. */
+  readonly calls: readonly Sent[];
+  /** The refusals its not-found carried, as `git` prints them; none when it carried none. */
+  readonly refused: Option.Option<readonly string[]>;
+}
+
+/** Runs a page's read against `platformOf`, which must end in a not-found. */
+const refusedBy = <A, E>(
+  read: Effect.Effect<A, E, Client>
+): Effect.Effect<Refused> =>
+  Effect.gen(function* () {
+    const calls = yield* Ref.make<readonly Sent[]>([]);
+
+    const failed = yield* Effect.flip(
+      read.pipe(Effect.provide(platformOf(calls)))
+    );
+
+    expect(isNotFound(failed)).toBeTruthy();
+
+    const carried = Schema.decodeUnknownOption(Refusals)(
+      isNotFound(failed) ? failed.data : undefined
+    );
+
+    return {
+      calls: yield* Ref.get(calls),
+      refused: Option.map(carried, explain),
+    };
+  }).pipe(Effect.orDie);
+
+describe("the code pages' reads", () => {
+  it.effect("read a folder and its README for the folder's page", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<readonly Sent[]>([]);
+
+      const read = yield* readTreePage({
+        project: "datekit",
+        rev: "main",
+      }).pipe(Effect.provide(platformOf(calls)));
+
+      expect(read.listing.entries.map((entry) => entry.path)).toStrictEqual([
+        "src",
+        "README.md",
+      ]);
+      expect(read.readme?.text).toBe(readme.text);
+      expect(yield* Ref.get(calls)).toHaveLength(2);
+    })
+  );
+
+  it.effect(
+    "pass a tag's name to the platform decoded, and carry back its refusal",
+    () =>
+      Effect.gen(function* () {
+        const { calls, refused } = yield* refusedBy(
+          readTreePage({
+            _splat: "src/format/locale",
+            project: "datekit",
+            rev: TAG_SEGMENT,
+          })
+        );
+
+        expect(calls).toStrictEqual([
+          { at: TAG, path: "src/format/locale", project: "datekit" },
+        ]);
+        expect(refused).toStrictEqual(
+          Option.some(explain([new UnknownRevision({ rev: TAG })]))
+        );
+      })
+  );
+
+  it.effect(
+    "are a not-found carrying the platform's refusal for a project, folder, file, revision or commit it lacks",
+    () =>
+      Effect.gen(function* () {
+        const cases: readonly (readonly [Effect.Effect<Refused>, Refusal])[] = [
+          [
+            refusedBy(readRefsPage("no-such-project")),
+            new UnknownProject({
+              project: ProjectName.make("no-such-project"),
+            }),
+          ],
+          [
+            refusedBy(
+              readTreePage({ _splat: "nope", project: "datekit", rev: "main" })
+            ),
+            noPath(RepoPath.make("nope")),
+          ],
+          [
+            refusedBy(
+              readBlobPage({
+                _splat: "nope.ts",
+                project: "datekit",
+                rev: "main",
+              })
+            ),
+            noPath(RepoPath.make("nope.ts")),
+          ],
+          [
+            refusedBy(readLogPage({ project: "datekit", rev: "v9" })),
+            new UnknownRevision({ rev: "v9" }),
+          ],
+          [
+            refusedBy(readCommitPage({ project: "datekit", sha: OLDER })),
+            new UnknownCommit({ sha: CommitSha.make(OLDER) }),
+          ],
+        ];
+
+        for (const [read, refusal] of cases) {
+          const { refused } = yield* read;
+
+          expect(refused).toStrictEqual(Option.some(explain([refusal])));
+        }
+      })
+  );
+
+  it.effect(
+    "are a not-found with no refusal, and ask nothing, for an address that can name nothing",
+    () =>
+      Effect.gen(function* () {
+        const reads: readonly Effect.Effect<Refused>[] = [
+          refusedBy(readRefsPage("Not_A-Project")),
+          refusedBy(readTreePage({ project: "datekit", rev: "%E0%A4%A" })),
+          refusedBy(readBlobPage({ project: "datekit", rev: "main" })),
+          refusedBy(readLogPage({ project: "datekit", rev: "%" })),
+          refusedBy(readCommitPage({ project: "datekit", sha: "abc1234" })),
+        ];
+
+        for (const read of reads) {
+          expect(yield* read).toStrictEqual({
+            calls: [],
+            refused: Option.none(),
+          });
+        }
+      })
+  );
+
+  it.effect("read the log page at `from`, a path's history only", () =>
+    Effect.gen(function* () {
+      const calls = yield* Ref.make<readonly Sent[]>([]);
+
+      const read = yield* readLogPage({
+        from: 30,
+        path: "src/parse.ts",
+        project: "datekit",
+        rev: "main",
+      }).pipe(Effect.provide(platformOf(calls)));
+
+      expect(yield* Ref.get(calls)).toStrictEqual([
+        {
+          at: "main",
+          from: 30,
+          limit: LOG_PAGE,
+          path: "src/parse.ts",
+          project: "datekit",
+        },
+      ]);
+      expect([read.from, read.next, read.path]).toStrictEqual([
+        30,
+        60,
+        "src/parse.ts",
+      ]);
+    })
+  );
 });

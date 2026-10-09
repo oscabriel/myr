@@ -20,6 +20,7 @@ import { Match, Schema } from "effect";
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
+import { answerPath } from "../ask/ask-page.tsx";
 import { askPath } from "../project/asks.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
 import { HandleLink } from "../shared/handle.tsx";
@@ -37,10 +38,6 @@ const LABEL = "text-muted-foreground text-xs font-medium";
 const isRole = Schema.is(CreditRole);
 
 const isHandle = Schema.is(Handle);
-
-/** An answer's page: the ask's latest answer and its verdict. */
-const answerPath = (project: ProjectName, ask: string) =>
-  `/${project}/answers/${ask}`;
 
 /** Each change as its mark says it. */
 const statusWords = Match.type<ChangedFile["status"]>().pipe(

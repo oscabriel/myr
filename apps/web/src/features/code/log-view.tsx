@@ -135,6 +135,16 @@ const Row = ({
   );
 };
 
+/**
+ * Where the page before the one at `from` starts. A whole log's `from`
+ * counts commits, so that page is one `LOG_PAGE` back. A path's history
+ * counts the commits the platform scanned (up to 200 a call, most of
+ * which may not touch the path), so where the page before began is not
+ * known: Newer goes back to the newest.
+ */
+const newerPage = (from: number, path: RepoPath | undefined) =>
+  path === undefined ? { from: Math.max(0, from - LOG_PAGE) } : { path };
+
 export const LogView = ({
   commits,
   from,
@@ -205,10 +215,7 @@ export const LogView = ({
       <Pager
         newer={
           from > 0
-            ? commitsHref(project, rev, {
-                ...filter,
-                from: Math.max(0, from - LOG_PAGE),
-              })
+            ? commitsHref(project, rev, newerPage(from, path))
             : undefined
         }
         older={

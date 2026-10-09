@@ -7,6 +7,7 @@
  */
 import type { RefsView as Refs } from "@repo/protocol/domain/code";
 
+import { answerPath } from "../ask/ask-page.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
@@ -133,7 +134,7 @@ export const RefsView = ({
                   {fork.repo}
                 </code>
                 {fork.ask === undefined ? null : (
-                  <a className={LINK} href={`/${project}/answers/${fork.ask}`}>
+                  <a className={LINK} href={answerPath(project, fork.ask)}>
                     Answer to {fork.ask}
                   </a>
                 )}

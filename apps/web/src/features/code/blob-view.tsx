@@ -65,15 +65,19 @@ export const NumberedLines = ({ text }: { readonly text: string }) => {
           {shown.map((line, index) => {
             const number = index + 1;
 
+            // The anchor sits on the line's text: the row around it is
+            // `display: contents`, which draws no box to scroll to.
             return (
-              <span className="contents" id={`L${number}`} key={number}>
+              <span className="contents" key={number}>
                 <a
                   className="text-muted-foreground hover:text-foreground pr-4 pl-3 text-right no-underline select-none"
                   href={`#L${number}`}
                 >
                   {number}
                 </a>
-                <span className="pr-3 whitespace-pre">{line}</span>
+                <span className="pr-3 whitespace-pre" id={`L${number}`}>
+                  {line}
+                </span>
               </span>
             );
           })}
