@@ -3,9 +3,9 @@
  * atom per code contract over the browser's `/rpc`, each taking the
  * contract's own payload and keyed by the project's code (`keys.code`),
  * which a landing changes. The code pages read on the server first (their
- * loaders), so the browser calls only the reads a page draws there: every
- * path for the file tree (`pathsAtom`), and the project page's root folder
- * and README (`projectCodeAtom`).
+ * loaders), so the browser calls only the reads a page draws there (every
+ * path for the file tree, `pathsAtom`) or keeps live: the project page's
+ * root folder and README (`projectCodeAtom`), which its loader also read.
  */
 import type { Contract } from "@repo/protocol/contracts";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -53,9 +53,10 @@ export const commitAtom = (payload: PayloadOf<"showCommit">) =>
 /**
  * The project page's code: the root folder at main and, when it has one,
  * its README, read after it. A project with nothing landed yet refuses
- * the read, and its page shows no code. Like the page's other reads
- * (`project.ts`), it renders as waiting on the server, so the Worker
- * never reads the code for a page that draws it only in the browser.
+ * the read, and its page shows no code. It renders as waiting on the
+ * server, where the page draws its loader's read of the same code
+ * (`server/folder.ts`); in the browser it takes over once it has a value,
+ * and reads again on each landing.
  */
 export const projectCodeAtom = Atom.family((project: ProjectName) =>
   Atom.withServerValueInitial(

@@ -15,8 +15,8 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 
-import { Skeleton } from "../../components/ui/skeleton.tsx";
 import { EntriesTable, ReadmeSection } from "../code/tree-view.tsx";
+import { ReadingRows } from "../front/reading.tsx";
 import { SignedInProposeLink } from "../propose/propose-link.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
@@ -245,9 +245,6 @@ export const ProjectView = ({
   );
 };
 
-/** Rows that hold the asks' place while the platform answers. */
-const ROWS = ["first", "second", "third"] as const;
-
 /**
  * The page as the server sends it, while the browser reads the asks and
  * landings: the clone line, rows holding their place, and the code the
@@ -267,19 +264,7 @@ export const ProjectReadingView = ({
   <PageShell title={project}>
     <ProjectNav current="overview" project={project} />
     <CloneBox platformUrl={platformUrl} project={project} />
-    <div aria-busy="true" className="flex flex-col">
-      <output className="sr-only">Reading from the platform</output>
-      {ROWS.map((row) => (
-        <div
-          className="border-rule flex flex-col gap-2 border-t py-4"
-          key={row}
-        >
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-5 w-full max-w-[60ch]" />
-          <Skeleton className="h-4 w-56" />
-        </div>
-      ))}
-    </div>
+    <ReadingRows />
     {code === undefined ? null : <CodeSection code={code} project={project} />}
   </PageShell>
 );

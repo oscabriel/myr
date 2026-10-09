@@ -253,6 +253,13 @@ describe("GitHub-flavoured Markdown", () => {
     expect(anchorsOf(markup)).toContain('<a href="#user-content-top">');
   });
 
+  it("prefixes an anchor's name the README sets, and points a link to it there", () => {
+    const markup = rendered('<a name="top">Top</a>\n\n[up](#top)');
+
+    expect(markup).toContain('name="user-content-top"');
+    expect(anchorsOf(markup)).toContain('<a href="#user-content-top">');
+  });
+
   it("keeps a link to a heading pointing at the heading", () => {
     const markup = rendered("## Usage\n\n[u](#usage)");
 

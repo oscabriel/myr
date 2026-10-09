@@ -21,8 +21,9 @@
  *    `## Usage` unprefixed;
  * 7. `rehypeFragmentLinks`: last, once every id is final, a `#x` link with
  *    no `x` in the file points at `user-content-x` when that is there (a
- *    footnote, a README's own `<a id>`), as GitHub's page script does. It
- *    only changes where a link inside the file points, never an id.
+ *    footnote, a README's own `<a id>` or `<a name>`), as GitHub's page
+ *    script does. It only changes where a link inside the file points,
+ *    never an id.
  *
  * react-markdown's `defaultUrlTransform` stays on as a second net.
  */
@@ -120,7 +121,7 @@ export const rehypeRepoUrls = (at: MarkdownAt) => (tree: Root) => {
 };
 
 /** The prefix the sanitizer puts on every `id` and `name` (`hast-util-sanitize`'s default). */
-const CLOBBER = defaultSchema.clobberPrefix ?? "user-content-";
+const CLOBBER = schema.clobberPrefix ?? "user-content-";
 
 const unprefixed = (value: string, lead = "") =>
   value.startsWith(`${lead}${CLOBBER}`)
@@ -171,16 +172,21 @@ export const rehypeFootnoteIds = () => (tree: Root) => {
 /**
  * A rehype plugin, run last: a link to `#x` where the file has no `x` but
  * has `user-content-x` (the sanitizer's prefix) points there, so a
- * footnote and a README's own anchor jump.
+ * footnote and a README's own anchor jump. A target is an element's `id`
+ * or an anchor's `name`, the two a browser scrolls to for a fragment.
  */
 export const rehypeFragmentLinks = () => (tree: Root) => {
   const ids = new Set<string>();
 
   visit(tree, "element", (node) => {
-    const { id } = node.properties;
+    const { id, name } = node.properties;
 
     if (Predicate.isString(id)) {
       ids.add(id);
+    }
+
+    if (node.tagName === "a" && Predicate.isString(name)) {
+      ids.add(name);
     }
   });
 

@@ -6,7 +6,7 @@
  * it calls the contracts and the views there import no transport.
  */
 import { Client } from "@repo/protocol/contracts";
-import type { FileView, TreeListing } from "@repo/protocol/domain/code";
+import type { FileView, Rev, TreeListing } from "@repo/protocol/domain/code";
 import type { ProjectName, RepoPath } from "@repo/protocol/ids";
 import type { Unauthenticated } from "@repo/protocol/principal";
 import type {
@@ -27,7 +27,7 @@ import type { RpcClientError } from "effect/rpc";
 export const readFolderWithReadme = (input: {
   readonly path: Option.Option<RepoPath>;
   readonly project: ProjectName;
-  readonly rev: string;
+  readonly rev: Rev;
 }): Effect.Effect<
   { readonly listing: TreeListing; readonly readme: Option.Option<FileView> },
   | UnknownProject

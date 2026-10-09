@@ -303,6 +303,18 @@ describe("the project's code on its page", () => {
   });
 });
 
+/** The contracts over HTTP, each request answered by `answer`. */
+const clientOver = (answer: (request: Request) => Promise<Response>) =>
+  Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
+    Layer.provide(RpcClient.layerProtocolHttp({ url: "http://localhost/rpc" })),
+    Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson]),
+    Layer.provide(
+      Layer.succeed(FetchHttpClient.Fetch, (input, init) =>
+        answer(new Request(input, init))
+      )
+    )
+  );
+
 /**
  * The contracts over a fresh dev world, as the Worker's loader reaches
  * them in process; the world ends with the scope.
@@ -313,18 +325,13 @@ const devWorld = Layer.unwrap(
 
     yield* Effect.addFinalizer(() => Effect.promise(dispose));
 
-    return Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
-      Layer.provide(
-        RpcClient.layerProtocolHttp({ url: "http://localhost/rpc" })
-      ),
-      Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson]),
-      Layer.provide(
-        Layer.succeed(FetchHttpClient.Fetch, (input, init) =>
-          handler(new Request(input, init))
-        )
-      )
-    );
+    return clientOver(handler);
   })
+);
+
+/** A platform that does not answer: every call comes back a 503. */
+const unanswering = clientOver(() =>
+  Promise.resolve(new Response("", { status: 503 }))
 );
 
 /** A platform that knows every project and has landed nothing on any. */
@@ -402,7 +409,19 @@ describe("the project's page as the server sends it", () => {
         expect(rowOf(markupOf(shown), "fix-week-start")).toContain(
           'href="/datekit/asks/fix-week-start"'
         );
-        expect(textOf(shown)).not.toContain("did not answer");
+      })
+  );
+
+  it.effect(
+    "is sent without its code, not as a not-found, when the platform does not answer",
+    () =>
+      Effect.gen(function* () {
+        const { code } = yield* readProjectPage("datekit").pipe(
+          Effect.flatMap(decodePage),
+          Effect.provide(unanswering)
+        );
+
+        expect(code).toBeUndefined();
       })
   );
 
