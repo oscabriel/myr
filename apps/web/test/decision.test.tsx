@@ -27,8 +27,8 @@ import {
 import { DecisionClosed } from "@repo/protocol/refusal";
 import type { UnknownDecision } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { DateTime, Effect, Exit, Layer, Ref } from "effect";
-import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
+import { Cause, DateTime, Effect, Exit, Layer, Ref } from "effect";
+import { AsyncResult, Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { RpcTest } from "effect/rpc";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -37,6 +37,11 @@ import { decideAtom } from "../src/client/decide.ts";
 import { keys } from "../src/client/keys.ts";
 import { todayAtom } from "../src/client/today.ts";
 import { DecisionCard } from "../src/features/decision/decision-card.tsx";
+import {
+  DraftRead,
+  draftReadOf,
+  readDraft,
+} from "../src/features/proposal/live-draft.ts";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
 import { TodayView } from "../src/features/today/today-page.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
@@ -312,7 +317,37 @@ describe("DecisionCard for an OpenProposal", () => {
     markupOf(
       <DecisionCard
         decision={opening}
-        draft={draft}
+        draft={readDraft(draft)}
+        now={now}
+        onDecide={() => {}}
+      />
+    );
+
+  /** `showProposal`'s answer for the proposal, its draft at `draft`. */
+  const shown = (draft?: DraftState) => {
+    const wanted = {
+      expiresAt: opening.expiresAt,
+      files: [],
+      id: proposal,
+      openedAt: opening.openedAt,
+      project: datekit,
+      proposer: Handle.make("lin-h"),
+      state: "open" as const,
+      want: "formatISO keeps the offset it was given.",
+    };
+
+    return {
+      files: [],
+      proposal: draft === undefined ? wanted : { ...wanted, draft },
+    };
+  };
+
+  /** The card once the browser's read of the proposal answered with `draft`. */
+  const cardRead = (draft?: DraftState) =>
+    markupOf(
+      <DecisionCard
+        decision={opening}
+        draft={draftReadOf(AsyncResult.success(shown(draft)))}
         now={now}
         onDecide={() => {}}
       />
@@ -328,6 +363,13 @@ describe("DecisionCard for an OpenProposal", () => {
     model: "@cf/moonshotai/kimi-k2.7-code",
     red: { lane: LaneName.make("unit"), signature: "expected '+02:00'" },
     round: 1,
+  });
+
+  const failed = DraftState.cases.Failed.make({
+    attempts: 3,
+    model: "@cf/moonshotai/kimi-k2.7-code",
+    refusal: "NotRedFirst",
+    round: 2,
   });
 
   it("shows a file's path as a heading and its content in a pre", () => {
@@ -351,6 +393,55 @@ describe("DecisionCard for an OpenProposal", () => {
     ).not.toContain('disabled=""');
   });
 
+  it("holds Accept on the server, until the browser has read the draft", () => {
+    const markup = markupOf(
+      <DecisionCard decision={opening} now={now} onDecide={() => {}} />
+    );
+
+    expect(acceptOf(markup)).toContain('disabled=""');
+    expect(markup).toContain("Reading the draft…");
+    expect(draftReadOf(AsyncResult.initial(true))).toStrictEqual(
+      DraftRead.Unread({ failed: false })
+    );
+  });
+
+  it("holds Accept, without a spinner, when the browser could not read the draft", () => {
+    const read = draftReadOf(AsyncResult.failure(Cause.fail("offline")));
+
+    const markup = markupOf(
+      <DecisionCard
+        decision={opening}
+        draft={read}
+        now={now}
+        onDecide={() => {}}
+      />
+    );
+
+    expect(read).toStrictEqual(DraftRead.Unread({ failed: true }));
+    expect(acceptOf(markup)).toContain('disabled=""');
+    expect(markup).toContain("Draft not read; reload");
+    expect(markup).not.toContain("Reading the draft…");
+    expect(
+      /<button[^>]*data-choice="accept"[^>]*>.*?<\/button>/u.exec(markup)?.[0]
+    ).not.toContain('data-slot="spinner"');
+  });
+
+  it("offers Accept once the read draft is ready, failed (an earlier ready draft or the want alone), or the proposal is a want alone", () => {
+    for (const markup of [cardRead(ready), cardRead(failed), cardRead()]) {
+      expect(acceptOf(markup)).not.toContain('disabled=""');
+      expect(markup).not.toContain("Reading the draft…");
+      expect(markup).not.toContain("Drafting…");
+    }
+  });
+
+  it("holds Accept, saying why, while the read draft is drafting", () => {
+    const markup = cardRead(drafting);
+
+    expect(acceptOf(markup)).toContain('disabled=""');
+    expect(markup).toContain("Drafting…");
+    expect(markup).not.toContain("Reading the draft…");
+  });
+
   it("offers Accept once the draft is ready", () => {
     const markup = card(ready);
 
@@ -368,7 +459,7 @@ describe("DecisionCard for an OpenProposal", () => {
             { label: "offset.test.ts", value: "test('keeps +02:00');\n" },
           ],
         }}
-        draft={ready}
+        draft={readDraft(ready)}
         now={now}
         onDecide={() => {}}
       />

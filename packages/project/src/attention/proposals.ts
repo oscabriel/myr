@@ -84,12 +84,12 @@ export const ProposalCommand = Data.taggedEnum<ProposalCommand>();
 /**
  * What moves an open proposal's draft. `DraftStarted`: the platform's
  * agent starts drafting its ask, at `by`'s request, in its first round or
- * one more (at most `DRAFT_ROUNDS`). `DraftSettled`: a round ended, as its
- * run reports it.
+ * one more (at most `DRAFT_ROUNDS`), with the note `by` asked it with, if
+ * any. `DraftSettled`: a round ended, as its run reports it.
  */
 export type DraftCommand = Data.TaggedEnum<{
   DraftSettled: { readonly result: DraftResult; readonly round: number };
-  DraftStarted: { readonly by: Handle };
+  DraftStarted: { readonly by: Handle; readonly note?: string };
 }>;
 
 /** Constructors for draft commands. */
@@ -281,11 +281,14 @@ const drafting = (proposal: Proposal, round: number) =>
   DraftState.guards.Drafting(proposal.draft) &&
   proposal.draft.round === round;
 
+/** The evidence line that says why a proposal's last draft round failed. */
+export const draftFailedLabel = "draft failed";
+
 /** What a settled round's decision says beside the want: red first and who drafted, or why it failed. */
 const settledLines = (result: DraftResult): readonly Evidence[] =>
   DraftResult.match(result, {
     Failed: ({ refusal }): readonly Evidence[] => [
-      { label: "draft failed", value: explain([refusal])[0] ?? refusal._tag },
+      { label: draftFailedLabel, value: explain([refusal])[0] ?? refusal._tag },
     ],
     Red: ({ attempts, lane, model, rationale, signature }) => [
       { label: "red first", value: `${lane}: ${signature}` },
@@ -297,7 +300,12 @@ const settledLines = (result: DraftResult): readonly Evidence[] =>
     ],
   });
 
-/** The proposal once a round settled: its files and `Ready`, or no files and `Failed`. */
+/**
+ * The proposal once a round settled: its files and `Ready`, or `Failed`.
+ * A failed first round leaves no files; a later one keeps the files the
+ * proposal holds, which are its last ready round's (a failed round before
+ * it kept none), so a decider can still accept that draft.
+ */
 const settledProposal = (
   proposal: Proposal,
   round: number,
@@ -312,7 +320,7 @@ const settledProposal = (
         refusal: refusal._tag,
         round,
       }),
-      files: [],
+      files: round === 1 ? [] : proposal.files,
     }),
     Red: ({ attempts, files, lane, model, signature }): Proposal => ({
       ...proposal,
@@ -360,7 +368,7 @@ export const draft = (
             })
           : Option.none()
       ),
-    DraftStarted: () => {
+    DraftStarted: ({ note }) => {
       if (proposal.state !== "open") {
         return Result.fail(new ProposalClosed({ proposal: proposal.id }));
       }
@@ -374,6 +382,11 @@ export const draft = (
 
       const round = nextRound(proposal);
 
+      const started =
+        note === undefined
+          ? { round, startedAt: now }
+          : { note, round, startedAt: now };
+
       return round > DRAFT_ROUNDS
         ? Result.fail(new CapReached({ cap: DRAFT_ROUNDS }))
         : Result.succeed(
@@ -382,10 +395,7 @@ export const draft = (
               lines: [],
               proposal: {
                 ...proposal,
-                draft: DraftState.cases.Drafting.make({
-                  round,
-                  startedAt: now,
-                }),
+                draft: DraftState.cases.Drafting.make(started),
               },
             })
           );

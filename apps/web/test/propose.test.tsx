@@ -10,11 +10,13 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { ProposeAsk } from "@repo/protocol/contracts";
 import { CommitSha, ProjectName, RepoPath } from "@repo/protocol/ids";
+import { Unauthenticated } from "@repo/protocol/principal";
 import { CapReached } from "@repo/protocol/refusal";
-import { Option, Schema } from "effect";
+import { Cause, Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
 import { proposalMade, topFolders } from "../src/client/propose.ts";
+import { ProposalFailure } from "../src/features/proposal/failure.tsx";
 import {
   ProposeView,
   proposalPayload,
@@ -207,5 +209,24 @@ describe("the sign-in link", () => {
       at,
       line: "12",
     });
+  });
+});
+
+describe("a refused send on the propose form", () => {
+  it("with no session, asks to sign in and come back to the form as it was", () => {
+    const here = `/datekit/proposals/new?about=src%2Fformat.ts&at=${at}&line=12`;
+
+    const markup = markupOf(
+      <ProposalFailure
+        cause={Cause.fail(new Unauthenticated({}))}
+        doing="propose it"
+        here={here}
+      />
+    );
+
+    expect(markup).toContain(
+      `href="/auth/signin?return=%2Fdatekit%2Fproposals%2Fnew%3Fabout%3Dsrc%252Fformat.ts%26at%3D${at}%26line%3D12"`
+    );
+    expect(plainText(markup)).not.toContain("Today is a decider's page");
   });
 });

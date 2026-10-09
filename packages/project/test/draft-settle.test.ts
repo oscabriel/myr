@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { RefName, RepoHost } from "@repo/artifacts/repo-host";
+import { RefName, RepoHost, Revision } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import type { CheckAt } from "@repo/checks/check-runner";
 import { parseTrailers } from "@repo/git/trailers";
@@ -332,7 +332,11 @@ describe("a proposal with a draft", () => {
         drafting.proposals,
       ]);
       expect(after.proposals.map(({ draft }) => draft)).toStrictEqual([
-        DraftState.cases.Drafting.make({ round: 2, startedAt: noon }),
+        DraftState.cases.Drafting.make({
+          note: "use UTC",
+          round: 2,
+          startedAt: noon,
+        }),
       ]);
       expect(yield* runs).toStrictEqual([
         { project, proposal, round: 1 },
@@ -372,6 +376,131 @@ describe("a proposal with a draft", () => {
             round: 1,
           }),
         ]);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "drafted again with a note, drafts with the note shown on the proposal",
+    () =>
+      Effect.gen(function* () {
+        const { api } = yield* proposed;
+
+        yield* api.draftSettled(proposal, 1, failed);
+
+        const again = yield* api.draftAsk(carol, {
+          note: "only the parser",
+          proposal,
+        });
+
+        const shown = yield* api.showProposal(anyone, proposal);
+
+        expect([again.proposal.draft, shown.proposal.draft]).toStrictEqual([
+          DraftState.cases.Drafting.make({
+            note: "only the parser",
+            round: 2,
+            startedAt: noon,
+          }),
+          DraftState.cases.Drafting.make({
+            note: "only the parser",
+            round: 2,
+            startedAt: noon,
+          }),
+        ]);
+      }).pipe(Effect.provide(world))
+  );
+
+  it.effect(
+    "drafted again after a ready round and failed, keeps the ready round's files and decision, and lands them on accept",
+    () =>
+      Effect.gen(function* () {
+        const { api } = yield* proposed;
+
+        yield* api.draftSettled(proposal, 1, red());
+        yield* api.draftAsk(carol, { note: "use UTC", proposal });
+        yield* api.draftSettled(proposal, 2, failed);
+
+        const decisions = yield* openProposalDecisions;
+        const shown = yield* api.showProposal(anyone, proposal);
+
+        expect(
+          decisions.map(({ decided, evidence, id }) => ({
+            decided,
+            evidence,
+            id,
+          }))
+        ).toStrictEqual([
+          {
+            decided: undefined,
+            evidence: [
+              { label: "want", value: want },
+              { label: "territory", value: "packages/parser" },
+              { label: ask.file, value: askSource },
+              { label: testPath, value: testSource },
+              {
+                label: "red first",
+                value: "redThenGreen: redThenGreen: scripted failure",
+              },
+              { label: "drafted by", value: `${model}, attempt 2 of 3` },
+              {
+                label: "why this test",
+                value:
+                  "parseWeek is missing, so the test fails by its assertion",
+              },
+              {
+                label: "draft failed",
+                value:
+                  "NotRedFirst: the ask's check must fail on main twice in the same way, by an assertion",
+              },
+            ],
+            id: firstDecision,
+          },
+        ]);
+        expect([shown.files, shown.proposal.draft]).toStrictEqual([
+          files,
+          DraftState.cases.Failed.make({
+            attempts: 3,
+            model,
+            refusal: "NotRedFirst",
+            round: 2,
+          }),
+        ]);
+
+        yield* api.draftAsk(carol, { proposal });
+        yield* api.draftSettled(proposal, 3, failed);
+
+        // A second failure keeps one line saying why, the last one.
+        expect(
+          (yield* openProposalDecisions).flatMap(({ evidence }) =>
+            evidence.filter(({ label }) => label === "draft failed")
+          )
+        ).toHaveLength(1);
+
+        yield* redOnMain;
+        yield* api.decide(alice, { choice: "accept", decision: firstDecision });
+
+        const host = yield* RepoHost;
+        const refs = yield* host.refs(repo).pipe(Effect.orDie);
+
+        const tip = Option.getOrThrow(
+          Option.fromUndefinedOr(refs.get(mainRef))
+        );
+
+        const landed = yield* Effect.forEach([ask.file, testPath], (path) =>
+          host
+            .readFile(repo, Revision.Commit({ sha: tip }), path)
+            .pipe(
+              Effect.orDie,
+              Effect.map(Option.map((bytes) => new TextDecoder().decode(bytes)))
+            )
+        );
+
+        expect(landed).toStrictEqual([
+          Option.some(askSource),
+          Option.some(testSource),
+        ]);
+        expect(
+          (yield* api.listAsks(anyone)).asks.map((listing) => listing.ask)
+        ).toStrictEqual([AskId.make("parse-week")]);
       }).pipe(Effect.provide(world))
   );
 

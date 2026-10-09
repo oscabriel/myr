@@ -46,6 +46,8 @@ export const standing = (proposal: Proposal) =>
 
 const draftingNow = DraftState.isAnyOf(["Drafting"]);
 
+const failedNow = DraftState.isAnyOf(["Failed"]);
+
 /** Whether the platform's agent is drafting the proposal's ask right now. */
 export const isDrafting = (proposal: Proposal) =>
   proposal.draft !== undefined && draftingNow(proposal.draft);
@@ -77,15 +79,25 @@ const StateBadge = ({ proposal }: { readonly proposal: Proposal }) => {
 /** What the draft says: in progress, ready with its red-first run, or failed. */
 const DraftFacts = ({ draft }: { readonly draft: DraftState }) =>
   DraftState.match(draft, {
-    Drafting: ({ round }) => (
-      <p className="flex items-start gap-2 text-sm" data-draft="Drafting">
-        <Spinner className="text-checking mt-0.5 shrink-0" />
-        <span>
-          Drafting (round {round}): the platform&apos;s agent is writing the ask
-          and a check, then running the check on main, where it must fail twice
-          the same way. This takes a few minutes; the page follows it.
-        </span>
-      </p>
+    Drafting: ({ note, round }) => (
+      <div className="flex flex-col gap-1 text-sm" data-draft="Drafting">
+        <p className="flex items-start gap-2">
+          <Spinner className="text-checking mt-0.5 shrink-0" />
+          <span>
+            Drafting (round {round}): the platform&apos;s agent is writing the
+            ask and a check, then running the check on main, where it must fail
+            twice the same way. This takes a few minutes; the page follows it.
+          </span>
+        </p>
+        {note === undefined ? null : (
+          <p
+            className="pl-6 [overflow-wrap:anywhere] whitespace-pre-line"
+            data-note=""
+          >
+            <span className={LABEL}>Note:</span> {note}
+          </p>
+        )}
+      </div>
     ),
     Failed: ({ attempts, model, refusal, round }) => (
       <div className="flex flex-col gap-1 text-sm" data-draft="Failed">
@@ -268,6 +280,12 @@ export const ProposalView = ({
           <h2 className="text-base font-semibold" id={`${proposal.id}-files`}>
             {proposal.draft === undefined ? "Proposed files" : "Drafted files"}
           </h2>
+          {proposal.draft !== undefined && failedNow(proposal.draft) ? (
+            <p className="text-muted-foreground -mt-2 text-sm" data-kept="">
+              An earlier round&apos;s ready draft, which a decider can still
+              accept: it runs red first again on main before the ask opens.
+            </p>
+          ) : null}
           {files.map(({ content, path }) => (
             <DraftedCode content={content} key={path} path={path} />
           ))}

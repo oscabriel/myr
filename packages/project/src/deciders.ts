@@ -110,6 +110,7 @@ import { AttentionEffect, platformHandle } from "./attention/effects.ts";
 import {
   draft,
   DraftCommand,
+  draftFailedLabel,
   expire as expireProposals,
   propose,
   ProposalCommand,
@@ -927,7 +928,17 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
   ) =>
     Effect.gen(function* () {
       const started = yield* Effect.fromResult(
-        draft(input.proposal, DraftCommand.DraftStarted({ by: input.by }), now)
+        draft(
+          input.proposal,
+          DraftCommand.DraftStarted({
+            by: input.by,
+            ...Option.match(input.note, {
+              onNone: () => ({}),
+              onSome: (note) => ({ note }),
+            }),
+          }),
+          now
+        )
       );
 
       const proposal = Option.getOrElse(
@@ -1005,7 +1016,10 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
    * A draft's round settled, by the pure rules: the proposal moves, and its
    * decision goes up with the files (or the want alone) and what the draft
    * says, or, when one is open already, takes that evidence, and the
-   * deciders of the files it now holds, in its place.
+   * deciders of the files it now holds, in its place. A failed round that
+   * kept an earlier ready round's files keeps that decision's evidence
+   * instead, with why this round failed in place of any earlier failure,
+   * so the earlier draft can still be accepted.
    * A stale round or a closed proposal changes nothing.
    */
   const settledBody =
@@ -1050,23 +1064,34 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           Red: ({ files: drafted }) => drafted,
         });
 
+        const open = Option.filter(
+          decisionOf(h, writes, settled.id),
+          ({ decided }) => decided === undefined
+        );
+
+        // A failed round that kept files keeps the decision that holds them.
+        const kept = Option.filter(
+          Option.map(open, ({ evidence: earlier }) =>
+            earlier.filter(({ label }) => label !== draftFailedLabel)
+          ),
+          () =>
+            DraftResult.guards.Failed(input.result) && settled.files.length > 0
+        );
+
         const evidence = [
-          ...evidenceOf({
-            files,
-            sealed: false,
-            territory,
-            want: settled.want,
-          }),
+          ...Option.getOrElse(kept, () =>
+            evidenceOf({
+              files,
+              sealed: false,
+              territory,
+              want: settled.want,
+            })
+          ),
           ...moved.value.lines,
         ];
 
         writes.proposals.set(settled.id, settled);
         emitted(writes, moved.value.effects);
-
-        const open = Option.filter(
-          decisionOf(h, writes, settled.id),
-          ({ decided }) => decided === undefined
-        );
 
         // The drafted files may lie under other deciders than the want did.
         const decidedBy = decidersOn(
