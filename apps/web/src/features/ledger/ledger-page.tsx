@@ -23,6 +23,7 @@ import type { ReactNode } from "react";
 
 import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
 import { postureLabel } from "../project/posture-label.ts";
+import { ProjectNav } from "../project/project-nav.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
@@ -354,6 +355,7 @@ export const LedgerView = ({
 
   return (
     <PageShell title={`Ledger of ${project}`}>
+      <ProjectNav current="ledger" project={project} />
       <div className="text-muted-foreground -mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         <PostureBadge label={ledger.postureLabel} posture={ledger.posture} />
         <span>{plural(layers.length, "layer", "layers")}</span>

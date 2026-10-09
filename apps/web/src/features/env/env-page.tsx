@@ -22,6 +22,7 @@ import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
+import { ProjectNav } from "../project/project-nav.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
@@ -203,6 +204,7 @@ export const EnvView = ({
 
   return (
     <PageShell title={`Env shape of ${project}`}>
+      <ProjectNav current="env" project={project} />
       <p className="text-muted-foreground -mt-4 text-sm">
         env shape:{" "}
         <a className={LINK} href={VARLOCK} rel="noreferrer">
@@ -271,6 +273,7 @@ export const NothingLanded = ({
   readonly project: ProjectName;
 }) => (
   <PageShell title={`Env shape of ${project}`}>
+    <ProjectNav current="env" project={project} />
     <EmptyState
       command={`${Brand.cli} env shape --project ${project}`}
       title={`Nothing has landed in ${project} yet, so there is no .env.schema to read. Its env shape appears here once its main lands.`}

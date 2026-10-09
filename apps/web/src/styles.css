@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "shadcn/tailwind.css";
 
+/* `prose` for rendered Markdown (a README, an ask's brief); its `dark:`
+   variant is the media query below, like every other one here. */
+@plugin "@tailwindcss/typography";
+
 /*
   The web's tokens (DESIGN.md names each one and when to use it).
 
@@ -238,6 +242,50 @@
   td,
   th {
     font-variant-numeric: tabular-nums;
+  }
+
+  /*
+    Pierre draws code inside shadow roots: `diffs-container` (@pierre/diffs)
+    and `file-tree-container` (@pierre/trees). Each reads these variables
+    from its host, so setting them here maps both onto the tokens above,
+    and both follow the media-query dark mode with them.
+  */
+  diffs-container {
+    --diffs-font-family: var(--font-mono);
+    --diffs-addition-color-override: var(--landed);
+    --diffs-deletion-color-override: var(--refused);
+    --diffs-modified-color-override: var(--waiting);
+    --diffs-selection-color-override: var(--checking);
+  }
+
+  file-tree-container {
+    --trees-font-family-override: var(--font-mono);
+    --trees-bg-override: var(--background);
+    --trees-bg-muted-override: var(--surface);
+    --trees-fg-override: var(--foreground);
+    --trees-fg-muted-override: var(--muted);
+    --trees-border-color-override: var(--rule);
+    --trees-border-radius-override: var(--radius);
+    --trees-accent-override: var(--checking);
+    --trees-focus-ring-color-override: var(--ring);
+    --trees-selected-bg-override: color-mix(
+      in oklch,
+      var(--checking) 14%,
+      transparent
+    );
+    --trees-selected-fg-override: var(--foreground);
+    --trees-status-added-override: var(--landed);
+    --trees-status-deleted-override: var(--refused);
+    --trees-status-modified-override: var(--waiting);
+    --trees-status-renamed-override: var(--checking);
+    --trees-status-untracked-override: var(--muted);
+    --trees-status-ignored-override: var(--muted);
+    --trees-git-added-color-override: var(--landed);
+    --trees-git-deleted-color-override: var(--refused);
+    --trees-git-modified-color-override: var(--waiting);
+    --trees-git-renamed-color-override: var(--checking);
+    --trees-git-untracked-color-override: var(--muted);
+    --trees-git-ignored-color-override: var(--muted);
   }
 
   @media (prefers-reduced-motion: reduce) {

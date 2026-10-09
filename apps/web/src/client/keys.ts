@@ -7,15 +7,24 @@
  * ask's keys include its project's, so a write that changes the ask (a
  * claim, a landing) also refetches the project's ask list.
  */
-import type { AskId, ProjectName } from "@repo/protocol/ids";
+import type { AskId, ProjectName, ProposalId } from "@repo/protocol/ids";
 
 export const keys = {
   ask: (project: ProjectName, ask: AskId): readonly string[] => [
     `ask:${project}/${ask}`,
     `project:${project}`,
   ],
+  /** The project's code reads (refs, trees, files, log, commits, why): a landing changes them. */
+  code: (project: ProjectName): readonly string[] => [`code:${project}`],
   front: (): readonly string[] => ["front"],
   ledger: (project: ProjectName): readonly string[] => [`ledger:${project}`],
+  /** The project's evaluated policy (the people page): a landing may change it. */
+  policy: (project: ProjectName): readonly string[] => [`policy:${project}`],
   project: (project: ProjectName): readonly string[] => [`project:${project}`],
+  /** One proposal (its draft state and files); includes its project's, as an ask's does. */
+  proposal: (project: ProjectName, proposal: ProposalId): readonly string[] => [
+    `proposal:${project}/${proposal}`,
+    `project:${project}`,
+  ],
   today: (): readonly string[] => ["today"],
 };

@@ -27,7 +27,11 @@
  * adds no bytes, so a limit is raised to its ceiling when a wave of work
  * starts, and tightened to about 15% above the measured bundle when the
  * wave ends: the platform's entry was 1,605,405 bytes before the code
- * browser and drafting, and its ceiling is 1,900,000 while they land.
+ * browser and drafting, and its ceiling is 1,900,000 while they land; the
+ * web's JavaScript was 2,364,955 bytes before the code browser and README
+ * rendering, and its ceiling is 4,500,000 while they land. The web's
+ * JavaScript counts the Worker's server modules only: chunks the browser
+ * alone loads (Pierre's) are assets.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, Path, pipe } from "effect";
@@ -43,7 +47,7 @@ interface Budget {
 export const budgets = {
   "apps/platform": { entry: 1_900_000, javascript: 2_500_000 },
   "apps/sandbox": { entry: 1_665_000, javascript: 2_500_000 },
-  "apps/web": { entry: 1_665_000, javascript: 2_500_000 },
+  "apps/web": { entry: 1_665_000, javascript: 4_500_000 },
 } as const satisfies Record<string, Budget>;
 
 /**

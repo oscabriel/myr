@@ -221,12 +221,13 @@ describe("the byte alarm", () => {
   });
 
   // Each Worker grows on its own, so each has limits of its own: the
-  // platform's at the ceiling the code browser and drafting land under.
+  // platform's and the web's JavaScript at the ceilings the code browser
+  // and drafting land under.
   it("holds each Worker it measures to limits of its own", () => {
     expect(budgets).toStrictEqual({
       "apps/platform": { entry: 1_900_000, javascript: 2_500_000 },
       "apps/sandbox": { entry: 1_665_000, javascript: 2_500_000 },
-      "apps/web": { entry: 1_665_000, javascript: 2_500_000 },
+      "apps/web": { entry: 1_665_000, javascript: 4_500_000 },
     });
     expect(Object.keys(budgets).toSorted()).toStrictEqual(
       workers.map(({ dir }) => dir).toSorted()

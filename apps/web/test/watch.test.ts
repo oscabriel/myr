@@ -17,6 +17,7 @@ import {
   KindName,
   LandedSha,
   ProjectName,
+  ProposalId,
 } from "@repo/protocol/ids";
 import { Clock, DateTime, Effect, Layer, Queue, Ref, Stream } from "effect";
 import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
@@ -187,6 +188,52 @@ describe(watchAtom, () => {
           Judged: [askKey, projectKey],
           Landed: [projectKey],
           Pushed: [askKey, projectKey],
+        });
+      })
+  );
+
+  it.effect(
+    "invalidates the code and policy reads on Landed, and the proposal's on ProposalDrafted",
+    () =>
+      Effect.gen(function* () {
+        const reactivity = yield* Reactivity.make;
+        const fired: string[] = [];
+        const proposal = ProposalId.make("prop-000001");
+
+        const listen = (key: string | undefined, kind: string) =>
+          reactivity.registerUnsafe([key ?? ""], () => {
+            fired.push(kind);
+          });
+
+        listen(keys.code(datekit)[0], "code");
+        listen(keys.policy(datekit)[0], "policy");
+        listen(keys.proposal(datekit, proposal)[0], "proposal");
+        listen(keys.project(datekit)[0], projectKey);
+
+        const events = yield* Queue.unbounded<ProjectEvent>();
+
+        yield* tab(() => Stream.fromQueue(events), reactivity);
+
+        yield* Queue.offer(
+          events,
+          ProjectEvent.cases.Landed.make({ at, landing, seq: 1 })
+        );
+
+        const landed = yield* firedNow(fired);
+
+        yield* Queue.offer(
+          events,
+          ProjectEvent.cases.ProposalDrafted.make({
+            at,
+            proposal,
+            ready: true,
+            seq: 2,
+          })
+        );
+
+        expect({ drafted: yield* firedNow(fired), landed }).toStrictEqual({
+          drafted: [projectKey, "proposal"],
+          landed: ["code", "policy", projectKey],
         });
       })
   );
