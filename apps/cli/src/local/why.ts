@@ -1,9 +1,9 @@
 /**
  * `<cli> why <path>:<line>`: which landing put a line there, and why. git
  * blame names the commit; the platform's landing record names the ask (the
- * one it answers, or the one an ask's opening opened), the accountable author, every credit and the verdict. A commit the platform
- * did not land is said to be none of its landings, with the trailers its
- * author wrote. A verdict note fetched from the platform rides along, but
+ * one it answers, or the one an ask's opening opened), the accountable
+ * author, every credit and the verdict. A commit the platform did not land
+ * is said to be none of its landings, with the trailers its author wrote. A verdict note fetched from the platform rides along, but
  * the landing record is the source.
  */
 import { notesRef } from "@repo/git/notes";

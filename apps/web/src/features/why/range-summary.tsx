@@ -3,8 +3,8 @@
  * browser's annotation rows: for a landing, "<subject> · <ask> answer ·
  * <author> · <n> credits · <verdict>", linking the commit, the ask, its
  * answer and the author (an ask's opening reads "Open ask <ask>" instead,
- * linking the ask alone: it answers nothing); for a commit the project adopted, "<subject> · <author> · before
- * adoption". Then where to go from here: the file before this commit, and
+ * linking the ask alone: it answers nothing); for a commit the project
+ * adopted, "<subject> · <author> · before adoption". Then where to go from here: the file before this commit, and
  * the propose form about the range's first line. `LandingDetails` is the
  * whole landing, for the line dialog.
  */
@@ -36,6 +36,19 @@ const DOT = (
   </span>
 );
 
+/** The ask a landing links, as its id linking the ask's page. */
+const AskLink = ({
+  linked,
+  project,
+}: {
+  readonly linked: LandingAsk;
+  readonly project: ProjectName;
+}) => (
+  <a className={`${ID} ${LINK}`} href={askPath(project, linked.ask)}>
+    {linked.ask}
+  </a>
+);
+
 /**
  * The ask a landing links: "<ask> answer" for the one it answers, with its
  * answer's page; "Open ask <ask>" for the one it opened, which has none.
@@ -47,11 +60,7 @@ const AskLinks = ({
   readonly linked: LandingAsk;
   readonly project: ProjectName;
 }) => {
-  const ask = (
-    <a className={`${ID} ${LINK}`} href={askPath(project, linked.ask)}>
-      {linked.ask}
-    </a>
-  );
+  const ask = <AskLink linked={linked} project={project} />;
 
   return linked.kind === "opened" ? (
     <span>Open ask {ask}</span>
@@ -75,7 +84,10 @@ const Adopted = ({ author }: { readonly author: string }) => (
   </>
 );
 
-/** "· <ask> answer (or Open ask <ask>) · <author> · <n> credits · <verdict>", for a landing. */
+/**
+ * "· <ask> answer · <author> · <n> credits · <verdict>" for a landing, or
+ * "· Open ask <ask> · …" for an ask's opening.
+ */
 const Landed = ({
   landing,
   project,
@@ -197,12 +209,7 @@ export const LandingDetails = ({
             </dt>
             <dd className="flex gap-2">
               {linked.kind === "opened" ? (
-                <a
-                  className={`${ID} ${LINK}`}
-                  href={askPath(project, linked.ask)}
-                >
-                  {linked.ask}
-                </a>
+                <AskLink linked={linked} project={project} />
               ) : (
                 <AskLinks linked={linked} project={project} />
               )}

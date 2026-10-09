@@ -2,9 +2,9 @@
  * The deployed "why" page, as a browser shows it: a file a landing changed,
  * with at least one row linking an ask, saved as `e2e/out/why.png` for the
  * shot list. The ask a landing answers counts, and so does the ask an
- * opening opened ("Open ask <id>"), so a stage whose landings are only
- * openings (an import's, or demo's, where nothing is answered) passes on an
- * opening's file.
+ * opening opened ("Open ask <id>"), so a project whose landings are only
+ * openings (burrow, or demo's datekit, where nothing is answered) passes on
+ * an opening's file.
  *
  * It runs only against `WEB_URL` (a stage's web origin) and is skipped
  * without it. `WEB_PROJECT` picks the project (datekit, which the seed puts
