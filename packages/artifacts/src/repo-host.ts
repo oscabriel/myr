@@ -26,10 +26,16 @@ export const BranchName = Schema.String.pipe(
 
 export type BranchName = typeof BranchName.Type;
 
-/** A full ref name: `refs/heads/main`, `refs/asked/landed`, `refs/notes/commits`. */
+/**
+ * A full ref name: `refs/heads/main`, `refs/asked/landed`, `refs/notes/commits`,
+ * `refs/tags/@changesets/cli@2.27.1` (a scoped package's tag; `@` and `+`
+ * are git's as well).
+ */
 export const RefName = Schema.String.pipe(
   Schema.check(
-    Schema.isPattern(/^refs\/(?!.*\.\.)[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+$/u)
+    Schema.isPattern(
+      /^refs\/(?!.*\.\.)[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)+$/u
+    )
   ),
   Schema.brand("RefName")
 );

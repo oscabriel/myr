@@ -1,13 +1,14 @@
 /**
  * The code browser's, the people page's and drafting's contracts and
  * routes, wired end to end through the platform's fetch
- * handler before their bodies exist: the policy read answers, each code
- * read reaches the façade (which names the issue that builds it), a draft
- * needs a person, and `/` and a project's raw files have their slots, open
- * to a stale credential as every public path is.
+ * handler: the policy read answers, the code reads reach the façade
+ * (`why` names the issue that builds it; the others are
+ * `code-reads.test.ts`'), a draft needs a person, and `/` and a project's
+ * raw files have their routes, open to a stale credential as every public
+ * path is (a raw file at no revision is a 404).
  */
 import { describe, expect, it } from "@effect/vitest";
-import { ProposalId } from "@repo/protocol/ids";
+import { ProposalId, RepoPath } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
 import { advanceTo } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
@@ -70,12 +71,11 @@ describe("the code, policy and drafting contracts over /rpc", () => {
       const { handler } = yield* platform;
       const anyone = yield* rpcClient(handler);
 
-      expect(yield* diedWith(anyone.listRefs({ project }))).toStrictEqual(
-        Option.some("not built: 903")
-      );
-      expect(yield* diedWith(anyone.readTree({ project }))).toStrictEqual(
-        Option.some("not built: 903")
-      );
+      expect(
+        yield* diedWith(
+          anyone.why({ path: RepoPath.make("package.json"), project })
+        )
+      ).toStrictEqual(Option.some("not built: 912"));
     })
   );
 
@@ -133,8 +133,8 @@ describe("the host page and raw files routes", () => {
             status: 501,
             text: "not built: 906 (draft model test-model)",
           },
-          raw: { status: 501, text: "not built: 903" },
-          rawStale: { status: 501, text: "not built: 903" },
+          raw: { status: 404, text: "" },
+          rawStale: { status: 404, text: "" },
         });
       })
   );
@@ -147,10 +147,8 @@ describe("the host page and raw files routes", () => {
         new Request(`${origin}/${project}/raw/info/refs`)
       );
 
-      expect(response.status).toBe(501);
-      expect(yield* Effect.promise(() => response.text())).toBe(
-        "not built: 903"
-      );
+      expect(response.status).toBe(404);
+      expect(yield* Effect.promise(() => response.text())).toBe("");
     })
   );
 });
