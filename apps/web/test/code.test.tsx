@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { packageOf } from "@repo/project/code/refs";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { Contract } from "@repo/protocol/contracts";
 import {
@@ -44,7 +45,12 @@ import { Refusals } from "../src/features/ask/refused.tsx";
 import { BlobView } from "../src/features/code/blob-view.tsx";
 import { CommitView } from "../src/features/code/commit-view.tsx";
 import { LOG_PAGE, LogView } from "../src/features/code/log-view.tsx";
-import { RefsView } from "../src/features/code/refs-view.tsx";
+import {
+  packageOfTag,
+  packageParamOf,
+  RefsView,
+  TAGS_PAGE,
+} from "../src/features/code/refs-view.tsx";
 import { TreeView } from "../src/features/code/tree-view.tsx";
 import { readBlobPage } from "../src/routes/$project/blob/$rev/$.tsx";
 import { readCommitPage } from "../src/routes/$project/commit/$sha.tsx";
@@ -693,6 +699,137 @@ describe(RefsView, () => {
     expect(text).not.toContain(Brand.refsPrefix);
     expect(text).not.toContain("refs/notes");
     expect(text.toLowerCase()).not.toContain("release");
+  });
+
+  it("lists no packages when the tags version none or one", () => {
+    const one = Schema.decodeSync(Refs)({
+      forks: [],
+      project: "datekit",
+      tags: [
+        { name: "v1.1.0", sha: IMPORTED },
+        { name: "@datekit/core@2.0.0", sha: LANDED },
+        { name: "@datekit/core@1.0.0", sha: OLDER },
+      ],
+    });
+
+    expect(markupOf(page)).not.toContain("data-package=");
+    expect(markupOf(<RefsView refs={one} />)).not.toContain("data-package=");
+    expect(textOf(<RefsView refs={one} />)).not.toContain("Packages");
+  });
+});
+
+describe("a monorepo's refs page", () => {
+  /** Tags as `listRefs` orders them: plain, then each package's run. */
+  const monorepo = Schema.decodeSync(Refs)({
+    forks: [],
+    landed: LANDED,
+    project: "datekit",
+    tags: [
+      { name: "v1.1.0", sha: IMPORTED },
+      { name: "@datekit/core@2.0.0", sha: LANDED },
+      { name: "@datekit/core@1.0.0", sha: OLDER },
+      { name: "fmt@0.1.0", sha: OLDER },
+    ],
+  });
+
+  const CORE = "/datekit/refs?package=%40datekit%2Fcore";
+
+  it("lists each package above the tags, with its newest tag, linked to its tree, and its count", () => {
+    const markup = markupOf(<RefsView refs={monorepo} />);
+    const core = slice(markup, "data-package", "@datekit/core");
+    const fmt = slice(markup, "data-package", "fmt");
+
+    expect(textOf(<RefsView refs={monorepo} />)).toContain("Packages");
+    expect(hrefsOf(core)).toStrictEqual([
+      CORE,
+      `/datekit/tree/${TAG_SEGMENT.replace("1.0.0", "2.0.0")}`,
+    ]);
+    expect(core).toContain(">2<");
+    // The last package's slice runs on to the page's end: its first two links.
+    expect(hrefsOf(fmt).slice(0, 2)).toStrictEqual([
+      "/datekit/refs?package=fmt",
+      "/datekit/tree/fmt%400.1.0",
+    ]);
+    expect(fmt).toContain(">1<");
+  });
+
+  it("puts the packages above the tags", () => {
+    const markup = markupOf(<RefsView refs={monorepo} />);
+
+    expect(markup.indexOf('data-package="@datekit/core"')).toBeGreaterThan(-1);
+    expect(markup.indexOf('data-package="@datekit/core"')).toBeLessThan(
+      markup.indexOf('data-tag="v1.1.0"')
+    );
+  });
+
+  it("lists only one package's tags, newest first, with a way back to all", () => {
+    const element = <RefsView package="@datekit/core" refs={monorepo} />;
+
+    const markup = markupOf(element);
+
+    expect(
+      [...markup.matchAll(/data-tag="(?<tag>[^"]*)"/gu)].map(
+        (match) => match.groups?.tag
+      )
+    ).toStrictEqual(["@datekit/core@2.0.0", "@datekit/core@1.0.0"]);
+    expect(markup).not.toContain("data-package=");
+    expect(hrefsOf(markup)).toContain("/datekit/refs");
+    expect(textOf(element)).toContain("All tags");
+  });
+
+  it("pages one package's tags, keeping the package in the address", () => {
+    const many = Schema.decodeSync(Refs)({
+      forks: [],
+      project: "datekit",
+      tags: [
+        ...Array.from({ length: TAGS_PAGE + 1 }, (_, at) => ({
+          name: `@datekit/core@1.0.${TAGS_PAGE - at}`,
+          sha: OLDER,
+        })),
+        { name: "fmt@0.1.0", sha: OLDER },
+      ],
+    });
+
+    expect(
+      hrefsOf(markupOf(<RefsView package="@datekit/core" refs={many} />))
+    ).toContain(`${CORE}&from=${TAGS_PAGE}`);
+    expect(
+      hrefsOf(
+        markupOf(
+          <RefsView from={TAGS_PAGE} package="@datekit/core" refs={many} />
+        )
+      )
+    ).toContain(CORE);
+  });
+
+  it("says plainly that a package it does not know has no tags", () => {
+    const element = <RefsView package="@datekit/none" refs={monorepo} />;
+
+    expect(markupOf(element)).not.toContain("data-tag=");
+    expect(textOf(element)).toContain("No tags for @datekit/none.");
+    expect(hrefsOf(markupOf(element))).toContain("/datekit/refs");
+  });
+
+  it("reads a package from the address only when it names one", () => {
+    expect(packageParamOf("@datekit/core")).toStrictEqual(
+      Option.some("@datekit/core")
+    );
+    expect(
+      [undefined, "", 3, "x".repeat(256)].map((value) => packageParamOf(value))
+    ).toStrictEqual([
+      Option.none(),
+      Option.none(),
+      Option.none(),
+      Option.none(),
+    ]);
+  });
+
+  it("groups by the same package as the platform's order", () => {
+    const names = ["v1.0.0", "@scope@1", "@scope", "a@b@1.0.0", "pkg@2"];
+
+    expect(names.map(packageOfTag)).toStrictEqual(
+      names.map((name) => Option.getOrUndefined(packageOf(name)))
+    );
   });
 });
 
