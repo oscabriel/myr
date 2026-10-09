@@ -16,8 +16,9 @@
  * never a landing (each view asks the project's record for those, so a
  * later landing shows at once). A value that fails to decode is a miss.
  *
- * Read order: the isolate's `CodeCache`, then the `CodeStore`, then the
- * walk; what a walk computed is put in both. A walk may start from what is
+ * Read order: the isolate's `CodeCache` (with the heavy reads: a why's
+ * ranges grow with its file), then the `CodeStore`, then the walk; what a
+ * walk computed is put in both. A walk may start from what is
  * kept at a first-parent ancestor at most `INCREMENT_REACH` commits back,
  * so a new landing on main costs a handful of reads.
  */
@@ -128,7 +129,7 @@ export const recall = <A>(
     return yield* cache.through(
       key,
       Effect.map(store.get(key), Option.flatMap(decode)),
-      { keep: Option.isSome }
+      { heavy: true, keep: Option.isSome }
     );
   });
 
@@ -147,7 +148,7 @@ export const remember = <A>(
     )(value).pipe(Effect.orDie);
 
     yield* store.put(key, encoded);
-    yield* cache.through(key, Effect.succeedSome(value), {});
+    yield* cache.through(key, Effect.succeedSome(value), { heavy: true });
   });
 
 /**

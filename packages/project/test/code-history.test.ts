@@ -9,7 +9,8 @@
  * that no longer decodes is computed again and replaced.
  */
 import { describe, expect, it } from "@effect/vitest";
-import { RepoHost } from "@repo/artifacts/repo-host";
+import { RepoHost, RepoSession } from "@repo/artifacts/repo-host";
+import type { RepoSessionApi } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import {
@@ -27,7 +28,8 @@ import { CodeStore } from "../src/code-store.ts";
 import { CodeStoreCounts, CodeStoreMemory } from "../src/code-store/memory.ts";
 import { logOf, whyOf } from "../src/code.ts";
 import type { CodeProject } from "../src/code.ts";
-import { CodeCacheLive } from "../src/code/cache.ts";
+import { CodeCache, CodeCacheLive } from "../src/code/cache.ts";
+import type { CodeReads } from "../src/code/cache.ts";
 import { keyOf, StoredWhy, whyKept } from "../src/code/history.ts";
 import { WHY_SCAN } from "../src/code/why.ts";
 import { Content, writer } from "./code-fixtures.ts";
@@ -525,8 +527,9 @@ describe("a cold walk", () => {
           });
 
           expect(commits).toHaveLength(30);
-          // Each commit's root tree once: no commit is looked up again as
-          // the one after it's parent.
+          // Each commit's root tree read once from the store. The view
+          // shares a tree read under way among its fibers, so this count
+          // holds the store's reads, not how often the walk asked.
           expect((yield* Ref.get(seen)).trees).toBe(200);
         })
       ),
@@ -567,5 +570,131 @@ describe("a kept value that no longer decodes", () => {
         ).toBeGreaterThanOrEqual(2);
       })
     )
+  );
+});
+
+/**
+ * The memory store, the session each commit, tree, blob and log read ran
+ * in noted in `sessions`, in order.
+ */
+const sessioned = (
+  sessions: Ref.Ref<readonly Option.Option<RepoSessionApi>[]>
+) => {
+  const noted = <A, E>(read: Effect.Effect<A, E>) =>
+    Effect.flatMap(RepoSession, (session) =>
+      Effect.andThen(
+        Ref.update(sessions, (was) => [...was, session]),
+        read
+      )
+    );
+
+  return Layer.effect(
+    RepoHost,
+    Effect.gen(function* () {
+      const host = yield* RepoHost;
+
+      return RepoHost.of({
+        ...host,
+        log: (name, at, limit, offset) =>
+          noted(host.log(name, at, limit, offset)),
+        readBlob: (name, id) => noted(host.readBlob(name, id)),
+        readCommit: (name, sha) => noted(host.readCommit(name, sha)),
+        readTree: (name, id) => noted(host.readTree(name, id)),
+      });
+    })
+  ).pipe(Layer.provide(RepoHostMemory));
+};
+
+/** How many sessions `sessions` names, and whether a read ran in none. */
+const sessionsIn = (sessions: readonly Option.Option<RepoSessionApi>[]) => ({
+  outside: sessions.some(Option.isNone),
+  sessions: new Set(sessions.flatMap(Option.toArray)).size,
+});
+
+describe("one view's reads", () => {
+  it.effect("of a cold why all run in one session", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Ref.make<
+        readonly Option.Option<RepoSessionApi>[]
+      >([]);
+
+      yield* Effect.gen(function* () {
+        const { grown } = yield* history;
+        const { code } = yield* recordOf(grown);
+
+        yield* Ref.set(sessions, []);
+        yield* onIsolate(whyOf(code, Option.none(), format));
+      }).pipe(
+        Effect.provide(Layer.merge(sessioned(sessions), CodeStoreMemory))
+      );
+
+      expect(sessionsIn(yield* Ref.get(sessions))).toStrictEqual({
+        outside: false,
+        sessions: 1,
+      });
+    })
+  );
+
+  it.effect("of a cold path's log page all run in one session", () =>
+    Effect.gen(function* () {
+      const sessions = yield* Ref.make<
+        readonly Option.Option<RepoSessionApi>[]
+      >([]);
+
+      yield* Effect.gen(function* () {
+        const { grown } = yield* history;
+        const { code } = yield* recordOf(grown);
+
+        yield* Ref.set(sessions, []);
+        yield* onIsolate(logOf(code, formatLog(grown)));
+      }).pipe(
+        Effect.provide(Layer.merge(sessioned(sessions), CodeStoreMemory))
+      );
+
+      expect(sessionsIn(yield* Ref.get(sessions))).toStrictEqual({
+        outside: false,
+        sessions: 1,
+      });
+    })
+  );
+});
+
+describe("kept history in the isolate's cache", () => {
+  it.effect(
+    "is kept with the heavy reads: a why's ranges grow with its file",
+    () =>
+      within(() =>
+        Effect.gen(function* () {
+          const { grown } = yield* history;
+          const { code } = yield* recordOf(grown);
+
+          const seen = yield* Ref.make<readonly (readonly [string, boolean])[]>(
+            []
+          );
+
+          const spy: CodeReads = {
+            through: (key, read, keeping = {}) =>
+              Effect.andThen(
+                Ref.update(seen, (was) => [
+                  ...was,
+                  [key, keeping.heavy === true] as const,
+                ]),
+                read
+              ),
+          };
+
+          yield* Effect.all([
+            whyOf(code, Option.none(), format),
+            logOf(code, formatLog(grown)),
+          ]).pipe(Effect.provideService(CodeCache, spy));
+
+          const kept = (yield* Ref.get(seen)).filter(([key]) =>
+            /\/(?:why|path-log)\/v\d+\//u.test(key)
+          );
+
+          expect(kept.length).toBeGreaterThan(0);
+          expect(kept.filter(([, heavy]) => !heavy)).toStrictEqual([]);
+        })
+      )
   );
 });

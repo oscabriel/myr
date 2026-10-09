@@ -1036,24 +1036,52 @@ describe("reads in one session, and Artifacts' rate limit", () => {
       )
   );
 
-  it.effect("asks again after a rate-limited read, then reads", () =>
-    within(
-      () =>
+  it.live(
+    "reads in a session inside another over the outer session's handle",
+    () =>
+      within(({ counts }) =>
         Effect.gen(function* () {
           const repos = yield* RepoHost;
-          const name = RepoName.make("limited");
+          const name = RepoName.make("nested");
           const { first } = yield* seeded(name);
-          const read = yield* onTestClock(repos.readCommit(name, first));
+          const before = { ...counts };
 
-          expect(
-            Exit.map(
-              read,
-              Option.map(({ sha }) => sha)
-            )
-          ).toStrictEqual(Exit.succeed(Option.some(first)));
-        }),
-      { rateLimited: 3 }
-    )
+          yield* inRepoSession(
+            Effect.all([
+              repos.readCommit(name, first),
+              inRepoSession(repos.log(name, at, 5)),
+              repos.readFile(name, at, RepoPath.make("a.txt")),
+            ])
+          ).pipe(Effect.orDie);
+
+          expect([
+            counts.gets - before.gets,
+            counts.disposed - before.disposed,
+          ]).toStrictEqual([1, 1]);
+        })
+      )
+  );
+
+  it.effect(
+    "asks again after each of four rate-limited reads, then reads",
+    () =>
+      within(
+        () =>
+          Effect.gen(function* () {
+            const repos = yield* RepoHost;
+            const name = RepoName.make("limited");
+            const { first } = yield* seeded(name);
+            const read = yield* onTestClock(repos.readCommit(name, first));
+
+            expect(
+              Exit.map(
+                read,
+                Option.map(({ sha }) => sha)
+              )
+            ).toStrictEqual(Exit.succeed(Option.some(first)));
+          }),
+        { rateLimited: 4 }
+      )
   );
 
   it.effect(

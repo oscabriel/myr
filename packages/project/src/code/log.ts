@@ -16,7 +16,7 @@
  * entry looked up once (`READS_AT_ONCE` under way, in one ordered pass),
  * and neighbours compared.
  */
-import { Revision, RepoHost } from "@repo/artifacts/repo-host";
+import { inRepoSession, Revision, RepoHost } from "@repo/artifacts/repo-host";
 import type {
   Commit,
   RepoNotFound,
@@ -331,4 +331,7 @@ export const logPage = (
       commits,
       scan.length > PATH_SCAN ? Option.some(from + PATH_SCAN) : Option.none()
     );
-  });
+  }).pipe(
+    // The scan and the walk over it: one session, one handle.
+    inRepoSession
+  );

@@ -514,6 +514,9 @@ export const whyView = (
       asOneView(computed(repo, commit, path, scan))
     );
 
-    // The commits it names are read through one session, as the walk's are.
-    return yield* inRepoSession(viewOf(project, commit, path, kept));
-  }).pipe(Effect.catchTag("RepoNotFound", Effect.die));
+    return yield* viewOf(project, commit, path, kept);
+  }).pipe(
+    // The walk and the commits it names: one session, one handle.
+    inRepoSession,
+    Effect.catchTag("RepoNotFound", Effect.die)
+  );

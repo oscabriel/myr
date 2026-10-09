@@ -268,13 +268,19 @@ export const RepoSession = Context.Reference<Option.Option<RepoSessionApi>>(
 
 /**
  * `effect` with its reads in one session: what a host holds for them is
- * released when `effect` ends, whatever it came to.
+ * released when `effect` ends, whatever it came to. Inside a session
+ * already, `effect` joins it, so a view whose parts each ask for a
+ * session still reads over one handle.
  */
 export const inRepoSession = <A, E, R>(
   effect: Effect.Effect<A, E, R>
 ): Effect.Effect<A, E, Exclude<R, Scope.Scope>> =>
   Effect.scoped(
     Effect.gen(function* () {
+      if (Option.isSome(yield* RepoSession)) {
+        return yield* effect;
+      }
+
       const scope = yield* Effect.scope;
       const opening = yield* Semaphore.make(1);
       const held = new Map<string, unknown>();
