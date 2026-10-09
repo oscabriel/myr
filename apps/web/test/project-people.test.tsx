@@ -7,6 +7,7 @@
  * page is read-only, and it shows nothing the two contracts don't carry.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { commandDocs } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { PublicPolicy } from "@repo/protocol/domain/policy";
@@ -122,6 +123,29 @@ const between = (markup: string, start: string, end?: string) =>
     end === undefined ? undefined : markup.indexOf(end)
   );
 
+/** The markup of the section whose heading has the id `id`. */
+const sectionOf = (markup: string, id: string) => {
+  const heading = markup.indexOf(`id="${id}"`);
+
+  return markup.slice(
+    markup.lastIndexOf("<section", heading),
+    markup.indexOf("</section>", heading)
+  );
+};
+
+/** Each shell line the page offers to copy, as typed. */
+const commandsOf = (markup: string) =>
+  [
+    ...markup.matchAll(/<code\b[^>]*select-all[^>]*>(?<line>.*?)<\/code>/gsu),
+  ].map((found) => plainText(found.groups?.line ?? "").trim());
+
+/** The CLI command a line runs: the longest command path it starts with. */
+const commandOf = (line: string) =>
+  commandDocs(Contracts)
+    .filter(({ path }) => line.startsWith(`${Brand.cli} ${path.join(" ")} `))
+    .toSorted((one, other) => other.path.length - one.path.length)
+    .at(0);
+
 /** Each `<tr>`'s text, in order. */
 const rowsOf = (markup: string) =>
   [...markup.matchAll(/<tr\b[^>]*>(?<row>.*?)<\/tr>/gsu)].map((found) =>
@@ -212,7 +236,63 @@ describe("a project's people page", () => {
   });
 
   it("says whether landings disclose the agents people worked through", () => {
-    expect(textOf(page)).toContain("Assisted-by:");
+    const disclosed = plainText(sectionOf(markupOf(page), "agents"));
+
+    const undisclosed = plainText(
+      sectionOf(
+        markupOf(
+          <PeopleView
+            ledger={datekitLedger}
+            policy={Option.some({ ...datekitPolicy, agents: "none" })}
+            project={datekit}
+          />
+        ),
+        "agents"
+      )
+    );
+
+    expect(disclosed).toContain(
+      "Each landing names the agents its people worked through"
+    );
+    expect(undisclosed).toContain("Landings carry no Assisted-by: trailer");
+    expect(undisclosed).not.toContain("names the agents");
+  });
+
+  it("says a denouncement still bars a person when the vouch rule is bans only", () => {
+    const vouching = plainText(
+      sectionOf(
+        markupOf(
+          <PeopleView
+            ledger={datekitLedger}
+            policy={Option.some({
+              ...datekitPolicy,
+              vouch: { ...datekitPolicy.vouch, mode: "bansOnly" },
+            })}
+            project={datekit}
+          />
+        ),
+        "vouching"
+      )
+    );
+
+    expect(vouching).toContain("Bans only: nobody needs a vouch");
+    expect(vouching).toContain(
+      "a denounced person still may not claim, push or propose"
+    );
+  });
+
+  it("links the file each section comes from, inside that section", () => {
+    const markup = markupOf(page);
+    const projectFile = `href="/datekit/blob/${sha}/${Brand.configDir}/project.ts"`;
+
+    for (const id of ["deciders", "limits", "agents"]) {
+      expect(sectionOf(markup, id)).toContain(projectFile);
+    }
+
+    expect(sectionOf(markup, "vouching")).toContain(
+      `href="/datekit/blob/${sha}/${Brand.configDir}/vouched.td"`
+    );
+    expect(markup.split(projectFile)).toHaveLength(4);
   });
 
   it("says which commit it is as of, and links each source file at that commit", () => {
@@ -243,6 +323,30 @@ describe("a project's people page", () => {
     );
     expect(text).toContain(`${Brand.cli} ask open`);
     expect(text).toContain(`${Brand.cli} land`);
+  });
+
+  it("shows each command whole: a real CLI command, with every flag its payload takes and --yes", () => {
+    const lines = commandsOf(markupOf(page));
+
+    expect(lines.map((line) => commandOf(line)?.contract)).toStrictEqual([
+      "openAsk",
+      "land",
+    ]);
+
+    for (const line of lines) {
+      const doc = commandOf(line);
+      const given = line.split(" ").filter((word) => word.startsWith("--"));
+
+      const payload = (doc?.flags ?? []).filter(
+        (flag) => !["--dry-run", "--json", "--yes"].includes(flag)
+      );
+
+      expect(
+        given.filter((flag) => !(doc?.flags ?? []).includes(flag))
+      ).toStrictEqual([]);
+      expect(payload.filter((flag) => !given.includes(flag))).toStrictEqual([]);
+      expect(given.includes("--yes")).toBe(doc?.needsApproval);
+    }
   });
 
   it("adds no sealed path, check name, salt or read log to what it was given", () => {

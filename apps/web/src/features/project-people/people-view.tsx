@@ -75,7 +75,7 @@ const blobPath = (project: ProjectName, at: string, path: string) =>
 const vouchModes = {
   all: "For everything: claiming an ask, offering a sealed answer and proposing an ask all need a vouch.",
   bansOnly:
-    "Bans only: nobody needs a vouch; a denouncement still bars the person it names from proposing.",
+    "Bans only: nobody needs a vouch, but a denounced person still may not claim, push or propose.",
   forCode:
     "For code: claiming an ask or offering a sealed answer needs a vouch; anyone not denounced may propose an ask.",
 } as const satisfies Record<PublicPolicy["vouch"]["mode"], string>;
@@ -262,7 +262,13 @@ const Layers = ({
   </Region>
 );
 
-const Limits = ({ policy }: { readonly policy: PublicPolicy }) => {
+const Limits = ({
+  policy,
+  source,
+}: {
+  readonly policy: PublicPolicy;
+  readonly source: ReactNode;
+}) => {
   const { budget, caps, claims, record } = policy;
 
   return (
@@ -290,11 +296,18 @@ const Limits = ({ policy }: { readonly policy: PublicPolicy }) => {
           }, for ${plural(record.windowDays, "day", "days")}`}
         </Field>
       </Fields>
+      {source}
     </Region>
   );
 };
 
-const Agents = ({ policy }: { readonly policy: PublicPolicy }) => (
+const Agents = ({
+  policy,
+  source,
+}: {
+  readonly policy: PublicPolicy;
+  readonly source: ReactNode;
+}) => (
   <Region id="agents" title="Agents">
     <p className="max-w-[70ch] text-sm">
       {policy.agents === "trailer" ? (
@@ -308,6 +321,7 @@ const Agents = ({ policy }: { readonly policy: PublicPolicy }) => (
         </>
       )}
     </p>
+    {source}
   </Region>
 );
 
@@ -352,10 +366,8 @@ const Evaluated = ({
       </Region>
       <Vouching policy={policy} project={project} />
       <Layers ledger={ledger} project={project} />
-      <Limits policy={policy} />
-      {projectFile}
-      <Agents policy={policy} />
-      {projectFile}
+      <Limits policy={policy} source={projectFile} />
+      <Agents policy={policy} source={projectFile} />
     </>
   );
 };
@@ -384,9 +396,11 @@ export const PeopleView = ({
         {`Change these by landing a change to ${Brand.configDir}/: open an ask for it, or, as a decider, land your own change.`}
       </p>
       <CommandLine
-        command={`${Brand.cli} ask open <ask> --project ${project}`}
+        command={`${Brand.cli} ask open <ask> --project ${project} --files <files> --yes`}
       />
-      <CommandLine command={`${Brand.cli} land --project ${project}`} />
+      <CommandLine
+        command={`${Brand.cli} land --project ${project} --base <base> --head $(git rev-parse HEAD) --message <message> --requestId land-$(git rev-parse HEAD) --yes`}
+      />
     </Region>
   </PageShell>
 );
