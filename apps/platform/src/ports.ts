@@ -28,6 +28,7 @@ import type { EvidenceStore } from "@repo/checks/evidence-store";
 import { EvidenceStoreR2 } from "@repo/checks/evidence-store/r2";
 import type { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
+import { CodeCacheLive } from "@repo/project/code/cache";
 import type { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import type { Lander } from "@repo/project/lander";
@@ -52,6 +53,13 @@ import type { Cartridge } from "./cartridges.ts";
 import type { PlatformConfig } from "./platform.ts";
 import type { RateLimits } from "./rate-limits.ts";
 import { ProjectSockets } from "./watch.ts";
+
+/**
+ * How many code reads (trees, commits, file texts, a commit's changes) an
+ * isolate keeps by object id, the least recently used dropped first. Each
+ * Artifacts read is billed; what an object id names never changes.
+ */
+const CODE_READS_KEPT = 2000;
 
 /** What the Worker's code runs on, besides sessions and the contracts' handlers. */
 export type WorkerPorts =
@@ -127,7 +135,10 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
       draft: config.DRAFT_LIMIT,
       proposal: config.PROPOSAL_LIMIT,
     }),
-    EvidenceStoreR2(config.EVIDENCE)
+    EvidenceStoreR2(config.EVIDENCE),
+    // The code reads' cache, one per isolate: a `Context.Reference`, so
+    // without this entry every read goes to Artifacts.
+    CodeCacheLive(CODE_READS_KEPT)
   ).pipe(
     Layer.provideMerge(RepoHostBinding.layer(config.ARTIFACTS)),
     Layer.provideMerge(WorkerFetch)

@@ -1,37 +1,21 @@
 /**
  * The code façade both handler files call: a project's code read from its
  * canonical repo alone, with main resolved through the project's record.
- * Until 903 and 912 land, each read names the issue that builds it.
+ * Until 912 lands, why each line is there names the issue that builds it.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import type { ProjectApi } from "@repo/project/project";
-import {
-  CommitSha,
-  LandedSha,
-  ProjectName,
-  RepoPath,
-} from "@repo/protocol/ids";
+import { LandedSha, ProjectName, RepoPath } from "@repo/protocol/ids";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Cause, Effect, Exit, Option } from "effect";
 
-import {
-  codeProjectOf,
-  commitOf,
-  fileOf,
-  logOf,
-  pathsOf,
-  refsOf,
-  treeOf,
-  whyOf,
-} from "../src/code.ts";
+import { codeProjectOf, whyOf } from "../src/code.ts";
 import { CodeCache } from "../src/code/cache.ts";
 
 const project = ProjectName.make("datekit");
 
 const landed = LandedSha.make("4".repeat(40));
-
-const sha = CommitSha.make("4".repeat(40));
 
 const path = RepoPath.make("README.md");
 
@@ -87,24 +71,11 @@ describe("a project's code, read through the façade", () => {
     })
   );
 
-  it.effect("names the issue that builds each read", () =>
+  it.effect("names the issue that builds why each line is there", () =>
     Effect.gen(function* () {
-      const none = Option.none();
-
-      expect(
-        yield* Effect.all([
-          diedWith(refsOf(code)),
-          diedWith(treeOf(code, none, none)),
-          diedWith(pathsOf(code, none)),
-          diedWith(fileOf(code, none, path)),
-          diedWith(logOf(code, { at: none, from: 0, limit: 30, path: none })),
-          diedWith(commitOf(code, sha)),
-          diedWith(whyOf(code, none, path)),
-        ])
-      ).toStrictEqual([
-        ...Array.from({ length: 6 }, () => Option.some("not built: 903")),
-        Option.some("not built: 912"),
-      ]);
+      expect(yield* diedWith(whyOf(code, Option.none(), path))).toStrictEqual(
+        Option.some("not built: 912")
+      );
     })
   );
 });

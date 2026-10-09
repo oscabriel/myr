@@ -7,8 +7,8 @@
  * consult the project's record only for main's landed commit, its landings
  * and its forks (`CodeProject`). Reads by object id go through `CodeCache`.
  *
- * Stubs until 903 (every read but `whyOf`) and 912 (`whyOf`) land; the
- * signatures are final.
+ * Each read lives in its own module under `code/`; `whyOf` is a stub until
+ * 912 lands.
  */
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import type {
@@ -37,10 +37,18 @@ import type {
 } from "@repo/protocol/refusal";
 import { Effect, Option } from "effect";
 
+import { commitDiff } from "./code/commit.ts";
+import { fileView } from "./code/file.ts";
+import { logPage } from "./code/log.ts";
+import { pathList } from "./code/paths.ts";
+import { refsView } from "./code/refs.ts";
+import { listing } from "./code/tree.ts";
 import type { ProjectApi } from "./project.ts";
 
 /** What the code reads take from a project's record, beside its canonical repo. */
 export interface CodeProject {
+  /** The project, as its refs name it. */
+  readonly project: ProjectName;
   /** The project's canonical repo: never a fork's or a layer's. */
   readonly repo: RepoName;
   /** Main's landed commit; none before the first push. */
@@ -60,6 +68,7 @@ export const codeProjectOf = (
   forks: api.forks(),
   head: Effect.map(api.head(), ({ landed }) => Option.fromUndefinedOr(landed)),
   landings: api.landings,
+  project,
   repo: RepoName.make(project),
 });
 
@@ -67,35 +76,35 @@ const notBuilt = (issue: string) => Effect.die(`not built: ${issue}`);
 
 /** Main's landed commit, its tags peeled and sorted newest first, and its forks. */
 export const refsOf = (
-  _project: CodeProject
-): Effect.Effect<RefsView, never, RepoHost> => notBuilt("903");
+  project: CodeProject
+): Effect.Effect<RefsView, never, RepoHost> => refsView(project);
 
 /** One folder at `at` (main when none), folders first, with its README. */
 export const treeOf = (
-  _project: CodeProject,
-  _at: Option.Option<Rev>,
-  _path: Option.Option<RepoPath>
+  project: CodeProject,
+  at: Option.Option<Rev>,
+  path: Option.Option<RepoPath>
 ): Effect.Effect<TreeListing, UnknownRevision | UnknownPath, RepoHost> =>
-  notBuilt("903");
+  listing(project, at, path);
 
 /** Every file path at `at`, up to the cap. */
 export const pathsOf = (
-  _project: CodeProject,
-  _at: Option.Option<Rev>
-): Effect.Effect<PathList, UnknownRevision, RepoHost> => notBuilt("903");
+  project: CodeProject,
+  at: Option.Option<Rev>
+): Effect.Effect<PathList, UnknownRevision, RepoHost> => pathList(project, at);
 
 /** One file at `at`: its text, or that it is binary or too large. */
 export const fileOf = (
-  _project: CodeProject,
-  _at: Option.Option<Rev>,
-  _path: RepoPath
+  project: CodeProject,
+  at: Option.Option<Rev>,
+  path: RepoPath
 ): Effect.Effect<FileView, UnknownRevision | UnknownPath, RepoHost> =>
-  notBuilt("903");
+  fileView(project, at, path);
 
 /** A page of first-parent commits from `at`, each landing with its record. */
 export const logOf = (
-  _project: CodeProject,
-  _input: {
+  project: CodeProject,
+  input: {
     readonly at: Option.Option<Rev>;
     readonly path: Option.Option<RepoPath>;
     readonly from: number;
@@ -105,13 +114,14 @@ export const logOf = (
   { readonly commits: readonly CommitView[]; readonly next?: number },
   UnknownRevision,
   RepoHost
-> => notBuilt("903");
+> => logPage(project, input);
 
 /** One commit and the files it changed against its first parent. */
 export const commitOf = (
-  _project: CodeProject,
-  _sha: CommitSha
-): Effect.Effect<CommitDiff, UnknownCommit, RepoHost> => notBuilt("903");
+  project: CodeProject,
+  sha: CommitSha
+): Effect.Effect<CommitDiff, UnknownCommit, RepoHost> =>
+  commitDiff(project, sha);
 
 /** Why each line of a file at `at` is there. */
 export const whyOf = (
