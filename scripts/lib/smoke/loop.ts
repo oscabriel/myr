@@ -15,6 +15,15 @@
  *    as committer, and the `Asked-by` and `Signed-off-by` trailers;
  * 8. `verdict-note`: its verdict note is on the answer's head in the fork.
  *
+ * With `draft`, three more steps on the same project:
+ *
+ * 9. `draft-propose`: the answerer proposes a want with `--draft`;
+ * 10. `draft-ready`: `proposal <id>` until the platform's agent has
+ *     drafted it, red first (a failed draft fails the step);
+ * 11. `draft-accept`: the decider accepts it from Today, and the landing
+ *     that opened its ask discloses the drafter (`Assisted-by:`) and
+ *     credits the answerer as its asker.
+ *
  * Each step is timed and printed as it passes; the first that fails ends
  * the run. The throwaway project, its repo and the claim's fork are written
  * to the throwaway ledger (`infra/created.ts`, by `smoke`) as soon as each
@@ -40,12 +49,15 @@ import { recordCreated } from "../../../infra/created.ts";
 import type { Created } from "../../../infra/created.ts";
 import { declaredStage, resources } from "../../../infra/stages.ts";
 import {
+  acceptDraft,
+  awaitDraft,
   awaitLanding,
   claimAsk,
   initProject,
   LoopFailed,
   openAsk,
   personAt,
+  proposeDraft,
   pushAnswer,
   pushOutOfScope,
   readLanding,
@@ -71,6 +83,15 @@ export interface StepTiming {
   readonly ms: number;
 }
 
+/** A drafted ask the loop accepted: the model, its attempts, and its landing's trailers. */
+export interface DraftReport {
+  readonly model: string;
+  readonly attempts: number;
+  /** From the proposal to the draft settled, in ms. */
+  readonly ms: number;
+  readonly trailers: readonly string[];
+}
+
 /** A loop that passed: what each step found, and how long each took. */
 export interface SmokeLoopReport {
   readonly project: ProjectName;
@@ -84,6 +105,8 @@ export interface SmokeLoopReport {
   readonly trailers: readonly string[];
   readonly noteFound: boolean;
   readonly timings: readonly StepTiming[];
+  /** With `draft`, the drafted ask it accepted. */
+  readonly draft?: DraftReport;
 }
 
 /** What one loop runs on, and as whom. */
@@ -100,6 +123,8 @@ export interface LoopInput {
   readonly answerer: Redacted.Redacted;
   /** How the loop waits for the landing: every 2 s, for up to 10 minutes, unless given. */
   readonly patience?: Patience;
+  /** Also propose with a draft, wait for it, and accept it (`--draft`). */
+  readonly draft?: boolean;
 }
 
 const PATIENCE: Patience = {
@@ -325,23 +350,70 @@ export const smokeLoop = (
       "verdict-note"
     )(readVerdictNote({ answerer, dir: work, head }));
 
-    return {
+    const timings = [
+      people,
+      init,
+      opened,
+      claimed,
+      refused,
+      answered,
+      landing,
+      noted,
+    ];
+
+    const report = {
       author: read.author,
       committer: read.committer,
       landed,
       noteFound: true,
       project,
       refusedWith,
-      timings: [
-        people,
-        init,
-        opened,
-        claimed,
-        refused,
-        answered,
-        landing,
-        noted,
-      ],
+      timings,
       trailers: read.trailers,
+    };
+
+    if (input.draft !== true) {
+      return report;
+    }
+
+    const [proposal, proposed] = yield* timed(
+      stage,
+      "draft-propose"
+    )(proposeDraft(answerer, project));
+
+    const [ready, drafted] = yield* timed(
+      stage,
+      "draft-ready"
+    )(
+      awaitDraft({
+        patience: input.patience ?? PATIENCE,
+        project,
+        proposal,
+        reader: answerer,
+      })
+    );
+
+    const [trailers, accepted] = yield* timed(
+      stage,
+      "draft-accept"
+    )(
+      acceptDraft({
+        decider,
+        dir: `${dir}/start`,
+        origin,
+        project,
+        proposal,
+        proposer: answerer.handle,
+      })
+    );
+
+    return {
+      ...report,
+      draft: {
+        ...ready,
+        ms: proposed.ms + drafted.ms,
+        trailers,
+      },
+      timings: [...timings, proposed, drafted, accepted],
     };
   }).pipe(Effect.scoped);

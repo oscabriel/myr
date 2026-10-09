@@ -26,6 +26,9 @@ import { RepoHostBinding } from "@repo/artifacts/repo-host/binding";
 import type { CheckRunner } from "@repo/checks/check-runner";
 import type { EvidenceStore } from "@repo/checks/evidence-store";
 import { EvidenceStoreR2 } from "@repo/checks/evidence-store/r2";
+import type { Drafter } from "@repo/drafting/drafter";
+import { DrafterWorkersAi } from "@repo/drafting/drafter/binding";
+import { DraftModel } from "@repo/drafting/run";
 import type { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import { CodeCacheLive } from "@repo/project/code/cache";
@@ -45,6 +48,7 @@ import { Layer, Option } from "effect";
 
 import { CheckRunnerSandbox } from "./adapters/check-runner-sandbox.ts";
 import { DoProjects } from "./adapters/do-projects.ts";
+import { DraftRunsWorkflow } from "./adapters/draft-runs-workflow.ts";
 import { WorkerFetch } from "./adapters/fetch.ts";
 import { LanderSandbox } from "./adapters/lander-sandbox.ts";
 import { WorkerRateLimits } from "./adapters/rate-limits.ts";
@@ -108,8 +112,9 @@ const memoryFrontPage = Layer.merge(
  * Durable Object, the sandbox's Checker, the Lander `LANDER_ADAPTER` names,
  * config folders evaluated in the Worker Loader, the front
  * page in D1, the rate limits, lane logs in the `EVIDENCE` bucket,
- * and the `PROJECT` namespace again for `watch`'s relay of each project's
- * socket.
+ * the `PROJECT` namespace again for `watch`'s relay of each project's
+ * socket, and each proposal's draft rounds as runs of the `Answer`
+ * Workflow.
  */
 const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
   Layer.mergeAll(
@@ -141,7 +146,10 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     EvidenceStoreR2(config.EVIDENCE),
     // The code reads' cache, one per isolate: a `Context.Reference`, so
     // without this entry every read goes to Artifacts.
-    CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy)
+    CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy),
+    // A `Context.Reference`: without this entry a draft proposal starts no
+    // run, and stays drafting.
+    DraftRunsWorkflow(config.ANSWER)
   ).pipe(
     Layer.provideMerge(RepoHostBinding.layer(config.ARTIFACTS)),
     Layer.provideMerge(WorkerFetch)
@@ -150,3 +158,14 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
 /** The ports for one stage's env, with every cartridge the platform plugs in. */
 export const workerPorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
   plugIn(config, corePorts(config), Object.values(cartridges));
+
+/**
+ * What a draft's run needs beside the Worker's ports: the drafter over
+ * Workers AI, asking `DRAFT_MODEL`, which a settled round names. Only the
+ * `Answer` Workflow's draft rounds take it.
+ */
+export const draftPorts = (config: PlatformConfig): Layer.Layer<Drafter> =>
+  Layer.merge(
+    DrafterWorkersAi(config.AI, config.DRAFT_MODEL),
+    Layer.succeed(DraftModel, config.DRAFT_MODEL)
+  );

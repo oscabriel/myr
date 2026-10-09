@@ -24,6 +24,11 @@
  *   clone and push it through the gateway. The `Answer` Workflow
  *   the cartridge starts an admission on keeps the instance and runs
  *   nothing: the world carries no Workflow.
+ * - A proposal made with a draft is drafted in process as it is made
+ *   (`@repo/drafting`'s inline runs, over the Worker's ports), by the
+ *   memory drafter scripted with the canned draft, whose test fails on any
+ *   `src/parse.ts` without a `parseOrdinal`: so smoke's `--loop --draft`
+ *   sees a draft go red first and open on accept with no model.
  *
  * The seed's `--world node` runs it (`scripts/lib/seed.ts`) and
  * reaches it over HTTP and git, as it reaches a stage. A process, not an
@@ -36,12 +41,18 @@ import type { RepoHost } from "@repo/artifacts/repo-host";
 import { CheckRunner, shaOf } from "@repo/checks/check-runner";
 import type { CheckAt } from "@repo/checks/check-runner";
 import { CheckRunnerLocal } from "@repo/checks/check-runner/local";
+import { cannedDrafter } from "@repo/drafting/draft-runs/canned";
+import { draftRunsInline } from "@repo/drafting/draft-runs/inline";
+import type { InlinePorts } from "@repo/drafting/draft-runs/inline";
+import type { Drafter } from "@repo/drafting/drafter";
 import { Projects } from "@repo/project/projects";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { git } from "@repo/testkit/git";
 import { untouchable } from "@repo/testkit/untouchable";
 import {
   Console,
+  Context,
+  Deferred,
   Duration,
   Effect,
   FileSystem,
@@ -169,6 +180,30 @@ const cartridgesOver =
     };
   };
 
+/**
+ * `plugIn` with draft runs in process beside it: each Project DO starts its
+ * rounds inline, on the Worker's ports (which the Worker's side hands over
+ * once built) and `drafter`.
+ */
+const withDrafts = (
+  plugIn: PlugIn,
+  ready: Deferred.Deferred<Context.Context<InlinePorts>>,
+  drafter: Context.Context<Drafter>
+): PlugIn => ({
+  project: Layer.merge(
+    plugIn.project ?? Layer.empty,
+    draftRunsInline(Deferred.await(ready))
+  ),
+  worker: Layer.merge(
+    plugIn.worker ?? Layer.empty,
+    Layer.effectDiscard(
+      Effect.flatMap(Effect.context<Projects | RepoHost>(), (ports) =>
+        Deferred.succeed(ready, Context.merge(drafter, ports))
+      )
+    )
+  ),
+});
+
 /** How long after the last round the world carries queued answer runs again. */
 const CARRY_EVERY = Duration.millis(250);
 
@@ -187,9 +222,13 @@ const serve = Effect.gen(function* () {
     () => import("../src/platform.ts")
   );
 
+  const drafter = yield* Layer.build(cannedDrafter);
+  const ready = yield* Deferred.make<Context.Context<InlinePorts>>();
+  const plugged = cartridgesOver(cartridges, decodeEnv);
+
   const world = yield* coreLoopWorld({
     checker: localChecker,
-    plugIn: cartridgesOver(cartridges, decodeEnv),
+    plugIn: (aside) => withDrafts(plugged(aside), ready, drafter),
     sessions,
   });
 
