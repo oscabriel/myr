@@ -55,7 +55,7 @@ describe("the refusal union", () => {
     ).toStrictEqual(Refusal.members.map((member) => member.identifier));
   });
 
-  it("lists all forty tags in union order, group by group", () => {
+  it("lists all forty-five tags in union order, group by group", () => {
     expect(Refusal.members.map((member) => member.identifier)).toStrictEqual([
       // Push and claim
       "NotClaimed",
@@ -96,11 +96,16 @@ describe("the refusal union", () => {
       "PostureChange",
       "NotDecider",
       "DecisionClosed",
+      "ProposalClosed",
+      "DraftInProgress",
       // Lookup
       "UnknownProject",
       "UnknownAsk",
       "UnknownCommit",
       "UnknownDecision",
+      "UnknownPath",
+      "UnknownRevision",
+      "UnknownProposal",
       // Setup
       "ProjectExists",
       "ImportFailed",
@@ -145,6 +150,7 @@ describe("the refusal union", () => {
       DecisionClosed: false,
       Denounced: false,
       DirectPush: false,
+      DraftInProgress: true,
       Flake: true,
       HeldBackFailed: false,
       ImportFailed: true,
@@ -160,6 +166,7 @@ describe("the refusal union", () => {
       PostureChange: false,
       PrivatePathInPublicTree: false,
       ProjectExists: false,
+      ProposalClosed: false,
       ReachedInternals: false,
       RepoBusy: true,
       SecretInOutput: false,
@@ -170,7 +177,10 @@ describe("the refusal union", () => {
       UnknownCommit: false,
       UnknownDecision: false,
       UnknownEnvItem: false,
+      UnknownPath: false,
       UnknownProject: false,
+      UnknownProposal: false,
+      UnknownRevision: false,
       UnstatedRequirement: false,
       ValueTooShort: false,
       VerifierBlocked: true,

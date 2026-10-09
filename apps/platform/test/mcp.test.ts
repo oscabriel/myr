@@ -24,6 +24,7 @@ import {
   Handle,
   LaneName,
   ProjectName,
+  ProposalId,
   RepoPath,
   RequestId,
 } from "@repo/protocol/ids";
@@ -399,6 +400,10 @@ const provoked = {
     args: { project: nowhere },
     refusal: new UnknownProject({ project: nowhere }),
   },
+  draftAsk: {
+    args: { project: nowhere, proposal: ProposalId.make("prop-000001") },
+    refusal: new UnknownProject({ project: nowhere }),
+  },
   finish: {
     args: { ask: fixWeek, base, head, project, requestId },
     refusal: new NotDecider({}),
@@ -435,6 +440,10 @@ const provoked = {
     args: { ask: nope, files: askFiles, project },
     refusal: new NotDecider({}),
   },
+  projectPolicy: {
+    args: { project: nowhere },
+    refusal: new UnknownProject({ project: nowhere }),
+  },
   proposeAsk: {
     args: { project: nowhere, want },
     refusal: new UnknownProject({ project: nowhere }),
@@ -446,6 +455,10 @@ const provoked = {
   showAsk: {
     args: { ask: nope, project },
     refusal: new UnknownAsk({ ask: nope }),
+  },
+  showProposal: {
+    args: { project: nowhere, proposal: ProposalId.make("prop-000001") },
+    refusal: new UnknownProject({ project: nowhere }),
   },
   status: {
     args: { project: nowhere },

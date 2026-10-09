@@ -79,6 +79,7 @@ export const keysOf = (
     Landed: () => keys.project(project),
     Lapsed: () => keys.project(project),
     LedgerAppended: () => keys.ledger(project),
+    ProposalDrafted: () => keys.project(project),
     ProposalOpened: () => keys.project(project),
     Pushed: ({ ask }) => keys.ask(project, ask),
     Released: () => keys.project(project),

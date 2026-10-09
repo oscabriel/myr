@@ -92,6 +92,7 @@ const step = (
     Landed: () => rows,
     Lapsed: ({ ask }) => withClaims(rows, keyOf(project, ask), -1),
     LedgerAppended: () => rows,
+    ProposalDrafted: () => rows,
     ProposalOpened: () => rows,
     Pushed: () => rows,
     Released: ({ ask }) => withClaims(rows, keyOf(project, ask), -1),

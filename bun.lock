@@ -61,6 +61,7 @@
         "@repo/artifacts": "workspace:*",
         "@repo/brand": "workspace:*",
         "@repo/checks": "workspace:*",
+        "@repo/drafting": "workspace:*",
         "@repo/gate": "workspace:*",
         "@repo/git": "workspace:*",
         "@repo/project": "workspace:*",
@@ -133,6 +134,7 @@
         "@repo/artifacts": "workspace:*",
         "@repo/checks": "workspace:*",
         "@repo/config": "workspace:*",
+        "@repo/drafting": "workspace:*",
         "@repo/git": "workspace:*",
         "@repo/project": "workspace:*",
         "@repo/rules": "workspace:*",
@@ -220,6 +222,25 @@
         "@effect/platform-node": "4.0.1",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/drafting": {
+      "name": "@repo/drafting",
+      "dependencies": {
+        "@repo/artifacts": "workspace:*",
+        "@repo/brand": "workspace:*",
+        "@repo/project": "workspace:*",
+        "@repo/protocol": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "5.20261006.1",
+        "@effect/vitest": "catalog:",
+        "@repo/config": "workspace:*",
+        "@repo/rules": "workspace:*",
+        "@repo/testkit": "workspace:*",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -879,6 +900,8 @@
     "@repo/cli": ["@repo/cli@workspace:apps/cli"],
 
     "@repo/config": ["@repo/config@workspace:packages/config"],
+
+    "@repo/drafting": ["@repo/drafting@workspace:packages/drafting"],
 
     "@repo/gate": ["@repo/gate@workspace:packages/gate"],
 

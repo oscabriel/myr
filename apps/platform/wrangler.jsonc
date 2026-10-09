@@ -38,6 +38,10 @@
     "STAGE": "local",
     // "container" (apps/sandbox) or "isogit" (in this Worker).
     "LANDER_ADAPTER": "container",
+    // The Workers AI model that drafts asks; swap it here, no code change.
+    "DRAFT_MODEL": "@cf/moonshotai/kimi-k2.7-code",
+    // The web app, which `/` links to: `vite dev`'s URL locally.
+    "PUBLIC_WEB_URL": "http://localhost:5173",
   },
   "secrets": {
     // Declared in .env.schema; the user sets the values. SESSION_TOKENS is
@@ -83,6 +87,8 @@
     { "binding": "RELEASES", "bucket_name": "releases-local" },
   ],
   "worker_loaders": [{ "binding": "LOADER" }],
+  // Workers AI, for the drafter (no key: the account's own).
+  "ai": { "binding": "AI" },
   "services": [{ "binding": "SANDBOX", "service": "sandbox" }],
   // Namespace ids differ per stage, so one stage's counts never spend
   // another's.
@@ -104,6 +110,12 @@
       "namespace_id": "1003",
       "simple": { "limit": 5, "period": 60 },
     },
+    // Drafts per person: each one is a model call and Checker runs.
+    {
+      "name": "DRAFT_LIMIT",
+      "namespace_id": "1004",
+      "simple": { "limit": 2, "period": 60 },
+    },
   ],
   "triggers": {
     "events": [
@@ -120,6 +132,8 @@
         "OPERATOR_HANDLE": "oscabriel",
         "STAGE": "dev-oscabriel",
         "LANDER_ADAPTER": "container",
+        "DRAFT_MODEL": "@cf/moonshotai/kimi-k2.7-code",
+        "PUBLIC_WEB_URL": "https://web-dev-oscabriel.oscargabriel.workers.dev",
       },
       "secrets": {
         "required": [
@@ -165,6 +179,7 @@
         { "binding": "RELEASES", "bucket_name": "releases-dev-oscabriel" },
       ],
       "worker_loaders": [{ "binding": "LOADER" }],
+      "ai": { "binding": "AI" },
       "services": [
         { "binding": "SANDBOX", "service": "sandbox-dev-oscabriel" },
       ],
@@ -184,6 +199,11 @@
           "namespace_id": "1103",
           "simple": { "limit": 5, "period": 60 },
         },
+        {
+          "name": "DRAFT_LIMIT",
+          "namespace_id": "1104",
+          "simple": { "limit": 2, "period": 60 },
+        },
       ],
       "triggers": {
         "events": [
@@ -202,6 +222,8 @@
         "OPERATOR_HANDLE": "oscabriel",
         "STAGE": "demo",
         "LANDER_ADAPTER": "container",
+        "DRAFT_MODEL": "@cf/moonshotai/kimi-k2.7-code",
+        "PUBLIC_WEB_URL": "https://web-demo.oscargabriel.workers.dev",
       },
       "secrets": {
         "required": [
@@ -243,6 +265,7 @@
         { "binding": "RELEASES", "bucket_name": "releases-demo" },
       ],
       "worker_loaders": [{ "binding": "LOADER" }],
+      "ai": { "binding": "AI" },
       "services": [{ "binding": "SANDBOX", "service": "sandbox-demo" }],
       "ratelimits": [
         {
@@ -259,6 +282,11 @@
           "name": "SIGN_IN_LIMIT",
           "namespace_id": "1203",
           "simple": { "limit": 5, "period": 60 },
+        },
+        {
+          "name": "DRAFT_LIMIT",
+          "namespace_id": "1204",
+          "simple": { "limit": 2, "period": 60 },
         },
       ],
       "triggers": {

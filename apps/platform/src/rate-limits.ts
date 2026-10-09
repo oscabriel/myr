@@ -12,8 +12,8 @@ import type { CapReached } from "@repo/protocol/refusal";
 import { Context } from "effect";
 import type { Effect } from "effect";
 
-/** What a rate limit counts: claims, or proposals (flags among them). */
-export type Limited = "claim" | "proposal";
+/** What a rate limit counts: claims, proposals (flags among them), or drafts. */
+export type Limited = "claim" | "proposal" | "draft";
 
 export class RateLimits extends Context.Service<
   RateLimits,

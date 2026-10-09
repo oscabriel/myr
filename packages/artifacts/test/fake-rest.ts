@@ -263,7 +263,7 @@ export const fakeRest = (
     const forkFailures = yield* Ref.make(options.forkFailures ?? 0);
     const tokens = yield* Ref.make<ReadonlyMap<string, Minted>>(new Map());
 
-    // `RepoHost`'s commits carry no times, so the fake reports the epoch.
+    // The times the host read from the commit itself.
     const metadataOf = (commit: Commit) => {
       const fields = {
         author: commit.author,
@@ -274,11 +274,16 @@ export const fakeRest = (
       };
 
       return options.casing === "camel"
-        ? { ...fields, authoredAt: 0, committedAt: 0, treeHash: commit.tree }
+        ? {
+            ...fields,
+            authoredAt: commit.authoredAt,
+            committedAt: commit.committedAt,
+            treeHash: commit.tree,
+          }
         : {
             ...fields,
-            authored_at: 0,
-            committed_at: 0,
+            authored_at: commit.authoredAt,
+            committed_at: commit.committedAt,
             tree_hash: commit.tree,
           };
     };

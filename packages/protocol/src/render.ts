@@ -33,6 +33,8 @@ const reason = Match.typeTags<Refusal, string>()({
     "this project's vouch file denounces you, so it takes no claims or proposals from you",
   DirectPush: ({ ref }) =>
     `main moves only by a landing, so ${ref} takes no direct push; push your answer to your claim's fork`,
+  DraftInProgress: ({ proposal }) =>
+    `the platform is already drafting ${proposal}'s ask`,
   Flake: ({ lane }) =>
     `the ${lane} checks failed, then passed on the same tree; the platform will run them again`,
   HeldBackFailed: ({ area, suite }) =>
@@ -56,6 +58,8 @@ const reason = Match.typeTags<Refusal, string>()({
   PrivatePathInPublicTree: ({ paths }) =>
     `would put held-back paths in a public tree: ${list(paths)}; those paths belong to a layer, so remove them from the answer`,
   ProjectExists: ({ project }) => `a project named ${project} already exists`,
+  ProposalClosed: ({ proposal }) =>
+    `${proposal} was already accepted, declined or expired`,
   ReachedInternals: ({ from, to }) =>
     `${from} reaches into ${to}, which its module does not export; import it through that module's public exports instead`,
   RepoBusy: () => "the repo was busy with another push",
@@ -73,7 +77,12 @@ const reason = Match.typeTags<Refusal, string>()({
   UnknownCommit: ({ sha }) => `this project has no commit ${sha}`,
   UnknownDecision: ({ decision }) => `this project has no decision ${decision}`,
   UnknownEnvItem: ({ key }) => `the env shape has no item ${key}`,
+  UnknownPath: ({ commit, path }) =>
+    `${short(commit)} has no file or folder at ${path}`,
   UnknownProject: ({ project }) => `no project is named ${project}`,
+  UnknownProposal: ({ proposal }) => `this project has no proposal ${proposal}`,
+  UnknownRevision: ({ rev }) =>
+    `${rev} is neither main, a commit this project holds, nor one of its tags`,
   UnstatedRequirement: ({ area }) =>
     `a held-back check in ${area} enforces something no public clause states`,
   ValueTooShort: ({ key, minimum }) =>

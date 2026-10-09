@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
-import { RepoPath } from "@repo/protocol/ids";
+import { CommitSha, RepoPath } from "@repo/protocol/ids";
 import { gitClient } from "@repo/testkit/git-client";
 import { DateTime, Duration, Effect, Option, Redacted } from "effect";
 import type { Layer } from "effect";
+import { readCommit, writeCommit, writeTag } from "isomorphic-git";
 
 import {
   BranchName,
@@ -15,6 +16,7 @@ import {
   RepoNotFound,
   Revision,
 } from "../src/repo-host.ts";
+import type { Commit } from "../src/repo-host.ts";
 import { memoryFs } from "../src/repo-host/memory-fs.ts";
 
 const main = RefName.make("refs/heads/main");
@@ -29,6 +31,80 @@ const text = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
 /** No object in any repo here has this id. */
 const absent = ObjectId.make("0".repeat(40));
+
+/** When a commit was written, and when committed: two different instants. */
+const authored = 1_700_000_000;
+
+const committed = 1_700_000_500;
+
+/** The test client's repo, which a push takes objects from. */
+type Source = Parameters<RepoHost["Service"]["push"]>[1];
+
+/**
+ * A commit on `parent`'s tree written by hand, so its author and committer
+ * times differ (the test client stamps both alike).
+ */
+const timedCommit = (source: Source, parent: CommitSha) =>
+  Effect.gen(function* () {
+    const { commit } = yield* Effect.promise(() =>
+      readCommit({ ...source, oid: parent })
+    );
+
+    const oid = yield* Effect.promise(() =>
+      writeCommit({
+        ...source,
+        commit: {
+          author: {
+            email: "author@example.com",
+            name: "Author",
+            timestamp: authored,
+            timezoneOffset: 0,
+          },
+          committer: {
+            email: "committer@example.com",
+            name: "Committer",
+            timestamp: committed,
+            timezoneOffset: -120,
+          },
+          message: "timed\n",
+          parent: [parent],
+          tree: commit.tree,
+        },
+      })
+    );
+
+    return CommitSha.make(oid);
+  });
+
+/** When a commit was written and committed, as a store read it. */
+const times = (commit: Commit) => ({
+  authoredAt: commit.authoredAt,
+  committedAt: commit.committedAt,
+});
+
+/** An annotated tag object naming `commit`; its id, as a push sends it. */
+const annotatedTag = (source: Source, name: string, commit: CommitSha) =>
+  Effect.map(
+    Effect.promise(() =>
+      writeTag({
+        ...source,
+        tag: {
+          message: `${name}\n`,
+          object: commit,
+          tag: name,
+          tagger: {
+            email: "tagger@example.com",
+            name: "Tagger",
+            timestamp: committed,
+            timezoneOffset: 0,
+          },
+          type: "commit",
+        },
+      })
+    ),
+    // SAFETY: a tag's id is a 40-hex object id, which a ref update carries as a commit's.
+    (oid) => CommitSha.make(oid)
+  );
 
 /** What an adapter's run of the suite adds to the shared cases. */
 export interface RepoHostSuite {
@@ -296,6 +372,110 @@ export const describeRepoHost = (
             10
           )
         ).toStrictEqual([]);
+      }).pipe(Effect.provide(host))
+    );
+
+    it.effect("reads when a commit was written and when committed", () =>
+      Effect.gen(function* () {
+        const repos = yield* RepoHost;
+        const client = yield* gitClient(memoryFs());
+        const first = yield* client.commit("first", [["a", "1"]]);
+        const timed = yield* timedCommit(client.source, first);
+        const name = RepoName.make("times");
+
+        yield* repos.create(name);
+        yield* repos.push(name, client.source, [
+          { from: Option.none(), ref: main, to: timed },
+        ]);
+
+        expect(
+          Option.map(yield* repos.readCommit(name, timed), times)
+        ).toStrictEqual(
+          Option.some({ authoredAt: authored, committedAt: committed })
+        );
+        expect(
+          (yield* repos.log(
+            name,
+            Revision.Branch({ name: BranchName.make("main") }),
+            10
+          )).map(times)
+        ).toStrictEqual([
+          { authoredAt: authored, committedAt: committed },
+          { authoredAt: 1_791_300_000, committedAt: 1_791_300_000 },
+        ]);
+      }).pipe(Effect.provide(host))
+    );
+
+    it.effect("logs from an offset, skipping the newest commits", () =>
+      Effect.gen(function* () {
+        const repos = yield* RepoHost;
+        const client = yield* gitClient(memoryFs());
+        const first = yield* client.commit("first", [["a", "1"]]);
+        const second = yield* client.commit("second", [["a", "2"]], [first]);
+        const third = yield* client.commit("third", [["a", "3"]], [second]);
+        const name = RepoName.make("offsets");
+
+        yield* repos.create(name);
+        yield* repos.push(name, client.source, [
+          { from: Option.none(), ref: main, to: third },
+        ]);
+
+        const tip = Revision.Branch({ name: BranchName.make("main") });
+
+        const shas = (limit: number, offset?: number) =>
+          repos
+            .log(name, tip, limit, offset)
+            .pipe(Effect.map((commits) => commits.map(({ sha }) => sha)));
+
+        expect(yield* shas(10, 1)).toStrictEqual([second, first]);
+        expect(yield* shas(1, 1)).toStrictEqual([second]);
+        expect(yield* shas(10, 3)).toStrictEqual([]);
+        expect(yield* shas(10, 0)).toStrictEqual([third, second, first]);
+      }).pipe(Effect.provide(host))
+    );
+
+    // An annotated tag names a tag object, which no commit read can read:
+    // `tags` peels each to its commit, while `refs` keeps what git lists.
+    it.effect("lists every tag peeled to its commit", () =>
+      Effect.gen(function* () {
+        const repos = yield* RepoHost;
+        const client = yield* gitClient(memoryFs());
+        const first = yield* client.commit("first", [["a", "1"]]);
+        const second = yield* client.commit("second", [["a", "2"]], [first]);
+        const annotated = yield* annotatedTag(client.source, "v1.0.0", first);
+        const name = RepoName.make("tagged");
+        const v1 = RefName.make("refs/tags/v1.0.0");
+        const light = RefName.make("refs/tags/light");
+
+        yield* repos.create(name);
+        yield* repos.push(name, client.source, [
+          { from: Option.none(), ref: main, to: second },
+        ]);
+        expect(yield* repos.tags(name)).toStrictEqual([]);
+        yield* repos.push(name, client.source, [
+          { from: Option.none(), ref: v1, to: annotated },
+        ]);
+        yield* repos.push(name, client.source, [
+          { from: Option.none(), ref: light, to: second },
+        ]);
+
+        const tags = yield* repos.tags(name);
+
+        expect(
+          tags.toSorted((one, other) => one.name.localeCompare(other.name))
+        ).toStrictEqual([
+          { name: light, sha: second },
+          { name: v1, sha: first },
+        ]);
+        expect((yield* repos.refs(name)).get(v1)).toBe(annotated);
+        expect(
+          yield* Effect.forEach(tags, ({ sha }) =>
+            Effect.map(repos.readCommit(name, sha), Option.isSome)
+          )
+        ).toStrictEqual([true, true]);
+        expect(
+          yield* Effect.flip(repos.tags(RepoName.make("missing")))
+        ).toStrictEqual(new RepoNotFound({ name: RepoName.make("missing") }));
       }).pipe(Effect.provide(host))
     );
 

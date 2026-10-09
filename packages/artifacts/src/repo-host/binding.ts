@@ -59,7 +59,7 @@ import {
   secondsOf,
 } from "./artifacts-api.ts";
 import type { Code } from "./artifacts-api.ts";
-import { listRefs, pushRefs } from "./smart-http.ts";
+import { listRefs, listTags, pushRefs } from "./smart-http.ts";
 
 /**
  * The codes a message names when the error carries none: Artifacts'
@@ -168,6 +168,8 @@ const decodeEntries = Schema.decodeUnknownEffect(Schema.Array(TreeEntry));
 const commitOf = (metadata: ArtifactsCommitMetadata) =>
   decodeCommit({
     author: metadata.author,
+    authoredAt: metadata.authoredAt,
+    committedAt: metadata.committedAt,
     committer: metadata.committer,
     message: metadata.message,
     parents: metadata.parents,
@@ -268,6 +270,16 @@ const refsOf = (name: RepoName, repo: ArtifactsRepo) =>
       const { remote, token } = yield* access(name, repo, "read");
 
       return yield* listRefs(remote, token);
+    })
+  );
+
+/** The repo's tags over smart HTTP, peeled: the binding lists no refs. */
+const tagsOf = (name: RepoName, repo: ArtifactsRepo) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { remote, token } = yield* access(name, repo, "read");
+
+      return yield* listTags(remote, token);
     })
   );
 
@@ -391,7 +403,8 @@ const log = (
   name: RepoName,
   repo: ArtifactsRepo,
   at: Revision,
-  limit: number
+  limit: number,
+  offset: number
 ) =>
   Effect.gen(function* () {
     const ref = refOf(at);
@@ -401,7 +414,7 @@ const log = (
       const asked = Math.min(limit - commits.length, LOG_PAGE);
 
       const page = yield* call(name, () =>
-        repo.log({ limit: asked, offset: commits.length, ref })
+        repo.log({ limit: asked, offset: offset + commits.length, ref })
       );
 
       for (const metadata of page) {
@@ -484,8 +497,8 @@ const make = (binding: Artifacts) =>
           Effect.provideService(Fetch, fetch)
         ),
       importFrom: (name, source) => importFrom(binding, name, source),
-      log: (name, at, limit) =>
-        read(name, (repo) => log(name, repo, at, limit)),
+      log: (name, at, limit, offset = 0) =>
+        read(name, (repo) => log(name, repo, at, limit, offset)),
       mintToken: (name, scope, ttl) =>
         read(name, (repo) => mintToken(name, repo, scope, ttl)),
       push: (name, source, updates) =>
@@ -546,6 +559,7 @@ const make = (binding: Artifacts) =>
         ),
       revokeToken: (name, id) =>
         read(name, (repo) => call(name, () => repo.revokeToken(id))),
+      tags: (name) => read(name, (repo) => tagsOf(name, repo)),
     });
   });
 

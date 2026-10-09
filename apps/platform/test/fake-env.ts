@@ -150,11 +150,14 @@ export const fakeProjects = (made: readonly string[] = []): Env["PROJECT"] => {
  * are absent.
  */
 export const fakeEnv = (): Env => ({
+  AI: untouchable("AI"),
   ANSWER: untouchable("ANSWER"),
   ARTIFACTS: untouchable("ARTIFACTS"),
   ARTIFACTS_PRIVATE: untouchable("ARTIFACTS_PRIVATE"),
   CLAIM_LIMIT: untouchable("CLAIM_LIMIT"),
   COOKIE_KEY: cookieKey,
+  DRAFT_LIMIT: untouchable("DRAFT_LIMIT"),
+  DRAFT_MODEL: "@cf/moonshotai/kimi-k2.7-code",
   EVIDENCE: untouchable("EVIDENCE"),
   FRONT_PAGE: untouchable("FRONT_PAGE"),
   LANDER_ADAPTER: "container",
@@ -167,6 +170,7 @@ export const fakeEnv = (): Env => ({
   PASSWORD_PEPPER: passwordPepper,
   PROJECT: fakeProjects(),
   PROPOSAL_LIMIT: untouchable("PROPOSAL_LIMIT"),
+  PUBLIC_WEB_URL: "http://localhost:5173",
   RELEASES: untouchable("RELEASES"),
   SANDBOX: untouchable("SANDBOX"),
   SIGN_IN_LIMIT: untouchable("SIGN_IN_LIMIT"),

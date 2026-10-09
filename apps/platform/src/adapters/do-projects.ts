@@ -91,6 +91,7 @@ const apiOf = (
     claim: (caller, ask) => assumingMade(on("claim", [caller, ask])),
     credits: (caller, handle) => on("credits", [caller, handle]),
     decide: (caller, input) => assumingMade(on("decide", [caller, input])),
+    draftAsk: (caller, input) => assumingMade(on("draftAsk", [caller, input])),
     events: (since, limit) => on("events", [since, limit]),
     // A name pointing at another project is the service's own
     // `UnknownProject`, so it crosses as the refusal it is.
@@ -99,16 +100,20 @@ const apiOf = (
     firstPusher: () => on("firstPusher", []),
     flagAsk: (caller, input) => assumingMade(on("flagAsk", [caller, input])),
     fork: (caller) => assumingMade(on("fork", [caller])),
+    forks: () => on("forks", []),
+    head: () => on("head", []),
     heldBackJob: (requestId) => on("heldBackJob", [requestId]),
     initProject: (caller, input) => on("initProject", [caller, input]),
     land: (caller, input) => assumingMade(on("land", [caller, input])),
     landing: (caller, sha) => assumingMade(on("landing", [caller, sha])),
+    landings: (shas) => on("landings", [shas]),
     layerAccess: (caller, layer) => on("layerAccess", [caller, layer]),
     layerFacts: (caller) => on("layerFacts", [caller]),
     ledger: (caller) => assumingMade(on("ledger", [caller])),
     listAsks: (caller) => assumingMade(on("listAsks", [caller])),
     onAlarm: () => on("onAlarm", []),
     openAsk: (caller, input) => assumingMade(on("openAsk", [caller, input])),
+    policy: () => on("policy", []),
     proposeAsk: (caller, input) =>
       assumingMade(on("proposeAsk", [caller, input])),
     recordAdmission: (input) => on("recordAdmission", [input]),
@@ -122,6 +127,8 @@ const apiOf = (
     scanForValues: (input) => on("scanForValues", [input]),
     setEnv: (caller, input) => assumingMade(on("setEnv", [caller, input])),
     showAsk: (caller, ask) => assumingMade(on("showAsk", [caller, ask])),
+    showProposal: (caller, proposal) =>
+      assumingMade(on("showProposal", [caller, proposal])),
     status: (caller) => assumingMade(on("status", [caller])),
     submitAnswer: (caller, input) =>
       assumingMade(on("submitAnswer", [caller, input])),

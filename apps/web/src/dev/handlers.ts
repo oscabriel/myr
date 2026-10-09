@@ -8,9 +8,23 @@
  * lists and merge what each says; `evidence` reads the world's lane logs.
  * Unlike the platform, nothing spends a rate limit: the world has one
  * browser at a time. Every `remote` names the origin the caller reached the
- * world by, as the platform's do.
+ * world by, as the platform's do. The code reads run the same
+ * `@repo/project/code` functions the platform's do, over the world's
+ * `RepoHost`.
  */
+import { RepoHost } from "@repo/artifacts/repo-host";
 import { EvidenceStore, LogRef } from "@repo/checks/evidence-store";
+import {
+  codeProjectOf,
+  commitOf,
+  fileOf,
+  logOf,
+  pathsOf,
+  refsOf,
+  treeOf,
+  whyOf,
+} from "@repo/project/code";
+import type { CodeProject } from "@repo/project/code";
 import { FrontPage } from "@repo/project/front-page";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
@@ -27,6 +41,9 @@ import { Array, DateTime, Effect, Number, Option, Order, Stream } from "effect";
 import type { Layer } from "effect";
 import { HttpServerRequest } from "effect/http";
 import type { Rpc, RpcGroup } from "effect/rpc";
+
+/** How many commits a page of `log` holds when the caller names no limit. */
+const LOG_PAGE = 30;
 
 /** How many events `watch` reads from its project at a time. */
 const EVENT_PAGE = 100;
@@ -131,18 +148,30 @@ const acrossProjects = (
 export const devHandlers: Layer.Layer<
   Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>,
   never,
-  Projects | FrontPage | EvidenceStore
+  Projects | FrontPage | EvidenceStore | RepoHost
 > = Contracts.toLayer(
   Effect.gen(function* () {
     const projects = yield* Projects;
     const frontPage = yield* FrontPage;
     const evidence = yield* EvidenceStore;
+    const host = yield* RepoHost;
 
     /** `call` on the project named `project`; one never made is `UnknownProject`. */
     const on = <A, E>(
       project: ProjectName,
       call: (api: ProjectApi) => Effect.Effect<A, E>
     ) => Effect.flatMap(projects.get(project), call);
+
+    /** A code read of `project`'s canonical repo, over the world's `RepoHost`. */
+    const code = <A, E>(
+      project: ProjectName,
+      read: (of: CodeProject) => Effect.Effect<A, E, RepoHost>
+    ) =>
+      on(project, (api) =>
+        read(codeProjectOf(api, project)).pipe(
+          Effect.provideService(RepoHost, host)
+        )
+      );
 
     /** `call` on every project the front page lists, in name order, keeping what each finds. */
     const everywhere = <A, E>(
@@ -179,6 +208,10 @@ export const devHandlers: Layer.Layer<
       decide: ({ project, ...input }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.decide(who, input))
+        ),
+      draftAsk: ({ project, ...input }) =>
+        Effect.flatMap(person, (who) =>
+          on(project, (api) => api.draftAsk(who, input))
         ),
       evidence: ({ project, ref }) =>
         Effect.flatMap(person, (who) =>
@@ -242,15 +275,42 @@ export const devHandlers: Layer.Layer<
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.listAsks(who))
         ),
+      listPaths: ({ at, project }) =>
+        code(project, (of) => pathsOf(of, Option.fromUndefinedOr(at))),
       listProjects: () =>
         Effect.map(frontPage.projects(), (listed) => ({ projects: listed })),
+      listRefs: ({ project }) => code(project, refsOf),
+      log: ({ at, from = 0, limit = LOG_PAGE, path, project }) =>
+        code(project, (of) =>
+          logOf(of, {
+            at: Option.fromUndefinedOr(at),
+            from,
+            limit,
+            path: Option.fromUndefinedOr(path),
+          })
+        ),
       openAsk: ({ project, ...input }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.openAsk(who, input))
         ),
+      projectPolicy: ({ project }) =>
+        on(project, (api) =>
+          Effect.map(api.policy(), (policy) =>
+            Option.match(policy, {
+              onNone: () => ({}),
+              onSome: (evaluated) => ({ policy: evaluated }),
+            })
+          )
+        ),
       proposeAsk: ({ project, ...input }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.proposeAsk(who, input))
+        ),
+      readFile: ({ at, path, project }) =>
+        code(project, (of) => fileOf(of, Option.fromUndefinedOr(at), path)),
+      readTree: ({ at, path, project }) =>
+        code(project, (of) =>
+          treeOf(of, Option.fromUndefinedOr(at), Option.fromUndefinedOr(path))
         ),
       release: ({ ask, project }) =>
         Effect.flatMap(person, (who) =>
@@ -263,6 +323,12 @@ export const devHandlers: Layer.Layer<
       showAsk: ({ ask, project }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showAsk(who, ask))
+        ),
+      showCommit: ({ project, sha }) =>
+        code(project, (of) => commitOf(of, sha)),
+      showProposal: ({ project, proposal }) =>
+        Effect.flatMap(caller, (who) =>
+          on(project, (api) => api.showProposal(who, proposal))
         ),
       status: ({ project }) =>
         Effect.gen(function* () {
@@ -327,6 +393,8 @@ export const devHandlers: Layer.Layer<
             )
           )
         ),
+      why: ({ at, path, project }) =>
+        code(project, (of) => whyOf(of, Option.fromUndefinedOr(at), path)),
     };
   })
 );

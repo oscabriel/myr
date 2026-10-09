@@ -22,12 +22,23 @@ import {
 } from "./domain/answer.ts";
 import { Ask, AskListing, Reserve } from "./domain/ask.ts";
 import { ClaimView } from "./domain/claim.ts";
-import { ConfigFile } from "./domain/common.ts";
+import {
+  CommitDiff,
+  CommitView,
+  PathList,
+  RefsView,
+  Rev,
+  FileView,
+  TreeListing,
+  WhyView,
+} from "./domain/code.ts";
+import { ConfigFile, NoneOrMore } from "./domain/common.ts";
 import { Choice, Decision, Today } from "./domain/decision.ts";
 import { EnvSchemaView } from "./domain/env.ts";
 import { ProjectEvent } from "./domain/event.ts";
 import { FrontPageEntry, ProjectListing } from "./domain/front-page.ts";
 import { LandingView } from "./domain/landing.ts";
+import { PublicPolicy } from "./domain/policy.ts";
 import { Proposal } from "./domain/proposal.ts";
 import { CreditSummary } from "./domain/record.ts";
 import { Ledger } from "./domain/visibility.ts";
@@ -41,7 +52,9 @@ import {
   LandedSha,
   LaneName,
   ProjectName,
+  ProposalId,
   RepoName,
+  RepoPath,
   RequestId,
 } from "./ids.ts";
 import { Authenticated } from "./principal.ts";
@@ -52,6 +65,7 @@ import {
   ClaimLapsed,
   DecisionClosed,
   Denounced,
+  DraftInProgress,
   ImportFailed,
   IncompleteBrief,
   NotClaimed,
@@ -62,6 +76,7 @@ import {
   OutOfScope,
   PrivatePathInPublicTree,
   ProjectExists,
+  ProposalClosed,
   ReachedInternals,
   RepoBusy,
   StaleBase,
@@ -70,7 +85,10 @@ import {
   UnknownCommit,
   UnknownDecision,
   UnknownEnvItem,
+  UnknownPath,
   UnknownProject,
+  UnknownProposal,
+  UnknownRevision,
   ValueTooShort,
   VerifierBlocked,
   WeakCheck,
@@ -106,6 +124,7 @@ const servedOn = {
   claim: ["rpc", "mcp", "cli"],
   credits: SurfaceName.literals,
   decide: SurfaceName.literals,
+  draftAsk: SurfaceName.literals,
   [envSchemaTag]: SurfaceName.literals,
   // A log may hold text an agent's transcript should not carry: never MCP.
   evidence: ["rpc", "cli"],
@@ -118,13 +137,22 @@ const servedOn = {
   landing: SurfaceName.literals,
   ledger: SurfaceName.literals,
   listAsks: SurfaceName.literals,
+  // The code reads: git already reads code locally, so no command or tool.
+  listPaths: ["rpc", "web"],
   listProjects: SurfaceName.literals,
+  listRefs: ["rpc", "web"],
+  log: ["rpc", "web"],
   openAsk: ["rpc", "mcp", "cli"],
+  projectPolicy: SurfaceName.literals,
   proposeAsk: SurfaceName.literals,
+  readFile: ["rpc", "web"],
+  readTree: ["rpc", "web"],
   release: ["rpc", "mcp", "cli"],
   // A value must never pass through an agent's transcript, so never MCP.
   setEnv: ["rpc", "cli"],
   showAsk: SurfaceName.literals,
+  showCommit: ["rpc", "web"],
+  showProposal: SurfaceName.literals,
   status: SurfaceName.literals,
   submitAnswer: ["rpc", "mcp", "cli"],
   today: SurfaceName.literals,
@@ -132,6 +160,7 @@ const servedOn = {
   vouch: ["rpc", "mcp", "cli"],
   // A stream has no tool or command form.
   watch: ["rpc", "web"],
+  why: ["rpc", "web"],
 } as const satisfies Record<string, readonly SurfaceName[]>;
 
 /**
@@ -376,6 +405,199 @@ export class Watch extends Rpc.make("watch", {
   .annotate(NeedsApproval, false)
   .annotate(Surfaces, servedOn.watch) {}
 
+// --- Code reads (the canonical repo only; git reads it locally too) --------
+
+export class ListRefs extends Rpc.make("listRefs", {
+  error: UnknownProject,
+  payload: { project: ProjectName },
+  success: RefsView,
+})
+  .annotate(
+    Description,
+    "List a project's refs: main's landed commit, its tags peeled to their commits, and its forks."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Surfaces, servedOn.listRefs) {}
+
+export class ReadTree extends Rpc.make("readTree", {
+  error: Schema.Union([UnknownProject, UnknownRevision, UnknownPath]),
+  payload: {
+    /** `main`, a commit or a tag; main's landed commit when absent. */
+    at: Schema.optionalKey(Rev),
+    /** The folder; the root when absent. */
+    path: Schema.optionalKey(RepoPath),
+    project: ProjectName,
+  },
+  success: TreeListing,
+})
+  .annotate(
+    Description,
+    "List one folder of a project at a revision, folders first, with its README when it has one."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Surfaces, servedOn.readTree) {}
+
+export class ListPaths extends Rpc.make("listPaths", {
+  error: Schema.Union([UnknownProject, UnknownRevision]),
+  payload: { at: Schema.optionalKey(Rev), project: ProjectName },
+  success: PathList,
+})
+  .annotate(
+    Description,
+    "List every file path in a project at a revision, up to a cap."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Surfaces, servedOn.listPaths) {}
+
+export class ReadFile extends Rpc.make("readFile", {
+  error: Schema.Union([UnknownProject, UnknownRevision, UnknownPath]),
+  payload: {
+    at: Schema.optionalKey(Rev),
+    path: RepoPath,
+    project: ProjectName,
+  },
+  success: FileView,
+})
+  .annotate(
+    Description,
+    "Read one file of a project at a revision: its text, or that it is binary or too large to show."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Surfaces, servedOn.readFile) {}
+
+export class LogOf extends Rpc.make("log", {
+  error: Schema.Union([UnknownProject, UnknownRevision]),
+  payload: {
+    at: Schema.optionalKey(Rev),
+    /** How many commits to skip: a page's `next`. */
+    from: Schema.optionalKey(NoneOrMore),
+    /** 30 when absent. */
+    limit: Schema.optionalKey(
+      Schema.Int.check(Schema.isBetween({ maximum: 100, minimum: 1 }))
+    ),
+    /** Only the commits that changed this path. */
+    path: Schema.optionalKey(RepoPath),
+    project: ProjectName,
+  },
+  success: Schema.Struct({
+    commits: Schema.Array(CommitView),
+    /** Where the next page starts; absent on the last. */
+    next: Schema.optionalKey(NoneOrMore),
+  }),
+})
+  .annotate(
+    Description,
+    "List a project's commits along first parents from a revision, newest first, each landing with its ask, people and verdict."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Surfaces, servedOn.log) {}
+
+export class ShowCommit extends Rpc.make("showCommit", {
+  error: Schema.Union([UnknownProject, UnknownCommit]),
+  payload: { project: ProjectName, sha: CommitSha },
+  success: CommitDiff,
+})
+  .annotate(
+    Description,
+    "Show one commit of a project and the files it changed against its first parent."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Surfaces, servedOn.showCommit) {}
+
+export class WhyOf extends Rpc.make("why", {
+  error: Schema.Union([UnknownProject, UnknownRevision, UnknownPath]),
+  payload: {
+    at: Schema.optionalKey(Rev),
+    path: RepoPath,
+    project: ProjectName,
+  },
+  success: WhyView,
+})
+  .annotate(
+    Description,
+    "Say why each line of a file is there: the commit that brought it, and the landing, ask and people behind that commit."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Surfaces, servedOn.why) {}
+
+export class PolicyOf extends Rpc.make("projectPolicy", {
+  error: UnknownProject,
+  payload: { project: ProjectName },
+  success: Schema.Struct({
+    /** Absent while the config folder at the landed commit has not evaluated. */
+    policy: Schema.optionalKey(PublicPolicy),
+  }),
+})
+  .annotate(
+    Description,
+    "Show a project's evaluated config folder at its landed commit: who decides which paths, its vouches, caps, budget and claim timing."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Cli, { name: "policy" })
+  .annotate(Surfaces, servedOn.projectPolicy) {}
+
+export class ShowProposal extends Rpc.make("showProposal", {
+  error: Schema.Union([UnknownProject, UnknownProposal]),
+  payload: { project: ProjectName, proposal: ProposalId },
+  success: Schema.Struct({
+    /** The files the proposal holds until a decider accepts it. */
+    files: Schema.Array(ConfigFile),
+    proposal: Proposal,
+  }),
+})
+  .annotate(
+    Description,
+    "Show one proposal, its draft's state and the ask files it holds."
+  )
+  .annotate(Audience, "public")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, true)
+  .annotate(Idempotent, true)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Cli, { name: "proposal", positional: ["proposal"] })
+  .annotate(Surfaces, servedOn.showProposal) {}
+
 // --- Writes -----------------------------------------------------------------
 
 export class InitProject extends Rpc.make("initProject", {
@@ -443,18 +665,36 @@ export class OpenAsk extends Rpc.make("openAsk", {
   .annotate(Cli, { name: "ask open", positional: ["ask"] })
   .annotate(Surfaces, servedOn.openAsk) {}
 
+/**
+ * A drafted proposal brings no files and no sealed answer: the platform's
+ * agent writes the ask's files.
+ */
+const draftsAlone = Schema.makeFilter(
+  (payload: {
+    readonly draft?: true;
+    readonly files?: unknown;
+    readonly sealed?: unknown;
+  }) =>
+    payload.draft === undefined ||
+    (payload.files === undefined && payload.sealed === undefined)
+      ? true
+      : "a drafted proposal carries neither files nor a sealed answer"
+);
+
 export class ProposeAsk extends Rpc.make("proposeAsk", {
   // `NotVouched` under the `all` mode, or for a sealed answer from someone
   // unvouched under `forCode` (a vouch admits sealed answers).
   error: Schema.Union([UnknownProject, Denounced, CapReached, NotVouched]),
-  payload: {
+  payload: Schema.Struct({
+    /** Have the platform's agent draft the ask's files from the want. */
+    draft: Schema.optionalKey(Schema.Literal(true)),
     files: Schema.optionalKey(Schema.NonEmptyArray(ConfigFile)),
     project: ProjectName,
     /** A sealed answer: the commit in the caller's working fork that answers it. */
     sealed: Schema.optionalKey(Schema.Struct({ head: CommitSha })),
     territory: Schema.optionalKey(Schema.NonEmptyString),
     want: Schema.NonEmptyString,
-  },
+  }).check(draftsAlone),
   success: Schema.Struct({ proposal: Proposal }),
 })
   .annotate(
@@ -469,6 +709,36 @@ export class ProposeAsk extends Rpc.make("proposeAsk", {
   .annotate(NeedsApproval, false)
   .annotate(Cli, { name: "propose" })
   .annotate(Surfaces, servedOn.proposeAsk) {}
+
+export class DraftAsk extends Rpc.make("draftAsk", {
+  error: Schema.Union([
+    UnknownProject,
+    UnknownProposal,
+    ProposalClosed,
+    NotDecider,
+    DraftInProgress,
+    CapReached,
+  ]),
+  payload: {
+    /** What the draft should do differently, for the agent to read. */
+    note: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(2000))),
+    project: ProjectName,
+    proposal: ProposalId,
+  },
+  success: Schema.Struct({ proposal: Proposal }),
+})
+  .annotate(
+    Description,
+    "Have the platform's agent draft, or draft again, an open proposal's ask and its failing check; the proposer or a decider may ask."
+  )
+  .annotate(Audience, "signedIn")
+  .annotate(Visibility, "public")
+  .annotate(ReadOnly, false)
+  .annotate(Idempotent, false)
+  .annotate(Destructive, false)
+  .annotate(NeedsApproval, false)
+  .annotate(Cli, { name: "ask draft", positional: ["proposal"] })
+  .annotate(Surfaces, servedOn.draftAsk) {}
 
 export class FlagAsk extends Rpc.make("flagAsk", {
   error: Schema.Union([UnknownProject, UnknownAsk, Denounced, CapReached]),
@@ -786,9 +1056,19 @@ export class Contracts extends RpcGroup.make(
   LedgerOf,
   EnvSchemaOf,
   Watch,
+  ListRefs,
+  ReadTree,
+  ListPaths,
+  ReadFile,
+  LogOf,
+  ShowCommit,
+  WhyOf,
+  PolicyOf,
+  ShowProposal,
   InitProject,
   OpenAsk,
   ProposeAsk,
+  DraftAsk,
   FlagAsk,
   Decide,
   Claim,

@@ -40,6 +40,8 @@ const answerer = { email: "answerer@example.com", name: "Answerer" };
 /** The one commit every repo holds on `main`. */
 const firstCommit = {
   author: answerer,
+  authoredAt: 1_791_300_000,
+  committedAt: 1_791_300_060,
   committer: answerer,
   message: "first",
   parents: [],
@@ -218,8 +220,8 @@ describe("the fake Artifacts binding", () => {
       );
       expect(yield* call(() => repo.readCommit(commit))).toStrictEqual({
         author: answerer,
-        authoredAt: 0,
-        committedAt: 0,
+        authoredAt: 1_791_300_000,
+        committedAt: 1_791_300_060,
         committer: answerer,
         hash: commit,
         message: "first",

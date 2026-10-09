@@ -43,6 +43,7 @@
     "@repo/artifacts": "workspace:*",
     "@repo/checks": "workspace:*",
     "@repo/config": "workspace:*",
+    "@repo/drafting": "workspace:*",
     "@repo/git": "workspace:*",
     "@repo/project": "workspace:*",
     "@repo/rules": "workspace:*",

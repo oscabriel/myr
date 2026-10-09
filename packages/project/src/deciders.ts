@@ -229,6 +229,8 @@ export interface DeciderApi {
   readonly proposeAsk: (
     caller: Person,
     input: {
+      /** Have the platform's agent draft the ask's files. */
+      readonly draft?: true;
       readonly files?: Array.NonEmptyReadonlyArray<ComposedFile>;
       readonly sealed?: { readonly head: CommitSha };
       readonly territory?: string;

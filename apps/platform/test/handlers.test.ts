@@ -827,11 +827,12 @@ const fakeLimit = (allowed: number) => {
 
 describe("the Worker's rate limits", () => {
   it.effect(
-    "count claims and proposals apart, per person whatever the case of their handle",
+    "count claims, proposals and drafts apart, per person whatever the case of their handle",
     () =>
       Effect.gen(function* () {
         const claims = fakeLimit(2);
         const proposals = fakeLimit(1);
+        const drafts = fakeLimit(1);
 
         const spent = yield* RateLimits.use(({ check }) =>
           Effect.all([
@@ -841,11 +842,14 @@ describe("the Worker's rate limits", () => {
             Effect.result(check("claim", Handle.make("bob"))),
             Effect.result(check("proposal", Handle.make("alice"))),
             Effect.result(check("proposal", Handle.make("alice"))),
+            Effect.result(check("draft", Handle.make("alice"))),
+            Effect.result(check("draft", Handle.make("Alice"))),
           ])
         ).pipe(
           Effect.provide(
             WorkerRateLimits({
               claim: claims.binding,
+              draft: drafts.binding,
               proposal: proposals.binding,
             })
           )
@@ -858,9 +862,12 @@ describe("the Worker's rate limits", () => {
           Result.void,
           Result.void,
           Result.fail(new CapReached({ cap: WorkerCaps.proposal })),
+          Result.void,
+          Result.fail(new CapReached({ cap: WorkerCaps.draft })),
         ]);
         expect(claims.keys).toStrictEqual(["alice", "alice", "alice", "bob"]);
         expect(proposals.keys).toStrictEqual(["alice", "alice"]);
+        expect(drafts.keys).toStrictEqual(["alice", "alice"]);
       })
   );
 
@@ -874,7 +881,9 @@ describe("the Worker's rate limits", () => {
         RateLimits.use(({ check }) =>
           check("claim", Handle.make("alice"))
         ).pipe(
-          Effect.provide(WorkerRateLimits({ claim: broken, proposal: broken }))
+          Effect.provide(
+            WorkerRateLimits({ claim: broken, draft: broken, proposal: broken })
+          )
         )
       );
 

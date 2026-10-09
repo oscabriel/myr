@@ -45,7 +45,7 @@ import {
   RepoName,
   RepoNotFound,
 } from "../repo-host.ts";
-import type { PushSource, RefUpdate } from "../repo-host.ts";
+import type { PushSource, RefUpdate, Tag } from "../repo-host.ts";
 
 /** What isomorphic-git or a response body threw, before it is read. */
 class GitFailure extends Data.TaggedError("GitFailure")<{
@@ -270,6 +270,48 @@ const refsAt = (remote: string, http: HttpClient) =>
           )
         )
     )
+  );
+
+/**
+ * Every `refs/tags/*` the remote lists, each peeled to what it names: the
+ * `^{}` line protocol v1 advertises after an annotated tag, else the tag's
+ * own target.
+ */
+const tagsAt = (remote: string, http: HttpClient) =>
+  git(() =>
+    listServerRefs({
+      http,
+      peelTags: true,
+      prefix: "refs/tags/",
+      protocolVersion: 1,
+      url: remote,
+    })
+  ).pipe(
+    Effect.catchTags({
+      GitFailure: ({ cause }) => Effect.die(cause),
+      HostBusy: Effect.die,
+    }),
+    Effect.map((refs) =>
+      refs.flatMap(({ oid, peeled, ref }) =>
+        Option.match(Option.all([decodeRef(ref), decodeSha(peeled ?? oid)]), {
+          onNone: () => [],
+          onSome: ([name, sha]) => [{ name, sha }],
+        })
+      )
+    )
+  );
+
+/** Every tag the remote lists, peeled to its commit. */
+export const listTags = (
+  remote: string,
+  token: Redacted.Redacted
+): Effect.Effect<readonly Tag[], RepoNotFound, Fetch> =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const name = yield* repoOf(remote);
+
+      return yield* tagsAt(remote, yield* httpFor(remote, token, name));
+    })
   );
 
 /**

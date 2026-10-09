@@ -15,6 +15,7 @@
     "@repo/artifacts": "workspace:*",
     "@repo/brand": "workspace:*",
     "@repo/checks": "workspace:*",
+    "@repo/drafting": "workspace:*",
     "@repo/gate": "workspace:*",
     "@repo/git": "workspace:*",
     "@repo/project": "workspace:*",

@@ -12,6 +12,7 @@ import {
   LandedSha,
   LayerName,
   ProjectName,
+  ProposalId,
   RequestId,
 } from "@repo/protocol/ids";
 import { ProjectExists, UnknownProject } from "@repo/protocol/refusal";
@@ -84,6 +85,10 @@ const everyMethod = (api: ProjectApi) =>
         decision: DecisionId.make("dec-none0001"),
       })
     ),
+    draftAsk: settled(
+      "draftAsk",
+      api.draftAsk(carol, { proposal: ProposalId.make("prop-000001") })
+    ),
     [envSchemaMethod]: settled(envSchemaMethod, api[envSchemaMethod](anyone)),
     events: settled("events", api.events(0, 100)),
     evidence: settled(
@@ -100,6 +105,8 @@ const everyMethod = (api: ProjectApi) =>
       api.flagAsk(bob, { ask: parseIso, reason: "It names no format." })
     ),
     fork: settled("fork", api.fork(carol)),
+    forks: settled("forks", api.forks()),
+    head: settled("head", api.head()),
     heldBackJob: settled("heldBackJob", api.heldBackJob(requestId)),
     initProject: settled("initProject", api.initProject(alice, {})),
     land: settled(
@@ -107,6 +114,7 @@ const everyMethod = (api: ProjectApi) =>
       api.land(bob, { base: sha, head: sha, message: "Tidy", requestId })
     ),
     landing: settled("landing", api.landing(anyone, sha)),
+    landings: settled("landings", api.landings([sha])),
     layerAccess: settled("layerAccess", api.layerAccess(alice, layer)),
     layerFacts: settled("layerFacts", api.layerFacts(bob)),
     ledger: settled("ledger", api.ledger(anyone)),
@@ -116,6 +124,7 @@ const everyMethod = (api: ProjectApi) =>
       "openAsk",
       api.openAsk(bob, { ask: parseIso, files: askFiles() })
     ),
+    policy: settled("policy", api.policy()),
     proposeAsk: settled(
       "proposeAsk",
       api.proposeAsk(carol, { want: "Parse ISO week dates." })
@@ -161,6 +170,10 @@ const everyMethod = (api: ProjectApi) =>
       })
     ),
     showAsk: settled("showAsk", api.showAsk(anyone, parseIso)),
+    showProposal: settled(
+      "showProposal",
+      api.showProposal(anyone, ProposalId.make("prop-000001"))
+    ),
     status: settled("status", api.status(bob)),
     submitAnswer: settled(
       "submitAnswer",
@@ -244,8 +257,13 @@ describe("Projects over the Project DO namespace", () => {
           projectMethods.toSorted()
         );
         expect(throughDo).toStrictEqual(inProcess);
-        // Only a step reported for an answer request that never was dies.
-        expect(died).toStrictEqual(["advanceAnswer"]);
+        // Only a step reported for an answer request that never was dies,
+        // and the drafting stubs, until 909 builds them.
+        expect(died).toStrictEqual([
+          "advanceAnswer",
+          "draftAsk",
+          "showProposal",
+        ]);
       })
   );
 });

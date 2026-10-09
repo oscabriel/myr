@@ -8,6 +8,7 @@ import {
   DecisionId,
   EnvKey,
   ProjectName,
+  ProposalId,
   RepoPath,
 } from "./ids.ts";
 import { Posture } from "./posture.ts";
@@ -315,6 +316,21 @@ export class DecisionClosed extends Schema.TaggedError<DecisionClosed>()(
   { ...Final, ...nextIs(cli("today")), decision: DecisionId }
 ) {}
 
+/** The proposal was accepted, declined or expired, so nothing more is drafted for it. */
+export class ProposalClosed extends Schema.TaggedError<ProposalClosed>()(
+  "ProposalClosed",
+  { ...Final, ...nextIs(cli("today")), proposal: ProposalId }
+) {}
+
+/** The platform is drafting this proposal's ask already; its page says when it settles. */
+export class DraftInProgress extends Schema.TaggedError<DraftInProgress>()(
+  "DraftInProgress",
+  { ...Retryable, proposal: ProposalId }
+) {
+  static readonly of = (proposal: ProposalId) =>
+    new DraftInProgress({ next: cli("proposal", proposal), proposal });
+}
+
 // Lookup
 
 /** No project has this name. */
@@ -340,6 +356,27 @@ export class UnknownCommit extends Schema.TaggedError<UnknownCommit>()(
 export class UnknownDecision extends Schema.TaggedError<UnknownDecision>()(
   "UnknownDecision",
   { ...Final, ...nextIs(cli("today")), decision: DecisionId }
+) {}
+
+/**
+ * The project has no file or folder at this path at this commit. The
+ * commit is `commit`: `at` points at a line, as on every refusal.
+ */
+export class UnknownPath extends Schema.TaggedError<UnknownPath>()(
+  "UnknownPath",
+  { ...Final, ...nextIs("git ls-tree"), commit: CommitSha, path: RepoPath }
+) {}
+
+/** Neither `main`, a commit the project holds, nor one of its tags. */
+export class UnknownRevision extends Schema.TaggedError<UnknownRevision>()(
+  "UnknownRevision",
+  { ...Final, ...nextIs("git ls-remote"), rev: Schema.String }
+) {}
+
+/** The project has no proposal with this id. */
+export class UnknownProposal extends Schema.TaggedError<UnknownProposal>()(
+  "UnknownProposal",
+  { ...Final, ...nextIs(cli("today")), proposal: ProposalId }
 ) {}
 
 // Setup
@@ -426,13 +463,22 @@ const maintainersOnly = [
   UnstatedRequirement,
 ] as const;
 
-const decision = [PostureChange, NotDecider, DecisionClosed] as const;
+const decision = [
+  PostureChange,
+  NotDecider,
+  DecisionClosed,
+  ProposalClosed,
+  DraftInProgress,
+] as const;
 
 const lookup = [
   UnknownProject,
   UnknownAsk,
   UnknownCommit,
   UnknownDecision,
+  UnknownPath,
+  UnknownRevision,
+  UnknownProposal,
 ] as const;
 
 const setup = [ProjectExists, ImportFailed] as const;

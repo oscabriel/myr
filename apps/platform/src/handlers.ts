@@ -8,13 +8,28 @@
  * merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
  * caller's rate limit first, so a call past it reaches no project.
  * `evidence` asks the project who may read a lane's log, which it reads
- * from the stage's `EvidenceStore`. `watch` is served by `watch.ts`: live
+ * from the stage's `EvidenceStore`. The code reads (`listRefs`, `readTree`,
+ * `listPaths`, `readFile`, `log`, `showCommit`, `why`) run here, over the
+ * Worker's `RepoHost` and the project's canonical repo (`@repo/project/code`),
+ * asking the project only for main's landed commit, its landings and forks. `watch` is served by `watch.ts`: live
  * for a caller on the framed `/rpc`, replayed and ended over JSON.
  *
  * Every `remote` a caller gets back is the platform's git URL for the repo,
  * at the origin the caller reached the platform by: never a storage URL.
  */
+import { RepoHost } from "@repo/artifacts/repo-host";
 import { EvidenceStore, LogRef } from "@repo/checks/evidence-store";
+import {
+  codeProjectOf,
+  commitOf,
+  fileOf,
+  logOf,
+  pathsOf,
+  refsOf,
+  treeOf,
+  whyOf,
+} from "@repo/project/code";
+import type { CodeProject } from "@repo/project/code";
 import { envSchemaMethod } from "@repo/project/deciders";
 import { FrontPage } from "@repo/project/front-page";
 import { GatewayUrl } from "@repo/project/project";
@@ -36,6 +51,9 @@ import type { Rpc, RpcGroup } from "effect/rpc";
 
 import { RateLimits } from "./rate-limits.ts";
 import { servedFramed, watchHandler } from "./watch.ts";
+
+/** How many commits a page of `log` holds when the caller names no limit. */
+const LOG_PAGE = 30;
 
 /** How many projects a call without one asks at once. */
 const FAN_OUT = 8;
@@ -156,19 +174,31 @@ const acrossProjects = (
 export const Handlers: Layer.Layer<
   Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>,
   never,
-  Projects | FrontPage | RateLimits | EvidenceStore
+  Projects | FrontPage | RateLimits | EvidenceStore | RepoHost
 > = Contracts.toLayer(
   Effect.gen(function* () {
     const projects = yield* Projects;
     const frontPage = yield* FrontPage;
     const rateLimits = yield* RateLimits;
     const evidence = yield* EvidenceStore;
+    const host = yield* RepoHost;
 
     /** `call` on the project named `project`; one never made is `UnknownProject`. */
     const on = <A, E>(
       project: ProjectName,
       call: (api: ProjectApi) => Effect.Effect<A, E>
     ) => Effect.flatMap(projects.get(project), call);
+
+    /** A code read of `project`'s canonical repo, over the Worker's `RepoHost`. */
+    const code = <A, E>(
+      project: ProjectName,
+      read: (of: CodeProject) => Effect.Effect<A, E, RepoHost>
+    ) =>
+      on(project, (api) =>
+        read(codeProjectOf(api, project)).pipe(
+          Effect.provideService(RepoHost, host)
+        )
+      );
 
     /**
      * `call` on every project the projection lists, in name order. A
@@ -216,6 +246,14 @@ export const Handlers: Layer.Layer<
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.decide(who, input))
         ),
+      draftAsk: ({ project, ...input }) =>
+        Effect.gen(function* () {
+          const who = yield* person;
+
+          yield* rateLimits.check("draft", who.handle);
+
+          return yield* on(project, (api) => api.draftAsk(who, input));
+        }),
       evidence: ({ project, ref }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) =>
@@ -281,11 +319,32 @@ export const Handlers: Layer.Layer<
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.listAsks(who))
         ),
+      listPaths: ({ at, project }) =>
+        code(project, (of) => pathsOf(of, Option.fromUndefinedOr(at))),
       listProjects: () =>
         Effect.map(frontPage.projects(), (listed) => ({ projects: listed })),
+      listRefs: ({ project }) => code(project, refsOf),
+      log: ({ at, from = 0, limit = LOG_PAGE, path, project }) =>
+        code(project, (of) =>
+          logOf(of, {
+            at: Option.fromUndefinedOr(at),
+            from,
+            limit,
+            path: Option.fromUndefinedOr(path),
+          })
+        ),
       openAsk: ({ project, ...input }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.openAsk(who, input))
+        ),
+      projectPolicy: ({ project }) =>
+        on(project, (api) =>
+          Effect.map(api.policy(), (policy) =>
+            Option.match(policy, {
+              onNone: () => ({}),
+              onSome: (evaluated) => ({ policy: evaluated }),
+            })
+          )
         ),
       proposeAsk: ({ project, ...input }) =>
         Effect.gen(function* () {
@@ -295,6 +354,12 @@ export const Handlers: Layer.Layer<
 
           return yield* on(project, (api) => api.proposeAsk(who, input));
         }),
+      readFile: ({ at, path, project }) =>
+        code(project, (of) => fileOf(of, Option.fromUndefinedOr(at), path)),
+      readTree: ({ at, path, project }) =>
+        code(project, (of) =>
+          treeOf(of, Option.fromUndefinedOr(at), Option.fromUndefinedOr(path))
+        ),
       release: ({ ask, project }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.release(who, ask))
@@ -306,6 +371,12 @@ export const Handlers: Layer.Layer<
       showAsk: ({ ask, project }) =>
         Effect.flatMap(caller, (who) =>
           on(project, (api) => api.showAsk(who, ask))
+        ),
+      showCommit: ({ project, sha }) =>
+        code(project, (of) => commitOf(of, sha)),
+      showProposal: ({ project, proposal }) =>
+        Effect.flatMap(caller, (who) =>
+          on(project, (api) => api.showProposal(who, proposal))
         ),
       status: ({ project }) =>
         Effect.gen(function* () {
@@ -362,6 +433,8 @@ export const Handlers: Layer.Layer<
         Stream.unwrap(
           Effect.map(servedFramed, (live) => watchHandler(payload, { live }))
         ).pipe(Stream.provideService(Projects, projects)),
+      why: ({ at, path, project }) =>
+        code(project, (of) => whyOf(of, Option.fromUndefinedOr(at), path)),
     };
   })
 );

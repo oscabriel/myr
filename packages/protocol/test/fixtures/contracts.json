@@ -72,6 +72,31 @@
         }
       }
     },
+    "draftAsk": {
+      "payload": {
+        "note": "The test should use UTC.",
+        "project": "datekit",
+        "proposal": "prop-000001"
+      },
+      "success": {
+        "proposal": {
+          "expiresAt": "2026-10-21T12:00:00.000Z",
+          "files": [],
+          "id": "prop-000001",
+          "openedAt": "2026-10-07T12:00:00.000Z",
+          "project": "datekit",
+          "proposer": "dave",
+          "state": "open",
+          "territory": "@datekit/parse",
+          "want": "An ISO week date parses to the Monday of that week.",
+          "draft": {
+            "_tag": "Drafting",
+            "round": 2,
+            "startedAt": "2026-10-07T12:00:00.000Z"
+          }
+        }
+      }
+    },
     "envShape": {
       "payload": {
         "project": "datekit"
@@ -325,6 +350,17 @@
         ]
       }
     },
+    "listPaths": {
+      "payload": {
+        "at": "v1.0.0",
+        "project": "datekit"
+      },
+      "success": {
+        "at": "1111111111111111111111111111111111111111",
+        "paths": ["README.md", "src/parse/iso.ts"],
+        "truncated": false
+      }
+    },
     "listProjects": {
       "payload": {},
       "success": {
@@ -341,6 +377,142 @@
             "project": "widgets"
           }
         ]
+      }
+    },
+    "listRefs": {
+      "payload": {
+        "project": "datekit"
+      },
+      "success": {
+        "forks": [
+          {
+            "ask": "iso-week",
+            "handle": "alice",
+            "kind": "claim",
+            "repo": "datekit--iso-week--alice",
+            "state": "live"
+          },
+          {
+            "handle": "dave",
+            "kind": "working",
+            "repo": "datekit--me--dave"
+          }
+        ],
+        "landed": "4444444444444444444444444444444444444444",
+        "project": "datekit",
+        "tags": [
+          {
+            "name": "v1.0.0",
+            "sha": "1111111111111111111111111111111111111111"
+          }
+        ]
+      }
+    },
+    "log": {
+      "payload": {
+        "at": "main",
+        "from": 30,
+        "limit": 30,
+        "path": "src/parse/iso.ts",
+        "project": "datekit"
+      },
+      "success": {
+        "commits": [
+          {
+            "author": {
+              "at": "2026-10-07T12:00:00.000Z",
+              "email": "carol@example.com",
+              "name": "Carol"
+            },
+            "body": "Asked-by: alice\nSigned-off-by: carol",
+            "committer": {
+              "at": "2026-10-07T12:00:00.000Z",
+              "email": "carol@example.com",
+              "name": "Carol"
+            },
+            "landing": {
+              "ask": "iso-week",
+              "assisted": [
+                {
+                  "harness": "claude-code",
+                  "model": "haiku",
+                  "verified": true
+                }
+              ],
+              "author": "carol",
+              "credits": [
+                {
+                  "handle": "alice",
+                  "role": "Asked-by"
+                },
+                {
+                  "handle": "carol",
+                  "role": "Signed-off-by"
+                }
+              ],
+              "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
+              "landedAt": "2026-10-07T12:00:00.000Z",
+              "parent": "1111111111111111111111111111111111111111",
+              "project": "datekit",
+              "requestId": "push-33333333",
+              "sha": "4444444444444444444444444444444444444444",
+              "verdict": {
+                "ask": "iso-week",
+                "at": "2026-10-07T12:00:00.000Z",
+                "base": "1111111111111111111111111111111111111111",
+                "checkVersion": "redThenGreen@0.0.0+abc123",
+                "head": "3333333333333333333333333333333333333333",
+                "heldBack": [
+                  {
+                    "area": "parse",
+                    "passed": 7,
+                    "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+                    "total": 7
+                  }
+                ],
+                "lanes": [
+                  {
+                    "command": "bun run lint",
+                    "durationMs": 1200,
+                    "lane": "lint",
+                    "result": "passed"
+                  },
+                  {
+                    "command": "bun run test",
+                    "durationMs": 3400,
+                    "lane": "unit",
+                    "logRef": "logs/datekit/7",
+                    "result": "passed"
+                  }
+                ],
+                "outcome": {
+                  "_tag": "Landed",
+                  "sha": "4444444444444444444444444444444444444444"
+                },
+                "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
+                "project": "datekit",
+                "stage": "checks",
+                "tree": "5555555555555555555555555555555555555555",
+                "verifier": "platform"
+              }
+            },
+            "parents": ["1111111111111111111111111111111111111111"],
+            "sha": "4444444444444444444444444444444444444444",
+            "subject": "Parse ISO week dates",
+            "trailers": [
+              {
+                "key": "Asked-by",
+                "value": "alice"
+              },
+              {
+                "key": "Signed-off-by",
+                "value": "carol"
+              }
+            ],
+            "tree": "5555555555555555555555555555555555555555"
+          }
+        ],
+        "next": 60
       }
     },
     "openAsk": {
@@ -387,6 +559,103 @@
         "landed": "4444444444444444444444444444444444444444"
       }
     },
+    "projectPolicy": {
+      "payload": {
+        "project": "datekit"
+      },
+      "success": {
+        "policy": {
+          "agents": "trailer",
+          "at": "4444444444444444444444444444444444444444",
+          "budget": {
+            "decisionsPerDay": 5,
+            "expireDays": 14
+          },
+          "caps": {
+            "claimsPerPerson": 3,
+            "proposalsPerPerson": 2
+          },
+          "claims": {
+            "lapseAfterMs": 86400000,
+            "warnAfterMs": 7200000
+          },
+          "deciders": [
+            {
+              "handles": ["alice"],
+              "paths": "**"
+            }
+          ],
+          "judge": {
+            "paths": ["config/**", ".env.schema"],
+            "pointers": ["package.json#/scripts"]
+          },
+          "kinds": [
+            {
+              "checkKind": "redThenGreen",
+              "claimers": "vouched",
+              "finish": "optional",
+              "name": "fix",
+              "oneWay": false,
+              "race": 1,
+              "requires": ["want", "check", "territory"],
+              "strength": "assertion"
+            }
+          ],
+          "modules": [
+            {
+              "module": "@datekit/parse",
+              "paths": ["packages/parse/**"],
+              "publicFiles": ["packages/parse/src/index.ts"]
+            }
+          ],
+          "ratchets": [
+            {
+              "measure": {
+                "_tag": "Metric",
+                "command": "bun run size",
+                "path": "/total"
+              },
+              "name": "bundleSize"
+            }
+          ],
+          "record": {
+            "countsAfterDays": 30,
+            "windowDays": 365
+          },
+          "run": {
+            "checks": {
+              "lint": "bun run lint",
+              "types": "bun run typecheck",
+              "unit": "bun run test"
+            },
+            "doctor": "bun run doctor",
+            "image": "checker:default",
+            "setup": "bun install --frozen-lockfile --ignore-scripts",
+            "setupEgress": ["registry.npmjs.org"],
+            "test": "bun test {path}"
+          },
+          "source": "config",
+          "vouch": {
+            "file": "config/vouched.td",
+            "mode": "forCode"
+          },
+          "vouches": [
+            {
+              "denounced": false,
+              "handle": "alice"
+            },
+            {
+              "denounced": true,
+              "handle": "mallory",
+              "note": "spam"
+            }
+          ],
+          "weakening": {
+            "markers": [".skip(", "@ts-ignore"]
+          }
+        }
+      }
+    },
     "proposeAsk": {
       "payload": {
         "files": [
@@ -417,6 +686,53 @@
             "fork": "datekit--me--dave",
             "head": "3333333333333333333333333333333333333333"
           }
+        }
+      }
+    },
+    "readFile": {
+      "payload": {
+        "at": "4444444444444444444444444444444444444444",
+        "path": "README.md",
+        "project": "datekit"
+      },
+      "success": {
+        "at": "4444444444444444444444444444444444444444",
+        "binary": false,
+        "path": "README.md",
+        "sha": "6666666666666666666666666666666666666666",
+        "size": 7,
+        "text": "# datekit\n",
+        "truncated": false
+      }
+    },
+    "readTree": {
+      "payload": {
+        "at": "main",
+        "path": "src",
+        "project": "datekit"
+      },
+      "success": {
+        "at": "4444444444444444444444444444444444444444",
+        "entries": [
+          {
+            "mode": "040000",
+            "name": "parse",
+            "path": "src/parse",
+            "sha": "5555555555555555555555555555555555555555",
+            "type": "tree"
+          },
+          {
+            "mode": "100644",
+            "name": "README.md",
+            "path": "src/README.md",
+            "sha": "6666666666666666666666666666666666666666",
+            "type": "blob"
+          }
+        ],
+        "path": "src",
+        "readme": {
+          "path": "src/README.md",
+          "sha": "6666666666666666666666666666666666666666"
         }
       }
     },
@@ -478,6 +794,154 @@
           }
         },
         "brief": "# iso-week\n\nAn ISO week date parses to the Monday of that week.\n"
+      }
+    },
+    "showCommit": {
+      "payload": {
+        "project": "datekit",
+        "sha": "4444444444444444444444444444444444444444"
+      },
+      "success": {
+        "commit": {
+          "author": {
+            "at": "2026-10-07T12:00:00.000Z",
+            "email": "carol@example.com",
+            "name": "Carol"
+          },
+          "body": "Asked-by: alice\nSigned-off-by: carol",
+          "committer": {
+            "at": "2026-10-07T12:00:00.000Z",
+            "email": "carol@example.com",
+            "name": "Carol"
+          },
+          "landing": {
+            "ask": "iso-week",
+            "assisted": [
+              {
+                "harness": "claude-code",
+                "model": "haiku",
+                "verified": true
+              }
+            ],
+            "author": "carol",
+            "credits": [
+              {
+                "handle": "alice",
+                "role": "Asked-by"
+              },
+              {
+                "handle": "carol",
+                "role": "Signed-off-by"
+              }
+            ],
+            "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "landedAt": "2026-10-07T12:00:00.000Z",
+            "parent": "1111111111111111111111111111111111111111",
+            "project": "datekit",
+            "requestId": "push-33333333",
+            "sha": "4444444444444444444444444444444444444444",
+            "verdict": {
+              "ask": "iso-week",
+              "at": "2026-10-07T12:00:00.000Z",
+              "base": "1111111111111111111111111111111111111111",
+              "checkVersion": "redThenGreen@0.0.0+abc123",
+              "head": "3333333333333333333333333333333333333333",
+              "heldBack": [
+                {
+                  "area": "parse",
+                  "passed": 7,
+                  "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+                  "total": 7
+                }
+              ],
+              "lanes": [
+                {
+                  "command": "bun run lint",
+                  "durationMs": 1200,
+                  "lane": "lint",
+                  "result": "passed"
+                },
+                {
+                  "command": "bun run test",
+                  "durationMs": 3400,
+                  "lane": "unit",
+                  "logRef": "logs/datekit/7",
+                  "result": "passed"
+                }
+              ],
+              "outcome": {
+                "_tag": "Landed",
+                "sha": "4444444444444444444444444444444444444444"
+              },
+              "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
+              "project": "datekit",
+              "stage": "checks",
+              "tree": "5555555555555555555555555555555555555555",
+              "verifier": "platform"
+            }
+          },
+          "parents": ["1111111111111111111111111111111111111111"],
+          "sha": "4444444444444444444444444444444444444444",
+          "subject": "Parse ISO week dates",
+          "trailers": [
+            {
+              "key": "Asked-by",
+              "value": "alice"
+            },
+            {
+              "key": "Signed-off-by",
+              "value": "carol"
+            }
+          ],
+          "tree": "5555555555555555555555555555555555555555"
+        },
+        "files": [
+          {
+            "after": "6666666666666666666666666666666666666666",
+            "before": "5555555555555555555555555555555555555555",
+            "binary": false,
+            "newText": "export const b = 2;\n",
+            "oldText": "export const b = 1;\n",
+            "path": "src/parse/iso.ts",
+            "status": "modified"
+          }
+        ],
+        "truncated": false
+      }
+    },
+    "showProposal": {
+      "payload": {
+        "project": "datekit",
+        "proposal": "prop-000001"
+      },
+      "success": {
+        "files": [
+          {
+            "content": "export default ask({ want: \"An ISO week date parses.\" });\n",
+            "path": "config/asks/iso-week.ask.ts"
+          }
+        ],
+        "proposal": {
+          "expiresAt": "2026-10-21T12:00:00.000Z",
+          "files": ["config/asks/iso-week.ask.ts"],
+          "id": "prop-000001",
+          "openedAt": "2026-10-07T12:00:00.000Z",
+          "project": "datekit",
+          "proposer": "dave",
+          "state": "open",
+          "territory": "@datekit/parse",
+          "want": "An ISO week date parses to the Monday of that week.",
+          "draft": {
+            "_tag": "Ready",
+            "attempts": 2,
+            "model": "@cf/moonshotai/kimi-k2.7-code",
+            "red": {
+              "lane": "unit",
+              "signature": "expected 2026-01-05, got undefined"
+            },
+            "round": 1
+          }
+        }
       }
     },
     "status": {
@@ -709,6 +1173,122 @@
         },
         "at": "2026-10-07T12:00:00.000Z",
         "seq": 42
+      }
+    },
+    "why": {
+      "payload": {
+        "at": "main",
+        "path": "src/parse/iso.ts",
+        "project": "datekit"
+      },
+      "success": {
+        "at": "4444444444444444444444444444444444444444",
+        "commits": [
+          {
+            "author": {
+              "at": "2026-10-07T12:00:00.000Z",
+              "email": "carol@example.com",
+              "name": "Carol"
+            },
+            "body": "Asked-by: alice\nSigned-off-by: carol",
+            "committer": {
+              "at": "2026-10-07T12:00:00.000Z",
+              "email": "carol@example.com",
+              "name": "Carol"
+            },
+            "parents": ["1111111111111111111111111111111111111111"],
+            "sha": "4444444444444444444444444444444444444444",
+            "subject": "Parse ISO week dates",
+            "trailers": [
+              {
+                "key": "Asked-by",
+                "value": "alice"
+              },
+              {
+                "key": "Signed-off-by",
+                "value": "carol"
+              }
+            ],
+            "tree": "5555555555555555555555555555555555555555"
+          }
+        ],
+        "landings": [
+          {
+            "ask": "iso-week",
+            "assisted": [
+              {
+                "harness": "claude-code",
+                "model": "haiku",
+                "verified": true
+              }
+            ],
+            "author": "carol",
+            "credits": [
+              {
+                "handle": "alice",
+                "role": "Asked-by"
+              },
+              {
+                "handle": "carol",
+                "role": "Signed-off-by"
+              }
+            ],
+            "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
+            "landedAt": "2026-10-07T12:00:00.000Z",
+            "parent": "1111111111111111111111111111111111111111",
+            "project": "datekit",
+            "requestId": "push-33333333",
+            "sha": "4444444444444444444444444444444444444444",
+            "verdict": {
+              "ask": "iso-week",
+              "at": "2026-10-07T12:00:00.000Z",
+              "base": "1111111111111111111111111111111111111111",
+              "checkVersion": "redThenGreen@0.0.0+abc123",
+              "head": "3333333333333333333333333333333333333333",
+              "heldBack": [
+                {
+                  "area": "parse",
+                  "passed": 7,
+                  "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+                  "total": 7
+                }
+              ],
+              "lanes": [
+                {
+                  "command": "bun run lint",
+                  "durationMs": 1200,
+                  "lane": "lint",
+                  "result": "passed"
+                },
+                {
+                  "command": "bun run test",
+                  "durationMs": 3400,
+                  "lane": "unit",
+                  "logRef": "logs/datekit/7",
+                  "result": "passed"
+                }
+              ],
+              "outcome": {
+                "_tag": "Landed",
+                "sha": "4444444444444444444444444444444444444444"
+              },
+              "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
+              "project": "datekit",
+              "stage": "checks",
+              "tree": "5555555555555555555555555555555555555555",
+              "verifier": "platform"
+            }
+          }
+        ],
+        "path": "src/parse/iso.ts",
+        "ranges": [
+          {
+            "end": 12,
+            "sha": "4444444444444444444444444444444444444444",
+            "start": 1
+          }
+        ],
+        "stoppedAt": "1111111111111111111111111111111111111111"
       }
     }
   }

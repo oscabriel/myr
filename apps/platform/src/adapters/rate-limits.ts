@@ -15,15 +15,21 @@ import type { Limited } from "../rate-limits.ts";
 /** How many of each kind one person may make. */
 export interface Limits {
   readonly claim: number;
+  readonly draft: number;
   readonly proposal: number;
 }
 
 /**
  * What `wrangler.jsonc` lets each binding admit per person, every 60 s, in
- * every stage: `CLAIM_LIMIT` and `PROPOSAL_LIMIT`'s `simple.limit`. A binding
+ * every stage: `CLAIM_LIMIT`, `DRAFT_LIMIT` and `PROPOSAL_LIMIT`'s
+ * `simple.limit`. A binding
  * can't say its own limit, so a refusal reads its cap here.
  */
-export const WorkerCaps = { claim: 10, proposal: 5 } as const satisfies Limits;
+export const WorkerCaps = {
+  claim: 10,
+  draft: 2,
+  proposal: 5,
+} as const satisfies Limits;
 
 /** A refusal for one more of `kind` than `limits` allow. */
 const capped = (limits: Limits, kind: Limited) =>
@@ -35,6 +41,7 @@ const capped = (limits: Limits, kind: Limited) =>
  */
 export const WorkerRateLimits = (bindings: {
   readonly claim: RateLimit;
+  readonly draft: RateLimit;
   readonly proposal: RateLimit;
 }): Layer.Layer<RateLimits> =>
   Layer.succeed(

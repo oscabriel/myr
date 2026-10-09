@@ -136,7 +136,11 @@ export interface WorldOptions {
   /** What the front page reads back; nothing by default. */
   readonly frontPage?: FrontPageSeed;
   /** Claims and proposals each person may make; 100 of each by default. */
-  readonly limits?: { readonly claim: number; readonly proposal: number };
+  readonly limits?: {
+    readonly claim: number;
+    readonly draft?: number;
+    readonly proposal: number;
+  };
 }
 
 const noFrontPage: FrontPageSeed = { credits: [], entries: [], projects: [] };
@@ -161,7 +165,11 @@ export const worldOf = (
       )
     ),
     FrontPageMemory.layer(options.frontPage ?? noFrontPage),
-    MemoryRateLimits(options.limits ?? { claim: 100, proposal: 100 }),
+    MemoryRateLimits({
+      claim: options.limits?.claim ?? 100,
+      draft: options.limits?.draft ?? 100,
+      proposal: options.limits?.proposal ?? 100,
+    }),
     EvidenceStoreMemory
   ).pipe(Layer.provideMerge(RepoHostMemory));
 

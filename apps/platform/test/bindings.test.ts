@@ -118,6 +118,7 @@ const Named = Schema.Array(Schema.Struct({ name: Schema.String }));
  * adds it says which it is.
  */
 const BindingKinds = Schema.Struct({
+  ai: Schema.optionalKey(Schema.Struct({ binding: Schema.String })),
   artifacts: Schema.optionalKey(Bound),
   d1_databases: Schema.optionalKey(Bound),
   durable_objects: Schema.optionalKey(Schema.Struct({ bindings: Named })),
@@ -179,6 +180,7 @@ const sorted = (names: Iterable<string>) =>
 const declaredIn = (raw: typeof Raw.Type) =>
   Effect.map(decodeBlock(raw), (block) => ({
     bindings: sorted([
+      ...(block.ai === undefined ? [] : [block.ai.binding]),
       ...(block.artifacts ?? []).map(({ binding }) => binding),
       ...(block.d1_databases ?? []).map(({ binding }) => binding),
       ...(block.durable_objects?.bindings ?? []).map(({ name }) => name),
@@ -250,6 +252,13 @@ const sandboxEnvKeys = Effect.map(
     )
 );
 
+/** The draft limit as a stage's block declares it, under its own namespace id. */
+const draftLimit = (id: string) => ({
+  name: "DRAFT_LIMIT",
+  namespace_id: id,
+  simple: { limit: 2, period: 60 },
+});
+
 describe("a wrangler.jsonc, read as data", () => {
   it.effect(
     "loses its comments and trailing commas, a comment between a comma and its bracket too, and keeps every string whole",
@@ -298,6 +307,74 @@ describe("the platform Worker's bindings", () => {
       }).pipe(Effect.provide(NodeServices.layer))
   );
 
+  // The drafter's model and the web's address are stage vars, and drafts
+  // are rate-limited apart from proposals, two a minute per person.
+  it.effect(
+    "set the drafter's model, the web's address and the draft limit in every stage",
+    () =>
+      Effect.gen(function* () {
+        const raw = yield* Effect.flatMap(
+          fileText("wrangler.jsonc"),
+          readJsonc
+        );
+
+        const { env = {} } = yield* Schema.decodeUnknownEffect(Staged)(raw);
+
+        const DraftBlock = Schema.Struct({
+          ai: Schema.Struct({ binding: Schema.String }),
+          ratelimits: Schema.Array(
+            Schema.Struct({
+              name: Schema.String,
+              namespace_id: Schema.String,
+              simple: Schema.Struct({
+                limit: Schema.Int,
+                period: Schema.Int,
+              }),
+            })
+          ),
+          vars: PlatformVars,
+        });
+
+        const read = (block: typeof Raw.Type | undefined) =>
+          Effect.map(
+            Schema.decodeUnknownEffect(DraftBlock)(block),
+            ({ ai, ratelimits, vars }) => ({
+              ai: ai.binding,
+              draftLimit: ratelimits.find(({ name }) => name === "DRAFT_LIMIT"),
+              model: vars.DRAFT_MODEL,
+              web: vars.PUBLIC_WEB_URL,
+            })
+          );
+
+        const model = "@cf/moonshotai/kimi-k2.7-code";
+
+        expect({
+          demo: yield* read(env.demo),
+          "dev-oscabriel": yield* read(env["dev-oscabriel"]),
+          top: yield* read(raw),
+        }).toStrictEqual({
+          demo: {
+            ai: "AI",
+            draftLimit: draftLimit("1204"),
+            model,
+            web: "https://web-demo.oscargabriel.workers.dev",
+          },
+          "dev-oscabriel": {
+            ai: "AI",
+            draftLimit: draftLimit("1104"),
+            model,
+            web: "https://web-dev-oscabriel.oscargabriel.workers.dev",
+          },
+          top: {
+            ai: "AI",
+            draftLimit: draftLimit("1004"),
+            model,
+            web: "http://localhost:5173",
+          },
+        });
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+
   it("are all the Env the Worker is given, and nothing else", () => {
     expectTypeOf<keyof Env>().toEqualTypeOf<
       Exclude<
@@ -336,6 +413,10 @@ describe("the platform Worker's bindings", () => {
     expectTypeOf<Env["PROPOSAL_LIMIT"]>().toExtend<
       Parameters<typeof WorkerRateLimits>[0]["proposal"]
     >();
+    expectTypeOf<Env["DRAFT_LIMIT"]>().toExtend<
+      Parameters<typeof WorkerRateLimits>[0]["draft"]
+    >();
+    expectTypeOf<PlatformConfig["AI"]>().toEqualTypeOf<Env["AI"]>();
     expectTypeOf<Env["FRONT_PAGE"]>().toExtend<
       Parameters<typeof D1Client.layer>[0]["db"]
     >();

@@ -70,8 +70,11 @@ export const Revision = Data.taggedEnum<Revision>();
 
 const Person = Schema.Struct({ email: Schema.String, name: Schema.String });
 
+/** A commit, with when it was written and when committed, in Unix seconds. */
 export const Commit = Schema.Struct({
   author: Person,
+  authoredAt: Schema.Int,
+  committedAt: Schema.Int,
   committer: Person,
   message: Schema.String,
   parents: Schema.Array(CommitSha),
@@ -80,6 +83,12 @@ export const Commit = Schema.Struct({
 });
 
 export type Commit = typeof Commit.Type;
+
+/** One tag: its full ref, and the commit it names, peeled. */
+export interface Tag {
+  readonly name: RefName;
+  readonly sha: CommitSha;
+}
 
 export type TokenScope = "read" | "write";
 
@@ -197,16 +206,25 @@ export class RepoHost extends Context.Service<
       name: RepoName,
       blob: ObjectId
     ) => Effect.Effect<Option.Option<Uint8Array>, RepoNotFound>;
-    /** First parents from `at`, newest first. */
+    /** First parents from `at`, newest first, the first `offset` (0 when absent) skipped. */
     readonly log: (
       name: RepoName,
       at: Revision,
-      limit: number
+      limit: number,
+      offset?: number
     ) => Effect.Effect<readonly Commit[], RepoNotFound>;
     /** Every ref, as `ls-remote` lists them, custom refs included. */
     readonly refs: (
       name: RepoName
     ) => Effect.Effect<ReadonlyMap<RefName, CommitSha>, RepoNotFound>;
+    /**
+     * Every `refs/tags/*`, each peeled to the commit it names: an annotated
+     * tag's ref names a tag object, which `readCommit` cannot read.
+     * `refs` keeps what git lists.
+     */
+    readonly tags: (
+      name: RepoName
+    ) => Effect.Effect<readonly Tag[], RepoNotFound>;
     readonly push: (
       name: RepoName,
       source: PushSource,

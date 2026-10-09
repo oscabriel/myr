@@ -105,7 +105,7 @@ import {
   secondsOf,
 } from "./artifacts-api.ts";
 import type { Code } from "./artifacts-api.ts";
-import { listRefs, pushRefs } from "./smart-http.ts";
+import { listRefs, listTags, pushRefs } from "./smart-http.ts";
 
 /** A refusal that names no code at all, such as a proxy's, read by status. */
 const byStatus = (status: number): Option.Option<Code> =>
@@ -195,9 +195,21 @@ const commitFields = {
   parents: Schema.Array(CommitSha),
 };
 
+// ASSUMPTION: the REST API spells the binding's times as it spells
+// `tree_hash`, in snake case, or as the binding does.
 const Metadata = Schema.Union([
-  Schema.Struct({ ...commitFields, tree_hash: ObjectId }),
-  Schema.Struct({ ...commitFields, treeHash: ObjectId }),
+  Schema.Struct({
+    ...commitFields,
+    authored_at: Schema.Int,
+    committed_at: Schema.Int,
+    tree_hash: ObjectId,
+  }),
+  Schema.Struct({
+    ...commitFields,
+    authoredAt: Schema.Int,
+    committedAt: Schema.Int,
+    treeHash: ObjectId,
+  }),
 ]);
 
 type Metadata = typeof Metadata.Type;
@@ -216,11 +228,21 @@ const decodeEntries = Schema.decodeUnknownEffect(Schema.Array(TreeEntry));
 
 const commitOf = (metadata: Metadata): Commit => ({
   author: metadata.author,
+  ...("tree_hash" in metadata
+    ? {
+        authoredAt: metadata.authored_at,
+        committedAt: metadata.committed_at,
+        tree: metadata.tree_hash,
+      }
+    : {
+        authoredAt: metadata.authoredAt,
+        committedAt: metadata.committedAt,
+        tree: metadata.treeHash,
+      }),
   committer: metadata.committer,
   message: metadata.message,
   parents: metadata.parents,
   sha: metadata.hash,
-  tree: "tree_hash" in metadata ? metadata.tree_hash : metadata.treeHash,
 });
 
 // Artifacts gives canonical modes: a folder is `40000`, as git stores it, not
@@ -684,7 +706,7 @@ const make = (options: {
         )
       );
 
-    const log = (name: RepoName, at: Revision, limit: number) =>
+    const log = (name: RepoName, at: Revision, limit: number, offset = 0) =>
       Effect.gen(function* () {
         const commits: Commit[] = [];
 
@@ -692,7 +714,7 @@ const make = (options: {
           const more = yield* page(
             name,
             refOf(at),
-            commits.length,
+            offset + commits.length,
             Math.min(limit - commits.length, LOG_PAGE)
           );
 
@@ -813,6 +835,12 @@ const make = (options: {
       // binding's `get` does.
       revokeToken: (name, id) =>
         remoteOf(name).pipe(Effect.andThen(revoke(id))),
+      tags: (name) =>
+        accessOf(name, "read").pipe(
+          Effect.flatMap(({ remote, token }) => listTags(remote, token)),
+          Effect.catchTag("ForkInProgress", Effect.die),
+          Effect.provideService(Fetch, fetch)
+        ),
     });
   });
 

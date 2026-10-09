@@ -7,14 +7,14 @@ import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Option, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 
 import { MemoryRateLimits, WorkerCaps } from "../src/adapters/rate-limits.ts";
 import { Handlers } from "../src/handlers.ts";
 import { ReleaseStore } from "../src/releases.ts";
-import { serve, Stage } from "../src/surfaces.ts";
+import { HostInfo, serve, Stage } from "../src/surfaces.ts";
 import type { Services } from "../src/surfaces.ts";
 
 /** Where every test request goes: the platform as `served` answers it. */
@@ -135,7 +135,8 @@ const unused = (port: string) => () =>
  * What a surfaces test may leave out: git's ports and the release store,
  * unused (no test here pushes, and only the releases test downloads), a
  * front page that lists no project and the repos behind it, unused (so the
- * skills index is empty), and the stage, `local`.
+ * skills index is empty), the stage, `local`, and a host with no web app
+ * whose drafter is `test-model`.
  */
 const defaults = Layer.mergeAll(
   Layer.succeed(
@@ -146,14 +147,18 @@ const defaults = Layer.mergeAll(
   Layer.succeed(ReleaseStore, ReleaseStore.of({ get: unused("ReleaseStore") })),
   FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
   Layer.succeed(RepoHost, untouchable<RepoHost["Service"]>("RepoHost")),
-  Layer.succeed(Stage, Stage.of({ name: "local" }))
+  Layer.succeed(Stage, Stage.of({ name: "local" })),
+  Layer.succeed(
+    HostInfo,
+    HostInfo.of({ draftModel: "test-model", webUrl: Option.none() })
+  )
 );
 
 /**
  * The contracts before any project exists, served by the platform's own
  * handlers: a call that names a project finds none (`UnknownProject`), the
- * front page lists nothing, nobody is near a rate limit, and no lane has
- * left a log.
+ * front page lists nothing, nobody is near a rate limit, no lane has
+ * left a log, and no repo is read.
  */
 export const noProjects = Handlers.pipe(
   Layer.provide([
@@ -167,6 +172,7 @@ export const noProjects = Handlers.pipe(
     FrontPageMemory.layer({ credits: [], entries: [], projects: [] }),
     MemoryRateLimits(WorkerCaps),
     EvidenceStoreMemory,
+    Layer.succeed(RepoHost, untouchable<RepoHost["Service"]>("RepoHost")),
   ])
 );
 
@@ -178,7 +184,13 @@ export const served = Effect.fnUntraced(function* <E>(
   services: Layer.Layer<
     Exclude<
       Services,
-      Projects | ReleaseStore | Upstream | FrontPage | RepoHost | Stage
+      | Projects
+      | ReleaseStore
+      | Upstream
+      | FrontPage
+      | RepoHost
+      | Stage
+      | HostInfo
     >,
     E
   >

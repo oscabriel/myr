@@ -21,7 +21,7 @@ import { ReleaseStoreBinding } from "./releases/binding.ts";
 import { Sessions } from "./sessions.ts";
 import { firstOf } from "./sessions/first-of.ts";
 import { sessionTable } from "./sessions/table.ts";
-import { Stage } from "./surfaces.ts";
+import { HostInfo, Stage } from "./surfaces.ts";
 import type { Services } from "./surfaces.ts";
 
 /**
@@ -66,6 +66,8 @@ export const LanderAdapter = Schema.Literals(["container", "isogit"]);
  * fails `typecheck` here and wherever it is used.
  */
 export const PlatformBindings = Schema.Struct({
+  /** Workers AI, which drafts asks (`DRAFT_MODEL` names the model). */
+  AI: binding<Env["AI"]>("Workers AI"),
   ANSWER: binding<Env["ANSWER"]>("the Answer Workflow"),
   ARTIFACTS: binding<Env["ARTIFACTS"]>("an Artifacts namespace"),
   /**
@@ -77,6 +79,7 @@ export const PlatformBindings = Schema.Struct({
     "the private Artifacts namespace"
   ),
   CLAIM_LIMIT: binding<Env["CLAIM_LIMIT"]>("a rate limit"),
+  DRAFT_LIMIT: binding<Env["DRAFT_LIMIT"]>("a rate limit"),
   EVIDENCE: binding<Env["EVIDENCE"]>("an R2 bucket"),
   FRONT_PAGE: binding<Env["FRONT_PAGE"]>("a D1 database"),
   LOADER: binding<Env["LOADER"]>("a Worker Loader"),
@@ -99,10 +102,16 @@ export const PlatformBindings = Schema.Struct({
 
 /** The vars `wrangler.jsonc` sets in every block. */
 export const PlatformVars = Schema.Struct({
+  /** The Workers AI model that drafts asks: `@cf/moonshotai/kimi-k2.7-code`. */
+  DRAFT_MODEL: Schema.NonEmptyString,
   LANDER_ADAPTER: LanderAdapter.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed("container"))
   ),
   OPERATOR_HANDLE: Handle,
+  /** The web app's own URL, which `/` links to; a stage without one links nowhere. */
+  PUBLIC_WEB_URL: Schema.optionalKey(
+    Schema.String.check(Schema.isPattern(/^https?:\/\//u))
+  ),
   STAGE: StageName,
 });
 
@@ -229,7 +238,8 @@ const sessionsOf = (config: PlatformConfig) =>
 
 /**
  * The surfaces' services over `ports`: every contract's handler, sessions,
- * the CLI's releases (over `RELEASES`) and the stage from the decoded env,
+ * the CLI's releases (over `RELEASES`), the stage and what `/` says of the
+ * host (the web's URL, the drafter's model) from the decoded env,
  * and the ports beside them (git's routes take the same `Projects` and
  * `Upstream` the handlers do). The Worker runs them over
  * `workerPorts(config)`; the core-loop test runs the same composition over
@@ -243,7 +253,14 @@ export const platformOn = (
     Handlers,
     sessionsOf(config),
     ReleaseStoreBinding(config.RELEASES),
-    Layer.succeed(Stage, Stage.of({ name: config.STAGE }))
+    Layer.succeed(Stage, Stage.of({ name: config.STAGE })),
+    Layer.succeed(
+      HostInfo,
+      HostInfo.of({
+        draftModel: config.DRAFT_MODEL,
+        webUrl: Option.fromUndefinedOr(config.PUBLIC_WEB_URL),
+      })
+    )
   ).pipe(Layer.provideMerge(ports));
 
 /**

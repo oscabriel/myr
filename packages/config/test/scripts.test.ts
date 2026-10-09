@@ -1,6 +1,7 @@
 /**
  * The demo-readiness scripts: a maintainer types `bun run swarm`,
- * `bun run seed` or `bun run release`, and each runs one entry file that
+ * `bun run seed`, `bun run release` or `bun run import-examples`, and each
+ * runs one entry file that
  * exists, so the work that builds them fills an entry without touching a
  * root file.
  */
@@ -37,17 +38,24 @@ const entryOf = (name: string) =>
   });
 
 describe("the demo-readiness scripts", () => {
-  it.live("swarm, seed and release each run one entry file that exists", () =>
-    Effect.gen(function* () {
-      expect({
-        release: yield* entryOf("release"),
-        seed: yield* entryOf("seed"),
-        swarm: yield* entryOf("swarm"),
-      }).toStrictEqual({
-        release: { command: "bun scripts/release.ts", exists: true },
-        seed: { command: "bun scripts/seed.ts", exists: true },
-        swarm: { command: "bun scripts/swarm.ts", exists: true },
-      });
-    }).pipe(Effect.provide(NodeServices.layer))
+  it.live(
+    "swarm, seed, release and import-examples each run one entry file that exists",
+    () =>
+      Effect.gen(function* () {
+        expect({
+          "import-examples": yield* entryOf("import-examples"),
+          release: yield* entryOf("release"),
+          seed: yield* entryOf("seed"),
+          swarm: yield* entryOf("swarm"),
+        }).toStrictEqual({
+          "import-examples": {
+            command: "bun scripts/import-examples.ts",
+            exists: true,
+          },
+          release: { command: "bun scripts/release.ts", exists: true },
+          seed: { command: "bun scripts/seed.ts", exists: true },
+          swarm: { command: "bun scripts/swarm.ts", exists: true },
+        });
+      }).pipe(Effect.provide(NodeServices.layer))
   );
 });

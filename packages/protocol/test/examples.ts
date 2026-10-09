@@ -6,6 +6,7 @@ import {
   DecisionId,
   EnvKey,
   ProjectName,
+  ProposalId,
   RepoPath,
 } from "../src/ids.ts";
 import {
@@ -18,6 +19,7 @@ import {
   DecisionClosed,
   Denounced,
   DirectPush,
+  DraftInProgress,
   Flake,
   HeldBackFailed,
   ImportFailed,
@@ -33,6 +35,7 @@ import {
   PostureChange,
   PrivatePathInPublicTree,
   ProjectExists,
+  ProposalClosed,
   ReachedInternals,
   RepoBusy,
   SecretInOutput,
@@ -43,7 +46,10 @@ import {
   UnknownCommit,
   UnknownDecision,
   UnknownEnvItem,
+  UnknownPath,
   UnknownProject,
+  UnknownProposal,
+  UnknownRevision,
   UnstatedRequirement,
   ValueTooShort,
   VerifierBlocked,
@@ -65,6 +71,8 @@ const project = ProjectName.make("datekit");
 const decision = DecisionId.make("dec-000001");
 
 const key = EnvKey.make("PAYMENTS_KEY");
+
+const proposal = ProposalId.make("prop-000001");
 
 // One of each member, in the union's order.
 export const examples: readonly Refusal[] = [
@@ -113,10 +121,15 @@ export const examples: readonly Refusal[] = [
   new PostureChange({ from: "open", to: "openCore" }),
   new NotDecider({}),
   new DecisionClosed({ decision }),
+  new ProposalClosed({ proposal }),
+  DraftInProgress.of(proposal),
   new UnknownProject({ project }),
   new UnknownAsk({ ask }),
   new UnknownCommit({ sha: main }),
   new UnknownDecision({ decision }),
+  new UnknownPath({ commit: main, path }),
+  new UnknownRevision({ rev: "v9.9.9" }),
+  new UnknownProposal({ proposal }),
   new ProjectExists({ project }),
   new ImportFailed({ reason: "the repo needs a sign-in to read" }),
   new UnknownEnvItem({ key }),

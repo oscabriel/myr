@@ -160,13 +160,19 @@ describe(commandDocs, () => {
       words.filter((name) => name.startsWith("ask") || name.startsWith("env"))
     ).toStrictEqual([
       "ask",
+      "ask draft",
       "ask flag",
       "ask open",
       "asks",
       "env set",
       "env shape",
     ]);
-    expect(words.slice(0, 3)).toStrictEqual(["ask", "ask flag", "ask open"]);
+    expect(words.slice(0, 4)).toStrictEqual([
+      "ask",
+      "ask draft",
+      "ask flag",
+      "ask open",
+    ]);
   });
 
   // `init` and `env set` do local work around the contract they call, so

@@ -1,12 +1,13 @@
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { platformSkill } from "@repo/agent-kit/platform";
-import type { RepoHost } from "@repo/artifacts/repo-host";
+import { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { Upstream } from "@repo/git/upstream";
-import type { FrontPage } from "@repo/project/front-page";
+import { FrontPage } from "@repo/project/front-page";
 import { Projects } from "@repo/project/projects";
 import { authenticated, bearerToken } from "@repo/protocol/authenticate";
 import { Client, Contracts, surfaced } from "@repo/protocol/contracts";
+import { ProjectName } from "@repo/protocol/ids";
 import { toToolkit } from "@repo/protocol/mcp";
 import {
   briefResources,
@@ -15,7 +16,7 @@ import {
 } from "@repo/protocol/mcp-extras";
 import { Authenticated } from "@repo/protocol/principal";
 import type { Person } from "@repo/protocol/principal";
-import { Context, Effect, Layer, Option } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import { McpProtocol, McpServer } from "effect/ai";
 import {
   Headers,
@@ -33,12 +34,18 @@ import {
 
 import { serveGit } from "./git.ts";
 import type { GitServices } from "./git.ts";
+import { homeResponse } from "./home.ts";
+import { HostInfo } from "./host-info.ts";
 import { LayerGate } from "./layer-gate.ts";
+import { rawResponse } from "./raw.ts";
 import { releaseRoutes } from "./releases.ts";
 import type { ReleaseStore } from "./releases.ts";
 import { Sessions } from "./sessions.ts";
 import { isFramed } from "./watch.ts";
 import { agentSkillRoutes } from "./well-known.ts";
+
+/** What `/` says of the host: the web app's URL and the drafter's model. */
+export { HostInfo } from "./host-info.ts";
 
 /** Which stage this Worker serves: `/health` says so. */
 export class Stage extends Context.Service<Stage, { readonly name: string }>()(
@@ -48,7 +55,8 @@ export class Stage extends Context.Service<Stage, { readonly name: string }>()(
 /**
  * What the surfaces need from the platform: the contracts' handlers,
  * sessions, what git's paths need, the CLI's releases, the front page and
- * the repos the projects' skills are read from, and the stage.
+ * the repos the projects' skills and raw files are read from, the stage,
+ * and what `/` says of the host.
  */
 export type Services =
   | Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>
@@ -57,7 +65,8 @@ export type Services =
   | ReleaseStore
   | FrontPage
   | RepoHost
-  | Stage;
+  | Stage
+  | HostInfo;
 
 /** git's smart-HTTP paths: `/<repo>(.git)/info/refs` and the two services. */
 const GIT_PATH =
@@ -75,6 +84,12 @@ const DISCOVERY_PATH =
  * `/token` and `/oauth/*`.
  */
 const SIGN_IN_PATH = /^\/(?:authorize|signup|token|oauth(?:\/.*)?)$/u;
+
+/**
+ * A project's raw files, `/<project>/raw/<rev>/<path…>`: no git path, whose
+ * second segment is `info` or a git service, ever matches it.
+ */
+const RAW_PATH = /^\/[a-z0-9]+(?:-[a-z0-9]+)*\/raw\/.+$/u;
 
 /**
  * The CLI's install script and releases (`releases.ts`):
@@ -95,11 +110,14 @@ const SKILLS_PATH = /^\/\.well-known\/agent-skills\/.+$/u;
  * answers an unknown credential with its own 401); the paths that tell a
  * client how to sign in, or sign it in, which may carry a stale token or an
  * OAuth client's own credential; the CLI's downloads, which anyone may
- * fetch, with whatever credential an installer happens to carry; and the
- * projects' skills, which an agent fetches the same way.
+ * fetch, with whatever credential an installer happens to carry; the
+ * projects' skills, which an agent fetches the same way; the host's own
+ * page, `/`; and a project's raw files, which a README's images name.
  */
 const isExempt = (path: string) =>
+  path === "/" ||
   path === "/health" ||
+  RAW_PATH.test(path) ||
   GIT_PATH.test(path) ||
   DISCOVERY_PATH.test(path) ||
   SIGN_IN_PATH.test(path) ||
@@ -338,6 +356,60 @@ const health = HttpRouter.use((router) =>
   })
 );
 
+/** A route that answers with a web `Response` from `respond`, given the web request. */
+const fromWeb =
+  <R>(respond: (web: Request) => Effect.Effect<Response, never, R>) =>
+  (request: HttpServerRequest.HttpServerRequest) =>
+    HttpServerRequest.toWeb(request).pipe(
+      Effect.flatMap(respond),
+      Effect.map(HttpServerResponse.fromWeb),
+      Effect.orElseSucceed(() => HttpServerResponse.empty({ status: 400 }))
+    );
+
+/** `/`: what this host serves, for a browser and for an agent (`home.ts`). */
+const home = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const services = Context.make(FrontPage, yield* FrontPage).pipe(
+      Context.add(HostInfo, yield* HostInfo)
+    );
+
+    yield* router.add(
+      "GET",
+      "/",
+      fromWeb((web) => Effect.provide(homeResponse(web), services))
+    );
+  })
+);
+
+const decodeProject = Schema.decodeUnknownOption(ProjectName);
+
+/** `/<project>/raw/<rev>/<path…>`: a project's raw files (`raw.ts`). */
+const raw = HttpRouter.use((router) =>
+  Effect.gen(function* () {
+    const services = Context.make(RepoHost, yield* RepoHost).pipe(
+      Context.add(Projects, yield* Projects)
+    );
+
+    yield* router.add("GET", "/:project/raw/*", (request) =>
+      Effect.gen(function* () {
+        const params = yield* HttpRouter.params;
+
+        return yield* Option.match(decodeProject(params.project), {
+          onNone: () =>
+            Effect.succeed(HttpServerResponse.empty({ status: 404 })),
+          onSome: (project) =>
+            fromWeb((web) =>
+              Effect.provide(
+                rawResponse(web, project, params["*"] ?? ""),
+                services
+              )
+            )(request),
+        });
+      })
+    );
+  })
+);
+
 /**
  * The protected-resource document (RFC 9728), answered to anyone: where a
  * client learns that the platform is its own authorization server. The
@@ -397,8 +469,10 @@ const git = HttpRouter.use((router) =>
 export const serve = <E>(services: Layer.Layer<Services, E>) =>
   HttpRouter.toWebHandler(
     Layer.mergeAll(
+      home,
       health,
       discovery,
+      raw,
       git,
       mcp,
       rpc,

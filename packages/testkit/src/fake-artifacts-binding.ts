@@ -81,6 +81,8 @@ interface Person {
 
 interface HostCommit {
   readonly author: Person;
+  readonly authoredAt: number;
+  readonly committedAt: number;
   readonly committer: Person;
   readonly message: string;
   readonly parents: readonly string[];
@@ -269,11 +271,11 @@ const entryOf = (entry: HostTreeEntry): ArtifactsTreeEntry => ({
   type: typeOf(entry),
 });
 
-// `RepoHost`'s commits carry no times, so the fake reports the epoch.
+// The times the host read from the commit itself, in Unix seconds.
 const metadataOf = (commit: HostCommit): ArtifactsCommitMetadata => ({
   author: { email: commit.author.email, name: commit.author.name },
-  authoredAt: 0,
-  committedAt: 0,
+  authoredAt: commit.authoredAt,
+  committedAt: commit.committedAt,
   committer: { email: commit.committer.email, name: commit.committer.name },
   hash: commit.sha,
   message: commit.message,

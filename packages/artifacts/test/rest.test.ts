@@ -655,6 +655,8 @@ describe("reads whose replies the REST docs do not show", () => {
             expect(commit).toStrictEqual(
               Option.some({
                 author: { email: "answerer@example.com", name: "Answerer" },
+                authoredAt: 1_791_300_000,
+                committedAt: 1_791_300_000,
                 committer: { email: "answerer@example.com", name: "Answerer" },
                 message: "first",
                 parents: [],

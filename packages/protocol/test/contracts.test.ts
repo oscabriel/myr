@@ -18,6 +18,7 @@ import {
 import {
   Contracts,
   partsOf,
+  ProposeAsk,
   SetEnv,
   surfaced,
   Watch,
@@ -132,6 +133,78 @@ const table = [
     tag: "watch",
   },
   {
+    audience: "public",
+    cli: "none",
+    errors: ["UnknownProject"],
+    flags: "RI",
+    on: "RW",
+    tag: "listRefs",
+  },
+  {
+    audience: "public",
+    cli: "none",
+    errors: ["UnknownProject", "UnknownRevision", "UnknownPath"],
+    flags: "RI",
+    on: "RW",
+    tag: "readTree",
+  },
+  {
+    audience: "public",
+    cli: "none",
+    errors: ["UnknownProject", "UnknownRevision"],
+    flags: "RI",
+    on: "RW",
+    tag: "listPaths",
+  },
+  {
+    audience: "public",
+    cli: "none",
+    errors: ["UnknownProject", "UnknownRevision", "UnknownPath"],
+    flags: "RI",
+    on: "RW",
+    tag: "readFile",
+  },
+  {
+    audience: "public",
+    cli: "none",
+    errors: ["UnknownProject", "UnknownRevision"],
+    flags: "RI",
+    on: "RW",
+    tag: "log",
+  },
+  {
+    audience: "public",
+    cli: "none",
+    errors: ["UnknownProject", "UnknownCommit"],
+    flags: "RI",
+    on: "RW",
+    tag: "showCommit",
+  },
+  {
+    audience: "public",
+    cli: "none",
+    errors: ["UnknownProject", "UnknownRevision", "UnknownPath"],
+    flags: "RI",
+    on: "RW",
+    tag: "why",
+  },
+  {
+    audience: "public",
+    cli: "policy",
+    errors: ["UnknownProject"],
+    flags: "RI",
+    on: "RMCW",
+    tag: "projectPolicy",
+  },
+  {
+    audience: "public",
+    cli: "proposal <proposal>",
+    errors: ["UnknownProject", "UnknownProposal"],
+    flags: "RI",
+    on: "RMCW",
+    tag: "showProposal",
+  },
+  {
     audience: "signedIn",
     cli: "init",
     errors: ["ProjectExists", "ImportFailed"],
@@ -163,6 +236,21 @@ const table = [
     flags: "",
     on: "RMCW",
     tag: "proposeAsk",
+  },
+  {
+    audience: "signedIn",
+    cli: "ask draft <proposal>",
+    errors: [
+      "UnknownProject",
+      "UnknownProposal",
+      "ProposalClosed",
+      "NotDecider",
+      "DraftInProgress",
+      "CapReached",
+    ],
+    flags: "",
+    on: "RMCW",
+    tag: "draftAsk",
   },
   {
     audience: "signedIn",
@@ -291,6 +379,20 @@ const table = [
     tag: "setEnv",
   },
 ] as const;
+
+/** Whether `proposeAsk` takes `payload`: `Some` when it decodes. */
+const decodes = (payload: typeof Schema.Json.Type) =>
+  Schema.decodeUnknownOption(ProposeAsk.payloadSchema)(payload)._tag;
+
+/** The code reads: on RPC and the web only (git reads code locally). */
+type CodeRead =
+  | "listPaths"
+  | "listRefs"
+  | "log"
+  | "readFile"
+  | "readTree"
+  | "showCommit"
+  | "why";
 
 /** Each surface's letter in the table's Surfaces column. */
 const letterOf = {
@@ -477,6 +579,24 @@ describe("the contracts group", () => {
     expect(JSON.stringify(decoded)).not.toContain(encoded.value);
   });
 
+  // The platform's agent writes a drafted proposal's files, so one that
+  // brings its own, or a sealed answer, is refused at the boundary.
+  it("takes a drafted proposal with no files and no sealed answer", () => {
+    const want = { project: "datekit", want: "Parse ISO weeks." };
+
+    const files = [{ content: "x", path: "config/asks/a.ask.ts" }];
+
+    const sealed = { head: "3".repeat(40) };
+
+    expect([
+      decodes({ ...want, draft: true }),
+      decodes({ ...want, draft: true, files }),
+      decodes({ ...want, draft: true, sealed }),
+      decodes({ ...want, files }),
+      decodes({ ...want, draft: false }),
+    ]).toStrictEqual(["Some", "None", "None", "Some", "None"]);
+  });
+
   it("streams a project's events from watch", () => {
     expect(RpcSchema.isStreamSchema(Watch.successSchema)).toBeTruthy();
     expect(Watch.successSchema.success).toBe(ProjectEvent);
@@ -500,10 +620,10 @@ describe("the group a surface serves", () => {
   it("types each surface's group as the contracts on it", () => {
     expectTypeOf<TagOn<"rpc">>().toEqualTypeOf<Contract["_tag"]>();
     expectTypeOf<TagOn<"mcp">>().toEqualTypeOf<
-      Exclude<Contract["_tag"], "evidence" | "setEnv" | "watch">
+      Exclude<Contract["_tag"], CodeRead | "evidence" | "setEnv" | "watch">
     >();
     expectTypeOf<TagOn<"cli">>().toEqualTypeOf<
-      Exclude<Contract["_tag"], "watch">
+      Exclude<Contract["_tag"], CodeRead | "watch">
     >();
   });
 

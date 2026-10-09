@@ -83,6 +83,19 @@
             }
           },
           {
+            "include": [
+              "scripts/import-examples.ts",
+              "scripts/lib/import/**/*.ts"
+            ],
+            "options": {
+              "allowedUnstableApis": [
+                "effect/http",
+                "effect/process",
+                "effect/rpc"
+              ]
+            }
+          },
+          {
             "include": ["packages/config/test/**/*.ts", "infra/**/*.ts"],
             "options": {
               "allowedUnstableApis": ["effect/http", "effect/process"]

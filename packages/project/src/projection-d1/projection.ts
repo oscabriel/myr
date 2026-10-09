@@ -179,6 +179,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
                     WHERE project = ${project} AND ${next}`,
                 ]
               : [],
+          ProposalDrafted: () => [],
           ProposalOpened: () => [],
           Pushed: () => [],
           Released: ({ ask }) => [claims(ask, -1)],

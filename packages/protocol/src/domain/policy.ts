@@ -110,6 +110,17 @@ export const Policy = Schema.Struct({
 export type Policy = typeof Policy.Type;
 
 /**
+ * A policy as anyone may read it: the evaluated config folder without its
+ * layers (the ledger shows those, and keeps the cartridge removable), its
+ * function-valued rules and its asks (`listAsks` lists them).
+ */
+export const PublicPolicy = Policy.mapFields(
+  Struct.omit(["asks", "functions", "visibility"])
+);
+
+export type PublicPolicy = typeof PublicPolicy.Type;
+
+/**
  * An ask as its file in the config folder states it: the platform adds its
  * project, when and in which landing it opened, and its state.
  */

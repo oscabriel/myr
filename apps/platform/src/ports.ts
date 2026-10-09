@@ -124,6 +124,7 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     Layer.succeed(ProjectSockets, Option.some(config.PROJECT)),
     WorkerRateLimits({
       claim: config.CLAIM_LIMIT,
+      draft: config.DRAFT_LIMIT,
       proposal: config.PROPOSAL_LIMIT,
     }),
     EvidenceStoreR2(config.EVIDENCE)

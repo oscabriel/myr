@@ -20,7 +20,7 @@ import {
   subdomainFile,
   WorkersDev,
 } from "../../../infra/stages.ts";
-import { workers } from "../../../scripts/startup-budget.ts";
+import { budgets, workers } from "../../../scripts/startup-budget.ts";
 import { repoRoot } from "./root.ts";
 
 /** A file under the repo root, as text, once its presence is asserted. */
@@ -218,6 +218,19 @@ describe("the web's package.json", () => {
 describe("the byte alarm", () => {
   it("measures the web Worker", () => {
     expect(workers.map(({ dir }) => dir)).toContain("apps/web");
+  });
+
+  // Each Worker grows on its own, so each has limits of its own: the
+  // platform's at the ceiling the code browser and drafting land under.
+  it("holds each Worker it measures to limits of its own", () => {
+    expect(budgets).toStrictEqual({
+      "apps/platform": { entry: 1_900_000, javascript: 2_500_000 },
+      "apps/sandbox": { entry: 1_665_000, javascript: 2_500_000 },
+      "apps/web": { entry: 1_665_000, javascript: 2_500_000 },
+    });
+    expect(Object.keys(budgets).toSorted()).toStrictEqual(
+      workers.map(({ dir }) => dir).toSorted()
+    );
   });
 });
 

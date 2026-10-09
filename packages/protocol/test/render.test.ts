@@ -5,21 +5,28 @@ import { Result } from "effect";
 import { Outcome } from "../src/domain/outcome.ts";
 import {
   AskId,
+  CommitSha,
   DecisionId,
   EnvKey,
   LandedSha,
   ProjectName,
+  ProposalId,
   RepoPath,
   RequestId,
 } from "../src/ids.ts";
 import {
   ChecksFailed,
   DirectPush,
+  DraftInProgress,
   OutOfScope,
   PrivatePathInPublicTree,
+  ProposalClosed,
   ReachedInternals,
   StaleBase,
   TouchedJudge,
+  UnknownPath,
+  UnknownProposal,
+  UnknownRevision,
   ValueTooShort,
   Weakened,
 } from "../src/refusal.ts";
@@ -207,6 +214,66 @@ describe(explain, () => {
         "  retryable: no",
       ]
     );
+  });
+
+  // A code read names what it could not find and how to look with git; a
+  // draft names the proposal, and where to follow it.
+  it.each([
+    {
+      lines: [
+        "UnknownPath: 2222222 has no file or folder at src/a.ts",
+        "  next: git ls-tree",
+        "  retryable: no",
+      ],
+      refusal: new UnknownPath({ commit: main, path }),
+    },
+    {
+      lines: [
+        "UnknownRevision: v9 is neither main, a commit this project holds, nor one of its tags",
+        "  next: git ls-remote",
+        "  retryable: no",
+      ],
+      refusal: new UnknownRevision({ rev: "v9" }),
+    },
+    {
+      lines: [
+        "UnknownProposal: this project has no proposal prop-000007",
+        `  next: ${Brand.cli} today`,
+        "  retryable: no",
+      ],
+      refusal: new UnknownProposal({
+        proposal: ProposalId.make("prop-000007"),
+      }),
+    },
+    {
+      lines: [
+        "ProposalClosed: prop-000007 was already accepted, declined or expired",
+        `  next: ${Brand.cli} today`,
+        "  retryable: no",
+      ],
+      refusal: new ProposalClosed({ proposal: ProposalId.make("prop-000007") }),
+    },
+    {
+      lines: [
+        "DraftInProgress: the platform is already drafting prop-000007's ask",
+        `  next: ${Brand.cli} proposal prop-000007`,
+        "  retryable: yes",
+      ],
+      refusal: DraftInProgress.of(ProposalId.make("prop-000007")),
+    },
+  ])("explains $refusal._tag with its next command", ({ lines, refusal }) => {
+    expect(explain([refusal])).toStrictEqual(lines);
+  });
+
+  it("names the commit a missing path was looked for at", () => {
+    expect(
+      explain([
+        new UnknownPath({
+          commit: CommitSha.make("abcdef0".padEnd(40, "0")),
+          path,
+        }),
+      ])[0]
+    ).toBe("UnknownPath: abcdef0 has no file or folder at src/a.ts");
   });
 
   // The refusal never holds the value, so no reader learns it, or its length,

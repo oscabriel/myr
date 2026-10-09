@@ -30,6 +30,8 @@ export const ProjectEvent = Schema.TaggedUnion({
   /** A claim lapsed: no push for too long. */
   Lapsed: { ...stamp, ask: AskId },
   LedgerAppended: { ...stamp, entry: LedgerEntry },
+  /** A proposal's draft settled: ready for a decider, or failed. */
+  ProposalDrafted: { ...stamp, proposal: ProposalId, ready: Schema.Boolean },
   ProposalOpened: { ...stamp, proposal: ProposalId },
   Pushed: { ...stamp, ask: AskId, head: CommitSha },
   /** A claim was released. */

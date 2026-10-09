@@ -7,11 +7,13 @@ import {
   listRefs,
   readBlob,
   readCommit,
+  readTag,
   readTree,
   resolveRef,
   writeBlob,
   writeCommit,
   writeRef,
+  writeTag,
   writeTree,
 } from "isomorphic-git";
 
@@ -160,6 +162,34 @@ const copyCommit = (
     yield* keep(oid, () => writeCommit({ ...into, commit }));
   });
 
+/**
+ * A ref's target, objects first: an annotated tag after what it names
+ * (a commit, or another tag), or else a commit and its history.
+ */
+const copyTarget = (
+  source: PushSource,
+  into: GitDir,
+  oid: string
+): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const tag = yield* unlessMissing(() => readTag({ ...source, oid }));
+
+    if (Option.isNone(tag)) {
+      yield* copyCommit(source, into, oid);
+
+      return;
+    }
+
+    const present = yield* unlessMissing(() => readTag({ ...into, oid }));
+
+    if (Option.isSome(present)) {
+      return;
+    }
+
+    yield* copyTarget(source, into, tag.value.tag.object);
+    yield* keep(oid, () => writeTag({ ...into, tag: tag.value.tag }));
+  });
+
 /** Sets the new repo `into`'s `ref` to `source`'s `tip`, objects first. */
 export const seedRef = (
   source: PushSource,
@@ -188,7 +218,7 @@ const apply = (into: GitDir, source: PushSource, update: RefUpdate) =>
       return RefOutcome.Stale({ ref: update.ref, tip });
     }
 
-    yield* copyCommit(source, into, update.to);
+    yield* copyTarget(source, into, update.to);
     yield* git(() =>
       writeRef({ ...into, force: true, ref: update.ref, value: update.to })
     ).pipe(Effect.orDie);
@@ -208,6 +238,8 @@ const commitAt = (repo: GitDir, sha: CommitSha) =>
     Effect.map(
       Option.map(({ commit, oid }): Commit => ({
         author: { email: commit.author.email, name: commit.author.name },
+        authoredAt: commit.author.timestamp,
+        committedAt: commit.committer.timestamp,
         committer: {
           email: commit.committer.email,
           name: commit.committer.name,
@@ -234,15 +266,22 @@ export const objectsAndRefs = (
   known: (name: RepoName) => Effect.Effect<StoredRepo, RepoNotFound>
 ): Pick<
   RepoHost["Service"],
-  "log" | "push" | "readBlob" | "readCommit" | "readFile" | "readTree" | "refs"
+  | "log"
+  | "push"
+  | "readBlob"
+  | "readCommit"
+  | "readFile"
+  | "readTree"
+  | "refs"
+  | "tags"
 > => ({
-  log: (name, at, limit) =>
+  log: (name, at, limit, offset = 0) =>
     Effect.gen(function* () {
       const { dir } = yield* known(name);
       const commits: Commit[] = [];
       let next = yield* resolve(dir, at);
 
-      while (Option.isSome(next) && commits.length < limit) {
+      while (Option.isSome(next) && commits.length < offset + limit) {
         const commit = yield* commitAt(dir, next.value);
 
         if (Option.isNone(commit)) {
@@ -253,7 +292,7 @@ export const objectsAndRefs = (
         next = Option.fromNullishOr(commit.value.parents[0]);
       }
 
-      return commits;
+      return commits.slice(offset);
     }),
   push: (name, source, updates) =>
     Effect.gen(function* () {
@@ -329,5 +368,34 @@ export const objectsAndRefs = (
       );
 
       return new Map(Array.getSomes(listed));
+    }),
+  // isomorphic-git's `readCommit` peels an annotated tag to its commit; a
+  // tag naming a tree or a blob names no commit, and is left out.
+  tags: (name) =>
+    Effect.gen(function* () {
+      const { dir } = yield* known(name);
+
+      const names = yield* git(() =>
+        listRefs({ ...dir, filepath: "refs/tags" })
+      ).pipe(Effect.orDie);
+
+      const listed = yield* Effect.forEach(names, (relative) =>
+        Effect.gen(function* () {
+          const ref = RefName.make(`refs/tags/${relative}`);
+          const tip = yield* tipOf(dir, ref);
+
+          const peeled = yield* Option.match(tip, {
+            onNone: () => Effect.succeedNone,
+            onSome: (oid) => unlessMissing(() => readCommit({ ...dir, oid })),
+          });
+
+          return Option.map(peeled, ({ oid }) => ({
+            name: ref,
+            sha: CommitSha.make(oid),
+          }));
+        })
+      );
+
+      return Array.getSomes(listed);
     }),
 });

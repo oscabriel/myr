@@ -63,6 +63,7 @@ import {
   Claim as ClaimContract,
   Credits,
   Decide,
+  DraftAsk,
   EnvSchemaOf,
   EvidenceOf,
   Finish,
@@ -78,6 +79,7 @@ import {
   Release,
   SetEnv,
   ShowAsk,
+  ShowProposal,
   Status,
   SubmitAnswer,
   TodayOf,
@@ -93,17 +95,18 @@ import type { AnswerView, LaneResult } from "@repo/protocol/domain/answer";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
+import { ForkRef } from "@repo/protocol/domain/code";
 import { RefNameText } from "@repo/protocol/domain/common";
-import type { Evidence } from "@repo/protocol/domain/common";
+import type { ConfigFile, Evidence } from "@repo/protocol/domain/common";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { AskKind } from "@repo/protocol/domain/kind";
-import type { LandingView } from "@repo/protocol/domain/landing";
+import { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
-import { Policy } from "@repo/protocol/domain/policy";
+import { Policy, PublicPolicy } from "@repo/protocol/domain/policy";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
@@ -112,18 +115,14 @@ import {
   Handle,
   LandedSha,
   LayerName,
+  ProposalId,
   RepoName,
   RepoPath,
   RequestId,
   TreeSha,
   sameHandle,
 } from "@repo/protocol/ids";
-import type {
-  DecisionId,
-  LaneName,
-  ProjectName,
-  ProposalId,
-} from "@repo/protocol/ids";
+import type { DecisionId, LaneName, ProjectName } from "@repo/protocol/ids";
 import { Person, Principal } from "@repo/protocol/principal";
 import {
   AskFull,
@@ -148,6 +147,9 @@ import type {
   CapReached,
   ClaimLapsed,
   Denounced,
+  DraftInProgress,
+  ProposalClosed,
+  UnknownProposal,
   OutOfScope,
   PrivatePathInPublicTree,
   ReachedInternals,
@@ -382,6 +384,44 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
     caller: Principal,
     sha: CommitSha
   ) => Effect.Effect<{ readonly landing: LandingView }, UnknownCommit>;
+  /** Where main has landed: none before the first push. */
+  readonly head: () => Effect.Effect<{ readonly landed?: LandedSha }>;
+  /**
+   * The landings among `shas` (at most `MAX_LANDINGS`), in their order: a
+   * commit the platform did not land, imported history among them, has none.
+   */
+  readonly landings: (
+    shas: readonly CommitSha[]
+  ) => Effect.Effect<readonly LandingView[]>;
+  /** Every claim's fork, with its ask, claimant and the claim's state. */
+  readonly forks: () => Effect.Effect<readonly ForkRef[]>;
+  /**
+   * The policy at the landed commit as anyone may read it (no layers, no
+   * function-valued rules, no asks); none until it has evaluated.
+   */
+  readonly policy: () => Effect.Effect<Option.Option<PublicPolicy>>;
+  /**
+   * The public face of a proposal: its state, its draft's, and the files it
+   * holds until a decider accepts it.
+   */
+  readonly showProposal: (
+    caller: Principal,
+    proposal: ProposalId
+  ) => Effect.Effect<
+    { readonly files: readonly ConfigFile[]; readonly proposal: Proposal },
+    UnknownProposal
+  >;
+  /**
+   * Has the platform's agent draft an open proposal's ask, or draft it
+   * again with a note, for its proposer or a decider of its paths.
+   */
+  readonly draftAsk: (
+    caller: Person,
+    input: { readonly note?: string; readonly proposal: ProposalId }
+  ) => Effect.Effect<
+    { readonly proposal: Proposal },
+    UnknownProposal | ProposalClosed | NotDecider | DraftInProgress | CapReached
+  >;
   /**
    * The log a failing lane left, by the name its verdict gives it
    * (`LaneResult.logRef`), for the project's deciders and the claimant
@@ -545,6 +585,9 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   ) => Effect.Effect<Option.Option<EnvKey>>;
 }
 
+/** The most commits one `landings` call looks up: a log page's, or a blame's batch. */
+export const MAX_LANDINGS = 100;
+
 /** The schemas one method's arguments (in order), success and failure cross a boundary with. */
 export interface MethodSchema {
   readonly args: readonly Schema.Top[];
@@ -594,6 +637,11 @@ export const MethodSchemas = {
     error: Decide.errorSchema,
     success: Decide.successSchema,
   },
+  draftAsk: {
+    args: [Person, DraftAsk.payloadSchema.mapFields(Struct.omit(["project"]))],
+    error: DraftAsk.errorSchema,
+    success: DraftAsk.successSchema,
+  },
   events: {
     args: [Schema.Int, Schema.Int],
     error: Schema.Never,
@@ -626,6 +674,12 @@ export const MethodSchemas = {
     error: Fork.errorSchema,
     success: Fork.successSchema,
   },
+  forks: { args: [], error: Schema.Never, success: Schema.Array(ForkRef) },
+  head: {
+    args: [],
+    error: Schema.Never,
+    success: Schema.Struct({ landed: Schema.optionalKey(LandedSha) }),
+  },
   heldBackJob: {
     args: [RequestId],
     error: Schema.Never,
@@ -648,6 +702,11 @@ export const MethodSchemas = {
     args: [Principal, CommitSha],
     error: LandingOf.errorSchema,
     success: LandingOf.successSchema,
+  },
+  landings: {
+    args: [Schema.Array(CommitSha).check(Schema.isMaxLength(MAX_LANDINGS))],
+    error: Schema.Never,
+    success: Schema.Array(LandingView),
   },
   layerAccess: {
     args: [Principal, LayerName],
@@ -678,10 +737,18 @@ export const MethodSchemas = {
     error: OpenAsk.errorSchema,
     success: OpenAsk.successSchema,
   },
+  policy: {
+    args: [],
+    error: Schema.Never,
+    success: Schema.Option(PublicPolicy),
+  },
   proposeAsk: {
     args: [
       Person,
-      ProposeAsk.payloadSchema.mapFields(Struct.omit(["project"])),
+      // The check reads only `draft`, `files` and `sealed`, which it keeps.
+      ProposeAsk.payloadSchema.mapFields(Struct.omit(["project"]), {
+        unsafePreserveChecks: true,
+      }),
     ],
     error: ProposeAsk.errorSchema,
     success: ProposeAsk.successSchema,
@@ -743,6 +810,11 @@ export const MethodSchemas = {
     args: [Principal, AskId],
     error: ShowAsk.errorSchema,
     success: ShowAsk.successSchema,
+  },
+  showProposal: {
+    args: [Principal, ProposalId],
+    error: ShowProposal.errorSchema,
+    success: ShowProposal.successSchema,
   },
   status: {
     args: [Person],
@@ -871,6 +943,34 @@ const checked = <A, E, R>(
       Effect.orDie(Schema.encodeUnknownEffect(schemas.success)(value))
     )
   );
+
+/** A policy as anyone may read it: without its layers, function-valued rules and asks. */
+const publicPolicy = (policy: Policy): PublicPolicy =>
+  Struct.omit(policy, ["asks", "functions", "visibility"]);
+
+/** A claim's fork, as the refs page lists it. */
+const listedFork = (claim: Live, state: ClaimView["state"]) =>
+  Option.some<ForkRef>({
+    ask: claim.ask,
+    handle: claim.claimant,
+    kind: "claim",
+    repo: claim.fork,
+    state,
+  });
+
+/** Where a claim stands, as its fork's listing says it; an open ask has no fork. */
+const forkOf = (state: ClaimState): Option.Option<ForkRef> =>
+  ClaimState.match(state, {
+    Answered: (claim) => listedFork(claim, "answered"),
+    Lapsed: (claim) => listedFork(claim, "lapsed"),
+    Live: (claim) => listedFork(claim, "live"),
+    Open: () => Option.none(),
+    Released: (claim) => listedFork(claim, "released"),
+    Warned: (claim) => listedFork(claim, "warned"),
+  });
+
+/** What a stub answers until the issue that builds it lands. */
+const notBuilt = (issue: string) => Effect.die(`not built: ${issue}`);
 
 /** The most of a lane's log `evidence` gives back: its last 256 KiB. */
 const EVIDENCE_TAIL = 256 * 1024;
@@ -4914,6 +5014,8 @@ export const projectService = (
           [caller, input],
           decided.decide(api, caller, input)
         ),
+      draftAsk: (caller, input) =>
+        checked(MethodSchemas.draftAsk, [caller, input], notBuilt("909")),
       events: (since, limit) =>
         checked(
           MethodSchemas.events,
@@ -4950,6 +5052,25 @@ export const projectService = (
         ),
       fork: (caller) =>
         checked(MethodSchemas.fork, [caller], decided.fork(api, caller)),
+      forks: () =>
+        checked(
+          MethodSchemas.forks,
+          [],
+          Effect.map(hydrate, (h) =>
+            Array.getSomes(h.claims.map(({ state }) => forkOf(state)))
+          )
+        ),
+      head: () =>
+        checked(
+          MethodSchemas.head,
+          [],
+          Effect.map(hydrate, (h) =>
+            Option.match(
+              Option.flatMapNullishOr(h.project, ({ landed }) => landed),
+              { onNone: () => ({}), onSome: (landed) => ({ landed }) }
+            )
+          )
+        ),
       heldBackJob: (requestId) =>
         checked(
           MethodSchemas.heldBackJob,
@@ -4977,6 +5098,15 @@ export const projectService = (
               onNone: () => Effect.fail(new UnknownCommit({ sha })),
               onSome: (landing) => Effect.succeed({ landing }),
             })
+          )
+        ),
+      landings: (shas) =>
+        checked(
+          MethodSchemas.landings,
+          [shas],
+          Effect.map(
+            Effect.forEach(Array.dedupe(shas), (sha) => store.landing(sha)),
+            Array.getSomes
           )
         ),
       layerAccess: (caller, layer) =>
@@ -5012,11 +5142,19 @@ export const projectService = (
           [caller, input],
           write(api, openBody(caller, input))
         ),
+      policy: () =>
+        checked(
+          MethodSchemas.policy,
+          [],
+          Effect.map(hydrate, (h) => Option.map(h.policy, publicPolicy))
+        ),
       proposeAsk: (caller, input) =>
         checked(
           MethodSchemas.proposeAsk,
           [caller, input],
-          decided.proposeAsk(api, caller, input)
+          input.draft === true
+            ? notBuilt("909")
+            : decided.proposeAsk(api, caller, input)
         ),
       recordAdmission: (input) =>
         checked(
@@ -5101,6 +5239,12 @@ export const projectService = (
               onSome: (ask) => Effect.succeed({ ask, brief: briefOf(ask) }),
             })
           )
+        ),
+      showProposal: (caller, proposal) =>
+        checked(
+          MethodSchemas.showProposal,
+          [caller, proposal],
+          notBuilt("909")
         ),
       status: (caller) =>
         checked(MethodSchemas.status, [caller], statusOf(caller)),
