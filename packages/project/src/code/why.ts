@@ -539,23 +539,42 @@ const computed = (
     return yield* walked(repo, at, path, log, head);
   });
 
-/** The view of `kept`: each commit it names as a reader sees it, and their landings. */
+/**
+ * The view of `kept`: each commit it names as a reader sees it, and their
+ * landings. The commits come from the walk's page of the log (kept by the
+ * isolate once the walk read it, else one read), not one read each: a
+ * why names up to dozens of them. One the page lacks is read on its own.
+ */
 const viewOf = (
   project: CodeProject,
   at: CommitSha,
   path: RepoPath,
-  kept: StoredWhy
+  kept: StoredWhy,
+  scan: number
 ): Effect.Effect<WhyView, RepoNotFound, RepoHost> =>
   Effect.gen(function* () {
+    const log =
+      kept.shas.length === 0
+        ? []
+        : yield* pageOf(project.repo, at, 0, Math.max(1, scan));
+
+    const bySha = new Map<string, Commit>(
+      log.map((commit) => [commit.sha, commit])
+    );
+
     const commits = yield* Effect.forEach(
       kept.shas,
       (sha) =>
-        commitAt(project.repo, sha).pipe(
-          Effect.flatMap(Effect.fromOption),
-          Effect.catchTag("NoSuchElementError", () =>
-            Effect.die(`${project.repo} has no commit ${sha}`)
-          )
-        ),
+        Option.match(Option.fromUndefinedOr(bySha.get(sha)), {
+          onNone: () =>
+            commitAt(project.repo, sha).pipe(
+              Effect.flatMap(Effect.fromOption),
+              Effect.catchTag("NoSuchElementError", () =>
+                Effect.die(`${project.repo} has no commit ${sha}`)
+              )
+            ),
+          onSome: Effect.succeed,
+        }),
       { concurrency: READS_AT_ONCE }
     );
 
@@ -597,7 +616,7 @@ export const whyView = (
       asOneView(computed(repo, commit, path, scan))
     );
 
-    return yield* viewOf(project, commit, path, kept);
+    return yield* viewOf(project, commit, path, kept, scan);
   }).pipe(
     // The walk and the commits it names: one session, one handle.
     inRepoSession,

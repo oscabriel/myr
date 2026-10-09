@@ -53,11 +53,23 @@ interface Seen {
   readonly blobs: number;
   /** Files read whole at a commit (`readFile`). */
   readonly files: number;
+  /** Commits read one by one (`readCommit`). */
+  readonly commits: number;
+  /** Pages of the log read (`log`). */
+  readonly logs: number;
   readonly peak: number;
   readonly events: readonly string[];
 }
 
-const none: Seen = { blobs: 0, events: [], files: 0, peak: 0, trees: 0 };
+const none: Seen = {
+  blobs: 0,
+  commits: 0,
+  events: [],
+  files: 0,
+  logs: 0,
+  peak: 0,
+  trees: 0,
+};
 
 /** How long a read of the object `id` takes, once a test sets it. */
 type Delay = Option.Option<(id: string) => Duration.Duration>;
@@ -75,7 +87,7 @@ const counted = (seen: Ref.Ref<Seen>, delay: Ref.Ref<Delay>) =>
       const under = yield* Ref.make(0);
 
       const timed = <A, E>(
-        kind: "blobs" | "files" | "trees",
+        kind: "blobs" | "commits" | "files" | "logs" | "trees",
         id: string,
         read: Effect.Effect<A, E>
       ) =>
@@ -110,7 +122,11 @@ const counted = (seen: Ref.Ref<Seen>, delay: Ref.Ref<Delay>) =>
 
       return RepoHost.of({
         ...host,
+        log: (name, at, limit, offset) =>
+          timed("logs", "log", host.log(name, at, limit, offset)),
         readBlob: (name, id) => timed("blobs", id, host.readBlob(name, id)),
+        readCommit: (name, sha) =>
+          timed("commits", sha, host.readCommit(name, sha)),
         // A file read at a commit is noted by the commit's id.
         readFile: (name, at, path) =>
           timed(
@@ -264,9 +280,18 @@ describe("code history kept across isolates", () => {
           yield* Ref.set(asked, 0);
 
           const again = yield* onIsolate(whyOf(code, Option.none(), format));
+          const { blobs, commits, files, logs, trees } = yield* Ref.get(seen);
 
           expect(again).toStrictEqual(first);
-          expect(yield* Ref.get(seen)).toStrictEqual(none);
+          // The commits it names come from one page of the log, not one
+          // read each.
+          expect({ blobs, commits, files, logs, trees }).toStrictEqual({
+            blobs: 0,
+            commits: 0,
+            files: 0,
+            logs: 1,
+            trees: 0,
+          });
           expect(yield* Ref.get(asked)).toBe(1);
         })
       )
@@ -292,10 +317,15 @@ describe("code history kept across isolates", () => {
           yield* Ref.set(seen, none);
 
           const again = yield* onIsolate(logOf(code, page));
+          const { blobs, files, trees } = yield* Ref.get(seen);
 
           expect(again).toStrictEqual(first);
           expect(first.commits).toHaveLength(2);
-          expect(yield* Ref.get(seen)).toStrictEqual(none);
+          expect({ blobs, files, trees }).toStrictEqual({
+            blobs: 0,
+            files: 0,
+            trees: 0,
+          });
         })
       )
   );
