@@ -12,9 +12,6 @@
  * version moves when its algorithm changes, so an old value is never read
  * as a new one.
  *
- * Trees are kept too, under `<repo>/tree/v<TREE_VERSION>/<tree id>`: their
- * entries' names, modes and ids (`tree.ts`).
- *
  * Values: ids and ranges, encoded with Schema; never a file's text, and
  * never a landing (each view asks the project's record for those, so a
  * later landing shows at once). A value that fails to decode is a miss.
@@ -65,9 +62,6 @@ export const StoredPathLog = Schema.Struct({
 });
 
 export type StoredPathLog = typeof StoredPathLog.Type;
-
-/** The stored trees' encoding version, in their keys. */
-export const TREE_VERSION = 1;
 
 /** The lowercase hex SHA-256 of `text`. */
 const sha256 = (text: string) =>
@@ -155,40 +149,6 @@ export const remember = <A>(
 
     yield* store.put(key, encoded);
     yield* cache.through(key, Effect.succeedSome(value), { heavy: true });
-  });
-
-/**
- * What the store keeps under `key`, else `compute` run and its value put
- * there: the store alone, for a value the caller keeps in the isolate's
- * cache its own way (a tree, among the light reads). A failure is never
- * kept, and a value that fails to decode is computed again and replaced.
- */
-export const throughStore = <A, E, R>(
-  kept: Kept<A>,
-  key: string,
-  compute: Effect.Effect<A, E, R>
-): Effect.Effect<A, E, R> =>
-  Effect.gen(function* () {
-    const store = yield* CodeStore;
-
-    const found = Option.flatMap(
-      yield* store.get(key),
-      Schema.decodeUnknownOption(Schema.fromJsonString(kept.schema))
-    );
-
-    if (Option.isSome(found)) {
-      return found.value;
-    }
-
-    const value = yield* compute;
-
-    const encoded = yield* Schema.encodeEffect(
-      Schema.fromJsonString(kept.schema)
-    )(value).pipe(Effect.orDie);
-
-    yield* store.put(key, encoded);
-
-    return value;
   });
 
 /**
