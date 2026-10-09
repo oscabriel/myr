@@ -10,7 +10,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
-import { PublicPolicy } from "@repo/protocol/domain/policy";
+import { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
 import { Ledger } from "@repo/protocol/domain/visibility";
 import { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
@@ -100,6 +100,12 @@ const burrowPolicy = decodePolicy({
   vouches: [],
 });
 
+/** Why an import with no config folder, whose defaults found no test command, has no policy at `sha`. */
+const noConfig = Schema.decodeSync(PolicyPending)({
+  at: sha,
+  reason: "noConfig",
+});
+
 const burrowLedger = decodeLedger({
   entries: [],
   layers: [],
@@ -113,6 +119,7 @@ const page = (
     ledger={datekitLedger}
     policy={Option.some(datekitPolicy)}
     project={datekit}
+    unevaluated={Option.none()}
   />
 );
 
@@ -255,6 +262,7 @@ describe("a project's people page", () => {
             ledger={datekitLedger}
             policy={Option.some({ ...datekitPolicy, agents: "none" })}
             project={datekit}
+            unevaluated={Option.none()}
           />
         ),
         "agents"
@@ -279,6 +287,7 @@ describe("a project's people page", () => {
               vouch: { ...datekitPolicy.vouch, mode: "bansOnly" },
             })}
             project={datekit}
+            unevaluated={Option.none()}
           />
         ),
         "vouching"
@@ -379,6 +388,7 @@ describe("a project's people page", () => {
         ledger={burrowLedger}
         policy={Option.some(burrowPolicy)}
         project={ProjectName.make("burrow")}
+        unevaluated={Option.none()}
       />
     );
 
@@ -395,20 +405,111 @@ describe("a project's people page", () => {
     expect(textOf(view)).toContain("vouches for nobody");
   });
 
-  it("says the config has not been evaluated yet, and shows no tables, when there is no policy", () => {
+  it("says nothing has landed yet, and shows no tables, when there is no policy and no reason", () => {
     const view = (
       <PeopleView
         ledger={datekitLedger}
         policy={Option.none()}
         project={datekit}
+        unevaluated={Option.none()}
       />
     );
 
     const markup = markupOf(view);
 
-    expect(textOf(view)).toContain("has not been evaluated yet");
+    expect(textOf(view)).toContain("Nothing has landed yet");
     expect(markup).not.toContain("<table");
     expect(markup).not.toContain('id="vouching"');
+  });
+
+  it("says a config with no config folder has not been evaluated, at which commit, and why", () => {
+    const view = (
+      <PeopleView
+        ledger={burrowLedger}
+        policy={Option.none()}
+        project={ProjectName.make("burrow")}
+        unevaluated={Option.some(noConfig)}
+      />
+    );
+
+    const text = textOf(view);
+    const markup = markupOf(view);
+
+    expect(
+      inOrder(text, [
+        `The config at the landed commit ${sha.slice(0, 7)} has not been evaluated`,
+        `the project has no ${Brand.configDir}/ folder`,
+        "the defaults need a test command",
+        "could not find in its CI or package files",
+      ])
+    ).toBeTruthy();
+    expect(markup).toMatch(
+      new RegExp(
+        `<a\\b[^>]*href="/burrow/commit/${sha}"[^>]*>${sha.slice(0, 7)}</a>`,
+        "u"
+      )
+    );
+    expect(text).toContain(`${Brand.configDir}/project.ts`);
+    expect(text).toContain("It is evaluated again at every landing.");
+    expect(markup).not.toContain("<table");
+  });
+
+  it("offers the CLI lines that make a config with no config folder evaluate, each a real command", () => {
+    const lines = commandsOf(
+      markupOf(
+        <PeopleView
+          ledger={burrowLedger}
+          policy={Option.none()}
+          project={ProjectName.make("burrow")}
+          unevaluated={Option.some(noConfig)}
+        />
+      )
+    );
+
+    expect(lines.map((line) => commandOf(line)?.path.join(" "))).toStrictEqual([
+      "init",
+      "ask open",
+      "land",
+    ]);
+    expect(lines[0]).toContain("--dry-run");
+
+    for (const line of lines) {
+      const flags = commandOf(line)?.flags ?? [];
+
+      expect(
+        line
+          .split(" ")
+          .filter((word) => word.startsWith("--"))
+          .filter((flag) => !flags.includes(flag))
+      ).toStrictEqual([]);
+    }
+  });
+
+  it("says a config folder that did not evaluate has not been evaluated, linking the folder at that commit", () => {
+    const view = (
+      <PeopleView
+        ledger={burrowLedger}
+        policy={Option.none()}
+        project={ProjectName.make("burrow")}
+        unevaluated={Option.some({ ...noConfig, reason: "configFailed" })}
+      />
+    );
+
+    const text = textOf(view);
+
+    expect(text).toContain(
+      `The config at the landed commit ${sha.slice(0, 7)} has not been evaluated: ${Brand.configDir}/ at ${sha.slice(0, 7)} did not evaluate`
+    );
+    expect(text).toContain(
+      `Fix it by landing a change to ${Brand.configDir}/.`
+    );
+    expect(markupOf(view)).toMatch(
+      new RegExp(
+        `<a\\b[^>]*href="/burrow/tree/${sha}/${Brand.configDir}"[^>]*>${Brand.configDir}/</a>`,
+        "u"
+      )
+    );
+    expect(text).not.toContain("test command");
   });
 
   it("shows a project without layers as open, with nothing held back", () => {
@@ -417,6 +518,7 @@ describe("a project's people page", () => {
         ledger={burrowLedger}
         policy={Option.some(burrowPolicy)}
         project={ProjectName.make("burrow")}
+        unevaluated={Option.none()}
       />
     );
 
@@ -427,7 +529,10 @@ describe("a project's people page", () => {
 /** A platform that knows only datekit, counting the reads it is asked for. */
 const platformOf = (
   asked: Ref.Ref<number>,
-  policy: Option.Option<PublicPolicy>
+  read: {
+    readonly policy?: PublicPolicy;
+    readonly unevaluated?: PolicyPending;
+  }
 ) =>
   Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
     Layer.provide(
@@ -441,10 +546,7 @@ const platformOf = (
               return yield* new UnknownProject({ project });
             }
 
-            return Option.match(policy, {
-              onNone: () => ({}),
-              onSome: (evaluated) => ({ policy: evaluated }),
-            });
+            return read;
           })
         ),
         Contracts.toLayerHandler("ledger", ({ project }) =>
@@ -469,7 +571,7 @@ describe(readPeople, () => {
       const asked = yield* Ref.make(0);
 
       const read = yield* readPeople("datekit").pipe(
-        Effect.provide(platformOf(asked, Option.some(datekitPolicy)))
+        Effect.provide(platformOf(asked, { policy: datekitPolicy }))
       );
 
       expect(read.policy?.at).toBe(sha);
@@ -480,15 +582,31 @@ describe(readPeople, () => {
     })
   );
 
-  it.effect("carries no policy while the config has not evaluated", () =>
+  it.effect(
+    "carries no policy, and why, while the config has not evaluated",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(0);
+
+        const read = yield* readPeople("datekit").pipe(
+          Effect.provide(platformOf(asked, { unevaluated: noConfig }))
+        );
+
+        expect(read.policy).toBeUndefined();
+        expect(read.unevaluated).toStrictEqual({ at: sha, reason: "noConfig" });
+      })
+  );
+
+  it.effect("carries neither before the first landing", () =>
     Effect.gen(function* () {
       const asked = yield* Ref.make(0);
 
       const read = yield* readPeople("datekit").pipe(
-        Effect.provide(platformOf(asked, Option.none()))
+        Effect.provide(platformOf(asked, {}))
       );
 
-      expect(read.policy).toBeUndefined();
+      expect(read).not.toHaveProperty("policy");
+      expect(read).not.toHaveProperty("unevaluated");
     })
   );
 
@@ -498,7 +616,7 @@ describe(readPeople, () => {
 
       const failed = yield* Effect.flip(
         readPeople("no-such-project").pipe(
-          Effect.provide(platformOf(asked, Option.some(datekitPolicy)))
+          Effect.provide(platformOf(asked, { policy: datekitPolicy }))
         )
       );
 
@@ -514,7 +632,7 @@ describe(readPeople, () => {
 
         const failed = yield* Effect.flip(
           readPeople("Not_A-Project").pipe(
-            Effect.provide(platformOf(asked, Option.some(datekitPolicy)))
+            Effect.provide(platformOf(asked, { policy: datekitPolicy }))
           )
         );
 
