@@ -1,25 +1,200 @@
-import { createFileRoute } from "@tanstack/react-router";
+import {
+  RegistryProvider,
+  useAtom,
+  useAtomMount,
+  useAtomValue,
+} from "@effect/atom-react";
+import { Client, ShowProposal } from "@repo/protocol/contracts";
+import { DecisionSubject } from "@repo/protocol/domain/decision";
+import type { Today } from "@repo/protocol/domain/decision";
+import type { Proposal } from "@repo/protocol/domain/proposal";
+import { ProjectName, ProposalId } from "@repo/protocol/ids";
+import type { DecisionId, Handle } from "@repo/protocol/ids";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { env } from "cloudflare:workers";
+import { Array, Effect, Option, Schema } from "effect";
+import { AsyncResult, Atom } from "effect/reactivity";
 
-import { pageTitle } from "../../../features/shared/layout.tsx";
-import { NotBuilt } from "../../../features/shared/not-built.tsx";
+import {
+  draftAtom,
+  projectTodayAtom,
+  proposalAtom,
+} from "../../../client/proposal.ts";
+import { watchAtom } from "../../../client/watch.ts";
+import { whoAtom } from "../../../features/auth/who.ts";
+import { ProjectNav } from "../../../features/project/project-nav.tsx";
+import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
+import { ProposalView } from "../../../features/proposal/proposal-view.tsx";
+import { EmptyState } from "../../../features/shared/empty.tsx";
+import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
+import { FailureView } from "../../../features/today/today-page.tsx";
+import { serverClient } from "../../../server/client.ts";
 
-// A proposal: its draft, the drafted files and the red-first evidence. A stub until 911 builds it.
+// `/$project/proposals/$proposal`: one proposal and the platform's draft of
+// its ask. The loader reads `showProposal` on the server, so the page
+// arrives whole and an address naming no project or proposal is a 404; in
+// the browser it reads again on each `ProposalDrafted` (the project's
+// watch), so a draft moves from Drafting to Ready or Failed on screen.
+// Who is signed in and the reader's Today (a decider's: it holds the open
+// decision on the proposal) are read in the browser only.
 
-const Page = () => {
-  const { project, proposal } = Route.useParams();
+type Shown = typeof ShowProposal.successSchema.Type;
+
+/** The proposal `name/id` names, encoded for the page; a not-found when there is none. */
+export const readProposal = (name: string, id: string) =>
+  Effect.gen(function* () {
+    const project = yield* Schema.decodeEffect(ProjectName)(name).pipe(
+      Effect.mapError(() => notFound())
+    );
+
+    const proposal = yield* Schema.decodeEffect(ProposalId)(id).pipe(
+      Effect.mapError(() => notFound())
+    );
+
+    const client = yield* Client;
+
+    const shown = yield* client.showProposal({ project, proposal }).pipe(
+      Effect.catchTags({
+        UnknownProject: () => Effect.fail(notFound()),
+        UnknownProposal: () => Effect.fail(notFound()),
+      })
+    );
+
+    return yield* Schema.encodeEffect(ShowProposal.successSchema)(shown);
+  });
+
+const proposalPage = createServerFn({ method: "GET" })
+  .validator(
+    (params: { readonly project: string; readonly proposal: string }) => params
+  )
+  .handler(({ data }) =>
+    Effect.runPromise(
+      readProposal(data.project, data.proposal).pipe(
+        Effect.provide(serverClient(env))
+      )
+    )
+  );
+
+/** The open decision on `proposal` in the reader's Today, if it is there. */
+const decisionOn = (
+  today: AsyncResult.AsyncResult<Today, unknown>,
+  proposal: Proposal
+): Option.Option<DecisionId> =>
+  Option.flatMap(AsyncResult.value(today), ({ decisions }) =>
+    Array.findFirst(
+      decisions,
+      ({ decided, project, subject }) =>
+        decided === undefined &&
+        project === proposal.project &&
+        DecisionSubject.guards.OpenProposal(subject) &&
+        subject.proposal === proposal.id
+    ).pipe(Option.map(({ id }) => id))
+  );
+
+/** Whether `who` is the proposer, or the reader decides in the project (their Today answered). */
+const mayRedraftAs = (
+  who: AsyncResult.AsyncResult<Option.Option<Handle>, unknown>,
+  today: AsyncResult.AsyncResult<Today, unknown>,
+  proposal: Proposal
+) =>
+  AsyncResult.isSuccess(today) ||
+  Option.exists(
+    Option.flatten(AsyncResult.value(who)),
+    (handle) => handle.toLowerCase() === proposal.proposer.toLowerCase()
+  );
+
+/** The page over the proposal's atom, which starts from what the loader read. */
+const FreshProposal = ({
+  project,
+  read,
+}: {
+  readonly project: ProjectName;
+  readonly read: Shown;
+}) => {
+  // Live: a `ProposalDrafted` re-reads the proposal.
+  useAtomMount(watchAtom(project));
+
+  const { files, proposal } = Option.getOrElse(
+    AsyncResult.value(useAtomValue(proposalAtom(project)(read.proposal.id))),
+    () => read
+  );
+
+  const who = useAtomValue(whoAtom);
+  const today = useAtomValue(projectTodayAtom(project));
+  const [redrafted, redraft] = useAtom(draftAtom);
 
   return (
-    <NotBuilt
-      issue="911"
+    <ProposalView
+      busy={redrafted.waiting}
+      decision={decisionOn(today, proposal)}
+      files={files}
+      mayRedraft={mayRedraftAs(who, today, proposal)}
+      onRedraft={(note) => {
+        redraft(
+          note === undefined
+            ? { project, proposal: proposal.id }
+            : { note, project, proposal: proposal.id }
+        );
+      }}
       project={project}
-      title={`${project}: proposal ${proposal}`}
-    />
+      proposal={proposal}
+    >
+      {AsyncResult.isFailure(redrafted) ? (
+        <div aria-live="polite">
+          <FailureView cause={redrafted.cause} />
+        </div>
+      ) : null}
+    </ProposalView>
   );
 };
 
+const ProposalPage = () => {
+  const read = Schema.decodeSync(ShowProposal.successSchema)(
+    Route.useLoaderData()
+  );
+
+  const { id, project } = read.proposal;
+
+  return (
+    <PageShell title={`${project}: proposal ${id}`}>
+      <ProjectNav project={project} />
+      <RegistryProvider
+        initialValues={[
+          Atom.initialValue(
+            proposalAtom(project)(id),
+            AsyncResult.success(read)
+          ),
+        ]}
+        key={`${project}/${id}`}
+      >
+        <FreshProposal project={project} read={read} />
+      </RegistryProvider>
+    </PageShell>
+  );
+};
+
+const Unknown = () => {
+  const { project, proposal } = Route.useParams();
+
+  return Option.match(Schema.decodeUnknownOption(ProjectName)(project), {
+    onNone: () => <UnknownProjectView name={project} />,
+    onSome: (name) => (
+      <PageShell title={`${name}: proposal ${proposal}`}>
+        <ProjectNav project={name} />
+        <EmptyState
+          title={`${name} has no proposal ${proposal}, or no such project exists.`}
+        />
+      </PageShell>
+    ),
+  });
+};
+
 export const Route = createFileRoute("/$project/proposals/$proposal")({
-  component: Page,
+  loader: ({ params }) => proposalPage({ data: params }),
   head: ({ params: { project, proposal } }) => ({
     meta: [{ title: pageTitle(`${project}: proposal ${proposal}`) }],
   }),
+  component: ProposalPage,
+  notFoundComponent: Unknown,
 });

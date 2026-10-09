@@ -10,11 +10,20 @@
  * HTTP and no platform.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
 import { RefNameText } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
-import { CommitSha, DecisionId, Handle, ProjectName } from "@repo/protocol/ids";
+import { DraftState } from "@repo/protocol/domain/proposal";
+import {
+  CommitSha,
+  DecisionId,
+  Handle,
+  LaneName,
+  ProjectName,
+  ProposalId,
+} from "@repo/protocol/ids";
 import { DecisionClosed } from "@repo/protocol/refusal";
 import type { UnknownDecision } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
@@ -27,6 +36,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { decideAtom } from "../src/client/decide.ts";
 import { keys } from "../src/client/keys.ts";
 import { todayAtom } from "../src/client/today.ts";
+import { DecisionCard } from "../src/features/decision/decision-card.tsx";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
 import { TodayView } from "../src/features/today/today-page.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
@@ -269,4 +279,107 @@ describe("the decide atom", () => {
         expect(markup).not.toContain('data-decision="dec-000002"');
       })
   );
+});
+
+/** The Accept button's opening tag. */
+const acceptOf = (markup: string) =>
+  /<button[^>]*data-choice="accept"[^>]*>/u.exec(markup)?.[0] ?? "";
+
+describe("DecisionCard for an OpenProposal", () => {
+  const askFile = `${Brand.configDir}/asks/x.ask.ts`;
+
+  const proposal = ProposalId.make("prop-000007");
+
+  const opening: Decision = {
+    deciders: [okonkwo],
+    default: "decline",
+    evidence: [
+      { label: "want", value: "formatISO keeps the offset it was given." },
+      {
+        label: askFile,
+        value: 'export default ask({ id: "x", kind: kinds.fix });\n',
+      },
+      { label: "red first", value: "unit: expected '+02:00', got 'Z'" },
+    ],
+    expiresAt: DateTime.makeUnsafe("2026-10-08T10:00:00Z"),
+    id: DecisionId.make("dec-000003"),
+    openedAt: DateTime.makeUnsafe("2026-10-06T10:00:00Z"),
+    project: datekit,
+    subject: DecisionSubject.cases.OpenProposal.make({ proposal }),
+  };
+
+  const card = (draft: DraftState) =>
+    markupOf(
+      <DecisionCard
+        decision={opening}
+        draft={draft}
+        now={now}
+        onDecide={() => {}}
+      />
+    );
+
+  const drafting = DraftState.cases.Drafting.make({
+    round: 2,
+    startedAt: now,
+  });
+
+  const ready = DraftState.cases.Ready.make({
+    attempts: 1,
+    model: "@cf/moonshotai/kimi-k2.7-code",
+    red: { lane: LaneName.make("unit"), signature: "expected '+02:00'" },
+    round: 1,
+  });
+
+  it("shows a file's path as a heading and its content in a pre", () => {
+    const markup = card(ready);
+
+    expect(markup).toMatch(new RegExp(`<h4[^>]*>${askFile}</h4>`, "u"));
+    expect(markup).toMatch(
+      /<pre[^>]*>export default ask\(\{ id: &quot;x&quot;, kind: kinds\.fix \}\);\n<\/pre>/u
+    );
+    expect(markup).not.toMatch(new RegExp(`<dt[^>]*>${askFile}</dt>`, "u"));
+    expect(markup).toMatch(/<dt[^>]*>red first<\/dt>/u);
+  });
+
+  it("holds Accept while the proposal's draft is drafting", () => {
+    const markup = card(drafting);
+
+    expect(acceptOf(markup)).toContain('disabled=""');
+    expect(markup).toContain("Drafting…");
+    expect(
+      /<button[^>]*data-choice="decline"[^>]*>/u.exec(markup)?.[0]
+    ).not.toContain('disabled=""');
+  });
+
+  it("offers Accept once the draft is ready", () => {
+    const markup = card(ready);
+
+    expect(acceptOf(markup)).not.toContain('disabled=""');
+    expect(markup).not.toContain("Drafting…");
+  });
+
+  it("shows a check at the repo's root as code too", () => {
+    const markup = markupOf(
+      <DecisionCard
+        decision={{
+          ...opening,
+          evidence: [
+            ...opening.evidence,
+            { label: "offset.test.ts", value: "test('keeps +02:00');\n" },
+          ],
+        }}
+        draft={ready}
+        now={now}
+        onDecide={() => {}}
+      />
+    );
+
+    expect(markup).toMatch(/<h4[^>]*>offset\.test\.ts<\/h4>/u);
+    expect(markup).not.toMatch(/<dt[^>]*>offset\.test\.ts<\/dt>/u);
+    expect(markup).toMatch(/<dt[^>]*>want<\/dt>/u);
+  });
+
+  it("links the proposal's page", () => {
+    expect(card(ready)).toContain('href="/datekit/proposals/prop-000007"');
+  });
 });
