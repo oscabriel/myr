@@ -225,7 +225,7 @@ describe("a refused send on the propose form", () => {
     );
 
     expect(markup).toContain(
-      `href="/auth/signin?${new URLSearchParams({ return: here }).toString()}"`
+      `href="/auth/signin?return=%2Fdatekit%2Fproposals%2Fnew%3Fabout%3Dsrc%252Fformat.ts%26at%3D${at}%26line%3D12"`
     );
     expect(plainText(markup)).not.toContain("Today is a decider's page");
   });

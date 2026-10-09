@@ -37,8 +37,7 @@ import {
   patchOf,
 } from "../finish/patch.ts";
 import { DraftedCode } from "../proposal/client-file.tsx";
-import { useLiveDraft } from "../proposal/live-draft.ts";
-import type { DraftRead } from "../proposal/live-draft.ts";
+import { DraftRead, useLiveDraft } from "../proposal/live-draft.ts";
 import { When } from "../shared/time.tsx";
 
 /** What a decider sends when they choose: the `decide` contract's payload, from its one schema. */
@@ -124,19 +123,30 @@ const opensAsk = DecisionSubject.isAnyOf(["OpenProposal"]);
 /** Whether a draft is still being written. */
 const isDraftingNow = DraftState.isAnyOf(["Drafting"]);
 
+/** Why Accept waits, and whether it is still waiting on something that will come. */
+interface Held {
+  readonly reason: string;
+  readonly waiting: boolean;
+}
+
 /**
- * Why Accept on a proposal waits, if it does: its draft not read yet, or
- * being written. Once read it may be accepted: a ready draft, a want alone,
- * or a failed round (which keeps an earlier ready draft, or leaves the want
- * alone).
+ * Why Accept on a proposal waits, if it does: its draft not read yet, its
+ * read failed, or the draft being written. Once read it may be accepted: a
+ * ready draft, a want alone, or a failed round (which keeps an earlier
+ * ready draft, or leaves the want alone).
  */
-const acceptHeld = (read: DraftRead): Option.Option<string> =>
-  Option.match(read, {
-    onNone: () => Option.some("Reading the draft…"),
-    onSome: (draft) =>
+const acceptHeld = (read: DraftRead): Option.Option<Held> =>
+  DraftRead.$match(read, {
+    Read: ({ draft }) =>
       Option.exists(draft, isDraftingNow)
-        ? Option.some("Drafting…")
+        ? Option.some({ reason: "Drafting…", waiting: true })
         : Option.none(),
+    Unread: ({ failed }) =>
+      Option.some(
+        failed
+          ? { reason: "Draft not read; reload", waiting: false }
+          : { reason: "Reading the draft…", waiting: true }
+      ),
   });
 
 /**
@@ -244,7 +254,7 @@ const Choices = ({
   decision,
   held,
   subject,
-}: ChoicesProps & { readonly held: Option.Option<string> }) => (
+}: ChoicesProps & { readonly held: Option.Option<Held> }) => (
   <fieldset className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
     <legend className="sr-only">Your choice: {subject}</legend>
     {allowedChoices(decision.subject).map((choice) => {
@@ -266,8 +276,8 @@ const Choices = ({
         >
           {Option.isSome(waits) ? (
             <>
-              <Spinner />
-              {waits.value}
+              {waits.value.waiting ? <Spinner /> : null}
+              {waits.value.reason}
             </>
           ) : (
             words[choice]

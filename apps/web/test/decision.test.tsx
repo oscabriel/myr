@@ -27,7 +27,7 @@ import {
 import { DecisionClosed } from "@repo/protocol/refusal";
 import type { UnknownDecision } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { DateTime, Effect, Exit, Layer, Option, Ref } from "effect";
+import { Cause, DateTime, Effect, Exit, Layer, Ref } from "effect";
 import { AsyncResult, Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { RpcTest } from "effect/rpc";
 import type { ReactElement } from "react";
@@ -37,7 +37,11 @@ import { decideAtom } from "../src/client/decide.ts";
 import { keys } from "../src/client/keys.ts";
 import { todayAtom } from "../src/client/today.ts";
 import { DecisionCard } from "../src/features/decision/decision-card.tsx";
-import { draftReadOf, readDraft } from "../src/features/proposal/live-draft.ts";
+import {
+  DraftRead,
+  draftReadOf,
+  readDraft,
+} from "../src/features/proposal/live-draft.ts";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
 import { TodayView } from "../src/features/today/today-page.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
@@ -361,6 +365,13 @@ describe("DecisionCard for an OpenProposal", () => {
     round: 1,
   });
 
+  const failed = DraftState.cases.Failed.make({
+    attempts: 3,
+    model: "@cf/moonshotai/kimi-k2.7-code",
+    refusal: "NotRedFirst",
+    round: 2,
+  });
+
   it("shows a file's path as a heading and its content in a pre", () => {
     const markup = card(ready);
 
@@ -389,11 +400,34 @@ describe("DecisionCard for an OpenProposal", () => {
 
     expect(acceptOf(markup)).toContain('disabled=""');
     expect(markup).toContain("Reading the draft…");
-    expect(draftReadOf(AsyncResult.initial(true))).toStrictEqual(Option.none());
+    expect(draftReadOf(AsyncResult.initial(true))).toStrictEqual(
+      DraftRead.Unread({ failed: false })
+    );
   });
 
-  it("offers Accept once the read draft is ready, or the proposal is a want alone", () => {
-    for (const markup of [cardRead(ready), cardRead()]) {
+  it("holds Accept, without a spinner, when the browser could not read the draft", () => {
+    const read = draftReadOf(AsyncResult.failure(Cause.fail("offline")));
+
+    const markup = markupOf(
+      <DecisionCard
+        decision={opening}
+        draft={read}
+        now={now}
+        onDecide={() => {}}
+      />
+    );
+
+    expect(read).toStrictEqual(DraftRead.Unread({ failed: true }));
+    expect(acceptOf(markup)).toContain('disabled=""');
+    expect(markup).toContain("Draft not read; reload");
+    expect(markup).not.toContain("Reading the draft…");
+    expect(
+      /<button[^>]*data-choice="accept"[^>]*>.*?<\/button>/u.exec(markup)?.[0]
+    ).not.toContain('data-slot="spinner"');
+  });
+
+  it("offers Accept once the read draft is ready, failed (an earlier ready draft or the want alone), or the proposal is a want alone", () => {
+    for (const markup of [cardRead(ready), cardRead(failed), cardRead()]) {
       expect(acceptOf(markup)).not.toContain('disabled=""');
       expect(markup).not.toContain("Reading the draft…");
       expect(markup).not.toContain("Drafting…");

@@ -232,7 +232,7 @@ describe("a failed call on the proposal page", () => {
     );
 
     expect(markup).toContain(
-      `href="/auth/signin?${new URLSearchParams({ return: here }).toString()}"`
+      'href="/auth/signin?return=%2Fdatekit%2Fproposals%2Fprop-000007"'
     );
     expect(plainText(markup)).toContain("Sign in");
     expect(plainText(markup)).not.toContain("Today is a decider's page");
