@@ -31,12 +31,12 @@ const rendered = (source: string, dir = "") =>
     <RepoMarkdown at={sha} dir={dir} project={project} source={source} />
   );
 
-/** The same, inside a router, as the app renders it. */
-const routed = (element: ReactElement) =>
+/** The same, inside a router at `location`, as the app renders it. */
+const routed = (element: ReactElement, location = "/p") =>
   renderToString(
     <RouterContextProvider
       router={createRouter({
-        history: createMemoryHistory({ initialEntries: ["/p"] }),
+        history: createMemoryHistory({ initialEntries: [location] }),
         routeTree: createRootRoute(),
       })}
     >
@@ -127,6 +127,23 @@ describe("links and images in docs/README.md", () => {
     expect(anchorsOf(markup)).toStrictEqual([
       `<a href="/p/blob/${sha}/x?raw=1#L3">`,
     ]);
+  });
+
+  it("marks a link to the page it is on as the current page, its query and fragment read as such", () => {
+    const markup = routed(
+      <RepoMarkdown
+        at={sha}
+        dir="docs"
+        project={project}
+        source="[a](../../x?raw=1#L3)"
+      />,
+      `/p/blob/${sha}/x?raw=1#L3`
+    );
+
+    const [anchor] = anchorsOf(markup);
+
+    expect(anchor).toContain(`href="/p/blob/${sha}/x?raw=1#L3"`);
+    expect(anchor).toContain('aria-current="page"');
   });
 
   it("leaves an external link as written, opened with no referrer", () => {

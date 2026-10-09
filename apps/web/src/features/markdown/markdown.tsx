@@ -10,7 +10,7 @@
  * file only draws the elements that come out of it.
  */
 import type { CommitSha, ProjectName } from "@repo/protocol/ids";
-import type { AnyRouter } from "@tanstack/react-router";
+import type { AnyRouter, RegisteredRouter } from "@tanstack/react-router";
 import { Link, useRouter } from "@tanstack/react-router";
 import type { ComponentProps, ReactNode } from "react";
 import Markdown, { defaultUrlTransform } from "react-markdown";
@@ -54,7 +54,10 @@ const ProjectLink = ({
       {children}
     </a>
   ) : (
-    <Link {...props} to={href}>
+    // `href`, not `to`: the router parses a built href into path, query
+    // and fragment, where `to` would keep `?raw=1#L3` inside the path. A
+    // `string` target makes `to` optional in the Link's props.
+    <Link<RegisteredRouter, string, string> {...props} href={href}>
       {children}
     </Link>
   );
