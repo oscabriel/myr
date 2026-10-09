@@ -5,9 +5,10 @@
  * no layer's repo can be read here; a path that looks like a layer's or a
  * held-back check's is refused anyway, as is an env file.
  *
- * The order is the priority: the root READMEs, the root manifest, the
- * project module, an existing ask with its test as a style example, then
- * the territory's files (or, with none given, the source files whose path
+ * The order is the priority: an existing ask with its test as a style
+ * example (first, so no long README can spend the budget it needs), the
+ * root READMEs, the root manifest, the project module, then the
+ * territory's files (or, with none given, the source files whose path
  * shares the most words with the want, at most 12), each source with its
  * sibling tests, and last every other README. Each file is cut at 40 KB,
  * and the rest of the budget cuts the next one, both with a marker.
@@ -294,10 +295,10 @@ export const pickFiles = (
     );
 
     const order = Array.dedupe([
-      ...rootReadmes,
-      ...settings,
       ...Option.toArray(example),
       ...Option.toArray(exampleTest),
+      ...rootReadmes,
+      ...settings,
       ...withTests,
       ...otherReadmes,
     ]);

@@ -6,12 +6,43 @@
  * attempt's question. `DraftFailed` stays inside the run: it is no public
  * refusal.
  */
+import { Brand } from "@repo/brand";
 import { AtLeastOne } from "@repo/protocol/domain/common";
 import { AskId, LandedSha, ProjectName, RepoPath } from "@repo/protocol/ids";
 import { Schema } from "effect";
 
 /** A string the model writes, bounded so no reply fills the Worker. */
 const Text = Schema.NonEmptyString.check(Schema.isMaxLength(4000));
+
+/** A path in the tree as git names it: relative, with no empty, `.` or `..` segment. */
+const TreePath = RepoPath.check(
+  Schema.makeFilter(
+    (path: string) =>
+      path
+        .split("/")
+        .every(
+          (segment) => segment !== "" && segment !== "." && segment !== ".."
+        )
+        ? true
+        : `${path} is not a path inside the tree`,
+    { expected: "a relative path inside the tree" }
+  )
+);
+
+/**
+ * Where the drafted test goes: anywhere in the tree but the config folder,
+ * which only code writes. The test is the model's own text, so a test path
+ * there would land model text as an ask file or the project's policy.
+ */
+const TestPath = TreePath.check(
+  Schema.makeFilter(
+    (path: string) =>
+      path.startsWith(`${Brand.configDir}/`)
+        ? `${path} is in ${Brand.configDir}/, which only code writes`
+        : true,
+    { expected: `a path outside ${Brand.configDir}/` }
+  )
+);
 
 /** One ask, drafted: only `fix` asks are drafted. */
 export const DraftedAsk = Schema.Struct({
@@ -24,10 +55,10 @@ export const DraftedAsk = Schema.Struct({
   /** Shown to the decider as evidence; never landed. */
   rationale: Schema.String.check(Schema.isMaxLength(4000)),
   /** The files an answer may change. */
-  territory: Schema.NonEmptyArray(RepoPath),
+  territory: Schema.NonEmptyArray(TreePath),
   /** The ask's check: a test that fails on main by an assertion. */
   test: Schema.Struct({
-    path: RepoPath,
+    path: TestPath,
     source: Schema.NonEmptyString.check(Schema.isMaxLength(100_000)),
   }),
   /** One testable sentence. */

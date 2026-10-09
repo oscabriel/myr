@@ -58,11 +58,11 @@ describe("the files a draft reads", () => {
 
       expect(first).toStrictEqual(second);
       expect(pathsOf(first)).toStrictEqual([
+        askFile("format-ordinal"),
+        "test/asks/format-ordinal.test.ts",
         "README.md",
         "package.json",
         `${Brand.configDir}/project.ts`,
-        askFile("format-ordinal"),
-        "test/asks/format-ordinal.test.ts",
         "src/add.ts",
         "test/add.test.ts",
         "docs/README.md",
@@ -158,6 +158,27 @@ describe("the files a draft reads", () => {
 
         expect(pathsOf(picked)).toContain(askFile("format-ordinal"));
         expect(pathsOf(picked)).toContain("test/asks/format-ordinal.test.ts");
+        expect(askTestFolderOf(picked)).toStrictEqual(Option.some("test/asks"));
+      })
+  );
+
+  it.effect(
+    "keeps the style example when a long README would spend the budget first",
+    () =>
+      Effect.gen(function* () {
+        const contents = { ...files, "README.md": "r".repeat(300 * 1024) };
+
+        const picked = yield* pickFiles(
+          tree,
+          { want: "time zones" },
+          read(contents),
+          8 * 1024
+        );
+
+        expect(pathsOf(picked).slice(0, 2)).toStrictEqual([
+          askFile("format-ordinal"),
+          "test/asks/format-ordinal.test.ts",
+        ]);
         expect(askTestFolderOf(picked)).toStrictEqual(Option.some("test/asks"));
       })
   );

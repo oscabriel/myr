@@ -3,6 +3,7 @@
  * asks the model for, and how each kind of reply or failure comes back.
  */
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { AskId, LandedSha, ProjectName, RepoPath } from "@repo/protocol/ids";
 import { Effect, Schema } from "effect";
 
@@ -26,7 +27,9 @@ const drafted: DraftedAsk = {
   want: "An ISO week date parses to the Monday of that week.",
 };
 
-const json = JSON.stringify(Schema.encodeSync(DraftedAsk)(drafted));
+const encoded = Schema.encodeSync(DraftedAsk)(drafted);
+
+const json = JSON.stringify(encoded);
 
 const input: DraftInput = {
   attempt: 1,
@@ -151,6 +154,38 @@ describe("the Workers AI drafter", () => {
         expect(
           yield* Effect.flip(draftWith({ reply: { choices: [] } }))
         ).toStrictEqual(failure("unparseable"));
+      })
+  );
+
+  it.effect(
+    "refuses a test path in the config folder or off the tree as `schema`, so model text never lands as config",
+    () =>
+      Effect.gen(function* () {
+        for (const path of [
+          `${Brand.configDir}/project.ts`,
+          `${Brand.configDir}/asks/other.ask.ts`,
+          "../outside.test.ts",
+          "/etc/passwd",
+          "test/./asks/iso-week.test.ts",
+        ]) {
+          const reply = JSON.stringify({
+            ...encoded,
+            test: { path, source: "export default 1;\n" },
+          });
+
+          expect(yield* Effect.flip(draftWith(chat(reply)))).toStrictEqual(
+            failure("schema")
+          );
+        }
+
+        const offTerritory = JSON.stringify({
+          ...encoded,
+          territory: ["src/../../secrets.ts"],
+        });
+
+        expect(yield* Effect.flip(draftWith(chat(offTerritory)))).toStrictEqual(
+          failure("schema")
+        );
       })
   );
 
