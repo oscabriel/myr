@@ -8,8 +8,9 @@
  * Kinds: a projected event for the read models (`Projected`), a claim's
  * fork (`MakeFork`), the start of an answer run (`StartAnswer`), a
  * landing's unwritten bookkeeping, written by landing the same job again
- * (`Bookkeeping`), and an effect a visibility plan asked for, settled by
- * the port that planned it (`Visibility`).
+ * (`Bookkeeping`), an effect a visibility plan asked for, settled by
+ * the port that planned it (`Visibility`), and the start of a proposal's
+ * draft run, one per round (`StartDraft`).
  */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { Verdict } from "@repo/protocol/domain/answer";
@@ -23,10 +24,11 @@ import {
   TreeSha,
 } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
-import { Array, DateTime, Effect, Option, Order, Schema } from "effect";
+import { Array, DateTime, Effect, Option, Order, Schema, Struct } from "effect";
 
 import { AnswerRuns } from "./answer-runs.ts";
 import type { AnswerQueue } from "./answer-runs.ts";
+import { DraftParams, DraftRuns } from "./draft-runs.ts";
 import { Lander, Rebuild } from "./lander.ts";
 import { backoff } from "./landing.ts";
 import type { OutboxRow } from "./project-store/rows.ts";
@@ -58,6 +60,7 @@ export const OutboxBody = Schema.Union([
   Schema.TaggedStruct("StartAnswer", { requestId: RequestId }),
   Schema.TaggedStruct("Bookkeeping", { job: LandAgain }),
   Schema.TaggedStruct("Visibility", { effect: VisibilityEffect }),
+  Schema.TaggedStruct("StartDraft", DraftParams.fields),
 ]).pipe(Schema.toTaggedUnion("_tag"));
 
 export type OutboxBody = typeof OutboxBody.Type;
@@ -101,6 +104,14 @@ export const startRow = (requestId: RequestId, at: DateTime.Utc) =>
   outboxRow(
     `start:${requestId}:${DateTime.toEpochMillis(at)}`,
     OutboxBody.cases.StartAnswer.make({ requestId }),
+    at
+  );
+
+/** The row that starts a proposal's draft run for one round: one row per round. */
+export const draftRow = (params: DraftParams, at: DateTime.Utc) =>
+  outboxRow(
+    `draft:${params.proposal}:r${params.round}`,
+    OutboxBody.cases.StartDraft.make(params),
     at
   );
 
@@ -180,9 +191,9 @@ const bySeq = Order.mapInput(Order.Number, ({ body }: Decoded) =>
 
 /**
  * Runs the rows: projected events first, in their order and in one call,
- * then forks, bookkeeping, visibility's effects, and last the answer runs
- * (which may run long, and settle their own rows). Nothing here fails: each
- * row is done, or retried.
+ * then forks, bookkeeping, visibility's effects, the draft runs, and last
+ * the answer runs (which may run long, and settle their own rows). Nothing
+ * here fails: each row is done, or retried.
  */
 export const runOutbox = (
   rows: readonly OutboxRow[],
@@ -237,6 +248,15 @@ export const runOutbox = (
       Effect.map(visibility.settle(body.effect), (ok) => ran(row, ok, now))
     );
 
+    const draftRuns = yield* DraftRuns;
+
+    const drafts = yield* Effect.forEach(of("StartDraft"), ({ body, row }) =>
+      Effect.as(
+        draftRuns.start(Struct.omit(body, ["_tag"])),
+        ran(row, true, now)
+      )
+    );
+
     const runs = yield* Effect.forEach(of("StartAnswer"), ({ body, row }) =>
       Effect.as(
         AnswerRuns.use((answers) => answers.start(body.requestId, queue)),
@@ -249,6 +269,7 @@ export const runOutbox = (
       ...forks,
       ...kept,
       ...planned,
+      ...drafts,
       ...runs,
     ]);
   });

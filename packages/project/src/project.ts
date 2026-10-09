@@ -20,7 +20,11 @@ import {
   RepoHost,
   Revision,
 } from "@repo/artifacts/repo-host";
-import type { RepoNotFound } from "@repo/artifacts/repo-host";
+import type {
+  ObjectId,
+  RepoNotFound,
+  TreeEntry,
+} from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { Brand } from "@repo/brand";
 import {
@@ -96,8 +100,12 @@ import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { ForkRef } from "@repo/protocol/domain/code";
-import { RefNameText } from "@repo/protocol/domain/common";
-import type { ConfigFile, Evidence } from "@repo/protocol/domain/common";
+import {
+  AtLeastOne,
+  ConfigFile,
+  RefNameText,
+} from "@repo/protocol/domain/common";
+import type { Evidence } from "@repo/protocol/domain/common";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
@@ -133,12 +141,14 @@ import {
   NotDecider,
   NotRedFirst,
   ProjectExists,
+  ProposalClosed,
   Refusal,
   StaleBase,
   TouchedJudge,
   UnknownAsk,
   UnknownCommit,
   UnknownProject,
+  UnknownProposal,
   VerifierBlocked,
   WeakCheck,
 } from "@repo/protocol/refusal";
@@ -147,9 +157,6 @@ import type {
   CapReached,
   ClaimLapsed,
   Denounced,
-  DraftInProgress,
-  ProposalClosed,
-  UnknownProposal,
   OutOfScope,
   PrivatePathInPublicTree,
   ReachedInternals,
@@ -170,6 +177,7 @@ import {
   Option,
   Order,
   Record,
+  Ref,
   Result,
   Schema,
   Semaphore,
@@ -201,6 +209,7 @@ import {
 } from "./claim.ts";
 import type { ClaimStep, Live } from "./claim.ts";
 import {
+  askIdOf,
   deciderDeadlines,
   deciders,
   decidersOn,
@@ -208,9 +217,18 @@ import {
   envSchemaMethod,
   isDecider,
   nextDecisionId,
+  pathsOf,
   strayDecision,
 } from "./deciders.ts";
 import type { DeciderApi, Opening } from "./deciders.ts";
+import {
+  DraftContextData,
+  DraftResult,
+  DraftRuns,
+  EXCERPT_BYTES,
+  Rehearsal,
+} from "./draft-runs.ts";
+import type { Diagnosis } from "./draft-runs.ts";
 import { ProjectEnv } from "./env-port.ts";
 import {
   askClosed,
@@ -401,27 +419,35 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
    */
   readonly policy: () => Effect.Effect<Option.Option<PublicPolicy>>;
   /**
-   * The public face of a proposal: its state, its draft's, and the files it
-   * holds until a decider accepts it.
+   * What a draft's run reads for one round of an open proposal: the landed
+   * commit, the want and territory, the public policy and the canonical
+   * tree's paths. Platform-only: no caller.
    */
-  readonly showProposal: (
-    caller: Principal,
-    proposal: ProposalId
-  ) => Effect.Effect<
-    { readonly files: readonly ConfigFile[]; readonly proposal: Proposal },
-    UnknownProposal
-  >;
+  readonly draftContext: (
+    proposal: ProposalId,
+    round: number
+  ) => Effect.Effect<DraftContextData, UnknownProposal | ProposalClosed>;
   /**
-   * Has the platform's agent draft an open proposal's ask, or draft it
-   * again with a note, for its proposer or a decider of its paths.
+   * An ask's files rehearsed as `accept` would open them, red first, by the
+   * first decider of their paths, and nothing landed or written: `Red`, or
+   * the final refusal `Refused` with why and the check's output's tail. A
+   * blocked Checker or a moved main stays an error, to try again.
+   * Platform-only: no caller.
    */
-  readonly draftAsk: (
-    caller: Person,
-    input: { readonly note?: string; readonly proposal: ProposalId }
-  ) => Effect.Effect<
-    { readonly proposal: Proposal },
-    UnknownProposal | ProposalClosed | NotDecider | DraftInProgress | CapReached
-  >;
+  readonly rehearseOpen: (
+    files: readonly ConfigFile[]
+  ) => Effect.Effect<Rehearsal, VerifierBlocked | StaleBase>;
+  /**
+   * A draft's round ended: a `Red` draft holds its files and goes to the
+   * deciders as the proposal's decision; a `Failed` one goes to them with
+   * its want alone. A round that is not the proposal's current one, or a
+   * proposal no longer open, changes nothing. Platform-only: no caller.
+   */
+  readonly draftSettled: (
+    proposal: ProposalId,
+    round: number,
+    result: DraftResult
+  ) => Effect.Effect<void>;
   /**
    * The log a failing lane left, by the name its verdict gives it
    * (`LaneResult.logRef`), for the project's deciders and the claimant
@@ -585,6 +611,9 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   ) => Effect.Effect<Option.Option<EnvKey>>;
 }
 
+/** The most paths a draft's context lists: as many as the code browser's `listPaths`. */
+const MAX_DRAFT_PATHS = 50_000;
+
 /** The most commits one `landings` call looks up: a log page's, or a blame's batch. */
 export const MAX_LANDINGS = 100;
 
@@ -641,6 +670,16 @@ export const MethodSchemas = {
     args: [Person, DraftAsk.payloadSchema.mapFields(Struct.omit(["project"]))],
     error: DraftAsk.errorSchema,
     success: DraftAsk.successSchema,
+  },
+  draftContext: {
+    args: [ProposalId, AtLeastOne],
+    error: Schema.Union([UnknownProposal, ProposalClosed]),
+    success: DraftContextData,
+  },
+  draftSettled: {
+    args: [ProposalId, AtLeastOne, DraftResult],
+    error: Schema.Never,
+    success: Schema.Void,
   },
   events: {
     args: [Schema.Int, Schema.Int],
@@ -785,6 +824,11 @@ export const MethodSchemas = {
     args: [PushReport],
     error: Schema.Never,
     success: Schema.Array(Refusal),
+  },
+  rehearseOpen: {
+    args: [Schema.Array(ConfigFile)],
+    error: Schema.Union([VerifierBlocked, StaleBase]),
+    success: Rehearsal,
   },
   release: {
     args: [Person, AskId],
@@ -969,9 +1013,6 @@ const forkOf = (state: ClaimState): Option.Option<ForkRef> =>
     Warned: (claim) => listedFork(claim, "warned"),
   });
 
-/** What a stub answers until the issue that builds it lands. */
-const notBuilt = (issue: string) => Effect.die(`not built: ${issue}`);
-
 /** The most of a lane's log `evidence` gives back: its last 256 KiB. */
 const EVIDENCE_TAIL = 256 * 1024;
 
@@ -982,14 +1023,14 @@ const startsCharacter = (byte: number) => byte < 0x80 || byte >= 0xc0;
  * A log as `evidence` gives it back: whole up to 256 KiB, else its last
  * 256 KiB, where a failure prints, cut between characters, never inside one.
  */
-const tailOf = (log: string) => {
+const tailOf = (log: string, limit = EVIDENCE_TAIL) => {
   const bytes = new TextEncoder().encode(log);
 
-  if (bytes.length <= EVIDENCE_TAIL) {
+  if (bytes.length <= limit) {
     return { text: log, truncated: false };
   }
 
-  const tail = bytes.subarray(bytes.length - EVIDENCE_TAIL);
+  const tail = bytes.subarray(bytes.length - limit);
   const from = tail.findIndex(startsCharacter);
 
   return {
@@ -1762,6 +1803,120 @@ const startOther = (
     }
   );
 
+/**
+ * What sees an ask's check run twice as it opens: whether the lane prints
+ * its output back, and both runs. Opening for real sees nothing; a
+ * rehearsal reads why the check was not red, and its output's tail.
+ */
+interface Watch {
+  readonly ran: (
+    lane: LaneName,
+    runs: readonly [CheckRun, CheckRun]
+  ) => Effect.Effect<void>;
+  readonly stdout: boolean;
+}
+
+const unwatched: Watch = { ran: () => Effect.void, stdout: false };
+
+/** A rehearsal's check, as its watch saw it run twice. */
+interface Seen {
+  readonly lane: LaneName;
+  readonly runs: readonly [CheckRun, CheckRun];
+}
+
+/** The refusals opening an ask gives that waiting does not lift. */
+type FinalRefusal =
+  | IncompleteBrief
+  | NotDecider
+  | NotRedFirst
+  | TouchedJudge
+  | WeakCheck;
+
+/** How one run of a rehearsed check went, for telling why it was not red. */
+const readingOf = (run: CheckRun, lane: LaneName) => {
+  const result = run.lanes.find((each) => each.lane === lane)?.result;
+
+  const signed = run.evidence.some(
+    (each) => each.lane === lane && each.signature !== undefined
+  );
+
+  return result === "failed" && !signed ? "loadError" : (result ?? "blocked");
+};
+
+/**
+ * Why a check was not red first, from its two runs: both passed; one could
+ * not run; one never reached an assertion (a load error, or a throw that is
+ * none); else it failed two ways.
+ */
+const notRedBecause = ({ lane, runs }: Seen): Diagnosis => {
+  const readings = runs.map((run) => readingOf(run, lane));
+
+  if (readings.every((reading) => reading === "passed")) {
+    return "Passed";
+  }
+
+  if (readings.includes("blocked")) {
+    return "Blocked";
+  }
+
+  return readings.includes("loadError") ? "LoadError" : "Flaky";
+};
+
+/** Why opening was refused, in a drafter's words. */
+const diagnosisOf = (
+  refusal: FinalRefusal,
+  seen: Option.Option<Seen>
+): Diagnosis =>
+  Match.valueTags(refusal, {
+    // A territory beyond the decider of the files' paths is the brief's.
+    IncompleteBrief: (): Diagnosis => "Brief",
+    NotDecider: (): Diagnosis => "Brief",
+    // No lane to run is a brief whose check names none.
+    NotRedFirst: () =>
+      Option.match(seen, {
+        onNone: (): Diagnosis => "Brief",
+        onSome: notRedBecause,
+      }),
+    TouchedJudge: (): Diagnosis => "Judge",
+    WeakCheck: ({ weakness }): Diagnosis =>
+      weakness === "no assertion" ? "NoTests" : "Weak",
+  });
+
+/** The last of what the check printed: its second run's output, else its first's. */
+const excerptOf = (seen: Option.Option<Seen>) =>
+  Option.match(
+    Option.flatMap(seen, ({ lane, runs: [first, second] }) =>
+      Option.orElse(outputOf(second, lane), () => outputOf(first, lane))
+    ),
+    {
+      onNone: () => "",
+      onSome: (printed) => tailOf(printed, EXCERPT_BYTES).text,
+    }
+  );
+
+/** A rehearsal refused: the refusal, why, and the output's tail. */
+const rehearsalRefused = (
+  refusal: FinalRefusal,
+  seen: Option.Option<Seen>
+): Rehearsal =>
+  Rehearsal.cases.Refused.make({
+    diagnosis: diagnosisOf(refusal, seen),
+    excerpt: excerptOf(seen),
+    refusal,
+  });
+
+/**
+ * A red rehearsal's lane and signature: the check's own, or, for a check
+ * red by its count, which has none, that it is.
+ */
+const redOf = ({ lane, runs }: Seen) => ({
+  lane,
+  signature: Result.match(redFirstOfRuns(runs, lane), {
+    onFailure: () => "red by its count",
+    onSuccess: ({ signature }) => signature,
+  }),
+});
+
 /** Whether an ask's check file has one of the five weak shapes. */
 const weakness = (ask: Ask, files: readonly AskFile[]) => {
   const { check } = ask;
@@ -1839,6 +1994,7 @@ export const projectService = (
     // provides it, a project without them otherwise.
     const visibility = yield* ProjectVisibility;
     const envPort = yield* ProjectEnv;
+    const draftRuns = yield* DraftRuns;
     const lock = yield* Semaphore.make(1);
     const repo = RepoName.make(name);
 
@@ -2152,7 +2308,9 @@ export const projectService = (
         );
 
         if (Array.isReadonlyArrayNonEmpty(due)) {
-          const ran = yield* withPorts(runOutbox(due, queue, now));
+          const ran = yield* withPorts(runOutbox(due, queue, now)).pipe(
+            Effect.provideService(DraftRuns, draftRuns)
+          );
 
           yield* store.ackOutbox(ran.done);
 
@@ -3673,8 +3831,16 @@ export const projectService = (
         (refusals) => Array.findFirst(refusals, isTouchedJudge)
       );
 
-    /** An ask's own check run twice on the composed commit, and the lane it ran as. */
-    const runTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
+    /**
+     * An ask's own check run twice on the composed commit, and the lane it
+     * ran as; `watch` sees both runs, and asks for the lane's output.
+     */
+    const runTwice = (
+      policy: Policy,
+      ask: Ask,
+      composed: CommitSha,
+      watch: Watch
+    ) =>
       Effect.gen(function* () {
         const lane = askCheckLane(policy, ask);
 
@@ -3691,13 +3857,19 @@ export const projectService = (
         const job = {
           ...env,
           at: CheckAt.cases.Commit.make({ commit: composed }),
-          lanes: [lane.value],
+          lanes: [
+            watch.stdout
+              ? CheckLane.make({ ...lane.value, output: "stdout" })
+              : lane.value,
+          ],
           project: name,
           repo,
           run: policy.run,
         };
 
         const runs = [yield* runner.run(job), yield* runner.run(job)] as const;
+
+        yield* watch.ran(lane.value.lane, runs);
 
         return { lane: lane.value.lane, runs };
       });
@@ -3707,9 +3879,14 @@ export const projectService = (
      * same way (a `lintToZero` check, by its count). Gives the counts of the
      * policy's ratchets the check's own run read on the way.
      */
-    const redTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
+    const redTwice = (
+      policy: Policy,
+      ask: Ask,
+      composed: CommitSha,
+      watch: Watch
+    ) =>
       Effect.gen(function* () {
-        const { lane, runs } = yield* runTwice(policy, ask, composed);
+        const { lane, runs } = yield* runTwice(policy, ask, composed, watch);
 
         if (CheckSpec.guards.LintToZero(ask.check)) {
           return yield* redByCount({
@@ -3731,9 +3908,14 @@ export const projectService = (
      * twice on the composed commit its count command prints the same
      * callers, and some in the ask's territory. Gives the count.
      */
-    const callersTwice = (policy: Policy, ask: Ask, composed: CommitSha) =>
+    const callersTwice = (
+      policy: Policy,
+      ask: Ask,
+      composed: CommitSha,
+      watch: Watch
+    ) =>
       Effect.gen(function* () {
-        const { lane, runs } = yield* runTwice(policy, ask, composed);
+        const { lane, runs } = yield* runTwice(policy, ask, composed, watch);
 
         const read = (run: CheckRun) =>
           Effect.fromOption(
@@ -3798,11 +3980,18 @@ export const projectService = (
       readonly h: Hydrated;
       readonly main: LandedSha;
       readonly policy: Policy;
+      readonly watch: Watch;
       readonly writes: Writes;
     }) =>
       Effect.gen(function* () {
         const { ask, composed, files, policy } = input;
-        const counts = yield* callersTwice(policy, ask, composed.commit);
+
+        const counts = yield* callersTwice(
+          policy,
+          ask,
+          composed.commit,
+          input.watch
+        );
 
         const callers: readonly RatchetCount[] = CheckSpec.guards.Migrate(
           ask.check
@@ -3866,6 +4055,7 @@ export const projectService = (
      */
     const landAsk = (input: {
       readonly ask: Ask;
+      readonly assisted: readonly AgentTrailer[];
       readonly children: readonly AskId[];
       readonly credits: readonly Credit[];
       readonly files: Array.NonEmptyReadonlyArray<ComposedFile>;
@@ -3881,7 +4071,7 @@ export const projectService = (
           main: input.main,
           message: formatLanding({
             ask: { ask: input.ask.id, project: name },
-            assisted: [],
+            assisted: input.assisted,
             body:
               children.length === 0
                 ? input.ask.brief.want
@@ -3911,17 +4101,20 @@ export const projectService = (
     };
 
     /**
-     * An ask opened from its files, red first, and landed as a platform
-     * commit: what `openAsk` does for a decider, and what an accepted
-     * proposal does for its proposer. `opening.decider` must decide
-     * for the ask's territory; `opening.asker` asks it and authors the
-     * landing, which carries `opening.credits`.
+     * Everything opening an ask checks, with nothing written and nothing
+     * landed: the files composed onto main, the ask they state evaluated at
+     * the composed commit, the judge they touch, a weak check, and red
+     * first (or a migrate ask's callers and family). Succeeds with what the
+     * landing needs; fails with the ask as it stands when it is open
+     * already, so nothing is to land. `opening.decider` must decide for the
+     * ask's territory. `watch` sees the check's runs.
      */
-    const openFrom = (
+    const prepareOpening = (
       h: Hydrated,
       writes: Writes,
       now: DateTime.Utc,
-      opening: Opening
+      opening: Opening,
+      watch: Watch
     ) =>
       Effect.gen(function* () {
         const live = liveRow(h);
@@ -3946,7 +4139,10 @@ export const projectService = (
 
         if (Option.isSome(stillOpen)) {
           return decidesOn(policy, stillOpen.value, decider.handle)
-            ? { ask: stillOpen.value, landed: stillOpen.value.openedIn }
+            ? Result.fail({
+                ask: stillOpen.value,
+                landed: stillOpen.value.openedIn,
+              })
             : yield* new NotDecider({});
         }
 
@@ -4009,19 +4205,53 @@ export const projectService = (
               h,
               main,
               policy,
+              watch,
               writes,
             })
           : {
               asks: Array.make(ask),
               callers: [],
               children: [],
-              counted: yield* redTwice(policy, ask, composed.commit),
+              counted: yield* redTwice(policy, ask, composed.commit, watch),
               files,
               tree: composed.tree,
             };
 
+        return Result.succeed({ ask, main, opens, row });
+      });
+
+    /**
+     * An ask opened from its files, red first, and landed as a platform
+     * commit: what `openAsk` does for a decider, and what an accepted
+     * proposal does for its proposer. `opening.decider` must decide
+     * for the ask's territory; `opening.asker` asks it and authors the
+     * landing, which carries `opening.credits` and discloses
+     * `opening.assisted`.
+     */
+    const openFrom = (
+      h: Hydrated,
+      writes: Writes,
+      now: DateTime.Utc,
+      opening: Opening
+    ) =>
+      Effect.gen(function* () {
+        const prepared = yield* prepareOpening(
+          h,
+          writes,
+          now,
+          opening,
+          unwatched
+        );
+
+        if (Result.isFailure(prepared)) {
+          return prepared.failure;
+        }
+
+        const { ask, main, opens, row } = prepared.success;
+
         const landed = yield* landAsk({
           ask,
+          assisted: opening.assisted,
           children: opens.children,
           credits: opening.credits,
           files: opens.files,
@@ -4044,7 +4274,7 @@ export const projectService = (
         }
 
         writes.landings.push({
-          assisted: [],
+          assisted: opening.assisted,
           author: opening.asker,
           credits: landed.credits,
           landedAt: now,
@@ -4090,10 +4320,176 @@ export const projectService = (
         openFrom(h, writes, now, {
           ask: input.ask,
           asker: caller.handle,
+          assisted: [],
           credits: [{ handle: caller.handle, role: "Asked-by" }],
           decider: caller,
           files: input.files,
         });
+
+    /**
+     * An ask's files rehearsed: `prepareOpening` by the first decider of
+     * their paths, its lane asked for its output, and nothing landed or
+     * written. A final refusal is `Refused`, with why and the output's tail.
+     */
+    const rehearse = (
+      h: Hydrated,
+      now: DateTime.Utc,
+      files: readonly ConfigFile[]
+    ) =>
+      Effect.gen(function* () {
+        const live = liveRow(h);
+
+        if (Option.isNone(live) || Option.isNone(h.policy)) {
+          return yield* new VerifierBlocked({});
+        }
+
+        const policy = h.policy.value;
+        const ask = askIdOf(files);
+
+        if (Option.isNone(ask) || !Array.isReadonlyArrayNonEmpty(files)) {
+          return rehearsalRefused(
+            new IncompleteBrief({ missing: ["want"] }),
+            Option.none()
+          );
+        }
+
+        const [first] = decidersOn(
+          policy,
+          pathsOf(
+            policy,
+            files.map(({ path }) => path),
+            Option.none()
+          ),
+          live.value.row.initializer
+        );
+
+        const decider = Person.make({ handle: first });
+        const seen = yield* Ref.make(Option.none<Seen>());
+
+        const watch: Watch = {
+          ran: (lane, runs) => Ref.set(seen, Option.some({ lane, runs })),
+          stdout: true,
+        };
+
+        const refused = (refusal: FinalRefusal) =>
+          Effect.map(Ref.get(seen), (runs): Rehearsal =>
+            rehearsalRefused(refusal, runs)
+          );
+
+        return yield* prepareOpening(
+          h,
+          writesOf(),
+          now,
+          {
+            ask: ask.value,
+            asker: decider.handle,
+            assisted: [],
+            credits: [],
+            decider,
+            files,
+          },
+          watch
+        ).pipe(
+          Effect.flatMap((prepared) =>
+            Result.match(prepared, {
+              // An ask by that name is open: its file is the judge now.
+              onFailure: (open) =>
+                refused(new TouchedJudge({ paths: [open.ask.file] })),
+              // Red first ran the check, so the watch saw it.
+              onSuccess: ({ opens }) =>
+                Effect.map(
+                  Effect.orDie(
+                    Effect.flatMap(Ref.get(seen), Effect.fromOption)
+                  ),
+                  (ran): Rehearsal =>
+                    Rehearsal.cases.Red.make({
+                      ...redOf(ran),
+                      tree: opens.tree,
+                    })
+                ),
+            })
+          ),
+          Effect.catchTags({
+            IncompleteBrief: refused,
+            NotDecider: refused,
+            NotRedFirst: refused,
+            TouchedJudge: refused,
+            WeakCheck: refused,
+          })
+        );
+      });
+
+    /** Every blob's path in the canonical tree at `at`, sorted, at most `MAX_DRAFT_PATHS`. */
+    const pathsAt = (at: LandedSha) => {
+      const walk = (
+        prefix: string,
+        tree: ObjectId
+      ): Effect.Effect<readonly RepoPath[]> =>
+        Effect.flatMap(Effect.orDie(host.readTree(repo, tree)), (entries) =>
+          Effect.map(
+            Effect.forEach(
+              Option.getOrElse(entries, (): readonly TreeEntry[] => []),
+              ({ name: entry, sha, type }) =>
+                type === "tree"
+                  ? walk(`${prefix}${entry}/`, sha)
+                  : Effect.succeed(
+                      type === "blob"
+                        ? [RepoPath.make(`${prefix}${entry}`)]
+                        : []
+                    )
+            ),
+            Array.flatten
+          )
+        );
+
+      return Effect.flatMap(Effect.orDie(host.readCommit(repo, at)), (read) =>
+        Option.match(read, {
+          onNone: () => Effect.succeed([]),
+          onSome: (landed) =>
+            Effect.map(walk("", landed.tree), (paths) =>
+              Array.sort(paths, Order.String).slice(0, MAX_DRAFT_PATHS)
+            ),
+        })
+      );
+    };
+
+    /**
+     * What a draft's run reads for one round: an open proposal's want and
+     * territory, the landed commit, the public policy there, and every path
+     * of the canonical tree.
+     */
+    const draftContextOf = (proposal: ProposalId, round: number) =>
+      Effect.gen(function* () {
+        const h = yield* hydrate;
+        const found = Array.findFirst(h.proposals, ({ id }) => id === proposal);
+
+        const live = Option.all({
+          policy: h.policy,
+          row: liveRow(h),
+          wanted: found,
+        });
+
+        if (Option.isNone(live)) {
+          return yield* new UnknownProposal({ proposal });
+        }
+
+        const { policy, row, wanted } = live.value;
+
+        if (wanted.state !== "open") {
+          return yield* new ProposalClosed({ proposal });
+        }
+
+        return {
+          at: row.landed,
+          paths: yield* pathsAt(row.landed),
+          policy: publicPolicy(policy),
+          project: name,
+          proposal,
+          round,
+          ...field("territory", Option.fromUndefinedOr(wanted.territory)),
+          want: wanted.want,
+        };
+      });
 
     /** Whether a person may claim an ask, by the trust rules, and the ask's race. */
     const trustOf = (
@@ -5015,7 +5411,23 @@ export const projectService = (
           decided.decide(api, caller, input)
         ),
       draftAsk: (caller, input) =>
-        checked(MethodSchemas.draftAsk, [caller, input], notBuilt("909")),
+        checked(
+          MethodSchemas.draftAsk,
+          [caller, input],
+          decided.draftAsk(api, caller, input)
+        ),
+      draftContext: (proposal, round) =>
+        checked(
+          MethodSchemas.draftContext,
+          [proposal, round],
+          draftContextOf(proposal, round)
+        ),
+      draftSettled: (proposal, round, result) =>
+        checked(
+          MethodSchemas.draftSettled,
+          [proposal, round, result],
+          decided.draftSettled(api, { proposal, result, round })
+        ),
       events: (since, limit) =>
         checked(
           MethodSchemas.events,
@@ -5152,9 +5564,7 @@ export const projectService = (
         checked(
           MethodSchemas.proposeAsk,
           [caller, input],
-          input.draft === true
-            ? notBuilt("909")
-            : decided.proposeAsk(api, caller, input)
+          decided.proposeAsk(api, caller, input)
         ),
       recordAdmission: (input) =>
         checked(
@@ -5211,6 +5621,17 @@ export const projectService = (
         ),
       recordPush: (input) =>
         checked(MethodSchemas.recordPush, [input], write(api, pushBody(input))),
+      rehearseOpen: (files) =>
+        checked(
+          MethodSchemas.rehearseOpen,
+          [files],
+          // Outside the lock: it reads, and writes nothing.
+          Effect.gen(function* () {
+            const h = yield* hydrate;
+
+            return yield* rehearse(h, yield* DateTime.now, files);
+          })
+        ),
       release: (caller, id) =>
         checked(
           MethodSchemas.release,
@@ -5244,7 +5665,7 @@ export const projectService = (
         checked(
           MethodSchemas.showProposal,
           [caller, proposal],
-          notBuilt("909")
+          decided.showProposal(proposal)
         ),
       status: (caller) =>
         checked(MethodSchemas.status, [caller], statusOf(caller)),
