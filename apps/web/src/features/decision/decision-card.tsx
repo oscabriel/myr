@@ -5,19 +5,28 @@
  * optional. A `Finish` decision links to the answer's diff; no other
  * decision shows one, and the card never shows the diff itself.
  *
+ * An `OpenProposal` shows the files the proposal would add (the ask file and
+ * its check) as code under their paths, links the proposal's page, and holds
+ * Accept while the platform's agent is drafting the proposal again: the
+ * draft state is passed in, or read from `showProposal` when it is not.
+ *
  * The subject's words follow GLOSSARY.md (ask, answer, landing, finish,
  * vouch). The default's word is the decision's `default` field as the
  * platform set it: the web keeps no table of defaults by subject.
  */
 import type { Decide } from "@repo/protocol/contracts";
+import type { Evidence as Fact } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
+import { DraftState } from "@repo/protocol/domain/proposal";
+import type { ProjectName, ProposalId } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
-import { FileDiff, Hourglass, ShieldCheck } from "lucide-react";
+import { FileDiff, FileText, Hourglass, ShieldCheck } from "lucide-react";
 import { useId, useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../components/ui/button.tsx";
+import { Spinner } from "../../components/ui/spinner.tsx";
 import { Textarea } from "../../components/ui/textarea.tsx";
 import {
   changedFiles,
@@ -25,6 +34,8 @@ import {
   PATCH_LABEL,
   patchOf,
 } from "../finish/patch.ts";
+import { DraftedCode } from "../proposal/client-file.tsx";
+import { useLiveDraft } from "../proposal/live-draft.ts";
 import { When } from "../shared/time.tsx";
 
 /** What a decider sends when they choose: the `decide` contract's payload, from its one schema. */
@@ -104,34 +115,60 @@ const words = {
   revert: "Revert",
 } as const satisfies Record<Choice, string>;
 
-const Evidence = ({ decision }: { readonly decision: Decision }) => {
-  // The diff is the finish page's; here it is only counted.
-  const facts = decision.evidence.filter(({ label }) => label !== PATCH_LABEL);
+/** Whether a decision opens a proposed ask. */
+const opensAsk = DecisionSubject.isAnyOf(["OpenProposal"]);
 
-  if (facts.length === 0) {
-    return null;
-  }
+/** Whether a draft is still being written. */
+const isDraftingNow = DraftState.isAnyOf(["Drafting"]);
+
+/**
+ * Whether an evidence line holds a file: its label is a path (one word with
+ * a slash, as the ask file's), where every other label is words.
+ */
+export const isFileFact = ({ label }: Fact) => /^\S+\/\S+$/u.test(label);
+
+/** The files an `OpenProposal` decision holds, shown as code; none for any other subject. */
+const filesOf = (decision: Decision): readonly Fact[] =>
+  opensAsk(decision.subject) ? decision.evidence.filter(isFileFact) : [];
+
+const Facts = ({ facts }: { readonly facts: readonly Fact[] }) => (
+  <dl className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[minmax(8rem,auto)_1fr]">
+    {facts.map(({ href, label, value }) => (
+      <div className="contents" key={`${label}:${value}`}>
+        <dt className={`${LABEL} pt-0.5`}>{label}</dt>
+        <dd className="mb-1.5 text-sm [overflow-wrap:anywhere] sm:mb-0">
+          {href === undefined ? (
+            value
+          ) : (
+            <a
+              className="decoration-rule underline hover:decoration-current"
+              href={href}
+            >
+              {value}
+            </a>
+          )}
+        </dd>
+      </div>
+    ))}
+  </dl>
+);
+
+const Evidence = ({ decision }: { readonly decision: Decision }) => {
+  // The diff is the finish page's; here it is only counted. A proposal's
+  // files are drawn as code below the facts.
+  const files = filesOf(decision);
+
+  const facts = decision.evidence.filter(
+    (fact) => fact.label !== PATCH_LABEL && !files.includes(fact)
+  );
 
   return (
-    <dl className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[minmax(8rem,auto)_1fr]">
-      {facts.map(({ href, label, value }) => (
-        <div className="contents" key={`${label}:${value}`}>
-          <dt className={`${LABEL} pt-0.5`}>{label}</dt>
-          <dd className="mb-1.5 text-sm [overflow-wrap:anywhere] sm:mb-0">
-            {href === undefined ? (
-              value
-            ) : (
-              <a
-                className="decoration-rule underline hover:decoration-current"
-                href={href}
-              >
-                {value}
-              </a>
-            )}
-          </dd>
-        </div>
+    <>
+      {facts.length === 0 ? null : <Facts facts={facts} />}
+      {files.map(({ label, value }) => (
+        <DraftedCode content={value} heading="h4" key={label} path={label} />
       ))}
-    </dl>
+    </>
   );
 };
 
@@ -157,10 +194,88 @@ const FinishLink = ({ decision }: { readonly decision: Decision }) => {
   );
 };
 
+/** The way from an `OpenProposal` decision to the proposal's page: its draft and files. */
+const ProposalLink = ({
+  project,
+  proposal,
+}: {
+  readonly project: ProjectName;
+  readonly proposal: ProposalId;
+}) => (
+  <a
+    className="decoration-rule flex w-fit items-center gap-2 text-sm font-medium underline hover:decoration-current"
+    href={`/${project}/proposals/${proposal}`}
+  >
+    <FileText aria-hidden="true" className="size-4 shrink-0" />
+    Read the proposal
+  </a>
+);
+
+interface ChoicesProps {
+  readonly busy: boolean;
+  readonly choose: (choice: Choice) => void;
+  readonly decision: Decision;
+  readonly subject: string;
+}
+
+/** One button per choice; Accept waits while the proposal is drafting. */
+const Choices = ({
+  busy,
+  choose,
+  decision,
+  drafting,
+  subject,
+}: ChoicesProps & { readonly drafting: boolean }) => (
+  <fieldset className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+    <legend className="sr-only">Your choice: {subject}</legend>
+    {allowedChoices(decision.subject).map((choice) => {
+      const isDefault = choice === decision.default;
+      const held = drafting && choice === "accept";
+
+      return (
+        <Button
+          className="h-11 px-4 text-sm sm:h-9 sm:min-w-28"
+          data-choice={choice}
+          disabled={busy || held}
+          key={choice}
+          onClick={() => {
+            choose(choice);
+          }}
+          type="button"
+          variant={isDefault ? "outline" : "default"}
+        >
+          {held ? (
+            <>
+              <Spinner />
+              Drafting…
+            </>
+          ) : (
+            words[choice]
+          )}
+          {isDefault ? (
+            <span className="text-muted-foreground font-normal">default</span>
+          ) : null}
+        </Button>
+      );
+    })}
+  </fieldset>
+);
+
+/** The choices on a proposal whose draft state was not passed: read from `showProposal`. */
+const ProposalChoices = ({
+  proposal,
+  ...props
+}: ChoicesProps & { readonly proposal: ProposalId }) => {
+  const draft = useLiveDraft(props.decision.project, proposal);
+
+  return <Choices {...props} drafting={Option.exists(draft, isDraftingNow)} />;
+};
+
 export const DecisionCard = ({
   busy = false,
   children,
   decision,
+  draft,
   now,
   onDecide,
   soon = false,
@@ -177,6 +292,11 @@ export const DecisionCard = ({
   readonly standalone?: boolean;
   /** What its own page shows before the choices: for a finish, the diff. */
   readonly children?: ReactNode;
+  /**
+   * For an `OpenProposal`, where the proposal's draft stands: Accept waits
+   * while it is drafting. Read from `showProposal` when not passed.
+   */
+  readonly draft?: DraftState | undefined;
 }) => {
   const [note, setNote] = useState("");
   const noteId = useId();
@@ -251,6 +371,13 @@ export const DecisionCard = ({
         <FinishLink decision={decision} />
       ) : null}
 
+      {opensAsk(decision.subject) ? (
+        <ProposalLink
+          project={decision.project}
+          proposal={decision.subject.proposal}
+        />
+      ) : null}
+
       {children === undefined ? null : (
         <div className="border-rule mt-3 flex flex-col gap-8 border-t pt-6">
           {children}
@@ -274,33 +401,23 @@ export const DecisionCard = ({
         />
       </details>
 
-      <fieldset className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <legend className="sr-only">Your choice: {subject}</legend>
-        {allowedChoices(decision.subject).map((choice) => {
-          const isDefault = choice === decision.default;
-
-          return (
-            <Button
-              className="h-11 px-4 text-sm sm:h-9 sm:min-w-28"
-              data-choice={choice}
-              disabled={busy}
-              key={choice}
-              onClick={() => {
-                choose(choice);
-              }}
-              type="button"
-              variant={isDefault ? "outline" : "default"}
-            >
-              {words[choice]}
-              {isDefault ? (
-                <span className="text-muted-foreground font-normal">
-                  default
-                </span>
-              ) : null}
-            </Button>
-          );
-        })}
-      </fieldset>
+      {opensAsk(decision.subject) && draft === undefined ? (
+        <ProposalChoices
+          busy={busy}
+          choose={choose}
+          decision={decision}
+          proposal={decision.subject.proposal}
+          subject={subject}
+        />
+      ) : (
+        <Choices
+          busy={busy}
+          choose={choose}
+          decision={decision}
+          drafting={draft !== undefined && isDraftingNow(draft)}
+          subject={subject}
+        />
+      )}
     </article>
   );
 };

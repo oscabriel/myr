@@ -2,7 +2,9 @@
  * A project's page: its posture, how to take part, its open asks, and its
  * recent landings with their credit trailers. Props in, markup out: the
  * route reads the listing, the asks and the landings (`src/client/project.ts`)
- * and the platform URL (the root loader), and hands them here.
+ * and the platform URL (the root loader), and hands them here. "Propose an
+ * ask" shows for signed-in members only, once the browser knows who that is
+ * (`features/propose/propose-link.tsx`).
  */
 import { Brand } from "@repo/brand";
 import type { AskListing } from "@repo/protocol/domain/ask";
@@ -13,6 +15,7 @@ import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 
 import { EntriesTable, ReadmeSection } from "../code/tree-view.tsx";
+import { SignedInProposeLink } from "../propose/propose-link.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
@@ -182,9 +185,12 @@ export const ProjectView = ({
           aria-labelledby="open-asks"
           className="flex min-w-0 flex-col gap-3 lg:col-start-1"
         >
-          <h2 className={SECTION} id="open-asks">
-            Open asks
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+            <h2 className={SECTION} id="open-asks">
+              Open asks
+            </h2>
+            <SignedInProposeLink project={project} />
+          </div>
           {asks.length === 0 ? (
             <EmptyState
               command={`${Brand.cli} ask open <ask> --files <files>`}
