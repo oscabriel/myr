@@ -1,8 +1,9 @@
 /**
  * The deployed web, as a browser shows it: the front page, a
- * project's page, an ask's page and the same ask as Markdown, and
- * `/llms.txt`, each asserted on its key text, each saved as one screenshot
- * in `e2e/out/` for the shot list.
+ * project's page, an ask's page and the same ask as Markdown,
+ * `/llms.txt`, and the project's code (a folder, a file at a line, the
+ * log, a commit and the refs), each asserted on its key text, each saved
+ * as one screenshot in `e2e/out/` for the shot list.
  *
  * It runs only against `WEB_URL` (a stage's web origin) and is skipped
  * without it. `WEB_PROJECT` and `WEB_ASK` pick the project and the ask
@@ -39,6 +40,12 @@ const out = decodeURIComponent(new URL("out/", import.meta.url).pathname);
 /** What every page that could not reach the platform says instead of its content. */
 const UNREACHABLE = "The platform did not answer";
 
+/** What a code page said before its view was built; a deployed page never says it. */
+const NOT_BUILT = "not built";
+
+/** A file every seeded datekit has, and the line its page is opened at. */
+const FILE = "src/add.ts";
+
 /** `url` on the web. */
 const at = (path: string) =>
   `${Option.getOrElse(settings.web, () => "")}${path}`;
@@ -73,6 +80,21 @@ const page = (
 
     yield* Effect.promise(() =>
       browser.screenshot({ fullPage: true, path: `${out}${shot}.png` })
+    );
+  });
+
+/** A code page: as `page` checks one, and it never says it is not built. */
+const code = (
+  browser: Page,
+  path: string,
+  shot: string,
+  texts: readonly string[]
+) =>
+  Effect.gen(function* () {
+    yield* page(browser, path, shot, texts);
+
+    yield* Effect.promise(() =>
+      expect(browser.getByText(NOT_BUILT)).toHaveCount(0)
     );
   });
 
@@ -153,4 +175,55 @@ test.describe("the deployed web", () => {
 
   test("/llms.txt is the web's Markdown for agents", ({ page: browser }) =>
     Effect.runPromise(markdown(browser, "/llms.txt", "llms-txt", [project])));
+
+  test(`${project}'s code at main lists its folders and README`, ({
+    page: browser,
+  }) =>
+    Effect.runPromise(
+      code(browser, `/${project}/tree/main`, "code-tree", ["src", "README.md"])
+    ));
+
+  test(`${project}'s ${FILE} opens at line 3`, ({ page: browser }) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        yield* code(browser, `/${project}/blob/main/${FILE}#L3`, "code-file", [
+          FILE,
+          "Permalink",
+        ]);
+
+        expect(new URL(browser.url()).hash).toBe("#L3");
+      })
+    ));
+
+  test(`${project}'s log groups its commits by day`, ({ page: browser }) =>
+    Effect.runPromise(
+      code(browser, `/${project}/commits/main`, "code-log", ["Commits on"])
+    ));
+
+  test(`${project}'s newest commit shows what it changed`, ({
+    page: browser,
+  }) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          browser.goto(at(`/${project}/commits/main`))
+        );
+
+        const href = yield* Effect.promise(() =>
+          browser
+            .locator(`a[href^="/${project}/commit/"]`)
+            .first()
+            .getAttribute("href")
+        );
+
+        expect(href).toMatch(/\/commit\/[0-9a-f]{40}$/u);
+
+        yield* code(browser, href ?? "", "code-commit", ["changed"]);
+      })
+    ));
+
+  test(`${project}'s refs show main and its tags`, ({ page: browser }) =>
+    Effect.runPromise(
+      code(browser, `/${project}/refs`, "code-refs", ["main", "Tags", "Forks"])
+    ));
 });

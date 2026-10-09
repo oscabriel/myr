@@ -1,15 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { env } from "cloudflare:workers";
 
-// A file's bytes at a revision, as the platform serves them under its
-// sandboxing headers. A stub answering 501 until 904 forwards it to the
-// platform (whose side 903 builds).
+import { backend } from "#backend";
 
-const notBuilt = () =>
-  new Response("Not built yet (904).\n", {
-    headers: { "content-type": "text/plain; charset=utf-8" },
-    status: 501,
-  });
+import { forwarded } from "../../../../features/agents/forward.ts";
 
+// A file's bytes at a revision: the platform serves them, under its
+// sandboxing headers and content types, at the same path; the web
+// passes GET and HEAD on and hands the answer back untouched, headers and
+// all, as `routes/releases/$.ts` does.
 export const Route = createFileRoute("/$project/raw/$rev/$")({
-  server: { handlers: { GET: notBuilt, HEAD: notBuilt } },
+  server: { handlers: forwarded(backend, env) },
 });

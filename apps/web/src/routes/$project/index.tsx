@@ -9,6 +9,7 @@ import { env } from "cloudflare:workers";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
+import { projectCodeAtom } from "../../client/code.ts";
 import { projectsAtom } from "../../client/front.ts";
 import { asksAtom, recentLandingsAtom } from "../../client/project.ts";
 import { watchAtom } from "../../client/watch.ts";
@@ -89,6 +90,12 @@ const ProjectBody = ({ project }: { readonly project: ProjectName }) => {
     listed: useAtomValue(projectsAtom),
   });
 
+  // The root folder and README: a project whose main has not landed (or
+  // whose code cannot be read now) shows its page without them.
+  const code = Option.getOrUndefined(
+    AsyncResult.value(useAtomValue(projectCodeAtom(project)))
+  );
+
   return AsyncResult.matchWithError(read, {
     onDefect: () => <Unreachable title={project} />,
     onError: (error) =>
@@ -101,6 +108,7 @@ const ProjectBody = ({ project }: { readonly project: ProjectName }) => {
     onSuccess: ({ value: { asks, landings, listed } }) => (
       <ProjectView
         asks={asks.asks}
+        code={code}
         landings={landings}
         listing={listingOf(project, listed.projects, asks.asks.length)}
         now={DateTime.nowUnsafe()}
