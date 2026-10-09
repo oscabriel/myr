@@ -7,17 +7,21 @@
  * (`<diffs-container>`), loaded only there.
  */
 import { describe, expect, it } from "@effect/vitest";
-import { CommitView, WhyView } from "@repo/protocol/domain/code";
+import { Client, Contracts } from "@repo/protocol/contracts";
+import { CommitView, FileView, WhyView } from "@repo/protocol/domain/code";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { LandedSha, ProjectName } from "@repo/protocol/ids";
-import { Schema } from "effect";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { Duration, Effect, Layer, Ref, Schema } from "effect";
+import { RpcTest } from "effect/rpc";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { LandingDetails } from "../src/features/why/range-summary.tsx";
 import { WhyCode } from "../src/features/why/why-code.tsx";
 import { WhyLines } from "../src/features/why/why-view.tsx";
+import { readWhyPage } from "../src/routes/$project/why/$rev/$.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -303,4 +307,108 @@ describe("the why page's drawing", () => {
       markupOf(<WhyCode project={datekit} text={TEXT} view={view} />)
     ).toContain("<diffs-container");
   });
+});
+
+/** What the platform was asked by one page read: each `readFile`'s `at`, and the most calls under way at once. */
+interface Asked {
+  readonly files: readonly string[];
+  readonly peak: number;
+  readonly under: number;
+}
+
+/**
+ * A platform answering `why` with `view` and `readFile` with the file at
+ * the commit `main` names (`mainAt`), each after a few milliseconds, every
+ * call noted in `asked`.
+ */
+const whyPlatform = (asked: Ref.Ref<Asked>, mainAt: string) => {
+  const during = <A, E>(answer: Effect.Effect<A, E>) =>
+    Effect.acquireUseRelease(
+      Ref.update(asked, (was) => ({
+        ...was,
+        peak: Math.max(was.peak, was.under + 1),
+        under: was.under + 1,
+      })),
+      () => Effect.andThen(Effect.sleep(Duration.millis(30)), answer),
+      () => Ref.update(asked, (was) => ({ ...was, under: was.under - 1 }))
+    );
+
+  return Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+    Layer.provide([
+      Layer.mergeAll(
+        unanswered,
+        Contracts.toLayerHandler("why", () => during(Effect.succeed(view))),
+        Contracts.toLayerHandler("readFile", (payload) =>
+          during(
+            Effect.gen(function* () {
+              yield* Ref.update(asked, (was) => ({
+                ...was,
+                files: [...was.files, payload.at ?? "main"],
+              }));
+
+              const at =
+                payload.at === undefined || payload.at === "main"
+                  ? mainAt
+                  : payload.at;
+
+              return yield* Schema.decodeEffect(FileView)({
+                at,
+                binary: false,
+                path: "src/format.ts",
+                sha: "5".repeat(40),
+                size: 6,
+                text: `at ${at.slice(0, 4)}\n`,
+                truncated: false,
+              }).pipe(Effect.orDie);
+            })
+          )
+        )
+      ),
+      asTester,
+    ])
+  );
+};
+
+const nothingAsked: Asked = { files: [], peak: 0, under: 0 };
+
+const whyAddress = { _splat: "src/format.ts", project: "datekit", rev: "main" };
+
+describe("the why page's read", () => {
+  it.live("asks for the why and the file's text at once", () =>
+    Effect.gen(function* () {
+      const asked = yield* Ref.make(nothingAsked);
+
+      const read = yield* readWhyPage(whyAddress).pipe(
+        // A not-found is TanStack's own error, typed `any`: neither case
+        // here reads one.
+        Effect.orDie,
+        Effect.provide(whyPlatform(asked, AT))
+      );
+
+      expect(read.text).toBe("at aaaa\n");
+      expect(yield* Ref.get(asked)).toStrictEqual({
+        files: ["main"],
+        peak: 2,
+        under: 0,
+      });
+    })
+  );
+
+  it.live(
+    "reads the file again at the why's commit when main moved between the two reads",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
+
+        const read = yield* readWhyPage(whyAddress).pipe(
+          // A not-found is TanStack's own error, typed `any`: neither case
+          // here reads one.
+          Effect.orDie,
+          Effect.provide(whyPlatform(asked, "b".repeat(40)))
+        );
+
+        expect(read.text).toBe("at aaaa\n");
+        expect((yield* Ref.get(asked)).files).toStrictEqual(["main", AT]);
+      })
+  );
 });

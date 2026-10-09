@@ -20,9 +20,11 @@ import { serverClient } from "../../../../server/client.ts";
 
 // Why each line of a file at a revision is there, read on the server: the
 // blame's ranges with their commits and landings, and the file's text at
-// the commit the blame resolved, so the two always agree. The browser then
-// draws the file with a row above each range. An address naming no
-// project, revision or file is a 404 showing the platform's refusal.
+// the commit the blame resolved, so the two always agree (both asked for
+// at once, the text again only if the revision moved between them). The
+// browser then draws the file with a row above each range. An address
+// naming no project, revision or file is a 404 showing the platform's
+// refusal.
 
 const WhyPageData = Schema.Struct({
   project: ProjectName,
@@ -51,13 +53,23 @@ export const readWhyPage = (params: WhyParams) =>
       UnknownRevision: notFoundFor,
     };
 
-    const view = yield* client
-      .why({ at: rev, path, project })
-      .pipe(Effect.catchTags(refused));
+    // Both at once: a cold why takes seconds, and the file's text needs
+    // none of it. Should the revision have moved between the two reads,
+    // the text is read again at the why's own commit.
+    const [view, read] = yield* Effect.all(
+      [
+        client.why({ at: rev, path, project }),
+        client.readFile({ at: rev, path, project }),
+      ],
+      { concurrency: 2 }
+    ).pipe(Effect.catchTags(refused));
 
-    const file = yield* client
-      .readFile({ at: view.at, path, project })
-      .pipe(Effect.catchTags(refused));
+    const file =
+      read.at === view.at
+        ? read
+        : yield* client
+            .readFile({ at: view.at, path, project })
+            .pipe(Effect.catchTags(refused));
 
     return yield* Schema.encodeEffect(WhyPageData)({
       project,
