@@ -7,17 +7,23 @@
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
+import { ProjectExists } from "@repo/protocol/refusal";
 import {
   Console,
+  Data,
+  Duration,
   Effect,
+  Fiber,
   FileSystem,
   Layer,
   Option,
   Path,
   Redacted,
+  Exit,
   Ref,
   Result,
 } from "effect";
+import { TestClock } from "effect/testing";
 
 import { LedgerFile, readLedger } from "../../../infra/created.ts";
 import {
@@ -31,6 +37,7 @@ import {
   ImportExamplesFailed,
   importExamples,
   ImportTarget,
+  initUntilAnswered,
   TagBackfill,
 } from "../../../scripts/lib/import/run.ts";
 import { ProjectName } from "../../protocol/src/ids.ts";
@@ -405,5 +412,80 @@ describe("bun scripts/import-examples.ts", () => {
           (yield* platform.calls).filter((call) => /ky|anyhow/u.test(call))
         ).toStrictEqual(["ls-remote anyhow", "tags anyhow"]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+});
+
+/** A call the platform never answered, as an edge timeout leaves it. */
+class NoAnswer extends Data.TaggedError("NoAnswer")<{
+  readonly after: string;
+}> {}
+
+/**
+ * `initUntilAnswered` over calls that answer `answers` in turn, the clock
+ * moved past its waits: how it ended, and how many calls it made.
+ */
+const askedAgain = (
+  answers: readonly Effect.Effect<
+    { readonly landed?: string },
+    NoAnswer | ProjectExists
+  >[]
+) =>
+  Effect.gen(function* () {
+    const made = yield* Ref.make(0);
+
+    const call = Effect.flatMap(
+      Ref.getAndUpdate(made, (count) => count + 1),
+      (count) => answers[count] ?? Effect.die("asked once too often")
+    );
+
+    const fiber = yield* Effect.forkChild(
+      initUntilAnswered(call, (error) => !(error instanceof NoAnswer))
+    );
+
+    yield* TestClock.adjust(Duration.minutes(2));
+
+    return { calls: yield* Ref.get(made), ended: yield* Fiber.await(fiber) };
+  });
+
+describe("an import's initProject, asked again", () => {
+  const anyhow = project("anyhow");
+
+  it.effect(
+    "takes ProjectExists after a call that got no answer as that call's project, made",
+    () =>
+      Effect.gen(function* () {
+        expect(
+          yield* askedAgain([
+            Effect.fail(new NoAnswer({ after: "100 s" })),
+            Effect.fail(new ProjectExists({ project: anyhow })),
+          ])
+        ).toStrictEqual({ calls: 2, ended: Exit.succeed({}) });
+      })
+  );
+
+  it.effect(
+    "answers ProjectExists on the first call, and asks nothing again",
+    () =>
+      Effect.gen(function* () {
+        expect(
+          yield* askedAgain([
+            Effect.fail(new ProjectExists({ project: anyhow })),
+          ])
+        ).toStrictEqual({
+          calls: 1,
+          ended: Exit.fail(new ProjectExists({ project: anyhow })),
+        });
+      })
+  );
+
+  it.effect("gives up after three more calls with no answer", () =>
+    Effect.gen(function* () {
+      const lost = Effect.fail(new NoAnswer({ after: "100 s" }));
+
+      expect(yield* askedAgain([lost, lost, lost, lost])).toStrictEqual({
+        calls: 4,
+        ended: Exit.fail(new NoAnswer({ after: "100 s" })),
+      });
+    })
   );
 });

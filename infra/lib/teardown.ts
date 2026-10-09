@@ -331,14 +331,21 @@ const onStage = (ledger: readonly Created[], stage: Stage, options: Options) =>
         options.keep.some((name) => ofProject(entry.name, name))
     );
 
-    const keptImports = live.filter(({ by }) => by === "import");
+    // Each kept import once, though a `--tags` backfill records its repo again.
+    const keptImports = [
+      ...new Map(
+        live.flatMap((entry) =>
+          entry.by === "import" ? [[keyOf(entry), entry] as const] : []
+        )
+      ).values(),
+    ];
 
     const never = live.filter(
       (entry) =>
         entry.kind !== "project" &&
         !chosen.has(keyOf(entry)) &&
         !kept.includes(entry) &&
-        !keptImports.includes(entry)
+        entry.by !== "import"
     );
 
     const projects = live.flatMap(({ by, kind, name }) =>

@@ -649,10 +649,18 @@ describe("bun infra/teardown.ts", () => {
   );
 
   it.live(
-    "lists the kept imports apart, never in the plan, and deletes none of them with --apply",
+    "lists the kept imports apart, each once, never in the plan, and deletes none of them with --apply",
     () =>
       Effect.gen(function* () {
-        const files = yield* tempRoot([...devLedger, ...imports]);
+        // A `--tags` backfill records anyhow's repo a second time.
+        const files = yield* tempRoot([
+          ...devLedger,
+          ...imports,
+          {
+            ...made("import", "repo", "anyhow", projects),
+            note: "tags backfilled",
+          },
+        ]);
 
         const fake = yield* memoryAccount({
           ...devRepos,
@@ -673,7 +681,7 @@ describe("bun infra/teardown.ts", () => {
             "  kept import: repo projects-dev-oscabriel/ky",
           ],
           standing: ["anyhow", "ky"],
-          total: "teardown on dev-oscabriel: 13 ledger entries, 5 to delete",
+          total: "teardown on dev-oscabriel: 14 ledger entries, 5 to delete",
         });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );

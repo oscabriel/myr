@@ -21,7 +21,6 @@ import {
   FileSystem,
   Layer,
   Redacted,
-  Schedule,
   Schema,
   Stream,
 } from "effect";
@@ -40,7 +39,12 @@ import type { Stage } from "../../../infra/stages.ts";
 import { servedWorld, worldOperator } from "../seed.ts";
 import { shownCommand, tagBackfillCommands } from "./plan.ts";
 import type { Command } from "./plan.ts";
-import { ImportExamplesFailed, ImportTarget, TagBackfill } from "./run.ts";
+import {
+  ImportExamplesFailed,
+  ImportTarget,
+  initUntilAnswered,
+  TagBackfill,
+} from "./run.ts";
 
 const failed = (reason: string) => new ImportExamplesFailed({ reason });
 
@@ -162,13 +166,6 @@ const clientAt = (
     Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson])
   );
 
-/**
- * An import that got no answer is asked again, a little later: a large
- * one can outlast the edge's request timeout, and the platform adopts the
- * repo the first call left. A refusal is never asked again.
- */
-const AGAIN = Schedule.spaced(Duration.seconds(30));
-
 /** The platform at `origin`, reached as the operator with `token`. */
 export const platformTarget = (input: {
   readonly origin: string;
@@ -187,14 +184,10 @@ export const platformTarget = (input: {
             argv: ["git", "ls-remote", `${input.origin}/${project}.git`],
           }).pipe(Effect.map(countsOf)),
         initProject: ({ branch, project, url }) =>
-          client.initProject({ import: { branch, url }, project }).pipe(
-            Effect.retry({
-              schedule: AGAIN,
-              times: 3,
-              while: (error) => !isRefusal(error),
-            }),
-            Effect.mapError(failedCall(`initProject ${project}`))
-          ),
+          initUntilAnswered(
+            client.initProject({ import: { branch, url }, project }),
+            isRefusal
+          ).pipe(Effect.mapError(failedCall(`initProject ${project}`))),
         label: input.label,
         listProjects: client.listProjects({}).pipe(
           Effect.map(

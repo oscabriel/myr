@@ -9,13 +9,17 @@
  * the real ones.
  */
 import { ProjectName } from "@repo/protocol/ids";
+import { ProjectExists } from "@repo/protocol/refusal";
 import {
   Array,
   Console,
   Context,
   DateTime,
+  Duration,
   Effect,
   Option,
+  Ref,
+  Schedule,
   Schema,
 } from "effect";
 import type { FileSystem, Layer, PlatformError } from "effect";
@@ -99,6 +103,42 @@ export class TagBackfill extends Context.Service<
     ) => Effect.Effect<number, ImportExamplesFailed>;
   }
 >()("scripts/TagBackfill") {}
+
+const isProjectExists = Schema.is(ProjectExists);
+
+/**
+ * One import's `initProject`, asked again 30 s apart, up to three more
+ * times, while it got no answer (`answered` false): a large import can
+ * outlast the edge's request timeout, and the platform adopts the repo the
+ * first call left. A refusal is never asked again. `ProjectExists` after a
+ * call that got no answer is that call's project, made after its answer
+ * was lost: this run's import, its landed SHA not known here.
+ */
+export const initUntilAnswered = <A extends { readonly landed?: string }, E>(
+  call: Effect.Effect<A, E>,
+  answered: (error: E) => boolean
+): Effect.Effect<{ readonly landed?: string }, E> =>
+  Effect.gen(function* () {
+    const unanswered = yield* Ref.make(false);
+
+    return yield* call.pipe(
+      Effect.catch((error) =>
+        Effect.flatMap(Ref.get(unanswered), (earlier) =>
+          earlier && isProjectExists(error)
+            ? Effect.succeed({})
+            : Effect.fail(error)
+        )
+      ),
+      Effect.tapError((error) =>
+        answered(error) ? Effect.void : Ref.set(unanswered, true)
+      ),
+      Effect.retry({
+        schedule: Schedule.spaced(Duration.seconds(30)),
+        times: 3,
+        while: (error) => !answered(error),
+      })
+    );
+  });
 
 const USAGE =
   "bun scripts/import-examples.ts --world node | --stage <dev-…> [--url <origin>] [--only <project>] [--tags] [--dry-run]";
@@ -313,7 +353,7 @@ const run = (options: ImportOptions) =>
           const { heads, tags } = yield* target.counts(example.project);
 
           yield* Console.log(
-            `imported ${example.project} (${example.kind}, ${example.branch}): main at ${made.landed?.slice(0, 12) ?? "nothing"}, ${heads} heads, ${tags} tags`
+            `imported ${example.project} (${example.kind}, ${example.branch}): main at ${made.landed?.slice(0, 12) ?? "a SHA an earlier unanswered call landed"}, ${heads} heads, ${tags} tags`
           );
 
           if (options.tags) {
