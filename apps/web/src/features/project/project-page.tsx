@@ -6,11 +6,13 @@
  */
 import { Brand } from "@repo/brand";
 import type { AskListing } from "@repo/protocol/domain/ask";
+import type { FileView, TreeListing } from "@repo/protocol/domain/code";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 
+import { EntriesTable, ReadmeSection } from "../code/tree-view.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
@@ -89,14 +91,67 @@ const steps = (project: ProjectName, platformUrl: string) =>
     },
   ] as const;
 
+/** A project's code as its page shows it: the root folder at main, and its README. */
+export interface ProjectCode {
+  readonly readme?: FileView | undefined;
+  readonly root: TreeListing;
+}
+
+/** The clone line, whole and copyable, and where to go once cloned. */
+const CloneBox = ({
+  platformUrl,
+  project,
+}: {
+  readonly platformUrl: string;
+  readonly project: ProjectName;
+}) => (
+  <section
+    aria-label="Clone"
+    className="border-rule bg-surface flex flex-col gap-2 border px-4 py-3"
+    data-clone=""
+  >
+    <h2 className="text-muted-foreground text-xs font-medium">
+      Clone it with plain git
+    </h2>
+    <CommandLine command={`git clone ${platformUrl}/${project}.git`} />
+  </section>
+);
+
+/** The root folder's entries at main, and the README below them. */
+const CodeSection = ({
+  code,
+  project,
+}: {
+  readonly code: ProjectCode;
+  readonly project: ProjectName;
+}) => (
+  <section aria-labelledby="code" className="flex min-w-0 flex-col gap-3">
+    <h2 className={SECTION} id="code">
+      <a
+        className="decoration-rule underline hover:decoration-current"
+        href={`/${project}/tree/main`}
+      >
+        Code
+      </a>
+    </h2>
+    <EntriesTable entries={code.root.entries} project={project} rev="main" />
+    {code.readme === undefined ? null : (
+      <ReadmeSection file={code.readme} project={project} />
+    )}
+  </section>
+);
+
 export const ProjectView = ({
   asks,
+  code,
   landings,
   listing,
   now,
   platformUrl,
 }: {
   readonly asks: readonly AskListing[];
+  /** The root folder at main and its README, once read; nothing is shown before. */
+  readonly code?: ProjectCode | undefined;
   readonly landings: readonly LandingView[];
   readonly listing: ProjectListing;
   readonly now: DateTime.Utc;
@@ -125,6 +180,7 @@ export const ProjectView = ({
           )}
         </span>
       </div>
+      <CloneBox platformUrl={platformUrl} project={project} />
       <div className="grid gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section
           aria-labelledby="open-asks"
@@ -178,6 +234,9 @@ export const ProjectView = ({
           )}
         </section>
       </div>
+      {code === undefined ? null : (
+        <CodeSection code={code} project={project} />
+      )}
     </PageShell>
   );
 };

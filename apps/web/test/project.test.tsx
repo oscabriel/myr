@@ -8,6 +8,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { AskListing } from "@repo/protocol/domain/ask";
+import { FileView, TreeListing } from "@repo/protocol/domain/code";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { LandingView } from "@repo/protocol/domain/landing";
@@ -215,6 +216,79 @@ describe(ProjectView, () => {
   });
 });
 
+describe("the project's code on its page", () => {
+  const AT = "a".repeat(40);
+
+  const root = Schema.decodeSync(TreeListing)({
+    at: AT,
+    entries: [
+      {
+        mode: "040000",
+        name: "src",
+        path: "src",
+        sha: "b".repeat(40),
+        type: "tree",
+      },
+      {
+        mode: "100644",
+        name: "README.md",
+        path: "README.md",
+        sha: "c".repeat(40),
+        type: "blob",
+      },
+    ],
+    readme: { path: "README.md", sha: "c".repeat(40) },
+  });
+
+  const readme = Schema.decodeSync(FileView)({
+    at: AT,
+    binary: false,
+    path: "README.md",
+    sha: "c".repeat(40),
+    size: 26,
+    text: "# datekit\n\nDates, kept.\n",
+    truncated: false,
+  });
+
+  const withCode = (
+    <ProjectView
+      asks={asks}
+      code={{ readme, root }}
+      landings={landings}
+      listing={listing}
+      now={now}
+      platformUrl={platformUrl}
+    />
+  );
+
+  it("shows the clone line in a box of its own, above the asks", () => {
+    const markup = markupOf(withCode);
+    const clone = markup.indexOf('data-clone=""');
+
+    expect(clone).toBeGreaterThan(-1);
+    expect(
+      markup.indexOf(`git clone ${platformUrl}/datekit.git`, clone)
+    ).toBeGreaterThan(clone);
+    expect(clone).toBeLessThan(markup.indexOf('id="open-asks"'));
+  });
+
+  it("lists the root's entries, each linking its page at main", () => {
+    const markup = markupOf(withCode);
+
+    expect(markup).toContain('href="/datekit/tree/main/src"');
+    expect(markup).toContain('href="/datekit/blob/main/README.md"');
+  });
+
+  it("renders the root README", () => {
+    expect(markupOf(withCode)).toContain('data-readme="README.md"');
+    expect(textOf(withCode)).toContain("Dates, kept.");
+  });
+
+  it("shows no code section before the code is read", () => {
+    expect(markupOf(page)).not.toContain("data-readme=");
+  });
+});
+
 describe(UnknownProjectView, () => {
   it("shows the platform's UnknownProject refusal for a name that could be a project", () => {
     const markup = markupOf(<UnknownProjectView name="no-such-project" />);
@@ -284,11 +358,11 @@ describe(recentLandings, () => {
   });
 });
 
-describe("the project, front page and people views", () => {
+describe("the project, front page, people and code views", () => {
   // Views only: props in, markup out. A view that fetched would tie its page
   // to one transport (src/surfaces.ts); the atoms live in src/client/.
   const sources: Readonly<Record<string, string>> = import.meta.glob(
-    "../src/features/{front,project,people}/**/*.{ts,tsx}",
+    "../src/features/{front,project,people,code}/**/*.{ts,tsx}",
     { eager: true, import: "default", query: "?raw" }
   );
 
