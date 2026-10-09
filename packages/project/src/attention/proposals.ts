@@ -138,7 +138,9 @@ const admit = (
     return Result.fail(new NotVouched({}));
   }
 
-  return openCount >= cap ? Result.fail(new CapReached({ cap })) : Result.void;
+  return openCount >= cap
+    ? Result.fail(new CapReached({ cap, limit: "proposals" }))
+    : Result.void;
 };
 
 /** The fields every proposal opens with, expiring after the policy's days. */
@@ -388,7 +390,7 @@ export const draft = (
           : { note, round, startedAt: now };
 
       return round > DRAFT_ROUNDS
-        ? Result.fail(new CapReached({ cap: DRAFT_ROUNDS }))
+        ? Result.fail(new CapReached({ cap: DRAFT_ROUNDS, limit: "drafts" }))
         : Result.succeed(
             Option.some({
               effects: [],

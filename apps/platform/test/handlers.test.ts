@@ -308,7 +308,9 @@ describe("claims", () => {
           project: datekit.project,
         });
 
-        expect(past).toStrictEqual(new CapReached({ cap: 1 }));
+        expect(past).toStrictEqual(
+          new CapReached({ cap: 1, limit: "claims", retryAfter: 60 })
+        );
         expect(bobs.claim.claimant).toBe("bob");
       }).pipe(Effect.provide(platform({ limits: { claim: 1, proposal: 5 } })))
   );
@@ -342,7 +344,9 @@ describe("proposals and flags", () => {
       });
 
       expect(proposed.proposal.proposer).toBe("bob");
-      expect(flagged).toStrictEqual(new CapReached({ cap: 1 }));
+      expect(flagged).toStrictEqual(
+        new CapReached({ cap: 1, limit: "proposals", retryAfter: 60 })
+      );
       expect({
         flags: carols.proposal.flags,
         proposer: carols.proposal.proposer,
@@ -862,12 +866,30 @@ describe("the Worker's rate limits", () => {
         expect(spent).toStrictEqual([
           Result.void,
           Result.void,
-          Result.fail(new CapReached({ cap: WorkerCaps.claim })),
+          Result.fail(
+            new CapReached({
+              cap: WorkerCaps.claim,
+              limit: "claims",
+              retryAfter: 60,
+            })
+          ),
           Result.void,
           Result.void,
-          Result.fail(new CapReached({ cap: WorkerCaps.proposal })),
+          Result.fail(
+            new CapReached({
+              cap: WorkerCaps.proposal,
+              limit: "proposals",
+              retryAfter: 60,
+            })
+          ),
           Result.void,
-          Result.fail(new CapReached({ cap: WorkerCaps.draft })),
+          Result.fail(
+            new CapReached({
+              cap: WorkerCaps.draft,
+              limit: "drafts",
+              retryAfter: 60,
+            })
+          ),
         ]);
         expect(claims.keys).toStrictEqual(["alice", "alice", "alice", "bob"]);
         expect(proposals.keys).toStrictEqual(["alice", "alice"]);

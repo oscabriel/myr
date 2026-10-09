@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { Schema } from "effect";
 
 import { RepoPath } from "../src/ids.ts";
-import { groups, Refusal, StaleBase } from "../src/refusal.ts";
+import { CapReached, groups, Refusal, StaleBase } from "../src/refusal.ts";
 import { base, examples, main } from "./examples.ts";
 
 // What Effect's MCP server sends for a declared tool failure that has no
@@ -37,6 +38,44 @@ describe("the refusal union", () => {
 
     expect(decoded.message).toBe("");
     expect(decoded).toStrictEqual(refusal);
+  });
+
+  it("sends a cap's limit and wait as JSON keys, and decodes one without them as before", () => {
+    const rate = new CapReached({ cap: 2, limit: "drafts", retryAfter: 60 });
+    const held = new CapReached({ cap: 3 });
+
+    expect(JSON.parse(overTheWire(rate))).toStrictEqual({
+      _tag: rate._tag,
+      cap: 2,
+      limit: "drafts",
+      next: `${Brand.cli} status`,
+      retryAfter: 60,
+      retryable: true,
+    });
+    expect(JSON.parse(overTheWire(held))).toStrictEqual({
+      _tag: held._tag,
+      cap: 3,
+      next: `${Brand.cli} status`,
+      retryable: true,
+    });
+    expect(
+      [rate, held].map((refusal) =>
+        Schema.decodeUnknownSync(Refusal)(JSON.parse(overTheWire(refusal)))
+      )
+    ).toStrictEqual([rate, held]);
+  });
+
+  it("refuses a cap's wait below one second", () => {
+    const zero = {
+      ...Schema.encodeSync(CapReached)(
+        new CapReached({ cap: 3, retryAfter: 60 })
+      ),
+      retryAfter: 0,
+    };
+
+    expect(() => Schema.decodeUnknownSync(Refusal)(zero)).toThrow(
+      /retryAfter/u
+    );
   });
 
   // MCP tool schemas come from this document. A bare `Schema.Number` admits

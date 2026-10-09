@@ -5,11 +5,46 @@ import type { Array } from "effect";
 import type { AnswerReceipt } from "./domain/answer.ts";
 import { Outcome } from "./domain/outcome.ts";
 import { ChecksFailed } from "./refusal.ts";
-import type { Refusal } from "./refusal.ts";
+import type { CapReached, Refusal } from "./refusal.ts";
 
 const short = (sha: string) => sha.slice(0, 7);
 
 const list = (items: readonly string[]) => items.join(", ");
+
+const counted = (count: number, noun: string) =>
+  `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+type CapLimit = NonNullable<CapReached["limit"]>;
+
+// A cap with no `retryAfter` is held: it lifts when a claim is released or
+// landed, a proposal decided; a proposal's draft rounds never lift.
+const held = {
+  claims: (cap) =>
+    `you already hold ${counted(cap, "claim")}, the most this project allows`,
+  drafts: (cap) =>
+    `this proposal was already drafted ${cap === 1 ? "once" : `${cap} times`}, the most one proposal takes`,
+  proposals: (cap) =>
+    `you already have ${counted(cap, "open proposal")} here, the most this project allows`,
+} as const satisfies Record<CapLimit, (cap: number) => string>;
+
+// A rate limit counts what one person made across the platform in a window.
+const rated = {
+  claims: { noun: "claim", verb: "made" },
+  drafts: { noun: "draft", verb: "started" },
+  proposals: { noun: "proposal", verb: "made" },
+} as const satisfies Record<CapLimit, { noun: string; verb: string }>;
+
+const capReason = ({
+  cap,
+  limit = "claims",
+  retryAfter,
+}: CapReached): string =>
+  retryAfter === undefined
+    ? held[limit](cap)
+    : `you ${rated[limit].verb} ${counted(cap, rated[limit].noun)} in the last minute, the most the platform allows; try again in ${retryAfter}s`;
+
+// A branch is what a person pushes; every other ref the platform writes.
+const BRANCH = "refs/heads/";
 
 // Reasons name only what the refusal's reader may see: held-back checks give
 // their area and suite, never a case or an input. A shape refusal's reason
@@ -20,8 +55,7 @@ const reason = Match.typeTags<Refusal, string>()({
   AskFull: ({ ask }) => `someone else holds the claim on ${ask}`,
   AttemptsExhausted: ({ area, resetsAt }) =>
     `no attempts left on ${area} until ${DateTime.formatIso(resetsAt)}`,
-  CapReached: ({ cap }) =>
-    `you already hold ${cap} claims, the most this project allows`,
+  CapReached: capReason,
   ChecksFailed: ({ lane, logRef }) =>
     logRef === ChecksFailed.withheld
       ? `the ${lane} checks failed; their log was withheld`
@@ -32,7 +66,9 @@ const reason = Match.typeTags<Refusal, string>()({
   Denounced: () =>
     "this project's vouch file denounces you, so it takes no claims or proposals from you",
   DirectPush: ({ ref }) =>
-    `main moves only by a landing, so ${ref} takes no direct push; push your answer to your claim's fork`,
+    ref.startsWith(BRANCH)
+      ? `main moves only by a landing, so ${ref} takes no direct push; push your answer to your claim's fork`
+      : `${ref} is written by the platform, not pushed; a fork takes branches only, so push your answer with git push ${Brand.slug} HEAD:main`,
   DraftInProgress: ({ proposal }) =>
     `the platform is already drafting ${proposal}'s ask`,
   Flake: ({ lane }) =>

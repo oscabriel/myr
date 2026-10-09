@@ -31,9 +31,27 @@ export const WorkerCaps = {
   proposal: 5,
 } as const satisfies Limits;
 
-/** A refusal for one more of `kind` than `limits` allow. */
+/** Which limit a refusal names for each kind it counts. */
+const LIMIT_OF = {
+  claim: "claims",
+  draft: "drafts",
+  proposal: "proposals",
+} as const satisfies Record<Limited, CapReached["limit"]>;
+
+/**
+ * How long a refused caller waits, in seconds: the bindings' 60 s period. A
+ * binding can't say when its window resets, so the whole period is the
+ * honest upper bound. It describes the bindings; it configures nothing.
+ */
+const WINDOW_SECONDS = 60;
+
+/** A refusal for one more of `kind` than `limits` allow, with when to try again. */
 const capped = (limits: Limits, kind: Limited) =>
-  new CapReached({ cap: limits[kind] });
+  new CapReached({
+    cap: limits[kind],
+    limit: LIMIT_OF[kind],
+    retryAfter: WINDOW_SECONDS,
+  });
 
 /**
  * The Worker's rate limits, one binding per kind. A binding that fails is a

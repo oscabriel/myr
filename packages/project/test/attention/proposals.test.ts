@@ -108,7 +108,7 @@ describe("proposing an ask", () => {
 
   it("refuses a person who already has the cap's proposals open", () => {
     expect(proposalOf(byCarol({ openCount: 2 }))).toStrictEqual(
-      Result.fail(new CapReached({ cap: 2 }))
+      Result.fail(new CapReached({ cap: 2, limit: "proposals" }))
     );
   });
 
@@ -233,7 +233,7 @@ describe("flagging an ask", () => {
       proposalOf(flagBy({ openCount: 2 })),
       proposalOf(flagBy({ denounced: true })),
     ]).toStrictEqual([
-      Result.fail(new CapReached({ cap: 2 })),
+      Result.fail(new CapReached({ cap: 2, limit: "proposals" })),
       Result.fail(new Denounced({})),
     ]);
   });

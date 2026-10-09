@@ -664,7 +664,7 @@ describe("proposing with a draft", () => {
           plain: plain.proposal.draft,
         }).toStrictEqual({
           drafted: "Drafting",
-          past: new CapReached({ cap: 1 }),
+          past: new CapReached({ cap: 1, limit: "drafts", retryAfter: 60 }),
           plain: undefined,
         });
       }).pipe(

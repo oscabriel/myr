@@ -493,7 +493,7 @@ describe("a proposal", () => {
         expect(run.alarm).toStrictEqual(Option.some(daysAfter(noon, 14)));
         expect([run.second.proposal.state, run.third]).toStrictEqual([
           "open",
-          new CapReached({ cap: 2 }),
+          new CapReached({ cap: 2, limit: "proposals" }),
         ]);
       })
   );

@@ -69,11 +69,23 @@ export class NotVouched extends Schema.TaggedError<NotVouched>()("NotVouched", {
   ...nextIs(cli("status")),
 }) {}
 
-/** The pusher already holds as many claims as the project allows. */
+/**
+ * The caller reached a limit of `cap`. `limit` says which: claims held (also
+ * when absent, the first meaning, so a claim cap needs no key), open
+ * proposals, or a proposal's draft rounds. A rate limit across the platform
+ * also gives `retryAfter`, the seconds until one more is let through; a cap
+ * without it lifts when something held is released, landed or decided.
+ */
 export class CapReached extends Schema.TaggedError<CapReached>()("CapReached", {
   ...Retryable,
   ...nextIs(cli("status")),
   cap: Schema.Int,
+  /** Which limit: claims held (also when absent), proposals, or drafts. */
+  limit: Schema.optionalKey(Schema.Literals(["claims", "proposals", "drafts"])),
+  /** For a rate limit: seconds until one more is let through. */
+  retryAfter: Schema.optionalKey(
+    Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
+  ),
 }) {}
 
 /** Someone else holds the ask's one claim. */
@@ -96,8 +108,9 @@ export class RepoBusy extends Schema.TaggedError<RepoBusy>()("RepoBusy", {
 }) {}
 
 /**
- * The push tried to move a canonical ref directly. Main moves only by a
- * landing; an answer goes to the claim's fork.
+ * The push tried to move a ref the pusher may not move: a canonical ref
+ * (main moves only by a landing; an answer goes to the claim's fork), or, on
+ * a fork, a ref outside `refs/heads/`, which the platform writes itself.
  */
 export class DirectPush extends Schema.TaggedError<DirectPush>()("DirectPush", {
   ...Final,

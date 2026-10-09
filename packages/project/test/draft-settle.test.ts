@@ -615,7 +615,7 @@ describe("a proposal with a draft", () => {
           DraftInProgress.of(proposal),
           new NotDecider({}),
           new UnknownProposal({ proposal: ProposalId.make("prop-000009") }),
-          new CapReached({ cap: 3 }),
+          new CapReached({ cap: 3, limit: "drafts" }),
           new ProposalClosed({ proposal }),
         ]);
         expect(second.proposal.draft).toStrictEqual(

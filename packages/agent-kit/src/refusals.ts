@@ -52,7 +52,7 @@ const repairs = {
     todo: "Wait until `resetsAt`: you used every attempt on that area's held-back checks for now.",
   },
   CapReached: {
-    todo: "Release a claim you hold, or land one, before you take another.",
+    todo: "Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again.",
   },
   ChecksFailed: {
     nextNames: "the command that reproduces the failure",

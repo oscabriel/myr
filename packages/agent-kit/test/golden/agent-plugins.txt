@@ -56,7 +56,7 @@ Instead of landing an answer, the platform answers with refusals. Git prints the
 | `NotClaimed` | yes | `__CLI__ claim <ask>` | Claim the ask, then push again. |
 | `ClaimLapsed` | yes | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
 | `NotVouched` | no | `__CLI__ status` | Ask a member of the project to vouch for you. |
-| `CapReached` | yes | `__CLI__ status` | Release a claim you hold, or land one, before you take another. |
+| `CapReached` | yes | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
 | `AskFull` | yes | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
 | `NoAsk` | no | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
 | `RepoBusy` | yes | `git push` | Push again. |

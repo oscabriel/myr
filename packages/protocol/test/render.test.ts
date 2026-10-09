@@ -15,6 +15,7 @@ import {
   RequestId,
 } from "../src/ids.ts";
 import {
+  CapReached,
   ChecksFailed,
   DirectPush,
   DraftInProgress,
@@ -214,6 +215,80 @@ describe(explain, () => {
         "  retryable: no",
       ]
     );
+  });
+
+  it("tells a push to a ref the platform writes that a fork takes branches only", () => {
+    expect(
+      explain([new DirectPush({ ref: `refs/notes/${Brand.slug}` })])
+    ).toStrictEqual([
+      `DirectPush: refs/notes/${Brand.slug} is written by the platform, not pushed; a fork takes branches only, so push your answer with git push ${Brand.slug} HEAD:main`,
+      `  next: ${Brand.cli} asks`,
+      "  retryable: no",
+    ]);
+  });
+
+  // A cap names the limit it reached, and a rate limit when to try again; a
+  // cap with no limit is claims held, as it always was.
+  it.each([
+    {
+      reason: "you already hold 3 claims, the most this project allows",
+      refusal: new CapReached({ cap: 3 }),
+    },
+    {
+      reason: "you already hold 1 claim, the most this project allows",
+      refusal: new CapReached({ cap: 1, limit: "claims" }),
+    },
+    {
+      reason:
+        "you made 10 claims in the last minute, the most the platform allows; try again in 60s",
+      refusal: new CapReached({ cap: 10, limit: "claims", retryAfter: 60 }),
+    },
+    {
+      reason:
+        "you made 5 proposals in the last minute, the most the platform allows; try again in 60s",
+      refusal: new CapReached({ cap: 5, limit: "proposals", retryAfter: 60 }),
+    },
+    {
+      reason:
+        "you made 1 proposal in the last minute, the most the platform allows; try again in 60s",
+      refusal: new CapReached({ cap: 1, limit: "proposals", retryAfter: 60 }),
+    },
+    {
+      reason:
+        "you already have 2 open proposals here, the most this project allows",
+      refusal: new CapReached({ cap: 2, limit: "proposals" }),
+    },
+    {
+      reason:
+        "you already have 1 open proposal here, the most this project allows",
+      refusal: new CapReached({ cap: 1, limit: "proposals" }),
+    },
+    {
+      reason:
+        "you started 2 drafts in the last minute, the most the platform allows; try again in 60s",
+      refusal: new CapReached({ cap: 2, limit: "drafts", retryAfter: 60 }),
+    },
+    {
+      reason:
+        "you started 1 draft in the last minute, the most the platform allows; try again in 30s",
+      refusal: new CapReached({ cap: 1, limit: "drafts", retryAfter: 30 }),
+    },
+    {
+      reason:
+        "this proposal was already drafted 3 times, the most one proposal takes",
+      refusal: new CapReached({ cap: 3, limit: "drafts" }),
+    },
+    {
+      reason:
+        "this proposal was already drafted once, the most one proposal takes",
+      refusal: new CapReached({ cap: 1, limit: "drafts" }),
+    },
+  ])("reads CapReached as: $reason", ({ refusal, reason }) => {
+    expect(explain([refusal])).toStrictEqual([
+      `CapReached: ${reason}`,
+      `  next: ${Brand.cli} status`,
+      "  retryable: yes",
+    ]);
   });
 
   // A code read names what it could not find and how to look with git; a
