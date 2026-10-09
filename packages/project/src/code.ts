@@ -7,8 +7,7 @@
  * consult the project's record only for main's landed commit, its landings
  * and its forks (`CodeProject`). Reads by object id go through `CodeCache`.
  *
- * Each read lives in its own module under `code/`; `whyOf` is a stub until
- * 912 lands.
+ * Each read lives in its own module under `code/`.
  */
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import type {
@@ -43,6 +42,7 @@ import { logPage } from "./code/log.ts";
 import { pathList } from "./code/paths.ts";
 import { refsView } from "./code/refs.ts";
 import { listing } from "./code/tree.ts";
+import { whyView } from "./code/why.ts";
 import type { ProjectApi } from "./project.ts";
 
 /** What the code reads take from a project's record, beside its canonical repo. */
@@ -71,8 +71,6 @@ export const codeProjectOf = (
   project,
   repo: RepoName.make(project),
 });
-
-const notBuilt = (issue: string) => Effect.die(`not built: ${issue}`);
 
 /** Main's landed commit, its tags peeled and sorted newest first, and its forks. */
 export const refsOf = (
@@ -125,8 +123,8 @@ export const commitOf = (
 
 /** Why each line of a file at `at` is there. */
 export const whyOf = (
-  _project: CodeProject,
-  _at: Option.Option<Rev>,
-  _path: RepoPath
+  project: CodeProject,
+  at: Option.Option<Rev>,
+  path: RepoPath
 ): Effect.Effect<WhyView, UnknownRevision | UnknownPath, RepoHost> =>
-  notBuilt("912");
+  whyView(project, at, path);

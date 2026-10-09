@@ -4,6 +4,8 @@ import { BlobSha, RepoPath } from "@repo/protocol/ids";
 import type { RepoName, TreeSha } from "@repo/protocol/ids";
 import { Array, Effect, Option, Order, Semaphore } from "effect";
 
+import { Edit, sharedEnds, shortestDiff } from "./line-diff.ts";
+
 /**
  * One file an answer changed, with its blob ids before and after. The same
  * shape as the gate's `Change` (`@repo/gate/facts`), which git cannot import.
@@ -152,46 +154,6 @@ const linesOf = (bytes: Uint8Array) => {
   return lines;
 };
 
-// Past this many edits the diff stops looking for the shortest script.
-const MAX_EDITS = 1024;
-
-const at = (values: Int32Array, index: number) => values[index] ?? 0;
-
-/**
- * Indexes in `next` that the edit script ending at `(n, m)` inserts, read
- * back from `trace`, where `trace[d]` holds diagonals `-d..d` after `d` edits.
- */
-const insertsFrom = (
-  trace: readonly Int32Array[],
-  ends: { readonly n: number; readonly m: number }
-) => {
-  const inserts: number[] = [];
-  let x = ends.n;
-  let y = ends.m;
-
-  for (let edits = trace.length - 1; edits > 0; edits -= 1) {
-    const previous = trace[edits - 1] ?? new Int32Array();
-    const diagonal = x - y;
-
-    const reached = (k: number) => at(previous, k + edits - 1);
-
-    const down =
-      diagonal === -edits ||
-      (diagonal !== edits && reached(diagonal - 1) < reached(diagonal + 1));
-
-    const from = down ? diagonal + 1 : diagonal - 1;
-
-    x = reached(from);
-    y = x - from;
-
-    if (down) {
-      inserts.push(y);
-    }
-  }
-
-  return inserts.toReversed();
-};
-
 /**
  * Lines of `next` with no partner in `previous`, matched by count: the
  * fallback for a rewrite too large for the shortest script.
@@ -213,83 +175,30 @@ const unmatched = (previous: readonly string[], next: readonly string[]) => {
 };
 
 /**
- * Indexes of the lines of `next` a shortest edit script from `previous`
- * inserts (Myers' O(ND) diff).
+ * The lines of `next` that are not in `previous`, numbered from 1: the
+ * insertions of the shortest edit script (`line-diff.ts`), or, for a
+ * rewrite too large for it, the lines with no partner by count.
  */
-const myers = (previous: readonly string[], next: readonly string[]) => {
-  const n = previous.length;
-  const m = next.length;
-  const limit = Math.min(n + m, MAX_EDITS);
-  const offset = limit + 1;
-  const reach = new Int32Array(2 * limit + 3);
-  const trace: Int32Array[] = [];
-
-  for (let edits = 0; edits <= limit; edits += 1) {
-    for (let diagonal = -edits; diagonal <= edits; diagonal += 2) {
-      let x =
-        diagonal === -edits ||
-        (diagonal !== edits &&
-          at(reach, offset + diagonal - 1) < at(reach, offset + diagonal + 1))
-          ? at(reach, offset + diagonal + 1)
-          : at(reach, offset + diagonal - 1) + 1;
-
-      let y = x - diagonal;
-
-      while (x < n && y < m && previous[x] === next[y]) {
-        x += 1;
-        y += 1;
-      }
-
-      reach[offset + diagonal] = x;
-
-      if (x >= n && y >= m) {
-        trace.push(reach.slice(offset - edits, offset + edits + 1));
-
-        return insertsFrom(trace, { m, n });
-      }
-    }
-
-    trace.push(reach.slice(offset - edits, offset + edits + 1));
-  }
-
-  return unmatched(previous, next);
-};
-
-/** The lines of `next` that are not in `previous`, numbered from 1. */
 const added = (
   previous: readonly string[],
   next: readonly string[]
-): readonly AddedLine[] => {
-  let start = 0;
+): readonly AddedLine[] =>
+  Option.match(shortestDiff(previous, next), {
+    onNone: () => {
+      const { head, tail } = sharedEnds(previous, next);
 
-  while (
-    start < previous.length &&
-    start < next.length &&
-    previous[start] === next[start]
-  ) {
-    start += 1;
-  }
-
-  let end = 0;
-
-  while (
-    end < previous.length - start &&
-    end < next.length - start &&
-    previous[previous.length - 1 - end] === next[next.length - 1 - end]
-  ) {
-    end += 1;
-  }
-
-  const middle = myers(
-    previous.slice(start, previous.length - end),
-    next.slice(start, next.length - end)
-  );
-
-  return middle.map((index) => ({
-    line: start + index + 1,
-    text: next[start + index] ?? "",
-  }));
-};
+      return unmatched(
+        previous.slice(head, previous.length - tail),
+        next.slice(head, next.length - tail)
+      ).map((index) => head + index);
+    },
+    onSome: (edits) =>
+      edits.flatMap((edit) =>
+        Edit.$is("Insert")(edit)
+          ? Array.makeBy(edit.count, (at) => edit.newStart + at)
+          : []
+      ),
+  }).map((index) => ({ line: index + 1, text: next[index] ?? "" }));
 
 /**
  * A file's lines; none for a binary blob, or for a submodule's pointer, whose
