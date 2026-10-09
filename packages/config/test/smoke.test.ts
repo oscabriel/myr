@@ -64,9 +64,18 @@ const rpcReply = (body: string): Reply =>
 /**
  * The platform as smoke expects to find it: healthy, OAuth's resource
  * metadata published, MCP closed to anyone without a credential, anonymous
- * reads open, and no repo it doesn't hold.
+ * reads open, no repo it doesn't hold, and a `/` that names MCP and the
+ * CLI's installer.
  */
 const healthy = ({ authorized, body, method, path }: Seen): Reply => {
+  if (method === "GET" && path === "/") {
+    return {
+      body: "<!doctype html><p><code>http://127.0.0.1/mcp</code></p><pre>curl -fsSL http://127.0.0.1/install.sh | sh</pre>",
+      contentType: "text/html; charset=utf-8",
+      status: 200,
+    };
+  }
+
   if (method === "GET" && path === "/health") {
     return { body: '{"ok":true,"stage":"dev-oscabriel"}', status: 200 };
   }
@@ -91,9 +100,14 @@ const healthy = ({ authorized, body, method, path }: Seen): Reply => {
 
 /**
  * A platform whose 401 gate is gone and whose stage is down: `/health` and
- * `/rpc` break, MCP opens to anyone, and git's paths answer 200.
+ * `/rpc` break, MCP opens to anyone, git's paths answer 200, and `/` is
+ * gone.
  */
 const broken = (seen: Seen): Reply => {
+  if (seen.path === "/") {
+    return { status: 404 };
+  }
+
   if (seen.path === "/health") {
     return { body: "upstream connect error", status: 503 };
   }
@@ -156,6 +170,14 @@ describe("smoke against a live stage", () => {
       expect(report.stage).toBe("dev-oscabriel");
       expect(report.probes.map(({ probe }) => probe)).toStrictEqual([
         ...platformProbes,
+      ]);
+      expect(platformProbes).toStrictEqual([
+        "health",
+        "oauth-metadata",
+        "mcp-needs-credential",
+        "anonymous-unknown-project",
+        "missing-repo-404",
+        "platform-root",
       ]);
       expect(
         report.probes.every(({ elapsedMs }) => elapsedMs >= 0)
@@ -234,6 +256,7 @@ describe("smoke against a live stage", () => {
           probe: "missing-repo-404",
           reason: "GET /no-such-project.git/info/refs answered 200, not 404",
         },
+        { probe: "platform-root", reason: "GET / answered 404, not 200" },
       ]);
     }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
@@ -398,6 +421,33 @@ describe("smoke's own checks", () => {
             probe: "anonymous-unknown-project",
             reason:
               "POST /rpc listAsks for no-such-project answered 200 without an UnknownProject refusal",
+          },
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  it.live(
+    "fails the platform's / when it names neither MCP nor the installer",
+    () =>
+      Effect.gen(function* () {
+        const origin = yield* fakePlatform((seen) =>
+          seen.path === "/"
+            ? {
+                body: "<!doctype html><p>Hello</p>",
+                contentType: "text/html; charset=utf-8",
+                status: 200,
+              }
+            : healthy(seen)
+        );
+
+        const result = yield* Effect.result(smoke(origin));
+
+        expect(
+          Result.isFailure(result) ? result.failure.failures : []
+        ).toStrictEqual([
+          {
+            probe: "platform-root",
+            reason: "GET / answered 200 without naming /mcp and install.sh",
           },
         ]);
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))

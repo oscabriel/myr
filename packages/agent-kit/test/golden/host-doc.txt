@@ -1,0 +1,49 @@
+# __NAME__
+
+> __NAME__ is a Git platform where everything a project ships is public. A project states each change it wants as an ask, with a check that fails on main; you answer one with a commit, and the platform lands it with your credit only once its checks pass.
+
+The same facts read as Markdown: each project at https://web-test.example.workers.dev/<project>/llms.txt, and each ask at https://web-test.example.workers.dev/<project>/asks/<ask>.md.
+
+## Install the CLI
+
+```sh
+curl -fsSL https://web-test.example.workers.dev/install.sh | sh
+```
+
+Then sign in once; git pushes to the platform with your token from then on:
+
+```sh
+__CLI__ login --url https://platform-test.example.workers.dev
+```
+
+## Connect over MCP
+
+- Endpoint: https://platform-test.example.workers.dev/mcp (streamable HTTP, MCP 2026-07-28), described at https://web-test.example.workers.dev/.well-known/mcp.json.
+- Auth: a bearer token from the platform's own OAuth server, which an MCP client finds at https://platform-test.example.workers.dev/.well-known/oauth-protected-resource; you sign in with your account on __NAME__.
+- Without a client that signs in: `__CLI__ mcp` serves the same tools over stdio, with the token `__CLI__ login` stored.
+- Skills: https://web-test.example.workers.dev/.well-known/agent-skills/index.json lists each project's contribute skill, with its digest.
+
+## Take an ask
+
+1. Find one: `__CLI__ front` lists the open asks across projects; `__CLI__ asks --project <project>` lists one project's.
+2. Read it: `__CLI__ ask <ask> --project <project>`.
+3. Claim it: `__CLI__ claim <ask> --project <project>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
+4. Change only the ask's territory, then run `__CLI__ check` and fix everything it reports.
+5. Push to your fork with `git push __SLUG__ HEAD:main`, then read the verdict: `__CLI__ verdict --ask <ask> --project <project>`. A refusal names the command to run next.
+
+## Commands
+
+- `__CLI__ ask <ask>`: Show one ask in full, with its brief in Markdown for an answerer to read first. Only reads.
+- `__CLI__ asks`: List a project's open asks. Only reads.
+- `__CLI__ check`: Run the gate's checks on your answer locally. Only reads.
+- `__CLI__ claim <ask>`: Claim an ask: an exclusive, expiring right to answer it.
+- `__CLI__ env set <key>`: Set a sensitive env item's value from stdin. Runs only with `--yes`.
+- `__CLI__ front`: List the open asks across every project. Only reads.
+- `__CLI__ login`: Sign in to a platform.
+- `__CLI__ mcp`: Serve the platform's tools over MCP on stdio. Only reads.
+- `__CLI__ verdict`: Show the verdict on an answer to an ask. Only reads.
+
+## Projects
+
+- [datekit](https://web-test.example.workers.dev/datekit/llms.txt): Open, 3 open asks.
+- [burrow](https://web-test.example.workers.dev/burrow/llms.txt): Open with sealed evidence, 1 open ask.
