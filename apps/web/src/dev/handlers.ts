@@ -293,15 +293,7 @@ export const devHandlers: Layer.Layer<
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.openAsk(who, input))
         ),
-      projectPolicy: ({ project }) =>
-        on(project, (api) =>
-          Effect.map(api.policy(), (policy) =>
-            Option.match(policy, {
-              onNone: () => ({}),
-              onSome: (evaluated) => ({ policy: evaluated }),
-            })
-          )
-        ),
+      projectPolicy: ({ project }) => on(project, (api) => api.policy()),
       proposeAsk: ({ project, ...input }) =>
         Effect.flatMap(person, (who) =>
           on(project, (api) => api.proposeAsk(who, input))

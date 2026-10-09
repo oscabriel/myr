@@ -22,13 +22,21 @@ export const ProposalState = Schema.Literals([
 
 export type ProposalState = typeof ProposalState.Type;
 
+/** What a member asks a draft to do differently, for the agent to read. */
+export const DraftNote = Schema.String.check(Schema.isMaxLength(2000));
+
 /**
- * Where the platform's draft of a proposal's ask stands: drafting, ready
+ * Where the platform's draft of a proposal's ask stands: drafting (with the
+ * note the round was asked with, if any), ready
  * (its check failed on main red first, in `lane`, the way `signature`
  * says), or failed after its attempts, with the last refusal's tag.
  */
 export const DraftState = Schema.TaggedUnion({
-  Drafting: { round: AtLeastOne, startedAt: Schema.DateTimeUtcFromString },
+  Drafting: {
+    note: Schema.optionalKey(DraftNote),
+    round: AtLeastOne,
+    startedAt: Schema.DateTimeUtcFromString,
+  },
   Failed: {
     attempts: AtLeastOne,
     model: Schema.NonEmptyString,

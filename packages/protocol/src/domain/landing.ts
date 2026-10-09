@@ -18,6 +18,11 @@ export const LandingView = Schema.Struct({
   /** The `Held-back:` trailer's value (`<area> <passed>/<total> @ <suite>; …`, without its key), when held-back checks judged it. */
   heldBackTrailer: Schema.optionalKey(Schema.NonEmptyString),
   landedAt: Schema.DateTimeUtcFromString,
+  /**
+   * The ask this landing opened (a migrate family's parent); absent on every
+   * other landing. An opening answers nothing, so it never sets `ask`.
+   */
+  opened: Schema.optionalKey(AskId),
   /** Main before it; absent for the first adoption (the initializer's first push, or an import's tip). */
   parent: Schema.optionalKey(LandedSha),
   project: ProjectName,

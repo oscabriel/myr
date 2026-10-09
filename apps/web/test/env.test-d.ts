@@ -17,4 +17,8 @@ describe("the web Worker's Env", () => {
     expectTypeOf<Env>().not.toHaveProperty("ARTIFACTS_PRIVATE");
     expectTypeOf<Extract<keyof Env, `ARTIFACTS${string}`>>().toBeNever();
   });
+
+  it("has no code-cache bucket: code history is the platform's to read and keep", () => {
+    expectTypeOf<Env>().not.toHaveProperty("CODE_CACHE");
+  });
 });

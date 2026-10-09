@@ -10,6 +10,7 @@ import { NodeServices } from "@effect/platform-node";
 import type { D1Client } from "@effect/sql-d1";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RepoHostBinding } from "@repo/artifacts/repo-host/binding";
+import type { CodeStoreR2 } from "@repo/project/code-store/binding";
 import type { RulesEvaluatorWorker } from "@repo/rules/rules-evaluator/worker";
 import {
   Array,
@@ -375,6 +376,40 @@ describe("the platform Worker's bindings", () => {
       }).pipe(Effect.provide(NodeServices.layer))
   );
 
+  // Code history persists in a bucket of its own per stage, named for its
+  // job, never another job's bucket.
+  it.effect("keep code history in each block's own code-cache bucket", () =>
+    Effect.gen(function* () {
+      const raw = yield* Effect.flatMap(fileText("wrangler.jsonc"), readJsonc);
+
+      const { env = {} } = yield* Schema.decodeUnknownEffect(Staged)(raw);
+
+      const Buckets = Schema.Struct({
+        r2_buckets: Schema.Array(
+          Schema.Struct({ binding: Schema.String, bucket_name: Schema.String })
+        ),
+      });
+
+      const codeCache = (block: typeof Raw.Type | undefined) =>
+        Effect.map(
+          Schema.decodeUnknownEffect(Buckets)(block),
+          ({ r2_buckets }) =>
+            r2_buckets.find(({ binding }) => binding === "CODE_CACHE")
+              ?.bucket_name
+        );
+
+      expect({
+        demo: yield* codeCache(env.demo),
+        "dev-oscabriel": yield* codeCache(env["dev-oscabriel"]),
+        top: yield* codeCache(raw),
+      }).toStrictEqual({
+        demo: "code-cache-demo",
+        "dev-oscabriel": "code-cache-dev-oscabriel",
+        top: "code-cache-local",
+      });
+    }).pipe(Effect.provide(NodeServices.layer))
+  );
+
   it("are all the Env the Worker is given, and nothing else", () => {
     expectTypeOf<keyof Env>().toEqualTypeOf<
       Exclude<
@@ -425,6 +460,12 @@ describe("the platform Worker's bindings", () => {
     >();
     expectTypeOf<Env["SIGN_IN_LIMIT"]>().toExtend<
       Parameters<typeof SignInAttemptsBinding>[0]
+    >();
+    expectTypeOf<Env["CODE_CACHE"]>().toExtend<
+      Parameters<typeof CodeStoreR2>[0]
+    >();
+    expectTypeOf<PlatformConfig["CODE_CACHE"]>().toEqualTypeOf<
+      Env["CODE_CACHE"]
     >();
   });
 

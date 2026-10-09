@@ -3,6 +3,7 @@ import { platformSkill } from "@repo/agent-kit/platform";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { Upstream } from "@repo/git/upstream";
+import { CodeStore } from "@repo/project/code-store";
 import { CodeCache } from "@repo/project/code/cache";
 import { FrontPage } from "@repo/project/front-page";
 import { Projects } from "@repo/project/projects";
@@ -387,11 +388,13 @@ const decodeProject = Schema.decodeUnknownOption(ProjectName);
 /** `/<project>/raw/<rev>/<path…>`: a project's raw files (`raw.ts`). */
 const raw = HttpRouter.use((router) =>
   Effect.gen(function* () {
-    // The isolate's code cache, as the `/rpc` code reads have it: a
-    // `Context.Reference`, so without it every raw read goes to Artifacts.
+    // The isolate's code cache and the code store, as the `/rpc` code
+    // reads have them: `Context.Reference`s, so without them every raw read
+    // goes to Artifacts.
     const services = Context.make(RepoHost, yield* RepoHost).pipe(
       Context.add(Projects, yield* Projects),
-      Context.add(CodeCache, yield* CodeCache)
+      Context.add(CodeCache, yield* CodeCache),
+      Context.add(CodeStore, yield* CodeStore)
     );
 
     yield* router.add("GET", "/:project/raw/*", (request) =>

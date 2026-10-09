@@ -6,14 +6,24 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { CheckSpec } from "@repo/protocol/domain/check";
-import { CommitSha, LaneName, RepoName, RepoPath } from "@repo/protocol/ids";
+import type { LandingView } from "@repo/protocol/domain/landing";
+import {
+  AskId,
+  CommitSha,
+  LandedSha,
+  LaneName,
+  RepoName,
+  RepoPath,
+} from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
+import { RulesEvaluator, RulesFailed } from "@repo/rules/rules-evaluator";
 import { advanceTo } from "@repo/testkit/clock";
 import type { Files } from "@repo/testkit/git-client";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
-import { Array, Effect, Layer, Option } from "effect";
+import { Array, DateTime, Effect, Layer, Option } from "effect";
 
 import { NoEnv } from "../src/env-port.ts";
+import { ProjectStore } from "../src/project-store.ts";
 import { projectService } from "../src/project.ts";
 import { NoVisibility } from "../src/visibility-port.ts";
 import { CheckScript, composedAt, Pusher, worldOf } from "./world.ts";
@@ -118,16 +128,26 @@ describe("a project's reads for its code and its people", () => {
     "say where main landed, which commits are landings, the forks and the public policy",
     () =>
       Effect.map(read.pipe(Effect.provide(world)), (got) => {
-        expect(got.before).toStrictEqual({
-          forks: [],
-          head: {},
-          policy: Option.none(),
-        });
+        // Before the first landing there is no policy, and nothing to say why.
+        expect(got.before).toStrictEqual({ forks: [], head: {}, policy: {} });
         expect(got.after.head).toStrictEqual({ landed: got.landed });
         // The ask's opening landed on the adoption; the other commit is none.
+        // An opening names the ask it opened, and answers none.
         expect(
-          got.after.landings.map(({ parent, sha }) => ({ parent, sha }))
-        ).toStrictEqual([{ parent: got.adopted, sha: got.landed }]);
+          got.after.landings.map(({ ask, opened, parent, sha }) => ({
+            ask,
+            opened,
+            parent,
+            sha,
+          }))
+        ).toStrictEqual([
+          {
+            ask: undefined,
+            opened: parseIso.id,
+            parent: got.adopted,
+            sha: got.landed,
+          },
+        ]);
         expect(got.after.forks).toStrictEqual([
           {
             ask: parseIso.id,
@@ -138,14 +158,149 @@ describe("a project's reads for its code and its people", () => {
           },
         ]);
 
-        const policy = Option.getOrThrow(got.after.policy);
+        const policy = Option.getOrThrow(
+          Option.fromUndefinedOr(got.after.policy.policy)
+        );
 
+        // It evaluated, so there is nothing to say why not.
         expect({
           deciders: policy.deciders,
           hidden: ["asks", "functions", "visibility"].filter(
             (key) => key in policy
           ),
-        }).toStrictEqual({ deciders: scenario.policy.deciders, hidden: [] });
+          keys: Object.keys(got.after.policy),
+        }).toStrictEqual({
+          deciders: scenario.policy.deciders,
+          hidden: [],
+          keys: ["policy"],
+        });
       })
+  );
+});
+
+/** A commit SHA made of one digit, for rows written straight to the store. */
+const shaOf = (digit: string) => LandedSha.make(digit.repeat(40));
+
+/**
+ * Rows as an older build wrote them: landings with no `opened`, beside the
+ * asks they opened. `p` opens a migrate family (the parent `migrate-p`, its
+ * step `migrate-p-1`), `a` lands an answer to `parse-iso`.
+ */
+const olderRows = Effect.gen(function* () {
+  yield* advanceTo("2026-10-07T12:00:00Z");
+
+  const api = yield* projectService(project);
+
+  yield* api.initProject(alice, {});
+
+  const landedAt = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
+
+  const row = (sha: LandedSha): LandingView => ({
+    assisted: [],
+    author: alice.handle,
+    credits: [{ handle: alice.handle, role: "Asked-by" }],
+    landedAt,
+    project,
+    sha,
+  });
+
+  const parent = AskId.make("migrate-p");
+
+  yield* ProjectStore.use((store) =>
+    store.commit({
+      asks: [
+        { ...parseIso, openedIn: shaOf("c") },
+        {
+          ...parseIso,
+          id: AskId.make("migrate-p-1"),
+          openedIn: shaOf("d"),
+          parent,
+        },
+        { ...parseIso, id: parent, openedIn: shaOf("d") },
+      ],
+      landings: [
+        row(shaOf("c")),
+        row(shaOf("d")),
+        { ...row(shaOf("e")), ask: parseIso.id },
+      ],
+    })
+  );
+
+  return {
+    landing: yield* api.landing(alice, shaOf("d")),
+    landings: yield* api.landings([shaOf("c"), shaOf("d"), shaOf("e")]),
+  };
+});
+
+describe("an opening's landing", () => {
+  it.effect(
+    "names the ask it opened when read, though its row was written without it: a migrate family's parent, never a step, and never on an answer",
+    () =>
+      Effect.map(olderRows.pipe(Effect.provide(world)), (got) => {
+        expect(
+          got.landings.map(({ ask, opened, sha }) => ({ ask, opened, sha }))
+        ).toStrictEqual([
+          { ask: undefined, opened: parseIso.id, sha: shaOf("c") },
+          { ask: undefined, opened: "migrate-p", sha: shaOf("d") },
+          { ask: parseIso.id, opened: undefined, sha: shaOf("e") },
+        ]);
+        expect(got.landing.landing.opened).toBe("migrate-p");
+      })
+  );
+});
+
+/** A rules evaluator whose every config folder fails to evaluate. */
+const failingRules = Layer.succeed(
+  RulesEvaluator,
+  RulesEvaluator.of({
+    call: () => Effect.succeed(false),
+    evaluate: () =>
+      Effect.fail(
+        new RulesFailed({ detail: "no test command", reason: "threw" })
+      ),
+  })
+);
+
+/** The policy after a first push of `files`, with every evaluation failing. */
+const unevaluatedAfter = (files: Files) =>
+  Effect.gen(function* () {
+    yield* advanceTo("2026-10-07T12:00:00Z");
+
+    const api = yield* projectService(project);
+
+    yield* api.initProject(alice, {});
+
+    const first = yield* Pusher.use((pusher) =>
+      pusher.push(repo, Option.none(), files, "Start")
+    );
+
+    const { landed } = yield* api.recordFirstPush(alice, first);
+
+    return { landed, policy: yield* api.policy() };
+  }).pipe(Effect.provide(Layer.merge(world, failingRules)));
+
+describe("a policy that has not evaluated", () => {
+  it.effect("says the landed tree has no config folder, when it has none", () =>
+    Effect.map(unevaluatedAfter(start), ({ landed, policy }) => {
+      expect(policy).toStrictEqual({
+        unevaluated: { at: landed, reason: "noConfig" },
+      });
+    })
+  );
+
+  it.effect(
+    "says the config folder did not evaluate, when the landed tree has one",
+    () =>
+      Effect.map(
+        unevaluatedAfter([
+          ...start,
+          [`${Brand.configDir}/project.ts`, "export default {};\n"],
+        ]),
+        ({ landed, policy }) => {
+          expect(policy).toStrictEqual({
+            unevaluated: { at: landed, reason: "configFailed" },
+          });
+        }
+      )
   );
 });

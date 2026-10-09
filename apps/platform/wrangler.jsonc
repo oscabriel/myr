@@ -81,10 +81,12 @@
   "kv_namespaces": [
     { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
   ],
-  // Lane logs, and the CLI's releases the platform serves.
+  // Lane logs, the CLI's releases the platform serves, and code history
+  // (why and a path's log), kept by immutable ids across isolates.
   "r2_buckets": [
     { "binding": "EVIDENCE", "bucket_name": "evidence-local" },
     { "binding": "RELEASES", "bucket_name": "releases-local" },
+    { "binding": "CODE_CACHE", "bucket_name": "code-cache-local" },
   ],
   "worker_loaders": [{ "binding": "LOADER" }],
   // Workers AI, for the drafter (no key: the account's own).
@@ -177,6 +179,7 @@
       "r2_buckets": [
         { "binding": "EVIDENCE", "bucket_name": "evidence-dev-oscabriel" },
         { "binding": "RELEASES", "bucket_name": "releases-dev-oscabriel" },
+        { "binding": "CODE_CACHE", "bucket_name": "code-cache-dev-oscabriel" },
       ],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },
@@ -263,6 +266,7 @@
       "r2_buckets": [
         { "binding": "EVIDENCE", "bucket_name": "evidence-demo" },
         { "binding": "RELEASES", "bucket_name": "releases-demo" },
+        { "binding": "CODE_CACHE", "bucket_name": "code-cache-demo" },
       ],
       "worker_loaders": [{ "binding": "LOADER" }],
       "ai": { "binding": "AI" },

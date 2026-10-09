@@ -155,6 +155,7 @@ export const fakeEnv = (): Env => ({
   ARTIFACTS: untouchable("ARTIFACTS"),
   ARTIFACTS_PRIVATE: untouchable("ARTIFACTS_PRIVATE"),
   CLAIM_LIMIT: untouchable("CLAIM_LIMIT"),
+  CODE_CACHE: untouchable("CODE_CACHE"),
   COOKIE_KEY: cookieKey,
   DRAFT_LIMIT: untouchable("DRAFT_LIMIT"),
   DRAFT_MODEL: "@cf/moonshotai/kimi-k2.7-code",

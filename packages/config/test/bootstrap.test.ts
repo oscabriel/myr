@@ -106,6 +106,8 @@ const everything: Existing = {
     "evidence-demo",
     "releases-dev-oscabriel",
     "releases-demo",
+    "code-cache-dev-oscabriel",
+    "code-cache-demo",
   ],
 };
 
@@ -171,6 +173,7 @@ describe("the stage table", () => {
           )
         ).toStrictEqual(
           stages.map((stage) => ({
+            CODE_CACHE: resources(stage).codeCache,
             EVIDENCE: resources(stage).evidence,
             RELEASES: resources(stage).releases,
           }))
@@ -197,6 +200,7 @@ describe("the bootstrap plan", () => {
       Step.CreateKv({ title: "oauth-dev-oscabriel" }),
       Step.CreateR2({ name: "evidence-dev-oscabriel" }),
       Step.CreateR2({ name: "releases-dev-oscabriel" }),
+      Step.CreateR2({ name: "code-cache-dev-oscabriel" }),
     ]);
   });
 
@@ -217,13 +221,14 @@ describe("the bootstrap plan", () => {
         },
       ],
       namespaces: ["projects-demo", "layers-demo", "layers-dev-oscabriel"],
-      r2: ["evidence-dev-oscabriel", "releases-demo"],
+      r2: ["evidence-dev-oscabriel", "releases-demo", "code-cache-demo"],
     };
 
     expect(plan("dev-oscabriel", demoOnly)).toStrictEqual([
       Step.CreateNamespace({ name: "projects-dev-oscabriel" }),
       Step.CreateD1({ name: "front-page-dev-oscabriel" }),
       Step.CreateR2({ name: "releases-dev-oscabriel" }),
+      Step.CreateR2({ name: "code-cache-dev-oscabriel" }),
     ]);
   });
 });
@@ -237,7 +242,8 @@ describe("a dry run", () => {
       "bootstrap demo (dry run): create KV oauth-demo",
       "bootstrap demo (dry run): create R2 evidence-demo",
       "bootstrap demo (dry run): create R2 releases-demo",
-      "bootstrap demo (dry run): would create 6; nothing was changed",
+      "bootstrap demo (dry run): create R2 code-cache-demo",
+      "bootstrap demo (dry run): would create 7; nothing was changed",
     ]);
     expect(planLines("demo", [])).toStrictEqual([
       "bootstrap demo (dry run): would create 0; nothing was changed",

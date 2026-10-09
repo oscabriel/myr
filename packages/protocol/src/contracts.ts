@@ -38,8 +38,8 @@ import { EnvSchemaView } from "./domain/env.ts";
 import { ProjectEvent } from "./domain/event.ts";
 import { FrontPageEntry, ProjectListing } from "./domain/front-page.ts";
 import { LandingView } from "./domain/landing.ts";
-import { PublicPolicy } from "./domain/policy.ts";
-import { Proposal } from "./domain/proposal.ts";
+import { PolicyPending, PublicPolicy } from "./domain/policy.ts";
+import { DraftNote, Proposal } from "./domain/proposal.ts";
 import { CreditSummary } from "./domain/record.ts";
 import { Ledger } from "./domain/visibility.ts";
 import {
@@ -561,6 +561,12 @@ export class PolicyOf extends Rpc.make("projectPolicy", {
   success: Schema.Struct({
     /** Absent while the config folder at the landed commit has not evaluated. */
     policy: Schema.optionalKey(PublicPolicy),
+    /**
+     * Why there is no policy at the landed commit: no config folder, or one
+     * that did not evaluate. Absent before the first landing and once a
+     * policy has evaluated.
+     */
+    unevaluated: Schema.optionalKey(PolicyPending),
   }),
 })
   .annotate(
@@ -721,7 +727,7 @@ export class DraftAsk extends Rpc.make("draftAsk", {
   ]),
   payload: {
     /** What the draft should do differently, for the agent to read. */
-    note: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(2000))),
+    note: Schema.optionalKey(DraftNote),
     project: ProjectName,
     proposal: ProposalId,
   },

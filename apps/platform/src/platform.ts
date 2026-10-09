@@ -79,6 +79,12 @@ export const PlatformBindings = Schema.Struct({
     "the private Artifacts namespace"
   ),
   CLAIM_LIMIT: binding<Env["CLAIM_LIMIT"]>("a rate limit"),
+  /**
+   * Code history (why, a path's log), kept by immutable ids so every
+   * isolate reads what one computed. Only this Worker binds it: the web
+   * reads code through the platform.
+   */
+  CODE_CACHE: binding<Env["CODE_CACHE"]>("an R2 bucket"),
   DRAFT_LIMIT: binding<Env["DRAFT_LIMIT"]>("a rate limit"),
   EVIDENCE: binding<Env["EVIDENCE"]>("an R2 bucket"),
   FRONT_PAGE: binding<Env["FRONT_PAGE"]>("a D1 database"),

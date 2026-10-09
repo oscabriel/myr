@@ -657,6 +657,31 @@
         "knownBad": ["8888888888888888888888888888888888888888"],
         "layer": "maintainers"
       }
+    },
+    "a pending policy for a reason the platform does not give": {
+      "schema": "PolicyPending",
+      "value": {
+        "at": "4444444444444444444444444444444444444444",
+        "reason": "broken"
+      }
+    },
+    "a landing that opened something not an ask id": {
+      "schema": "LandingView",
+      "value": {
+        "assisted": [],
+        "author": "alice",
+        "credits": [
+          {
+            "handle": "alice",
+            "role": "Asked-by"
+          }
+        ],
+        "landedAt": "2026-10-07T12:00:00.000Z",
+        "opened": "Not An Ask!",
+        "parent": "1111111111111111111111111111111111111111",
+        "project": "datekit",
+        "sha": "4444444444444444444444444444444444444444"
+      }
     }
   },
   "roundTrip": {
@@ -1271,6 +1296,21 @@
           "tree": "5555555555555555555555555555555555555555",
           "verifier": "platform"
         }
+      },
+      {
+        "assisted": [],
+        "author": "alice",
+        "credits": [
+          {
+            "handle": "alice",
+            "role": "Asked-by"
+          }
+        ],
+        "landedAt": "2026-10-07T12:00:00.000Z",
+        "opened": "iso-week",
+        "parent": "1111111111111111111111111111111111111111",
+        "project": "datekit",
+        "sha": "4444444444444444444444444444444444444444"
       }
     ],
     "Ledger": [
@@ -1704,6 +1744,16 @@
         }
       }
     ],
+    "PolicyPending": [
+      {
+        "at": "4444444444444444444444444444444444444444",
+        "reason": "noConfig"
+      },
+      {
+        "at": "4444444444444444444444444444444444444444",
+        "reason": "configFailed"
+      }
+    ],
     "Principal": [
       {
         "_tag": "Person",
@@ -1908,6 +1958,23 @@
           "fork": "datekit--me--dave",
           "head": "3333333333333333333333333333333333333333"
         },
+        "state": "open",
+        "territory": "@datekit/parse",
+        "want": "An ISO week date parses to the Monday of that week."
+      },
+      {
+        "draft": {
+          "_tag": "Drafting",
+          "note": "Name the week-53 case in the want.",
+          "round": 2,
+          "startedAt": "2026-10-07T13:00:00.000Z"
+        },
+        "expiresAt": "2026-10-21T12:00:00.000Z",
+        "files": ["config/asks/iso-week.ask.ts"],
+        "id": "prop-000001",
+        "openedAt": "2026-10-07T12:00:00.000Z",
+        "project": "datekit",
+        "proposer": "dave",
         "state": "open",
         "territory": "@datekit/parse",
         "want": "An ISO week date parses to the Monday of that week."

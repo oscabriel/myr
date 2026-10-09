@@ -121,6 +121,22 @@ export const PublicPolicy = Policy.mapFields(
 export type PublicPolicy = typeof PublicPolicy.Type;
 
 /**
+ * Why a project's policy has not evaluated at its landed commit, derived at
+ * each read and never stored.
+ */
+export const PolicyPending = Schema.Struct({
+  at: LandedSha,
+  /**
+   * `noConfig`: the landed tree has no config folder, and the defaults found
+   * no test command. `configFailed`: the folder is there and did not
+   * evaluate.
+   */
+  reason: Schema.Literals(["noConfig", "configFailed"]),
+});
+
+export type PolicyPending = typeof PolicyPending.Type;
+
+/**
  * An ask as its file in the config folder states it: the platform adds its
  * project, when and in which landing it opened, and its state.
  */

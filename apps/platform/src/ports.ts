@@ -31,6 +31,7 @@ import { DrafterWorkersAi } from "@repo/drafting/drafter/binding";
 import { DraftModel } from "@repo/drafting/run";
 import type { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
+import { CodeStoreR2 } from "@repo/project/code-store/binding";
 import { CodeCacheLive } from "@repo/project/code/cache";
 import type { FrontPage } from "@repo/project/front-page";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
@@ -111,7 +112,8 @@ const memoryFrontPage = Layer.merge(
  * its binding, git's upstream and every repo read over it, each project's
  * Durable Object, the sandbox's Checker, the Lander `LANDER_ADAPTER` names,
  * config folders evaluated in the Worker Loader, the front
- * page in D1, the rate limits, lane logs in the `EVIDENCE` bucket,
+ * page in D1, the rate limits, lane logs in the `EVIDENCE` bucket, code
+ * history in the `CODE_CACHE` bucket,
  * the `PROJECT` namespace again for `watch`'s relay of each project's
  * socket, and each proposal's draft rounds as runs of the `Answer`
  * Workflow.
@@ -147,6 +149,10 @@ const corePorts = (config: PlatformConfig): Layer.Layer<WorkerPorts> =>
     // The code reads' cache, one per isolate: a `Context.Reference`, so
     // without this entry every read goes to Artifacts.
     CodeCacheLive(CODE_READS_KEPT.light, CODE_READS_KEPT.heavy),
+    // The code history's store across isolates, in `CODE_CACHE`: a
+    // `Context.Reference`, so without this entry history is kept only in
+    // the isolate's cache above.
+    CodeStoreR2(config.CODE_CACHE),
     // A `Context.Reference`: without this entry a draft proposal starts no
     // run, and stays drafting.
     DraftRunsWorkflow(config.ANSWER)

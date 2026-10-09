@@ -7,7 +7,7 @@
  * every public path is (a raw file at no revision is a 404).
  */
 import { describe, expect, it } from "@effect/vitest";
-import { ProposalId, RepoPath } from "@repo/protocol/ids";
+import { AskId, ProposalId, RepoPath } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
 import { advanceTo } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
@@ -48,12 +48,34 @@ describe("the code, policy and drafting contracts over /rpc", () => {
       const { handler } = yield* platform;
       const anyone = yield* rpcClient(handler);
 
-      const { policy } = yield* anyone.projectPolicy({ project });
+      const read = yield* anyone.projectPolicy({ project });
+      const { policy } = read;
 
+      // It evaluated, so there is nothing to say why not.
+      expect(Object.keys(read)).toStrictEqual(["policy"]);
       expect(policy?.source).toBe("config");
       expect(policy?.deciders).toStrictEqual(datekit.policy.deciders);
       expect(Object.keys(policy ?? {})).not.toContain("visibility");
       expect(Object.keys(policy ?? {})).not.toContain("asks");
+    })
+  );
+
+  it.effect("give anyone an opening's landing, naming the ask it opened", () =>
+    Effect.gen(function* () {
+      const { handler } = yield* platform;
+      const anyone = yield* rpcClient(handler);
+      const ask = AskId.make("parse-iso");
+      const { ask: opened } = yield* anyone.showAsk({ ask, project });
+
+      const { landing } = yield* anyone.landing({
+        project,
+        sha: opened.openedIn,
+      });
+
+      expect({ ask: landing.ask, opened: landing.opened }).toStrictEqual({
+        ask: undefined,
+        opened: ask,
+      });
     })
   );
 

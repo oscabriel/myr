@@ -51,6 +51,8 @@ export interface Resources {
   readonly evidence: string;
   /** The R2 bucket the CLI's releases are downloaded from (`/install.sh`, `/releases/*`). */
   readonly releases: string;
+  /** The R2 bucket that keeps code history (why, a path's log) by immutable ids. */
+  readonly codeCache: string;
   /** The Workflow that merges, checks and lands an answer. */
   readonly answer: string;
   /** The Workflow that hears every push to the public namespace. */
@@ -60,6 +62,7 @@ export interface Resources {
 /** Each resource's name at `stage`. */
 export const resources = (stage: Stage): Resources => ({
   answer: `answer-${stage}`,
+  codeCache: `code-cache-${stage}`,
   evidence: `evidence-${stage}`,
   frontPage: `front-page-${stage}`,
   layers: `layers-${stage}`,

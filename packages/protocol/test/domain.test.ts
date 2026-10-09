@@ -15,8 +15,13 @@ import { FrontPageEntry, ProjectListing } from "../src/domain/front-page.ts";
 import { AskKind } from "../src/domain/kind.ts";
 import { LandingView } from "../src/domain/landing.ts";
 import { Outcome } from "../src/domain/outcome.ts";
-import { AskInput, Policy, PolicyInput } from "../src/domain/policy.ts";
-import { Proposal } from "../src/domain/proposal.ts";
+import {
+  AskInput,
+  Policy,
+  PolicyInput,
+  PolicyPending,
+} from "../src/domain/policy.ts";
+import { DraftNote, Proposal } from "../src/domain/proposal.ts";
 import { CreditSummary } from "../src/domain/record.ts";
 import { RunBlock } from "../src/domain/run.ts";
 import { Territory } from "../src/domain/territory.ts";
@@ -92,6 +97,7 @@ const schemas = {
   Outcome,
   Policy,
   PolicyInput,
+  PolicyPending,
   Principal,
   ProjectEvent,
   ProjectListing,
@@ -162,6 +168,9 @@ describe("the domain schemas", () => {
     ["ProjectEvent", ProjectEvent],
     ["VisibilityPolicy", VisibilityPolicy],
     ["LayerManifest", LayerManifest],
+    ["LandingView", LandingView],
+    ["PolicyPending", PolicyPending],
+    ["Proposal", Proposal],
   ] as const)(
     "%s has a JSON Schema with no non-finite numbers and no nulls",
     (_name, schema) => {
@@ -170,6 +179,15 @@ describe("the domain schemas", () => {
       expect(document).not.toMatch(/Infinity|NaN|"null"/u);
     }
   );
+
+  // `draftAsk`'s note and a running draft's are one schema: what the
+  // member asked the agent for, at most 2,000 characters.
+  it("keep a draft's note to 2,000 characters", () => {
+    expect([
+      refuses(DraftNote, "x".repeat(2000)),
+      refuses(DraftNote, "x".repeat(2001)),
+    ]).toStrictEqual([false, true]);
+  });
 
   it("fill the defaults for every key the config folder may leave out", () => {
     expect(

@@ -79,6 +79,7 @@ import {
   LedgerOf,
   ListAsks,
   OpenAsk,
+  PolicyOf,
   ProposeAsk,
   Release,
   SetEnv,
@@ -114,7 +115,8 @@ import type { AskKind } from "@repo/protocol/domain/kind";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
-import { Policy, PublicPolicy } from "@repo/protocol/domain/policy";
+import type { PublicPolicy } from "@repo/protocol/domain/policy";
+import { Policy } from "@repo/protocol/domain/policy";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
   AskId,
@@ -415,9 +417,10 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   readonly forks: () => Effect.Effect<readonly ForkRef[]>;
   /**
    * The policy at the landed commit as anyone may read it (no layers, no
-   * function-valued rules, no asks); none until it has evaluated.
+   * function-valued rules, no asks), once it has evaluated; until then, after
+   * the first landing, why it has not (derived at each read, never stored).
    */
-  readonly policy: () => Effect.Effect<Option.Option<PublicPolicy>>;
+  readonly policy: () => Effect.Effect<PolicyStatus>;
   /**
    * What a draft's run reads for one round of an open proposal: the landed
    * commit, the want and territory, the public policy and the canonical
@@ -614,6 +617,9 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
 /** The most paths a draft's context lists: as many as the code browser's `listPaths`. */
 const MAX_DRAFT_PATHS = 50_000;
 
+/** What `projectPolicy` answers: the public policy, or why there is none yet. */
+export type PolicyStatus = typeof PolicyOf.successSchema.Type;
+
 /** The most commits one `landings` call looks up: a log page's, or a blame's batch. */
 export const MAX_LANDINGS = 100;
 
@@ -779,7 +785,7 @@ export const MethodSchemas = {
   policy: {
     args: [],
     error: Schema.Never,
-    success: Schema.Option(PublicPolicy),
+    success: PolicyOf.successSchema,
   },
   proposeAsk: {
     args: [
@@ -1976,6 +1982,10 @@ const leaveIfDone = (
   );
 };
 
+/** A landing that names neither the ask it answers nor one it opened. */
+const namesNoAsk = (landing: LandingView) =>
+  landing.ask === undefined && landing.opened === undefined;
+
 /** One project's service over the ports. */
 export const projectService = (
   name: ProjectName
@@ -2524,6 +2534,91 @@ export const projectService = (
             })),
         })
       );
+
+    /**
+     * Whether the landed tree at `at` has a config folder at its root: one
+     * commit read and one tree read. A commit or tree the repo does not have
+     * has none.
+     */
+    const hasConfigAt = (at: LandedSha) =>
+      Effect.gen(function* () {
+        const landedCommit = yield* host.readCommit(repo, at);
+
+        if (Option.isNone(landedCommit)) {
+          return false;
+        }
+
+        const root = yield* host.readTree(repo, landedCommit.value.tree);
+
+        return Option.exists(root, (entries) =>
+          entries.some(
+            ({ name: entry, type }) =>
+              entry === Brand.configDir && type === "tree"
+          )
+        );
+      }).pipe(Effect.orDie);
+
+    /**
+     * The public policy once one has evaluated; before that, after the first
+     * landing, why not: the landed tree has no config folder (the defaults
+     * found no test command), or it has one that did not evaluate. Derived
+     * here, never stored, so a project that never evaluated says why at once.
+     */
+    const policyStatus: Effect.Effect<PolicyStatus> = Effect.gen(function* () {
+      const h = yield* hydrate;
+
+      if (Option.isSome(h.policy)) {
+        return { policy: publicPolicy(h.policy.value) };
+      }
+
+      const landed = Option.flatMapNullishOr(h.project, (row) => row.landed);
+
+      if (Option.isNone(landed)) {
+        return {};
+      }
+
+      const at = landed.value;
+
+      return {
+        unevaluated: {
+          at,
+          reason: (yield* hasConfigAt(at))
+            ? ("configFailed" as const)
+            : ("noConfig" as const),
+        },
+      };
+    });
+
+    /**
+     * Each landing with the ask it opened: a row written before landings
+     * carried `opened` gets it from the asks, the one with no parent whose
+     * `openedIn` is its SHA. Only a landing that names no ask is looked up,
+     * and the asks are read once for the whole batch.
+     */
+    const withOpened = (found: readonly LandingView[]) =>
+      Effect.gen(function* () {
+        if (!found.some(namesNoAsk)) {
+          return found;
+        }
+
+        const { asks } = yield* store.load();
+
+        const openedIn = new Map<string, AskId>();
+
+        for (const ask of asks) {
+          if (ask.parent === undefined && !openedIn.has(ask.openedIn)) {
+            openedIn.set(ask.openedIn, ask.id);
+          }
+        }
+
+        return found.map((landing) => {
+          const opened = openedIn.get(landing.sha);
+
+          return namesNoAsk(landing) && opened !== undefined
+            ? { ...landing, opened }
+            : landing;
+        });
+      });
 
     // --------------------------------------------------------- generated
 
@@ -4292,6 +4387,8 @@ export const projectService = (
           author: opening.asker,
           credits: landed.credits,
           landedAt: now,
+          // The ask it opened: a migrate family's parent, never a step.
+          opened: ask.id,
           parent: main,
           project: name,
           requestId: landed.requestId,
@@ -5522,7 +5619,10 @@ export const projectService = (
           Effect.flatMap(store.landing(sha), (found) =>
             Option.match(found, {
               onNone: () => Effect.fail(new UnknownCommit({ sha })),
-              onSome: (landing) => Effect.succeed({ landing }),
+              onSome: (landing) =>
+                Effect.map(withOpened([landing]), ([named = landing]) => ({
+                  landing: named,
+                })),
             })
           )
         ),
@@ -5530,9 +5630,9 @@ export const projectService = (
         checked(
           MethodSchemas.landings,
           [shas],
-          Effect.map(
+          Effect.flatMap(
             Effect.forEach(Array.dedupe(shas), (sha) => store.landing(sha)),
-            Array.getSomes
+            (found) => withOpened(Array.getSomes(found))
           )
         ),
       layerAccess: (caller, layer) =>
@@ -5568,12 +5668,7 @@ export const projectService = (
           [caller, input],
           write(api, openBody(caller, input))
         ),
-      policy: () =>
-        checked(
-          MethodSchemas.policy,
-          [],
-          Effect.map(hydrate, (h) => Option.map(h.policy, publicPolicy))
-        ),
+      policy: () => checked(MethodSchemas.policy, [], policyStatus),
       proposeAsk: (caller, input) =>
         checked(
           MethodSchemas.proposeAsk,
