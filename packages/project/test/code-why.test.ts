@@ -28,6 +28,7 @@ import { CodeCacheLive } from "../src/code/cache.ts";
 import { whyView } from "../src/code/why.ts";
 import {
   Content,
+  growingHistory,
   longHistory,
   png,
   overlappingTrees,
@@ -280,6 +281,37 @@ describe("why each line is there", () => {
 
           expect(ranges).toStrictEqual([{ end: 1, sha: shas[0], start: 1 }]);
         }).pipe(Effect.provide(overlappingTrees(reading, peak)));
+
+        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(8);
+        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(16);
+      }),
+    { timeout: 30_000 }
+  );
+
+  it.live(
+    "reads the file's older versions several at a time, not one after another",
+    () =>
+      Effect.gen(function* () {
+        const reading = yield* Ref.make(false);
+        const peak = yield* Ref.make(0);
+
+        yield* Effect.gen(function* () {
+          const { code, shas } = yield* growingHistory(40);
+
+          yield* Ref.set(reading, true);
+
+          // Each of the 40 lines came with a commit of its own, so the
+          // blame reads every older version of `grow.txt`.
+          const { ranges } = yield* whyView(
+            code,
+            main,
+            RepoPath.make("grow.txt")
+          );
+
+          expect(ranges).toStrictEqual(
+            shas.map((sha, at) => ({ end: at + 1, sha, start: at + 1 }))
+          );
+        }).pipe(Effect.provide(overlappingTrees(reading, peak, "blob")));
 
         expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(8);
         expect(yield* Ref.get(peak)).toBeLessThanOrEqual(16);

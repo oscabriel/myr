@@ -386,6 +386,40 @@ export const longHistory = (count: number) =>
     return { code: recordOf(name, head, []), shas };
   });
 
+/**
+ * A history of `count` commits, each appending one line to `grow.txt`, so
+ * every line was brought by a commit of its own.
+ */
+export const growingHistory = (count: number) =>
+  Effect.gen(function* () {
+    const git = yield* writer;
+    const name = RepoName.make("growkit");
+    const shas: CommitSha[] = [];
+
+    for (let at = 1; at <= count; at += 1) {
+      const lines = Array.makeBy(at, (line) => `line ${line + 1}\n`).join("");
+
+      const sha = yield* git.commit(
+        `Commit ${at}`,
+        [["grow.txt", text(lines)]],
+        shas.slice(-1),
+        at
+      );
+
+      shas.push(sha);
+    }
+
+    const head = shas.at(-1) ?? shas[0];
+
+    if (head === undefined) {
+      return yield* Effect.die("no commits");
+    }
+
+    yield* git.push(name, [["refs/heads/main", head]]);
+
+    return { code: recordOf(name, head, []), shas };
+  });
+
 /** One root commit of `count` files. */
 export const wide = (count: number) =>
   Effect.gen(function* () {
@@ -405,15 +439,16 @@ export const wide = (count: number) =>
   });
 
 /**
- * The memory store, each `readTree` taking 10 ms once `reading` is set (a
- * history is written fast, then read), with the most reads ever under way
- * at once kept in `peak`: a live store answers a read in tens of
- * milliseconds, so a walk that reads one tree at a time takes all its
- * reads added up.
+ * The memory store, each `readTree` (or each `readBlob`, for `"blob"`)
+ * taking 10 ms once `reading` is set (a history is written fast, then
+ * read), with the most reads ever under way at once kept in `peak`: a live
+ * store answers a read in tens of milliseconds, so a walk that reads one
+ * object at a time takes all its reads added up.
  */
 export const overlappingTrees = (
   reading: Ref.Ref<boolean>,
-  peak: Ref.Ref<number>
+  peak: Ref.Ref<number>,
+  kind: "blob" | "tree" = "tree"
 ) =>
   Layer.effect(
     RepoHost,
@@ -431,13 +466,20 @@ export const overlappingTrees = (
         () => Ref.update(under, (count) => count - 1)
       );
 
+      const slowed = Ref.get(reading).pipe(
+        Effect.flatMap((on) => (on ? timed : Effect.void))
+      );
+
       return RepoHost.of({
         ...host,
+        readBlob: (name, id) =>
+          kind === "blob"
+            ? Effect.andThen(slowed, host.readBlob(name, id))
+            : host.readBlob(name, id),
         readTree: (name, id) =>
-          Ref.get(reading).pipe(
-            Effect.flatMap((on) => (on ? timed : Effect.void)),
-            Effect.andThen(host.readTree(name, id))
-          ),
+          kind === "tree"
+            ? Effect.andThen(slowed, host.readTree(name, id))
+            : host.readTree(name, id),
       });
     })
   ).pipe(Layer.provide(RepoHostMemory));

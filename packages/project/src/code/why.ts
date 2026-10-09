@@ -2,9 +2,9 @@
  * Why each line of a file is there (spec W9-D9): a first-parent blame from
  * a revision. The walk takes at most `WHY_SCAN` first-parent commits from
  * the log and the path's blob at each (trees kept by id through
- * `CodeCache`), keeps the commits where the blob changed, then reads those
- * blobs newest first, one at a time, only until every line has its commit
- * (`@repo/git/blame`). Each commit a line points at comes back as a reader
+ * `CodeCache`, `READS_AT_ONCE` commits read together), keeps the commits
+ * where the blob changed, then reads those blobs newest first, a batch at
+ * a time, only until every line has its commit (`@repo/git/blame`). Each commit a line points at comes back as a reader
  * sees it, and the landings among them come from the project's record in
  * one batch, so an imported commit never reads as a landing. Lines older
  * than the walk reached point at the commit it stopped at, named
@@ -166,15 +166,26 @@ const read = (
       text: contents.value.text.value,
     });
 
-    for (const version of older) {
+    // Each batch of older versions is read together, then traced in
+    // order, until every line has its commit.
+    for (const batch of Array.chunksOf(older, READS_AT_ONCE)) {
       if (isSettled(tracing)) {
         break;
       }
 
-      tracing = traceBack(tracing, {
-        sha: version.commit.sha,
-        text: yield* textOf(repo, version.blob),
-      });
+      const texts = yield* Effect.forEach(
+        batch,
+        (version) => textOf(repo, version.blob),
+        { concurrency: READS_AT_ONCE }
+      );
+
+      for (const [version, text] of Array.zip(batch, texts)) {
+        if (isSettled(tracing)) {
+          break;
+        }
+
+        tracing = traceBack(tracing, { sha: version.commit.sha, text });
+      }
     }
 
     const { ranges, reachedEnd } = settle(tracing);
