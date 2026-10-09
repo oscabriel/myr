@@ -36,6 +36,7 @@ import {
   fork,
   longHistory,
   project,
+  overlappingTrees,
   wide,
 } from "./code-fixtures.ts";
 
@@ -429,6 +430,36 @@ describe("the log", () => {
         );
         expect(counted.next).toBe(3);
       }).pipe(Effect.provide(RepoHostMemory)),
+    long
+  );
+});
+
+describe("a path's log, read live", () => {
+  it.live(
+    "reads its commits' trees several at a time, not one after another",
+    () =>
+      Effect.gen(function* () {
+        const reading = yield* Ref.make(false);
+        const peak = yield* Ref.make(0);
+
+        yield* Effect.gen(function* () {
+          const { code, shas } = yield* longHistory(64);
+
+          yield* Ref.set(reading, true);
+
+          const { commits } = yield* logOf(code, {
+            ...page,
+            path: path("once.txt"),
+          });
+
+          expect(commits.map(({ sha }) => sha)).toStrictEqual([shas[0]]);
+        }).pipe(Effect.provide(overlappingTrees(reading, peak)));
+
+        // 64 commits, two trees each: one at a time a live store took a
+        // minute for 200; sixteen commits at once, each its two trees.
+        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(8);
+        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(32);
+      }),
     long
   );
 });

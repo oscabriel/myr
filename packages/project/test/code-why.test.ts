@@ -26,7 +26,13 @@ import { whyOf } from "../src/code.ts";
 import type { CodeProject } from "../src/code.ts";
 import { CodeCacheLive } from "../src/code/cache.ts";
 import { whyView } from "../src/code/why.ts";
-import { Content, png, writer } from "./code-fixtures.ts";
+import {
+  Content,
+  longHistory,
+  png,
+  overlappingTrees,
+  writer,
+} from "./code-fixtures.ts";
 
 const project = ProjectName.make("datekit");
 
@@ -250,6 +256,35 @@ describe("why each line is there", () => {
           Effect.provide(Layer.merge(countedBy(reads), CodeCacheLive(100)))
         );
       })
+  );
+
+  it.live(
+    "reads the file's blob in each commit several at a time, not one after another",
+    () =>
+      Effect.gen(function* () {
+        const reading = yield* Ref.make(false);
+        const peak = yield* Ref.make(0);
+
+        yield* Effect.gen(function* () {
+          const { code, shas } = yield* longHistory(64);
+
+          yield* Ref.set(reading, true);
+
+          // `once.txt` never changes, so the walk reads its blob in all 64
+          // commits.
+          const { ranges } = yield* whyView(
+            code,
+            main,
+            RepoPath.make("once.txt")
+          );
+
+          expect(ranges).toStrictEqual([{ end: 1, sha: shas[0], start: 1 }]);
+        }).pipe(Effect.provide(overlappingTrees(reading, peak)));
+
+        expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(8);
+        expect(yield* Ref.get(peak)).toBeLessThanOrEqual(16);
+      }),
+    { timeout: 30_000 }
   );
 
   it.effect("answers no ranges for a binary file, at its commit", () =>

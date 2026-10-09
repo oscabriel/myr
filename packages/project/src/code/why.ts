@@ -27,7 +27,7 @@ import { CodeCache } from "./cache.ts";
 import { contentsOf, contentsOfBytes, unlessTooLarge } from "./file.ts";
 import { commitViews } from "./log.ts";
 import { commitAt, resolveRev } from "./revision.ts";
-import { entryAt } from "./tree.ts";
+import { entryAt, READS_AT_ONCE } from "./tree.ts";
 
 /** The most first-parent commits one view walks. */
 export const WHY_SCAN = 200;
@@ -68,20 +68,27 @@ const versionsOf = (
     const versions: Version[] = [];
     let current = newest;
 
-    for (const commit of log.slice(1)) {
-      const blob = yield* blobAt(repo, commit, path);
+    // Each batch's blobs are read together, then walked in order.
+    for (const batch of Array.chunksOf(log.slice(1), READS_AT_ONCE)) {
+      const blobs = yield* Effect.forEach(
+        batch,
+        (commit) => blobAt(repo, commit, path),
+        { concurrency: READS_AT_ONCE }
+      );
 
-      if (Option.contains(blob, current.blob)) {
-        current = { blob: current.blob, commit };
-      } else {
-        versions.push(current);
+      for (const [commit, blob] of Array.zip(batch, blobs)) {
+        if (Option.contains(blob, current.blob)) {
+          current = { blob: current.blob, commit };
+        } else {
+          versions.push(current);
 
-        if (Option.isNone(blob)) {
-          // The file was born in the commit after this one.
-          return { stopped: false, versions };
+          if (Option.isNone(blob)) {
+            // The file was born in the commit after this one.
+            return { stopped: false, versions };
+          }
+
+          current = { blob: blob.value, commit };
         }
-
-        current = { blob: blob.value, commit };
       }
     }
 

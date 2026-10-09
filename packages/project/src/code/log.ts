@@ -18,12 +18,12 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import { TreeSha } from "@repo/protocol/ids";
 import type { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
 import type { UnknownRevision } from "@repo/protocol/refusal";
-import { DateTime, Effect, Equal, Option } from "effect";
+import { Array, DateTime, Effect, Equal, Option } from "effect";
 
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
 import { commitAt, resolveRev } from "./revision.ts";
-import { entryAt } from "./tree.ts";
+import { entryAt, READS_AT_ONCE } from "./tree.ts";
 
 /** The most commits one page holds. */
 export const LOG_LIMIT = 100;
@@ -166,40 +166,60 @@ export const logPage = (
     const scanned = scan.slice(0, PATH_SCAN);
     const touched: Commit[] = [];
 
-    for (const [at, commit] of scanned.entries()) {
-      const parent = Option.fromUndefinedOr(commit.parents[0]);
-      const after = Option.fromUndefinedOr(scan[at + 1]);
+    /** Whether the commit at `at` in the scan changed `path` from its first parent. */
+    const changedAt = (at: number, commit: Commit) =>
+      Effect.gen(function* () {
+        const parent = Option.fromUndefinedOr(commit.parents[0]);
+        const after = Option.fromUndefinedOr(scan[at + 1]);
 
-      // The log is first parents, so the next commit in it is this one's
-      // parent; only past the scan is the parent read on its own.
-      const parentCommit = yield* Option.match(parent, {
-        onNone: () => Effect.succeedNone,
-        onSome: (first) =>
-          Option.exists(after, ({ sha: next }) => next === first)
-            ? Effect.succeed(after)
-            : commitAt(repo, first),
-      }).pipe(Effect.orDie);
+        // The log is first parents, so the next commit in it is this one's
+        // parent; only past the scan is the parent read on its own.
+        const parentCommit = yield* Option.match(parent, {
+          onNone: () => Effect.succeedNone,
+          onSome: (first) =>
+            Option.exists(after, ({ sha: next }) => next === first)
+              ? Effect.succeed(after)
+              : commitAt(repo, first),
+        });
 
-      const parentTree = Option.map(parentCommit, ({ tree }) => tree);
+        const parentTree = Option.map(parentCommit, ({ tree }) => tree);
 
-      const now = yield* idAt(repo, commit.tree, path).pipe(Effect.orDie);
-
-      const before = yield* Option.match(parentTree, {
-        onNone: () => Effect.succeedNone,
-        onSome: (tree) => idAt(repo, tree, path),
-      }).pipe(Effect.orDie);
-
-      if (!Equal.equals(now, before)) {
-        touched.push(commit);
-      }
-
-      if (touched.length === limit) {
-        const commits = yield* commitViews(project, touched);
-
-        return pageWith(
-          commits,
-          at + 1 < scan.length ? Option.some(from + at + 1) : Option.none()
+        const [now, before] = yield* Effect.all(
+          [
+            idAt(repo, commit.tree, path),
+            Option.match(parentTree, {
+              onNone: () => Effect.succeedNone,
+              onSome: (tree) => idAt(repo, tree, path),
+            }),
+          ],
+          { concurrency: 2 }
         );
+
+        return !Equal.equals(now, before);
+      }).pipe(Effect.orDie);
+
+    // Each batch is read together, then walked in order, so a page that
+    // fills stops the scan where its last commit is.
+    for (const batch of Array.chunksOf([...scanned.entries()], READS_AT_ONCE)) {
+      const changed = yield* Effect.forEach(
+        batch,
+        ([at, commit]) => changedAt(at, commit),
+        { concurrency: READS_AT_ONCE }
+      );
+
+      for (const [[at, commit], touches] of Array.zip(batch, changed)) {
+        if (touches) {
+          touched.push(commit);
+        }
+
+        if (touched.length === limit) {
+          const commits = yield* commitViews(project, touched);
+
+          return pageWith(
+            commits,
+            at + 1 < scan.length ? Option.some(from + at + 1) : Option.none()
+          );
+        }
       }
     }
 

@@ -17,6 +17,15 @@ import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
 import { commitAt, resolveRev } from "./revision.ts";
 
+/**
+ * How many commits a walk over history (a path's log, why each line is
+ * there) reads at once. A live store answers each read in tens of
+ * milliseconds, so one at a time a 200-commit walk took a minute on
+ * dev-oscabriel; sixteen at once stays far under the store's 2,000
+ * requests per 10 s per repo.
+ */
+export const READS_AT_ONCE = 16;
+
 /** The entries of the tree `id`; a tree a commit or a tree names is always there. */
 export const entriesOf = (
   repo: RepoName,

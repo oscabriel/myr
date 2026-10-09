@@ -9,6 +9,7 @@
  */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import type { RefUpdate } from "@repo/artifacts/repo-host";
+import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { Brand } from "@repo/brand";
 import type { ForkRef } from "@repo/protocol/domain/code";
@@ -21,7 +22,16 @@ import {
   ProjectName,
   RepoName,
 } from "@repo/protocol/ids";
-import { Array, Data, DateTime, Effect, Option } from "effect";
+import {
+  Array,
+  Data,
+  DateTime,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Ref,
+} from "effect";
 import {
   init,
   writeBlob,
@@ -393,3 +403,41 @@ export const wide = (count: number) =>
 
     return { code: recordOf(name, sha, []), sha };
   });
+
+/**
+ * The memory store, each `readTree` taking 10 ms once `reading` is set (a
+ * history is written fast, then read), with the most reads ever under way
+ * at once kept in `peak`: a live store answers a read in tens of
+ * milliseconds, so a walk that reads one tree at a time takes all its
+ * reads added up.
+ */
+export const overlappingTrees = (
+  reading: Ref.Ref<boolean>,
+  peak: Ref.Ref<number>
+) =>
+  Layer.effect(
+    RepoHost,
+    Effect.gen(function* () {
+      const host = yield* RepoHost;
+      const under = yield* Ref.make(0);
+
+      const timed = Effect.acquireUseRelease(
+        Ref.updateAndGet(under, (count) => count + 1).pipe(
+          Effect.tap((count) =>
+            Ref.update(peak, (most) => Math.max(most, count))
+          )
+        ),
+        () => Effect.sleep(Duration.millis(10)),
+        () => Ref.update(under, (count) => count - 1)
+      );
+
+      return RepoHost.of({
+        ...host,
+        readTree: (name, id) =>
+          Ref.get(reading).pipe(
+            Effect.flatMap((on) => (on ? timed : Effect.void)),
+            Effect.andThen(host.readTree(name, id))
+          ),
+      });
+    })
+  ).pipe(Layer.provide(RepoHostMemory));
