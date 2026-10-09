@@ -158,6 +158,31 @@ describe("the Workers AI drafter", () => {
   );
 
   it.effect(
+    "takes one sentence where the schema asks for a list of them, as a list of one",
+    () =>
+      Effect.gen(function* () {
+        // kimi-k2.7-code on dev-oscabriel (914) answered every attempt with
+        // `context` and `outOfScope` as strings, whatever the JSON Schema said.
+        const reply = JSON.stringify({
+          ...encoded,
+          context: "An ordinal date is YYYY-DDD.",
+          outOfScope: "Changing parse.",
+        });
+
+        expect(yield* draftWith(chat(reply))).toStrictEqual({
+          ...drafted,
+          context: ["An ordinal date is YYYY-DDD."],
+          outOfScope: ["Changing parse."],
+        });
+        expect(
+          yield* Effect.flip(
+            draftWith(chat(JSON.stringify({ ...encoded, context: "" })))
+          )
+        ).toStrictEqual(failure("schema"));
+      })
+  );
+
+  it.effect(
     "refuses a test path in the config folder or off the tree as `schema`, so model text never lands as config",
     () =>
       Effect.gen(function* () {

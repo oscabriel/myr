@@ -8,7 +8,7 @@
 import { Effect, Hash, Layer, Predicate, Schema } from "effect";
 import type { JsonSchema } from "effect";
 
-import { DraftedAsk, DraftFailed } from "../drafted.ts";
+import { DraftedAsk, DraftedReply, DraftFailed } from "../drafted.ts";
 import type { DraftInput } from "../drafted.ts";
 import { Drafter } from "../drafter.ts";
 import { systemPrompt, userPrompt } from "../prompt.ts";
@@ -73,7 +73,8 @@ const decodeReply = Schema.decodeUnknownEffect(Reply);
 
 const decodeJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Unknown));
 
-const decodeDrafted = Schema.decodeUnknownEffect(DraftedAsk);
+/** A reply's fields, where one sentence may stand for a list of them. */
+const decodeDrafted = Schema.decodeUnknownEffect(DraftedReply);
 
 /** A reply wrapped in one Markdown code fence, unwrapped. */
 const unfenced = (text: string) =>

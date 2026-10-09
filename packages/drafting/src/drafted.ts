@@ -9,7 +9,7 @@
 import { Brand } from "@repo/brand";
 import { AtLeastOne } from "@repo/protocol/domain/common";
 import { AskId, LandedSha, ProjectName, RepoPath } from "@repo/protocol/ids";
-import { Schema } from "effect";
+import { Schema, SchemaTransformation } from "effect";
 
 /** A string the model writes, bounded so no reply fills the Worker. */
 const Text = Schema.NonEmptyString.check(Schema.isMaxLength(4000));
@@ -66,6 +66,36 @@ export const DraftedAsk = Schema.Struct({
 });
 
 export type DraftedAsk = typeof DraftedAsk.Type;
+
+/**
+ * Sentences as a model may send them: a list, or one sentence alone, which
+ * decodes as a list of one. Workers AI does not hold a model to the JSON
+ * Schema it is asked for: kimi-k2.7-code sent `context` and `outOfScope` as
+ * strings on every attempt (914, live on dev-oscabriel).
+ */
+const Sentences = Schema.Union([
+  Schema.Array(Text),
+  Text.pipe(
+    Schema.decodeTo(
+      Schema.Array(Text),
+      SchemaTransformation.transform({
+        decode: (one: string): readonly string[] => [one],
+        encode: (all) => all.join("\n"),
+      })
+    )
+  ),
+]);
+
+/**
+ * A model's reply, decoded into a `DraftedAsk`: the same fields, but a
+ * list of sentences may come as one sentence. The model is still asked for
+ * `DraftedAsk`'s JSON Schema.
+ */
+export const DraftedReply = Schema.Struct({
+  ...DraftedAsk.fields,
+  context: Schema.optionalKey(Sentences),
+  outOfScope: Schema.optionalKey(Sentences),
+});
 
 /** One file the drafter reads, as text. */
 export const ContextFile = Schema.Struct({
