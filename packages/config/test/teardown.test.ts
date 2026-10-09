@@ -107,7 +107,40 @@ const listed: readonly Listed[] = [
   namespace("witness"),
 ];
 
+/** Two imports of the preview repos, kept: each one's project and repo line. */
+const imports: readonly Created[] = [
+  made("import", "project", "anyhow"),
+  made("import", "repo", "anyhow", projects),
+  made("import", "project", "ky"),
+  made("import", "repo", "ky", projects),
+];
+
 describe("the teardown plan", () => {
+  it("never selects an import, nor a fork of one, even with every line in the ledger and the listing", () => {
+    expect(
+      teardownPlan({
+        ledger: [
+          ...imports,
+          made("smoke", "repo", "anyhow--fix-backtrace--bram", projects),
+          ...ledger,
+        ],
+        listed: [
+          ...listed,
+          repo("anyhow"),
+          repo("ky"),
+          repo("anyhow--fix-backtrace--bram"),
+        ],
+        stages: [dev],
+      })
+    ).toStrictEqual([
+      repo("datekit-805--maintainers", layers),
+      repo("burrow-swarm-1--drop-legacy-fetch-burrow-kit--marisol"),
+      repo("burrow-swarm-1"),
+      repo("smoke-r1--parse-year--bram"),
+      repo("smoke-r1"),
+    ]);
+  });
+
   it("selects a smoke run's repos and a swarm copy's repos that are in both the ledger and the listing, forks before what they fork", () => {
     expect(teardownPlan({ ledger, listed, stages: [dev] })).toStrictEqual([
       repo("datekit-805--maintainers", layers),
@@ -611,6 +644,36 @@ describe("bun infra/teardown.ts", () => {
           projects: devRepos[projects],
           read: [],
           result: Result.fail(new RecordingInProgress({ file: files.lock })),
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "lists the kept imports apart, never in the plan, and deletes none of them with --apply",
+    () =>
+      Effect.gen(function* () {
+        const files = yield* tempRoot([...devLedger, ...imports]);
+
+        const fake = yield* memoryAccount({
+          ...devRepos,
+          [projects]: [...devRepos[projects], "anyhow", "ky"],
+        });
+
+        const { printed } = yield* tornDown(["--apply"], fake.account, files);
+
+        expect({
+          kept: printed.filter((line) => /anyhow|\bky\b/u.test(line)),
+          standing: yield* fake.standing(projects, ["anyhow", "ky"]),
+          total: printed[0],
+        }).toStrictEqual({
+          kept: [
+            "  kept import: project anyhow",
+            "  kept import: repo projects-dev-oscabriel/anyhow",
+            "  kept import: project ky",
+            "  kept import: repo projects-dev-oscabriel/ky",
+          ],
+          standing: ["anyhow", "ky"],
+          total: "teardown on dev-oscabriel: 13 ledger entries, 5 to delete",
         });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );

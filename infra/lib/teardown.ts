@@ -11,7 +11,9 @@
  * with its maintainers layer, and `burrow`) with every fork of them, since a
  * claim on demo's burrow during the take is recorded and must outlive it. Nor
  * is anything in `witness`, which belongs to another project and is never even
- * read. Workers, D1, KV and
+ * read. The imported preview repos (`by: "import"`) are kept like the seeded
+ * examples, with every fork of them: listed as "kept imports", never
+ * selected; deleting one is a person's Cloudflare delete. Workers, D1, KV and
  * R2 are not Artifacts, so no listing names them and no plan can hold them. A
  * project entry is a Durable Object and a front-page row: teardown leaves both
  * (they are harmless, and not billed at this size), and says so.
@@ -83,10 +85,19 @@ interface Scope {
   readonly keep?: readonly string[];
 }
 
+/** The projects the ledger records as kept imports, on any stage. */
+const importsOf = (ledger: readonly Created[]): ReadonlySet<string> =>
+  new Set(ledger.flatMap(({ by, name }) => (by === "import" ? [name] : [])));
+
 /** Whether a ledger entry is a namespace or repo teardown may ever delete. */
-const deletable = (entry: Created, guarded: ReadonlySet<string>) =>
+const deletable = (
+  entry: Created,
+  guarded: ReadonlySet<string>,
+  imported: ReadonlySet<string>
+) =>
   !guarded.has(entry.name) &&
   !examples.some((example) => ofProject(entry.name, example)) &&
+  ![...imported].some((kept) => ofProject(entry.name, kept)) &&
   (entry.kind === "namespace" ||
     (entry.kind === "repo" &&
       entry.namespace !== undefined &&
@@ -100,12 +111,13 @@ const deletable = (entry: Created, guarded: ReadonlySet<string>) =>
  */
 const candidatesOf = (scope: Scope): readonly Created[] => {
   const guarded = protectedNames([...declared, ...scope.stages]);
+  const imported = importsOf(scope.ledger);
 
   return scope.ledger.filter(
     (entry) =>
       entry.deletedAt === undefined &&
       scope.stages.some((stage) => stage === entry.stage) &&
-      deletable(entry, guarded) &&
+      deletable(entry, guarded, imported) &&
       !(scope.keep ?? []).some((kept) => ofProject(entry.name, kept))
   );
 };
@@ -311,22 +323,26 @@ const onStage = (ledger: readonly Created[], stage: Stage, options: Options) =>
     const live = entries.filter(({ deletedAt }) => deletedAt === undefined);
     const chosen = new Set(candidates.map(keyOf));
     const guarded = protectedNames([...declared, stage]);
+    const imported = importsOf(ledger);
 
     const kept = live.filter(
       (entry) =>
-        deletable(entry, guarded) &&
+        deletable(entry, guarded, imported) &&
         options.keep.some((name) => ofProject(entry.name, name))
     );
+
+    const keptImports = live.filter(({ by }) => by === "import");
 
     const never = live.filter(
       (entry) =>
         entry.kind !== "project" &&
         !chosen.has(keyOf(entry)) &&
-        !kept.includes(entry)
+        !kept.includes(entry) &&
+        !keptImports.includes(entry)
     );
 
-    const projects = live.flatMap(({ kind, name }) =>
-      kind === "project" ? [name] : []
+    const projects = live.flatMap(({ by, kind, name }) =>
+      kind === "project" && by !== "import" ? [name] : []
     );
 
     yield* Console.log(
@@ -340,6 +356,7 @@ const onStage = (ledger: readonly Created[], stage: Stage, options: Options) =>
           there.has(keyOf(entry)) ? [] : [`  gone already: ${shown(entry)}`]
         ),
         ...kept.map((entry) => `  kept by --keep: ${shown(entry)}`),
+        ...keptImports.map((entry) => `  kept import: ${shown(entry)}`),
         ...never.map((entry) => `  never selectable: ${shown(entry)}`),
         ...(projects.length === 0
           ? []

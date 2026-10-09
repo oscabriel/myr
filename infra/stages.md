@@ -105,6 +105,8 @@ The live runs before the ledger existed left throwaways that it doesn't hold, al
 - The test accounts `w3tester-muyk9zdx` and `w5web-muz3airr` in `front-page-dev-oscabriel` (no identity or credit rows), and their OAuth grants in `oauth-dev-oscabriel`: one for `w5web-muz3airr` and two for `w3tester-muyk9zdx`.
 - The Project Durable Objects and front-page rows of those test projects. They are harmless and are not deleted.
 
+Imported projects (kept). `bun scripts/import-examples.ts --stage dev-oscabriel` imports the open-source repos the code browser is previewed on (anyhow, ky, gum, click, awesome, changesets, stb and fuzzel), one at a time, and records each in the ledger with `by: "import"`: one `project` line and one `repo` line in `projects-dev-oscabriel`, plus a `tags backfilled` note when `--tags` pushed their tags. They are not throwaways: teardown lists them as "kept imports" and never selects them, nor any fork of them, as it keeps the seeded examples. Deleting one is a person's Cloudflare delete. The script refuses `demo`.
+
 `demo` has no throwaways: `projects-demo` holds `datekit` and `burrow`, and `layers-demo` holds `datekit--maintainers`. Nothing that makes throwaways is meant to run there before the take: the core-loop smoke and the swarm's rehearsals run on the dev stage, the swarm on a `seed --as` copy. The take's swarm on demo's `burrow` will record its claim forks in the ledger; teardown never selects them (section 4).
 
 ## 4. Teardown policy

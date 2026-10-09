@@ -9,6 +9,7 @@ import {
 } from "../repo-host.ts";
 import type { RepoCreated, RepoName } from "../repo-host.ts";
 import {
+  defaultRefOf,
   initBare,
   mainRef,
   objectsAndRefs,
@@ -19,6 +20,8 @@ import type { StoredRepo } from "./isogit-store.ts";
 import { memoryFs } from "./memory-fs.ts";
 
 const remoteOf = (name: RepoName) => `memory://${name}.git`;
+
+const branchOf = (ref: string) => ref.replace(/^refs\/heads\//u, "");
 
 const createdOf = (name: RepoName): RepoCreated => ({
   name,
@@ -112,13 +115,27 @@ const make = () => {
           });
         }
 
-        const ref = `refs/heads/${source.branch ?? "main"}`;
+        // Without a branch, the remote's default: what its HEAD names, or
+        // its one branch, as `master` is on a remote that has only that.
+        const named =
+          source.branch === undefined
+            ? yield* defaultRefOf(from.dir)
+            : Option.some(`refs/heads/${source.branch}`);
+
+        if (Option.isNone(named)) {
+          return yield* new ImportRefused({
+            name,
+            reason: `${source.url} has no default branch`,
+          });
+        }
+
+        const ref = named.value;
         const tip = yield* tipOf(from.dir, ref);
 
         if (Option.isNone(tip)) {
           return yield* new ImportRefused({
             name,
-            reason: `${source.url} has no branch ${source.branch ?? "main"}`,
+            reason: `${source.url} has no branch ${branchOf(ref)}`,
           });
         }
 

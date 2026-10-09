@@ -2787,7 +2787,16 @@ export const projectService = (
 
     /**
      * An imported repo adopted: its tip becomes the first landed SHA, on a
-     * `main` of its own when the imported branch had another name.
+     * `main` of its own when the imported branch had another name. The tip
+     * is `main`'s, else the named branch's, else the one branch the import
+     * made (the remote's default, `master` or any other).
+     *
+     * `adopt` runs only while the project has no row, so a repo that exists
+     * is this project's earlier import, which died after Artifacts made the
+     * repo (a slow import outlasting the binding's wait): it is waited for
+     * and adopted, as `initBody` keeps an empty repo a failed `create` left.
+     * ASSUMPTION: the retry names the same remote; the repo holds what the
+     * first import copied.
      */
     const adopt = (from: { readonly branch?: string; readonly url: string }) =>
       Effect.gen(function* () {
@@ -2814,20 +2823,25 @@ export const projectService = (
                     reason: reason === "" ? "the import was refused" : reason,
                   })
                 ),
-              RepoExists: () =>
-                Effect.fail(new ProjectExists({ project: name })),
+              RepoExists: () => Effect.void,
             })
           );
 
         const refs = yield* host.refs(repo).pipe(Effect.orDie);
 
-        const imported = RefName.make(
-          `refs/heads/${Option.getOrElse(named, () => "main")}`
+        const branches = [...refs].filter(([ref]) =>
+          ref.startsWith("refs/heads/")
         );
 
-        const tip = Option.fromNullishOr(
-          refs.get(mainRef) ?? refs.get(imported)
-        );
+        const tip = Option.firstSomeOf([
+          Option.fromNullishOr(refs.get(mainRef)),
+          Option.flatMap(named, (given) =>
+            Option.fromNullishOr(refs.get(RefName.make(`refs/heads/${given}`)))
+          ),
+          Option.isNone(named) && branches.length === 1
+            ? Option.fromNullishOr(branches[0]?.[1])
+            : Option.none(),
+        ]);
 
         if (Option.isNone(tip)) {
           return yield* new ImportFailed({

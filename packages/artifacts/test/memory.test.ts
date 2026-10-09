@@ -16,6 +16,7 @@ import { describeRepoHost } from "./repo-host-contract.ts";
 
 // Its test-only meaning of a public remote: another repo in the same store.
 describeRepoHost("memory", RepoHostMemory, {
+  danglingHead: true,
   importUrl: (name) =>
     RepoHost.use((repos) => repos.remote(name)).pipe(Effect.orDie),
 });

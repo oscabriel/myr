@@ -12,7 +12,9 @@ import {
   Duration,
   Effect,
   Exit,
+  Fiber,
   FiberSet,
+  FileSystem,
   Layer,
   Option,
   Redacted,
@@ -20,6 +22,7 @@ import {
 } from "effect";
 import type { Scope } from "effect";
 import type { ChildProcessSpawner } from "effect/process";
+import { TestClock } from "effect/testing";
 import { readCommit } from "isomorphic-git";
 
 import { Fetch, FetchFailed } from "../src/fetch.ts";
@@ -207,6 +210,7 @@ const world = (
       layer: RepoHostBinding.layer(binding).pipe(
         Layer.provide(Layer.succeed(Fetch, fetch))
       ),
+      root,
       seen,
       store,
       tokens,
@@ -830,5 +834,169 @@ describe("git smart HTTP over the Fetch port", () => {
         ).toStrictEqual(new RepoNotFound({ name }));
       }).pipe(Effect.provideService(Fetch, fetch))
     )
+  );
+});
+
+/**
+ * `effect` run to its end on the TestClock: the clock moves on by the
+ * longest sleep the binding takes between asks while the effect runs, so
+ * a wait of minutes passes at once, whatever real I/O it does between.
+ */
+const onTestClock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.gen(function* () {
+    const fiber = yield* Effect.forkChild(effect);
+
+    while (fiber.pollUnsafe() === undefined) {
+      yield* TestClock.adjust(Duration.seconds(16));
+      yield* Effect.yieldNow;
+    }
+
+    return yield* Fiber.await(fiber);
+  });
+
+/** How many tokens on `name` are still live, as the fake lists them. */
+const liveTokens = (fake: Artifacts, name: RepoName) =>
+  Effect.acquireUseRelease(
+    Effect.promise(() => fake.get(name)),
+    (repo) =>
+      Effect.promise(() => repo.listTokens()).pipe(
+        Effect.map(
+          ({ tokens: listed }) =>
+            listed.filter(({ state }) => state === "active").length
+        )
+      ),
+    (repo) =>
+      Effect.sync(() => {
+        repo[Symbol.dispose]();
+      })
+  );
+
+describe("an import Artifacts is still copying", () => {
+  const master = RefName.make("refs/heads/master");
+
+  // A remote whose default branch is `master`, as anyhow's is: its HEAD
+  // names `master`, and the import takes that branch under its own name.
+  it.live(
+    "imports a remote whose default branch is master without being told",
+    () =>
+      within(
+        ({ root }) =>
+          Effect.gen(function* () {
+            const repos = yield* RepoHost;
+            const client = yield* gitClient(memoryFs());
+            const first = yield* client.commit("first", [["a", "1"]]);
+            const remote = RepoName.make("upstream-master");
+            const name = RepoName.make("adopted-master");
+
+            yield* repos.create(remote).pipe(Effect.orDie);
+            yield* repos
+              .push(remote, client.source, [
+                { from: Option.none(), ref: master, to: first },
+              ])
+              .pipe(Effect.orDie);
+            yield* FileSystem.FileSystem.use((fs) =>
+              fs.writeFileString(
+                `${root}/${remote}.git/HEAD`,
+                "ref: refs/heads/master\n"
+              )
+            ).pipe(Effect.provide(NodeServices.layer), Effect.orDie);
+
+            yield* repos
+              .importFrom(name, {
+                url: yield* repos.remote(remote).pipe(Effect.orDie),
+              })
+              .pipe(Effect.orDie);
+
+            expect(yield* repos.refs(name).pipe(Effect.orDie)).toStrictEqual(
+              new Map([[master, first]])
+            );
+          }),
+        { defaultBranch: "master" }
+      )
+  );
+
+  // Seven asks (about 32 s) were too few for a large import; the binding
+  // now asks for about three minutes, so twelve busy answers pass.
+  it.effect(
+    "waits through twelve IMPORT_IN_PROGRESS answers, then revokes the import's token and reads it",
+    () =>
+      within(
+        ({ fake }) =>
+          Effect.gen(function* () {
+            const repos = yield* RepoHost;
+            const name = RepoName.make("slow-import");
+            const { first } = yield* seeded(RepoName.make("slow-source"));
+
+            const imported = yield* onTestClock(
+              repos.importFrom(name, {
+                url: yield* repos
+                  .remote(RepoName.make("slow-source"))
+                  .pipe(Effect.orDie),
+              })
+            );
+
+            const read = yield* onTestClock(repos.refs(name));
+
+            expect(Exit.isSuccess(imported)).toBeTruthy();
+            expect(read).toStrictEqual(Exit.succeed(new Map([[main, first]])));
+            // Revoked by the import's own wait, which outlasted all twelve.
+            expect(yield* liveTokens(fake, name)).toBe(0);
+          }),
+        { importing: 12 }
+      )
+  );
+
+  it.effect("still gives a repo being created seven asks, no more", () =>
+    within(
+      ({ fake }) =>
+        Effect.gen(function* () {
+          const repos = yield* RepoHost;
+          const name = RepoName.make("slow-create");
+
+          // The create's own wait asks eight times and gives up, leaving
+          // its write token live; the read after it waits out the ninth.
+          const created = yield* onTestClock(repos.create(name));
+          const read = yield* onTestClock(repos.refs(name));
+
+          expect(Exit.isSuccess(created)).toBeTruthy();
+          expect(read).toStrictEqual(Exit.succeed(new Map()));
+          expect(yield* liveTokens(fake, name)).toBe(1);
+        }),
+      { making: { code: "CREATE_IN_PROGRESS", gets: 9 } }
+    )
+  );
+
+  // Past the wait, the read dies with the repo made; the project's retry
+  // meets `RepoExists`, and a read once the import is done finds it.
+  it.effect(
+    "dies past the wait, then answers RepoExists to the retry and reads the repo once it is copied",
+    () =>
+      within(
+        ({ fake }) =>
+          Effect.gen(function* () {
+            const repos = yield* RepoHost;
+            const name = RepoName.make("stuck-import");
+            const source = RepoName.make("stuck-source");
+            const { first } = yield* seeded(source);
+            const url = yield* repos.remote(source).pipe(Effect.orDie);
+
+            const imported = yield* onTestClock(
+              repos.importFrom(name, { url })
+            );
+
+            const died = yield* onTestClock(repos.refs(name));
+            const again = yield* onTestClock(repos.importFrom(name, { url }));
+            const read = yield* onTestClock(repos.refs(name));
+
+            expect(Exit.isSuccess(imported)).toBeTruthy();
+            expect(Exit.hasDies(died)).toBeTruthy();
+            expect(again).toStrictEqual(Exit.fail(new RepoExists({ name })));
+            expect(read).toStrictEqual(Exit.succeed(new Map([[main, first]])));
+            // The import's day-long write token outlived the wait; nothing
+            // was handed it, and it expires.
+            expect(yield* liveTokens(fake, name)).toBe(1);
+          }),
+        { importing: 40 }
+      )
   );
 });
