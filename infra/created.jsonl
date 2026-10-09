@@ -97,3 +97,6 @@
 {"at":"2026-10-09T07:42:36.197Z","by":"import","kind":"project","name":"fuzzel","stage":"dev-oscabriel"}
 {"at":"2026-10-09T07:42:36.197Z","by":"import","kind":"repo","name":"fuzzel","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
 {"at":"2026-10-09T07:42:42.694Z","by":"import","kind":"repo","name":"fuzzel","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-09T19:39:42.918Z","by":"smoke","kind":"project","name":"smoke-20261009-193937","stage":"dev-oscabriel"}
+{"at":"2026-10-09T19:39:42.918Z","by":"smoke","kind":"repo","name":"smoke-20261009-193937","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-09T19:40:38.252Z","by":"smoke","kind":"repo","name":"smoke-20261009-193937--parse-year--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
