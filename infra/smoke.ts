@@ -171,9 +171,11 @@ const serverError = (status: number) => status >= 500;
 /**
  * A server error, or a 404 from a hostname that is not serving yet: a
  * Worker's first deploy to workers.dev answers 404 for its first seconds
- * (once, smoke ran 4 s after the web's first deploy and got 404 twice). Only
- * the web's probes read a 404 so; the platform's `missing-repo-404` expects
- * one.
+ * (once, smoke ran 4 s after the web's first deploy and got 404 twice), and
+ * a deploy that adds a route can still be answered by the version before it
+ * (demo's W9 deploy: `/` answered 404 once as the upload finished). The
+ * web's probes and `platform-root` read a 404 so; the platform's
+ * `missing-repo-404` expects one.
  */
 const notServingYet = (status: number) => status >= 500 || status === 404;
 
@@ -354,7 +356,7 @@ const platformRoot = (origin: string) => {
   const label = "GET /";
 
   return send(label, HttpClientRequest.get(`${origin}/`)).pipe(
-    Effect.flatMap(statusIs(label, 200)),
+    Effect.flatMap(statusIs(label, 200, notServingYet)),
     Effect.flatMap(({ text }) =>
       text.includes("/mcp") && text.includes("install.sh")
         ? Effect.void

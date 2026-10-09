@@ -229,6 +229,35 @@ describe("smoke against a live stage", () => {
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
+  it.live(
+    "asks / again while the version before a deploy still answers it with 404, and passes once it settles",
+    () =>
+      Effect.gen(function* () {
+        // demo's W9 deploy (914): smoke ran as the upload finished, and the
+        // W8 version, which has no `/`, answered it once more with 404.
+        const asked = { root: 0 };
+
+        const origin = yield* fakePlatform((seen) => {
+          if (seen.path === "/") {
+            asked.root += 1;
+
+            if (asked.root <= 2) {
+              return { status: 404 };
+            }
+          }
+
+          return healthy(seen);
+        });
+
+        const report = yield* smoke(origin, { settling: "10 seconds" });
+
+        expect({
+          asked,
+          probes: report.probes.map(({ probe }) => probe),
+        }).toStrictEqual({ asked: { root: 3 }, probes: [...platformProbes] });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
   it.live("names each probe that fails, and why", () =>
     Effect.gen(function* () {
       const origin = yield* fakePlatform(broken);
