@@ -1,18 +1,17 @@
 /**
  * The code browser's, the people page's and drafting's contracts and
- * routes, wired end to end through the platform's fetch
- * handler: the policy read answers, the code reads reach the façade
- * (`why` here; the others are `code-reads.test.ts`'), a draft needs a
- * person, and `/` and a project's
- * raw files have their routes, open to a stale credential as every public
- * path is (a raw file at no revision is a 404).
+ * routes, wired end to end through the platform's fetch handler: the
+ * policy read answers, the code reads reach the façade (`why` here; the
+ * others are `code-reads.test.ts`'), a draft needs a person, and `/` and a
+ * project's raw files have their routes, open to a stale credential as
+ * every public path is (a raw file at no revision is a 404).
  */
 import { describe, expect, it } from "@effect/vitest";
 import { ProposalId, RepoPath } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
 import { advanceTo } from "@repo/testkit/clock";
 import { aProject, withAsk, withVouches } from "@repo/testkit/scenarios";
-import { Cause, Effect, Exit, Layer, Option } from "effect";
+import { Effect, Exit, Layer } from "effect";
 
 import { Handlers } from "../src/handlers.ts";
 import { MemorySessions } from "../src/sessions/memory.ts";
@@ -43,14 +42,6 @@ const platform = Effect.gen(function* () {
   );
 });
 
-/** What a call died with, as text; none when it did not die. */
-const diedWith = <A, E>(call: Effect.Effect<A, E>) =>
-  Effect.map(Effect.exit(call), (exit) =>
-    Exit.isFailure(exit) && Cause.hasDies(exit.cause)
-      ? Option.some(String(Cause.squash(exit.cause)))
-      : Option.none()
-  );
-
 describe("the code, policy and drafting contracts over /rpc", () => {
   it.effect("give anyone a project's policy, without its layers", () =>
     Effect.gen(function* () {
@@ -66,17 +57,25 @@ describe("the code, policy and drafting contracts over /rpc", () => {
     })
   );
 
-  it.effect("reach the code façade, whose why answers without dying", () =>
-    Effect.gen(function* () {
-      const { handler } = yield* platform;
-      const anyone = yield* rpcClient(handler);
+  it.effect(
+    "reach the code façade, whose why names the landing behind each line",
+    () =>
+      Effect.gen(function* () {
+        const { handler } = yield* platform;
+        const anyone = yield* rpcClient(handler);
+        const path = RepoPath.make("package.json");
+        const view = yield* anyone.why({ path, project });
+        const [first] = view.commits;
 
-      expect(
-        yield* diedWith(
-          anyone.why({ path: RepoPath.make("package.json"), project })
-        )
-      ).toStrictEqual(Option.none());
-    })
+        expect(view.path).toBe(path);
+        expect(first?.subject).toBe("Start");
+        expect(view.ranges).toStrictEqual([
+          { end: 1, sha: first?.sha, start: 1 },
+        ]);
+        expect(
+          view.landings.map(({ author, sha }) => [sha, author])
+        ).toStrictEqual([[first?.sha, "alice"]]);
+      })
   );
 
   it.effect("refuse a draft to anyone not signed in", () =>
