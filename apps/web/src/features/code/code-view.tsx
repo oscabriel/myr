@@ -54,7 +54,12 @@ const reveal = (pending: Pending) => {
       : node?.shadowRoot?.querySelector(`[data-line="${line}"]`);
 
   if (row !== null && row !== undefined) {
-    row.scrollIntoView({ block: "center" });
+    // The page scrolls, not the drawing, and only up or down:
+    // `scrollIntoView` would also slide a wide line sideways under the
+    // line numbers.
+    globalThis.scrollBy({
+      top: row.getBoundingClientRect().top - globalThis.innerHeight / 2,
+    });
     pending.line = undefined;
   }
 };

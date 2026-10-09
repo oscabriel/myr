@@ -73,13 +73,9 @@ const NoLandings = ({
     <EmptyState title="No landings among the project's recent events." />
   );
 
-/** The steps that take a newcomer from nothing to a checked answer. */
-const steps = (project: ProjectName, platformUrl: string) =>
+/** The steps that take a newcomer from a clone (the box above) to a checked answer. */
+const steps = (project: ProjectName) =>
   [
-    {
-      command: `git clone ${platformUrl}/${project}.git`,
-      label: "Clone it with plain git",
-    },
     {
       command: `${Brand.cli} asks --project ${project}`,
       label: "See what it asks for",
@@ -210,7 +206,7 @@ export const ProjectView = ({
             Take part
           </h2>
           <ol className="border-rule flex flex-col gap-4 border-t pt-4">
-            {steps(project, platformUrl).map(({ command, label }) => (
+            {steps(project).map(({ command, label }) => (
               <li className="flex min-w-0 flex-col gap-1.5" key={command}>
                 <span className="text-muted-foreground text-xs font-medium">
                   {label}

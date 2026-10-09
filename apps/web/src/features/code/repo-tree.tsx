@@ -64,7 +64,11 @@ export const RepoTree = ({
     }
   }, [model, current]);
 
-  return <FileTree className="block h-full min-h-64" model={model} />;
+  // The tree scrolls inside itself, so it needs a definite height: a
+  // minimum leaves its rows clipped to nothing.
+  return (
+    <FileTree className="h-[40dvh] lg:h-[calc(100dvh-2rem)]" model={model} />
+  );
 };
 
 // `React.lazy` takes a module's default export.

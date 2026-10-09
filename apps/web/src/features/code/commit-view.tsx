@@ -83,19 +83,37 @@ const Person = ({
   </div>
 );
 
-/** A trailer: a credit naming a handle links the person; any other reads as written. */
+/**
+ * The person a credit trailer names on a landing: its value's handle,
+ * before any ` <email>` (`Asked-by: ines-v <ines-v@users.…>`). Only the
+ * platform's own landings name its people; an imported commit's
+ * `Signed-off-by:` names someone elsewhere, never a page here.
+ */
+const personIn = (landed: boolean, name: string, value: string) => {
+  const handle = value.replace(/\s*<[^>]*>$/u, "");
+
+  return landed && isRole(name) && isHandle(handle) ? handle : undefined;
+};
+
+/** A trailer: a landing's credit links the person; any other reads as written. */
 const Trailer = ({
+  landed,
   name,
   value,
 }: {
+  readonly landed: boolean;
   readonly name: string;
   readonly value: string;
-}) => (
-  <li className="[overflow-wrap:anywhere]">
-    <span className="text-muted-foreground">{name}:</span>{" "}
-    {isRole(name) && isHandle(value) ? <HandleLink handle={value} /> : value}
-  </li>
-);
+}) => {
+  const person = personIn(landed, name, value);
+
+  return (
+    <li className="[overflow-wrap:anywhere]">
+      <span className="text-muted-foreground">{name}:</span>{" "}
+      {person === undefined ? value : <HandleLink handle={person} />}
+    </li>
+  );
+};
 
 /** The changed files by path, each linking its new version (or its old one, deleted). */
 export const ChangedList = ({
@@ -212,7 +230,12 @@ export const CommitView = ({
             <h2 className={LABEL}>Trailers</h2>
             <ul className={`flex flex-col gap-1 ${ID}`}>
               {commit.trailers.map(({ key, value }) => (
-                <Trailer key={`${key}:${value}`} name={key} value={value} />
+                <Trailer
+                  key={`${key}:${value}`}
+                  landed={landing !== undefined}
+                  name={key}
+                  value={value}
+                />
               ))}
             </ul>
           </section>

@@ -477,8 +477,8 @@ const landedCommit: typeof Commit.Encoded = {
   sha: LANDED,
   subject: "Answer parse-iso-week",
   trailers: [
-    { key: "Asked-by", value: "ines-v" },
-    { key: "Signed-off-by", value: "bram" },
+    { key: "Asked-by", value: "ines-v <ines-v@users.example.com>" },
+    { key: "Signed-off-by", value: "bram <bram@users.example.com>" },
   ],
   tree: "4".repeat(40),
 };
@@ -521,6 +521,21 @@ describe(CommitView, () => {
 
     expect(hrefs).toContain("/people/ines-v");
     expect(hrefs).toContain("/people/bram");
+  });
+
+  it("links no one from an imported commit's trailers", () => {
+    const { landing: _landing, ...imported } = landedCommit;
+
+    const markup = markupOf(
+      <CommitView
+        diff={decodeDiff({ commit: imported, files: [], truncated: false })}
+        now={now}
+        project={datekit}
+      />
+    );
+
+    expect(hrefsOf(markup)).not.toContain("/people/bram");
+    expect(markup).toContain("bram@users.example.com");
   });
 
   it("shows the landing's ask, its answer and its verdict", () => {
