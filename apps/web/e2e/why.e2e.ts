@@ -8,23 +8,32 @@
  *
  * It runs only against `WEB_URL` (a stage's web origin) and is skipped
  * without it. `WEB_PROJECT` picks the project (datekit, which the seed puts
- * on every stage, unless given) and `WEB_WHY_PATH` the file (datekit's
- * `src/format.ts` unless given; per stage, an opening's file such as
- * the config folder's `asks/format-ordinal.ask.ts`). It only reads.
+ * on every stage, unless given) and `WEB_WHY_PATH` the file: datekit's
+ * `src/format.ts` unless given, and burrow's own opening's file, the config
+ * folder's `asks/drop-legacy-fetch.ask.ts`, for `WEB_PROJECT=burrow` (per
+ * stage, an opening's file such as datekit's `asks/format-ordinal.ask.ts`
+ * where nothing was answered). It only reads.
  */
 import { expect, test } from "@playwright/test";
+import { Brand } from "@repo/brand";
 import { Config, Effect, Option } from "effect";
 
 /** What the check reads of its env: where the web lives, and which file to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
+    const project = yield* Config.NonEmptyString("WEB_PROJECT").pipe(
+      Config.withDefault("datekit")
+    );
+
     return {
       path: yield* Config.NonEmptyString("WEB_WHY_PATH").pipe(
-        Config.withDefault("src/format.ts")
+        Config.withDefault(
+          project === "burrow"
+            ? `${Brand.configDir}/asks/drop-legacy-fetch.ask.ts`
+            : "src/format.ts"
+        )
       ),
-      project: yield* Config.NonEmptyString("WEB_PROJECT").pipe(
-        Config.withDefault("datekit")
-      ),
+      project,
       web: Option.map(
         yield* Config.option(Config.NonEmptyString("WEB_URL")),
         (url) => url.replace(/\/+$/u, "")
