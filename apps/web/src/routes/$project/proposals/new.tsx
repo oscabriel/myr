@@ -1,6 +1,10 @@
 import { useAtom, useAtomValue } from "@effect/atom-react";
 import { CommitSha, ProjectName, RepoPath } from "@repo/protocol/ids";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  useLocation,
+  useNavigate,
+} from "@tanstack/react-router";
 import { Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { useEffect, useState } from "react";
@@ -10,13 +14,14 @@ import {
   proposalMade,
   proposeAtom,
 } from "../../../client/propose.ts";
+import { hereOf } from "../../../features/auth/session-slot.tsx";
 import { whoAtom } from "../../../features/auth/who.ts";
 import { ProjectNav } from "../../../features/project/project-nav.tsx";
 import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
+import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { ProposeView } from "../../../features/propose/propose-view.tsx";
 import type { About } from "../../../features/propose/propose-view.tsx";
 import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
-import { FailureView } from "../../../features/today/today-page.tsx";
 
 // `/$project/proposals/new`: the propose form. Who is signed in and the
 // project's top folders are read in the browser (the server paints the
@@ -61,6 +66,7 @@ const Checking = () => (
 const Propose = ({ project }: { readonly project: ProjectName }) => {
   const navigate = useNavigate();
   const search = Route.useSearch();
+  const here = useLocation({ select: hereOf });
   const who = useAtomValue(whoAtom);
 
   const modules = Option.getOrElse(
@@ -102,7 +108,11 @@ const Propose = ({ project }: { readonly project: ProjectName }) => {
     >
       {AsyncResult.isFailure(proposed) ? (
         <div aria-live="polite">
-          <FailureView cause={proposed.cause} />
+          <ProposalFailure
+            cause={proposed.cause}
+            doing="propose it"
+            here={here}
+          />
         </div>
       ) : null}
     </ProposeView>

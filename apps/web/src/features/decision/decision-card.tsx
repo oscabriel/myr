@@ -7,8 +7,10 @@
  *
  * An `OpenProposal` shows the files the proposal would add (the ask file and
  * its check) as code under their paths, links the proposal's page, and holds
- * Accept while the platform's agent is drafting the proposal again: the
- * draft state is passed in, or read from `showProposal` when it is not.
+ * Accept until its draft has been read, and while the platform's agent is
+ * drafting the proposal again: the draft is passed in, or read from
+ * `showProposal` in the browser when it is not, so the server never renders
+ * an Accept the browser might then hold.
  *
  * The subject's words follow GLOSSARY.md (ask, answer, landing, finish,
  * vouch). The default's word is the decision's `default` field as the
@@ -36,6 +38,7 @@ import {
 } from "../finish/patch.ts";
 import { DraftedCode } from "../proposal/client-file.tsx";
 import { useLiveDraft } from "../proposal/live-draft.ts";
+import type { DraftRead } from "../proposal/live-draft.ts";
 import { When } from "../shared/time.tsx";
 
 /** What a decider sends when they choose: the `decide` contract's payload, from its one schema. */
@@ -120,6 +123,21 @@ const opensAsk = DecisionSubject.isAnyOf(["OpenProposal"]);
 
 /** Whether a draft is still being written. */
 const isDraftingNow = DraftState.isAnyOf(["Drafting"]);
+
+/**
+ * Why Accept on a proposal waits, if it does: its draft not read yet, or
+ * being written. Once read it may be accepted: a ready draft, a want alone,
+ * or a failed round (which keeps an earlier ready draft, or leaves the want
+ * alone).
+ */
+const acceptHeld = (read: DraftRead): Option.Option<string> =>
+  Option.match(read, {
+    onNone: () => Option.some("Reading the draft…"),
+    onSome: (draft) =>
+      Option.exists(draft, isDraftingNow)
+        ? Option.some("Drafting…")
+        : Option.none(),
+  });
 
 /**
  * Whether an evidence line holds a file: its label is a path (one word with
@@ -219,25 +237,26 @@ interface ChoicesProps {
   readonly subject: string;
 }
 
-/** One button per choice; Accept waits while the proposal is drafting. */
+/** One button per choice; Accept waits, saying why, while `held` says it should. */
 const Choices = ({
   busy,
   choose,
   decision,
-  drafting,
+  held,
   subject,
-}: ChoicesProps & { readonly drafting: boolean }) => (
+}: ChoicesProps & { readonly held: Option.Option<string> }) => (
   <fieldset className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
     <legend className="sr-only">Your choice: {subject}</legend>
     {allowedChoices(decision.subject).map((choice) => {
       const isDefault = choice === decision.default;
-      const held = drafting && choice === "accept";
+
+      const waits = Option.filter(held, () => choice === "accept");
 
       return (
         <Button
           className="h-11 px-4 text-sm sm:h-9 sm:min-w-28"
           data-choice={choice}
-          disabled={busy || held}
+          disabled={busy || Option.isSome(waits)}
           key={choice}
           onClick={() => {
             choose(choice);
@@ -245,10 +264,10 @@ const Choices = ({
           type="button"
           variant={isDefault ? "outline" : "default"}
         >
-          {held ? (
+          {Option.isSome(waits) ? (
             <>
               <Spinner />
-              Drafting…
+              {waits.value}
             </>
           ) : (
             words[choice]
@@ -267,9 +286,9 @@ const ProposalChoices = ({
   proposal,
   ...props
 }: ChoicesProps & { readonly proposal: ProposalId }) => {
-  const draft = useLiveDraft(props.decision.project, proposal);
+  const read = useLiveDraft(props.decision.project, proposal);
 
-  return <Choices {...props} drafting={Option.exists(draft, isDraftingNow)} />;
+  return <Choices {...props} held={acceptHeld(read)} />;
 };
 
 export const DecisionCard = ({
@@ -294,10 +313,11 @@ export const DecisionCard = ({
   /** What its own page shows before the choices: for a finish, the diff. */
   readonly children?: ReactNode;
   /**
-   * For an `OpenProposal`, where the proposal's draft stands: Accept waits
-   * while it is drafting. Read from `showProposal` when not passed.
+   * For an `OpenProposal`, what has been read of the proposal's draft:
+   * Accept waits until it is read, and while it is drafting. Read from
+   * `showProposal` in the browser when not passed.
    */
-  readonly draft?: DraftState | undefined;
+  readonly draft?: DraftRead | undefined;
 }) => {
   const [note, setNote] = useState("");
   const noteId = useId();
@@ -415,7 +435,11 @@ export const DecisionCard = ({
           busy={busy}
           choose={choose}
           decision={decision}
-          drafting={draft !== undefined && isDraftingNow(draft)}
+          held={
+            draft !== undefined && opensAsk(decision.subject)
+              ? acceptHeld(draft)
+              : Option.none()
+          }
           subject={subject}
         />
       )}

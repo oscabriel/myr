@@ -10,7 +10,7 @@ import type { Today } from "@repo/protocol/domain/decision";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import { ProjectName, ProposalId } from "@repo/protocol/ids";
 import type { DecisionId, Handle } from "@repo/protocol/ids";
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useLocation } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { Array, Effect, Option, Schema } from "effect";
@@ -22,13 +22,14 @@ import {
   proposalAtom,
 } from "../../../client/proposal.ts";
 import { watchAtom } from "../../../client/watch.ts";
+import { hereOf } from "../../../features/auth/session-slot.tsx";
 import { whoAtom } from "../../../features/auth/who.ts";
 import { ProjectNav } from "../../../features/project/project-nav.tsx";
 import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
+import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { ProposalView } from "../../../features/proposal/proposal-view.tsx";
 import { EmptyState } from "../../../features/shared/empty.tsx";
 import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
-import { FailureView } from "../../../features/today/today-page.tsx";
 import { serverClient } from "../../../server/client.ts";
 
 // `/$project/proposals/$proposal`: one proposal and the platform's draft of
@@ -120,6 +121,7 @@ const FreshProposal = ({
     () => read
   );
 
+  const here = useLocation({ select: hereOf });
   const who = useAtomValue(whoAtom);
   const today = useAtomValue(projectTodayAtom(project));
   const [redrafted, redraft] = useAtom(draftAtom);
@@ -142,7 +144,11 @@ const FreshProposal = ({
     >
       {AsyncResult.isFailure(redrafted) ? (
         <div aria-live="polite">
-          <FailureView cause={redrafted.cause} />
+          <ProposalFailure
+            cause={redrafted.cause}
+            doing="draft it again"
+            here={here}
+          />
         </div>
       ) : null}
     </ProposalView>

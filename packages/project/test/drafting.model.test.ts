@@ -5,6 +5,7 @@ import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import { DraftState } from "@repo/protocol/domain/proposal";
 import type { Proposal } from "@repo/protocol/domain/proposal";
+import type { ProposalId } from "@repo/protocol/ids";
 import { LandedSha, LaneName, RepoName, RepoPath } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { NotRedFirst } from "@repo/protocol/refusal";
@@ -214,17 +215,33 @@ const fileLabels = (decision: Decision) =>
     notFiles.has(label) ? [] : [label]
   );
 
+/** The files each proposal held when a round of it last settled ready. */
+type ReadyFiles = ReadonlyMap<ProposalId, readonly RepoPath[]>;
+
+/** `ready`, with the files of every proposal that reads `Ready` in `snapshot`. */
+const readyIn = (ready: ReadyFiles, snapshot: ProjectSnapshot): ReadyFiles =>
+  new Map([
+    ...ready,
+    ...snapshot.proposals.flatMap((proposal) =>
+      proposal.draft !== undefined && DraftState.guards.Ready(proposal.draft)
+        ? [[proposal.id, proposal.files] as const]
+        : []
+    ),
+  ]);
+
 /**
  * What a step broke. No decision exists while a proposal drafts its first
  * round; a settle of a stale round, or of a closed proposal, changes
  * nothing; an open `Ready` proposal's files are exactly the files its
- * decision's evidence holds, beside its red first, and a `Failed` one's
- * decision holds no files, and says why.
+ * decision's evidence holds, beside its red first; and a `Failed` one keeps
+ * the files of its last ready round (none if it never had one), which its
+ * decision holds, with its red first when there are any, and says why.
  */
 const brokenBy = (
   move: Move,
   before: ProjectSnapshot,
-  after: ProjectSnapshot
+  after: ProjectSnapshot,
+  ready: ReadyFiles
 ): readonly string[] => [
   ...after.proposals.flatMap((proposal) =>
     proposal.draft !== undefined &&
@@ -277,7 +294,17 @@ const brokenBy = (
         : [`${proposal.id} is ready, and its decision holds other files`];
     }
 
-    return held && says("draft failed") && !says("red first")
+    const earlier = ready.get(proposal.id) ?? [];
+
+    if (JSON.stringify(proposal.files) !== JSON.stringify(earlier)) {
+      return [
+        `${proposal.id}'s draft failed, and it lost its ready round's files`,
+      ];
+    }
+
+    return held &&
+      says("draft failed") &&
+      says("red first") === earlier.length > 0
       ? []
       : [`${proposal.id}'s draft failed, and its decision says otherwise`];
   }),
@@ -372,12 +399,16 @@ const firstBreak = (history: readonly Move[]) =>
 
     yield* api.recordFirstPush(person("alice"), first);
 
+    let ready: ReadyFiles = new Map();
+
     for (const [index, move] of history.entries()) {
       const before = yield* stored;
 
+      ready = readyIn(ready, before);
+
       yield* step(api, before, move);
 
-      const broken = brokenBy(move, before, yield* stored);
+      const broken = brokenBy(move, before, yield* stored, ready);
 
       if (broken.length > 0) {
         return [`step ${index} (${move._tag})`, ...broken];

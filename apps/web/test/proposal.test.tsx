@@ -13,15 +13,17 @@ import { Client, Contracts, ShowProposal } from "@repo/protocol/contracts";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { DraftState } from "@repo/protocol/domain/proposal";
 import { DecisionId, Handle, LaneName, ProjectName } from "@repo/protocol/ids";
+import { Unauthenticated } from "@repo/protocol/principal";
 import { UnknownProject, UnknownProposal } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
+import { Cause, DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
 import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { RpcTest } from "effect/rpc";
 
 import { projectTodayAtom } from "../src/client/proposal.ts";
 import { keysOf } from "../src/client/watch.ts";
+import { ProposalFailure } from "../src/features/proposal/failure.tsx";
 import {
   DRAFT_ATTEMPTS,
   ProposalView,
@@ -129,6 +131,20 @@ describe(ProposalView, () => {
     expect(markup).not.toMatch(DRAFT_AGAIN);
   });
 
+  it("while drafting with a note, shows the note the round was asked with", () => {
+    const noted = withDraft(
+      shownWith([]),
+      DraftState.cases.Drafting.make({
+        note: "only the parser",
+        round: 2,
+        startedAt: DateTime.makeUnsafe("2026-10-07T09:00:01Z"),
+      })
+    );
+
+    expect(plainText(view(noted))).toContain("Note: only the parser");
+    expect(plainText(view(drafting))).not.toContain("Note:");
+  });
+
   it("once ready, shows both files, the red-first run, who drafted it and its decision", () => {
     const markup = view(ready, Option.some(decision));
     const text = plainText(markup);
@@ -151,6 +167,25 @@ describe(ProposalView, () => {
 
     expect(plainText(markup)).toContain("NotRedFirst");
     expect(markup).toMatch(DRAFT_AGAIN);
+  });
+
+  it("failed after a ready round, still shows that round's files as a draft a decider can accept", () => {
+    const kept = withDraft(
+      ready,
+      DraftState.cases.Failed.make({
+        attempts: 3,
+        model,
+        refusal: "NotRedFirst",
+        round: 2,
+      })
+    );
+
+    const text = plainText(view(kept));
+
+    expect(text).toContain(askFile);
+    expect(text).toContain(testFile);
+    expect(text).toContain("An earlier round's ready draft");
+    expect(plainText(view(ready))).not.toContain("An earlier round");
   });
 
   it("offers Draft again only to the proposer or a decider", () => {
@@ -181,6 +216,39 @@ describe(ProposalView, () => {
 
     expect(plainText(markup)).toContain("accepted");
     expect(markup).not.toContain("<button");
+  });
+});
+
+describe("a failed call on the proposal page", () => {
+  const here = "/datekit/proposals/prop-000007";
+
+  it("with no session, asks to sign in and come back to the page", () => {
+    const markup = markupOf(
+      <ProposalFailure
+        cause={Cause.fail(new Unauthenticated({}))}
+        doing="draft it again"
+        here={here}
+      />
+    );
+
+    expect(markup).toContain(
+      `href="/auth/signin?${new URLSearchParams({ return: here }).toString()}"`
+    );
+    expect(plainText(markup)).toContain("Sign in");
+    expect(plainText(markup)).not.toContain("Today is a decider's page");
+  });
+
+  it("refused, shows the refusal", () => {
+    const markup = markupOf(
+      <ProposalFailure
+        cause={Cause.fail(new UnknownProposal({ proposal: ready.proposal.id }))}
+        doing="draft it again"
+        here={here}
+      />
+    );
+
+    expect(plainText(markup)).toContain("UnknownProposal");
+    expect(markup).not.toContain("/auth/signin");
   });
 });
 
