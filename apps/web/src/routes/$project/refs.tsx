@@ -8,12 +8,12 @@ import { Effect, Option, Schema } from "effect";
 import { notFoundFor } from "../../features/ask/refused.tsx";
 import { offsetOf, projectOf } from "../../features/code/address.ts";
 import { CodeNotFound } from "../../features/code/not-found.tsx";
-import { RefsView } from "../../features/code/refs-view.tsx";
+import { packageParamOf, RefsView } from "../../features/code/refs-view.tsx";
 import { pageTitle } from "../../features/shared/layout.tsx";
 import { serverClient } from "../../server/client.ts";
 
 // Main, the tags and the forks, read on the server; `?from=` pages the
-// tags.
+// tags, and `?package=` lists one package's tags alone.
 
 /** The refs for their page, or a not-found carrying the platform's refusal. */
 export const readRefsPage = (name: string) =>
@@ -38,16 +38,23 @@ const refsPage = createServerFn({ method: "GET" })
 
 const RefsPage = () => {
   const refs = Schema.decodeSync(Refs)(Route.useLoaderData());
-  const { from } = Route.useSearch();
+  const search = Route.useSearch();
 
-  return <RefsView from={from ?? 0} refs={refs} />;
+  return (
+    <RefsView from={search.from ?? 0} package={search.package} refs={refs} />
+  );
 };
 
 export const Route = createFileRoute("/$project/refs")({
   // The router writes back what this returns, dropping only `undefined`,
-  // so the first page's address carries no `from`.
-  validateSearch: (search: { readonly from?: unknown }) => ({
+  // so the first page's address carries no `from`, and all the tags' no
+  // `package`.
+  validateSearch: (search: {
+    readonly from?: unknown;
+    readonly package?: unknown;
+  }) => ({
     from: Option.getOrUndefined(offsetOf(search.from)),
+    package: Option.getOrUndefined(packageParamOf(search.package)),
   }),
   loader: ({ params }) => refsPage({ data: params.project }),
   head: ({ params: { project } }) => ({

@@ -1,7 +1,7 @@
 /**
  * A project's refs as readers see them: main's landed commit (the
  * project's record, never a ref), its tags peeled to their commits (the
- * repo's `tags`) and sorted by version, newest first, and its forks. Only
+ * repo's `tags`) in a reader's order (`sortTags`), and its forks. Only
  * `refs/tags/*` is read: nothing of the platform's own (its landed mirror,
  * compose refs, notes) and no branch but main ever shows.
  */
@@ -77,6 +77,63 @@ export const compareTags = (one: string, other: string): number => {
   return leftIsLonger === longerIsNewer ? -1 : 1;
 };
 
+/**
+ * The package a tag versions: the name before its last `@`, when that `@`
+ * is past the first character (`@changesets/cli@2.27.1` versions
+ * `@changesets/cli`, `get-workspaces@1.0.11` versions `get-workspaces`).
+ * A tag with no such `@` (`v1.2.3`, a bare scope) versions no package.
+ */
+export const packageOf = (tag: string): Option.Option<string> => {
+  const at = tag.lastIndexOf("@");
+
+  return at > 0 ? Option.some(tag.slice(0, at)) : Option.none();
+};
+
+/**
+ * Tags in the order a reader meets them, from their names alone: the tags
+ * that version no package first; then each package's tags as one run, the
+ * package with the most tags first (a monorepo's main package), ties by
+ * name; newest first within each (`compareTags`).
+ */
+export const sortTags = <T extends { readonly name: string }>(
+  tags: readonly T[]
+): readonly T[] => {
+  const keyed = tags.map((tag) => ({
+    pkg: Option.getOrUndefined(packageOf(tag.name)),
+    tag,
+  }));
+
+  const counts = new Map<string, number>();
+
+  for (const { pkg } of keyed) {
+    if (pkg !== undefined) {
+      counts.set(pkg, (counts.get(pkg) ?? 0) + 1);
+    }
+  }
+
+  const runOrder = (one: string | undefined, other: string | undefined) => {
+    if (one === other) {
+      return 0;
+    }
+
+    if (one === undefined || other === undefined) {
+      return one === undefined ? -1 : 1;
+    }
+
+    const more = (counts.get(other) ?? 0) - (counts.get(one) ?? 0);
+
+    return more === 0 ? compareText(one, other) : Math.sign(more);
+  };
+
+  return keyed
+    .toSorted(
+      (one, other) =>
+        runOrder(one.pkg, other.pkg) ||
+        compareTags(one.tag.name, other.tag.name)
+    )
+    .map(({ tag }) => tag);
+};
+
 const decodeTag = Schema.decodeUnknownOption(TagName);
 
 /** Main's landed commit, its tags peeled and sorted newest first, and its forks. */
@@ -103,7 +160,7 @@ export const refsView = (
     return {
       forks,
       project: project.project,
-      tags: named.toSorted((one, other) => compareTags(one.name, other.name)),
+      tags: sortTags(named),
       ...Option.match(landed, {
         onNone: () => ({}),
         onSome: (sha) => ({ landed: sha }),
