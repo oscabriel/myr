@@ -10,11 +10,17 @@
   // The top level is stage `local`: `vite dev` and the type generation read
   // it, and it is never deployed. Each stage under `env` repeats the binding
   // and the vars, since wrangler does not inherit them into an environment.
+  //
+  // Workers Cache is on in each deployed stage, and off at the top, so `vite
+  // dev` keeps nothing (ADR 0026). It keys by the Worker's version, so each
+  // deploy starts cold and a kept page never names another version's hashed
+  // assets: `cross_version_cache` stays off.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "web",
-  // TanStack Start's own server entry (the Cloudflare framework guide); the
-  // Cloudflare Vite plugin builds it.
-  "main": "@tanstack/react-start/server-entry",
+  // TanStack Start's own server entry, wrapped so every answer passes
+  // through what the edge may keep (src/server/edge-cache.ts; the Cloudflare
+  // framework guide's custom entrypoint). The Cloudflare Vite plugin builds it.
+  "main": "src/server.ts",
   "compatibility_date": "2026-10-05",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
@@ -31,6 +37,7 @@
   },
   "env": {
     "dev-oscabriel": {
+      "cache": { "enabled": true },
       "services": [
         { "binding": "PLATFORM", "service": "platform-dev-oscabriel" },
       ],
@@ -39,6 +46,7 @@
       },
     },
     "demo": {
+      "cache": { "enabled": true },
       "services": [{ "binding": "PLATFORM", "service": "platform-demo" }],
       "vars": {
         "PUBLIC_PLATFORM_URL": "https://platform-demo.oscargabriel.workers.dev",
