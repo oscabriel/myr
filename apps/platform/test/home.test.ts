@@ -12,12 +12,13 @@ import { Brand } from "@repo/brand";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
+import { StandingPosturesMemory } from "@repo/project/standing-posture/memory";
 import { Contracts } from "@repo/protocol/contracts";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option, Ref } from "effect";
 
 import { MemorySessions } from "../src/sessions/memory.ts";
 import { HostInfo } from "../src/surfaces.ts";
@@ -233,6 +234,63 @@ describe("the platform's /", () => {
         expect(text).toContain(
           `- [datekit](${webUrl}/datekit/llms.txt): Open with sealed evidence, 3 open asks.`
         );
+      })
+  );
+
+  it.effect(
+    "keeps the posture it read in the platform's kept postures, so a second / reads no project",
+    () =>
+      Effect.gen(function* () {
+        const reads = yield* Ref.make(0);
+
+        const counted = Layer.succeed(
+          Projects,
+          Projects.of({
+            create: () => Effect.die("the home page makes no project"),
+            get: (project) =>
+              project === "datekit"
+                ? Effect.succeed(
+                    untouchable<ProjectApi>("ProjectApi", {
+                      standing: () =>
+                        Effect.as(
+                          Ref.update(reads, (count) => count + 1),
+                          { posture: "openWithSealedEvidence", seen: 1 }
+                        ),
+                    })
+                  )
+                : Effect.fail(new UnknownProject({ project })),
+          })
+        );
+
+        const { fetch } = yield* served(
+          Layer.mergeAll(
+            counted,
+            noProjects,
+            StandingPosturesMemory,
+            MemorySessions.layer({}),
+            FrontPageMemory.layer({ credits: [], entries: [], projects }),
+            Layer.succeed(
+              HostInfo,
+              HostInfo.of({
+                draftModel: "@cf/test/drafter",
+                webUrl: Option.some(webUrl),
+              })
+            )
+          )
+        );
+
+        const markdown = { headers: { accept: "text/markdown" } };
+
+        for (const _ of [1, 2]) {
+          const response = yield* fetch(new Request(`${origin}/`, markdown));
+          const text = yield* Effect.promise(() => response.text());
+
+          expect(text).toContain(
+            `- [datekit](${webUrl}/datekit/llms.txt): Open with sealed evidence, 3 open asks.`
+          );
+        }
+
+        expect(yield* Ref.get(reads)).toBe(1);
       })
   );
 

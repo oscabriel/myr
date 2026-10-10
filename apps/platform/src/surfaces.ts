@@ -7,6 +7,7 @@ import { CodeStore } from "@repo/project/code-store";
 import { CodeCache } from "@repo/project/code/cache";
 import { FrontPage } from "@repo/project/front-page";
 import { Projects } from "@repo/project/projects";
+import { StandingPostures } from "@repo/project/standing-posture";
 import { authenticated, bearerToken } from "@repo/protocol/authenticate";
 import { Client, Contracts, surfaced } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
@@ -369,7 +370,9 @@ const home = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const services = Context.make(FrontPage, yield* FrontPage).pipe(
       Context.add(HostInfo, yield* HostInfo),
-      Context.add(Projects, yield* Projects)
+      Context.add(Projects, yield* Projects),
+      // A `Context.Reference`: without it each `/` reads every project.
+      Context.add(StandingPostures, yield* StandingPostures)
     );
 
     yield* router.add(

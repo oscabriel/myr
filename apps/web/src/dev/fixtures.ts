@@ -387,6 +387,12 @@ const overlay: Layer.Layer<
             Effect.mapError(() => new UnknownProposal({ proposal: id }))
           )
         ),
+      // The posture vellum's record's ledger shows, which no clock moves.
+      standing: () =>
+        Effect.map(current, (record) => ({
+          posture: record.ledger.posture,
+          seen: lastSeqOf(record),
+        })),
       status: (caller) =>
         Effect.map(current, (record) => statusIn(record, caller.handle)),
       today: (caller) =>
