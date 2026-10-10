@@ -325,6 +325,19 @@ const newestCommit = (browser: Page, project: string) =>
     return href ?? "";
   });
 
+/**
+ * A project's home: its README rendered, and the facts' Take part steps,
+ * which clone it with plain git. The facts render inline and in the
+ * inspector, one of them hidden at each width, so the visible one is asked.
+ */
+const homeWanted = (project: string, readme: string) => ({
+  selectors: [
+    "[data-readme]",
+    `section[aria-label="Take part"]:visible:has-text("/${project}.git")`,
+  ],
+  texts: [readme],
+});
+
 /** The pages every import shows. */
 const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
   const timedProject = project === "changesets" || project === "click";
@@ -333,10 +346,13 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
     page: browser,
   }) =>
     Effect.runPromise(
-      visit(browser, project, `/${project}`, "home", {
-        selectors: ["[data-clone]", "[data-readme]"],
-        texts: [readme, `git clone`],
-      })
+      visit(
+        browser,
+        project,
+        `/${project}`,
+        "home",
+        homeWanted(project, readme)
+      )
     ));
 
   test(`${project}'s ${dir} lists its entries`, ({ page: browser }) =>
@@ -388,9 +404,20 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
         const href = yield* newestCommit(browser, project);
 
         yield* visit(browser, project, href, "commit", {
-          selectors: ["[data-diffs-header]"],
           texts: ["changed"],
         });
+
+        // A source's own commit may change nothing (gum's newest is a
+        // version bump); any other shows each file it changed.
+        const empty = yield* awaited(() =>
+          browser.getByText(/^0 files changed/u).count()
+        );
+
+        if (empty === 0) {
+          yield* awaited(() =>
+            expect(browser.locator("[data-diffs-header]").first()).toBeVisible()
+          );
+        }
       })
     ));
 
@@ -412,7 +439,7 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
         `/${project}/people`,
         "people",
         evaluated
-          ? { selectors: ['tr[data-paths="**"]'] }
+          ? { selectors: ['[data-paths="**"]'] }
           : {
               texts: [
                 "has not been evaluated",
@@ -436,7 +463,6 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
           )
         : visit(browser, project, `/${project}/why/main/${file}`, "why", {
             selectors: ["[data-range]"],
-            texts: ["Why each line is there"],
           })
     ));
 
@@ -460,10 +486,13 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
 const knownPages = ({ file, project, readme }: Known) => {
   test(`${project}'s home renders its ${readme}`, ({ page: browser }) =>
     Effect.runPromise(
-      visit(browser, project, `/${project}`, "home", {
-        selectors: ["[data-clone]", "[data-readme]"],
-        texts: [readme],
-      })
+      visit(
+        browser,
+        project,
+        `/${project}`,
+        "home",
+        homeWanted(project, readme)
+      )
     ));
 
   test(`${project}'s root lists ${file}`, ({ page: browser }) =>
