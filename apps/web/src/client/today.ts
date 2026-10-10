@@ -8,12 +8,22 @@
  * `decide`) invalidates `keys.today()`, and this atom reads again.
  */
 import type { ProjectName } from "@repo/protocol/ids";
+import { Atom } from "effect/reactivity";
 
 import { ContractsClient } from "../surfaces.ts";
 import { keys } from "./keys.ts";
 
-/** The caller's Today, across their projects or narrowed to one. */
-export const todayAtom = (project?: ProjectName) =>
-  ContractsClient.query("today", project === undefined ? {} : { project }, {
-    reactivityKeys: keys.today(),
-  });
+/**
+ * The caller's Today, across their projects or narrowed to one. A server
+ * render never reads it (the page's loader does, with the reader's
+ * session, and seeds it); unseeded, it renders as waiting there.
+ */
+const todayFamily = Atom.family((project: ProjectName | undefined) =>
+  Atom.withServerValueInitial(
+    ContractsClient.query("today", project === undefined ? {} : { project }, {
+      reactivityKeys: keys.today(),
+    })
+  )
+);
+
+export const todayAtom = (project?: ProjectName) => todayFamily(project);

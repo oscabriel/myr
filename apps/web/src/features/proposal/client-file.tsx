@@ -36,7 +36,7 @@ export const DraftedCode = ({
 
   return (
     <section className="flex min-w-0 flex-col gap-1.5" data-file={path}>
-      <Heading className="font-mono text-sm font-medium [overflow-wrap:anywhere]">
+      <Heading className="text-mono font-mono font-medium [overflow-wrap:anywhere]">
         {path}
       </Heading>
       {DraftedFileLater === undefined ? (

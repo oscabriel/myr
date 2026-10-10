@@ -1,304 +1,305 @@
 /**
- * Today: a decider's day of decisions, not diffs, held to a budget. The
- * budget's decisions and the finishes are counted apart (a finish costs more
- * than a decision); the decisions expiring soon come first, then the rest by
- * expiry; what the budget leaves out waits for tomorrow, and may expire to
- * its safe default. Below them: the newcomers to welcome, and a sample of
- * landings that needed nobody.
+ * Today: a decider's day of decisions, not diffs, held to a budget said in
+ * one sentence. The decisions sit in sections: those due within the day,
+ * then the rest within the budget by expiry, then how many wait for
+ * tomorrow (their ids are not in the read, so they have no rows). Below
+ * them, the newcomers to welcome and a sample of landings that needed
+ * nobody.
+ *
+ * Each row says its subject in plain words (the link to its page), its
+ * project, kind and id, and when it expires over its default. From the
+ * shell's width a row selects into the inspector, which holds the whole
+ * decision: its evidence, a note, and its choices, each with what it does.
+ * Below it a row opens in place, one at a time, its choices kept in sight
+ * above the bottom bar while it is open.
+ *
+ * A choice taken leaves its row where it was, reading what it did; the
+ * budget sentence moves with the next read. There is no toast.
  *
  * A failure reads as what it is: a refusal (`NotDecider` for a person who
- * decides nothing) through `RefusalView`, a missing sign-in as the way to
- * sign in, and an unreachable platform as that, never as an empty day.
+ * decides nothing) through `RefusalView`, a missing sign-in as what Today
+ * is and how to sign in, and an unreachable platform as that, never as an
+ * empty day.
  */
 import { Brand } from "@repo/brand";
 import type { Decision, Today } from "@repo/protocol/domain/decision";
 import type { LandingView } from "@repo/protocol/domain/landing";
-import type { DecisionId, ProjectName } from "@repo/protocol/ids";
-import { Unauthenticated } from "@repo/protocol/principal";
-import { Refusal } from "@repo/protocol/refusal";
-import { Array as Arr, Cause, DateTime, Option, Order, Schema } from "effect";
+import { Array as Arr, Option, Order } from "effect";
+import type { DateTime } from "effect";
+import { constVoid } from "effect/Function";
 import { AsyncResult } from "effect/reactivity";
-import { CircleCheck, LogIn, Unplug } from "lucide-react";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 
+import { signInHref } from "../auth/session-slot.tsx";
+import { commitHref, shortSha } from "../code/paths.ts";
+import { stuckAboveBar } from "../decision/choices.tsx";
 import { DecisionCard } from "../decision/decision-card.tsx";
 import type { DecideInput } from "../decision/decision-card.tsx";
-import { LABEL } from "../shared/classes.ts";
+import {
+  consequenceOf,
+  decisionHref,
+  decisionKey,
+  describeDefault,
+  describeSubject,
+  subjectKind,
+  takenWords,
+  tookEffect,
+} from "../decision/subject.ts";
+import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
-import { HandleLink } from "../shared/handle.tsx";
+import { FactBlock } from "../shared/facts.tsx";
+import { useListKeys } from "../shared/keys.tsx";
+import { AppLink } from "../shared/link.tsx";
+import { personPath } from "../shared/paths.ts";
+import { UnreachableNotice } from "../shared/pending.tsx";
 import { RefusalView } from "../shared/refusal.tsx";
-import { When } from "../shared/time.tsx";
+import { MetaCode, MetaLine, Row, RowGroup } from "../shared/row.tsx";
+import { Workspace } from "../shared/shell/workspace.tsx";
+import { StatusLine } from "../shared/status-line.tsx";
+import { distanceInWords, When } from "../shared/time.tsx";
+import { expiringSoon, expiryOrder, readOfCause, TodayRead } from "./read.ts";
 
-const isRefusal = Schema.is(Refusal);
+export {
+  findDecision,
+  orderDecisions,
+  readOfCause,
+  TodayPageData,
+  TodayRead,
+} from "./read.ts";
 
-const isUnauthenticated = Schema.is(Unauthenticated);
+const counted = (count: number) => (count === 0 ? "none" : String(count));
 
-/** A decision's place in a Today that may hold several projects. */
-const keyOf = ({ id, project }: Decision) => `${project}/${id}`;
+/** The day's budget, in one sentence: decisions taken and left, and the finishes apart. */
+export const budgetSentence = (budget: Today["budget"]) =>
+  `Decisions: ${budget.used} taken, ${counted(Math.max(0, budget.total - budget.used))} left today. Finishes are counted apart: ${counted(budget.finishes)} taken.`;
 
-/** Soonest to expire first, then oldest, then by project and id: one order every time. */
-const expiryOrder: Order.Order<Decision> = Order.combineAll([
-  Order.mapInput(DateTime.Order, ({ expiresAt }: Decision) => expiresAt),
-  Order.mapInput(DateTime.Order, ({ openedAt }: Decision) => openedAt),
-  Order.mapInput(Order.String, ({ project }: Decision) => project),
-  Order.mapInput(Order.String, ({ id }: Decision) => id),
-]);
+/** The budget for the context bar: what is left. */
+const budgetShort = (budget: Today["budget"]) =>
+  `${counted(Math.max(0, budget.total - budget.used))} left today`;
 
-/**
- * The decisions `today.expiringSoon` names. Ids are minted per project, so a
- * Today across projects may hold two decisions with one id; where an id is
- * named `n` times, the `n` of its decisions that expire first are the ones
- * meant (a decision that expires within the day expires before any that
- * does not).
- */
-const expiringSoon = (today: Today): ReadonlySet<string> => {
-  const named = Arr.groupBy(today.expiringSoon, (id) => id);
-  const byExpiry = Arr.sort(today.decisions, expiryOrder);
+/** What Today is, for someone it does not hold decisions for yet. */
+const WHAT_TODAY_IS =
+  "Today is a decider's page: the decisions you owe your projects each day, each with its evidence and a safe default if you leave it.";
 
-  return new Set(
-    Object.entries(named).flatMap(([id, times]) =>
-      byExpiry
-        .filter((decision) => decision.id === id)
-        .slice(0, times.length)
-        .map(keyOf)
-    )
+/** A decision on the page: listed, and whether it is due within the day. */
+interface Listed {
+  readonly decision: Decision;
+  readonly soon: boolean;
+}
+
+/** The choice a row's decision was taken with, when the decider took it here. */
+const choiceOf = (decision: Decision) => decision.decided?.choice;
+
+/** Its expiry over its default, at the row's end; muted when it is not due within the day. */
+const openState = (listed: Listed, now: DateTime.Utc) => ({
+  mark: listed.soon ? ("waiting" as const) : ("notYet" as const),
+  time: `default: ${listed.decision.default}`,
+  word: distanceInWords(listed.decision.expiresAt, now),
+});
+
+/** The way to open a row in place, below the shell's width. */
+const OpenHere = ({
+  decision,
+  onToggle,
+  open,
+}: {
+  readonly decision: Decision;
+  readonly open: boolean;
+  readonly onToggle: () => void;
+}) => (
+  <button
+    aria-controls={`here-${decisionKey(decision).replace("/", "-")}`}
+    aria-expanded={open}
+    aria-label={`${open ? "Close" : "Decide"} here: ${describeSubject(decision.subject)}`}
+    className="text-muted-foreground hover:text-foreground hover:bg-surface shell:hidden relative z-10 inline-flex size-11 shrink-0 items-center justify-center transition-colors duration-[120ms]"
+    onClick={onToggle}
+    type="button"
+  >
+    <ChevronDown
+      aria-hidden="true"
+      className={`size-5 transition-transform duration-[180ms] ${open ? "rotate-180" : ""}`}
+      strokeWidth={1.75}
+    />
+  </button>
+);
+
+interface RowsProps {
+  readonly busy: boolean;
+  readonly now: DateTime.Utc;
+  readonly onDecide: (input: DecideInput) => void;
+  readonly onSelect: ((key: string) => void) | undefined;
+  readonly open: string | undefined;
+  readonly onOpen: (key: string | undefined) => void;
+  readonly selected: string | undefined;
+  /** The decisions taken while the page was open, to stamp once. */
+  readonly stamped: ReadonlySet<string>;
+}
+
+/** One decision's row: its subject, where it stands, and (below the shell's width) the whole of it in place. */
+const DecisionRow = ({
+  listed,
+  props,
+}: {
+  readonly listed: Listed;
+  readonly props: RowsProps;
+}) => {
+  const { decision } = listed;
+  const key = decisionKey(decision);
+  const choice = choiceOf(decision);
+  const isOpen = props.open === key && choice === undefined;
+
+  const state =
+    choice === undefined
+      ? openState(listed, props.now)
+      : {
+          mark: tookEffect(decision, choice)
+            ? ("landed" as const)
+            : ("notNeeded" as const),
+          stamp: props.stamped.has(key),
+          word: takenWords[choice],
+        };
+
+  return (
+    <Row
+      action={
+        choice === undefined ? (
+          <OpenHere
+            decision={decision}
+            onToggle={() => {
+              props.onOpen(isOpen ? undefined : key);
+            }}
+            open={isOpen}
+          />
+        ) : undefined
+      }
+      data={{
+        "data-decided": choice,
+        "data-decision": decision.id,
+        "data-project": decision.project,
+        "data-soon": listed.soon,
+      }}
+      href={decisionHref(decision)}
+      id={key}
+      meta={
+        choice === undefined ? (
+          <MetaLine
+            parts={[
+              decision.project,
+              subjectKind(decision.subject),
+              <MetaCode key="id">{decision.id}</MetaCode>,
+            ]}
+          />
+        ) : (
+          consequenceOf(decision.subject, choice)
+        )
+      }
+      onSelect={props.onSelect}
+      selected={props.selected === key}
+      state={state}
+      strip={
+        choice === undefined ? (
+          <div
+            className={`shell:hidden pr-2 ${isOpen ? "animate-in fade-in-0 slide-in-from-top-1 pb-1 duration-[180ms]" : "hidden"}`}
+            id={`here-${key.replace("/", "-")}`}
+          >
+            <DecisionCard
+              busy={props.busy}
+              choices={stuckAboveBar}
+              decision={decision}
+              now={props.now}
+              onDecide={props.onDecide}
+              soon={listed.soon}
+            />
+          </div>
+        ) : undefined
+      }
+      title={describeSubject(decision.subject)}
+    />
   );
 };
 
-/** Today's decisions in the order a decider takes them: expiring soon first, then by expiry. */
-export const orderDecisions = (today: Today): readonly Decision[] => {
-  const soon = expiringSoon(today);
-
-  return Arr.sort(
-    today.decisions,
-    Order.combine(
-      Order.mapInput(
-        Order.Boolean,
-        (decision: Decision) => !soon.has(keyOf(decision))
-      ),
-      expiryOrder
-    )
-  );
-};
-
-/** Where one decision stands on Today: listed (and whether it expires soon), or not there. */
-export const findDecision = (
-  today: Today,
-  project: ProjectName,
-  id: DecisionId
-): Option.Option<{ readonly decision: Decision; readonly soon: boolean }> => {
-  const soon = expiringSoon(today);
-
-  return Arr.findFirst(
-    today.decisions,
-    (decision) => decision.project === project && decision.id === id
-  ).pipe(
-    Option.map((decision) => ({ decision, soon: soon.has(keyOf(decision)) }))
-  );
-};
+const Section = ({
+  children,
+  count,
+  name,
+}: {
+  readonly children: ReactNode;
+  readonly name: string;
+  readonly count?: string;
+}) => (
+  <RowGroup
+    {...(count === undefined ? {} : { counts: count })}
+    label={name}
+    name={name}
+    under="bar"
+  >
+    {children}
+  </RowGroup>
+);
 
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-const SECTION = "flex flex-col gap-3";
-
-const TITLE = "text-lg font-semibold";
-
-/** A one-line notice under a rule: an icon, then what to know. */
-export const Notice = ({
-  children,
-  icon,
+/** The decisions, due today then within the budget, each section only when it holds one. */
+const DecisionSections = ({
+  listed,
+  props,
 }: {
-  readonly children: ReactNode;
-  readonly icon: ReactNode;
-}) => (
-  <output className="border-rule flex items-start gap-2 border-t border-b py-3 text-sm">
-    {icon}
-    <span>{children}</span>
-  </output>
-);
-
-/** A call that failed: a refusal as the platform gave it, or why there is no answer. */
-export const FailureView = ({
-  cause,
-}: {
-  readonly cause: Cause.Cause<unknown>;
+  readonly listed: readonly Listed[];
+  readonly props: RowsProps;
 }) => {
-  const error = Cause.findErrorOption(cause);
+  const dueToday = listed.filter(({ soon }) => soon);
+  const later = listed.filter(({ soon }) => !soon);
 
-  if (Option.isSome(error) && isRefusal(error.value)) {
-    return <RefusalView refusals={[error.value]} />;
-  }
-
-  if (Option.isSome(error) && isUnauthenticated(error.value)) {
-    return (
-      <Notice
-        icon={<LogIn aria-hidden="true" className="mt-0.5 size-4 shrink-0" />}
-      >
-        Today is a decider&apos;s page.{" "}
-        <a
-          className="decoration-rule font-medium underline hover:decoration-current"
-          href="/auth/signin"
+  return (
+    <>
+      {dueToday.length === 0 ? null : (
+        <Section
+          count={plural(dueToday.length, "decision", "decisions")}
+          name="Due today"
         >
-          Sign in
-        </a>{" "}
-        to see yours.
-      </Notice>
-    );
-  }
-
-  return (
-    <Notice
-      icon={<Unplug aria-hidden="true" className="mt-0.5 size-4 shrink-0" />}
-    >
-      The platform did not answer. Reload the page, or run{" "}
-      <code className="font-mono text-[0.8125rem]">{Brand.cli} today</code> in a
-      terminal.
-    </Notice>
-  );
-};
-
-/** Today on its way from the platform. */
-export const ReadingToday = () => (
-  <output className="text-muted-foreground block text-sm">
-    Reading your Today
-  </output>
-);
-
-/** The day's budget, as two fields: decisions against the total, and finishes apart. */
-const Budget = ({ budget }: { readonly budget: Today["budget"] }) => {
-  const left = Math.max(0, budget.total - budget.used);
-
-  return (
-    <dl
-      aria-label="Today's budget"
-      className="border-rule grid grid-cols-2 border-t border-b"
-    >
-      <div className="border-rule flex flex-col gap-0.5 border-r py-2 pr-3">
-        <dt className={LABEL}>Decisions</dt>
-        <dd className="text-2xl font-semibold tabular-nums" data-budget="used">
-          {budget.used} of {budget.total}
-        </dd>
-        <dd className="text-muted-foreground text-xs">
-          {plural(left, "decision", "decisions")} left today
-        </dd>
-      </div>
-      <div className="flex flex-col gap-0.5 py-2 pl-3">
-        <dt className={LABEL}>Finishes</dt>
-        <dd
-          className="text-2xl font-semibold tabular-nums"
-          data-budget="finishes"
-        >
-          {plural(budget.finishes, "finish", "finishes")}
-        </dd>
-        <dd className="text-muted-foreground text-xs">
-          counted apart from decisions
-        </dd>
-      </div>
-    </dl>
-  );
-};
-
-/** What the decider's last choice came to: taken, refused, or on its way. */
-export const DecidedNotice = ({
-  decided,
-}: {
-  readonly decided: AsyncResult.AsyncResult<
-    { readonly decision: Decision },
-    unknown
-  >;
-}) => {
-  if (AsyncResult.isFailure(decided)) {
-    return <FailureView cause={decided.cause} />;
-  }
-
-  if (AsyncResult.isInitial(decided)) {
-    return decided.waiting ? (
-      <p className="text-checking text-sm" data-decided="waiting">
-        Sending your choice
-      </p>
-    ) : null;
-  }
-
-  const { decision } = decided.value;
-
-  return decision.decided === undefined ? null : (
-    <p
-      className="flex items-start gap-2 text-sm"
-      data-decided={decision.decided.choice}
-    >
-      <CircleCheck
-        aria-hidden="true"
-        className="text-landed mt-0.5 size-4 shrink-0"
-      />
-      <span>
-        <strong className="text-landed font-semibold">Decided:</strong>{" "}
-        {decision.decided.choice} on{" "}
-        <code className="font-mono text-[0.8125rem]">
-          {decision.project}/{decision.id}
-        </code>
-      </span>
-    </p>
-  );
-};
-
-const Decisions = ({
-  decided,
-  now,
-  onDecide,
-  today,
-}: {
-  readonly decided: AsyncResult.AsyncResult<
-    { readonly decision: Decision },
-    unknown
-  >;
-  readonly now: DateTime.Utc;
-  readonly onDecide: (input: DecideInput) => void;
-  readonly today: Today;
-}) => {
-  const soon = expiringSoon(today);
-  const ordered = orderDecisions(today);
-
-  return (
-    <section aria-labelledby="today-decisions" className={SECTION}>
-      <h2 className={TITLE} id="today-decisions">
-        Decisions
-      </h2>
-      <div aria-live="polite">
-        <DecidedNotice decided={decided} />
-      </div>
-      {ordered.length === 0 ? (
-        <EmptyState
-          command={`${Brand.cli} today`}
-          title="Nothing to decide today. Undecided decisions expire to their safe default."
-        />
-      ) : (
-        <ol className="border-rule flex flex-col border-t">
-          {ordered.map((decision) => (
-            <li className="border-rule border-b py-5" key={keyOf(decision)}>
-              <DecisionCard
-                busy={decided.waiting}
-                decision={decision}
-                now={now}
-                onDecide={onDecide}
-                soon={soon.has(keyOf(decision))}
-              />
-            </li>
+          {dueToday.map((each) => (
+            <DecisionRow
+              key={decisionKey(each.decision)}
+              listed={each}
+              props={props}
+            />
           ))}
-        </ol>
+        </Section>
       )}
-      {today.overflow === 0 ? null : (
-        <p
-          className="text-muted-foreground text-sm"
-          data-overflow={today.overflow}
+      {later.length === 0 ? null : (
+        <Section
+          count={plural(later.length, "decision", "decisions")}
+          name="Within your budget"
         >
-          {today.overflow} more {today.overflow === 1 ? "waits" : "wait"} for
-          tomorrow; each expires to its default if nobody decides first.
-        </p>
+          {later.map((each) => (
+            <DecisionRow
+              key={decisionKey(each.decision)}
+              listed={each}
+              props={props}
+            />
+          ))}
+        </Section>
       )}
-    </section>
+    </>
   );
 };
+
+/** How many wait beyond the budget, as a sentence: their ids are not in the read. */
+const Tomorrow = ({ overflow }: { readonly overflow: number }) =>
+  overflow === 0 ? null : (
+    <Section name="Waits for tomorrow">
+      <li
+        className="border-rule text-ui flex min-h-10 items-center border-b py-2"
+        data-overflow={overflow}
+      >
+        {overflow} more {overflow === 1 ? "waits" : "wait"} for tomorrow; each
+        expires to its default if nobody decides first.
+      </li>
+    </Section>
+  );
 
 const Newcomers = ({
   newcomers,
@@ -306,21 +307,18 @@ const Newcomers = ({
   readonly newcomers: Today["newcomers"];
 }) =>
   newcomers.length === 0 ? null : (
-    <section aria-labelledby="today-newcomers" className={SECTION}>
-      <h2 className={TITLE} id="today-newcomers">
-        Newcomers to welcome
-      </h2>
-      <p className="text-muted-foreground text-sm">
-        Their first claim was this week.
-      </p>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-        {newcomers.map((handle) => (
-          <li key={handle}>
-            <HandleLink handle={handle} />
-          </li>
-        ))}
-      </ul>
-    </section>
+    <Section name="Newcomers to welcome">
+      {newcomers.map((handle) => (
+        <Row
+          href={personPath(handle)}
+          id={handle}
+          key={handle}
+          meta="made a first claim this week"
+          size="one-line"
+          title={handle}
+        />
+      ))}
+    </Section>
   );
 
 const Unattended = ({
@@ -331,53 +329,318 @@ const Unattended = ({
   readonly now: DateTime.Utc;
 }) =>
   landings.length === 0 ? null : (
-    <section aria-labelledby="today-unattended" className={SECTION}>
-      <h2 className={TITLE} id="today-unattended">
-        Landed without a decision
-      </h2>
-      <p className="text-muted-foreground text-sm">
-        A sample of answers that passed the gate and needed nobody.
-      </p>
-      <ul className="border-rule flex flex-col border-t">
-        {landings.map((landing) => (
-          <li
-            className="border-rule flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b py-2 text-sm"
-            key={`${landing.project}/${landing.sha}`}
-          >
-            <code className="font-mono text-[0.8125rem]">
-              {landing.sha.slice(0, 7)}
-            </code>
-            <span className="min-w-0 [overflow-wrap:anywhere]">
-              <span className="font-mono text-[0.8125rem]">
-                {landing.project}
-              </span>
-              {landing.ask === undefined ? null : (
-                <>
-                  {" "}
-                  answers{" "}
-                  <span className="font-mono text-[0.8125rem]">
-                    {landing.ask}
-                  </span>
-                </>
-              )}
-              , by <HandleLink handle={landing.author} />
-            </span>
-            <span className="text-muted-foreground ml-auto text-xs">
-              <When at={landing.landedAt} now={now} />
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <Section name="Landed without a decision">
+      {landings.map((landing) => (
+        <Row
+          href={commitHref(landing.project, landing.sha)}
+          id={landing.sha}
+          key={`${landing.project}/${landing.sha}`}
+          meta={
+            <MetaLine
+              parts={[
+                landing.project,
+                <MetaCode key="sha">{shortSha(landing.sha)}</MetaCode>,
+              ]}
+            />
+          }
+          state={{
+            mark: "landed",
+            time: <When at={landing.landedAt} now={now} />,
+            word: "Landed",
+          }}
+          title={
+            landing.ask === undefined
+              ? `Landed by ${landing.author}`
+              : `${landing.ask}, answered by ${landing.author}`
+          }
+        />
+      ))}
+    </Section>
   );
+
+/** The decision the inspector holds, whole. */
+const SelectedFacts = ({
+  busy,
+  listed,
+  now,
+  onDecide,
+  stamped,
+}: {
+  readonly busy: boolean;
+  readonly listed: Listed;
+  readonly now: DateTime.Utc;
+  readonly onDecide: (input: DecideInput) => void;
+  readonly stamped: boolean;
+}) => (
+  <>
+    <FactBlock label="State">
+      <AppLink
+        className="text-want decoration-rule font-semibold text-balance [overflow-wrap:anywhere] underline-offset-4 hover:underline"
+        to={decisionHref(listed.decision)}
+      >
+        {describeSubject(listed.decision.subject)}
+      </AppLink>
+      <StatusLine
+        subject={{
+          decision: listed.decision,
+          kind: "decision",
+          now,
+          viewerDecides: true,
+        }}
+      />
+      <p className="text-label text-muted-foreground font-normal">
+        {describeDefault(listed.decision)}
+      </p>
+    </FactBlock>
+    <FactBlock label="Evidence and choices">
+      <DecisionCard
+        busy={busy}
+        decision={listed.decision}
+        expiry={false}
+        layout="stack"
+        now={now}
+        onDecide={onDecide}
+        soon={listed.soon}
+        stamp={stamped}
+      />
+    </FactBlock>
+  </>
+);
+
+/** Signed out: what Today is, the way in, and the command. */
+const SignedOutNotice = ({ here }: { readonly here: string }) => (
+  <div className="flex max-w-[70ch] flex-col items-start gap-3">
+    <p className="text-body">{WHAT_TODAY_IS}</p>
+    <p className="text-ui">
+      <a
+        className="decoration-rule font-medium underline hover:decoration-current"
+        href={signInHref(here)}
+      >
+        Sign in
+      </a>{" "}
+      to see yours, or read it from a terminal:
+    </p>
+    <CommandLine command={`${Brand.cli} today`} />
+  </div>
+);
+
+/** What a choice that failed came back with: the refusal, or why there is none. */
+const DecidedFailure = ({
+  decided,
+}: {
+  readonly decided: AsyncResult.AsyncResult<unknown, unknown>;
+}) => {
+  if (!AsyncResult.isFailure(decided)) {
+    return null;
+  }
+
+  const read = readOfCause(decided.cause);
+
+  return TodayRead.match(read, {
+    Read: () => null,
+    Refused: ({ refusal }) => <RefusalView refusals={[refusal]} />,
+    SignedOut: () => <SignedOutNotice here="/today" />,
+    Unreachable: () => <UnreachableNotice />,
+  });
+};
+
+/** The page around a Today with no decisions to list: the reason, said whole. */
+const Unlisted = ({ children }: { readonly children: ReactNode }) => (
+  <Workspace crumbs={[{ label: "Today" }]} title="Today" variant="list">
+    {children}
+  </Workspace>
+);
+
+/**
+ * The decisions on the page: Today's, and any the decider took here that
+ * the next read no longer lists, each where it was.
+ */
+const listedOf = (
+  today: Today,
+  taken: ReadonlyMap<string, Listed>
+): readonly Listed[] => {
+  const soon = expiringSoon(today);
+
+  const current = today.decisions.map((decision) => {
+    const key = decisionKey(decision);
+
+    return taken.get(key) ?? { decision, soon: soon.has(key) };
+  });
+
+  const gone = [...taken.values()].filter(
+    ({ decision }) =>
+      !today.decisions.some(
+        (each) => decisionKey(each) === decisionKey(decision)
+      )
+  );
+
+  return Arr.sort(
+    [...current, ...gone],
+    Order.combine(
+      Order.mapInput(Order.Boolean, ({ soon: due }: Listed) => !due),
+      Order.mapInput(expiryOrder, ({ decision }: Listed) => decision)
+    )
+  );
+};
+
+/** `kept` with `decision`, taken, where it was listed. */
+const withTaken = (
+  kept: ReadonlyMap<string, Listed>,
+  decision: Decision,
+  soon: ReadonlySet<string>
+): ReadonlyMap<string, Listed> => {
+  const key = decisionKey(decision);
+
+  return new Map([
+    ...kept,
+    [key, { decision, soon: kept.get(key)?.soon ?? soon.has(key) }],
+  ]);
+};
+
+/** The decision a choice just came back with, when it was taken. */
+const takenNow = (
+  decided: AsyncResult.AsyncResult<{ readonly decision: Decision }, unknown>
+): Option.Option<Decision> =>
+  Option.filter(
+    Option.map(AsyncResult.value(decided), ({ decision }) => decision),
+    ({ decided: record }) => record !== undefined
+  );
+
+const ListedToday = ({
+  decided,
+  now,
+  onDecide,
+  onSelect,
+  selected,
+  today,
+}: {
+  readonly today: Today;
+  readonly now: DateTime.Utc;
+  readonly onDecide: (input: DecideInput) => void;
+  readonly decided: AsyncResult.AsyncResult<
+    { readonly decision: Decision },
+    unknown
+  >;
+  readonly selected: string | undefined;
+  readonly onSelect: ((key: string) => void) | undefined;
+}) => {
+  const [kept, setKept] = useState<ReadonlyMap<string, Listed>>(new Map());
+  const [open, setOpen] = useState<string>();
+  const soon = expiringSoon(today);
+  const fresh = takenNow(decided);
+
+  // A choice taken stays on the page after the next read leaves it out:
+  // kept as soon as it comes back, while this render draws it already.
+  if (
+    Option.isSome(fresh) &&
+    kept.get(decisionKey(fresh.value))?.decision.decided === undefined
+  ) {
+    setKept(withTaken(kept, fresh.value, soon));
+  }
+
+  const taken = Option.match(fresh, {
+    onNone: () => kept,
+    onSome: (decision) => withTaken(kept, decision, soon),
+  });
+
+  const listed = listedOf(today, taken);
+  const keys = listed.map(({ decision }) => decisionKey(decision));
+  const select = onSelect ?? constVoid;
+
+  useListKeys(keys, select);
+
+  const shown =
+    listed.find(({ decision }) => decisionKey(decision) === selected) ??
+    listed[0];
+
+  const stamped = new Set(
+    [...kept.keys()].filter((key) => {
+      const decision = kept.get(key)?.decision;
+      const choice = decision?.decided?.choice;
+
+      return (
+        decision !== undefined &&
+        choice !== undefined &&
+        choice !== "decline" &&
+        tookEffect(decision, choice)
+      );
+    })
+  );
+
+  const props: RowsProps = {
+    busy: decided.waiting,
+    now,
+    onDecide,
+    onOpen: setOpen,
+    onSelect,
+    open,
+    // A row is drawn selected only when the address names it; with none
+    // named the inspector holds the first, and no row looks chosen.
+    selected,
+    stamped,
+  };
+
+  return (
+    // Below the shell's width a row opens in place, so the inspector's
+    // copy of the selected decision is not drawn in main as well.
+    <div className="contents [&_[data-facts=inline]]:hidden">
+      <Workspace
+        count={budgetShort(today.budget)}
+        crumbs={[{ label: "Today" }]}
+        facts={
+          shown === undefined ? undefined : (
+            <SelectedFacts
+              busy={decided.waiting}
+              listed={shown}
+              now={now}
+              onDecide={onDecide}
+              stamped={stamped.has(decisionKey(shown.decision))}
+            />
+          )
+        }
+        factsHeading="Selected decision"
+        {...(shown === undefined
+          ? {}
+          : { factsKey: decisionKey(shown.decision) })}
+        status={
+          <p
+            className="text-want max-w-[70ch]"
+            data-budget={`${today.budget.used}/${today.budget.total}`}
+          >
+            {budgetSentence(today.budget)}
+          </p>
+        }
+        title="Today"
+        variant="list"
+      >
+        <div aria-live="polite" className="empty:hidden">
+          <DecidedFailure decided={decided} />
+        </div>
+        {listed.length === 0 ? (
+          <EmptyState
+            command={`${Brand.cli} today`}
+            title="Nothing to decide today. Undecided decisions expire to their safe default."
+          />
+        ) : (
+          <DecisionSections listed={listed} props={props} />
+        )}
+        <Tomorrow overflow={today.overflow} />
+        <Newcomers newcomers={today.newcomers} />
+        <Unattended landings={today.unattended} now={now} />
+      </Workspace>
+    </div>
+  );
+};
 
 export const TodayView = ({
   decided = AsyncResult.initial(),
   now,
   onDecide,
-  result,
+  onSelect,
+  read,
+  selected,
 }: {
-  readonly result: AsyncResult.AsyncResult<Today, unknown>;
+  readonly read: TodayRead;
   readonly now: DateTime.Utc;
   readonly onDecide: (input: DecideInput) => void;
   /** The decider's last choice, as `decide` answered it. */
@@ -385,28 +648,36 @@ export const TodayView = ({
     { readonly decision: Decision },
     unknown
   >;
-}) => {
-  if (AsyncResult.isFailure(result)) {
-    return <FailureView cause={result.cause} />;
-  }
-
-  if (AsyncResult.isInitial(result)) {
-    return <ReadingToday />;
-  }
-
-  const today = result.value;
-
-  return (
-    <>
-      <Budget budget={today.budget} />
-      <Decisions
+  /** The decision the inspector holds (`project/id`); the first listed when none. */
+  readonly selected?: string | undefined;
+  readonly onSelect?: ((key: string) => void) | undefined;
+}) =>
+  TodayRead.match(read, {
+    Read: ({ today }) => (
+      <ListedToday
         decided={decided}
         now={now}
         onDecide={onDecide}
+        onSelect={onSelect}
+        selected={selected}
         today={today}
       />
-      <Newcomers newcomers={today.newcomers} />
-      <Unattended landings={today.unattended} now={now} />
-    </>
-  );
-};
+    ),
+    Refused: ({ refusal }) => (
+      <Unlisted>
+        <p className="text-body max-w-[70ch]">{WHAT_TODAY_IS}</p>
+        <RefusalView refusals={[refusal]} />
+        <CommandLine command={`${Brand.cli} today`} />
+      </Unlisted>
+    ),
+    SignedOut: () => (
+      <Unlisted>
+        <SignedOutNotice here="/today" />
+      </Unlisted>
+    ),
+    Unreachable: () => (
+      <Unlisted>
+        <UnreachableNotice />
+      </Unlisted>
+    ),
+  });

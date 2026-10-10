@@ -123,12 +123,34 @@ describe(ProposalView, () => {
     expect(text).toContain("lin-h");
   });
 
-  it("while drafting, shows the spinner and no Draft again", () => {
+  it("titles the page with the want, never the proposal's id", () => {
+    expect(view(drafting)).toMatch(
+      /<h1[^>]*>formatISO keeps the offset it was given\.<\/h1>/u
+    );
+  });
+
+  it("while drafting, says so in the checking role, and offers no Draft again", () => {
     const markup = view(drafting);
 
-    expect(markup).toContain('data-slot="spinner"');
-    expect(plainText(markup)).toContain("Drafting");
+    expect(markup).toMatch(/data-tone="checking"[^>]*>[\s\S]*?Drafting/u);
     expect(markup).not.toMatch(DRAFT_AGAIN);
+  });
+
+  it("once ready, says it waits for a decider, in the waiting role", () => {
+    const markup = view(ready);
+
+    expect(markup).toMatch(/data-tone="waiting"/u);
+    expect(plainText(markup)).toContain("Ready , waits for a decider");
+  });
+
+  it("reads the draft as a guide, in its order: the ask file, the check, red first", () => {
+    const text = plainText(view(ready));
+
+    expect(text.indexOf("The ask file")).toBeLessThan(
+      text.indexOf("The check")
+    );
+    expect(text.indexOf("The check")).toBeLessThan(text.indexOf("Red first"));
+    expect(view(ready)).not.toMatch(/<h2[^>]*>\s*0[1-9]/u);
   });
 
   it("while drafting with a note, shows the note the round was asked with", () => {
@@ -158,15 +180,35 @@ describe(ProposalView, () => {
     expect(markup).toContain('href="/datekit/decisions/dec-000003"');
   });
 
-  it("once ready, shows no spinner", () => {
+  it("once ready, draws nothing in the checking role", () => {
+    expect(view(ready)).not.toContain('data-tone="checking"');
     expect(view(ready)).not.toContain('data-slot="spinner"');
   });
 
-  it("once failed, shows the last refusal's headline and Draft again", () => {
+  it("once failed with a refusal, draws it as git prints it, and offers Draft again", () => {
     const markup = view(failed);
 
     expect(plainText(markup)).toContain("NotRedFirst");
+    expect(markup).toContain('data-refusal="NotRedFirst"');
     expect(markup).toMatch(DRAFT_AGAIN);
+  });
+
+  it("once failed with a refusal it cannot draw whole, says so in ink, never in the refused role", () => {
+    const weak = withDraft(
+      shownWith([]),
+      DraftState.cases.Failed.make({
+        attempts: 3,
+        model,
+        refusal: "WeakCheck",
+        round: 1,
+      })
+    );
+
+    const markup = view(weak);
+
+    expect(plainText(markup)).toContain("The draft failed: WeakCheck");
+    expect(markup).not.toContain("text-refused");
+    expect(markup).not.toContain("data-refusal=");
   });
 
   it("failed after a ready round, still shows that round's files as a draft a decider can accept", () => {

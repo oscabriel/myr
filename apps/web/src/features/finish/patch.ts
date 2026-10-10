@@ -93,3 +93,63 @@ export const changedFiles = (patch: string): readonly string[] => {
 
   return Arr.dedupe(blocks.flatMap((block) => Option.toArray(pathOf(block))));
 };
+
+/** The text of each file's block of a unified diff, by the path it ends up at. */
+export const fileBlocks = (patch: string): ReadonlyMap<string, string> => {
+  const lines = patch.split("\n");
+  const gitHeaders = lines.some((line) => HEADER.test(line));
+
+  const starts = (line: string, next: string | undefined) =>
+    gitHeaders
+      ? line.startsWith("diff --git ")
+      : OLD_FILE.test(line) && next !== undefined && NEW_FILE.test(next);
+
+  const blocks: string[][] = [];
+
+  for (const [index, line] of lines.entries()) {
+    if (starts(line, lines[index + 1])) {
+      blocks.push([line]);
+    } else {
+      blocks.at(-1)?.push(line);
+    }
+  }
+
+  return new Map(
+    blocks.flatMap((block) =>
+      Option.toArray(
+        Option.map(pathOf(block), (path) => [path, block.join("\n")] as const)
+      )
+    )
+  );
+};
+
+/**
+ * A short, stable id for one file's change: a polynomial hash over its
+ * block of the diff, kept under a 32-bit prime. A new head that changes
+ * the file changes its id, so whatever was kept against the old one no
+ * longer matches.
+ */
+export const patchIdOf = (text: string): string => {
+  let hash = 7;
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + (text.codePointAt(index) ?? 0)) % 4_294_967_291;
+  }
+
+  return hash.toString(16).padStart(8, "0");
+};
+
+const waives = DecisionSubject.isAnyOf(["Waiver"]);
+
+/**
+ * The answer's diff a `Waiver` decision carries, when it carries one under
+ * the same `patch` label a finish uses: the page draws the marker's file
+ * from it, with the marker at its line.
+ */
+export const waiverPatchOf = (decision: Decision): Option.Option<string> =>
+  waives(decision.subject)
+    ? Option.map(
+        Arr.findFirst(decision.evidence, ({ label }) => label === PATCH_LABEL),
+        ({ value }) => value
+      ).pipe(Option.filter((patch) => patch.trim().length > 0))
+    : Option.none();

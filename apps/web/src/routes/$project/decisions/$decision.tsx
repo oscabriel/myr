@@ -1,159 +1,296 @@
-import { useAtom, useAtomValue } from "@effect/atom-react";
-import { Brand } from "@repo/brand";
-import type { Today } from "@repo/protocol/domain/decision";
-import { DecisionId, ProjectName } from "@repo/protocol/ids";
-import { createFileRoute, getRouteApi } from "@tanstack/react-router";
-import { DateTime, Option, Schema } from "effect";
+import { useAtom, useAtomMount, useAtomValue } from "@effect/atom-react";
+import type { Decision } from "@repo/protocol/domain/decision";
+import {
+  createFileRoute,
+  getRouteApi,
+  useLocation,
+  useRouter,
+} from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
+import { env } from "cloudflare:workers";
+import { Effect, Option, Schema } from "effect";
+import type { DateTime } from "effect";
 import { AsyncResult } from "effect/reactivity";
+import { useCallback, useMemo, useState } from "react";
 
-import {
-  decideAtom,
-  finishAskAtom,
-  finishVerdictAtom,
-} from "../../../client/decide.ts";
-import { todayAtom } from "../../../client/today.ts";
-import { DecisionCard } from "../../../features/decision/decision-card.tsx";
+import { decideAtom } from "../../../client/decide.ts";
+import { projectEventsAtom } from "../../../client/events.ts";
+import { watchAtom } from "../../../client/watch.ts";
+import { hereOf } from "../../../features/auth/session-slot.tsx";
+import { useCodeFileKeys } from "../../../features/code/file-keys.ts";
+import { parseDiffHash } from "../../../features/code/line-hash.ts";
+import { SPLIT_QUERY, useMedia } from "../../../features/code/media.ts";
+import { diffAnchor } from "../../../features/code/paths.ts";
 import type { DecideInput } from "../../../features/decision/decision-card.tsx";
-import { FinishView } from "../../../features/finish/finish-view.tsx";
-import { isFinishDecision } from "../../../features/finish/patch.ts";
-import type { FinishDecision } from "../../../features/finish/patch.ts";
-import { EmptyState } from "../../../features/shared/empty.tsx";
-import { pageHead } from "../../../features/shared/head.ts";
-import { PageShell } from "../../../features/shared/layout.tsx";
+import { DecisionView } from "../../../features/decision/decision-page.tsx";
 import {
-  DecidedNotice,
-  FailureView,
-  findDecision,
-  ReadingToday,
-} from "../../../features/today/today-page.tsx";
+  DecisionPageData,
+  DecisionRead,
+  newerThan,
+  readDecision,
+} from "../../../features/decision/read.ts";
+import type { FoundDecision } from "../../../features/decision/read.ts";
+import { patchFiles } from "../../../features/finish/files.ts";
+import { FinishFilesButton } from "../../../features/finish/finish-files-button.tsx";
+import { FinishRail } from "../../../features/finish/finish-rail.tsx";
+import { FinishView } from "../../../features/finish/finish-view.tsx";
+import {
+  isFinishDecision,
+  patchOf,
+  waiverPatchOf,
+} from "../../../features/finish/patch.ts";
+import type { FinishDecision } from "../../../features/finish/patch.ts";
+import { marksKey, useReadMarks } from "../../../features/finish/read-marks.ts";
+import { pageHead } from "../../../features/shared/head.ts";
+import { personalPage } from "../../../server/cache-headers.ts";
+import { serverClient } from "../../../server/client.ts";
 
-// `/$project/decisions/$decision`: one decision from the decider's Today in
-// that project; for a `Finish`, the answer's diff, its ask and verdict, and
-// the lines that finish it. The decision comes from `today` alone: someone
-// who decides nothing there gets `NotDecider`, and no other read fetches a
-// decision or a diff. Read in the browser, as Today is.
+// `/$project/decisions/$decision`: one decision from the reader's Today in
+// that project, read on the server with their own session; for a finish,
+// the answer's diff, its ask and verdict, and where an earlier round was
+// refused. The decision comes from `today` alone: someone who decides
+// nothing there sees what a decision is and no evidence. A page about its
+// reader is kept by no cache.
 
 const root = getRouteApi("__root__");
 
-const projectOf = Schema.decodeUnknownOption(ProjectName);
+interface DecisionParams {
+  readonly project: string;
+  readonly decision: string;
+}
 
-const decisionOf = Schema.decodeUnknownOption(DecisionId);
+const decisionPage = createServerFn({ method: "GET" })
+  .validator((params: DecisionParams) => params)
+  .handler(({ data }) =>
+    Effect.runPromise(
+      readDecision(data).pipe(Effect.provide(serverClient(env, getRequest())))
+    )
+  );
 
-/** The ask and verdict a finish shows beside its diff, as they arrive. */
-const Finish = ({ decision }: { readonly decision: FinishDecision }) => {
+/** The decision the page found, when it found one. */
+const foundOf = (read: DecisionRead): Option.Option<FoundDecision> =>
+  DecisionRead.guards.Found(read) ? Option.some(read) : Option.none();
+
+/** The finish the page found, when the decision is one. */
+const finishOf = (read: DecisionRead) =>
+  Option.flatMap(foundOf(read), (found) =>
+    isFinishDecision(found.decision)
+      ? Option.some({ decision: found.decision, found })
+      : Option.none()
+  );
+
+/** The decision as the reader's choice left it, once taken on this page. */
+const takenHere = (
+  decided: AsyncResult.AsyncResult<{ readonly decision: Decision }, unknown>,
+  decision: Decision
+) =>
+  Option.getOrUndefined(
+    Option.filter(
+      Option.map(AsyncResult.value(decided), (taken) => taken.decision),
+      (taken) =>
+        taken.id === decision.id &&
+        taken.project === decision.project &&
+        taken.decided !== undefined
+    )
+  );
+
+/** A finish's page: its files, folds, layout, read marks and keys. */
+const Finish = ({
+  busy,
+  decision,
+  found,
+  now,
+  onDecide,
+  taken,
+}: {
+  readonly decision: FinishDecision;
+  readonly found: FoundDecision;
+  readonly now: DateTime.Utc;
+  readonly onDecide: (input: DecideInput) => void;
+  readonly busy: boolean;
+  readonly taken: Decision | undefined;
+}) => {
   const { platformUrl } = root.useLoaderData();
+  const router = useRouter();
   const { ask, head } = decision.subject;
-  const shown = useAtomValue(finishAskAtom(decision.project, ask));
-  const judged = useAtomValue(finishVerdictAtom(decision.project, ask, head));
+
+  // Live: a push to the answer while the page is open says so.
+  useAtomMount(watchAtom(decision.project));
+  const events = useAtomValue(projectEventsAtom(decision.project));
+
+  const newerHead =
+    found.newerHead ??
+    Option.getOrUndefined(
+      Option.flatMapNullishOr(AsyncResult.value(events), (all) =>
+        newerThan(all, ask, head)
+      )
+    );
+
+  const files = useMemo(
+    () =>
+      Option.match(patchOf(decision), {
+        onNone: () => [],
+        onSome: (patch) =>
+          patchFiles(
+            patch,
+            found.ask?.territory.paths ?? [],
+            `${decision.project}/${decision.id}/${head}`
+          ),
+      }),
+    [decision, found.ask, head]
+  );
+
+  const marked = useMemo(
+    () => files.map(({ file, patchId }) => ({ patchId, path: file.path })),
+    [files]
+  );
+
+  const { mark, read } = useReadMarks(
+    marksKey(decision.project, decision.id),
+    head,
+    marked
+  );
+
+  const [chosen, setChosen] = useState(false);
+  const roomy = useMedia(SPLIT_QUERY);
+  // Split only where the screen has room for two sides.
+  const split = chosen && roomy;
+
+  const defaults = useMemo(
+    () =>
+      new Set(
+        files.filter(({ folded }) => folded).map(({ file }) => file.path)
+      ),
+    [files]
+  );
+
+  const [folded, setFolded] = useState<ReadonlySet<string>>(defaults);
+
+  const onFold = useCallback((path: string, fold: boolean) => {
+    setFolded((was) => {
+      if (was.has(path) === fold) {
+        return was;
+      }
+
+      const next = new Set(was);
+
+      if (fold) {
+        next.add(path);
+      } else {
+        next.delete(path);
+      }
+
+      return next;
+    });
+  }, []);
+
+  const current = useLocation({
+    select: ({ hash }) =>
+      Option.getOrUndefined(
+        Option.map(parseDiffHash(hash), ({ path }) => path)
+      ),
+  });
+
+  const paths = useMemo(() => files.map(({ file }) => file.path), [files]);
+
+  useCodeFileKeys(paths, current, (path) => {
+    Effect.runFork(
+      Effect.tryPromise(() =>
+        router.navigate({
+          hash: diffAnchor(path),
+          replace: true,
+          resetScroll: false,
+          to: ".",
+        })
+      ).pipe(Effect.ignore)
+    );
+  });
 
   return (
     <FinishView
-      ask={Option.getOrUndefined(AsyncResult.value(shown))?.ask}
-      decision={decision}
+      ask={found.ask}
+      busy={busy}
+      decision={
+        taken === undefined ? decision : { ...taken, subject: decision.subject }
+      }
+      draw
+      files={files}
+      filesButton={<FinishFilesButton />}
+      folded={folded}
+      newerHead={newerHead}
+      now={now}
+      onDecide={onDecide}
+      onFold={onFold}
+      onFoldAll={(fold) => {
+        setFolded(fold ? new Set(paths) : new Set());
+      }}
+      onMark={mark}
+      onSplit={setChosen}
+      placed={found.placed}
       platformUrl={platformUrl}
-      verdict={Option.getOrUndefined(AsyncResult.value(judged))?.verdict}
+      read={read}
+      soon={found.soon}
+      split={split}
+      stamp={taken !== undefined}
+      verdict={found.verdict}
     />
   );
 };
 
-const NotOnToday = ({ decision }: { readonly decision: string }) => (
-  <EmptyState
-    command={`${Brand.cli} today`}
-    title={`Decision ${decision} is not on your Today: it was decided, it expired to its default, or it waits beyond today's budget.`}
-  />
-);
-
-/** The decision named, as the decider's Today in its project has it. */
-const Found = ({
-  busy,
-  id,
-  onDecide,
-  project,
-  today,
-}: {
-  readonly busy: boolean;
-  readonly id: DecisionId;
-  readonly onDecide: (input: DecideInput) => void;
-  readonly project: ProjectName;
-  readonly today: AsyncResult.AsyncResult<Today, unknown>;
-}) => {
-  if (AsyncResult.isFailure(today)) {
-    return <FailureView cause={today.cause} />;
-  }
-
-  if (AsyncResult.isInitial(today)) {
-    return <ReadingToday />;
-  }
-
-  const found = findDecision(today.value, project, id);
-
-  if (Option.isNone(found)) {
-    return <NotOnToday decision={id} />;
-  }
-
-  const { decision, soon } = found.value;
-
-  // A finish is read whole (want, verdict, diff, the lines) before its
-  // choices, which end the page.
-  return (
-    <DecisionCard
-      busy={busy}
-      decision={decision}
-      now={DateTime.nowUnsafe()}
-      onDecide={onDecide}
-      soon={soon}
-      standalone
-    >
-      {isFinishDecision(decision) ? <Finish decision={decision} /> : undefined}
-    </DecisionCard>
-  );
-};
-
-/** One project's Today, read for the decision page. */
-const InProject = ({
-  id,
-  project,
-}: {
-  readonly id: DecisionId;
-  readonly project: ProjectName;
-}) => {
-  const today = useAtomValue(todayAtom(project));
-  const [decided, decide] = useAtom(decideAtom);
-
-  return (
-    <>
-      <div aria-live="polite">
-        <DecidedNotice decided={decided} />
-      </div>
-      <Found
-        busy={decided.waiting}
-        id={id}
-        onDecide={decide}
-        project={project}
-        today={today}
-      />
-    </>
-  );
-};
-
 const DecisionPage = () => {
-  const params = Route.useParams();
-  const project = projectOf(params.project);
-  const id = decisionOf(params.decision);
+  const data = Schema.decodeSync(DecisionPageData)(Route.useLoaderData());
+  const [decided, decide] = useAtom(decideAtom);
+  const here = useLocation({ select: hereOf });
+
+  const waiverFiles = useMemo(
+    () =>
+      Option.getOrElse(
+        Option.flatMap(foundOf(data.read), ({ decision }) =>
+          Option.map(waiverPatchOf(decision), (patch) =>
+            patchFiles(patch, [], `${decision.project}/${decision.id}`)
+          )
+        ),
+        () => []
+      ),
+    [data.read]
+  );
+
+  const found = finishOf(data.read);
+
+  const finish = Option.isSome(found) ? (
+    <Finish
+      busy={decided.waiting}
+      decision={found.value.decision}
+      found={found.value.found}
+      now={data.now}
+      onDecide={decide}
+      taken={takenHere(decided, found.value.decision)}
+    />
+  ) : undefined;
 
   return (
-    <PageShell title={`Decision ${params.decision}`}>
-      {Option.isSome(project) && Option.isSome(id) ? (
-        <InProject id={id.value} project={project.value} />
-      ) : (
-        <NotOnToday decision={params.decision} />
+    <DecisionView
+      busy={decided.waiting}
+      data={data}
+      files={waiverFiles}
+      finish={finish}
+      here={here}
+      onDecide={decide}
+      taken={Option.getOrUndefined(
+        Option.flatMapNullishOr(foundOf(data.read), ({ decision }) =>
+          takenHere(decided, decision)
+        )
       )}
-    </PageShell>
+    />
   );
 };
 
 export const Route = createFileRoute("/$project/decisions/$decision")({
+  staticData: { rail: FinishRail },
+  loader: ({ params }) => decisionPage({ data: params }),
+  headers: () => personalPage,
+  head: ({ params }) =>
+    pageHead({ title: `Decision ${params.decision} · ${params.project}` }),
   component: DecisionPage,
-  head: ({ params }) => pageHead({ title: `Decision ${params.decision}` }),
-  ssr: false,
 });

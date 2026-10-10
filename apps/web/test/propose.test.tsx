@@ -20,6 +20,7 @@ import { ProposalFailure } from "../src/features/proposal/failure.tsx";
 import {
   ProposeView,
   proposalPayload,
+  territoryChoices,
 } from "../src/features/propose/propose-view.tsx";
 import type { About } from "../src/features/propose/propose-view.tsx";
 import { markupOf, plainText } from "./ask-fixtures.ts";
@@ -50,15 +51,45 @@ describe(ProposeView, () => {
     expect(plainText(markup)).toContain(
       "Let the platform's agent draft the ask"
     );
-    expect(markup).toMatch(/<button[^>]*type="submit"[^>]*>Propose/u);
+    expect(markup).toMatch(/<button[^>]*type="submit"/u);
   });
 
-  it("offers each of the project's top folders as the territory", () => {
+  it("says on Propose why it waits, until there is a want", () => {
+    const empty = signedIn();
+
+    const written = signedIn(
+      Option.some({ at, line: 12, path: RepoPath.make("src/format.ts") })
+    );
+
+    expect(empty).toMatch(
+      /<button(?=[^>]*disabled="")(?=[^>]*type="submit")[^>]*>Write the want first<\/button>/u
+    );
+    expect(written).toMatch(
+      /<button[^>]*type="submit"[^>]*>Propose<\/button>/u
+    );
+    expect(written).not.toMatch(
+      /<button(?=[^>]*disabled="")(?=[^>]*type="submit")/u
+    );
+  });
+
+  it("offers each of the project's top folders as the territory, through the kit's select, never a native one", () => {
     const markup = signedIn();
 
     expect(markup).toContain('name="territory"');
-    expect(markup).toContain('<option value="src">src</option>');
-    expect(markup).toContain('<option value="docs">docs</option>');
+    expect(markup).not.toContain("<select");
+    expect(markup).toContain('data-slot="select-trigger"');
+    expect(territoryChoices(modules)).toStrictEqual([
+      { label: "Let the agent choose", value: "" },
+      { label: "docs", value: "docs" },
+      { label: "src", value: "src" },
+    ]);
+  });
+
+  it("gives the same proposal as a command, and what makes a good want", () => {
+    const text = plainText(signedIn());
+
+    expect(text).toContain(`${Brand.cli} propose --draft "<want>"`);
+    expect(text).toContain("not how to change the code");
   });
 
   it("starts the want at the line a why page names", () => {
@@ -84,6 +115,9 @@ describe(ProposeView, () => {
     expect(markup).not.toContain("<form");
     expect(markup).not.toContain("<textarea");
     expect(markup).toMatch(/<a[^>]*href="\/auth\/signin[^"]*"[^>]*>Sign in/u);
+    expect(plainText(markup)).toContain(
+      `${Brand.cli} propose --draft "<want>"`
+    );
   });
 });
 

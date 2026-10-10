@@ -22,6 +22,8 @@ export interface DraftedFileProps {
 
 const options: FileOptions<undefined, undefined> = {
   ...diffsOptions,
+  // The path is the section's heading already.
+  disableFileHeader: true,
   overflow: "scroll",
 };
 

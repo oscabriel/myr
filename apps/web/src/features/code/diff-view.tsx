@@ -64,6 +64,11 @@ export interface DiffCodeProps {
   readonly folded?: ReadonlySet<string> | undefined;
   /** A header's fold was pressed. */
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;
+  /**
+   * The files already parsed, in the order to draw them: a decision's diff
+   * comes as a patch, with no whole texts to parse `files` from.
+   */
+  readonly drawn?: readonly DrawnFile[] | undefined;
 }
 
 /**
@@ -156,6 +161,7 @@ const reveal = (
 
 export const DiffCode = ({
   annotations = NO_ANNOTATIONS,
+  drawn: parsed,
   files,
   folded,
   onFold,
@@ -166,7 +172,7 @@ export const DiffCode = ({
   const container = useRef<HTMLDivElement>(null);
   const [hash, setHash] = useState("");
 
-  const drawn = useMemo(() => drawnFiles(files), [files]);
+  const drawn = useMemo(() => parsed ?? drawnFiles(files), [files, parsed]);
 
   const items = useMemo(
     () =>

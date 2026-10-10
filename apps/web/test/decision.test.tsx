@@ -17,17 +17,19 @@ import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
 import { DraftState } from "@repo/protocol/domain/proposal";
 import {
+  AskId,
   CommitSha,
   DecisionId,
   Handle,
   LaneName,
   ProjectName,
   ProposalId,
+  RepoPath,
 } from "@repo/protocol/ids";
 import { DecisionClosed } from "@repo/protocol/refusal";
 import type { UnknownDecision } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { Cause, DateTime, Effect, Exit, Layer, Ref } from "effect";
+import { Cause, DateTime, Effect, Exit, Layer, Option, Ref } from "effect";
 import { AsyncResult, Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { RpcTest } from "effect/rpc";
 import type { ReactElement } from "react";
@@ -38,15 +40,46 @@ import { keys } from "../src/client/keys.ts";
 import { todayAtom } from "../src/client/today.ts";
 import { DecisionCard } from "../src/features/decision/decision-card.tsx";
 import {
+  DecisionRead,
+  DecisionView,
+} from "../src/features/decision/decision-page.tsx";
+import type { DecisionPageData } from "../src/features/decision/decision-page.tsx";
+import { patchFiles } from "../src/features/finish/files.ts";
+import { waiverPatchOf } from "../src/features/finish/patch.ts";
+import {
   DraftRead,
   draftReadOf,
   readDraft,
 } from "../src/features/proposal/live-draft.ts";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
-import { TodayView } from "../src/features/today/today-page.tsx";
+import {
+  readOfCause,
+  TodayRead,
+  TodayView,
+} from "../src/features/today/today-page.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
+
+/** What a reader sees of `markup`: the text without its tags. */
+const plainTextOf = (markup: string) =>
+  markup
+    .replaceAll(/<[^>]+>/gu, " ")
+    .replaceAll("&#x27;", "'")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&amp;", "&")
+    .replaceAll(/\s+/gu, " ");
+
+/** Today as the page reads it from the atom: listed, or why not. */
+const readOf = (result: AsyncResult.AsyncResult<Today, unknown>): TodayRead => {
+  if (AsyncResult.isSuccess(result)) {
+    return TodayRead.cases.Read.make({ today: result.value });
+  }
+
+  return AsyncResult.isFailure(result)
+    ? readOfCause(result.cause)
+    : TodayRead.cases.Unreachable.make({});
+};
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
@@ -253,7 +286,9 @@ describe("the decide atom", () => {
           today: asked.today,
         }).toStrictEqual({ listAsks: 2, today: 2 });
         expect(
-          markupOf(<TodayView now={now} onDecide={() => {}} result={today} />)
+          markupOf(
+            <TodayView now={now} onDecide={() => {}} read={readOf(today)} />
+          )
         ).not.toContain('data-decision="dec-000002"');
       })
   );
@@ -274,7 +309,7 @@ describe("the decide atom", () => {
             decided={decided}
             now={now}
             onDecide={() => {}}
-            result={today}
+            read={readOf(today)}
           />
         );
 
@@ -472,5 +507,132 @@ describe("DecisionCard for an OpenProposal", () => {
 
   it("links the proposal's page", () => {
     expect(card(ready)).toContain('href="/datekit/proposals/prop-000007"');
+  });
+});
+
+const vellum = ProjectName.make("vellum");
+
+/** A waiver on the answer to escape-attribute-quotes, carrying the answer's diff of the marker's file. */
+const waiver: Decision = {
+  deciders: [okonkwo],
+  default: "decline",
+  evidence: [
+    {
+      label: "patch",
+      value: [
+        "diff --git a/test/attributes.test.ts b/test/attributes.test.ts",
+        "index 1111111..2222222 100644",
+        "--- a/test/attributes.test.ts",
+        "+++ b/test/attributes.test.ts",
+        "@@ -6,4 +6,5 @@",
+        ' import { escape } from "../src/escape.ts";',
+        " ",
+        ' test("quotes", () => {',
+        '+test.skip("a quote in a code span", () => {});',
+        '   expect(escape(\'"\')).toBe("&quot;");',
+        "",
+      ].join("\n"),
+    },
+  ],
+  expiresAt: DateTime.makeUnsafe("2026-10-08T10:00:00Z"),
+  id: DecisionId.make("dec-000002"),
+  openedAt: DateTime.makeUnsafe("2026-10-06T10:00:00Z"),
+  project: vellum,
+  subject: DecisionSubject.cases.Waiver.make({
+    ask: AskId.make("escape-attribute-quotes"),
+    at: { line: 9, path: RepoPath.make("test/attributes.test.ts") },
+    marker: ".skip(",
+    reason: "A quote in a code span needs the escaper's context.",
+  }),
+};
+
+const pageOf = (read: DecisionRead, chosen?: Decision) => {
+  const data: DecisionPageData = {
+    decision: waiver.id,
+    now,
+    project: vellum,
+    read,
+  };
+
+  const files = DecisionRead.guards.Found(read)
+    ? Option.match(waiverPatchOf(read.decision), {
+        onNone: () => [],
+        onSome: (patch) => patchFiles(patch, [], "test"),
+      })
+    : [];
+
+  return markupOf(
+    <DecisionView
+      data={data}
+      files={files}
+      here="/vellum/decisions/dec-000002"
+      onDecide={() => {}}
+      taken={chosen}
+    />
+  );
+};
+
+const found = DecisionRead.cases.Found.make({
+  decision: waiver,
+  placed: [],
+  soon: true,
+});
+
+describe(DecisionView, () => {
+  it("titles the page with the subject and says when it expires, its default and whose move it is", () => {
+    const text = plainTextOf(pageOf(found));
+
+    expect(text).toContain(
+      "Allow .skip( at test/attributes.test.ts:9 in the answer to escape-attribute-quotes"
+    );
+    expect(text).toContain("Expires in 22 h");
+    expect(text).toContain("default: decline");
+    expect(text).toContain("your move");
+  });
+
+  it("draws a waiver's marker at its line, in the answer's diff of that file", () => {
+    const markup = pageOf(found);
+    const line = markup.indexOf('data-line="9"');
+    const note = markup.indexOf('data-note-line="9"');
+    const after = markup.indexOf('data-line="10"');
+
+    expect(markup).toContain('data-file="test/attributes.test.ts"');
+    expect(line).toBeGreaterThan(-1);
+    expect(note).toBeGreaterThan(line);
+    expect(after).toBeGreaterThan(note);
+    expect(markup.slice(note, after)).toContain('data-marker=".skip("');
+  });
+
+  it("says under each choice what it does", () => {
+    const markup = pageOf(found);
+
+    expect(markup).toContain('data-consequence="accept"');
+    expect(markup).toContain('data-consequence="decline"');
+    expect(plainTextOf(markup)).toContain(
+      "The answer goes on through the gate with .skip( allowed there, with you as Decided-by."
+    );
+  });
+
+  it("once decided, shows the record and no choices", () => {
+    const markup = pageOf(found, {
+      ...waiver,
+      decided: { at: now, by: okonkwo, choice: "accept", note: "Split out." },
+    });
+
+    expect(markup).not.toContain("data-choice=");
+    expect(markup).toContain('data-decided="accept"');
+    expect(plainTextOf(markup)).toContain("Accepted");
+    expect(plainTextOf(markup)).toContain("Split out.");
+  });
+
+  it("signed out, says what a decision is and who takes it, with no choices and no evidence", () => {
+    const markup = pageOf(DecisionRead.cases.SignedOut.make({}));
+    const text = plainTextOf(markup);
+
+    expect(markup).not.toContain("data-choice=");
+    expect(markup).not.toContain(".skip(");
+    expect(text).toContain("A decider takes it on their Today");
+    expect(markup).toContain('href="/vellum/people"');
+    expect(text).toContain(`${Brand.cli} today --project vellum`);
   });
 });
