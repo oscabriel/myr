@@ -957,19 +957,29 @@ describe.each(["memory", "sqlite"] as const)(
     );
 
     it.effect(
-      "8. an answer whose re-merge conflicts is refused as stale, and main stays",
+      "8. an answer whose re-merge conflicts is refused as stale, naming the landing that moved the path, and main stays",
       () =>
         Effect.map(
           conflicting.pipe(Effect.provide(worldOf(scenario, store))),
           (raced) => {
+            const lexed = RepoPath.make("packages/lexer/src/lex.ts");
+
             expect(raced.tip).toBe(raced.between);
             expect(raced.outcomes).toStrictEqual([
               Outcome.cases.Refused.make({
                 refusals: [
                   new StaleBase({
                     base: raced.base,
-                    conflicts: [RepoPath.make("packages/lexer/src/lex.ts")],
+                    conflicts: [lexed],
                     main: raced.between,
+                    movedBy: [
+                      {
+                        ask: AskId.make("tidy-all"),
+                        author: frank.handle,
+                        landing: raced.between,
+                        path: lexed,
+                      },
+                    ],
                   }),
                 ],
               }),

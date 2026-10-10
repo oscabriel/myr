@@ -8,6 +8,7 @@ import {
   CommitSha,
   DecisionId,
   EnvKey,
+  Handle,
   LandedSha,
   ProjectName,
   ProposalId,
@@ -62,6 +63,27 @@ describe(explain, () => {
       "  next: git pull --rebase",
       "  retryable: yes",
     ]);
+  });
+
+  it("names the landing that last changed each conflicting path it knows of", () => {
+    const landing = LandedSha.make("3333333333333333333333333333333333333333");
+    const other = RepoPath.make("src/b.ts");
+
+    expect(
+      explain([
+        new StaleBase({
+          base,
+          conflicts: [path, other, RepoPath.make("src/c.ts")],
+          main,
+          movedBy: [
+            { ask, author: Handle.make("alice"), landing, path },
+            { author: Handle.make("dora"), landing, path: other },
+          ],
+        }),
+      ])[0]
+    ).toBe(
+      "StaleBase: main moved to 2222222, past your base 1111111; conflicts in src/a.ts (last changed by alice in 3333333, for fix-parser), src/b.ts (last changed by dora in 3333333), src/c.ts"
+    );
   });
 
   it("points at the line when the refusal has one", () => {

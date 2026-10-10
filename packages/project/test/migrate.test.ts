@@ -442,7 +442,8 @@ const standIns = (options: CheckerOptions) =>
       });
 
       const ports = Context.make(CheckRunner, runner).pipe(
-        Context.add(Lander, lander)
+        Context.add(Lander, lander),
+        Context.add(RepoHost, host)
       );
 
       /** The project's queue, with the ratchets counted on a tree before its check is reported. */
@@ -468,6 +469,7 @@ const standIns = (options: CheckerOptions) =>
               })
             : queue.advanceAnswer(requestId, command, report),
         answer: queue.answer,
+        landings: queue.landings,
       });
 
       const leave = (requestId: RequestId) =>

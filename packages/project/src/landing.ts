@@ -31,6 +31,7 @@ import {
   StaleBase,
   Weakened,
 } from "@repo/protocol/refusal";
+import type { MovedBy } from "@repo/protocol/refusal";
 import { Array, Data, DateTime, Duration, Match, Option, Schema } from "effect";
 
 import { ProjectEventInput } from "./events.ts";
@@ -144,10 +145,14 @@ export type LandingCommand = Data.TaggedEnum<{
     readonly main: LandedSha;
     readonly tree: TreeSha;
   };
-  /** The merge onto `main` conflicted in these paths. */
+  /**
+   * The merge onto `main` conflicted in these paths; `movedBy` names the
+   * landing that last changed each one the step found.
+   */
   MergeConflict: {
     readonly conflicts: readonly RepoPath[];
     readonly main: LandedSha;
+    readonly movedBy?: Array.NonEmptyReadonlyArray<MovedBy>;
   };
   /** The checks judged `tree`. */
   Checked: {
@@ -323,6 +328,19 @@ const human = (
       ),
   });
 
+/** The refusal a merge that conflicted stands for, naming who moved each path the step found. */
+const staleOn = (
+  base: CommitSha,
+  {
+    conflicts,
+    main,
+    movedBy,
+  }: Extract<LandingCommand, { readonly _tag: "MergeConflict" }>
+) =>
+  movedBy === undefined
+    ? new StaleBase({ base, conflicts, main })
+    : new StaleBase({ base, conflicts, main, movedBy });
+
 /** The refusal a declined decision stands for. */
 const declined = (subject: AnswerDecision): Refusal =>
   AnswerDecision.match(subject, {
@@ -488,11 +506,9 @@ export const transition = (
               )
             : stay(merging)
         ),
-        Match.tag("MergeConflict", ({ conflicts, main }) =>
-          main === merging.main
-            ? refuse(merging.request, [
-                new StaleBase({ base: merging.request.base, conflicts, main }),
-              ])
+        Match.tag("MergeConflict", (conflict) =>
+          conflict.main === merging.main
+            ? refuse(merging.request, [staleOn(merging.request.base, conflict)])
             : stay(merging)
         ),
         Match.tag("Blocked", ({ attempt }) => retry(merging, attempt, now)),

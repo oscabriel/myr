@@ -69,7 +69,7 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | `Weakened` | Shape | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet. |
 | `PrivatePathInPublicTree` | Shape | no | 65 | `__CLI__ check` | Take the held-back paths it names out of your answer. |
 | `ReachedInternals` | Shape | no | 65 | `__CLI__ check` | Import the other module only through its public files. |
-| `StaleBase` | Merge | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
+| `StaleBase` | Merge | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve. |
 | `StaleLayer` | Merge | yes | 75 | `__CLI__ status` | Nothing: the answer is checked again. |
 | `ChecksFailed` | Checks | no | 65 | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
 | `HeldBackFailed` | Checks | no | 65 | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
@@ -173,6 +173,8 @@ A project's page follows its events as they happen (the `watch` contract). Each 
 ### Recover from `StaleBase`
 
 `main` moved under your answer, and the answer did not merge onto it. Rebase onto the new `main`, resolve what the rebase stops on, and push again: `git pull --rebase https://platform-test.example.workers.dev/<project>.git main`, then `git push __SLUG__ HEAD:main`.
+
+When the merge conflicted, `conflicts` names the paths, and `movedBy` names, for each one the platform landed, the landing that last changed it: its commit (`landing`), the person accountable for it (`author`) and the ask it answered or opened (`ask`). Read that ask (`__CLI__ ask <ask> --project <project>`) before you resolve, so your answer keeps its change.
 
 ### Follow an answer until it lands
 

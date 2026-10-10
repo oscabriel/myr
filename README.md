@@ -231,7 +231,7 @@ Each promise names the check that holds it, and `bun run verify` runs every one.
 
 | Promise | How to check |
 | --- | --- |
-| A push outside its ask's territory is refused in git's own `remote:` lines, and the fork keeps the commit. The fixed answer lands as the platform's commit, authored by the answerer, with `Asked-by` and `Signed-off-by`; a stale answer is `StaleBase`; replaying a request lands nothing twice. | `apps/platform/test/core-loop.test.ts` |
+| A push outside its ask's territory is refused in git's own `remote:` lines, and the fork keeps the commit. The fixed answer lands as the platform's commit, authored by the answerer, with `Asked-by` and `Signed-off-by`; a stale answer is `StaleBase`, naming the landing that last moved each conflicting path; replaying a request lands nothing twice. | `apps/platform/test/core-loop.test.ts` |
 | Refusals are one closed union of typed values, each with `retryable`, `next` and an optional `at`, and no `message`. MCP returns each one with its tag. | `packages/protocol/test/refusal.test.ts`, `packages/protocol/test/mcp.test.ts`, `apps/platform/test/mcp.test.ts` |
 | One renderer writes every refusal, for git, the CLI, MCP and the web. | `packages/protocol/test/render.test.ts` |
 | The CLI exits with each refusal's own code, 75 exactly when it is retryable, and the built binary does too. | `packages/protocol/test/exit-code.test.ts`, `apps/cli/test/build.test.ts` |

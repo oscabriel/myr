@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Schema } from "effect";
 
-import { RepoPath } from "../src/ids.ts";
+import { AskId, Handle, LandedSha, RepoPath } from "../src/ids.ts";
 import { CapReached, groups, Refusal, StaleBase } from "../src/refusal.ts";
 import { base, examples, main } from "./examples.ts";
 
@@ -29,6 +29,39 @@ describe("the refusal union", () => {
       next: "git pull --rebase",
       retryable: true,
     });
+  });
+
+  it("sends who moved each conflicting path as JSON, and decodes it back", () => {
+    const landing = LandedSha.make("3333333333333333333333333333333333333333");
+
+    const moved = new StaleBase({
+      base,
+      conflicts: [RepoPath.make("src/a.ts")],
+      main,
+      movedBy: [
+        {
+          ask: AskId.make("fix-parser"),
+          author: Handle.make("alice"),
+          landing,
+          path: RepoPath.make("src/a.ts"),
+        },
+      ],
+    });
+
+    expect(JSON.parse(overTheWire(moved))).toStrictEqual({
+      _tag: moved._tag,
+      base,
+      conflicts: ["src/a.ts"],
+      main,
+      movedBy: [
+        { ask: "fix-parser", author: "alice", landing, path: "src/a.ts" },
+      ],
+      next: "git pull --rebase",
+      retryable: true,
+    });
+    expect(
+      Schema.decodeUnknownSync(Refusal)(JSON.parse(overTheWire(moved)))
+    ).toStrictEqual(moved);
   });
 
   it.each(examples)("$_tag comes back from the wire as it left", (refusal) => {

@@ -98,7 +98,7 @@ const repairs = {
   },
   RepoBusy: { todo: "Push again." },
   StaleBase: {
-    todo: "Main moved: rebase onto it, resolve the conflicts it names, and push again.",
+    todo: "Main moved: rebase onto it, resolve the conflicts it names, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve.",
   },
   StaleLayer: { todo: "Nothing: the answer is checked again." },
   TouchedJudge: {

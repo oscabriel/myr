@@ -181,6 +181,8 @@ const load = ({ project, requestId }: AnswerParams) =>
  * The port call `effect` names, run as the in-process run runs it
  * (`runStep`), on the answer's run as its project holds it now (as
  * `prepare` hands it on); `None` when the run no longer waits on `call`.
+ * A merge that conflicts reads the project's landings to name who moved
+ * each path.
  */
 const portCall = (
   params: AnswerParams,
@@ -190,11 +192,18 @@ const portCall = (
     run
   ) => Effect.succeed(run)
 ) =>
-  Effect.flatMap(load(params), (run) =>
-    Option.isSome(run) && waitsOn(run.value, call)
-      ? Effect.flatMap(prepare(run.value), (ready) => runStep(ready, effect))
-      : Effect.succeedNone
-  );
+  Effect.gen(function* () {
+    const api = yield* projectOf(params.project);
+    const run = yield* api.answer(params.requestId);
+
+    if (Option.isNone(run) || !waitsOn(run.value, call)) {
+      return Option.none();
+    }
+
+    const ready = yield* prepare(run.value);
+
+    return yield* runStep(ready, effect, api.landings);
+  });
 
 /** A verdict as its note holds it: JSON. */
 const encodeVerdict = Schema.encodeEffect(Schema.fromJsonString(Verdict));

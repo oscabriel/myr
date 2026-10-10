@@ -155,6 +155,12 @@ const guides = (commands: Commands, platformUrl: string) => [
   "",
   `\`main\` moved under your answer, and the answer did not merge onto it. Rebase onto the new \`main\`, resolve what the rebase stops on, and push again: ${code(`git pull --rebase ${platformUrl}/<project>.git main`)}, then ${pushAnswer}.`,
   "",
+  `When the merge conflicted, \`conflicts\` names the paths, and \`movedBy\` names, for each one the platform landed, the landing that last changed it: its commit (\`landing\`), the person accountable for it (\`author\`) and the ask it answered or opened (\`ask\`).${withCommand(
+    typed(commands, "ask", {}, ["project"]),
+    (each) =>
+      ` Read that ask (${each}) before you resolve, so your answer keeps its change.`
+  ).join("")}`,
+  "",
   "### Follow an answer until it lands",
   "",
   ...withCommand(

@@ -20,6 +20,7 @@ import { Ask } from "@repo/protocol/domain/ask";
 import { RatchetSpec } from "@repo/protocol/domain/check";
 import { Choice } from "@repo/protocol/domain/decision";
 import { AskKind } from "@repo/protocol/domain/kind";
+import type { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { RunBlock } from "@repo/protocol/domain/run";
 import { Territory } from "@repo/protocol/domain/territory";
@@ -36,7 +37,7 @@ import {
   TreeSha,
 } from "@repo/protocol/ids";
 import type { RequestId } from "@repo/protocol/ids";
-import { Refusal, VerifierBlocked } from "@repo/protocol/refusal";
+import { MovedBy, Refusal, VerifierBlocked } from "@repo/protocol/refusal";
 import { Context, Effect, Option, Schema } from "effect";
 
 import { UnlandedRunEnv } from "./env-port.ts";
@@ -63,7 +64,12 @@ export const ReportedCommand = Schema.TaggedUnion({
   Finished: { by: Handle },
   LandedOk: { sha: LandedSha },
   MainMoved: { from: LandedSha, main: LandedSha },
-  MergeConflict: { conflicts: Schema.Array(RepoPath), main: LandedSha },
+  MergeConflict: {
+    conflicts: Schema.Array(RepoPath),
+    main: LandedSha,
+    // Absent from a step recorded before a merge named who moved a path.
+    movedBy: Schema.optionalKey(Schema.NonEmptyArray(MovedBy)),
+  },
   Merged: { changes: Schema.Array(Change), main: LandedSha, tree: TreeSha },
   Start: { main: LandedSha },
   Wait: { parent: AskId },
@@ -202,7 +208,8 @@ export interface Advanced {
  * report what a step came to. `advanceAnswer` returns only the port calls
  * the run makes next (`Merge`, `RunChecks`, `Land`), and a `Retry` when it
  * should stop and wait for the project's alarm; the project settles
- * everything else itself.
+ * everything else itself. A merge that conflicts reads `landings` to name
+ * who moved each path.
  */
 export interface AnswerQueue {
   readonly advanceAnswer: (
@@ -213,6 +220,13 @@ export interface AnswerQueue {
   readonly answer: (
     requestId: RequestId
   ) => Effect.Effect<Option.Option<AnswerRun>>;
+  /**
+   * The landings among `shas` (at most `MAX_LANDINGS`), in their order: a
+   * commit the platform did not land, imported history among them, has none.
+   */
+  readonly landings: (
+    shas: readonly CommitSha[]
+  ) => Effect.Effect<readonly LandingView[]>;
 }
 
 /**
