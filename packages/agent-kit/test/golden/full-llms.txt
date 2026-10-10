@@ -161,7 +161,7 @@ A project's page follows its events as they happen (the `watch` contract). Each 
 - `Claimed`: Someone claimed an ask.
 - `Decided`: A decider took a decision.
 - `Judged`: An answer was checked, with the outcome its verdict holds.
-- `Landed`: A landing reached `main`.
+- `Landed`: A landing reached `main`; the first is the project's adopted `main`, from its first push or its import.
 - `Lapsed`: A claim lapsed: no push for too long.
 - `LedgerAppended`: The project's public ledger gained an entry.
 - `ProposalDrafted`: A proposal's draft settled: ready for a decider, or failed.

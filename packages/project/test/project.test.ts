@@ -892,8 +892,10 @@ describe.each(["memory", "sqlite"] as const)(
       "5. its events come in order, and the projection heard every one",
       () =>
         Effect.map(seen, ({ answered }) => {
-          // The ask's opening lands too, and is heard as a landing.
+          // The adoption and the ask's opening land too, and are heard as
+          // landings.
           expect(answered.events).toStrictEqual([
+            "Landed",
             "AskOpened",
             "Landed",
             "Claimed",
@@ -1221,12 +1223,13 @@ describe("the project's outbox", () => {
           expect(before).toStrictEqual({
             alarm: Option.some(DateTime.add(noon, { seconds: 1 })),
             fork: false,
-            outbox: ["MakeFork", "Projected", "Projected"],
+            outbox: ["MakeFork", "Projected"],
           });
+          // The adoption's landing is the event refused; the alarm projects it.
           expect(after).toStrictEqual({
             fork: true,
             outbox: [],
-            projected: ["Claimed", "AskOpened", "Landed"],
+            projected: ["AskOpened", "Landed", "Claimed", "Landed"],
           });
         }
       )

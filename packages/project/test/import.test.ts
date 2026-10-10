@@ -6,13 +6,14 @@
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
+import { ProjectEvent } from "@repo/protocol/domain/event";
 import { LandedSha, RepoName } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { ProjectExists } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import { gitClient } from "@repo/testkit/git-client";
 import { aProject } from "@repo/testkit/scenarios";
-import { Effect, Exit, Option, Ref } from "effect";
+import { DateTime, Effect, Exit, Option, Ref } from "effect";
 
 import { ProjectStore } from "../src/project-store.ts";
 import { projectService } from "../src/project.ts";
@@ -143,6 +144,37 @@ describe("importing a public repo", () => {
           main: tip,
           state: Option.some("live"),
         });
+      }).pipe(Effect.provide(worldOf(scenario, "memory")))
+  );
+
+  it.effect(
+    "is heard as its adoption's landing, so a project whose policy never evaluates is listed",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-08T12:00:00Z");
+
+        const { tip, url } = yield* upstreamOnMaster;
+        const api = yield* projectService(project);
+
+        yield* api.initProject(alice, { import: { url } });
+
+        const heard = yield* api.events(0, 10);
+
+        expect(heard.map(({ event }) => event._tag)).toStrictEqual(["Landed"]);
+        expect(
+          heard.flatMap(({ event }) =>
+            ProjectEvent.guards.Landed(event) ? [event.landing] : []
+          )
+        ).toStrictEqual([
+          {
+            assisted: [],
+            author: alice.handle,
+            credits: [],
+            landedAt: DateTime.makeUnsafe("2026-10-08T12:00:00Z"),
+            project,
+            sha: LandedSha.make(tip),
+          },
+        ]);
       }).pipe(Effect.provide(worldOf(scenario, "memory")))
   );
 
