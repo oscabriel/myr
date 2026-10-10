@@ -17,7 +17,12 @@
  *    sees the name it was started by (`src/bin.ts`), so the link is git's
  *    credential helper.
  *
+ * `--version <semver>` stamps both builds (`versionDefine`): it is what
+ * the CLI's `--version` prints. Without it the build says `0.0.0`.
+ *
  * A Bun script, outside every Worker's graph. Names come from `Brand`.
+ * Importing it builds nothing (`tsdown.config.ts` and the tests read its
+ * pure parts): only `bun build.ts` runs the build.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Brand } from "@repo/brand";
@@ -30,13 +35,54 @@ import {
   Predicate,
   Schema,
 } from "effect";
-import { Command, Flag } from "effect/cli";
+import { CliConfig, Command, Flag, GlobalFlag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { build } from "tsdown";
 
 import { NATIVE, npmMachineOf } from "./build-targets.ts";
 import { EMBEDDED_KEY } from "./src/local/config-runtime.ts";
-import { declarations, library } from "./tsdown.config.ts";
+import {
+  declarations,
+  library,
+  npm,
+  UNSTAMPED,
+  versionDefine,
+} from "./tsdown.config.ts";
+
+// The one define both bundlers get, kept beside tsdown's configs, which
+// this module imports (lint refuses an import cycle).
+export { versionDefine } from "./tsdown.config.ts";
+
+/** What one build is asked for. */
+export interface BuildOptions {
+  /** Bun targets to cross-compile for, without `bun-`; none builds for this machine. */
+  readonly targets: readonly string[];
+  /** The version both builds are stamped with. */
+  readonly version: string;
+}
+
+/**
+ * `bun build --compile`'s arguments for one binary: `entry` compiled to
+ * `outfile`, for `target` (this machine when absent), stamped with `version`.
+ */
+export const compileArgs = (input: {
+  readonly entry: string;
+  readonly outfile: string;
+  readonly target?: string;
+  readonly version: string;
+}) => [
+  "build",
+  "--compile",
+  "--minify",
+  ...Object.entries(versionDefine(input.version)).flatMap(([key, value]) => [
+    "--define",
+    `${key}=${value}`,
+  ]),
+  ...(input.target === undefined ? [] : [`--target=bun-${input.target}`]),
+  input.entry,
+  "--outfile",
+  input.outfile,
+];
 
 class BuildFailed extends Data.TaggedError("BuildFailed")<{
   readonly step: string;
@@ -117,7 +163,7 @@ const tsdown = (step: string, config: Parameters<typeof build>[0]) =>
     try: () => build(config),
   });
 
-const make = (targets: readonly string[]) =>
+const make = ({ targets, version }: BuildOptions) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -162,11 +208,10 @@ const make = (targets: readonly string[]) =>
         path.join(dir, name)
       );
 
-    // 1. The npm build.
-    yield* tsdown("tsdown", {
-      config: path.join(root, "tsdown.config.ts"),
-      cwd: root,
-    });
+    // 1. The npm build, one entry at a time: the first cleans `dist/`.
+    for (const config of npm(version)) {
+      yield* tsdown("tsdown", { ...config, config: false, cwd: root });
+    }
 
     // 2. The library entries' types. tsgo declares them in a folder at a
     // fixed path, removed once the build ends: the bundled `.d.ts` files keep
@@ -346,18 +391,15 @@ const make = (targets: readonly string[]) =>
       yield* run(
         "bun build --compile",
         "bun",
-        [
-          "build",
-          "--compile",
-          "--minify",
+        compileArgs({
+          entry: path.join(compile, "main.ts"),
+          outfile: path.join(dir, Brand.cli),
+          version,
           ...Option.match(target, {
-            onNone: () => [],
-            onSome: (name) => [`--target=bun-${name}`],
+            onNone: () => ({}),
+            onSome: (name) => ({ target: name }),
           }),
-          path.join(compile, "main.ts"),
-          "--outfile",
-          path.join(dir, Brand.cli),
-        ],
+        }),
         { env }
       );
 
@@ -372,25 +414,57 @@ const targets = Flag.String("targets").pipe(
   Flag.optional
 );
 
-const command = Command.make("build", { targets }, (flags) =>
-  make(
-    Option.match(flags.targets, {
-      onNone: () => [],
-      onSome: (list) =>
-        list
-          .split(",")
-          .map((target) => target.trim().replace(/^bun-/u, ""))
-          .filter((target) => target.length > 0),
-    })
-  )
-).pipe(
-  Command.withDescription(
-    "Build the CLI: the npm dist/, and a standalone binary that is also git's credential helper."
-  )
+const version = Flag.String("version").pipe(
+  Flag.withDescription(
+    `The version both builds are stamped with, which the CLI's --version prints (default ${UNSTAMPED}).`
+  ),
+  Flag.optional
 );
 
-BunRuntime.runMain(
-  Command.run(command, { version: "0.0.0" }).pipe(
-    Effect.provide(BunServices.layer)
-  )
-);
+/** The build's command line, running `then` with what it asks for. */
+const command = <E, R>(
+  then: (options: BuildOptions) => Effect.Effect<void, E, R>
+) =>
+  Command.make("build", { targets, version }, (flags) =>
+    then({
+      targets: Option.match(flags.targets, {
+        onNone: () => [],
+        onSome: (list) =>
+          list
+            .split(",")
+            .map((target) => target.trim().replace(/^bun-/u, ""))
+            .filter((target) => target.length > 0),
+      }),
+      version: Option.getOrElse(flags.version, () => UNSTAMPED),
+    })
+  ).pipe(
+    Command.withDescription(
+      "Build the CLI: the npm dist/, and a standalone binary that is also git's credential helper."
+    )
+  );
+
+/**
+ * The build's own `--version` takes a value, so effect/cli's built-in
+ * `--version` (a boolean that prints and exits) is left out.
+ */
+const builtIns = CliConfig.make({
+  builtIns: GlobalFlag.BuiltIns.filter((flag) => flag !== GlobalFlag.Version),
+});
+
+/** Runs `then` with what `argv`, the build's arguments, asks for. */
+export const parseBuild = <E, R>(
+  argv: readonly string[],
+  then: (options: BuildOptions) => Effect.Effect<void, E, R>
+) =>
+  Command.runWith(command(then), { version: UNSTAMPED })(argv).pipe(
+    Effect.provideService(CliConfig.CliConfig, builtIns)
+  );
+
+if (import.meta.main) {
+  BunRuntime.runMain(
+    Command.run(command(make), { version: UNSTAMPED }).pipe(
+      Effect.provideService(CliConfig.CliConfig, builtIns),
+      Effect.provide(BunServices.layer)
+    )
+  );
+}
