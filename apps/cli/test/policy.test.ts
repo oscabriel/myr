@@ -101,7 +101,7 @@ describe("under an agent", () => {
   );
 
   it.effect(
-    "prints a refusal as one refused envelope under --json, and exits 1",
+    "prints a refusal as one refused envelope under --json, and exits with its code",
     () =>
       Effect.gen(function* () {
         const run = yield* runProgram(
@@ -111,7 +111,7 @@ describe("under an agent", () => {
 
         expect(run.out).toHaveLength(1);
         expect(run.err).toStrictEqual([]);
-        expect(run.code).toBe(1);
+        expect(run.code).toBe(75);
         expect(yield* decodeEnvelope(run.out[0] ?? "")).toStrictEqual({
           command: "claim",
           ok: false,
@@ -134,7 +134,7 @@ describe("under an agent", () => {
         const printed = run.err.join("\n");
 
         expect(run.out).toStrictEqual([]);
-        expect(run.code).toBe(1);
+        expect(run.code).toBe(75);
         expect(printed.split(reason)).toHaveLength(2);
         expect(run.err).toStrictEqual([
           `- ${reason}`,

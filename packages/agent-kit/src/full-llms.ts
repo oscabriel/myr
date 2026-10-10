@@ -1,7 +1,7 @@
 /**
  * `/llms-full.txt`: what an agent needs beyond the index, in one file.
  * `frontLlms`' text, then every refusal of the closed union (every group,
- * from `refusalCatalog`), how git meets the platform, how a landing
+ * from `refusalCatalog`), the CLI's exit codes, how git meets the platform, how a landing
  * happens (ADR 0014), one line per event a watcher hears, and the guides
  * for the moments an answer goes sideways.
  *
@@ -19,7 +19,7 @@ import { Option } from "effect";
 
 import type { CommandDoc } from "./command-doc.ts";
 import { frontLlms, typed, withCommand } from "./host-doc.ts";
-import { refusalCatalog } from "./refusals.ts";
+import { exitCodeSection, refusalCatalog } from "./refusals.ts";
 import { code, page, table } from "./text.ts";
 
 type Commands = readonly CommandDoc[];
@@ -41,11 +41,12 @@ const refusals = () => [
   `Every refusal the platform gives, in every group of its closed union. Each has a \`_tag\`, \`retryable\` (whether trying the same thing again can help) and \`next\` (the command to run next), and no message: match on the tag. Git prints them on its \`remote:\` lines, ${code(cli("check"))} and ${code(cli("status"))} print them, an MCP tool returns them as JSON, and the verdict note holds them. The refusals about an answer's files arrive together, so one push hears about all of them.`,
   "",
   ...table(
-    ["`_tag`", "Group", "Retryable", "`next`", "What to do"],
-    refusalCatalog().map(({ group, next, retryable, tag, todo }) => [
+    ["`_tag`", "Group", "Retryable", "Exit code", "`next`", "What to do"],
+    refusalCatalog().map(({ exitCode, group, next, retryable, tag, todo }) => [
       code(tag),
       group,
       retryable ? "yes" : "no",
+      String(exitCode),
       next,
       todo,
     ])
@@ -186,8 +187,8 @@ const guides = (commands: Commands, platformUrl: string) => [
 ];
 
 /**
- * `/llms-full.txt`: the index, then the refusals, git, landings, events
- * and guides. The web serves it; the platform's `/` stays the index alone.
+ * `/llms-full.txt`: the index, then the refusals, exit codes, git,
+ * landings, events and guides. The web serves it; the platform's `/` stays the index alone.
  */
 export const fullLlms = (input: {
   readonly commands: Commands;
@@ -197,6 +198,7 @@ export const fullLlms = (input: {
 }) =>
   `${frontLlms(input)}\n${page([
     ...refusals(),
+    ...exitCodeSection(),
     ...gitHere(input.platformUrl),
     ...landing(),
     ...events(),

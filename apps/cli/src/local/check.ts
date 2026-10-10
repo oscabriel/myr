@@ -66,7 +66,7 @@ import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { Credentials } from "../credentials.ts";
-import { Output, Reported } from "../output.ts";
+import { endRefused, Output, Reported } from "../output.ts";
 import { repoContext } from "../repo-context.ts";
 import type { RepoContext } from "../repo-context.ts";
 import { commitOf, localFacts, outsideAnyHook, runGit } from "./facts.ts";
@@ -125,16 +125,13 @@ const stop = (text: string) =>
     Effect.andThen(output.note(text), Effect.fail(new Reported()))
   );
 
-/** Prints `refusals` the way every command does, then ends the command. */
+/** Prints `refusals` the way every command does, then ends the command with their exit code. */
 const refuse = (
   json: boolean,
   refusals: Array.NonEmptyReadonlyArray<Refusal>
 ) =>
   Output.use((output) =>
-    Effect.andThen(
-      output.refused({ command: COMMAND, json, refusals }),
-      Effect.fail(new Reported())
-    )
+    endRefused(output, { command: COMMAND, json, refusals })
   );
 
 /**

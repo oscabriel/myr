@@ -52,53 +52,68 @@ __CLI__ login --url https://platform-test.example.workers.dev
 
 Every refusal the platform gives, in every group of its closed union. Each has a `_tag`, `retryable` (whether trying the same thing again can help) and `next` (the command to run next), and no message: match on the tag. Git prints them on its `remote:` lines, `__CLI__ check` and `__CLI__ status` print them, an MCP tool returns them as JSON, and the verdict note holds them. The refusals about an answer's files arrive together, so one push hears about all of them.
 
-| `_tag` | Group | Retryable | `next` | What to do |
-| --- | --- | --- | --- | --- |
-| `NotClaimed` | Push and claim | yes | `__CLI__ claim <ask>` | Claim the ask, then push again. |
-| `ClaimLapsed` | Push and claim | yes | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
-| `NotVouched` | Push and claim | no | `__CLI__ status` | Ask a member of the project to vouch for you. |
-| `CapReached` | Push and claim | yes | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
-| `AskFull` | Push and claim | yes | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
-| `NoAsk` | Push and claim | no | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
-| `RepoBusy` | Push and claim | yes | `git push` | Push again. |
-| `DirectPush` | Push and claim | no | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
-| `AskBlocked` | Push and claim | yes | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
-| `Denounced` | Push and claim | no | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
-| `OutOfScope` | Shape | no | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
-| `TouchedJudge` | Shape | no | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
-| `Weakened` | Shape | no | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet. |
-| `PrivatePathInPublicTree` | Shape | no | `__CLI__ check` | Take the held-back paths it names out of your answer. |
-| `ReachedInternals` | Shape | no | `__CLI__ check` | Import the other module only through its public files. |
-| `StaleBase` | Merge | yes | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
-| `StaleLayer` | Merge | yes | `__CLI__ status` | Nothing: the answer is checked again. |
-| `ChecksFailed` | Checks | no | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
-| `HeldBackFailed` | Checks | no | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
-| `AttemptsExhausted` | Checks | yes | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
-| `Flake` | Never counted against the answerer | yes | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
-| `VerifierBlocked` | Never counted against the answerer | yes | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
-| `NotRedFirst` | At ask open | no | `__CLI__ check` | Make the ask's check fail on main by an assertion, the same way twice, then open the ask again. |
-| `WeakCheck` | At ask open | no | `__CLI__ check` | Strengthen the check: as it stands, the trivial answer `weakness` names would pass it. |
-| `IncompleteBrief` | At ask open | no | `__CLI__ check` | Fill in the fields `missing` names: the ask's kind requires them. |
-| `LayerContentInPublicTree` | Maintainers only | no | `__CLI__ check` | Take the paths it names out: their files stay private and never enter a public tree. |
-| `SecretInOutput` | Maintainers only | no | `__CLI__ check` | Take the write-only value of `item` out of the output or the tree (`where`), then check again. |
-| `UnstatedRequirement` | Maintainers only | no | `__CLI__ check` | State in public what the area's held-back check holds, or take the check out of the suite. |
-| `PostureChange` | Decision | no | `__CLI__ today` | Wait for a decider to take the posture change it names (`from`, `to`); `next` lists the decisions waiting. |
-| `NotDecider` | Decision | no | `__CLI__ status` | Only one of the project's deciders may do this: ask one of them. |
-| `DecisionClosed` | Decision | no | `__CLI__ today` | Nothing to decide: it was taken already, or expired to its default. |
-| `ProposalClosed` | Decision | no | `__CLI__ today` | Nothing more is drafted for it: the proposal was accepted, declined or expired. |
-| `DraftInProgress` | Decision | yes | `__CLI__ proposal <proposal>` | Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles. |
-| `UnknownProject` | Lookup | no | `__CLI__ asks` | Check the project's name: every project is listed in the index. |
-| `UnknownAsk` | Lookup | no | `__CLI__ asks` | Check the ask's name: `next` lists the project's open asks. |
-| `UnknownCommit` | Lookup | no | `git fetch` | Fetch the project, then name a commit it holds. |
-| `UnknownDecision` | Lookup | no | `__CLI__ today` | Check the decision's id: `next` lists the decisions waiting on you. |
-| `UnknownPath` | Lookup | no | `git ls-tree` | Name a path the commit holds: `next` lists its files. |
-| `UnknownRevision` | Lookup | no | `git ls-remote` | Name `main`, a commit the project holds or one of its tags: `next` lists its refs. |
-| `UnknownProposal` | Lookup | no | `__CLI__ today` | Check the proposal's id: `next` lists the proposals waiting on you. |
-| `ProjectExists` | Setup | no | `__CLI__ asks` | Pick another name: that one is taken. |
-| `ImportFailed` | Setup | yes | `__CLI__ init` | Read `reason`, then import again. |
-| `UnknownEnvItem` | Env | no | `__CLI__ env shape` | Name a key the project's env shape has: `next` lists them. |
-| `NotSensitive` | Env | no | `__CLI__ env shape` | Only an `@sensitive` item holds a write-only value: `next` shows which items are. |
-| `ValueTooShort` | Env | no | `__CLI__ env set <key>`, with `--acknowledge-short` when the value is above the floor | Give a longer value, or acknowledge a short one where the floor allows it. |
+| `_tag` | Group | Retryable | Exit code | `next` | What to do |
+| --- | --- | --- | --- | --- | --- |
+| `NotClaimed` | Push and claim | yes | 75 | `__CLI__ claim <ask>` | Claim the ask, then push again. |
+| `ClaimLapsed` | Push and claim | yes | 75 | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
+| `NotVouched` | Push and claim | no | 77 | `__CLI__ status` | Ask a member of the project to vouch for you. |
+| `CapReached` | Push and claim | yes | 75 | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
+| `AskFull` | Push and claim | yes | 75 | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
+| `NoAsk` | Push and claim | no | 66 | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
+| `RepoBusy` | Push and claim | yes | 75 | `git push` | Push again. |
+| `DirectPush` | Push and claim | no | 77 | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
+| `AskBlocked` | Push and claim | yes | 75 | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
+| `Denounced` | Push and claim | no | 77 | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `OutOfScope` | Shape | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
+| `TouchedJudge` | Shape | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
+| `Weakened` | Shape | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet. |
+| `PrivatePathInPublicTree` | Shape | no | 65 | `__CLI__ check` | Take the held-back paths it names out of your answer. |
+| `ReachedInternals` | Shape | no | 65 | `__CLI__ check` | Import the other module only through its public files. |
+| `StaleBase` | Merge | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
+| `StaleLayer` | Merge | yes | 75 | `__CLI__ status` | Nothing: the answer is checked again. |
+| `ChecksFailed` | Checks | no | 65 | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
+| `HeldBackFailed` | Checks | no | 65 | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
+| `AttemptsExhausted` | Checks | yes | 75 | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
+| `Flake` | Never counted against the answerer | yes | 75 | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
+| `VerifierBlocked` | Never counted against the answerer | yes | 75 | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
+| `NotRedFirst` | At ask open | no | 65 | `__CLI__ check` | Make the ask's check fail on main by an assertion, the same way twice, then open the ask again. |
+| `WeakCheck` | At ask open | no | 65 | `__CLI__ check` | Strengthen the check: as it stands, the trivial answer `weakness` names would pass it. |
+| `IncompleteBrief` | At ask open | no | 65 | `__CLI__ check` | Fill in the fields `missing` names: the ask's kind requires them. |
+| `LayerContentInPublicTree` | Maintainers only | no | 65 | `__CLI__ check` | Take the paths it names out: their files stay private and never enter a public tree. |
+| `SecretInOutput` | Maintainers only | no | 65 | `__CLI__ check` | Take the write-only value of `item` out of the output or the tree (`where`), then check again. |
+| `UnstatedRequirement` | Maintainers only | no | 65 | `__CLI__ check` | State in public what the area's held-back check holds, or take the check out of the suite. |
+| `PostureChange` | Decision | no | 65 | `__CLI__ today` | A decider declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions. |
+| `NotDecider` | Decision | no | 77 | `__CLI__ status` | Only one of the project's deciders may do this: ask one of them. |
+| `DecisionClosed` | Decision | no | 66 | `__CLI__ today` | Nothing to decide: it was taken already, or expired to its default. |
+| `ProposalClosed` | Decision | no | 66 | `__CLI__ today` | Nothing more is drafted for it: the proposal was accepted, declined or expired. |
+| `DraftInProgress` | Decision | yes | 75 | `__CLI__ proposal <proposal>` | Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles. |
+| `UnknownProject` | Lookup | no | 66 | `__CLI__ asks` | Check the project's name: every project is listed in the index. |
+| `UnknownAsk` | Lookup | no | 66 | `__CLI__ asks` | Check the ask's name: `next` lists the project's open asks. |
+| `UnknownCommit` | Lookup | no | 66 | `git fetch` | Fetch the project, then name a commit it holds. |
+| `UnknownDecision` | Lookup | no | 66 | `__CLI__ today` | Check the decision's id: `next` lists the decisions waiting on you. |
+| `UnknownPath` | Lookup | no | 66 | `git ls-tree` | Name a path the commit holds: `next` lists its files. |
+| `UnknownRevision` | Lookup | no | 66 | `git ls-remote` | Name `main`, a commit the project holds or one of its tags: `next` lists its refs. |
+| `UnknownProposal` | Lookup | no | 66 | `__CLI__ today` | Check the proposal's id: `next` lists the proposals waiting on you. |
+| `ProjectExists` | Setup | no | 65 | `__CLI__ asks` | Pick another name: that one is taken. |
+| `ImportFailed` | Setup | yes | 75 | `__CLI__ init` | Read `reason`, then import again. |
+| `UnknownEnvItem` | Env | no | 66 | `__CLI__ env shape` | Name a key the project's env shape has: `next` lists them. |
+| `NotSensitive` | Env | no | 65 | `__CLI__ env shape` | Only an `@sensitive` item holds a write-only value: `next` shows which items are. |
+| `ValueTooShort` | Env | no | 65 | `__CLI__ env set <key>`, with `--acknowledge-short` when the value is above the floor | Give a longer value, or acknowledge a short one where the floor allows it. |
+
+## Exit codes
+
+`__SLUG__` exits with a code from sysexits(3), so a script or an agent can tell what to do next without reading stderr. A refusal's code follows from its `retryable`: 75 when trying again can help, else the code for what has to change, as the Refusals table lists it. A command that meets several refusals at once exits with the first of 77, 66, 65, 75 among them.
+
+| Exit code | Means |
+| --- | --- |
+| 0 | It did what it was asked. |
+| 1 | Something else went wrong; stderr says what. |
+| 2 | The command was misused; stderr names the flag or value, and nothing was sent. |
+| 65 | Refused: what you sent has to change (the answer, the ask or the value). |
+| 66 | Refused: what you named does not exist, or no longer stands open; `next` lists what does. |
+| 69 | No platform answered: it is down, or the URL is wrong. |
+| 75 | Refused for now: run the refusal's `next`, then try the same thing again. |
+| 77 | Refused: you may not do this until you sign in, or someone lets you in. |
 
 ## Git here
 

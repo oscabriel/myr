@@ -445,14 +445,14 @@ describe(`${Brand.cli} env set`, () => {
     { refusal: new NotSensitive({ key }) },
     { refusal: ValueTooShort.of(key, 12) },
   ])(
-    "prints $refusal._tag from the platform once, and exits 1",
+    "prints $refusal._tag from the platform once, and exits 65",
     ({ refusal }: { readonly refusal: NotSensitive | ValueTooShort }) =>
       Effect.gen(function* () {
         const ran = yield* run([key, ...always, "--yes"], {
           answer: Effect.fail(refusal),
         });
 
-        expect(ran.code).toBe(1);
+        expect(ran.code).toBe(65);
         expect(ran.out).toBe("");
         expect(ran.err).toBe(explain([refusal]).join("\n"));
         neverShown(ran);

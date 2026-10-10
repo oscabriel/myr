@@ -233,7 +233,7 @@ describe("a contract as a CLI command", () => {
           [...answer, "--json"]
         );
 
-        expect(result).toStrictEqual(Result.fail(new Reported()));
+        expect(result).toStrictEqual(Result.fail(Reported.of([refusal])));
         expect(printed).toStrictEqual([
           {
             input: { command: "submit", json: true, refusals: [refusal] },
@@ -275,7 +275,7 @@ describe("a contract as a CLI command", () => {
           answer
         );
 
-        expect(result).toStrictEqual(Result.fail(new Reported()));
+        expect(result).toStrictEqual(Result.fail(Reported.of([refusal])));
         expect(printed).toStrictEqual([
           {
             input: { command: "submit", json: false, refusals: [refusal] },
@@ -325,7 +325,11 @@ describe("a contract as a CLI command", () => {
           ["fix-week", "--project", project]
         );
 
-        expect(result).toStrictEqual(Result.fail(new Reported()));
+        expect(result).toStrictEqual(
+          Result.fail(
+            Reported.of([new AskFull({ ask: AskId.make("fix-week") })])
+          )
+        );
         expect(yield* Ref.get(claimed)).toStrictEqual([
           { ask: AskId.make("fix-week"), project },
         ]);

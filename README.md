@@ -177,6 +177,7 @@ A harness needs nothing of ours to read a refusal: it arrives in `git push` outp
 - **`myr mcp`** serves the platform's tools over MCP on stdio, in all five protocol versions from 2024-11-05 to 2026-07-28.
 - **Remote MCP** at `<platform>/mcp` speaks the stateless 2026-07-28 protocol, signed in through the platform's OAuth; the web's `/.well-known/mcp.json` points at it.
 - **The credential helper**, `git-credential-myr`, hands git the stored token for the platform's host and never prompts. It passes the harness and model it finds in the environment (`AI_AGENT` first, then Claude Code's, Cursor's or pi's own variables) as audit metadata, which a landing discloses as `Assisted-by`; identity is only ever the person's token.
+- **Exit codes.** `myr` ends with a code from sysexits(3), so a harness can branch without reading stderr: 75 when running the refusal's `next` and trying again can help, 65 when what was sent has to change, 66 when what was named does not exist, 77 when the caller may not, 69 when no platform answered, and 2 for a misuse. `/llms-full.txt` gives each refusal's code.
 - **`myr hook <event> --json`** answers Claude Code's hooks (session start, before a tool runs, before stopping) with the gate's own policy. It fails open: the gateway stays the authority.
 - **The pi package.** Once published, the package carries a `"pi"` key, so `pi install npm:@myr/cli` gives a pi agent the claim's brief, a guard before it edits the judge closure, and a verdict loop that continues at most three times.
 
@@ -233,6 +234,7 @@ Each promise names the check that holds it, and `bun run verify` runs every one.
 | A push outside its ask's territory is refused in git's own `remote:` lines, and the fork keeps the commit. The fixed answer lands as the platform's commit, authored by the answerer, with `Asked-by` and `Signed-off-by`; a stale answer is `StaleBase`; replaying a request lands nothing twice. | `apps/platform/test/core-loop.test.ts` |
 | Refusals are one closed union of typed values, each with `retryable`, `next` and an optional `at`, and no `message`. MCP returns each one with its tag. | `packages/protocol/test/refusal.test.ts`, `packages/protocol/test/mcp.test.ts`, `apps/platform/test/mcp.test.ts` |
 | One renderer writes every refusal, for git, the CLI, MCP and the web. | `packages/protocol/test/render.test.ts` |
+| The CLI exits with each refusal's own code, 75 exactly when it is retryable, and the built binary does too. | `packages/protocol/test/exit-code.test.ts`, `apps/cli/test/build.test.ts` |
 | One push hears every shape refusal at once, not one per attempt. | `packages/gate/test/shape.test.ts` |
 | An answer cannot edit the files that judge it, and a disabling marker without a reason is refused. | `packages/checks/test/judge.test.ts`, `packages/gate/test/markers.test.ts` |
 | An ask opens only red first: its check fails on `main` twice the same way, by an assertion. | `packages/checks/test/red-first.test.ts` |

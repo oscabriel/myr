@@ -552,7 +552,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
   );
 
   it.live(
-    "prints ProjectExists once and exits 1, pushing nothing",
+    "prints ProjectExists once and exits 65, pushing nothing",
     () =>
       Effect.gen(function* () {
         const machine = yield* aMachine;
@@ -568,7 +568,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           "--yes",
         ]);
 
-        expect(ran.code).toBe(1);
+        expect(ran.code).toBe(65);
         expect(
           ran.err.filter((line) =>
             line.includes("a project named demo already exists")

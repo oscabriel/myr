@@ -320,7 +320,8 @@ describe("a command that needs approval", () => {
         handlers: deciding(calls),
       });
 
-      expect(run.code).toBe(1);
+      // DecisionClosed: the decision named no longer stands open.
+      expect(run.code).toBe(66);
       expect(yield* Ref.get(calls)).toBe(1);
     })
   );
@@ -594,7 +595,7 @@ describe("an answer offered with submit", () => {
   );
 
   it.effect(
-    "prints a refused receipt as a refusal: once on stderr, nothing on stdout, exit 1",
+    "prints a refused receipt as a refusal: once on stderr, nothing on stdout, exit 75 for a moved main",
     () =>
       Effect.gen(function* () {
         const run = yield* runProgram(submitArgs, {
@@ -603,7 +604,7 @@ describe("an answer offered with submit", () => {
           ),
         });
 
-        expect(run.code).toBe(1);
+        expect(run.code).toBe(75);
         expect(run.out).toStrictEqual([]);
         expect(run.err).toStrictEqual(explain([refusal]));
       })
@@ -617,7 +618,7 @@ describe("an answer offered with submit", () => {
         ),
       });
 
-      expect(run.code).toBe(1);
+      expect(run.code).toBe(75);
       expect(run.err).toStrictEqual([]);
       expect(run.out).toHaveLength(1);
       expect(yield* decodeEnvelope(run.out[0] ?? "")).toStrictEqual({

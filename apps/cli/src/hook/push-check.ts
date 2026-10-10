@@ -59,8 +59,8 @@ const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
 /**
  * `PushCheck` over a child process: `command` (the CLI, as this process was
  * started) with `check --shape-only --offline --json --base <base>`, in
- * `root`. It exits 1
- * when it refuses, so the exit code says nothing; the envelope says all.
+ * `root`. A refusal ends it with the refusal's exit code, but the envelope
+ * says all, so only the envelope is read.
  */
 export const pushCheckWith = (
   command: readonly [string, ...string[]]

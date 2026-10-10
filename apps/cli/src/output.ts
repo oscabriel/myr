@@ -15,7 +15,7 @@ import type { Array } from "effect";
 import { Policy } from "./policy.ts";
 import type { Mode } from "./policy.ts";
 
-export { Reported } from "@repo/protocol/cli";
+export { endRefused, Reported } from "@repo/protocol/cli";
 
 export type { View } from "@repo/protocol/cli";
 
