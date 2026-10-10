@@ -263,7 +263,7 @@ const frontPageWorld: Effect.Effect<FrontPageWorld, never, Scope.Scope> =
 
 describe("the project list and credits over the platform's /rpc", () => {
   it.effect(
-    "after a landing, lists the project and its people's credits from D1 without calling a project",
+    "after a landing, lists the project from D1, asking it only its posture, and its people's credits without calling a project",
     () =>
       Effect.gen(function* () {
         yield* advanceTo(noon);
@@ -291,7 +291,8 @@ describe("the project list and credits over the platform's /rpc", () => {
               { area: "parser", count: 1, project, role: "Signed-off-by" },
             ],
           },
-          calls: [],
+          // The list's one read: datekit's posture, from its ledger.
+          calls: [`get ${project}`],
           listed: {
             projects: [
               { landedAt: at(noon), openAsks: 1, posture: "open", project },

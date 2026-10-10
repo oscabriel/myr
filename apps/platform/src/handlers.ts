@@ -3,9 +3,10 @@
  * more. A contract that names a project calls
  * that project's `ProjectApi` (its Durable Object, through `Projects`) as
  * the caller `Authenticated` named; the cross-project reads (`listProjects`,
- * `frontPage`, `credits`) come from the front-page projection; `status` and
- * `today` without a project ask every project the projection lists and
- * merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
+ * `frontPage`, `credits`) come from the front-page projection, each listed
+ * project's posture read from its own ledger (`withStandingPosture`);
+ * `status` and `today` without a project ask every project the projection
+ * lists and merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
  * caller's rate limit first, so a call past it reaches no project; a
  * proposal with a draft, and `draftAsk`, spend the draft limit too.
  * `evidence` asks the project who may read a lane's log, which it reads
@@ -36,6 +37,7 @@ import { FrontPage } from "@repo/project/front-page";
 import { GatewayUrl } from "@repo/project/project";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
+import { withStandingPosture } from "@repo/project/standing-posture";
 import { Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
 import type { AnswerView } from "@repo/protocol/domain/answer";
 import type { ClaimView } from "@repo/protocol/domain/claim";
@@ -323,7 +325,11 @@ export const Handlers: Layer.Layer<
       listPaths: ({ at, project }) =>
         code(project, (of) => pathsOf(of, Option.fromUndefinedOr(at))),
       listProjects: () =>
-        Effect.map(frontPage.projects(), (listed) => ({ projects: listed })),
+        frontPage.projects().pipe(
+          Effect.flatMap(withStandingPosture),
+          Effect.provideService(Projects, projects),
+          Effect.map((listed) => ({ projects: listed }))
+        ),
       listRefs: ({ project }) => code(project, refsOf),
       log: ({ at, from = 0, limit = LOG_PAGE, path, project }) =>
         code(project, (of) =>

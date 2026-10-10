@@ -171,6 +171,20 @@ const listedWithLanding = inFreshWorld((as) =>
   })
 );
 
+/** The project list beside each project's ledger, as anyone reads them. */
+const listedWithLedgers = inFreshWorld((as) =>
+  Effect.gen(function* () {
+    const anyone = yield* clientOf(as());
+    const { projects } = yield* anyone.listProjects({});
+
+    const ledgers = yield* Effect.forEach(PROJECTS, (project) =>
+      anyone.ledger({ project })
+    );
+
+    return { ledgers, projects };
+  })
+);
+
 /**
  * Each test seeds whole worlds, the first one cold, while turbo runs every
  * package's tests at once: about 0.5 s alone, near vitest's 5 s default
@@ -223,6 +237,24 @@ describe("the dev seed", seededWorlds, () => {
         expect(opening.opened).toBeDefined();
         expect(landedAt).toHaveLength(1);
       })
+  );
+
+  it.live("lists each project at the posture its own ledger gives", () =>
+    Effect.gen(function* () {
+      const { ledgers, projects } = yield* listedWithLedgers;
+
+      expect(
+        projects.map(({ posture, project }) => [project, posture])
+      ).toStrictEqual(
+        ledgers.map(({ posture, project }) => [project, posture])
+      );
+      // The dev world composes no visibility cartridge, so every ledger,
+      // and the list with it, reads Open.
+      expect(ledgers.map(({ posture }) => posture)).toStrictEqual([
+        "open",
+        "open",
+      ]);
+    })
   );
 
   it.live("lands bram's answer to datekit with its credit trailers", () =>

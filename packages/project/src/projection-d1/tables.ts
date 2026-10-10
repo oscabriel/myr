@@ -57,7 +57,9 @@ CREATE TABLE cursor (
  * does.
  *
  * - `projects`: one row per project the projection has heard from: its
- *   posture (`open` until a `PostureChanged` ledger entry), its open asks
+ *   posture (`open` until a `PostureChanged` ledger entry; the fallback a
+ *   list keeps when it cannot read the project's own ledger, which it reads
+ *   for the posture standing now: `withStandingPosture`), its open asks
  *   (counted from `front_page` whenever an ask opens or closes), and when
  *   it last landed (null before its first landing).
  * - `credits`: how many landings credit a person (by `handle_key`, the

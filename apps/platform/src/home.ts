@@ -8,14 +8,19 @@
  * Every URL is built from the request's origin, the one the client reached:
  * the platform is also the git remote, the MCP base and the CLI's URL, so
  * the page names them as the reader will type them. The projects are the
- * front page's, and nothing else: no layer and no fork is listed. Every
- * value that reaches the HTML is escaped. Not a redirect: the web app is a
- * link, so the host stays discoverable at its own address.
+ * front page's, and nothing else: no layer and no fork is listed; each
+ * one's posture is the one its own ledger stands at, as `listProjects`
+ * answers it (`withStandingPosture`), so `/` and the web's `/llms.txt`
+ * stay one text. Every value that reaches the HTML is escaped. Not a
+ * redirect: the web app is a link, so the host stays discoverable at its
+ * own address.
  */
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { frontLlms, MCP_PROTOCOL } from "@repo/agent-kit/host-doc";
 import { Brand } from "@repo/brand";
 import { FrontPage } from "@repo/project/front-page";
+import type { Projects } from "@repo/project/projects";
+import { withStandingPosture } from "@repo/project/standing-posture";
 import { Contracts } from "@repo/protocol/contracts";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Effect, Option } from "effect";
@@ -163,10 +168,14 @@ const homeHtml = (input: {
 /** `/` for `request`: Markdown for an agent that asks for it, else the page. */
 export const homeResponse = (
   request: Request
-): Effect.Effect<Response, never, FrontPage | HostInfo> =>
+): Effect.Effect<Response, never, FrontPage | HostInfo | Projects> =>
   Effect.gen(function* () {
     const { draftModel, webUrl } = yield* HostInfo;
-    const projects = yield* FrontPage.use((frontPage) => frontPage.projects());
+
+    const projects = yield* FrontPage.use((frontPage) =>
+      frontPage.projects()
+    ).pipe(Effect.flatMap(withStandingPosture));
+
     const { origin } = new URL(request.url);
 
     if (wantsMarkdown(request)) {

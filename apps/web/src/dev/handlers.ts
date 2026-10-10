@@ -28,6 +28,7 @@ import type { CodeProject } from "@repo/project/code";
 import { FrontPage } from "@repo/project/front-page";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
+import { withStandingPosture } from "@repo/project/standing-posture";
 import { Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
 import type { AnswerView } from "@repo/protocol/domain/answer";
 import type { ClaimView } from "@repo/protocol/domain/claim";
@@ -278,7 +279,11 @@ export const devHandlers: Layer.Layer<
       listPaths: ({ at, project }) =>
         code(project, (of) => pathsOf(of, Option.fromUndefinedOr(at))),
       listProjects: () =>
-        Effect.map(frontPage.projects(), (listed) => ({ projects: listed })),
+        frontPage.projects().pipe(
+          Effect.flatMap(withStandingPosture),
+          Effect.provideService(Projects, projects),
+          Effect.map((listed) => ({ projects: listed }))
+        ),
       listRefs: ({ project }) => code(project, refsOf),
       log: ({ at, from = 0, limit = LOG_PAGE, path, project }) =>
         code(project, (of) =>
