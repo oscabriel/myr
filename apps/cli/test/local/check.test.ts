@@ -35,6 +35,7 @@ import { asTester, unanswered } from "@repo/protocol/testing";
 import { gitOk } from "@repo/testkit/git";
 import {
   Array,
+  Cause,
   DateTime,
   Effect,
   Exit,
@@ -42,6 +43,7 @@ import {
   Layer,
   Option,
   Path,
+  Runtime,
   Schema,
 } from "effect";
 import { CliOutput } from "effect/cli";
@@ -142,6 +144,10 @@ const run = (argv: readonly string[]) =>
       out: (yield* TestConsole.logLines).map(String),
     };
   });
+
+/** The code a run's process ends with: 0 for a success. */
+const exitCodeOf = (exit: Exit.Exit<unknown, unknown>) =>
+  Exit.isSuccess(exit) ? 0 : Runtime.getErrorExitCode(Cause.squash(exit.cause));
 
 const decodeJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Json));
 
@@ -389,7 +395,7 @@ const raisingInA = (repo: CheckRepo) =>
 
 describe(`${Brand.cli} check`, () => {
   it.live(
-    "prints the refusals the gateway would give the same head, in one envelope, and exits 1",
+    "prints the refusals the gateway would give the same head, in one envelope, and exits 65: the answer must change",
     () =>
       Effect.gen(function* () {
         const repo = yield* aCheckRepo;
@@ -407,7 +413,7 @@ describe(`${Brand.cli} check`, () => {
 
         const expected = yield* gateSays(repo, repo.straying);
 
-        expect(Exit.isFailure(printed.exit)).toBeTruthy();
+        expect(exitCodeOf(printed.exit)).toBe(65);
         expect(printed.err.join("\n")).toContain(`made up for ${handle}`);
         expect(yield* envelopeOf(printed.out)).toStrictEqual({
           command: "check",

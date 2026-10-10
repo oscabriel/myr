@@ -5,6 +5,7 @@
  */
 import { Brand } from "@repo/brand";
 import { ApprovalNeeded, MissingValue, Reported } from "@repo/protocol/cli";
+import { ExitCode } from "@repo/protocol/exit-code";
 import { Unauthenticated } from "@repo/protocol/principal";
 import { Refusal } from "@repo/protocol/refusal";
 import { Console, Effect, Exit, Layer, Option, Runtime, Schema } from "effect";
@@ -45,7 +46,7 @@ export const root = Command.make(Brand.cli).pipe(
 );
 
 /** The exit code of a usage error, as for a command line effect/cli can't parse. */
-const USAGE = 2;
+const USAGE = ExitCode.usage;
 
 /**
  * The command was misused and said so in one line on stderr: the program
@@ -103,35 +104,54 @@ const usageLine = (failure: Failure): Option.Option<string> => {
     : Option.none();
 };
 
-/** What to say on stderr about a failure nobody printed yet. */
+/** What to say on stderr about a failure nobody printed yet, and the code the process ends with. */
 const noteFor = (failure: Failure) => {
   if (isUnauthenticated(failure)) {
-    return signIn;
+    return { exitCode: ExitCode.noPerm, note: signIn };
   }
 
   if (isTransportFailure(failure)) {
-    return `could not reach the platform: ${transportMessage(failure)}`;
+    return {
+      exitCode: ExitCode.unavailable,
+      note: `could not reach the platform: ${transportMessage(failure)}`,
+    };
   }
 
-  return String(failure);
+  return { exitCode: ExitCode.failed, note: String(failure) };
+};
+
+/** How a failure printed already ends: as it said, or with its refusal's code. */
+const printed = (failure: Failure): Option.Option<Reported> => {
+  if (isReported(failure)) {
+    return Option.some(failure);
+  }
+
+  return isRefusal(failure)
+    ? Option.some(Reported.of([failure]))
+    : Option.none();
 };
 
 /**
  * Says once what nobody printed yet, and how the process ends: a misuse in
- * one line on stderr (exit 2); not being signed in with what to run next,
- * and a platform out of reach, on stderr (exit 1); a refusal or anything
- * `Reported`, nothing more (exit 1).
+ * one line on stderr (exit 2); not being signed in with what to run next
+ * (77), a platform out of reach (69) and anything else (1), on stderr; a
+ * refusal, or anything `Reported`, nothing more, with its own code.
  */
 const settle = (
   failure: Failure
 ): Effect.Effect<never, Reported | Misused, Output> =>
   Option.match(usageLine(failure), {
     onNone: () =>
-      isReported(failure) || isRefusal(failure)
-        ? Effect.fail(new Reported())
-        : Output.use((output) => output.note(noteFor(failure))).pipe(
-            Effect.andThen(Effect.fail(new Reported()))
-          ),
+      Option.match(printed(failure), {
+        onNone: () => {
+          const { exitCode, note } = noteFor(failure);
+
+          return Output.use((output) => output.note(note)).pipe(
+            Effect.andThen(Effect.fail(new Reported({ exitCode })))
+          );
+        },
+        onSome: Effect.fail,
+      }),
     onSome: (line) =>
       Output.use((output) => output.note(line)).pipe(
         Effect.andThen(Effect.fail(new Misused()))
@@ -156,8 +176,8 @@ const builtInsFor = (policy: Option.Option<Policy["Service"]>) =>
  * without a subcommand, is a success. A misuse (a parse error, a missing
  * value, `--yes` left out, any failure whose `Runtime.errorExitCode` is 2)
  * ends as `Misused` (exit 2) after one line on stderr; every other failure
- * ends as `Reported` (exit 1), printed once: a refusal by the command,
- * anything else here. A defect (a stub's "not built") is not caught: the
+ * ends as `Reported`, printed once: a refusal by the command, with its
+ * exit code (`exitCodeFor`), anything else here (`settle`). A defect (a stub's "not built") is not caught: the
  * runtime prints it, loudly. `env set`'s words are screened before
  * effect/cli parses them, so a value typed where a flag goes is never
  * printed back.

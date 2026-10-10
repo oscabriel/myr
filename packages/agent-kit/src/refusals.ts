@@ -1,12 +1,14 @@
 /**
  * The refusals an answer can meet, read from the closed union: each one's
- * tag, whether retrying can help and its `next` come from its schema, and
- * what to do about it from the table below, which the type holds to the
- * union's groups (a refusal added to one fails the typecheck until it has
- * a line here). `refusalCatalog` walks every group the same way, for
- * `/llms-full.txt`, with a second table for the refusals no answer meets.
+ * tag, whether retrying can help and its `next` come from its schema, its
+ * exit code from the CLI's (`exitCodeOfTag`), and what to do about it from
+ * the table below, which the type holds to the union's groups (a refusal
+ * added to one fails the typecheck until it has a line here).
+ * `refusalCatalog` walks every group the same way, for `/llms-full.txt`,
+ * with a second table for the refusals no answer meets.
  */
 import { Brand } from "@repo/brand";
+import { ExitCode, exitCodeOfTag, precedence } from "@repo/protocol/exit-code";
 import { groups } from "@repo/protocol/refusal";
 import { Exit, Predicate, SchemaAST } from "effect";
 
@@ -139,7 +141,7 @@ const elsewhere = {
     todo: "Only an `@sensitive` item holds a write-only value: `next` shows which items are.",
   },
   PostureChange: {
-    todo: "Wait for a decider to take the posture change it names (`from`, `to`); `next` lists the decisions waiting.",
+    todo: "A decider declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions.",
   },
   ProjectExists: { todo: "Pick another name: that one is taken." },
   ProposalClosed: {
@@ -207,6 +209,8 @@ const constructorDefault = (ast: SchemaAST.AST) => {
 export interface AnswerRefusal {
   readonly tag: string;
   readonly retryable: boolean;
+  /** The code the CLI exits with when it meets this refusal. */
+  readonly exitCode: ExitCode;
   /** Its `next`, in Markdown: the command as a code span, or what it names. */
   readonly next: string;
   readonly todo: string;
@@ -232,6 +236,7 @@ const rowOf = (
   const repair = repairTable.get(member.identifier);
 
   return {
+    exitCode: exitCodeOfTag(member.identifier),
     next: nextOf(fixed, repair),
     retryable: SchemaAST.isLiteral(retryable) && retryable.literal === true,
     tag: member.identifier,
@@ -260,17 +265,49 @@ export const refusalCatalog = (): readonly CatalogRow[] =>
     }))
   );
 
+/** What each code the CLI exits with tells its caller, in the order a caller reads them. */
+const exitMeanings = {
+  [ExitCode.ok]: "It did what it was asked.",
+  [ExitCode.failed]: "Something else went wrong; stderr says what.",
+  [ExitCode.usage]:
+    "The command was misused; stderr names the flag or value, and nothing was sent.",
+  [ExitCode.dataErr]:
+    "Refused: what you sent has to change (the answer, the ask or the value).",
+  [ExitCode.noInput]:
+    "Refused: what you named does not exist, or no longer stands open; `next` lists what does.",
+  [ExitCode.unavailable]:
+    "No platform answered: it is down, or the URL is wrong.",
+  [ExitCode.tempFail]:
+    "Refused for now: run the refusal's `next`, then try the same thing again.",
+  [ExitCode.noPerm]:
+    "Refused: you may not do this until you sign in, or someone lets you in.",
+} as const satisfies Record<ExitCode, string>;
+
+/** The CLI's exit codes, as `/llms-full.txt` lists them. */
+export const exitCodeSection = () => [
+  "## Exit codes",
+  "",
+  `${code(Brand.cli)} exits with a code from sysexits(3), so a script or an agent can tell what to do next without reading stderr. A refusal's code follows from its \`retryable\`: 75 when trying again can help, else the code for what has to change, as the Refusals table lists it. A command that meets several refusals at once exits with the first of ${precedence.map(String).join(", ")} among them.`,
+  "",
+  ...table(
+    ["Exit code", "Means"],
+    Object.entries(exitMeanings).map(([exit, means]) => [exit, means])
+  ),
+  "",
+];
+
 /** The refusals section every skill carries. */
 export const refusalSection = () => [
   "## Refusals",
   "",
-  `Instead of landing an answer, the platform answers with refusals. Git prints them on its \`remote:\` lines, \`${cli("check")}\` and \`${cli("status")}\` print them, and the verdict note holds them as JSON. Each one has a \`_tag\`, \`retryable\` (whether trying the same thing again can help) and \`next\` (the command to run next). The refusals about an answer's files arrive together, so one push hears about all of them.`,
+  `Instead of landing an answer, the platform answers with refusals. Git prints them on its \`remote:\` lines, \`${cli("check")}\` and \`${cli("status")}\` print them, and the verdict note holds them as JSON. Each one has a \`_tag\`, \`retryable\` (whether trying the same thing again can help) and \`next\` (the command to run next). The refusals about an answer's files arrive together, so one push hears about all of them. The CLI exits with a refusal's code: 75 when trying again can help, and 65, 66 or 77 when something has to change first.`,
   "",
   ...table(
-    ["`_tag`", "Retryable", "`next`", "What to do"],
-    answerRefusals.map(({ next, retryable, tag, todo }) => [
+    ["`_tag`", "Retryable", "Exit code", "`next`", "What to do"],
+    answerRefusals.map(({ exitCode, next, retryable, tag, todo }) => [
       code(tag),
       retryable ? "yes" : "no",
+      String(exitCode),
       next,
       todo,
     ])

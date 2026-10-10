@@ -46,6 +46,7 @@ import {
   ReadOnly,
   Surfaces,
 } from "./annotations.ts";
+import { ExitCode, exitCodeFor } from "./exit-code.ts";
 import type { Unauthenticated } from "./principal.ts";
 import { Refusal } from "./refusal.ts";
 
@@ -165,13 +166,33 @@ export class MissingValue extends Schema.TaggedError<MissingValue>()(
 }
 
 /**
- * Everything a command printed has been printed: the program exits 1 and
- * prints nothing more, and the runtime reports nothing of its own.
+ * Everything a command printed has been printed: the program exits with
+ * `exitCode` (1 unless refusals set it) and prints nothing more, and the
+ * runtime reports nothing of its own.
  */
-export class Reported extends Schema.TaggedError<Reported>()("Reported", {}) {
-  override readonly [Runtime.errorExitCode] = 1;
+export class Reported extends Schema.TaggedError<Reported>()("Reported", {
+  exitCode: Schema.optionalKey(Schema.Int),
+}) {
+  override readonly [Runtime.errorExitCode] = this.exitCode ?? ExitCode.failed;
   override readonly [Runtime.errorReported] = false;
+
+  /** Refusals printed: the program exits with the code they share (`exitCodeFor`). */
+  static readonly of = (refusals: Array.NonEmptyReadonlyArray<Refusal>) =>
+    new Reported({ exitCode: exitCodeFor(refusals) });
 }
+
+/**
+ * Hands `refusals` to `output` once, then ends the command as `Reported`
+ * with their exit code: how every command meets a refusal.
+ */
+export const endRefused = (
+  output: Pick<CommandOutput, "refused">,
+  input: Parameters<CommandOutput["refused"]>[0]
+): Effect.Effect<never, Reported> =>
+  Effect.andThen(
+    output.refused(input),
+    Effect.fail(Reported.of(input.refusals))
+  );
 
 interface FieldSpec {
   readonly description: string | undefined;
@@ -468,7 +489,7 @@ const asJson = (text: string): View => ({
  * one that changes something takes `--dry-run`, which prints the encoded
  * payload and calls nothing. A refusal, or the refusals a success carries
  * (`refusalsIn`), go to `output.refused` once, and the command fails with
- * `Reported`.
+ * `Reported` and their exit code (`endRefused`).
  */
 export const toCommand = <
   R extends CommandRpc,
@@ -603,19 +624,18 @@ export const toCommand = <
 
         const success = yield* call(decoded).pipe(
           Effect.catchIf(isRefusal, (refusal) =>
-            Effect.andThen(
-              output.refused({ command, json, refusals: [refusal] }),
-              Effect.fail(new Reported())
-            )
+            endRefused(output, { command, json, refusals: [refusal] })
           )
         );
 
         const carried = options.refusalsIn?.(success) ?? [];
 
         if (Array.isReadonlyArrayNonEmpty(carried)) {
-          yield* output.refused({ command, json, refusals: carried });
-
-          return yield* new Reported();
+          return yield* endRefused(output, {
+            command,
+            json,
+            refusals: carried,
+          });
         }
 
         const data = yield* Effect.orDie(encodeSuccess(success));

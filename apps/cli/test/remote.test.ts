@@ -118,7 +118,7 @@ describe("the remote client", () => {
 
         const status = yield* runProgram(["status"], { client, handlers });
 
-        expect([asks.code, status.code]).toStrictEqual([0, 1]);
+        expect([asks.code, status.code]).toStrictEqual([0, 77]);
         expect(asks.out.join("\n")).toContain("fix-week");
         expect(status.err.join("\n")).toContain(signIn);
         expect(status.out).toStrictEqual([]);
@@ -126,28 +126,30 @@ describe("the remote client", () => {
       }).pipe(Effect.scoped)
   );
 
-  it.live("turns a 401 into the same words, not a stack trace", () =>
-    Effect.gen(function* () {
-      const platform = yield* httpPlatform(handlers);
+  it.live(
+    "turns a 401 into the same words, not a stack trace, and exits 77",
+    () =>
+      Effect.gen(function* () {
+        const platform = yield* httpPlatform(handlers);
 
-      const run = yield* runProgram(["status"], {
-        client: remote(
-          holding(Option.some(profileOn(platform.origin, "a-stale-token")))
-        ),
-        handlers,
-      });
+        const run = yield* runProgram(["status"], {
+          client: remote(
+            holding(Option.some(profileOn(platform.origin, "a-stale-token")))
+          ),
+          handlers,
+        });
 
-      expect(run.code).toBe(1);
-      expect(run.err).toStrictEqual([
-        "Unauthenticated: the platform does not know who you are",
-        `  ${signIn}`,
-        "  retryable: no",
-      ]);
-    }).pipe(Effect.scoped)
+        expect(run.code).toBe(77);
+        expect(run.err).toStrictEqual([
+          "Unauthenticated: the platform does not know who you are",
+          `  ${signIn}`,
+          "  retryable: no",
+        ]);
+      }).pipe(Effect.scoped)
   );
 
   it.live(
-    "says in one line what failed when the platform answers with an error",
+    "says in one line what failed when the platform answers with an error, and exits 69",
     () =>
       Effect.gen(function* () {
         const origin = yield* failingPlatform(503);
@@ -157,7 +159,7 @@ describe("the remote client", () => {
           handlers,
         });
 
-        expect(run.code).toBe(1);
+        expect(run.code).toBe(69);
         expect(run.out).toStrictEqual([]);
         expect(run.err).toHaveLength(1);
         expect(run.err[0]).toMatch(/^could not reach the platform: .*\b503\b/u);

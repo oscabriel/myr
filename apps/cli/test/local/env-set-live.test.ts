@@ -836,7 +836,7 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
     );
 
     it.effect(
-      "refuses bram, no decider, with NotDecider printed once and exit 1",
+      "refuses bram, no decider, with NotDecider printed once and exit 77",
       () =>
         Effect.gen(function* () {
           const { byBram } = yield* Scenario;
@@ -846,7 +846,7 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
             err: filled(byBram.err),
             out: filled(byBram.out),
           }).toStrictEqual({
-            code: 1,
+            code: 77,
             err: explain([new NotDecider({})]),
             out: [],
           });
@@ -872,12 +872,12 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
             },
           }).toStrictEqual({
             publicItem: {
-              code: 1,
+              code: 65,
               err: explain([new NotSensitive({ key: EnvKey.make("APP_ENV") })]),
               out: [],
             },
             tooShort: {
-              code: 1,
+              code: 65,
               err: explain([ValueTooShort.of(token, 12)]),
               out: [],
             },

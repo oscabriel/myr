@@ -26,7 +26,7 @@ import {
 import { Argument, Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { Output, Reported } from "../output.ts";
+import { endRefused, Output } from "../output.ts";
 import type { View } from "../output.ts";
 import { repoContext } from "../repo-context.ts";
 import type { RepoContext } from "../repo-context.ts";
@@ -66,7 +66,7 @@ const isRefusal = Schema.is(Refusal);
 
 /**
  * Prints a refusal the platform answered with, once, through `Output`, and
- * ends with `Reported` (exit 1). Shared with `env set`.
+ * ends with `Reported` and the refusal's exit code. Shared with `env set`.
  */
 export const reportRefusals =
   (command: string, json: boolean) =>
@@ -74,8 +74,8 @@ export const reportRefusals =
     effect.pipe(
       Effect.catchIf(isRefusal, (refusal) =>
         Output.use((output) =>
-          output.refused({ command, json, refusals: [refusal] })
-        ).pipe(Effect.andThen(Effect.fail(new Reported())))
+          endRefused(output, { command, json, refusals: [refusal] })
+        )
       )
     );
 

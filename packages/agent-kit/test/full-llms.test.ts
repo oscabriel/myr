@@ -10,6 +10,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
+import { ExitCode } from "@repo/protocol/exit-code";
 import { ProjectName } from "@repo/protocol/ids";
 import { groups } from "@repo/protocol/refusal";
 import { Effect } from "effect";
@@ -158,7 +159,7 @@ describe(fullLlms, () => {
     expect(refusals).toContainEqual(
       expect.stringMatching(
         new RegExp(
-          `^\\| \`UnknownAsk\` \\| Lookup \\| no \\| \`${Brand.cli} asks\` \\| .+ \\|$`,
+          `^\\| \`UnknownAsk\` \\| Lookup \\| no \\| 66 \\| \`${Brand.cli} asks\` \\| .+ \\|$`,
           "u"
         )
       )
@@ -166,10 +167,22 @@ describe(fullLlms, () => {
     expect(refusals).toContainEqual(
       expect.stringMatching(
         new RegExp(
-          `^\\| \`DraftInProgress\` \\| Decision \\| yes \\| \`${Brand.cli} proposal <proposal>\` \\| .+ \\|$`,
+          `^\\| \`DraftInProgress\` \\| Decision \\| yes \\| 75 \\| \`${Brand.cli} proposal <proposal>\` \\| .+ \\|$`,
           "u"
         )
       )
+    );
+  });
+
+  it("lists every code the CLI exits with, once", () => {
+    const listed = section("Exit codes").flatMap((line) => {
+      const exit = /^\| (?<code>\d+) \|/u.exec(line)?.groups?.code;
+
+      return exit === undefined ? [] : [Number(exit)];
+    });
+
+    expect(listed.toSorted((a, b) => a - b)).toStrictEqual(
+      Object.values(ExitCode).toSorted((a, b) => a - b)
     );
   });
 

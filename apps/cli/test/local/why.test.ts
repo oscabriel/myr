@@ -547,21 +547,23 @@ describe(`${Brand.cli} why`, () => {
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
-  it.live("prints a refusal from the platform once, and exits 1", () =>
-    Effect.gen(function* () {
-      const { dir } = yield* aRepo;
+  it.live(
+    "prints a refusal from the platform once, and exits 66 for a name that names nothing",
+    () =>
+      Effect.gen(function* () {
+        const { dir } = yield* aRepo;
 
-      const ran = yield* run(
-        dir,
-        ["src/week.ts:3", "--project", "datekit"],
-        platform(() => Effect.fail(new UnknownProject({ project })))
-      );
+        const ran = yield* run(
+          dir,
+          ["src/week.ts:3", "--project", "datekit"],
+          platform(() => Effect.fail(new UnknownProject({ project })))
+        );
 
-      expect(ran.code).toBe(1);
-      expect(ran.out).toBe("");
-      expect(ran.err).toBe(
-        explain([new UnknownProject({ project })]).join("\n")
-      );
-    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+        expect(ran.code).toBe(66);
+        expect(ran.out).toBe("");
+        expect(ran.err).toBe(
+          explain([new UnknownProject({ project })]).join("\n")
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 });

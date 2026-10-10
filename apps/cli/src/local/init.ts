@@ -30,7 +30,7 @@ import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { gitHelperConfig } from "../credentials.ts";
-import { Output, Reported } from "../output.ts";
+import { endRefused, Output } from "../output.ts";
 import { parseRemote, repoContext } from "../repo-context.ts";
 import { projectFile } from "./project-file.ts";
 
@@ -254,15 +254,11 @@ const committing = (paths: readonly string[]) =>
     ["git", "commit", "--quiet", "--message", SUBJECT, "--", path],
   ]);
 
-/** Prints `refusal` once, as the CLI prints every refusal, and ends as `Reported`. */
+/** Prints `refusal` once, as the CLI prints every refusal, and ends as `Reported` with its exit code. */
 const refuse = (json: boolean) => (refusal: Refusal) =>
-  Effect.gen(function* () {
-    const output = yield* Output;
-
-    yield* output.refused({ command: COMMAND, json, refusals: [refusal] });
-
-    return yield* new Reported();
-  });
+  Output.use((output) =>
+    endRefused(output, { command: COMMAND, json, refusals: [refusal] })
+  );
 
 /** Asks the platform to make the project; a refusal is printed once. */
 const makeProject = (payload: Payload, json: boolean) =>

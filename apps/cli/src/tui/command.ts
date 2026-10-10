@@ -12,7 +12,7 @@ import type { NotDecider, UnknownProject } from "@repo/protocol/refusal";
 import { Context, Effect, Option, Schema } from "effect";
 import { Command, Flag } from "effect/cli";
 
-import { Output, Reported } from "../output.ts";
+import { endRefused, Output } from "../output.ts";
 import { views } from "../render.ts";
 import { payloadFor, runTodayTui, TuiRefused } from "./run.ts";
 
@@ -22,15 +22,12 @@ const encodeToday = Schema.encodeUnknownEffect(TodayOf.successSchema);
 
 /**
  * The `today` contract's refusals, each printed once where the command's
- * refusals go; the command then ends `Reported`.
+ * refusals go; the command then ends `Reported`, with the refusal's exit code.
  */
 const reported = (json: boolean) => {
   const once = (refusal: NotDecider | UnknownProject) =>
-    Effect.andThen(
-      Effect.flatMap(Effect.service(Output), (output) =>
-        output.refused({ command: COMMAND, json, refusals: [refusal] })
-      ),
-      Effect.fail(new Reported())
+    Effect.flatMap(Effect.service(Output), (output) =>
+      endRefused(output, { command: COMMAND, json, refusals: [refusal] })
     );
 
   return { NotDecider: once, UnknownProject: once };

@@ -48,32 +48,32 @@ The platform serves its contracts as MCP tools at `https://__SLUG__.technology/m
 
 ## Refusals
 
-Instead of landing an answer, the platform answers with refusals. Git prints them on its `remote:` lines, `__CLI__ check` and `__CLI__ status` print them, and the verdict note holds them as JSON. Each one has a `_tag`, `retryable` (whether trying the same thing again can help) and `next` (the command to run next). The refusals about an answer's files arrive together, so one push hears about all of them.
+Instead of landing an answer, the platform answers with refusals. Git prints them on its `remote:` lines, `__CLI__ check` and `__CLI__ status` print them, and the verdict note holds them as JSON. Each one has a `_tag`, `retryable` (whether trying the same thing again can help) and `next` (the command to run next). The refusals about an answer's files arrive together, so one push hears about all of them. The CLI exits with a refusal's code: 75 when trying again can help, and 65, 66 or 77 when something has to change first.
 
-| `_tag` | Retryable | `next` | What to do |
-| --- | --- | --- | --- |
-| `NotClaimed` | yes | `__CLI__ claim <ask>` | Claim the ask, then push again. |
-| `ClaimLapsed` | yes | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
-| `NotVouched` | no | `__CLI__ status` | Ask a member of the project to vouch for you. |
-| `CapReached` | yes | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
-| `AskFull` | yes | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
-| `NoAsk` | no | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
-| `RepoBusy` | yes | `git push` | Push again. |
-| `DirectPush` | no | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
-| `AskBlocked` | yes | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
-| `Denounced` | no | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
-| `OutOfScope` | no | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
-| `TouchedJudge` | no | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
-| `Weakened` | no | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet. |
-| `PrivatePathInPublicTree` | no | `__CLI__ check` | Take the held-back paths it names out of your answer. |
-| `ReachedInternals` | no | `__CLI__ check` | Import the other module only through its public files. |
-| `StaleBase` | yes | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
-| `StaleLayer` | yes | `__CLI__ status` | Nothing: the answer is checked again. |
-| `ChecksFailed` | no | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
-| `HeldBackFailed` | no | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
-| `AttemptsExhausted` | yes | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
-| `Flake` | yes | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
-| `VerifierBlocked` | yes | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
+| `_tag` | Retryable | Exit code | `next` | What to do |
+| --- | --- | --- | --- | --- |
+| `NotClaimed` | yes | 75 | `__CLI__ claim <ask>` | Claim the ask, then push again. |
+| `ClaimLapsed` | yes | 75 | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
+| `NotVouched` | no | 77 | `__CLI__ status` | Ask a member of the project to vouch for you. |
+| `CapReached` | yes | 75 | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
+| `AskFull` | yes | 75 | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
+| `NoAsk` | no | 66 | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
+| `RepoBusy` | yes | 75 | `git push` | Push again. |
+| `DirectPush` | no | 77 | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
+| `AskBlocked` | yes | 75 | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
+| `Denounced` | no | 77 | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `OutOfScope` | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
+| `TouchedJudge` | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
+| `Weakened` | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet. |
+| `PrivatePathInPublicTree` | no | 65 | `__CLI__ check` | Take the held-back paths it names out of your answer. |
+| `ReachedInternals` | no | 65 | `__CLI__ check` | Import the other module only through its public files. |
+| `StaleBase` | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
+| `StaleLayer` | yes | 75 | `__CLI__ status` | Nothing: the answer is checked again. |
+| `ChecksFailed` | no | 65 | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
+| `HeldBackFailed` | no | 65 | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
+| `AttemptsExhausted` | yes | 75 | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
+| `Flake` | yes | 75 | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
+| `VerifierBlocked` | yes | 75 | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
 
 ## No fence yet
 

@@ -365,7 +365,8 @@ layer(BuiltOnce, { excludeTestServices: true, timeout: "180 seconds" })(
             exitCode: checked.exitCode,
             stderr: checked.stderr,
           }).toStrictEqual({
-            exitCode: 1,
+            // UnknownAsk: the ask named is not one the policy has.
+            exitCode: 66,
             stderr: "",
           });
 
