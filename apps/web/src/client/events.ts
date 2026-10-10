@@ -6,8 +6,8 @@
  *
  * - `projectEventsAtom(project)` holds the replay. Over JSON the platform
  *   replays the kept events in one response and ends (only the framed
- *   `/rpc` keeps the stream open), and the project's key reads it again,
- *   so the page's live view (`watch.ts`) keeps it current.
+ *   `/rpc` keeps the stream open), and the page's live view (`watch.ts`)
+ *   reads it again on each event, so it stays current.
  * - The derivations beside it are pure: `askStates` (per ask), `whoseMove`,
  *   `familyMarks`, `stampsFrom` (when a landing that happened while the page
  *   was open earns its stamp) and `recentLandings`.
@@ -80,10 +80,13 @@ export interface Family {
 /** Who acts next on an ask. */
 export type Move = "answerer" | "decider" | "family" | "none" | "platform";
 
-/** The project's events, replayed from the first; read again whenever the project's key is invalidated. */
+/**
+ * The project's events, replayed from the first; read again on each event
+ * the page's live view hears, and on each of its polls (`keys.events`).
+ */
 export const projectEventsAtom = Atom.family((project: ProjectName) =>
   Atom.withServerValueInitial(
-    ContractsClient.runtime.factory.withReactivity(keys.project(project))(
+    ContractsClient.runtime.factory.withReactivity(keys.events(project))(
       ContractsClient.runtime.atom(
         Effect.gen(function* () {
           const client = yield* ContractsClient;

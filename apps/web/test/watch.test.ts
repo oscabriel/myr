@@ -2,8 +2,9 @@
  * The page's live view: `watchAtom(project)`, mounted by the
  * project and answer pages, follows the project's events from the last
  * number of the replay the page read and invalidates the keys each one
- * changes, so the page's reads fetch again; a stream that fails before it
- * hears anything turns into a poll every `POLL_MS`. Each test runs the atom
+ * changes, so the page's reads fetch again (and, once the replay is in,
+ * the keys its events change, for what came before the stream); a stream
+ * that fails before it hears anything turns into a poll every `POLL_MS`. Each test runs the atom
  * in a registry of its own, over a stub stream, a replay given as the
  * project's events and the test's own `Reactivity`, on the TestClock.
  */
@@ -375,13 +376,103 @@ describe(watchAtom, () => {
           AsyncResult.success(kept.slice(0, 7))
         );
 
+        // Once for the page's read after the replay, once for the event.
+        yield* runUntil(() => fired.length > 1);
+        yield* runUntil(() => fired.length > 2);
+
+        expect(fired).toStrictEqual([projectKey, projectKey]);
+      })
+  );
+
+  // A page's own reads may be older than the replay (a loader read them on
+  // the server; the replay is read in the browser later): what happened in
+  // between is in the replay but not on the page, and the stream starts
+  // after it.
+  it.effect(
+    "reads the page once more after the replay, for what came between the page's read and the replay, and never the replay itself",
+    () =>
+      Effect.gen(function* () {
+        const { fired, reactivity } = yield* invalidations;
+        const [events] = keys.events(datekit);
+
+        reactivity.registerUnsafe([events ?? ""], () => {
+          fired.push("events");
+        });
+
+        yield* tab(
+          () => Stream.never,
+          reactivity,
+          AsyncResult.success([
+            ProjectEvent.cases.Claimed.make({
+              ask: parseIso,
+              at,
+              claimant: Handle.make("alice"),
+              seq: 1,
+            }),
+            ProjectEvent.cases.Judged.make({
+              ask: parseIso,
+              at,
+              head,
+              outcome: Outcome.cases.Checking.make({ stage: "merge" }),
+              seq: 2,
+            }),
+          ])
+        );
+
         const heard = yield* firedNow(fired);
 
         yield* runUntil(() => fired.length > 0);
 
         expect({ after: [...fired], heard }).toStrictEqual({
           after: [],
-          heard: [projectKey],
+          heard: [askKey, projectKey],
+        });
+      })
+  );
+
+  it.effect(
+    "reads the replay again on each event the stream brings, and on each poll",
+    () =>
+      Effect.gen(function* () {
+        const reactivity = yield* Reactivity.make;
+        const fired: string[] = [];
+        const [events] = keys.events(datekit);
+
+        reactivity.registerUnsafe([events ?? ""], () => {
+          fired.push("events");
+        });
+
+        const heard = yield* Queue.unbounded<ProjectEvent>();
+        const connects = yield* Ref.make(0);
+
+        yield* tab(
+          () =>
+            Stream.unwrap(
+              Effect.map(
+                Ref.getAndUpdate(connects, (count) => count + 1),
+                (count) =>
+                  count === 0
+                    ? Stream.fromQueue(heard).pipe(Stream.take(1))
+                    : Stream.fail("no framed /rpc here")
+              )
+            ),
+          reactivity
+        );
+
+        yield* Queue.offer(
+          heard,
+          ProjectEvent.cases.Warned.make({ ask: parseIso, at, seq: 1 })
+        );
+
+        const onEvent = yield* firedNow(fired);
+
+        yield* TestClock.adjust(POLL_MS);
+        yield* runUntil(() => Ref.getUnsafe(connects) > 1);
+        yield* TestClock.adjust(POLL_MS);
+
+        expect({ onEvent, onPoll: yield* firedNow(fired) }).toStrictEqual({
+          onEvent: ["events"],
+          onPoll: ["events"],
         });
       })
   );

@@ -16,6 +16,12 @@ export const keys = {
   ],
   /** The project's code reads (refs, trees, files, log, commits, why): a landing changes them. */
   code: (project: ProjectName): readonly string[] => [`code:${project}`],
+  /**
+   * The project's replayed events (`events.ts`): every event changes them.
+   * Not the project's key, so a page's reads can be read again without
+   * replaying every event once more.
+   */
+  events: (project: ProjectName): readonly string[] => [`events:${project}`],
   front: (): readonly string[] => ["front"],
   ledger: (project: ProjectName): readonly string[] => [`ledger:${project}`],
   /** The project's evaluated policy (the people page): a landing may change it. */

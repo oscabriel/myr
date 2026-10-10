@@ -14,14 +14,18 @@
  *   an ask's keys include its project's (`keys.ts`), the answer page's
  *   verdict fetches again too.
  *
- * The project and answer pages mount it (`useAtomMount`), so it runs only
- * in the browser, from the page's mount to its unmount. It follows from the
- * last number of the project's replay (`projectEventsAtom`, which the page
- * reads anyway), not from the first event, so a new watcher hears none of
- * the kept events again and makes the page read nothing twice; whatever
- * happened between that replay and the stream's start comes first on the
- * stream, so it is heard once. A replay that cannot be read starts the
- * follow from the first event, as before.
+ * Every page that shows a project live mounts it (`useAtomMount`), so it
+ * runs only in the browser, from the page's mount to its unmount. It follows from the
+ * last number of the project's replay (`projectEventsAtom`), not from the
+ * first event, so a new watcher hears none of the kept events again and
+ * never replays them twice. The page's own reads may be older than that
+ * replay (a loader read them on the server, or they were read beside it),
+ * so once the replay is in, the keys its events change are invalidated
+ * once: whatever happened between the page's first read and the replay is
+ * read then, and whatever happened after comes first on the stream. The
+ * replay has a key of its own (`keys.events`), so that read leaves it be;
+ * each event the stream brings, and each poll, reads it again. A replay
+ * that cannot be read starts the follow from the first event, as before.
  */
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -31,6 +35,7 @@ import {
   Effect,
   Exit,
   Layer,
+  Option,
   Ref,
   Schedule,
   Stream,
@@ -94,12 +99,30 @@ export const keysOf = (
     Warned: ({ ask }) => keys.ask(project, ask),
   });
 
-/** `project` followed from `since` for as long as it runs: the stream while it works, then the poll. */
-const followed = (project: ProjectName, since: Effect.Effect<number>) =>
+/** The keys any of `events` changes, each once. */
+const keysOfAll =
+  (project: ProjectName) =>
+  (events: readonly ProjectEvent[]): readonly string[] =>
+    Array.dedupe(events.flatMap((event) => keysOf(project, event)));
+
+/** `project` followed from the end of its `replay` for as long as it runs: the stream while it works, then the poll. */
+const followed = <E>(
+  project: ProjectName,
+  replay: Effect.Effect<readonly ProjectEvent[], E>
+) =>
   Effect.gen(function* () {
     const watch = yield* ProjectWatch;
     const reactivity = yield* Reactivity.Reactivity;
-    const last = yield* Ref.make(yield* since);
+    const kept = yield* Effect.option(replay);
+
+    const last = yield* Ref.make(
+      Option.match(kept, { onNone: () => 0, onSome: lastSeq })
+    );
+
+    // The page's reads, once, for what came between them and the replay.
+    yield* reactivity.invalidate(
+      Option.match(kept, { onNone: () => [], onSome: keysOfAll(project) })
+    );
 
     /** One stream from the last number heard, to its end: whether it failed before it heard anything. */
     const once = Effect.gen(function* () {
@@ -108,9 +131,10 @@ const followed = (project: ProjectName, since: Effect.Effect<number>) =>
       const ended = yield* watch.follow(project, yield* Ref.get(last)).pipe(
         Stream.runForEachArray((events) =>
           Effect.gen(function* () {
-            yield* reactivity.invalidate(
-              Array.dedupe(events.flatMap((event) => keysOf(project, event)))
-            );
+            yield* reactivity.invalidate([
+              ...keysOfAll(project)(events),
+              ...keys.events(project),
+            ]);
             yield* Ref.set(last, Array.lastNonEmpty(events).seq);
             yield* Ref.set(heard, true);
           })
@@ -129,7 +153,7 @@ const followed = (project: ProjectName, since: Effect.Effect<number>) =>
     );
 
     return yield* reactivity
-      .invalidate(keys.project(project))
+      .invalidate([...keys.project(project), ...keys.events(project)])
       .pipe(Effect.delay(POLL_MS), Effect.forever);
   });
 
@@ -140,14 +164,8 @@ const followed = (project: ProjectName, since: Effect.Effect<number>) =>
 export const watchAtom = Atom.family((project: ProjectName) =>
   Atom.map(
     watchRuntime.atom((get) =>
-      followed(
-        project,
-        // Read once, not followed: a new replay must not start the stream over.
-        get.resultOnce(projectEventsAtom(project)).pipe(
-          Effect.map(lastSeq),
-          Effect.orElseSucceed(() => 0)
-        )
-      )
+      // Read once, not followed: a new replay must not start the stream over.
+      followed(project, get.resultOnce(projectEventsAtom(project)))
     ),
     constVoid
   )
