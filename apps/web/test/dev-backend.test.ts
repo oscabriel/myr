@@ -206,6 +206,29 @@ describe("the dev seed", seededWorlds, () => {
     })
   );
 
+  it.live("adds none of the fixtures without their switch", () =>
+    Effect.gen(function* () {
+      const { entries, projects } = yield* pages;
+      const listed = new Set(projects.map(({ project }) => project));
+
+      for (const fixture of [
+        "vellum",
+        "amberlog",
+        "cinderbox",
+        "fernwick",
+        "mossgate",
+        "quillon",
+        "tidepool",
+      ]) {
+        expect(listed.has(ProjectName.make(fixture))).toBeFalsy();
+      }
+
+      expect(
+        entries.every(({ project }) => PROJECTS.includes(project))
+      ).toBeTruthy();
+    })
+  );
+
   it.live("counts every time it holds in whole minutes from one start", () =>
     Effect.gen(function* () {
       const seen = yield* instants;

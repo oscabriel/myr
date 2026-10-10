@@ -46,6 +46,29 @@ const ports = Layer.mergeAll(
   Layer.provideMerge(RepoHostMemory)
 );
 
+/** The project service over every port, before anything reads it. */
+const core = withDraftRunsInline(ProjectsMemory).pipe(
+  Layer.provideMerge(ports)
+);
+
+/** What the read side of a world is built over: its projects and their projected events. */
+export type DevCore = Layer.Success<typeof core> | DevClock;
+
+/**
+ * A fresh world whose front page and handlers read through `between`,
+ * which may stand in for the projects and the projected events it is
+ * given (the fixtures do, `fixtures.ts`). Built twice, it is two worlds.
+ */
+export const devWorldWith = <Out, E, In extends DevCore>(
+  between: Layer.Layer<Out, E, In>
+) =>
+  Layer.mergeAll(DevFrontPage, EvidenceStoreMemory).pipe(
+    Layer.provideMerge(between),
+    Layer.provideMerge(core),
+    Layer.provideMerge(devClockAt(devStart)),
+    Layer.fresh
+  );
+
 /**
  * A fresh, empty world: its projects, the front page over them, the lane
  * logs, the repo host the people's git pushes to, and its clock at
@@ -53,9 +76,4 @@ const ports = Layer.mergeAll(
  */
 export const devWorld: Layer.Layer<
   Projects | FrontPage | EvidenceStore | RepoHost | DevClock
-> = Layer.mergeAll(DevFrontPage, EvidenceStoreMemory).pipe(
-  Layer.provideMerge(withDraftRunsInline(ProjectsMemory)),
-  Layer.provideMerge(ports),
-  Layer.provideMerge(devClockAt(devStart)),
-  Layer.fresh
-);
+> = devWorldWith(Layer.empty);

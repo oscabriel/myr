@@ -39,7 +39,7 @@ import type { Files } from "./git.ts";
 const mainRef = RefName.make("refs/heads/main");
 
 /** People who propose and flag in datekit; nobody vouched for them. */
-const visitors = {
+export const visitors = {
   flagger: Handle.make("sefa"),
   proposer: Handle.make("tove"),
   regular: Handle.make("wren"),
@@ -119,24 +119,25 @@ const at = (minute: number) =>
   );
 
 /**
- * A project made and adopted: its initializer creates it, pushes its first
- * commit, and the gateway reports the push.
+ * A project made and adopted at `when`: its initializer creates it, pushes
+ * its first commit a minute later, and the gateway reports the push.
  */
-const started = (
+export const startedAt = (
   project: ProjectName,
   initializer: Handle,
   files: Files,
-  minute: number
+  when: DateTime.Utc
 ) =>
   Effect.gen(function* () {
     const projects = yield* Projects;
+    const clock = yield* DevClock;
 
-    yield* at(minute);
+    yield* clock.set(when);
 
     const api = yield* projects.create(project);
 
     yield* api.initProject(as(initializer), {});
-    yield* at(minute + 1);
+    yield* clock.set(DateTime.add(when, { minutes: 1 }));
 
     const first = yield* pushed(RepoName.make(project), {
       author: initializer,
@@ -145,13 +146,25 @@ const started = (
       parent: Option.none(),
     });
 
-    yield* api.recordFirstPush(as(initializer), first);
+    const { landed } = yield* api.recordFirstPush(as(initializer), first);
 
-    return api;
+    return { api, landed };
   });
 
+/** A project made and adopted at `minute` minutes after the world's start. */
+const started = (
+  project: ProjectName,
+  initializer: Handle,
+  files: Files,
+  minute: number
+) =>
+  Effect.map(
+    startedAt(project, initializer, files, devMinute(minute)),
+    ({ api }) => api
+  );
+
 /** Each ask opened by `decider` from its files, a minute apart from `minute`. */
-const opened = (
+export const opened = (
   api: ProjectApi,
   decider: Handle,
   asks: readonly (readonly [AskId, Opening])[],
