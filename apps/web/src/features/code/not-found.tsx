@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 
 import { EmptyState } from "../shared/empty.tsx";
 import { AppLink } from "../shared/link.tsx";
+import { ASKS_PATH } from "../shared/paths.ts";
 import { RefusalView } from "../shared/refusal.tsx";
 import { Refusals } from "../shared/refusals.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
@@ -41,7 +42,7 @@ const Refused = ({
       <RefusalView refusals={refusals} />
     )}
     <p className="text-ui flex flex-wrap gap-x-4 gap-y-1">
-      <AppLink className={LINK} to="/">
+      <AppLink className={LINK} to={ASKS_PATH}>
         Open asks
       </AppLink>
     </p>

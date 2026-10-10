@@ -24,7 +24,7 @@ import {
   forTheEdge,
   KEPT_NOWHERE,
 } from "../src/server/edge-cache.ts";
-import { frontPageHandler } from "../src/server/front-page.ts";
+import { frontPageHandler, landingHandler } from "../src/server/front-page.ts";
 import { frontLlmsHandler, projectLlmsHandler } from "../src/server/llms.ts";
 import { rpcHandler } from "../src/server/rpc.ts";
 import { SESSION_COOKIE } from "../src/server/session.ts";
@@ -298,6 +298,19 @@ const CREDENTIAL_ROUTES: readonly (readonly [
     "/",
     (request) =>
       Promise.resolve(
+        landingHandler(
+          listingDatekit,
+          PLATFORM_URL
+        )({
+          next: () => answer(branchPage),
+          request,
+        })
+      ),
+  ],
+  [
+    "/asks",
+    (request) =>
+      Promise.resolve(
         frontPageHandler(
           listingDatekit,
           PLATFORM_URL
@@ -356,6 +369,67 @@ describe("a route that hands the reader's cookie on", () => {
         expect(kept(served).cacheControl).toMatch(/^public\b/u);
         expect(kept(served).vary).toMatch(/\bCookie$/u);
       })
+  );
+});
+
+/** The landing's GET, falling through to a page the edge may keep. */
+const landing = (request: Request) =>
+  Promise.resolve(
+    landingHandler(
+      listingDatekit,
+      PLATFORM_URL
+    )({
+      next: () => answer(branchPage),
+      request,
+    })
+  );
+
+describe("the landing", () => {
+  it.effect(
+    "sends a reader who carries a session to their home, and the edge keeps that nowhere",
+    () =>
+      Effect.gen(function* () {
+        const served = yield* Effect.promise(() =>
+          edgeEntry({ fetch: landing }).fetch(
+            get("/", { accept: "text/html", cookie: SIGNED_IN })
+          )
+        );
+
+        expect({
+          location: served.headers.get("location"),
+          status: served.status,
+          ...kept(served),
+        }).toStrictEqual({
+          cacheControl: KEPT_NOWHERE,
+          location: "/home",
+          status: 302,
+          vary: null,
+        });
+      })
+  );
+
+  it.effect(
+    "is the same page for every reader without a session, which the edge may keep",
+    () =>
+      Effect.gen(function* () {
+        const served = yield* Effect.promise(() =>
+          edgeEntry({ fetch: landing }).fetch(get("/", { accept: "text/html" }))
+        );
+
+        expect(served.status).toBe(200);
+        expect(kept(served).cacheControl).toMatch(/^public\b/u);
+        expect(kept(served).vary).toMatch(/\bCookie$/u);
+      })
+  );
+
+  it.effect("lets a cookie that is not a session through to the page", () =>
+    Effect.gen(function* () {
+      const own = yield* Effect.promise(() =>
+        landing(get("/", { accept: "text/html", cookie: "theme=dark" }))
+      );
+
+      expect(own.status).toBe(200);
+    })
   );
 });
 

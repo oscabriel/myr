@@ -298,7 +298,7 @@ const stoppedPage = (
   );
 
   return new Response(
-    `<!doctype html><meta charset="utf-8"><title>Sign-in stopped · ${Brand.name}</title><p>${reason}</p><p><a href="${AUTH_PATHS.signIn}">Sign in again</a> or go to <a href="/">the front page</a>.</p>`,
+    `<!doctype html><meta charset="utf-8"><title>Sign-in stopped · ${Brand.name}</title><p>${reason}</p><p><a href="${AUTH_PATHS.signIn}">Sign in again</a> or go to <a href="/asks">the open asks</a>.</p>`,
     { headers, status }
   );
 };

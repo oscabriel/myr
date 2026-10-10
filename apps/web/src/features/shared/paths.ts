@@ -9,6 +9,16 @@ import type {
   ProjectName,
 } from "@repo/protocol/ids";
 
+/** The front page: every open ask, across every project. */
+export const ASKS_PATH = "/asks";
+
+/** A signed-in reader's own page. */
+export const HOME_PATH = "/home";
+
+/** The docs' index, or one of its pages. */
+export const docsPath = (page?: string) =>
+  page === undefined ? "/docs" : `/docs/${page}`;
+
 /** A project's page. */
 export const projectPath = (project: ProjectName) => `/${project}`;
 

@@ -8,7 +8,7 @@
  */
 import { Brand } from "@repo/brand";
 import { useRouter } from "@tanstack/react-router";
-import { Bot, Keyboard } from "lucide-react";
+import { BookOpen, Bot, Keyboard } from "lucide-react";
 import { useRef } from "react";
 import type { RefObject } from "react";
 
@@ -30,6 +30,7 @@ import { Sheet, SheetContent } from "../../../components/ui/sheet.tsx";
 import { SessionSlot } from "../../auth/session-slot.tsx";
 import { KeysHelp, useKeys } from "../keys.tsx";
 import { AppLink } from "../link.tsx";
+import { docsPath } from "../paths.ts";
 import { useCurrentProject, useProjectList, useShell } from "./context.ts";
 import type { Overlay } from "./context.ts";
 import {
@@ -136,7 +137,7 @@ const ProjectSwitcher = ({
   );
 };
 
-/** The phone's More: For agents, the project's sections, the keys, the session. */
+/** The phone's More: Docs, For agents, the project's sections, the keys, the session. */
 const More = () => {
   const project = useCurrentProject();
   const listed = useProjectList();
@@ -144,6 +145,18 @@ const More = () => {
 
   return (
     <div className="flex flex-col gap-2 px-2 py-2">
+      <AppLink
+        activeOptions={{ exact: true }}
+        className={RAIL_ROW}
+        to={docsPath()}
+      >
+        <BookOpen
+          aria-hidden="true"
+          className="text-muted-foreground size-4"
+          strokeWidth={1.75}
+        />
+        Docs
+      </AppLink>
       <AppLink
         activeOptions={{ exact: true }}
         className={RAIL_ROW}

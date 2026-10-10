@@ -3,7 +3,8 @@
  * draws the router's links (`AppLink`), reads the location or the route's
  * params needs around it, as the app's router gives it in the browser.
  *
- * The routes are the app's shape without its loaders: `/`, `/today`,
+ * The routes are the app's shape without its loaders: `/` (the landing,
+ * outside the shell), `/asks`, `/home`, `/today`, `/docs`, `/docs/$page`,
  * `/agents`, `/people/$handle` and `/$project` with its pages under it, so
  * the shell finds the project in `/datekit/ledger` and none in `/agents`.
  * The view itself is the root's component: it renders whatever the
@@ -39,8 +40,16 @@ const routesFor = (view: ReactNode, options: RenderOptions) => {
   const project = createRoute({ getParentRoute: () => root, path: "$project" });
 
   return root.addChildren([
-    createRoute({ getParentRoute: () => root, path: "/" }),
+    createRoute({
+      getParentRoute: () => root,
+      path: "/",
+      staticData: { shell: "bare" },
+    }),
+    createRoute({ getParentRoute: () => root, path: "asks" }),
+    createRoute({ getParentRoute: () => root, path: "home" }),
     createRoute({ getParentRoute: () => root, path: "today" }),
+    createRoute({ getParentRoute: () => root, path: "docs" }),
+    createRoute({ getParentRoute: () => root, path: "docs/$page" }),
     createRoute({ getParentRoute: () => root, path: "agents" }),
     createRoute({ getParentRoute: () => root, path: "people/$handle" }),
     project.addChildren([

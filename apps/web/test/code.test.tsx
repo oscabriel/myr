@@ -1526,7 +1526,7 @@ describe("a missing path", () => {
     );
 
     expect(markupOf(element)).toContain('data-refusal="UnknownRevision"');
-    expect(hrefsOf(markupOf(element))).toContain("/");
+    expect(hrefsOf(markupOf(element))).toContain("/asks");
   });
 });
 

@@ -8,6 +8,8 @@ import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
 import { KindName, ProjectName } from "@repo/protocol/ids";
 import { Option, Schema } from "effect";
 
+import { ASKS_PATH } from "../shared/paths.ts";
+
 /** Asks the viewer may take now: the one value `?take=` has. */
 export const Take = Schema.Literal("open");
 
@@ -80,7 +82,7 @@ export const frontPath = (filter: FrontFilterInput) => {
     })
   ).toString();
 
-  return search === "" ? "/" : `/?${search}`;
+  return search === "" ? ASKS_PATH : `${ASKS_PATH}?${search}`;
 };
 
 /** Whether `entry` passes every part of `filter`. */

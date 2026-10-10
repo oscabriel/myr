@@ -455,7 +455,7 @@ describe(NoSuchAsk, () => {
     const markup = markupOf(<NoSuchAsk project="datekit" />);
 
     expect(markup).toContain('href="/datekit"');
-    expect(markup).toContain('href="/"');
+    expect(markup).toContain('href="/asks"');
     expect(textOf(<NoSuchAsk project="datekit" />)).toContain("Open asks");
   });
 
@@ -481,7 +481,7 @@ describe(NoSuchAsk, () => {
     const markup = markupOf(<NoSuchAsk data={data} project="nowhere" />);
 
     expect(markup).not.toContain('href="/nowhere"');
-    expect(markup).toContain('href="/"');
+    expect(markup).toContain('href="/asks"');
   });
 
   it("says what its route gives it when a not-found carries no refusal", () => {

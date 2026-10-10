@@ -2,7 +2,8 @@
  * The front page's reads on the server, and its answer to an agent: what
  * its loader reads (the open asks, each family's parent in full, and the
  * events of each project that holds a family), and its GET, which gives a
- * request for Markdown `llms.txt`.
+ * request for Markdown `llms.txt`. The landing at `/` answers an agent the
+ * same way, and sends a reader who carries a session to their home.
  */
 import { Client } from "@repo/protocol/contracts";
 import { Ask } from "@repo/protocol/domain/ask";
@@ -14,8 +15,11 @@ import { Array as Arr, DateTime, Effect, Option, Schema, Stream } from "effect";
 import { wantsMarkdown } from "../features/ask/markdown.ts";
 import { familiesIn } from "../features/front/families.ts";
 import { variedByAccept } from "../features/front/markdown.ts";
+import { HOME_PATH } from "../features/shared/paths.ts";
+import { KEPT_NOWHERE } from "./edge-cache.ts";
 import { frontLlmsHandler } from "./llms.ts";
 import type { ClientFor } from "./llms.ts";
+import { credentialFrom } from "./session.ts";
 
 /** What the loader carries from the server: the asks, the families' parents in full, and their projects' events. */
 export const FrontPageData = Schema.Struct({
@@ -105,3 +109,34 @@ export const frontPageHandler =
           )
         )
       : next();
+
+/** The answer that sends a signed-in reader from the landing to their home. */
+const toHome = () =>
+  new Response(null, {
+    headers: { "cache-control": KEPT_NOWHERE, location: HOME_PATH },
+    status: 302,
+  });
+
+/**
+ * The landing's GET: a request for Markdown gets `llms.txt`, as the front
+ * page's does; a reader who carries a session goes to `/home`, an answer
+ * kept nowhere (the edge never stores an answer to a request with a
+ * cookie); anyone else gets the landing, the same page for every reader.
+ */
+export const landingHandler =
+  (clientFor: ClientFor, platformUrl: string) =>
+  <Next>({
+    next,
+    request,
+  }: {
+    readonly next: () => Next;
+    readonly request: Request;
+  }): Promise<Response> | Next => {
+    if (wantsMarkdown(request)) {
+      return frontPageHandler(clientFor, platformUrl)({ next, request });
+    }
+
+    return Option.isSome(credentialFrom(request))
+      ? Promise.resolve(toHome())
+      : next();
+  };

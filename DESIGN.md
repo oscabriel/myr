@@ -207,7 +207,7 @@ The web's look, as built, for anyone adding or changing a page. Tokens live in `
 
 The web is the console an operator keeps open beside a terminal: on the left, where you are; in the middle, what is waiting; on the right, the typed facts of the thing in your hand. Every screen answers three questions in this order: what state is it in, whose move is it, and what runs next. The answer to the last one is always a command you can copy. A reader selects one thing (a row, with a click or `j`), reads its state and its next command in the inspector, copies the command (`1`), and goes back to the terminal.
 
-The pages are for operating, not persuading. Density is set by a decider clearing Today on a phone and a contributor reading a refusal beside a terminal: two-line rows, 14 px metadata, a 13 px floor. Colour means state and nothing else, and always sits beside a word and a mark, so a page read in grayscale, by a screen reader or in a terminal says the same thing. One paper ground runs under all three panes; panes are parted by hairlines, never floated, rounded or shadowed. The landing's stamp is the one authored moment.
+The pages are for operating, not persuading. One page is the exception: the landing at `/`, drawn outside the shell, says what the platform is and leads to the open asks (see "The landing"). Density is set by a decider clearing Today on a phone and a contributor reading a refusal beside a terminal: two-line rows, 14 px metadata, a 13 px floor. Colour means state and nothing else, and always sits beside a word and a mark, so a page read in grayscale, by a screen reader or in a terminal says the same thing. One paper ground runs under all three panes; panes are parted by hairlines, never floated, rounded or shadowed. The landing's stamp is the one authored moment.
 
 Rejected on purpose: the developer-forge dashboard (floating rounded panels on a grey ground, cards in a grid, stat tiles, a blue link colour, pill badges, avatar stacks, coloured file icons), its glossy cousin (dark glass, blur, glows, gradients), and the terminal costume (green on black, monospace for everything). Monospace appears only where the text is what a terminal prints or takes: commands, refusal transcripts, trailers, SHAs, paths, ids, env keys and code.
 
@@ -332,14 +332,14 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 ### Rail (`Rail`)
 
 - **Character:** where you are, always in the same place.
-- **Shape:** the wordmark row (44 px, linking `/`); the site's sections, each a 32 px row of a 16 px mark and its word (Asks, Today with the count of decisions waiting for a signed-in decider, For agents); "Projects" over one 32 px row per project, its posture's mark and short word at the row's end; the current project's sections indented under it (Asks with its open count, Code, Landings, Refs, Policy, Ledger, Env shape); "All projects" opening the switcher after the first eight; the session (handle or Sign in) and a Keys button pinned at the foot.
+- **Shape:** the wordmark row (44 px, linking `/`, the landing); the site's sections, each a 32 px row of a 16 px mark and its word (Home, Asks at `/asks`, Today with the count of decisions waiting for a signed-in decider, Docs, For agents); "Projects" over one 32 px row per project, its posture's mark and short word at the row's end; the current project's sections indented under it (Asks with its open count, Code, Landings, Refs, Policy, Ledger, Env shape); "All projects" opening the switcher after the first eight; the session (handle or Sign in) and a Keys button pinned at the foot.
 - **Current item:** the surface fill, ink at 600, `aria-current`. Never a coloured bar or an accent.
 - **Code form:** a route that fills the rail's slot (`staticData.rail`: the tree on tree, blob and why; the changed files on a commit and a finish) folds the site's sections and projects into a Menu button on the wordmark row and the project's sections into a one-line disclosure, and the slot fills the rest.
 
 ### Top bar and bottom bar
 
 - **Top bar** (below 1120 px): on a tablet, 48 px, Menu, the wordmark, the current project as a switcher, the session; on a phone, 44 px, Back to the page above on a subject page (else the wordmark) and the project's switcher.
-- **Bottom bar** (phones): fixed, 56 px plus the safe area, `<nav aria-label="Sections">`, four items each a mark over its 13 px word: Asks, Today, Projects (the switcher as a full-height sheet), More (For agents, the project's sections, Keys, the session). The current item is ink at 600 with a 2 px ink rule on its top edge.
+- **Bottom bar** (phones): fixed, 56 px plus the safe area, `<nav aria-label="Sections">`, five items each a mark over its 13 px word: Home, Asks, Today, Projects (the switcher as a full-height sheet), More (Docs, For agents, the project's sections, Keys, the session). The current item is ink at 600 with a 2 px ink rule on its top edge.
 
 ### Context bar, page head and toolbar
 
@@ -444,6 +444,12 @@ The platform's own label, never rewritten, through the state badge: a lock mark 
 - **Links:** every link between pages is the router's (`AppLink`), preloading on hover or focus, so moving never reloads the document; the page being read is `aria-current="page"`. Links in running text are ink, underlined in the hairline colour, ink on hover; links in rows and the rail are not underlined. A skip link to `#main` is the first tab stop.
 - **Keys:** `?` opens the keys dialog with the switch "Single-key shortcuts: On / Off" (kept in this browser, on by default); `j`/`k` move through a list's rows (and from 1120 px select them), Enter opens; `J`/`K` move between files on code, commit and finish pages; `1`–`9` copy the page's numbered commands, the inspector's first; Escape closes a sheet or clears the selection. No key acts in a field, a combobox or the tree's filter. Every key has a pointer twin.
 - **Selection:** in the address (`?ask=`, `?decision=`), replaced in history, so a selected row and its facts render on the server and can be shared.
+
+### The landing
+
+- **Where:** `/`, the one page outside the shell (its route's `staticData: { shell: "bare" }`); the front page is `/asks`. A reader who carries a session is sent to `/home` before it is drawn.
+- **Shape:** one centred column on the paper ground, parted by hairlines like any page. Its first action is the link to the open asks; its second, the install line as a command to copy. Its evidence is real output, set in mono as a terminal prints it: a refusal transcript from `git push`, not an illustration of one.
+- **Rules:** every rule on this page holds there too. No cards, tiles, big numbers, gradients, glows, kickers or page-load choreography; colour only for state, beside its word; nothing below 13 px; no word from the banned list below.
 
 ### The platform's own pages
 

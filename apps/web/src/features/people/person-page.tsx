@@ -14,7 +14,7 @@ import { Array, Order } from "effect";
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { projectPath } from "../shared/paths.ts";
+import { ASKS_PATH, projectPath } from "../shared/paths.ts";
 import { MetaCode, MetaLine, Row, RowGroup } from "../shared/row.tsx";
 import { projectSections } from "../shared/shell/sections.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
@@ -159,7 +159,7 @@ export const PersonView = ({
     >
       {projects.length === 0 ? (
         <EmptyState
-          onward={<AppLink to="/">Open asks</AppLink>}
+          onward={<AppLink to={ASKS_PATH}>Open asks</AppLink>}
           title="No credited landings yet."
         />
       ) : (
@@ -180,7 +180,7 @@ export const PersonView = ({
 export const NoSuchPersonView = () => (
   <PageShell title="No such person">
     <EmptyState
-      onward={<AppLink to="/">Open asks</AppLink>}
+      onward={<AppLink to={ASKS_PATH}>Open asks</AppLink>}
       title="A handle is letters, digits and dashes, starting with a letter or digit, and this address names none."
     />
   </PageShell>
