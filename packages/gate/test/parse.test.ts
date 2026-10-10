@@ -225,7 +225,7 @@ const rows: readonly {
     name: "a push to a layer's repo, which W6 opens to its writers",
     refusals: [new DirectPush({ ref: main })],
   },
-  // A fork takes branches only: every other ref is the platform's to write.
+  // A fork takes branches only: every other ref is the platform's or no one's.
   {
     facts: testFacts({ ref: tag }),
     name: "the claimant's push of a tag to their claim's fork",

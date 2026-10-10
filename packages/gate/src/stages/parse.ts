@@ -63,8 +63,8 @@ const branchPrefix = "refs/heads/";
 
 /**
  * Main moves only by a landing: no push reaches a canonical ref.
- * A fork takes branches only: its notes, tags and the platform's own refs
- * are written by the platform, so a push of any ref outside `refs/heads/`
+ * A fork takes branches only: its notes and merge refs are the platform's
+ * to write and a tag is no one's, so a push of any ref outside `refs/heads/`
  * is a direct push, whoever makes it. A working fork takes pushes from its
  * owner only, and a layer's repo takes none here: its writers arrive with
  * the visibility cartridge.

@@ -9,8 +9,9 @@
  * is live, and a decider's commits on top when they finish its answer; a
  * working fork takes its owner's. A fork takes branches only: a push of its
  * notes, a tag or the platform's own refs is `DirectPush`, whoever makes it,
- * and refuses the whole push. The platform writes those refs straight to
- * the store (`RepoHost.push`, the Lander), never through the gateway.
+ * and refuses the whole push. The platform writes its notes and merge refs
+ * straight to the store (`RepoHost.push`, the Lander), never through the
+ * gateway; no one writes a fork's tags.
  * `ProjectApi` has no read of the push facts the gate's parse stage takes
  * (the policy, the ask, the claim), so `admit` asks the claimant's own
  * `status` and leaves the full parse to `review`, where `recordPush` runs it.
