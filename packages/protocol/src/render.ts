@@ -56,10 +56,17 @@ const reason = Match.typeTags<Refusal, string>()({
   AttemptsExhausted: ({ area, resetsAt }) =>
     `no attempts left on ${area} until ${DateTime.formatIso(resetsAt)}`,
   CapReached: capReason,
-  ChecksFailed: ({ lane, logRef }) =>
-    logRef === ChecksFailed.withheld
-      ? `the ${lane} checks failed; their log was withheld`
-      : `the ${lane} checks failed on the answer; run next in a clone of the fork to see the failure; the log is kept as ${logRef}, for the answer's claimant and the project's deciders to read with ${Brand.cli} evidence`,
+  ChecksFailed: ({ lane, logRef, next }) => {
+    if (logRef === ChecksFailed.withheld) {
+      return `the ${lane} checks failed; their log was withheld`;
+    }
+
+    // `evidence` lets in the answerer and the project's deciders alone; the
+    // local check keeps no log for it to read.
+    return ChecksFailed.isLocal(logRef)
+      ? `the ${lane} checks failed on this commit; run ${next} to see the failure`
+      : `the ${lane} checks failed on the answer; run ${next} in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's deciders read with ${Brand.cli} evidence`;
+  },
   ClaimLapsed: ({ ask }) => `your claim on ${ask} lapsed`,
   DecisionClosed: ({ decision }) =>
     `${decision} was already decided, or expired to its default`,

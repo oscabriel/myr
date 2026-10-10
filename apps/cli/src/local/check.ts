@@ -791,7 +791,13 @@ export const check = Command.make(
       const failed = run.lanes.flatMap(({ command, lane, result }) =>
         result === "passed"
           ? []
-          : [new ChecksFailed({ lane, logRef: `local:${lane}`, next: command })]
+          : [
+              new ChecksFailed({
+                lane,
+                logRef: ChecksFailed.localRef(lane),
+                next: command,
+              }),
+            ]
       );
 
       for (const evidence of run.evidence) {

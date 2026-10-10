@@ -401,18 +401,37 @@ describe(explain, () => {
   });
 
   // The lane's command reproduces the failure in a clone of the fork; the log
-  // is read through `evidence`, which lets in the answer's claimant and the
-  // project's deciders alone.
-  it("says the checks failed on the answer, how to see it, and where the log is kept", () => {
+  // is read through `evidence`, which lets in the answerer and the project's
+  // deciders alone.
+  it("says the checks failed on the answer, the command that shows it, and where the log is kept", () => {
     const logRef = "datekit/push-2222222/unit#1";
 
     expect(
       explain([new ChecksFailed({ lane: "unit", logRef, next: "bun test" })])
     ).toStrictEqual([
-      `ChecksFailed: the unit checks failed on the answer; run next in a clone of the fork to see the failure; the log is kept as ${logRef}, for the answer's claimant and the project's deciders to read with ${Brand.cli} evidence`,
+      `ChecksFailed: the unit checks failed on the answer; run bun test in a clone of the fork to see the failure; the log is kept as ${logRef}, which the answerer and the project's deciders read with ${Brand.cli} evidence`,
       "  next: bun test",
       "  retryable: no",
     ]);
+  });
+
+  // The CLI's local check ran the lane on this machine: no log was kept, so
+  // nothing points at `evidence`.
+  it("says a lane the local check ran failed here, with no kept log to read", () => {
+    const lines = explain([
+      new ChecksFailed({
+        lane: "unit",
+        logRef: ChecksFailed.localRef("unit"),
+        next: "bun test",
+      }),
+    ]);
+
+    expect(lines).toStrictEqual([
+      "ChecksFailed: the unit checks failed on this commit; run bun test to see the failure",
+      "  next: bun test",
+      "  retryable: no",
+    ]);
+    expect(lines.join("\n")).not.toContain("evidence");
   });
 
   // `today` across every project raises it too, so it names no project.

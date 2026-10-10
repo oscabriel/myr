@@ -209,6 +209,8 @@ export class StaleLayer extends Schema.TaggedError<StaleLayer>()("StaleLayer", {
 
 // Checks
 
+const LOCAL = "local:";
+
 /** A check failed; `next` is the command that reproduces it. */
 export class ChecksFailed extends Schema.TaggedError<ChecksFailed>()(
   "ChecksFailed",
@@ -223,6 +225,15 @@ export class ChecksFailed extends Schema.TaggedError<ChecksFailed>()(
    * was never kept, and nothing names the item.
    */
   static readonly withheld = "withheld";
+
+  /**
+   * The `logRef` of a lane the CLI's local check ran on the caller's machine:
+   * its log was kept nowhere, so `evidence` has nothing to read.
+   */
+  static readonly localRef = (lane: string) => `${LOCAL}${lane}`;
+
+  /** Whether `logRef` names a lane the local check ran. */
+  static readonly isLocal = (logRef: string) => logRef.startsWith(LOCAL);
 }
 
 /** A held-back check failed; only its area and suite are disclosed. */
