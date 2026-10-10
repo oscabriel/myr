@@ -1,22 +1,21 @@
 /**
  * How long a browser may keep a page, by what the page is addressed by: a
- * page at a full commit id never changes, a page at `main` or a tag changes
- * with the next landing, and a page about the person reading it is theirs
- * alone. A route gives one of these as its `headers`.
+ * page at `main`, a tag or a commit changes with the next landing (a
+ * commit's page carries its landing), and a page about the person reading
+ * it is theirs alone. A route gives one of these as its `headers`.
  */
 import { describe, expect, it } from "@effect/vitest";
 
-import {
-  branchPage,
-  immutablePage,
-  personalPage,
-} from "../src/server/cache-headers.ts";
+import * as CacheHeaders from "../src/server/cache-headers.ts";
+import { branchPage, personalPage } from "../src/server/cache-headers.ts";
 
 describe("a page's cache headers", () => {
-  it("keeps a page at a full commit id for a year, never asking again", () => {
-    expect(immutablePage).toStrictEqual({
-      "Cache-Control": "public, max-age=31536000, immutable",
-    });
+  it("keeps no page for good: each one carries what a landing may change", () => {
+    expect(
+      Object.values(CacheHeaders).filter((headers) =>
+        headers["Cache-Control"].includes("immutable")
+      )
+    ).toStrictEqual([]);
   });
 
   it("keeps a page at main or a tag briefly, and serves it stale while it asks again", () => {

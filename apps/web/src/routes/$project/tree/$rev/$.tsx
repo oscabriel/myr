@@ -10,7 +10,6 @@ import { AsyncResult } from "effect/reactivity";
 
 import { CodeRail } from "../-code-rail.tsx";
 import { FilesButton } from "../-files-button.tsx";
-import { codePageHeaders } from "../-headers.ts";
 import { softLanding } from "../-soft-landing.ts";
 import { lastChangesAtom } from "../../../../client/code.ts";
 import {
@@ -22,6 +21,7 @@ import { CodeNotFound } from "../../../../features/code/not-found.tsx";
 import { TreeView } from "../../../../features/code/tree-view.tsx";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
+import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { readFolderWithReadme } from "../../../../server/folder.ts";
 
@@ -119,8 +119,7 @@ const TreePage = () => {
 export const Route = createFileRoute("/$project/tree/$rev/$")({
   staticData: { rail: CodeRail },
   loader: ({ params }) => treePage({ data: params }),
-  headers: ({ loaderData, params }) =>
-    codePageHeaders(params.rev, loaderData !== undefined),
+  headers: () => branchPage,
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({
       title: `${_splat === undefined || _splat === "" ? project : _splat} at ${rev}`,

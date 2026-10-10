@@ -17,10 +17,10 @@ import { CodeNotFound } from "../../../../features/code/not-found.tsx";
 import { NumberedLines } from "../../../../features/code/numbered-lines.tsx";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
+import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { CodeRail } from "../../tree/-code-rail.tsx";
 import { FilesButton } from "../../tree/-files-button.tsx";
-import { codePageHeaders } from "../../tree/-headers.ts";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
 // A file at a revision, read on the server with the commit that last
@@ -150,8 +150,7 @@ export const Route = createFileRoute("/$project/blob/$rev/$")({
 
     return page;
   },
-  headers: ({ loaderData, params }) =>
-    codePageHeaders(params.rev, loaderData !== undefined),
+  headers: () => branchPage,
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({ title: `${_splat ?? project} at ${rev}` }),
   component: BlobPage,

@@ -43,7 +43,7 @@ import {
 import { constVoid } from "effect/Function";
 import { Atom, Reactivity } from "effect/reactivity";
 
-import { framedClient } from "../surfaces.ts";
+import { framedClient, sharedRuntime } from "../surfaces.ts";
 import { lastSeq, projectEventsAtom } from "./events.ts";
 import { keys } from "./keys.ts";
 
@@ -71,8 +71,8 @@ const framedWatch = Layer.effect(
   )
 );
 
-/** The runtime `watchAtom` runs on; a test gives it a stub `ProjectWatch`. */
-export const watchRuntime = Atom.runtime(framedWatch);
+/** The runtime `watchAtom` runs on, sharing the page's and the rail's `Reactivity`; a test gives it a stub `ProjectWatch`. */
+export const watchRuntime = sharedRuntime(framedWatch);
 
 /** The keys an event of `project` changes. */
 export const keysOf = (
@@ -80,13 +80,15 @@ export const keysOf = (
   event: ProjectEvent
 ): readonly string[] =>
   ProjectEvent.match(event, {
-    AskClosed: () => keys.project(project),
-    AskOpened: () => keys.project(project),
+    // The project list's open asks and last landing (the rail's) too.
+    AskClosed: () => [...keys.project(project), ...keys.front()],
+    AskOpened: () => [...keys.project(project), ...keys.front()],
     Claimed: () => keys.project(project),
     Decided: () => keys.project(project),
     Judged: ({ ask }) => keys.ask(project, ask),
     Landed: () => [
       ...keys.project(project),
+      ...keys.front(),
       ...keys.code(project),
       ...keys.policy(project),
     ],

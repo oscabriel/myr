@@ -62,9 +62,8 @@ import {
   readTreePage,
   Route as TreeRoute,
 } from "../src/routes/$project/tree/$rev/$.tsx";
-import { codePageHeaders } from "../src/routes/$project/tree/-headers.ts";
 import { Route as WhyRoute } from "../src/routes/$project/why/$rev/$.tsx";
-import { branchPage, immutablePage } from "../src/server/cache-headers.ts";
+import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
@@ -320,6 +319,10 @@ const inspectorOf = (markup: string) =>
 /** How many times `part` appears in `text`. */
 const countIn = (text: string, part: string) => text.split(part).length - 1;
 
+/** The `<a …>` that reads `label`, in `markup`. */
+const anchorOf = (markup: string, label: string) =>
+  new RegExp(`<a\\b[^>]*>${label}</a>`, "u").exec(markup)?.[0];
+
 describe(TreeView, () => {
   const page = (
     <TreeView
@@ -400,6 +403,24 @@ describe(TreeView, () => {
   it("leaves the file tree to the browser", () => {
     expect(markupOf(page)).not.toContain("<file-tree-container");
   });
+
+  it.effect(
+    "links the folder's history with its path as the search, current on that page",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          `/datekit/commits/${TAG_SEGMENT}?path=src%2Fformat%2Flocale`,
+          <TreeView listing={nested} now={now} project={datekit} rev={TAG} />
+        );
+
+        const history = anchorOf(markup, "History");
+
+        expect(history).toContain(
+          `href="/datekit/commits/${TAG_SEGMENT}?path=src%2Fformat%2Flocale"`
+        );
+        expect(history).toContain('aria-current="page"');
+      })
+  );
 });
 
 /** Where a file's facts link their permalink, on the page of `mode`. */
@@ -421,6 +442,27 @@ describe("a file's facts", () => {
     expect(permalink("code")).toBe(`/datekit/blob/${AT}/README.md`);
     expect(permalink("why")).toBe(`/datekit/why/${AT}/README.md`);
   });
+
+  // The history's `?path=` is the address's search, not part of its path:
+  // the router then reads `main` as the revision (a hover fetches the right
+  // page) and marks the link on the history it leads to.
+  it.effect(
+    "link the file's history with its path as the search, current on that page",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/datekit/commits/main?path=README.md",
+          <FileFacts file={readme} now={now} project={datekit} rev="main" />
+        );
+
+        const history = anchorOf(markup, "History of this file");
+
+        expect(history).toContain(
+          'href="/datekit/commits/main?path=README.md"'
+        );
+        expect(history).toContain('aria-current="page"');
+      })
+  );
 });
 
 describe(BlobView, () => {
@@ -1488,25 +1530,15 @@ describe("a missing path", () => {
   });
 });
 
-/** The line a code page's route answers its headers with. */
-const headersLine = (path: string) =>
-  `headers: ({ loaderData, params }) => codePageHeaders(params.${
-    path.includes("/commit/") ? "sha" : "rev"
-  }, loaderData !== undefined)`;
+/** The line every code page's route answers its headers with. */
+const HEADERS_LINE = "headers: () => branchPage";
 
 describe("a code page's caching", () => {
-  it("keeps a page at a whole commit id for good, and a page at main or a tag briefly", () => {
-    expect(
-      [AT, "main", TAG].map((rev) => codePageHeaders(rev, true))
-    ).toStrictEqual([immutablePage, branchPage, branchPage]);
-  });
-
-  it("keeps a page that found nothing only briefly, even at a whole commit id, since a later landing or import may fill it", () => {
-    expect(
-      [AT, "main"].map((rev) => codePageHeaders(rev, false))
-    ).toStrictEqual([branchPage, branchPage]);
-  });
-
+  // A commit never changes, but its page is more than the commit: it
+  // carries the commit's landing, which the project records only after
+  // main has moved (a read between the two finds none), and words such as
+  // "2 minutes ago", reckoned from when it was read. Kept for good, such a
+  // page would never show the landing, and its times would never move.
   const routes: Readonly<Record<string, string>> = import.meta.glob(
     "../src/routes/$project/{tree,blob,why}/$rev/$.tsx",
     { eager: true, import: "default", query: "?raw" }
@@ -1517,13 +1549,14 @@ describe("a code page's caching", () => {
     { eager: true, import: "default", query: "?raw" }
   );
 
-  it("answers each code page with the headers its revision earns, and a commit's for good", () => {
+  it("keeps each code page briefly, even at a whole commit id, and reads it again behind it", () => {
     const pages = { ...routes, ...logs };
 
     expect(Object.keys(pages)).toHaveLength(5);
     expect(
       Object.entries(pages).flatMap(([path, source]) =>
-        source.replaceAll(/\s+/gu, " ").includes(headersLine(path))
+        source.replaceAll(/\s+/gu, " ").includes(HEADERS_LINE) &&
+        !source.includes("immutable")
           ? []
           : [path]
       )

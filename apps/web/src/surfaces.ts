@@ -20,17 +20,30 @@
 import { surfaced } from "@repo/protocol/contracts";
 import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
-import { AtomRpc } from "effect/reactivity";
+import { Atom, AtomRpc } from "effect/reactivity";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 
 /** The contracts whose `Surfaces` annotation includes `web`. */
 export const webContracts = surfaced("web");
+
+/**
+ * The runtimes the web's atoms run on, over one memo map for every
+ * registry, so they share one `Reactivity`: a page's atoms live in a
+ * registry of the page's own (`client/seeded.ts`) and the rail's in the
+ * root's, and a write or an event heard on the page must refetch the
+ * rail's counts too. A layer built for several registries is released
+ * when the last of them lets it go.
+ */
+export const sharedRuntime = Atom.context({
+  memoMap: Layer.makeMemoMapUnsafe(),
+});
 
 /** The web's contracts as atoms: `ContractsClient.query(tag, payload, options)` and `ContractsClient.mutation(tag)`. */
 export class ContractsClient extends AtomRpc.Service<ContractsClient>()(
   "web/ContractsClient",
   {
     group: webContracts,
+    runtime: sharedRuntime,
     // JSON, as the platform's `/rpc` serves it.
     protocol: RpcClient.layerProtocolHttp({ url: "/rpc" }).pipe(
       Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson])

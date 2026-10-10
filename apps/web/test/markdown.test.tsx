@@ -12,6 +12,7 @@ import {
   createRootRoute,
   createRouter,
 } from "@tanstack/react-router";
+import { Effect } from "effect";
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
 
@@ -20,6 +21,7 @@ import {
   RepoText,
   isMarkdownPath,
 } from "../src/features/markdown/markdown.tsx";
+import { renderAt } from "./render.tsx";
 
 const sha = CommitSha.make("0123456789abcdef0123456789abcdef01234567");
 
@@ -152,6 +154,37 @@ describe("links and images in docs/README.md", () => {
     expect(anchor).toContain(`href="/p/blob/${sha}/x?raw=1#L3"`);
     expect(anchor).toContain('aria-current="page"');
   });
+
+  // A file's path may hold the router's own marks (`routes/$project/…`,
+  // `bin/$.sh`): they are the file's name, never a param the router fills
+  // from the page being read.
+  it.effect(
+    "opens a path holding $ or braces as the README names it, inside the app's router",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/p",
+          <RepoMarkdown
+            at={sha}
+            dir=""
+            project={project}
+            source="[r](src/routes/$project/index.tsx) [s](bin/$.sh) [o](src/{-$x}.ts#L2)"
+          />
+        );
+
+        expect(
+          anchorsOf(markup).map((anchor) =>
+            decodeURIComponent(
+              /href="(?<href>[^"]*)"/u.exec(anchor)?.groups?.href ?? ""
+            )
+          )
+        ).toStrictEqual([
+          `/p/blob/${sha}/src/routes/$project/index.tsx`,
+          `/p/blob/${sha}/bin/$.sh`,
+          `/p/blob/${sha}/src/{-$x}.ts#L2`,
+        ]);
+      })
+  );
 
   it("leaves an external link as written, opened with no referrer", () => {
     const [anchor] = anchorsOf(readme("[c](https://e.org)"));

@@ -18,8 +18,8 @@ import type { LogShow } from "../../../features/code/log-view.tsx";
 import { CodeNotFound } from "../../../features/code/not-found.tsx";
 import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
+import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
-import { codePageHeaders } from "../tree/-headers.ts";
 
 // The landings: the log from a revision, a page at a time (`?from=` is
 // where the page starts), only the commits that changed `?path=` when
@@ -116,8 +116,7 @@ export const Route = createFileRoute("/$project/commits/$rev")({
   }),
   loaderDeps: ({ search }) => ({ from: search.from, path: search.path }),
   loader: ({ deps, params }) => logPage({ data: { ...params, ...deps } }),
-  headers: ({ loaderData, params }) =>
-    codePageHeaders(params.rev, loaderData !== undefined),
+  headers: () => branchPage,
   head: ({ params: { project, rev } }) =>
     pageHead({ title: `${project}: landings on ${rev}` }),
   component: LogPage,

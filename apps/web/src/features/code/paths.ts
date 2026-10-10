@@ -34,7 +34,11 @@ export const rawHref = (project: ProjectName, rev: string, path: string) =>
 export const whyHref = (project: ProjectName, rev: string, path: string) =>
   under(`/${project}/why/${revSegment(rev)}`, path);
 
-/** The log from `rev`: only the commits that changed `path` when given, from the `from`th. */
+/**
+ * The log from `rev`: only the commits that changed `path` when given, from
+ * the `from`th. An `AppLink` takes the bare log as its `to` and the query
+ * as its `search`, or the router reads the query as part of the revision.
+ */
 export const commitsHref = (
   project: ProjectName,
   rev: string,

@@ -16,6 +16,7 @@ import type { ComponentProps, ReactNode } from "react";
 import Markdown, { defaultUrlTransform } from "react-markdown";
 import type { Components, ExtraProps } from "react-markdown";
 
+import { literalPath } from "../shared/link.tsx";
 import { rehypePluginsFor, remarkPlugins } from "./pipeline.ts";
 
 export interface RepoMarkdownProps {
@@ -55,9 +56,11 @@ const ProjectLink = ({
     </a>
   ) : (
     // `href`, not `to`: the router parses a built href into path, query
-    // and fragment, where `to` would keep `?raw=1#L3` inside the path. A
-    // `string` target makes `to` optional in the Link's props.
-    <Link<RegisteredRouter, string, string> {...props} href={href}>
+    // and fragment, where `to` would keep `?raw=1#L3` inside the path. Its
+    // `$` and braces escaped (`literalPath`): a file's name, never a param
+    // the router fills from the page being read. A `string` target makes
+    // `to` optional in the Link's props.
+    <Link<RegisteredRouter, string, string> {...props} href={literalPath(href)}>
       {children}
     </Link>
   );

@@ -15,18 +15,20 @@ import { CodeNotFound } from "../../../features/code/not-found.tsx";
 import { PlainDiff } from "../../../features/code/plain-diff.tsx";
 import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
+import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 import { CommitRail } from "../tree/-code-rail.tsx";
 import { CommitPageData } from "../tree/-commit-files.ts";
 import { FilesButton } from "../tree/-files-button.tsx";
-import { codePageHeaders } from "../tree/-headers.ts";
 
 // One commit and what it changed, read on the server, with the territory
 // of the ask it answered (the diff's stats split by it): the page arrives
 // with the landing and the diff as plain text, and the browser draws the
 // diff over it, the changed files as a tree in the rail. A commit never
-// changes, so neither does its page: it is kept for good (a 404 only
-// briefly), and the router never reads it again.
+// changes, but its page carries its landing, which the project records
+// after main has moved, and times reckoned from the read: a browser keeps
+// it briefly, as a page at `main`. Within a visit the router keeps what it
+// read, so a change of layout never reads the diff again.
 
 interface CommitParams {
   readonly project: string;
@@ -190,10 +192,10 @@ export const Route = createFileRoute("/$project/commit/$sha")({
     style: search.style === "split" ? ("split" as const) : undefined,
   }),
   loader: ({ params }) => commitPage({ data: params }),
-  // A commit never changes: what was read stays fresh for good.
+  // The diff never changes: a layout change (`?style=split`) rewrites the
+  // address, and must not read it again.
   staleTime: Number.POSITIVE_INFINITY,
-  headers: ({ loaderData, params }) =>
-    codePageHeaders(params.sha, loaderData !== undefined),
+  headers: () => branchPage,
   head: ({ params: { project, sha } }) =>
     pageHead({ title: `${project}: commit ${sha.slice(0, 7)}` }),
   component: CommitPage,
