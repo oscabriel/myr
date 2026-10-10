@@ -106,7 +106,7 @@ const repairs = {
     todo: "Nothing: the platform could not run the checks, and runs them again.",
   },
   Weakened: {
-    todo: "Take the marker out, or give it a reason for a decider to weigh; never raise a ratchet.",
+    todo: "Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet.",
   },
 } as const satisfies Record<AnswerTag, Repair>;
 
