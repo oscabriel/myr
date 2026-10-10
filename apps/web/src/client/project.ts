@@ -13,6 +13,8 @@ import { AsyncResult, Atom } from "effect/reactivity";
 import { ContractsClient } from "../surfaces.ts";
 import { projectEventsAtom } from "./events.ts";
 import { keys } from "./keys.ts";
+import { ledgerAtom } from "./ledger.ts";
+import { policyAtom } from "./policy.ts";
 import { watchAtom } from "./watch.ts";
 
 export const asksAtom = Atom.family((project: ProjectName) =>
@@ -68,13 +70,7 @@ export const followedAtom = Atom.family((key: string) =>
  * the server, where the page draws what its loader read.
  */
 export const projectLedgerAtom = Atom.family((project: ProjectName) =>
-  Atom.withServerValueInitial(
-    ContractsClient.query(
-      "ledger",
-      { project },
-      { reactivityKeys: [...keys.ledger(project), ...keys.project(project)] }
-    )
-  )
+  Atom.withServerValueInitial(ledgerAtom(project))
 );
 
 /**
@@ -83,11 +79,5 @@ export const projectLedgerAtom = Atom.family((project: ProjectName) =>
  * what its loader read.
  */
 export const projectPolicyAtom = Atom.family((project: ProjectName) =>
-  Atom.withServerValueInitial(
-    ContractsClient.query(
-      "projectPolicy",
-      { project },
-      { reactivityKeys: [...keys.policy(project), ...keys.project(project)] }
-    )
-  )
+  Atom.withServerValueInitial(policyAtom(project))
 );
