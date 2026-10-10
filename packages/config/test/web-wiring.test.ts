@@ -160,6 +160,30 @@ describe("the web Worker's wrangler.jsonc", () => {
         }
       })
   );
+
+  // ADR 0026: the edge keeps the web's answers only behind its entry, which
+  // decides what may be kept; `vite dev` keeps nothing; and a kept page
+  // never outlives its Worker version, whose hashed assets it names.
+  it.effect(
+    "enters through src/server.ts, and turns Workers Cache on in each stage alone, per version",
+    () =>
+      Effect.gen(function* () {
+        const config = yield* presentJson("apps/web/wrangler.jsonc", Wrangler);
+        const top = yield* presentJson("apps/web/wrangler.jsonc", Block);
+
+        expect(top.main).toBe("src/server.ts");
+        expect("cache" in top, "the local stage keeps nothing").toBeFalsy();
+
+        for (const stage of stages) {
+          expect(
+            config.env[stage]?.cache,
+            `${stage} keeps answers`
+          ).toStrictEqual({
+            enabled: true,
+          });
+        }
+      })
+  );
 });
 
 describe("the web Worker's generated Env", () => {
