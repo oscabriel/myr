@@ -13,31 +13,60 @@ import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import type { Duration } from "effect";
+import type { DateTime, Duration } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
 
+import { DevClock, devStart, startEndingNow } from "./clock.ts";
 import { withFixtures } from "./fixtures.ts";
 import type { FixtureMode } from "./fixtures.ts";
+import { fixturesNow } from "./fixtures/vellum.ts";
 import { devHandlers } from "./handlers.ts";
-import { seedDev } from "./seed.ts";
+import { seedDev, seedEnd } from "./seed.ts";
 import { devSessions } from "./sessions.ts";
-import { devWorld } from "./world.ts";
+import { devWorldAt } from "./world.ts";
 
-/** How a dev world is made: with the fixtures or without, and how soon the live landing comes. */
+/** How a dev world is made: with the fixtures or without, how soon the live landing comes, and when it is. */
 export interface DevWorldOptions {
   readonly fixtures?: FixtureMode;
   /** In `live` mode, how long after vellum's `watch` is first answered its lint child lands. */
   readonly liveAfter?: Duration.Duration;
+  /**
+   * Where the world's time stands. `"fixed"`, as a test builds it: the
+   * calendar as written, from `devStart`, and the clock standing where the
+   * seed left it. `"present"`, as the running dev server builds it: the
+   * calendar moved so the seed's last instant is the minute the world is
+   * built in, and the clock running on from there in real time.
+   */
+  readonly time?: "fixed" | "present";
 }
 
-/** A fresh world, seeded; with the fixtures when `options` asks for them. */
-const seededWorld = (options: DevWorldOptions) => {
+/** The calendar's instant a seed with `fixtures` leaves the clock at. */
+const seedEndOf = (fixtures: FixtureMode) =>
+  fixtures === "off" ? seedEnd : fixturesNow;
+
+/** A fresh world whose calendar starts at `start`, seeded; with the fixtures when `fixtures` asks for them. */
+const seededFrom = (start: DateTime.Utc, options: DevWorldOptions) => {
   const { fixtures = "off" } = options;
 
   return fixtures === "off"
-    ? Layer.effectDiscard(seedDev).pipe(Layer.provideMerge(devWorld))
-    : withFixtures(fixtures, options.liveAfter);
+    ? Layer.effectDiscard(seedDev).pipe(Layer.provideMerge(devWorldAt(start)))
+    : withFixtures(fixtures, options.liveAfter, start);
+};
+
+/** A fresh world, seeded, at the time `options` asks for. */
+const seededWorld = (options: DevWorldOptions) => {
+  const { fixtures = "off", time = "fixed" } = options;
+
+  return time === "fixed"
+    ? seededFrom(devStart, options)
+    : Layer.unwrap(
+        Effect.map(startEndingNow(seedEndOf(fixtures)), (start) =>
+          Layer.effectDiscard(
+            Effect.flatMap(Effect.service(DevClock), (clock) => clock.run)
+          ).pipe(Layer.provideMerge(seededFrom(start, options)))
+        )
+      );
 };
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);

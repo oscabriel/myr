@@ -10,10 +10,10 @@
  * and flagging, the decider declining two, and someone pushing straight to
  * `main`, reported as the push event would be.
  *
- * Each step happens at its own whole minute after the world's start
- * (`devMinute`), so every time the world holds comes from one fixed instant
- * and two seeds give the same world. The world then serves at the last
- * step's minute.
+ * Each step happens at its own whole minute of the world's calendar
+ * (`devMinute`), so every time the world holds comes from one start and
+ * two seeds on the same start give the same world. The world then serves
+ * from the last step's minute, `seedEnd`.
  *
  * What the service can't be brought to through its methods is left out:
  * a `Finish` decision (nothing opens one yet) and an
@@ -112,15 +112,16 @@ const pushed = (repo: RepoName, input: Parameters<typeof commitOf>[0]) =>
 const filesOf = (repo: RepoName, commit: CommitSha) =>
   Effect.flatMap(filesAt(repo, commit), Effect.fromOption);
 
-/** Moves the world's clock to `minute` minutes after its start. */
+/** Moves the world's clock to the calendar's minute `minute`. */
 const at = (minute: number) =>
   Effect.flatMap(Effect.service(DevClock), (clock) =>
     clock.set(devMinute(minute))
   );
 
 /**
- * A project made and adopted at `when`: its initializer creates it, pushes
- * its first commit a minute later, and the gateway reports the push.
+ * A project made and adopted at the calendar's instant `when`: its
+ * initializer creates it, pushes its first commit a minute later, and the
+ * gateway reports the push.
  */
 export const startedAt = (
   project: ProjectName,
@@ -151,7 +152,7 @@ export const startedAt = (
     return { api, landed };
   });
 
-/** A project made and adopted at `minute` minutes after the world's start. */
+/** A project made and adopted at the calendar's minute `minute`. */
 const started = (
   project: ProjectName,
   initializer: Handle,
@@ -315,6 +316,12 @@ const seedBurrow = Effect.flatMap(
   (api) => opened(api, burrowPeople.decider, burrow.asks, 17)
 );
 
+/** The seed's last minute: the stray push. */
+const STRAY_MINUTE = 21;
+
+/** The calendar's instant the seed leaves the world's clock at. */
+export const seedEnd = devMinute(STRAY_MINUTE);
+
 /**
  * Someone with access to datekit's storage pushes to `main` past the
  * platform, and the push event reports it: a `StrayPush` decision whose
@@ -325,7 +332,7 @@ const strayPush = (api: ProjectApi) =>
     const host = yield* RepoHost;
     const repo = RepoName.make(datekit.project);
 
-    yield* at(21);
+    yield* at(STRAY_MINUTE);
 
     const tip = yield* Effect.fromOption(
       Option.fromNullishOr((yield* host.refs(repo)).get(mainRef))

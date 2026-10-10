@@ -10,7 +10,8 @@
  * with a draft is drafted in process as it is made, by the memory drafter
  * scripted with the canned draft (`@repo/drafting/draft-runs/canned`),
  * and goes red first on the scripted Checker. One clock, set by the seed,
- * is the world's time (`clock.ts`).
+ * is the world's time, its calendar starting where the world is told to
+ * (`clock.ts`).
  */
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -26,6 +27,7 @@ import type { Projects } from "@repo/project/projects";
 import { ProjectsMemory } from "@repo/project/projects/memory";
 import { RulesEvaluatorJson } from "@repo/rules/rules-evaluator/json";
 import { Layer } from "effect";
+import type { DateTime } from "effect";
 
 import { DevChecker } from "./checker.ts";
 import { devClockAt, devStart } from "./clock.ts";
@@ -57,23 +59,26 @@ export type DevCore = Layer.Success<typeof core> | DevClock;
 /**
  * A fresh world whose front page and handlers read through `between`,
  * which may stand in for the projects and the projected events it is
- * given (the fixtures do, `fixtures.ts`). Built twice, it is two worlds.
+ * given (the fixtures do, `fixtures.ts`), with its calendar starting at
+ * `start`. Built twice, it is two worlds.
  */
 export const devWorldWith = <Out, E, In extends DevCore>(
-  between: Layer.Layer<Out, E, In>
+  between: Layer.Layer<Out, E, In>,
+  start: DateTime.Utc = devStart
 ) =>
   Layer.mergeAll(DevFrontPage, EvidenceStoreMemory).pipe(
     Layer.provideMerge(between),
     Layer.provideMerge(core),
-    Layer.provideMerge(devClockAt(devStart)),
+    Layer.provideMerge(devClockAt(start)),
     Layer.fresh
   );
 
 /**
  * A fresh, empty world: its projects, the front page over them, the lane
  * logs, the repo host the people's git pushes to, and its clock at
- * `devStart`. Built twice, it is two worlds.
+ * `start`. Built twice, it is two worlds.
  */
-export const devWorld: Layer.Layer<
-  Projects | FrontPage | EvidenceStore | RepoHost | DevClock
-> = devWorldWith(Layer.empty);
+export const devWorldAt = (
+  start: DateTime.Utc
+): Layer.Layer<Projects | FrontPage | EvidenceStore | RepoHost | DevClock> =>
+  devWorldWith(Layer.empty, start);

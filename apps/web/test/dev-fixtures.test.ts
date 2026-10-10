@@ -22,6 +22,9 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { RpcClient, RpcSerialization } from "effect/rpc";
 
 import { askStates, familyMarks } from "../src/client/events.ts";
+import type { FixtureMode } from "../src/dev/fixtures.ts";
+import { fixturesNow } from "../src/dev/fixtures/vellum.ts";
+import { seedEnd } from "../src/dev/seed.ts";
 import type { DevWorldOptions } from "../src/dev/server.ts";
 import { devServer } from "../src/dev/server.ts";
 import { devToken } from "../src/dev/sessions.ts";
@@ -719,5 +722,132 @@ describe("the dev world's live landing", seededWorlds, () => {
           );
         })
       )
+  );
+});
+
+/** `at`'s distance from `from`, in milliseconds. */
+const millisFrom = (from: DateTime.DateTime, at: DateTime.DateTime) =>
+  Duration.toMillis(DateTime.distance(from, at));
+
+/**
+ * The open decisions ines-v takes across her projects, and two instants
+ * the world stamps on what it makes, a little apart: its present then.
+ */
+const timesIn = (options: DevWorldOptions) =>
+  inWorld(options, (as) =>
+    Effect.gen(function* () {
+      const ines = yield* as(signedIn("ines-v"));
+      const { decisions } = yield* ines.today({});
+
+      const proposedAt = (handle: string, want: string) =>
+        Effect.flatMap(as(signedIn(handle)), (client) =>
+          Effect.map(
+            client.proposeAsk({ project: ProjectName.make("datekit"), want }),
+            ({ proposal }) => proposal.openedAt
+          )
+        );
+
+      const first = yield* proposedAt("tove", "datekit prints ISO weeks.");
+
+      yield* Effect.sleep(Duration.millis(20));
+
+      const second = yield* proposedAt("sefa", "datekit reads RFC 2822 dates.");
+
+      return { decisions, first, second };
+    })
+  );
+
+/**
+ * A fixed world stands at the calendar's `end` once seeded; a world at
+ * the present has every instant moved by one whole number of minutes, so
+ * `end` is the minute it was built in, and its clock runs on from there,
+ * with every decision still to come.
+ */
+const placedAtThePresent = (fixtures: FixtureMode, end: DateTime.Utc) =>
+  Effect.gen(function* () {
+    const fixed = yield* timesIn({ fixtures });
+
+    expect([fixed.first, fixed.second]).toStrictEqual([end, end]);
+
+    const before = DateTime.startOf(yield* DateTime.now, "minute");
+    const present = yield* timesIn({ fixtures, time: "present" });
+    const after = yield* DateTime.now;
+
+    const shift = millisFrom(
+      fixed.decisions[0]?.openedAt ?? end,
+      present.decisions[0]?.openedAt ?? end
+    );
+
+    const unshifted = (at: DateTime.Utc) =>
+      DateTime.subtractDuration(at, Duration.millis(shift));
+
+    expect(present.decisions.length).toBeGreaterThan(0);
+    expect(
+      present.decisions.map(({ expiresAt, id, openedAt }) => [
+        id,
+        unshifted(openedAt),
+        unshifted(expiresAt),
+      ])
+    ).toStrictEqual(
+      fixed.decisions.map(({ expiresAt, id, openedAt }) => [
+        id,
+        openedAt,
+        expiresAt,
+      ])
+    );
+    expect(shift % Duration.toMillis(Duration.minutes(1))).toBe(0);
+
+    const anchor = DateTime.addDuration(end, Duration.millis(shift));
+
+    expect([
+      millisFrom(before, anchor) >= 0,
+      millisFrom(anchor, DateTime.startOf(after, "minute")) >= 0,
+      millisFrom(anchor, present.first) >= 0,
+      millisFrom(present.first, present.second) > 0,
+      millisFrom(present.second, after) >= 0,
+      present.decisions.every(
+        ({ expiresAt }) => millisFrom(present.second, expiresAt) > 0
+      ),
+    ]).toStrictEqual([true, true, true, true, true, true]);
+  });
+
+describe("the dev world's time", seededWorlds, () => {
+  it.live(
+    "ends the default seed at the present minute and runs on from it",
+    () => placedAtThePresent("off", seedEnd)
+  );
+
+  it.live(
+    "ends the fixtures' story at the present minute and runs on from it",
+    () => placedAtThePresent("on", fixturesNow)
+  );
+
+  it.live("lands the live child at the present on a running clock", () =>
+    Effect.gen(function* () {
+      const before = yield* DateTime.now;
+
+      const landed = yield* inWorld(
+        { fixtures: "live", liveAfter: Duration.zero, time: "present" },
+        (as) =>
+          Effect.gen(function* () {
+            const anyone = yield* as();
+
+            yield* eventsOf(anyone);
+
+            return closedIn(yield* eventsOf(anyone)).find(
+              (event) => event.ask === "retire-old-tokenizer-vellum-lint"
+            );
+          })
+      );
+
+      const after = yield* DateTime.now;
+
+      expect(landed).toBeDefined();
+      expect([
+        millisFrom(DateTime.startOf(before, "minute"), landed?.at ?? before) >=
+          0,
+        millisFrom(landed?.at ?? after, after) >= 0,
+      ]).toStrictEqual([true, true]);
+    })
   );
 });
