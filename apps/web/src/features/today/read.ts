@@ -51,6 +51,10 @@ const isRefusal = Schema.is(Refusal);
 
 const isUnauthenticated = Schema.is(Unauthenticated);
 
+/** Whether a read failed because its reader is not signed in. */
+export const isSignedOut = (cause: Cause.Cause<unknown>) =>
+  Option.exists(Cause.findErrorOption(cause), isUnauthenticated);
+
 /** A failed read of Today, as the page says it. */
 export const readOfCause = (cause: Cause.Cause<unknown>): TodayRead => {
   const error = Cause.findErrorOption(cause);
@@ -59,7 +63,7 @@ export const readOfCause = (cause: Cause.Cause<unknown>): TodayRead => {
     return TodayRead.cases.Refused.make({ refusal: error.value });
   }
 
-  return Option.exists(error, isUnauthenticated)
+  return isSignedOut(cause)
     ? TodayRead.cases.SignedOut.make({})
     : TodayRead.cases.Unreachable.make({});
 };

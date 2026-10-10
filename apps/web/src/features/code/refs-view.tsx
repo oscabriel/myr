@@ -12,7 +12,6 @@
  * tag and its count, sits above the tags, and `?package=` lists one
  * package's tags alone.
  */
-import type { ClaimState } from "@repo/protocol/domain/claim";
 import { packageOf } from "@repo/protocol/domain/code";
 import type {
   ForkRef,
@@ -29,8 +28,14 @@ import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { answerPath, personPath } from "../shared/paths.ts";
-import { MetaCode, MetaLine, Row, RowGroup, RowList } from "../shared/row.tsx";
-import type { RowState } from "../shared/row.tsx";
+import {
+  CLAIM_STATES,
+  MetaCode,
+  MetaLine,
+  Row,
+  RowGroup,
+  RowList,
+} from "../shared/row.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { Pager } from "./pager.tsx";
 import { commitHref, shortSha, treeHref } from "./paths.ts";
@@ -113,15 +118,6 @@ const Person = ({ handle }: { readonly handle: ForkRef["handle"] }) => (
     <HandleLink handle={handle} />
   </span>
 );
-
-/** Each claim state as a row says it: its mark and its word. */
-const CLAIM_STATES = {
-  answered: { mark: "landed", word: "Answered" },
-  lapsed: { mark: "notNeeded", word: "Lapsed" },
-  live: { mark: "claimed", word: "Claimed" },
-  released: { mark: "notNeeded", word: "Given up" },
-  warned: { mark: "waiting", word: "Warned, no push lately" },
-} as const satisfies Record<ClaimState, RowState>;
 
 /** A group of rows, or what it would hold said plainly when it holds none. */
 const Group = ({

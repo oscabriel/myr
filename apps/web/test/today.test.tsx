@@ -11,7 +11,6 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { Client, Contracts } from "@repo/protocol/contracts";
 import { RefNameText } from "@repo/protocol/domain/common";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision, Today } from "@repo/protocol/domain/decision";
@@ -29,15 +28,11 @@ import {
   RepoPath,
 } from "@repo/protocol/ids";
 import { DecisionClosed, NotDecider } from "@repo/protocol/refusal";
-import { Cause, DateTime, Effect, Layer, Schema } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { Cause, DateTime, Effect, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
-import { RpcClient, RpcSerialization } from "effect/rpc";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { devServer } from "../src/dev/server.ts";
-import { devToken } from "../src/dev/sessions.ts";
 import {
   allowedChoices,
   consequenceOf,
@@ -53,6 +48,7 @@ import {
   TodayView,
 } from "../src/features/today/today-page.tsx";
 import { Route, todayHeaders } from "../src/routes/today.tsx";
+import { fixturesClient } from "./dev-client.ts";
 
 /** The entities React writes for text, and what each reads as. */
 const ENTITIES: ReadonlyMap<string, string> = new Map([
@@ -574,38 +570,6 @@ describe(consequenceOf, () => {
 });
 
 const vellum = ProjectName.make("vellum");
-
-/** A `Client` of a fresh dev world with its fixtures, signed in as `handle` (or as nobody). */
-const fixturesClient = (handle?: string) =>
-  Layer.unwrap(
-    Effect.gen(function* () {
-      const { dispose, handler } = devServer({ fixtures: "on" });
-
-      yield* Effect.addFinalizer(() => Effect.promise(dispose));
-
-      return Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
-        Layer.provide(
-          RpcClient.layerProtocolHttp({
-            transformClient: HttpClient.mapRequest((request) =>
-              handle === undefined
-                ? request
-                : HttpClientRequest.bearerToken(
-                    request,
-                    devToken(Handle.make(handle))
-                  )
-            ),
-            url: "http://localhost/rpc",
-          })
-        ),
-        Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson]),
-        Layer.provide(
-          Layer.succeed(FetchHttpClient.Fetch, (input, init) =>
-            handler(new Request(input, init))
-          )
-        )
-      );
-    })
-  );
 
 /** The page the route renders from what `readToday` sent, as the browser decodes it. */
 const pageFrom = (encoded: typeof TodayPageData.Encoded) => {

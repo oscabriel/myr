@@ -20,6 +20,7 @@
  * `data-*` a list carries sits on the row's `<li>`.
  */
 import type { AskListing } from "@repo/protocol/domain/ask";
+import type { ClaimState } from "@repo/protocol/domain/claim";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { MouseEvent, ReactNode } from "react";
@@ -297,7 +298,7 @@ export const RowGroup = ({
   /** The group's facts after its name: a project's posture. */
   readonly facts?: ReactNode;
   /** Its counts at the end, in words: "7 open · 6 to take". */
-  readonly counts?: string;
+  readonly counts?: string | undefined;
   /** The group's name in words, for its list (the name may be a link). */
   readonly label?: string;
   /** What the header sticks under. */
@@ -360,6 +361,29 @@ export const useRowSelection = (
   return { clear, focused, select, selected };
 };
 
+/** An answer's latest outcome as a row's state: a retryable refusal turns back. */
+export const outcomeState = (outcome: Outcome): RowState =>
+  Outcome.match(outcome, {
+    AwaitingDecision: (): RowState => ({ mark: "waiting", word: "Waiting" }),
+    AwaitingFinish: (): RowState => ({ mark: "waiting", word: "Waiting" }),
+    Checking: (): RowState => ({ mark: "checking", word: "Checking" }),
+    Landed: (): RowState => ({ mark: "landed", word: "Landed" }),
+    Refused: ({ refusals }): RowState => ({
+      mark: refusals[0].retryable ? "retry" : "refused",
+      word: "Refused",
+    }),
+    WaitingOnParent: (): RowState => ({ mark: "waiting", word: "Waiting" }),
+  });
+
+/** Each claim state as a row says it: its mark and its word. */
+export const CLAIM_STATES = {
+  answered: { mark: "landed", word: "Answered" },
+  lapsed: { mark: "notNeeded", word: "Lapsed" },
+  live: { mark: "claimed", word: "Claimed" },
+  released: { mark: "notNeeded", word: "Given up" },
+  warned: { mark: "waiting", word: "Warned, no push lately" },
+} as const satisfies Record<ClaimState, RowState>;
+
 /** Where an open ask stands for its reader, as a row's state. */
 const askState = (
   listing: AskListing,
@@ -371,17 +395,7 @@ const askState = (
   }
 
   if (progress?.latest !== undefined) {
-    return Outcome.match(progress.latest, {
-      AwaitingDecision: (): RowState => ({ mark: "waiting", word: "Waiting" }),
-      AwaitingFinish: (): RowState => ({ mark: "waiting", word: "Waiting" }),
-      Checking: (): RowState => ({ mark: "checking", word: "Checking" }),
-      Landed: (): RowState => ({ mark: "landed", word: "Landed" }),
-      Refused: ({ refusals }): RowState => ({
-        mark: refusals[0].retryable ? "retry" : "refused",
-        word: "Refused",
-      }),
-      WaitingOnParent: (): RowState => ({ mark: "waiting", word: "Waiting" }),
-    });
+    return outcomeState(progress.latest);
   }
 
   if (listing.claimed || progress?.claimant !== undefined) {
