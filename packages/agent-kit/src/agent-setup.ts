@@ -24,6 +24,7 @@ import { groups } from "@repo/protocol/refusal";
 import { Array as Arr, Schema } from "effect";
 
 import type { CommandDoc } from "./command-doc.ts";
+import { installCommand } from "./install.ts";
 import { mcpServersFor } from "./platform.ts";
 import { span } from "./sections.ts";
 import { code, listed, page, printJson, table } from "./text.ts";
@@ -103,8 +104,7 @@ const theCli = ({
     {
       label: "Install",
       language: "sh",
-      // The web forwards the CLI's downloads to the platform, as `llms.txt` says.
-      text: `curl -fsSL ${webUrl}/install.sh | sh`,
+      text: installCommand(webUrl),
     },
     ...(has(commands, "login")
       ? [

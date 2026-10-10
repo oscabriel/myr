@@ -24,6 +24,7 @@ import type { Posture } from "@repo/protocol/posture";
 import { Array as Arr, Option } from "effect";
 
 import type { CommandDoc } from "./command-doc.ts";
+import { installCommand } from "./install.ts";
 
 type Command = CommandDoc;
 
@@ -224,7 +225,7 @@ export const frontLlms = (input: {
     "## Install the CLI",
     "",
     "```sh",
-    `curl -fsSL ${served}/install.sh | sh`,
+    installCommand(served),
     "```",
     "",
     ...Option.match(commandOf(commands, "login"), {
