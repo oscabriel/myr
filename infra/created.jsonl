@@ -106,3 +106,93 @@
 {"at":"2026-10-10T18:26:23.693Z","by":"smoke","kind":"project","name":"smoke-20261010-182620","stage":"dev-oscabriel"}
 {"at":"2026-10-10T18:26:23.723Z","by":"smoke","kind":"repo","name":"smoke-20261010-182620","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
 {"at":"2026-10-10T18:27:25.025Z","by":"smoke","kind":"repo","name":"smoke-20261010-182620--parse-year--bram","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T20:59:08.792Z","by":"import","kind":"project","name":"hono","stage":"dev-oscabriel"}
+{"at":"2026-10-10T20:59:08.792Z","by":"import","kind":"repo","name":"hono","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T20:59:25.095Z","by":"import","kind":"repo","name":"hono","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:01:00.423Z","by":"import","kind":"project","name":"express","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:01:00.423Z","by":"import","kind":"repo","name":"express","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:01:18.325Z","by":"import","kind":"repo","name":"express","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:02:46.187Z","by":"import","kind":"project","name":"fastify","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:02:46.187Z","by":"import","kind":"repo","name":"fastify","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:02:59.126Z","by":"import","kind":"repo","name":"fastify","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:03:57.875Z","by":"import","kind":"project","name":"zustand","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:03:57.875Z","by":"import","kind":"repo","name":"zustand","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:04:06.502Z","by":"import","kind":"repo","name":"zustand","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:04:57.154Z","by":"import","kind":"project","name":"immer","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:04:57.154Z","by":"import","kind":"repo","name":"immer","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:05:06.667Z","by":"import","kind":"repo","name":"immer","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:05:57.434Z","by":"import","kind":"project","name":"nanoid","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:05:57.434Z","by":"import","kind":"repo","name":"nanoid","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:06:04.523Z","by":"import","kind":"repo","name":"nanoid","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:06:58.077Z","by":"import","kind":"project","name":"commander","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:06:58.077Z","by":"import","kind":"repo","name":"commander","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:07:02.748Z","by":"import","kind":"repo","name":"commander","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:07:56.191Z","by":"import","kind":"project","name":"execa","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:07:56.191Z","by":"import","kind":"repo","name":"execa","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:08:03.619Z","by":"import","kind":"repo","name":"execa","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:08:45.771Z","by":"import","kind":"project","name":"chalk","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:08:45.771Z","by":"import","kind":"repo","name":"chalk","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:08:51.282Z","by":"import","kind":"repo","name":"chalk","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:09:29.677Z","by":"import","kind":"project","name":"mitt","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:09:29.677Z","by":"import","kind":"repo","name":"mitt","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:09:33.956Z","by":"import","kind":"repo","name":"mitt","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:10:10.678Z","by":"import","kind":"project","name":"clsx","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:10:10.678Z","by":"import","kind":"repo","name":"clsx","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:10:14.070Z","by":"import","kind":"repo","name":"clsx","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:11:21.298Z","by":"import","kind":"project","name":"ripgrep","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:11:21.298Z","by":"import","kind":"repo","name":"ripgrep","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:11:27.956Z","by":"import","kind":"repo","name":"ripgrep","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:12:54.617Z","by":"import","kind":"project","name":"serde","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:12:54.617Z","by":"import","kind":"repo","name":"serde","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:13:06.992Z","by":"import","kind":"repo","name":"serde","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:14:14.516Z","by":"import","kind":"project","name":"axum","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:14:14.516Z","by":"import","kind":"repo","name":"axum","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:14:28.459Z","by":"import","kind":"repo","name":"axum","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:15:05.748Z","by":"import","kind":"project","name":"fd","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:15:05.748Z","by":"import","kind":"repo","name":"fd","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:15:12.779Z","by":"import","kind":"repo","name":"fd","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:15:45.141Z","by":"import","kind":"project","name":"hyperfine","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:15:45.141Z","by":"import","kind":"repo","name":"hyperfine","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:15:49.315Z","by":"import","kind":"repo","name":"hyperfine","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:16:44.807Z","by":"import","kind":"project","name":"bubbletea","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:16:44.807Z","by":"import","kind":"repo","name":"bubbletea","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:16:52.374Z","by":"import","kind":"repo","name":"bubbletea","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:17:55.456Z","by":"import","kind":"project","name":"fzf","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:17:55.456Z","by":"import","kind":"repo","name":"fzf","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:18:04.136Z","by":"import","kind":"repo","name":"fzf","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:18:34.711Z","by":"import","kind":"project","name":"cobra","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:18:34.711Z","by":"import","kind":"repo","name":"cobra","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:18:40.673Z","by":"import","kind":"repo","name":"cobra","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:19:27.532Z","by":"import","kind":"project","name":"gin","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:19:27.532Z","by":"import","kind":"repo","name":"gin","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:19:33.575Z","by":"import","kind":"repo","name":"gin","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:20:32.729Z","by":"import","kind":"project","name":"requests","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:20:32.729Z","by":"import","kind":"repo","name":"requests","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:20:43.924Z","by":"import","kind":"repo","name":"requests","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:21:44.000Z","by":"import","kind":"project","name":"flask","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:21:44.000Z","by":"import","kind":"repo","name":"flask","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:21:53.811Z","by":"import","kind":"repo","name":"flask","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:22:31.894Z","by":"import","kind":"project","name":"httpx","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:22:31.894Z","by":"import","kind":"repo","name":"httpx","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:22:40.046Z","by":"import","kind":"repo","name":"httpx","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:23:34.262Z","by":"import","kind":"project","name":"typer","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:23:34.262Z","by":"import","kind":"repo","name":"typer","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:23:38.693Z","by":"import","kind":"repo","name":"typer","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:24:28.520Z","by":"import","kind":"project","name":"jinja","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:24:28.520Z","by":"import","kind":"repo","name":"jinja","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:24:37.048Z","by":"import","kind":"repo","name":"jinja","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:26:01.399Z","by":"import","kind":"project","name":"lua","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:26:01.399Z","by":"import","kind":"repo","name":"lua","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:26:15.680Z","by":"import","kind":"repo","name":"lua","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:27:02.468Z","by":"import","kind":"project","name":"jq","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:27:02.468Z","by":"import","kind":"repo","name":"jq","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:27:09.881Z","by":"import","kind":"repo","name":"jq","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:27:33.485Z","by":"import","kind":"project","name":"kilo","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:27:33.485Z","by":"import","kind":"repo","name":"kilo","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:27:36.980Z","by":"import","kind":"repo","name":"kilo","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:28:27.545Z","by":"import","kind":"project","name":"sinatra","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:28:27.545Z","by":"import","kind":"repo","name":"sinatra","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:28:39.332Z","by":"import","kind":"repo","name":"sinatra","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
+{"at":"2026-10-10T21:29:41.679Z","by":"import","kind":"project","name":"nvm","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:29:41.679Z","by":"import","kind":"repo","name":"nvm","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel"}
+{"at":"2026-10-10T21:29:49.661Z","by":"import","kind":"repo","name":"nvm","namespace":"projects-dev-oscabriel","stage":"dev-oscabriel","note":"tags backfilled"}
