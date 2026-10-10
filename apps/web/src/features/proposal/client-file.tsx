@@ -18,7 +18,7 @@ const DraftedFileLater = import.meta.env.SSR
 
 /** The file's text as the server and a reader without JavaScript see it. */
 const Plain = ({ content }: { readonly content: string }) => (
-  <pre className="border-rule bg-surface overflow-x-auto border px-3 py-2 font-mono text-[0.8125rem] leading-5">
+  <pre className="border-rule bg-surface text-mono leading-code overflow-x-auto border px-3 py-2 font-mono">
     {content}
   </pre>
 );

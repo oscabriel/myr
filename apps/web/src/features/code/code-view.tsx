@@ -12,7 +12,6 @@
  * The library and Shiki's grammars are megabytes, so only the browser
  * loads this module (`client-code.tsx`); the Worker never bundles it.
  */
-import { DEFAULT_THEMES } from "@pierre/diffs";
 import { File } from "@pierre/diffs/react";
 import type { FileOptions, SelectedLineRange } from "@pierre/diffs/react";
 import { Option } from "effect";
@@ -20,6 +19,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { lineHash, parseLineHash } from "./line-hash.ts";
 import type { LineRange } from "./line-hash.ts";
+import { diffsOptions, registerCodeTheme } from "./pierre.ts";
+
+registerCodeTheme();
 
 /** Past this many characters a file is drawn without highlighting. */
 const HIGHLIGHT_LIMIT = 300_000;
@@ -92,6 +94,7 @@ export const FileCode = ({ path, sha, text }: FileCodeProps) => {
 
   const options = useMemo(
     (): FileOptions<undefined, undefined> => ({
+      ...diffsOptions,
       enableLineSelection: true,
       lineHoverHighlight: "number",
       onLineSelected: (range: SelectedLineRange | null) => {
@@ -117,9 +120,6 @@ export const FileCode = ({ path, sha, text }: FileCodeProps) => {
         reveal(pending.current);
       },
       overflow: "scroll",
-      preferredHighlighter: "shiki-js",
-      theme: DEFAULT_THEMES,
-      themeType: "system",
       tokenizeMaxLength: HIGHLIGHT_LIMIT,
     }),
     []

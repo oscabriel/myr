@@ -9,19 +9,19 @@
  *
  * Only the browser loads this module (`client-code.tsx`).
  */
-import { DEFAULT_THEMES } from "@pierre/diffs";
 import { MultiFileDiff } from "@pierre/diffs/react";
 import type { FileDiffOptions } from "@pierre/diffs/react";
 import type { ChangedFile } from "@repo/protocol/domain/code";
 
 import { diffAnchor } from "./paths.ts";
+import { diffsOptions, registerCodeTheme } from "./pierre.ts";
+
+registerCodeTheme();
 
 const optionsFor = (split: boolean): FileDiffOptions<undefined, undefined> => ({
+  ...diffsOptions,
   diffStyle: split ? "split" : "unified",
   overflow: "wrap",
-  preferredHighlighter: "shiki-js",
-  theme: DEFAULT_THEMES,
-  themeType: "system",
 });
 
 export interface DiffCodeProps {
@@ -54,7 +54,7 @@ export const DiffCode = ({ files, split }: DiffCodeProps) => {
         ) : (
           <section
             aria-label={file.path}
-            className="border-rule border border-dashed px-4 py-3 font-mono text-[0.8125rem]"
+            className="border-rule text-mono border border-dashed px-4 py-3 font-mono"
             id={diffAnchor(file.path)}
             key={file.path}
           >

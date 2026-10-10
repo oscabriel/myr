@@ -44,7 +44,7 @@ const stageNames = Match.type<StageName>().pipe(
 
 const short = (sha: string) => sha.slice(0, 7);
 
-const ID = "font-mono text-[0.8125rem]";
+const ID = "font-mono text-mono";
 
 interface Reading {
   readonly icon: LucideIcon;
@@ -249,10 +249,10 @@ export const StageStrip = ({
               strokeWidth={state === "current" ? 2.5 : 2}
             />
             <span className="flex min-w-0 flex-col leading-tight">
-              <span className="truncate text-xs font-medium">
+              <span className="text-label truncate">
                 {stageNames(name).label}
               </span>
-              <span className={`text-[0.6875rem] ${tones[state]}`}>{word}</span>
+              <span className={`text-label ${tones[state]}`}>{word}</span>
             </span>
           </li>
         );

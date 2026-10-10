@@ -17,7 +17,7 @@ const Lines = ({ refusal }: { readonly refusal: Refusal }) => {
   const prefix = `${refusal._tag}:`;
 
   return (
-    <samp className="block max-w-[96ch] font-mono text-[0.8125rem] leading-6 [overflow-wrap:anywhere] whitespace-pre-wrap">
+    <samp className="text-mono leading-terminal block max-w-[96ch] font-mono [overflow-wrap:anywhere] whitespace-pre-wrap">
       {explain([refusal]).map((line) => (
         <span className="block" key={line}>
           {line.startsWith(prefix) ? (

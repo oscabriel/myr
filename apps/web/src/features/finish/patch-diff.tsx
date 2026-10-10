@@ -7,17 +7,19 @@
  * The library and Shiki's grammars are megabytes, so only the browser loads
  * this module (`client-diff.tsx`); the Worker never bundles it.
  */
-import { DEFAULT_THEMES, parsePatchFiles } from "@pierre/diffs";
+import { parsePatchFiles } from "@pierre/diffs";
 import { FileDiff } from "@pierre/diffs/react";
 import type { FileDiffOptions } from "@pierre/diffs/react";
 import { useMemo } from "react";
 
+import { diffsOptions, registerCodeTheme } from "../code/pierre.ts";
+
+registerCodeTheme();
+
 const options = {
+  ...diffsOptions,
   diffStyle: "unified",
   overflow: "wrap",
-  preferredHighlighter: "shiki-js",
-  theme: DEFAULT_THEMES,
-  themeType: "system",
 } as const satisfies FileDiffOptions<undefined, undefined>;
 
 export const PatchDiffs = ({ patch }: { readonly patch: string }) => {

@@ -9,7 +9,6 @@
  * on the server too, so its markup can be checked; the page loads it only
  * in the browser (`client-why.tsx`), and the Worker never bundles it.
  */
-import { DEFAULT_THEMES } from "@pierre/diffs";
 import { File } from "@pierre/diffs/react";
 import type { FileOptions, LineAnnotation } from "@pierre/diffs/react";
 import type { WhyView } from "@repo/protocol/domain/code";
@@ -26,9 +25,12 @@ import {
 } from "@/components/ui/dialog";
 
 import { shortSha } from "../code/paths.ts";
+import { diffsOptions, registerCodeTheme } from "../code/pierre.ts";
 import { LandingDetails, RangeLinks, RangeSummary } from "./range-summary.tsx";
 import { linesWords, rowAt, rowsOf } from "./rows.ts";
 import type { WhyRow } from "./rows.ts";
+
+registerCodeTheme();
 
 /** Past this many characters a file is drawn without highlighting. */
 const HIGHLIGHT_LIMIT = 300_000;
@@ -105,14 +107,12 @@ export const WhyCode = ({ project, text, view }: WhyCodeProps) => {
 
   const options = useMemo(
     (): FileOptions<WhyRow, undefined> => ({
+      ...diffsOptions,
       lineHoverHighlight: "number",
       onLineNumberClick: ({ lineNumber }) => {
         setLine(lineNumber);
       },
       overflow: "scroll",
-      preferredHighlighter: "shiki-js",
-      theme: DEFAULT_THEMES,
-      themeType: "system",
       tokenizeMaxLength: HIGHLIGHT_LIMIT,
     }),
     []

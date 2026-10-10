@@ -7,10 +7,13 @@
  * The library and Shiki's grammars are megabytes, so only the browser
  * loads this module (`client-file.tsx`); the Worker never bundles it.
  */
-import { DEFAULT_THEMES } from "@pierre/diffs";
 import { File } from "@pierre/diffs/react";
 import type { FileOptions } from "@pierre/diffs/react";
 import { useMemo } from "react";
+
+import { diffsOptions, registerCodeTheme } from "../code/pierre.ts";
+
+registerCodeTheme();
 
 export interface DraftedFileProps {
   readonly path: string;
@@ -18,10 +21,8 @@ export interface DraftedFileProps {
 }
 
 const options: FileOptions<undefined, undefined> = {
+  ...diffsOptions,
   overflow: "scroll",
-  preferredHighlighter: "shiki-js",
-  theme: DEFAULT_THEMES,
-  themeType: "system",
 };
 
 export const DraftedFile = ({ content, path }: DraftedFileProps) => {

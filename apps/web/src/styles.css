@@ -20,6 +20,12 @@
   --sealed    held-back checks, layers and sealed evidence
   --muted     not reached, not needed, secondary text
 
+  Everything else is neutral: controls are ruled in --input, placeholders
+  in --skeleton, code is drawn in the low-chroma --syntax-* colours, and a
+  diff's added and removed lines in teal and rose (--diff-*), a family of
+  their own, so a deletion never reads as a refusal or an addition as a
+  landing. test/tokens.test.ts measures every pair that must hold.
+
   Light and dark follow the system setting (no toggle, no script, no flash):
   shadcn's `dark:` variant is the media query, not a class.
 */
@@ -92,6 +98,42 @@
   --refused: oklch(0.5 0.18 27);
   --sealed: oklch(0.46 0.13 305);
 
+  /* A control's border at 3:1 on paper (WCAG 2.2 SC 1.4.11), and the
+     stroke of a placeholder that holds a row's place. */
+  --input: oklch(0.62 0.01 258);
+  --skeleton: oklch(0.8 0.008 255);
+
+  /* Code: ink carries keywords, names and calls; strings lean teal and
+     constants olive, both too grey to be mistaken for a state. */
+  --syntax-keyword: var(--foreground);
+  --syntax-function: var(--foreground);
+  --syntax-parameter: var(--foreground);
+  --syntax-string: oklch(0.46 0.035 200);
+  --syntax-constant: oklch(0.47 0.035 110);
+  --syntax-comment: var(--muted);
+  --syntax-punctuation: var(--muted);
+  --syntax-link: var(--syntax-string);
+
+  /* A diff's lines. The sign colour draws the + and -, the bars and a
+     changed line's number; the line's tint is that colour mixed into the
+     paper as Pierre mixes it (12% here, 20% in the dark), so a server's
+     plain-text diff can match the drawing; emphasis marks the changed
+     words. */
+  --diff-add-sign: oklch(0.51 0.09 195);
+  --diff-add-bg: color-mix(in lab, var(--background) 88%, var(--diff-add-sign));
+  --diff-add-emphasis: color-mix(
+    in oklab,
+    var(--diff-add-sign) 18%,
+    transparent
+  );
+  --diff-del-sign: oklch(0.51 0.12 345);
+  --diff-del-bg: color-mix(in lab, var(--background) 88%, var(--diff-del-sign));
+  --diff-del-emphasis: color-mix(
+    in oklab,
+    var(--diff-del-sign) 18%,
+    transparent
+  );
+
   /* shadcn's names, mapped onto the roles above. */
   --card: var(--background);
   --card-foreground: var(--foreground);
@@ -106,7 +148,6 @@
   --accent-foreground: var(--foreground);
   --destructive: var(--refused);
   --border: var(--rule);
-  --input: var(--rule);
   --ring: var(--foreground);
   --radius: 0.125rem;
 }
@@ -126,6 +167,35 @@
     --refused: oklch(0.73 0.15 25);
     --sealed: oklch(0.76 0.11 305);
 
+    --input: oklch(0.55 0.01 258);
+    --skeleton: oklch(0.36 0.01 258);
+
+    --syntax-string: oklch(0.8 0.035 200);
+    --syntax-constant: oklch(0.82 0.035 110);
+
+    --diff-add-sign: oklch(0.74 0.08 195);
+    --diff-add-bg: color-mix(
+      in lab,
+      var(--background) 80%,
+      var(--diff-add-sign)
+    );
+    --diff-add-emphasis: color-mix(
+      in oklab,
+      var(--diff-add-sign) 26%,
+      transparent
+    );
+    --diff-del-sign: oklch(0.72 0.1 345);
+    --diff-del-bg: color-mix(
+      in lab,
+      var(--background) 80%,
+      var(--diff-del-sign)
+    );
+    --diff-del-emphasis: color-mix(
+      in oklab,
+      var(--diff-del-sign) 26%,
+      transparent
+    );
+
     --popover: oklch(0.235 0.009 258);
   }
 }
@@ -138,7 +208,35 @@
     "JetBrains Mono", ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo,
     monospace;
 
-  /* A fixed scale, ratio about 1.2: product type does not float. */
+  /*
+    The type scale, by role: a fixed rem scale, nothing fluid, and nothing
+    under 13 px. Mono is only for what a terminal prints or takes; its
+    three lines are inline (the token's own), a transcript
+    (`leading-terminal`) and code (`leading-code`, Pierre's 20 px).
+  */
+  --text-headline: 1.5rem;
+  --text-headline--line-height: 2rem;
+  --text-headline--letter-spacing: -0.015em;
+  --text-headline--font-weight: 600;
+  --text-title: 1.1875rem;
+  --text-title--line-height: 1.6rem;
+  --text-title--letter-spacing: -0.01em;
+  --text-title--font-weight: 600;
+  --text-want: 1rem;
+  --text-want--line-height: 1.5rem;
+  --text-body: 1rem;
+  --text-body--line-height: 1.55rem;
+  --text-ui: 0.875rem;
+  --text-ui--line-height: 1.3rem;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.15rem;
+  --text-label--font-weight: 500;
+  --text-mono: 0.8125rem;
+  --text-mono--line-height: 1.25rem;
+  --leading-terminal: 1.5rem;
+  --leading-code: 20px;
+
+  /* The earlier scale, which pages written before the one above still use. */
   --text-xs: 0.75rem;
   --text-xs--line-height: 1.1rem;
   --text-sm: 0.875rem;
@@ -162,6 +260,13 @@
   --color-waiting: var(--waiting);
   --color-refused: var(--refused);
   --color-sealed: var(--sealed);
+  --color-skeleton: var(--skeleton);
+  --color-diff-add-sign: var(--diff-add-sign);
+  --color-diff-add-bg: var(--diff-add-bg);
+  --color-diff-add-emphasis: var(--diff-add-emphasis);
+  --color-diff-del-sign: var(--diff-del-sign);
+  --color-diff-del-bg: var(--diff-del-bg);
+  --color-diff-del-emphasis: var(--diff-del-emphasis);
   --color-muted: var(--surface);
   --color-muted-foreground: var(--muted-foreground);
 
@@ -231,11 +336,14 @@
     outline-offset: 2px;
   }
 
+  /* Code shows what was typed: `=>` stays two characters. */
   code,
   kbd,
   samp,
   pre {
-    font-feature-settings: "calt" 0;
+    font-feature-settings:
+      "calt" 0,
+      "liga" 0;
   }
 
   time,
@@ -248,42 +356,86 @@
     Pierre draws code inside shadow roots: `diffs-container` (@pierre/diffs)
     and `file-tree-container` (@pierre/trees). Each reads these variables
     from its host, so setting them here maps both onto the tokens above,
-    and both follow the media-query dark mode with them.
+    and both follow the media-query dark mode with them. Nothing outside
+    them reaches in: the `code` rule above stops at the shadow root, so the
+    ligatures are switched off again here.
   */
   diffs-container {
+    /* Metrics: the mono token on Pierre's 20 px line. */
     --diffs-font-family: var(--font-mono);
-    --diffs-addition-color-override: var(--landed);
-    --diffs-deletion-color-override: var(--refused);
-    --diffs-modified-color-override: var(--waiting);
-    --diffs-selection-color-override: var(--checking);
+    --diffs-font-size: 0.8125rem;
+    --diffs-line-height: 20px;
+    --diffs-font-features: "calt" 0, "liga" 0;
+    --diffs-tab-size: 2;
+    --diffs-header-font-family: var(--font-sans);
+
+    /* The ground: code sits on the paper, gutter and all. */
+    --diffs-background: var(--background);
+    --diffs-foreground: var(--foreground);
+    --diffs-bg-context-override: var(--background);
+    --diffs-bg-context-gutter-override: var(--background);
+    --diffs-bg-separator-override: var(--surface);
+    --diffs-fg-number-override: var(--muted);
+    /* Pierre mixes a few percent of this into a hovered line, which lands
+       on the surface's tone in both schemes. */
+    --diffs-bg-hover-override: var(--foreground);
+    /* The viewer's own selection, checking's hue, as text selection is;
+       Pierre mixes it into the line at about a fifth. */
+    --diffs-bg-selection-override: var(--checking);
+    --diffs-bg-selection-number-override: var(--checking);
+
+    /* The token theme (features/code/pierre.ts) reads these. */
+    --diffs-token-keyword: var(--syntax-keyword);
+    --diffs-token-function: var(--syntax-function);
+    --diffs-token-parameter: var(--syntax-parameter);
+    --diffs-token-string: var(--syntax-string);
+    --diffs-token-string-expression: var(--syntax-string);
+    --diffs-token-constant: var(--syntax-constant);
+    --diffs-token-comment: var(--syntax-comment);
+    --diffs-token-punctuation: var(--syntax-punctuation);
+    --diffs-token-link: var(--syntax-link);
+
+    /* A diff's lines, in its own tints (Pierre mixes the line's from the
+       sign, as --diff-add-bg says). */
+    --diffs-addition-color-override: var(--diff-add-sign);
+    --diffs-bg-addition-override: var(--diff-add-sign);
+    --diffs-bg-addition-number-override: var(--diff-add-sign);
+    --diffs-bg-addition-emphasis-override: var(--diff-add-emphasis);
+    --diffs-deletion-color-override: var(--diff-del-sign);
+    --diffs-bg-deletion-override: var(--diff-del-sign);
+    --diffs-bg-deletion-number-override: var(--diff-del-sign);
+    --diffs-bg-deletion-emphasis-override: var(--diff-del-emphasis);
+    --diffs-modified-color-override: var(--muted);
   }
 
   file-tree-container {
-    --trees-font-family-override: var(--font-mono);
+    /* A tree is read like a list, in the UI's own face and size. */
+    --trees-font-family-override: var(--font-sans);
+    --trees-font-size-override: 0.875rem;
     --trees-bg-override: var(--background);
     --trees-bg-muted-override: var(--surface);
     --trees-fg-override: var(--foreground);
     --trees-fg-muted-override: var(--muted);
-    --trees-border-color-override: var(--rule);
+    --trees-input-bg-override: var(--background);
+    --trees-border-color-override: var(--input);
     --trees-border-radius-override: var(--radius);
-    --trees-accent-override: var(--checking);
+    --trees-accent-override: var(--foreground);
     --trees-focus-ring-color-override: var(--ring);
-    --trees-selected-bg-override: color-mix(
-      in oklch,
-      var(--checking) 14%,
-      transparent
-    );
+    --trees-selected-bg-override: var(--surface);
     --trees-selected-fg-override: var(--foreground);
-    --trees-status-added-override: var(--landed);
-    --trees-status-deleted-override: var(--refused);
-    --trees-status-modified-override: var(--waiting);
-    --trees-status-renamed-override: var(--checking);
+    /* One colour for every file's icon: a file's kind is not a state. */
+    --trees-file-icon-color: var(--muted);
+    /* A commit's changes, in the diff's tints; a change in place is muted. */
+    --trees-status-added-override: var(--diff-add-sign);
+    --trees-status-deleted-override: var(--diff-del-sign);
+    --trees-status-modified-override: var(--muted);
+    --trees-status-renamed-override: var(--muted);
     --trees-status-untracked-override: var(--muted);
     --trees-status-ignored-override: var(--muted);
-    --trees-git-added-color-override: var(--landed);
-    --trees-git-deleted-color-override: var(--refused);
-    --trees-git-modified-color-override: var(--waiting);
-    --trees-git-renamed-color-override: var(--checking);
+    --trees-git-added-color-override: var(--diff-add-sign);
+    --trees-git-deleted-color-override: var(--diff-del-sign);
+    --trees-git-modified-color-override: var(--muted);
+    --trees-git-renamed-color-override: var(--muted);
     --trees-git-untracked-color-override: var(--muted);
     --trees-git-ignored-color-override: var(--muted);
   }
@@ -297,4 +449,30 @@
       transition-duration: 0.01ms !important;
     }
   }
+}
+
+/*
+  Rendered Markdown (a README, a `.md` file) in the page's colours: the
+  typography plugin's palette, every role mapped to a token, so one set of
+  classes serves both schemes (features/markdown/markdown.tsx).
+*/
+@utility prose-tokens {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-lead: var(--muted);
+  --tw-prose-links: var(--foreground);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-counters: var(--muted);
+  --tw-prose-bullets: var(--muted);
+  --tw-prose-hr: var(--rule);
+  --tw-prose-quotes: var(--muted);
+  --tw-prose-quote-borders: var(--rule);
+  --tw-prose-captions: var(--muted);
+  --tw-prose-kbd: var(--foreground);
+  --tw-prose-kbd-shadows: var(--rule);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-pre-code: var(--foreground);
+  --tw-prose-pre-bg: var(--surface);
+  --tw-prose-th-borders: var(--input);
+  --tw-prose-td-borders: var(--rule);
 }

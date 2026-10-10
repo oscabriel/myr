@@ -278,6 +278,51 @@ describe("GitHub-flavoured Markdown", () => {
   });
 });
 
+/** The classes on the prose wrapper of a README with code and a title. */
+const proseClasses = () => {
+  const markup = rendered(
+    "# datekit\n\nCall `format()` first.\n\n```ts\nconst a = () => 1;\n```"
+  );
+
+  return new Set(
+    /<div class="(?<classes>[^"]*\bprose\b[^"]*)"/u
+      .exec(markup)
+      ?.groups?.classes?.split(" ")
+  );
+};
+
+describe("a README drawn in the page's own type", () => {
+  it("shows inline code without the backticks around it", () => {
+    const classes = proseClasses();
+
+    expect(classes.has("prose-code:before:content-none")).toBeTruthy();
+    expect(classes.has("prose-code:after:content-none")).toBeTruthy();
+  });
+
+  it("sets a code block on the surface, ruled in a hairline, in the mono size", () => {
+    const classes = proseClasses();
+
+    expect(classes.has("prose-pre:bg-surface")).toBeTruthy();
+    expect(classes.has("prose-pre:border-rule")).toBeTruthy();
+    expect(classes.has("prose-pre:text-mono")).toBeTruthy();
+  });
+
+  it("keeps lines to 70 characters", () => {
+    expect(proseClasses().has("max-w-[70ch]")).toBeTruthy();
+  });
+
+  it("sets its h1 at the title size, under the page's own headline", () => {
+    expect(proseClasses().has("prose-h1:text-title")).toBeTruthy();
+  });
+
+  it("colours it from the tokens, so both schemes come from one set of classes", () => {
+    const classes = proseClasses();
+
+    expect(classes.has("prose-tokens")).toBeTruthy();
+    expect(classes.has("dark:prose-invert")).toBeFalsy();
+  });
+});
+
 describe("a README that is not Markdown", () => {
   it.each([
     ["README.md", true],

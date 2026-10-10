@@ -33,7 +33,7 @@ export const CommandLine = ({ command }: { readonly command: string }) => {
   };
 
   return (
-    <div className="border-rule bg-surface flex w-fit max-w-full min-w-0 items-start gap-2 border py-1 pr-1 pl-3 font-mono text-[0.8125rem] leading-6">
+    <div className="border-rule bg-surface text-mono leading-terminal flex w-fit max-w-full min-w-0 items-start gap-2 border py-1 pr-1 pl-3 font-mono">
       <span aria-hidden="true" className="text-muted-foreground select-none">
         $
       </span>

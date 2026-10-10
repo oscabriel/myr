@@ -87,21 +87,19 @@ export const SiteFooter = ({
   <footer className="border-rule border-t">
     <div className={`${COLUMN} grid gap-6 py-8 sm:grid-cols-3`}>
       <section className="flex min-w-0 flex-col gap-2">
-        <h2 className="text-muted-foreground text-xs font-medium">
+        <h2 className="text-muted-foreground text-label">
           Plain git: clone any project
         </h2>
         <CommandLine command={`git clone ${platformUrl}/<project>.git`} />
       </section>
       <section className="flex min-w-0 flex-col gap-2">
-        <h2 className="text-muted-foreground text-xs font-medium">
+        <h2 className="text-muted-foreground text-label">
           Install the {Brand.cli} CLI
         </h2>
         <CommandLine command={`curl -fsSL ${platformUrl}/install.sh | sh`} />
       </section>
       <section className="flex min-w-0 flex-col gap-2">
-        <h2 className="text-muted-foreground text-xs font-medium">
-          Connect an agent
-        </h2>
+        <h2 className="text-muted-foreground text-label">Connect an agent</h2>
         <p className="text-sm">
           <a
             className="decoration-rule underline hover:decoration-current"

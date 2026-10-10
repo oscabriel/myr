@@ -14,6 +14,7 @@ import { FileTree, useFileTree } from "@pierre/trees/react";
 import { useEffect, useMemo } from "react";
 
 import { ancestorsOf } from "./paths.ts";
+import { treesOptions } from "./pierre.ts";
 
 export interface RepoTreeProps {
   /** The path the page shows, a file or a folder. */
@@ -37,7 +38,7 @@ export const RepoTree = ({
   const preparedInput = useMemo(() => prepareFileTreeInput(paths), [paths]);
 
   const { model } = useFileTree({
-    density: "compact",
+    ...treesOptions,
     fileTreeSearchMode: "hide-non-matches",
     id: "repo-tree",
     initialExpandedPaths:

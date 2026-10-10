@@ -22,9 +22,9 @@ export const inTrailerOrder = (credits: readonly Credit[]) =>
 export const assistedValue = ({ harness, model, verified }: AgentTrailer) =>
   `${harness}${model === undefined ? "" : `:${model}`} (${verified ? "verified" : "claimed"})`;
 
-const LINES = "flex flex-col gap-1 font-mono text-[0.8125rem] leading-6";
+const LINES = "flex flex-col gap-1 font-mono text-mono leading-terminal";
 
-const LABEL = "text-xs font-medium text-muted-foreground";
+const LABEL = "text-label text-muted-foreground";
 
 export const CreditTrailers = ({
   assisted,
