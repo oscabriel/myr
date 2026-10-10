@@ -322,8 +322,8 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
         }).toStrictEqual({
           claimed: { ask: parseIso, claimant: "alice" },
           landed: { ask: parseIso, author: "alice", shown },
-          replayed: ["1 AskOpened", "2 Landed"],
-          resumed: ["4 Pushed", "5 Judged", "6 Landed", "7 AskClosed"],
+          replayed: ["1 Landed", "2 AskOpened", "3 Landed"],
+          resumed: ["5 Pushed", "6 Judged", "7 Landed", "8 AskClosed"],
           unbroken: { first: true, second: true },
         });
         // Over JSON, the same events replay and end.
@@ -446,7 +446,7 @@ const noon = "2026-10-07T12:00:00Z";
 
 describe("a Project DO's watch room, over a fake state and a real shell", () => {
   it.effect(
-    "replays only the newest 500 events to a socket opened from 0 when 602 are recorded, in order, and tags it by the number it opened from",
+    "replays only the newest 500 events to a socket opened from 0 when 603 are recorded, in order, and tags it by the number it opened from",
     () =>
       Effect.gen(function* () {
         yield* advanceTo(noon);
@@ -455,8 +455,8 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
         const room = watchRoom(state, yield* shellOver(":memory:"));
         const call = through(room);
 
-        // parse-iso opens and its opening lands (2 events), then 300
-        // claims, each released (600).
+        // The adoption lands, parse-iso opens and its opening lands (3
+        // events), then 300 claims, each released (600).
         yield* opening(call);
         yield* Effect.forEach(
           Array.range(1, 300),
@@ -478,11 +478,11 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
           count: frames.length,
           first: framed(frames.slice(0, 2)),
           last: framed(frames.slice(-1)),
-          unbroken: frames.every(({ seq }, index) => seq === 103 + index),
+          unbroken: frames.every(({ seq }, index) => seq === 104 + index),
         }).toStrictEqual({
           count: 500,
-          first: ["103 Claimed", "104 Released"],
-          last: ["602 Released"],
+          first: ["104 Claimed", "105 Released"],
+          last: ["603 Released"],
           unbroken: true,
         });
         expect(accepted.map(({ tags }) => tags)).toStrictEqual([
@@ -509,8 +509,8 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
         const gone = doSocket();
 
         yield* room.admit(fromStart.socket, 0);
-        yield* room.admit(fromNow.socket, 2);
-        yield* room.admit(gone.socket, 2);
+        yield* room.admit(fromNow.socket, 3);
+        yield* room.admit(gone.socket, 3);
         close(gone.socket);
 
         yield* call("claim", [bob, doParseIso]);
@@ -522,8 +522,14 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
           fromStart: framed(yield* fromStart.frames),
           gone: framed(yield* gone.frames),
         }).toStrictEqual({
-          fromNow: ["3 Claimed", "4 Released"],
-          fromStart: ["1 AskOpened", "2 Landed", "3 Claimed", "4 Released"],
+          fromNow: ["4 Claimed", "5 Released"],
+          fromStart: [
+            "1 Landed",
+            "2 AskOpened",
+            "3 Landed",
+            "4 Claimed",
+            "5 Released",
+          ],
           gone: [],
         });
       }).pipe(Effect.provide(doWorld))
@@ -597,13 +603,13 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
 
         const watched = doSocket();
 
-        yield* room.admit(watched.socket, 2);
+        yield* room.admit(watched.socket, 3);
         // Hibernation woke it without its attachment.
         watched.socket.serializeAttachment(null);
 
         yield* call("claim", [bob, doParseIso]);
 
-        expect(framed(yield* watched.frames)).toStrictEqual(["3 Claimed"]);
+        expect(framed(yield* watched.frames)).toStrictEqual(["4 Claimed"]);
       }).pipe(Effect.provide(doWorld))
   );
 });
@@ -737,17 +743,23 @@ describe("the Worker's relay of a Project DO's watch socket", () => {
 
         const heard = yield* hearing(relayedFrom(namespace));
 
-        yield* heardUntil(heard, (events) => events.length >= 2);
+        yield* heardUntil(heard, (events) => events.length >= 3);
         yield* call("claim", [bob, doParseIso]);
         yield* call("release", [bob, doParseIso]);
 
         expect({
           heard: brief(
-            yield* heardUntil(heard, (events) => events.length >= 4)
+            yield* heardUntil(heard, (events) => events.length >= 5)
           ),
           opened: yield* opened,
         }).toStrictEqual({
-          heard: ["1 AskOpened", "2 Landed", "3 Claimed", "4 Released"],
+          heard: [
+            "1 Landed",
+            "2 AskOpened",
+            "3 Landed",
+            "4 Claimed",
+            "5 Released",
+          ],
           opened: [0],
         });
       }).pipe(Effect.provide(doWorld)),
@@ -765,7 +777,7 @@ describe("the Worker's relay of a Project DO's watch socket", () => {
 
         const heard = yield* hearing(relayedFrom(namespace));
 
-        yield* heardUntil(heard, (events) => events.length >= 3);
+        yield* heardUntil(heard, (events) => events.length >= 4);
 
         // The DO restarts: its end of the socket closes.
         (yield* server)?.close(1012, "restarting");
@@ -782,12 +794,18 @@ describe("the Worker's relay of a Project DO's watch socket", () => {
 
         expect({
           heard: brief(
-            yield* heardUntil(heard, (events) => events.length >= 4)
+            yield* heardUntil(heard, (events) => events.length >= 5)
           ),
           opened: yield* opened,
         }).toStrictEqual({
-          heard: ["1 AskOpened", "2 Landed", "3 Claimed", "4 Released"],
-          opened: [0, 3],
+          heard: [
+            "1 Landed",
+            "2 AskOpened",
+            "3 Landed",
+            "4 Claimed",
+            "5 Released",
+          ],
+          opened: [0, 4],
         });
       }).pipe(Effect.provide(doWorld)),
     15_000
@@ -807,11 +825,11 @@ describe("the Worker's relay of a Project DO's watch socket", () => {
 
         expect({
           heard: brief(
-            yield* heardUntil(heard, (events) => events.length >= 3)
+            yield* heardUntil(heard, (events) => events.length >= 4)
           ),
           opened: yield* opened,
         }).toStrictEqual({
-          heard: ["1 AskOpened", "2 Landed", "3 Claimed"],
+          heard: ["1 Landed", "2 AskOpened", "3 Landed", "4 Claimed"],
           opened: [],
         });
       }).pipe(Effect.provide(doWorld)),

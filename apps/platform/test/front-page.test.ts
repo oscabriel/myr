@@ -170,6 +170,8 @@ interface FrontPageWorld {
   readonly anyone: Client["Service"];
   /** bob's answer to `parse-iso` landed, as his claim, push and submission make it. */
   readonly landAnswer: Effect.Effect<void>;
+  /** quietkit made and first pushed, and nothing else: no ask, no policy evaluated. */
+  readonly makeQuiet: Effect.Effect<void>;
 }
 
 const frontPageWorld: Effect.Effect<FrontPageWorld, never, Scope.Scope> =
@@ -260,10 +262,36 @@ const frontPageWorld: Effect.Effect<FrontPageWorld, never, Scope.Scope> =
         calls.length = 0;
       }),
       landAnswer,
+      makeQuiet: seeded(aProject({ name: "quietkit" })).pipe(
+        Effect.provideContext(ports)
+      ),
     };
   });
 
 describe("the project list and credits over the platform's /rpc", () => {
+  it.effect(
+    "lists a project that was only made and first pushed, its adoption the one event it has",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo(noon);
+
+        const world = yield* frontPageWorld;
+
+        yield* world.makeQuiet;
+
+        const { projects } = yield* world.anyone.listProjects({});
+
+        expect(
+          projects.find(({ project: listed }) => listed === "quietkit")
+        ).toStrictEqual({
+          landedAt: at(noon),
+          openAsks: 0,
+          posture: "open",
+          project: "quietkit",
+        });
+      }).pipe(Effect.scoped)
+  );
+
   it.effect(
     "after a landing, lists the project from D1, asking it only its posture and only once, and its people's credits without calling a project",
     () =>

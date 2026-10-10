@@ -131,12 +131,13 @@ const world = Layer.mergeAll(worldOf(scenario, "memory"), NoVisibility, NoEnv);
 
 describe("a project's reads for its code and its people", () => {
   it.effect(
-    "hear an ask's opening as a landing, naming the ask it opened, so a list of landings shows it",
+    "hear the adoption and an ask's opening as landings, the opening naming the ask it opened, so a list of landings shows both",
     () =>
       Effect.map(read.pipe(Effect.provide(world)), (got) => {
         expect(
           got.landedEvents.map(({ ask, opened, sha }) => ({ ask, opened, sha }))
         ).toStrictEqual([
+          { ask: undefined, opened: undefined, sha: got.adopted },
           { ask: undefined, opened: parseIso.id, sha: got.landed },
         ]);
       })

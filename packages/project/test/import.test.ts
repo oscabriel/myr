@@ -1,18 +1,20 @@
 /**
  * A project adopted from a public repo, whatever its default branch, and
  * adopted again by a retry when the first import died after Artifacts made
- * the repo.
+ * the repo; and each adoption, an import's or a first push's, heard once
+ * as a landing.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
+import { ProjectEvent } from "@repo/protocol/domain/event";
 import { LandedSha, RepoName } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { ProjectExists } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import { gitClient } from "@repo/testkit/git-client";
 import { aProject } from "@repo/testkit/scenarios";
-import { Effect, Exit, Option, Ref } from "effect";
+import { DateTime, Effect, Exit, Option, Ref } from "effect";
 
 import { ProjectStore } from "../src/project-store.ts";
 import { projectService } from "../src/project.ts";
@@ -146,6 +148,37 @@ describe("importing a public repo", () => {
       }).pipe(Effect.provide(worldOf(scenario, "memory")))
   );
 
+  it.effect(
+    "is heard as its adoption's landing, so a project whose policy never evaluates is listed",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-08T12:00:00Z");
+
+        const { tip, url } = yield* upstreamOnMaster;
+        const api = yield* projectService(project);
+
+        yield* api.initProject(alice, { import: { url } });
+
+        const heard = yield* api.events(0, 10);
+
+        expect(heard.map(({ event }) => event._tag)).toStrictEqual(["Landed"]);
+        expect(
+          heard.flatMap(({ event }) =>
+            ProjectEvent.guards.Landed(event) ? [event.landing] : []
+          )
+        ).toStrictEqual([
+          {
+            assisted: [],
+            author: alice.handle,
+            credits: [],
+            landedAt: DateTime.makeUnsafe("2026-10-08T12:00:00Z"),
+            project,
+            sha: LandedSha.make(tip),
+          },
+        ]);
+      }).pipe(Effect.provide(worldOf(scenario, "memory")))
+  );
+
   it.effect("still answers ProjectExists for a project that exists", () =>
     Effect.gen(function* () {
       yield* advanceTo("2026-10-08T12:00:00Z");
@@ -159,5 +192,35 @@ describe("importing a public repo", () => {
         yield* Effect.flip(api.initProject(alice, { import: { url } }))
       ).toStrictEqual(new ProjectExists({ project }));
     }).pipe(Effect.provide(worldOf(scenario, "memory")))
+  );
+});
+
+describe("a first push", () => {
+  it.effect(
+    "is heard once as the adoption's landing, however often it is recorded",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-08T12:00:00Z");
+
+        const api = yield* projectService(project);
+        const client = yield* gitClient(memoryFs());
+
+        const first = yield* client.commit("Start", [
+          ["README.md", "# start\n"],
+        ]);
+
+        yield* api.initProject(alice, {});
+        yield* (yield* RepoHost)
+          .push(repo, client.source, [
+            { from: Option.none(), ref: mainRef, to: first },
+          ])
+          .pipe(Effect.orDie);
+        yield* api.recordFirstPush(alice, first);
+        yield* api.recordFirstPush(alice, first);
+
+        const heard = yield* api.events(0, 10);
+
+        expect(heard.map(({ event }) => event._tag)).toStrictEqual(["Landed"]);
+      }).pipe(Effect.provide(worldOf(scenario, "memory")))
   );
 });

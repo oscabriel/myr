@@ -1176,6 +1176,20 @@ const isEmpty = (writes: Writes) =>
   ].every((count) => count === 0);
 
 /** A row's key in its table, as the store keys it. */
+/**
+ * Keeps `landing` and hears it as `Landed`: every landing that moves main
+ * is heard, so a watcher and the front page see it (a project's row is
+ * written on its first event).
+ */
+const keepLanding = (
+  writes: Writes,
+  landing: LandingView,
+  now: DateTime.Utc
+) => {
+  writes.landings.push(landing);
+  writes.events.push(ProjectEventInput.Landed({ at: now, landing }));
+};
+
 const keyIn = <A>(table: Table<A>, row: A) => {
   const columns = table.columns(row);
 
@@ -2725,10 +2739,7 @@ export const projectService = (
 
         const moved = yield* withPolicyAt({ ...row, landed: sha }, sha, now);
 
-        writes.landings.push(view);
-        writes.events.push(
-          ProjectEventInput.Landed({ at: now, landing: view })
-        );
+        keepLanding(writes, view, now);
         writes.project.set("row", moved);
       });
 
@@ -3787,21 +3798,30 @@ export const projectService = (
 
     /**
      * The first adoption as a landing: the initializer's first push, or an
-     * import's tip. It answers no ask and has no parent; its row lets
-     * `landing` (and so OnPush) know the commit as the platform's own.
+     * import's tip. It answers no ask, has no parent and credits no one;
+     * its row lets `landing` (and so OnPush) know the commit as the
+     * platform's own, and its event lists the project on the front page
+     * even when no policy evaluates and nothing else happens in it.
      */
-    const adoption = (
+    const landAdoption = (
+      writes: Writes,
       author: Handle,
       sha: LandedSha,
       now: DateTime.Utc
-    ): LandingView => ({
-      assisted: [],
-      author,
-      credits: [],
-      landedAt: now,
-      project: name,
-      sha,
-    });
+    ) => {
+      keepLanding(
+        writes,
+        {
+          assisted: [],
+          author,
+          credits: [],
+          landedAt: now,
+          project: name,
+          sha,
+        },
+        now
+      );
+    };
 
     const initBody =
       (
@@ -3838,7 +3858,7 @@ export const projectService = (
 
           const landed = yield* adopt(input.import);
 
-          writes.landings.push(adoption(caller.handle, landed, now));
+          landAdoption(writes, caller.handle, landed, now);
           writes.project.set(
             "row",
             yield* withPolicyAt({ ...made, landed, state: "live" }, landed, now)
@@ -3876,7 +3896,7 @@ export const projectService = (
               : yield* refused;
           }
 
-          writes.landings.push(adoption(row.initializer, landed, now));
+          landAdoption(writes, row.initializer, landed, now);
           writes.project.set(
             "row",
             yield* withPolicyAt({ ...row, landed, state: "live" }, landed, now)
@@ -4420,10 +4440,9 @@ export const projectService = (
           sha: landed.sha,
         };
 
-        writes.landings.push(landing);
         // Heard as every landing is (main moved), so a list of landings
         // shows the opening; it answers no ask, so it credits nothing.
-        writes.events.push(ProjectEventInput.Landed({ at: now, landing }));
+        keepLanding(writes, landing, now);
         writes.project.set(
           "row",
           yield* withPolicyAt({ ...row, landed: landed.sha }, landed.sha, now)
