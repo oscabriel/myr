@@ -15,7 +15,7 @@ import { proposeFormPath } from "./propose-view.tsx";
 
 export const ProposeLink = ({ project }: { readonly project: ProjectName }) => (
   <a
-    className="decoration-rule flex w-fit items-center gap-2 text-sm font-medium underline hover:decoration-current"
+    className="text-ui decoration-rule flex w-fit items-center gap-2 font-medium underline hover:decoration-current"
     data-propose=""
     href={proposeFormPath(project)}
   >

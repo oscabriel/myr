@@ -1,9 +1,4 @@
-import {
-  RegistryProvider,
-  useAtom,
-  useAtomMount,
-  useAtomValue,
-} from "@effect/atom-react";
+import { useAtom, useAtomMount, useAtomValue } from "@effect/atom-react";
 import { Client, ShowProposal } from "@repo/protocol/contracts";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Today } from "@repo/protocol/domain/decision";
@@ -13,24 +8,24 @@ import type { DecisionId, Handle } from "@repo/protocol/ids";
 import { createFileRoute, notFound, useLocation } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
-import { Array, Effect, Option, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/reactivity";
+import { Array, DateTime, Effect, Option, Schema } from "effect";
+import { AsyncResult } from "effect/reactivity";
 
 import {
   draftAtom,
   projectTodayAtom,
   proposalAtom,
 } from "../../../client/proposal.ts";
+import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
 import { watchAtom } from "../../../client/watch.ts";
+import { NotFoundView } from "../../../features/ask/refused.tsx";
 import { hereOf } from "../../../features/auth/session-slot.tsx";
 import { whoAtom } from "../../../features/auth/who.ts";
-import { ProjectNav } from "../../../features/project/project-nav.tsx";
-import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
 import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { ProposalView } from "../../../features/proposal/proposal-view.tsx";
-import { EmptyState } from "../../../features/shared/empty.tsx";
 import { pageHead } from "../../../features/shared/head.ts";
-import { PageShell } from "../../../features/shared/layout.tsx";
+import { notFoundFor, Refusals } from "../../../features/shared/refusals.ts";
+import { personalPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 
 // `/$project/proposals/$proposal`: one proposal and the platform's draft of
@@ -58,8 +53,8 @@ export const readProposal = (name: string, id: string) =>
 
     const shown = yield* client.showProposal({ project, proposal }).pipe(
       Effect.catchTags({
-        UnknownProject: () => Effect.fail(notFound()),
-        UnknownProposal: () => Effect.fail(notFound()),
+        UnknownProject: notFoundFor,
+        UnknownProposal: notFoundFor,
       })
     );
 
@@ -130,6 +125,7 @@ const FreshProposal = ({
   return (
     <ProposalView
       busy={redrafted.waiting}
+      now={DateTime.nowUnsafe()}
       decision={decisionOn(today, proposal)}
       files={files}
       mayRedraft={mayRedraftAs(who, today, proposal)}
@@ -164,43 +160,39 @@ const ProposalPage = () => {
   const { id, project } = read.proposal;
 
   return (
-    <PageShell title={`${project}: proposal ${id}`}>
-      <ProjectNav project={project} />
-      <RegistryProvider
-        initialValues={[
-          Atom.initialValue(
-            proposalAtom(project)(id),
-            AsyncResult.success(read)
-          ),
-        ]}
-        key={`${project}/${id}`}
-      >
-        <FreshProposal project={project} read={read} />
-      </RegistryProvider>
-    </PageShell>
+    <SeededAtoms
+      id={`${project}/${id}`}
+      seeds={[seedSuccess(proposalAtom(project)(id), read)]}
+    >
+      <FreshProposal project={project} read={read} />
+    </SeededAtoms>
   );
 };
 
-const Unknown = () => {
-  const { project, proposal } = Route.useParams();
+const decodeRefusals = Schema.decodeUnknownOption(Refusals);
 
-  return Option.match(Schema.decodeUnknownOption(ProjectName)(project), {
-    onNone: () => <UnknownProjectView name={project} />,
-    onSome: (name) => (
-      <PageShell title={`${name}: proposal ${proposal}`}>
-        <ProjectNav project={name} />
-        <EmptyState
-          title={`${name} has no proposal ${proposal}, or no such project exists.`}
-        />
-      </PageShell>
-    ),
-  });
-};
+/** A proposal or a project the platform does not know: its refusal, as git prints it. */
+const Unknown = ({ data }: { readonly data?: unknown }) => (
+  <NotFoundView
+    nothing="Nothing is at this address: a project's name is lowercase words joined by single dashes, and a proposal's id reads prop- and six digits."
+    refusals={Option.getOrUndefined(decodeRefusals(data))}
+    title="No such proposal"
+  />
+);
 
 export const Route = createFileRoute("/$project/proposals/$proposal")({
   loader: ({ params }) => proposalPage({ data: params }),
-  head: ({ params: { project, proposal } }) =>
-    pageHead({ title: `${project}: proposal ${proposal}` }),
+  // Who may draft it again and the decision on it are the reader's own.
+  headers: () => personalPage,
+  head: ({ loaderData, params: { project, proposal } }) =>
+    pageHead(
+      loaderData === undefined
+        ? { title: `${proposal} · ${project}` }
+        : {
+            description: loaderData.proposal.want,
+            title: `${proposal} · ${project}`,
+          }
+    ),
   component: ProposalPage,
   notFoundComponent: Unknown,
 });

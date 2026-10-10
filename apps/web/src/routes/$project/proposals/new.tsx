@@ -16,13 +16,11 @@ import {
 } from "../../../client/propose.ts";
 import { hereOf } from "../../../features/auth/session-slot.tsx";
 import { whoAtom } from "../../../features/auth/who.ts";
-import { ProjectNav } from "../../../features/project/project-nav.tsx";
 import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
 import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { ProposeView } from "../../../features/propose/propose-view.tsx";
 import type { About } from "../../../features/propose/propose-view.tsx";
 import { pageHead } from "../../../features/shared/head.ts";
-import { PageShell } from "../../../features/shared/layout.tsx";
 
 // `/$project/proposals/new`: the propose form. Who is signed in and the
 // project's top folders are read in the browser (the server paints the
@@ -57,12 +55,6 @@ const aboutOf = (search: {
     path: about,
   }));
 
-const Checking = () => (
-  <output className="text-muted-foreground block text-sm">
-    Checking who is signed in
-  </output>
-);
-
 /** The form for `project`, once the browser knows who is signed in. */
 const Propose = ({ project }: { readonly project: ProjectName }) => {
   const navigate = useNavigate();
@@ -91,21 +83,18 @@ const Propose = ({ project }: { readonly project: ProjectName }) => {
     }
   }, [made, navigate, project]);
 
-  if (!AsyncResult.isSuccess(who)) {
-    return <Checking />;
-  }
-
   return (
     <ProposeView
       about={aboutOf(search)}
       busy={proposed.waiting}
+      checking={!AsyncResult.isSuccess(who)}
       modules={modules}
       onPropose={(payload) => {
         setSent(true);
         propose(payload);
       }}
       project={project}
-      signedIn={Option.isSome(who.value)}
+      signedIn={AsyncResult.isSuccess(who) && Option.isSome(who.value)}
     >
       {AsyncResult.isFailure(proposed) ? (
         <div aria-live="polite">
@@ -125,12 +114,7 @@ const Page = () => {
 
   return Option.match(decodeProject(params.project), {
     onNone: () => <UnknownProjectView name={params.project} />,
-    onSome: (project) => (
-      <PageShell title={`${project}: propose an ask`}>
-        <ProjectNav project={project} />
-        <Propose project={project} />
-      </PageShell>
-    ),
+    onSome: (project) => <Propose project={project} />,
   });
 };
 
@@ -146,5 +130,5 @@ export const Route = createFileRoute("/$project/proposals/new")({
     line: Option.getOrUndefined(decodeLine(search.line)),
   }),
   head: ({ params: { project } }) =>
-    pageHead({ title: `${project}: propose an ask` }),
+    pageHead({ title: `Propose an ask · ${project}` }),
 });
