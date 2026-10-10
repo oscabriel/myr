@@ -30,9 +30,10 @@ import {
   projectPageHead,
   projectPageHeaders,
 } from "../src/routes/$project/index.tsx";
-import { frontPageHead, frontPageHeaders } from "../src/routes/index.tsx";
+import { frontPageHead, frontPageHeaders } from "../src/routes/asks.tsx";
+import { landingHead, landingHeaders } from "../src/routes/index.tsx";
 import { llmsFullHandler } from "../src/routes/llms-full[.]txt.ts";
-import { frontPageHandler } from "../src/server/front-page.ts";
+import { frontPageHandler, landingHandler } from "../src/server/front-page.ts";
 import { projectPageHandler } from "../src/server/project-page.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
@@ -493,15 +494,18 @@ const alternate = (href: string) => ({
 });
 
 describe("the list pages, asked for Markdown", () => {
-  it.effect("answers / with llms.txt, varied by Accept", () =>
+  it.effect.each([
+    ["/", landingHandler],
+    ["/asks", frontPageHandler],
+  ] as const)("answers %s with llms.txt, varied by Accept", ([path, handler]) =>
     Effect.gen(function* () {
       const seen = yield* answered(
-        frontPageHandler(
+        handler(
           listing(projects),
           platformUrl
         )({
           next: () => "the page" as const,
-          request: getAt("/", "text/markdown"),
+          request: getAt(path, "text/markdown"),
         })
       );
 
@@ -546,12 +550,21 @@ describe("the list pages, asked for Markdown", () => {
 
   it("gives a browser the page", () => {
     expect(
-      frontPageHandler(
+      landingHandler(
         listing(projects),
         platformUrl
       )({
         next: () => "the page" as const,
         request: getAt("/", BROWSER),
+      })
+    ).toBe("the page");
+    expect(
+      frontPageHandler(
+        listing(projects),
+        platformUrl
+      )({
+        next: () => "the page" as const,
+        request: getAt("/asks", BROWSER),
       })
     ).toBe("the page");
     expect(
@@ -567,11 +580,17 @@ describe("the list pages, asked for Markdown", () => {
   });
 
   it("names each page's Markdown as an alternate, in its head and its Link header", () => {
-    expect(frontPageHeaders()).toMatchObject({
-      link: '</llms.txt>; rel="alternate"; type="text/markdown"',
-      vary: "Accept",
-    });
-    expect(frontPageHead().links).toContainEqual(alternate("/llms.txt"));
+    for (const [headers, head] of [
+      [landingHeaders, landingHead],
+      [frontPageHeaders, frontPageHead],
+    ] as const) {
+      expect(headers()).toMatchObject({
+        link: '</llms.txt>; rel="alternate"; type="text/markdown"',
+        vary: "Accept",
+      });
+      expect(head().links).toContainEqual(alternate("/llms.txt"));
+    }
+
     expect(
       projectPageHeaders({ params: { project: "datekit" } })
     ).toMatchObject({

@@ -847,7 +847,7 @@ describe(UnknownProjectView, () => {
 
         expect(markup).toContain('data-refusal="UnknownProject"');
         expect(markup).toContain("no-such-project");
-        expect(markup).toMatch(/<a\b[^>]*href="\/"[^>]*>Open asks<\/a>/u);
+        expect(markup).toMatch(/<a\b[^>]*href="\/asks"[^>]*>Open asks<\/a>/u);
       })
   );
 

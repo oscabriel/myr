@@ -89,14 +89,16 @@ describe("the shell", () => {
 
         expect(rail).not.toBe("");
         expect(
-          links.filter(
-            ({ href, text }) =>
-              ["/", "/today", "/agents"].includes(href ?? "") &&
-              text !== Brand.name
+          links.filter(({ href }) =>
+            ["/home", "/asks", "/today", "/docs", "/agents"].includes(
+              href ?? ""
+            )
           )
         ).toStrictEqual([
-          { active: false, current: false, href: "/", text: "Asks" },
+          { active: false, current: false, href: "/home", text: "Home" },
+          { active: false, current: false, href: "/asks", text: "Asks" },
           { active: false, current: false, href: "/today", text: "Today" },
+          { active: false, current: false, href: "/docs", text: "Docs" },
           {
             active: false,
             current: false,
@@ -173,6 +175,29 @@ describe("the shell", () => {
       })
   );
 
+  it.effect(
+    "draws only the page on the landing, with no rail, bars or skip link, and the wordmark leads there",
+    () =>
+      Effect.gen(function* () {
+        const landing = yield* renderAt(
+          "/",
+          <AppShell>
+            <p>Landing</p>
+          </AppShell>
+        );
+
+        expect(landing).toBe("<p>Landing</p>");
+
+        const rail = elementOf(
+          yield* renderAt("/agents", ledgerPage(false)),
+          "nav",
+          'aria-label="Site"'
+        );
+
+        expect(linksOf(rail)[0]).toMatchObject({ href: "/", text: Brand.name });
+      })
+  );
+
   it.effect("shows no project's sections on a page outside a project", () =>
     Effect.gen(function* () {
       const rail = elementOf(
@@ -241,7 +266,7 @@ describe("the shell", () => {
   );
 
   it.effect(
-    "gives phones a bar of sections: Asks, Today, Projects and More",
+    "gives phones a bar of sections: Home, Asks, Today, Projects and More",
     () =>
       Effect.gen(function* () {
         const bar = elementOf(
@@ -250,9 +275,10 @@ describe("the shell", () => {
           'aria-label="Sections"'
         );
 
-        expect(textOf(bar)).toBe("Asks Today Projects More");
+        expect(textOf(bar)).toBe("Home Asks Today Projects More");
         expect(linksOf(bar).map(({ href }) => href)).toStrictEqual([
-          "/",
+          "/home",
+          "/asks",
           "/today",
         ]);
       })

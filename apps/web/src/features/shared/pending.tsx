@@ -18,6 +18,7 @@ import { Unplug } from "lucide-react";
 import { Button } from "../../components/ui/button.tsx";
 import { PageShell } from "./layout.tsx";
 import { AppLink } from "./link.tsx";
+import { ASKS_PATH } from "./paths.ts";
 import { crumbsFor, projectOf } from "./shell/sections.ts";
 import { Workspace } from "./shell/workspace.tsx";
 import { RowSkeleton } from "./skeleton.tsx";
@@ -127,7 +128,7 @@ export const NotFoundPage = () => {
         <li>
           <AppLink
             className="decoration-rule hover:decoration-foreground underline"
-            to="/"
+            to={ASKS_PATH}
           >
             Open asks
           </AppLink>

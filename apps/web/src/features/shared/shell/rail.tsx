@@ -1,6 +1,7 @@
 /**
- * The rail: where the reader is. Top to bottom, the wordmark; the site's
- * sections (Asks, Today, For agents), each a word beside its mark; the
+ * The rail: where the reader is. Top to bottom, the wordmark, which leads
+ * to the landing; the site's sections (Home, Asks, Today, Docs, For
+ * agents), each a word beside its mark; the
  * projects, the current one first with its own sections under it; the
  * rail's slot on pages that fill it (the code pages' tree); and the session
  * with the Keys button at the foot.
@@ -18,10 +19,12 @@ import type { ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
 import { useLocation } from "@tanstack/react-router";
 import {
+  BookOpen,
   Bot,
   CalendarCheck,
   ChevronDown,
   Folders,
+  House,
   Keyboard,
   List,
   Menu,
@@ -35,6 +38,7 @@ import { SessionSlot } from "../../auth/session-slot.tsx";
 import { postureLabel } from "../../project/posture-label.ts";
 import { AppLink } from "../link.tsx";
 import { POSTURE_MARKS } from "../mark-look.ts";
+import { ASKS_PATH, docsPath, HOME_PATH } from "../paths.ts";
 import {
   useCurrentProject,
   useProjectList,
@@ -58,8 +62,10 @@ const MARK = "text-muted-foreground size-4 shrink-0";
 const SHOWN = 8;
 
 const SITE = [
-  { icon: List, label: "Asks", to: "/" },
+  { icon: House, label: "Home", to: HOME_PATH },
+  { icon: List, label: "Asks", to: ASKS_PATH },
   { icon: CalendarCheck, label: "Today", to: "/today" },
+  { icon: BookOpen, label: "Docs", to: docsPath() },
   { icon: Bot, label: "For agents", to: "/agents" },
 ] as const satisfies readonly {
   readonly icon: LucideIcon;
@@ -87,7 +93,7 @@ export const RailCount = ({
 /** Today's count, as the root route read it. */
 const TodayCount = () => useTodayCount() ?? null;
 
-/** The wordmark, home to the front page. */
+/** The wordmark, leading to the landing (which sends a signed-in reader home). */
 export const Wordmark = ({
   className = "",
 }: {
@@ -102,7 +108,7 @@ export const Wordmark = ({
   </AppLink>
 );
 
-/** Asks, Today and For agents. */
+/** Home, Asks, Today, Docs and For agents. */
 const SiteSections = () => (
   <ul className="flex flex-col gap-px">
     {SITE.map(({ icon: Icon, label, to }) => (

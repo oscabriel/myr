@@ -15,7 +15,7 @@ import type { Array } from "effect";
 
 import { EmptyState } from "../shared/empty.tsx";
 import { AppLink } from "../shared/link.tsx";
-import { projectPath } from "../shared/paths.ts";
+import { ASKS_PATH, projectPath } from "../shared/paths.ts";
 import { RefusalView } from "../shared/refusal.tsx";
 import { Refusals } from "../shared/refusals.ts";
 import type { Crumb } from "../shared/shell/sections.ts";
@@ -37,7 +37,7 @@ const Onward = ({ project }: { readonly project: ProjectName | undefined }) => (
         {project}
       </AppLink>
     )}
-    <AppLink className={LINK} to="/">
+    <AppLink className={LINK} to={ASKS_PATH}>
       Open asks
     </AppLink>
   </nav>
@@ -61,7 +61,7 @@ export const NotFoundView = ({
   // The trail goes as far as what exists: the project and its asks.
   const crumbs: readonly Crumb[] =
     known === undefined
-      ? [{ label: "Asks", to: "/" }, { label: title }]
+      ? [{ label: "Asks", to: ASKS_PATH }, { label: title }]
       : [
           { label: known, to: projectPath(known) },
           { label: "Asks", to: projectPath(known) },

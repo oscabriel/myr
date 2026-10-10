@@ -56,7 +56,7 @@ const SECTION_OF = {
 } as const satisfies Record<string, ProjectTab>;
 
 /** The site's own first segments: every other one names a project. */
-const SITE = new Set(["agents", "people", "today"]);
+const SITE = new Set(["agents", "asks", "docs", "home", "people", "today"]);
 
 /** `segment` decoded, or as it came when it does not decode. */
 const decoded = (segment: string) =>
@@ -140,6 +140,12 @@ const pathCrumbs = (project: string, path: string): readonly Crumb[] =>
 /** The site's own pages' trails, by first segment. */
 const SITE_CRUMBS = {
   agents: () => [{ label: "For agents" }],
+  asks: () => [{ label: "Asks" }],
+  docs: (page: string | undefined) =>
+    page === undefined
+      ? [{ label: "Docs" }]
+      : [{ label: "Docs", to: "/docs" }, { label: page }],
+  home: () => [{ label: "Home" }],
   people: (handle: string | undefined) => [{ label: handle ?? "People" }],
   today: () => [{ label: "Today" }],
 } as const satisfies Record<

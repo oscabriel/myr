@@ -9,8 +9,11 @@
  * The shell owns the overlays (the rail as a sheet, More, Projects, the
  * keys dialog), loaded once the page is up and closed whenever the reader
  * moves, and the keyboard's one listener.
+ *
+ * One page is drawn outside it: the landing, whose route names
+ * `staticData: { shell: "bare" }`. There the shell gives the page alone.
  */
-import { useHydrated, useLocation } from "@tanstack/react-router";
+import { useHydrated, useLocation, useMatches } from "@tanstack/react-router";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -23,6 +26,20 @@ import { LazyOverlays } from "./lazy-overlays.ts";
 import { Rail } from "./rail.tsx";
 import { TopBar } from "./top-bar.tsx";
 
+declare module "@tanstack/react-router" {
+  interface StaticDataRouteOption {
+    /** `"bare"`: the page is drawn alone, with no rail, bars or overlays. */
+    readonly shell?: "bare";
+  }
+}
+
+/** Whether the address's page is drawn outside the shell. */
+const useBare = () =>
+  useMatches({
+    select: (matches) =>
+      matches.some(({ staticData }) => staticData.shell === "bare"),
+  });
+
 export const AppShell = ({
   children,
   projects,
@@ -30,6 +47,7 @@ export const AppShell = ({
 }: ShellReads & { readonly children: ReactNode }) => {
   const pathname = useLocation({ select: (location) => location.pathname });
   const hydrated = useHydrated();
+  const bare = useBare();
 
   // An overlay belongs to the address it opened on: a link inside it moves
   // the reader on, and it is gone from the next page.
@@ -61,6 +79,10 @@ export const AppShell = ({
     () => ({ projects, todayCount }),
     [projects, todayCount]
   );
+
+  if (bare) {
+    return children;
+  }
 
   return (
     <ShellContext value={shell}>

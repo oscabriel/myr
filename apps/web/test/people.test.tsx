@@ -135,7 +135,7 @@ describe("a person's page", () => {
         );
 
         expect(textOf(html)).toContain("No credited landings yet.");
-        expect(html).toContain('href="/"');
+        expect(html).toContain('href="/asks"');
       })
   );
 });

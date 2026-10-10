@@ -153,7 +153,7 @@ const props = (
 
 const front = (filter: FrontFilter, more: Partial<FrontPageProps> = {}) =>
   renderAt(
-    filter.kind === undefined ? "/" : frontPath(filter),
+    filter.kind === undefined ? "/asks" : frontPath(filter),
     <FrontPageView {...props(filter, more)} />
   );
 
@@ -468,15 +468,15 @@ describe(FrontPageView, () => {
         expect(rowsIn(markup)).toStrictEqual(["split-format"]);
         expect(
           [
-            'href="/?kind=bug"',
-            'href="/?kind=migrate&amp;reserved=newcomers"',
+            'href="/asks?kind=bug"',
+            'href="/asks?kind=migrate&amp;reserved=newcomers"',
           ].filter((href) => !markup.includes(href))
         ).toStrictEqual([]);
         expect(
           [
-            'href="/?reserved=newcomers"',
-            'href="/?take=open"',
-            'href="/?project=burrow"',
+            'href="/asks?reserved=newcomers"',
+            'href="/asks?take=open"',
+            'href="/asks?project=burrow"',
           ].filter((href) => !all.includes(href))
         ).toStrictEqual([]);
         expect(textIn(toolbar)).toMatch(
@@ -520,7 +520,7 @@ describe(FrontPageView, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/?ask=fix-week-start",
+          "/asks?ask=fix-week-start",
           <FrontPageView {...props({})} />
         );
 
@@ -614,7 +614,7 @@ const seededWorld = { timeout: 30_000 };
 /** The page as the route renders it from what its loader read. */
 const sentFrom = (data: FrontPageData, filter: FrontFilter = {}) =>
   renderAt(
-    "/",
+    "/asks",
     <FrontPageView
       entries={data.entries}
       events={

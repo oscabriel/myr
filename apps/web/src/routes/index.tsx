@@ -1,241 +1,83 @@
-import { useAtomMount, useAtomRefresh, useAtomValue } from "@effect/atom-react";
-import type { Ask } from "@repo/protocol/domain/ask";
-import type { ProjectListing } from "@repo/protocol/domain/front-page";
-import { AskId } from "@repo/protocol/ids";
-import type { ProjectName } from "@repo/protocol/ids";
-import {
-  createFileRoute,
-  getRouteApi,
-  useHydrated,
-  useRouter,
-} from "@tanstack/react-router";
-import { createServerFn } from "@tanstack/react-start";
+import { Brand } from "@repo/brand";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { env } from "cloudflare:workers";
-import { Array as Arr, Effect, Option, Predicate, Schema } from "effect";
-import { AsyncResult } from "effect/reactivity";
-import { useEffect, useMemo } from "react";
-import type { ReactNode } from "react";
+import { useEffect } from "react";
 
-import { selectedAskAtom } from "../client/ask.ts";
-import { projectEventsAtom } from "../client/events.ts";
-import { frontPageAtom, projectsAtom } from "../client/front.ts";
-import {
-  familyEventsAtom,
-  followedAtom,
-  projectsKey,
-} from "../client/project.ts";
-import { SeededAtoms, seedSuccess } from "../client/seeded.ts";
-import type { Seed } from "../client/seeded.ts";
 import { useSignedIn } from "../features/auth/session-slot.tsx";
-import { readFilter } from "../features/front/filter.ts";
-import type { FrontFilter } from "../features/front/filter.ts";
-import { FrontPageView } from "../features/front/front-page.tsx";
-import { EXPLAINER } from "../features/front/head.ts";
 import {
   markdownAlternateLink,
   markdownLink,
 } from "../features/front/markdown.ts";
-import { useStamps } from "../features/front/stamps.ts";
 import { pageHead } from "../features/shared/head.ts";
-import { reloadOnEnter } from "../features/shared/shell/selection.ts";
+import { AppLink } from "../features/shared/link.tsx";
+import { ASKS_PATH, HOME_PATH } from "../features/shared/paths.ts";
 import { branchPage } from "../server/cache-headers.ts";
 import { serverClient } from "../server/client.ts";
-import {
-  FrontPageData,
-  frontPageHandler,
-  readFrontPage,
-} from "../server/front-page.ts";
+import { landingHandler } from "../server/front-page.ts";
 
-// The front page: every open ask, read on the server by the loader, so the
-// page (and an agent fetching it) arrives with its asks; narrowed here by
-// the address's search. The whole list is read, so the filter offers every
-// kind. The list of projects (each group's posture) is the browser's read,
-// never the loader's: it may arrive after the rows, and moves none of them.
-// The same URL answers `Accept: text/markdown` with `llms.txt`.
+// `/`, the landing: the one page drawn outside the shell. It is the same
+// page for every reader, so the edge may keep it; its server GET sends a
+// reader who carries a session to `/home` before the page is drawn, and
+// gives an agent `llms.txt`. A signed-in reader who reaches it by a link
+// is moved on once the browser knows who they are.
 
-const TITLE = "Open asks";
+/** What the platform is, in a sentence: the page's head and its lede. */
+const ABOUT =
+  "A git platform where a project says what it wants as asks, anyone may answer, and a change lands on main only by passing a typed gate.";
 
 /** Where the page's Markdown is. */
 const MARKDOWN = "/llms.txt";
 
-const frontPageData = createServerFn({ method: "GET" }).handler(() =>
-  Effect.runPromise(readFrontPage.pipe(Effect.provide(serverClient(env))))
-);
-
-/** The page's headers: kept briefly, varied by `Accept`, its Markdown named. */
-export const frontPageHeaders = () => ({
+/** The landing's headers: kept briefly, varied by `Accept`, its Markdown named. */
+export const landingHeaders = () => ({
   ...branchPage,
   link: markdownLink(MARKDOWN),
   vary: "Accept",
 });
 
-/** The page's head: its title, its one sentence, and its Markdown. */
-export const frontPageHead = () => ({
-  ...pageHead({ description: EXPLAINER, title: TITLE }),
+/** The landing's head: the product's name, its sentence, and its Markdown. */
+export const landingHead = () => ({
+  ...pageHead({
+    description: ABOUT,
+    title: "A git platform with a typed gate",
+  }),
   links: [markdownAlternateLink(MARKDOWN)],
 });
 
-/** The open asks, unfiltered: the page narrows them, so its filter can offer every kind. */
-const everyAsk = frontPageAtom({});
+/** A signed-in reader who came by a link goes on to their home. */
+const useHomeOnceSignedIn = () => {
+  const signedIn = useSignedIn();
+  const navigate = useNavigate();
 
-const root = getRouteApi("__root__");
-
-/**
- * The selected ask in full, read in the browser once it is selected. It
- * wraps the page whether or not a row is selected, so selecting one never
- * remounts the list (and loses the row the keys rest on).
- */
-const WithFull = ({
-  children,
-  pick,
-}: {
-  readonly pick:
-    | { readonly ask: AskId; readonly project: ProjectName }
-    | undefined;
-  readonly children: (full: Ask | undefined) => ReactNode;
-}) => {
-  const read = useAtomValue(selectedAskAtom(pick));
-
-  return children(AsyncResult.isSuccess(read) ? read.value.ask : undefined);
-};
-
-const decodeAsk = Schema.decodeUnknownOption(AskId);
-
-/** The page over its atoms, which start from what the loader read and stay live. */
-const LiveFront = ({
-  data,
-  filter,
-  platformUrl,
-  projects,
-  selected,
-  signedIn,
-  webUrl,
-}: {
-  readonly data: FrontPageData;
-  readonly filter: FrontFilter;
-  readonly platformUrl: string;
-  readonly projects: readonly ProjectListing[] | undefined;
-  readonly selected: string | undefined;
-  readonly signedIn: boolean;
-  readonly webUrl: string;
-}) => {
-  const hydrated = useHydrated();
-  const key = projectsKey(data.events.map(({ project }) => project));
-  const refresh = useAtomRefresh(everyAsk);
-
-  // Live: each family's project, followed while the page is open.
-  useAtomMount(followedAtom(key));
-
-  // The loader read as anyone; once someone is signed in, read who may take what for them.
   useEffect(() => {
     if (signedIn) {
-      refresh();
+      void navigate({ replace: true, to: HOME_PATH });
     }
-  }, [refresh, signedIn]);
-
-  const { entries } = Option.getOrElse(
-    AsyncResult.value(useAtomValue(everyAsk)),
-    () => data
-  );
-
-  const events = useAtomValue(familyEventsAtom(key));
-  const stampsOf = useStamps(events);
-
-  const picked = Option.flatMap(decodeAsk(selected), (ask) =>
-    Option.map(
-      Arr.findFirst(entries, (entry) => entry.ask.ask === ask),
-      (entry) => ({ ask, project: entry.project })
-    )
-  );
-
-  const view = (selectedAsk?: Ask) => (
-    <FrontPageView
-      entries={entries}
-      events={events}
-      filter={filter}
-      now={data.now}
-      parents={data.parents}
-      platformUrl={platformUrl}
-      projects={projects}
-      selectedAsk={selectedAsk}
-      stampsOf={stampsOf}
-      webUrl={webUrl}
-    />
-  );
-
-  return (
-    <WithFull pick={hydrated ? Option.getOrUndefined(picked) : undefined}>
-      {view}
-    </WithFull>
-  );
+  }, [navigate, signedIn]);
 };
 
-const FrontPage = () => {
-  const { ask, ...filter } = Route.useSearch();
-  const loaded = Route.useLoaderData();
-
-  const data = useMemo(
-    () => Schema.decodeSync(FrontPageData)(loaded),
-    [loaded]
-  );
-
-  const { platformUrl } = root.useLoaderData();
-  const { origin } = useRouter();
-
-  // The root's own reads, in the registry it shares with the shell.
-  const listed = useAtomValue(projectsAtom);
-  const signedIn = useSignedIn();
-
-  const seeds: readonly Seed[] = [
-    seedSuccess(everyAsk, { entries: data.entries }),
-    ...data.events.map(({ events, project }) =>
-      seedSuccess(projectEventsAtom(project), events)
-    ),
-  ];
+const Landing = () => {
+  useHomeOnceSignedIn();
 
   return (
-    <SeededAtoms id="front" seeds={seeds}>
-      <LiveFront
-        data={data}
-        filter={filter}
-        platformUrl={platformUrl}
-        projects={
-          AsyncResult.isSuccess(listed) ? listed.value.projects : undefined
-        }
-        selected={ask}
-        signedIn={signedIn}
-        webUrl={origin}
-      />
-    </SeededAtoms>
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-6 px-6 py-12">
+      <p className="text-want font-semibold">{Brand.name}</p>
+      <h1 className="text-headline font-semibold">{ABOUT}</h1>
+      <p>
+        <AppLink to={ASKS_PATH}>See the open asks</AppLink>
+      </p>
+    </main>
   );
 };
-
-/** The filter, and the selected ask, from the address. */
-const readSearch = (search: {
-  readonly ask?: unknown;
-  readonly kind?: unknown;
-  readonly project?: unknown;
-  readonly reserved?: unknown;
-  readonly take?: unknown;
-}) => ({
-  ...readFilter(search),
-  ...Option.match(Option.liftPredicate(search.ask, Predicate.isString), {
-    onNone: () => ({}),
-    onSome: (ask) => ({ ask }),
-  }),
-});
 
 export const Route = createFileRoute("/")({
-  // TanStack infers each option from the ones before it.
-  validateSearch: readSearch,
-  loader: () => frontPageData(),
-  shouldReload: reloadOnEnter,
-  head: frontPageHead,
-  headers: frontPageHeaders,
-  component: FrontPage,
+  staticData: { shell: "bare" },
+  head: landingHead,
+  headers: landingHeaders,
+  component: Landing,
   server: {
     handlers: {
-      GET: frontPageHandler(
+      GET: landingHandler(
         (request) => serverClient(env, request),
         env.PUBLIC_PLATFORM_URL
       ),

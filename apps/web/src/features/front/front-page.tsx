@@ -10,7 +10,7 @@
  *
  * Each project's posture is said once, on its group's header, from the
  * list of projects; a row says only its own state. The filter is a link
- * (`/?kind=bug&take=open`), so a filtered list is an address to share.
+ * (`/asks?kind=bug&take=open`), so a filtered list is an address to share.
  */
 import { Brand } from "@repo/brand";
 import { Reserve } from "@repo/protocol/domain/ask";
