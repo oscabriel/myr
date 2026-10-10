@@ -17,6 +17,8 @@ import { watchAtom } from "../../client/watch.ts";
 import { EnvView, NothingLanded } from "../../features/env/env-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
 import { pageHead } from "../../features/shared/head.ts";
+import { useProjectList } from "../../features/shared/shell/context.ts";
+import { branchPage } from "../../server/cache-headers.ts";
 import { serverClient } from "../../server/client.ts";
 
 // A project's env shape, as anyone may read it: never a value, and no form
@@ -92,7 +94,12 @@ const FreshEnv = ({
     () => read
   );
 
-  return <EnvView now={now} schema={schema} />;
+  // The posture rides with the list of projects, which may come after the page.
+  const posture = useProjectList()?.find(
+    (listing) => listing.project === read.project
+  )?.posture;
+
+  return <EnvView now={now} posture={posture} schema={schema} />;
 };
 
 const EnvPage = () => {
@@ -124,7 +131,13 @@ const Unknown = () => {
 
 export const Route = createFileRoute("/$project/env")({
   loader: ({ params }) => envPage({ data: params.project }),
-  head: ({ params }) => pageHead({ title: `Env shape of ${params.project}` }),
+  // The env shape moves with the next landing or value set: kept briefly, read again behind.
+  headers: () => branchPage,
+  head: ({ params: { project } }) =>
+    pageHead({
+      title: `Env shape · ${project}`,
+      description: `${project}'s env items, never a value.`,
+    }),
   component: EnvPage,
   notFoundComponent: Unknown,
 });

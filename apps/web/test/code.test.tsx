@@ -2,14 +2,14 @@
  * The code browser's pages, rendered to HTML with `react-dom/server` from
  * fixtures decoded with the protocol's own schemas: a folder (`TreeView`), a
  * file (`BlobView`), the landings (`LogView`), one commit (`CommitView`), a
- * missing path's soft landing and the refs (`RefsView`). Each is what the
- * server sends before the browser loads Pierre: the tree and the
+ * missing path's soft landing; the refs page has its own test
+ * (`refs.test.tsx`). Each is what the server sends before the browser
+ * loads Pierre: the tree and the
  * highlighted code are client-only, so none of these pages carries a
  * `<file-tree-container` or a `<diffs-container`; a commit's diff arrives as
  * plain text at the drawing's measures.
  */
 import { describe, expect, it } from "@effect/vitest";
-import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { Contract } from "@repo/protocol/contracts";
 import {
@@ -35,7 +35,7 @@ import {
 import type { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { defaultParseSearch, isNotFound } from "@tanstack/react-router";
+import { isNotFound } from "@tanstack/react-router";
 import { DateTime, Effect, Layer, Option, Ref, Schema } from "effect";
 import { RpcTest } from "effect/rpc";
 import type { Rpc } from "effect/rpc";
@@ -47,8 +47,6 @@ import { CommitView } from "../src/features/code/commit-view.tsx";
 import { LOG_PAGE } from "../src/features/code/log-page.ts";
 import { LogView } from "../src/features/code/log-view.tsx";
 import { CodeNotFound } from "../src/features/code/not-found.tsx";
-import { packageParamOf } from "../src/features/code/refs-param.ts";
-import { RefsView, TAGS_PAGE } from "../src/features/code/refs-view.tsx";
 import { SoftLanding } from "../src/features/code/soft-landing.ts";
 import { TreeView } from "../src/features/code/tree-view.tsx";
 import { Refusals } from "../src/features/shared/refusals.ts";
@@ -1060,217 +1058,6 @@ describe(CommitView, () => {
       textOf(<CommitView diff={truncated} now={now} project={datekit} />)
     ).toContain("too large to show whole");
     expect(textOf(page)).not.toContain("too large to show whole");
-  });
-});
-
-describe(RefsView, () => {
-  const refs = Schema.decodeSync(Refs)({
-    forks: [
-      {
-        ask: "parse-iso",
-        handle: "ines-v",
-        kind: "claim",
-        repo: "datekit--parse-iso--ines-v",
-        state: "live",
-      },
-      { handle: "bram", kind: "working", repo: "datekit--me--bram" },
-    ],
-    landed: LANDED,
-    project: "datekit",
-    tags: [
-      { name: "v1.1.0", sha: IMPORTED },
-      { name: "v1.0.0", sha: OLDER },
-    ],
-  });
-
-  const page = <RefsView refs={refs} />;
-
-  it("shows main at its landed commit, linked", () => {
-    const main = slice(markupOf(page), "data-ref", "main");
-
-    expect(main).toContain(LANDED.slice(0, 7));
-    expect(hrefsOf(main)).toContain(`/datekit/commit/${LANDED}`);
-  });
-
-  it("lists the tags newest first, each linking its tree", () => {
-    const markup = markupOf(page);
-
-    expect(markup.indexOf('data-tag="v1.1.0"')).toBeGreaterThan(-1);
-    expect(markup.indexOf('data-tag="v1.1.0"')).toBeLessThan(
-      markup.indexOf('data-tag="v1.0.0"')
-    );
-    expect(hrefsOf(markup)).toContain("/datekit/tree/v1.1.0");
-  });
-
-  it("links a claim fork to its answer, with its ask, person and state", () => {
-    const fork = slice(
-      markupOf(page),
-      "data-fork",
-      "datekit--parse-iso--ines-v"
-    );
-
-    expect(hrefsOf(fork)).toContain("/datekit/answers/parse-iso");
-    expect(hrefsOf(fork)).toContain("/people/ines-v");
-    expect(fork).toContain("live");
-    expect(textOf(page)).toContain("datekit--me--bram");
-  });
-
-  it("never names the platform's own refs, and says tags, not releases", () => {
-    const text = textOf(page);
-
-    expect(text).not.toContain(Brand.refsPrefix);
-    expect(text).not.toContain("refs/notes");
-    expect(text.toLowerCase()).not.toContain("release");
-  });
-
-  it("lists no packages when the tags version none or one", () => {
-    const one = Schema.decodeSync(Refs)({
-      forks: [],
-      project: "datekit",
-      tags: [
-        { name: "v1.1.0", sha: IMPORTED },
-        { name: "@datekit/core@2.0.0", sha: LANDED },
-        { name: "@datekit/core@1.0.0", sha: OLDER },
-      ],
-    });
-
-    expect(markupOf(page)).not.toContain("data-package=");
-    expect(markupOf(<RefsView refs={one} />)).not.toContain("data-package=");
-    expect(textOf(<RefsView refs={one} />)).not.toContain("Packages");
-  });
-});
-
-describe("a monorepo's refs page", () => {
-  /** Tags as `listRefs` orders them: plain, then each package's run. */
-  const monorepo = Schema.decodeSync(Refs)({
-    forks: [],
-    landed: LANDED,
-    project: "datekit",
-    tags: [
-      { name: "v1.1.0", sha: IMPORTED },
-      { name: "@datekit/core@2.0.0", sha: LANDED },
-      { name: "@datekit/core@1.0.0", sha: OLDER },
-      { name: "fmt@0.1.0", sha: OLDER },
-    ],
-  });
-
-  const CORE = "/datekit/refs?package=%40datekit%2Fcore";
-
-  it("lists each package above the tags, with its newest tag, linked to its tree, and its count", () => {
-    const markup = markupOf(<RefsView refs={monorepo} />);
-    const core = slice(markup, "data-package", "@datekit/core");
-    const fmt = slice(markup, "data-package", "fmt");
-
-    expect(textOf(<RefsView refs={monorepo} />)).toContain("Packages");
-    expect(hrefsOf(core)).toStrictEqual([
-      CORE,
-      `/datekit/tree/${TAG_SEGMENT.replace("1.0.0", "2.0.0")}`,
-    ]);
-    expect(textOf(<RefsView refs={monorepo} />)).toContain("2 tags");
-    // The last package's slice runs on to the page's end: its first two links.
-    expect(hrefsOf(fmt).slice(0, 2)).toStrictEqual([
-      "/datekit/refs?package=fmt",
-      "/datekit/tree/fmt%400.1.0",
-    ]);
-    expect(fmt).toContain("1 tag<");
-  });
-
-  it("puts the packages above the tags", () => {
-    const markup = markupOf(<RefsView refs={monorepo} />);
-
-    expect(markup.indexOf('data-package="@datekit/core"')).toBeGreaterThan(-1);
-    expect(markup.indexOf('data-package="@datekit/core"')).toBeLessThan(
-      markup.indexOf('data-tag="v1.1.0"')
-    );
-  });
-
-  it("lists only one package's tags, newest first, with a way back to all", () => {
-    const element = <RefsView package="@datekit/core" refs={monorepo} />;
-
-    const markup = markupOf(element);
-
-    expect(
-      [...markup.matchAll(/data-tag="(?<tag>[^"]*)"/gu)].map(
-        (match) => match.groups?.tag
-      )
-    ).toStrictEqual(["@datekit/core@2.0.0", "@datekit/core@1.0.0"]);
-    expect(markup).not.toContain("data-package=");
-    expect(hrefsOf(markup)).toContain("/datekit/refs");
-    expect(textOf(element)).toContain("All tags");
-  });
-
-  it("pages one package's tags, keeping the package in the address", () => {
-    const many = Schema.decodeSync(Refs)({
-      forks: [],
-      project: "datekit",
-      tags: [
-        ...Array.from({ length: TAGS_PAGE + 1 }, (_, at) => ({
-          name: `@datekit/core@1.0.${TAGS_PAGE - at}`,
-          sha: OLDER,
-        })),
-        { name: "fmt@0.1.0", sha: OLDER },
-      ],
-    });
-
-    expect(
-      hrefsOf(markupOf(<RefsView package="@datekit/core" refs={many} />))
-    ).toContain(`${CORE}&from=${TAGS_PAGE}`);
-    expect(
-      hrefsOf(
-        markupOf(
-          <RefsView from={TAGS_PAGE} package="@datekit/core" refs={many} />
-        )
-      )
-    ).toContain(CORE);
-  });
-
-  it("says plainly that a package it does not know has no tags", () => {
-    const element = <RefsView package="@datekit/none" refs={monorepo} />;
-
-    expect(markupOf(element)).not.toContain("data-tag=");
-    expect(textOf(element)).toContain("No tags for @datekit/none.");
-    expect(hrefsOf(markupOf(element))).toContain("/datekit/refs");
-  });
-
-  it("links each package so the router reads its name back, even one that reads as a number", () => {
-    const odd = Schema.decodeSync(Refs)({
-      forks: [],
-      project: "datekit",
-      tags: [
-        { name: "2048@1.0.0", sha: OLDER },
-        { name: "true@1.0.0", sha: OLDER },
-        { name: "@datekit/core@1.0.0", sha: OLDER },
-      ],
-    });
-
-    const read = hrefsOf(markupOf(<RefsView refs={odd} />))
-      .filter((href) => href.includes("package="))
-      .map((href) => {
-        // What the router hands the route's `validateSearch`.
-        const search = defaultParseSearch(new URL(href, "https://web").search);
-
-        return packageParamOf("package" in search ? search.package : undefined);
-      });
-
-    expect(read).toStrictEqual([
-      Option.some("2048"),
-      Option.some("true"),
-      Option.some("@datekit/core"),
-    ]);
-  });
-
-  it("reads a package from the address only when it names one", () => {
-    expect(packageParamOf("@datekit/core")).toStrictEqual(
-      Option.some("@datekit/core")
-    );
-    expect(
-      [undefined, "", 3, "x".repeat(256)].map((value) => packageParamOf(value))
-    ).toStrictEqual([
-      Option.none(),
-      Option.none(),
-      Option.none(),
-      Option.none(),
-    ]);
   });
 });
 

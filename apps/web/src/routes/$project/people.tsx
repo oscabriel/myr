@@ -19,11 +19,13 @@ import { watchAtom } from "../../client/watch.ts";
 import { PeopleView } from "../../features/project-people/people-view.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
 import { pageHead } from "../../features/shared/head.ts";
+import { branchPage } from "../../server/cache-headers.ts";
 import { serverClient } from "../../server/client.ts";
 
-// Who decides what in a project, who is vouched for, and who reads and
-// writes each layer: the evaluated policy at the landed commit beside the
-// ledger. The loader reads both on the server, so the page arrives whole
+// A project's policy (its section reads "Policy" at the address it has
+// always had): who decides what, who is vouched for, its limits, and its
+// layers in a line, from the evaluated policy at the landed commit beside
+// the ledger. The loader reads both on the server, so the page arrives whole
 // and an address naming no project is a 404; in the browser each reads
 // again as the platform lands changes and appends entries.
 
@@ -125,7 +127,13 @@ const Unknown = () => {
 
 export const Route = createFileRoute("/$project/people")({
   loader: ({ params }) => peoplePage({ data: params.project }),
-  head: ({ params: { project } }) => pageHead({ title: `${project}: people` }),
+  // The policy moves with the next landing: kept briefly, read again behind.
+  headers: () => branchPage,
+  head: ({ params: { project } }) =>
+    pageHead({
+      title: `Policy · ${project}`,
+      description: `${project}'s deciders and limits.`,
+    }),
   component: PeoplePage,
   notFoundComponent: Unknown,
 });

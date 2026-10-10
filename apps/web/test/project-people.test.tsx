@@ -1,5 +1,5 @@
 /**
- * A project's people page, rendered to HTML with `react-dom/server` from
+ * A project's policy page (its route is `/$project/people`), rendered to HTML with `react-dom/server` from
  * fixtures decoded with the protocol's own schemas (`PublicPolicy` from
  * `projectPolicy`, `Ledger` from `ledger`): who decides which paths, who is
  * vouched for and denounced, each layer's readers and writers, the caps,
@@ -20,8 +20,11 @@ import { Effect, Layer, Option, Ref, Schema } from "effect";
 import { RpcTest } from "effect/rpc";
 
 import { PeopleView } from "../src/features/project-people/people-view.tsx";
+import { projectSections } from "../src/features/shared/shell/sections.ts";
 import { readPeople } from "../src/routes/$project/people.tsx";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
+import { elementWith, elementsWith, inspectorOf, mainOf } from "./records.ts";
+import { renderAt } from "./render.tsx";
 
 const datekit = ProjectName.make("datekit");
 
@@ -123,28 +126,25 @@ const page = (
   />
 );
 
-/** The markup from `start` up to `end` (or to the end): one section of the page. */
-const between = (markup: string, start: string, end?: string) =>
-  markup.slice(
-    markup.indexOf(start),
-    end === undefined ? undefined : markup.indexOf(end)
-  );
-
 /** The markup of the section whose heading has the id `id`. */
 const sectionOf = (markup: string, id: string) => {
   const heading = markup.indexOf(`id="${id}"`);
 
-  return markup.slice(
-    markup.lastIndexOf("<section", heading),
-    markup.indexOf("</section>", heading)
-  );
+  return heading === -1
+    ? ""
+    : elementWith(markup.slice(markup.lastIndexOf("<section", heading)), "");
 };
 
-/** Each shell line the page offers to copy, as typed. */
+/**
+ * Each shell line the page offers to copy, as typed: one command, its
+ * continuation lines (` \` then a new line) joined back into one.
+ */
 const commandsOf = (markup: string) =>
   [
     ...markup.matchAll(/<code\b[^>]*select-all[^>]*>(?<line>.*?)<\/code>/gsu),
-  ].map((found) => plainText(found.groups?.line ?? "").trim());
+  ].map((found) =>
+    plainText((found.groups?.line ?? "").replaceAll(/ \\\n\s*/gu, " ")).trim()
+  );
 
 /** The CLI command a line runs: the longest command path it starts with. */
 const commandOf = (line: string) =>
@@ -153,36 +153,71 @@ const commandOf = (line: string) =>
     .toSorted((one, other) => other.path.length - one.path.length)
     .at(0);
 
-/** Each `<tr>`'s text, in order. */
-const rowsOf = (markup: string) =>
-  [...markup.matchAll(/<tr\b[^>]*>(?<row>.*?)<\/tr>/gsu)].map((found) =>
-    plainText(found.groups?.row ?? "").trim()
+/** Each deciders row's text, in order. */
+const decidersOf = (markup: string) =>
+  elementsWith(mainOf(markup), "data-paths=").map((row) =>
+    plainText(row).trim()
   );
 
-describe("a project's people page", () => {
-  it("lists who decides which paths, in the policy's order, each handle linked to their page", () => {
+describe("a project's policy page", () => {
+  it("is titled Policy, as of the landed commit, from the config file, each linked", () => {
     const markup = markupOf(page);
-    const table = between(markup, "<table", "</table>");
+    const meta = plainText(mainOf(markup));
 
-    expect(rowsOf(table)).toStrictEqual([
-      "Paths Deciders",
+    expect(markup).toMatch(/<h1\b[^>]*>Policy<\/h1>/u);
+    expect(meta).toContain(
+      `As of ${sha.slice(0, 7)} , from ${Brand.configDir}/project.ts`
+    );
+    expect(markup).toMatch(
+      new RegExp(
+        `<a\\b[^>]*href="/datekit/commit/${sha}"[^>]*>${sha.slice(0, 7)}</a>`,
+        "u"
+      )
+    );
+    expect(mainOf(markup)).toContain(
+      `href="/datekit/blob/${sha}/${Brand.configDir}/project.ts"`
+    );
+  });
+
+  it.effect(
+    "reads Policy in the crumbs and the project's sections, at the address it has always had",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt("/datekit/people", page);
+        const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
+
+        expect(plainText(crumbs)).toContain("Policy");
+        expect(plainText(crumbs)).not.toContain("People");
+        expect(
+          projectSections("datekit").find(({ to }) => to === "/datekit/people")
+            ?.label
+        ).toBe("Policy");
+      })
+  );
+
+  it("lists who decides which paths, in the policy's order, the path in mono and each handle linked to their page", () => {
+    const markup = markupOf(page);
+    const rows = elementsWith(mainOf(markup), "data-paths=");
+
+    expect(decidersOf(markup)).toStrictEqual([
       "** ines-v",
       "src/format/** okonkwo , bram",
       "src/tz.ts okonkwo",
     ]);
-    expect(table).toMatch(
+    expect(rows[0]).toMatch(/<code\b[^>]*font-mono[^>]*>\*\*<\/code>/u);
+    expect(rows[1]).toMatch(
       /<a\b[^>]*href="\/people\/okonkwo"[^>]*>okonkwo<\/a>/u
     );
-    expect(table).toMatch(/<a\b[^>]*href="\/people\/bram"[^>]*>bram<\/a>/u);
+    expect(rows[1]).toMatch(/<a\b[^>]*href="\/people\/bram"[^>]*>bram<\/a>/u);
   });
 
   it("states the vouch rule in words and splits the file into vouched and denounced, with notes", () => {
-    const markup = markupOf(page);
-    const vouching = plainText(between(markup, 'id="vouching"', 'id="layers"'));
+    const markup = mainOf(markupOf(page));
+    const vouching = sectionOf(markup, "vouching");
 
-    expect(vouching).toContain("For code");
+    expect(plainText(vouching)).toContain("For code");
     expect(
-      inOrder(vouching, [
+      inOrder(plainText(vouching), [
         "Vouched for",
         "bram",
         "first answer landed in 0.4.0",
@@ -193,50 +228,39 @@ describe("a project's people page", () => {
         "opened 40 proposals",
       ])
     ).toBeTruthy();
-    expect(markup).toContain(
+    expect(vouching).toContain('data-vouch="spam-bot"');
+    expect(vouching).toContain(
       `href="/datekit/blob/${sha}/${Brand.configDir}/vouched.td"`
     );
   });
 
-  it("shows each layer's audience, readers, writers, disclosure, reason and sunset, from the ledger", () => {
-    const layers = plainText(
-      between(markupOf(page), 'id="layers"', 'id="limits"')
+  it("names the layers in one line that links the ledger, and lists no reader, writer or audience again", () => {
+    const markup = mainOf(markupOf(page));
+    const layers = elementWith(markup, "data-layers");
+
+    expect(layers).toContain('data-layer="maintainers"');
+    expect(layers).toMatch(/<a\b[^>]*href="\/datekit\/ledger"/u);
+    expect(plainText(layers)).toContain("sealed");
+    expect(layers.slice(layers.indexOf(">") + 1)).not.toMatch(
+      /<(?:p|div|ul|ol|li|dl)\b/u
     );
 
-    expect(
-      inOrder(layers, [
-        "maintainers",
-        "Audience",
-        "maintainers",
-        "Readers",
-        "the deciders",
-        "Writers",
-        "ines-v",
-        "okonkwo",
-        "Disclosure",
-        "sealed",
-        "Reason",
-        "Held-back checks judge an answer by the ask's words.",
-        "Sunset",
-        "90 days",
-      ])
-    ).toBeTruthy();
+    for (const repeated of ["Readers", "Writers", "Audience", "the deciders"]) {
+      expect(markup).not.toContain(repeated);
+    }
   });
 
-  it("says what a layer discloses in the ledger page's own words", () => {
-    const layers = plainText(
-      between(markupOf(page), 'id="layers"', 'id="limits"')
-    );
+  it("heads the layers' line as its own section, so it never reads as part of Agents", () => {
+    const markup = mainOf(markupOf(page));
+    const layers = sectionOf(markup, "layers");
 
-    expect(layers).toContain(
-      "sealed: counts, authors and a salted root; never names, paths or contents"
-    );
+    expect(layers).toMatch(/<h2\b[^>]*id="layers"[^>]*>Layers<\/h2>/u);
+    expect(layers).toContain("data-layers");
+    expect(sectionOf(markup, "agents")).not.toContain("data-layers");
   });
 
-  it("shows the caps, budget, claim timing and record window", () => {
-    const limits = plainText(
-      between(markupOf(page), 'id="limits"', 'id="agents"')
-    );
+  it("shows the caps, budget, claim timing and record window, the numbers tabular", () => {
+    const limits = sectionOf(mainOf(markupOf(page)), "limits");
 
     for (const words of [
       "3 claims per person",
@@ -248,8 +272,10 @@ describe("a project's people page", () => {
       "30 days",
       "365 days",
     ]) {
-      expect(limits).toContain(words);
+      expect(plainText(limits)).toContain(words);
     }
+
+    expect(limits).toContain("tabular-nums");
   });
 
   it("says whether landings disclose the agents people worked through", () => {
@@ -300,52 +326,41 @@ describe("a project's people page", () => {
     );
   });
 
-  it("links the file each section comes from, inside that section", () => {
-    const markup = markupOf(page);
-    const projectFile = `href="/datekit/blob/${sha}/${Brand.configDir}/project.ts"`;
-
-    for (const id of ["deciders", "limits", "agents"]) {
-      expect(sectionOf(markup, id)).toContain(projectFile);
-    }
-
-    expect(sectionOf(markup, "vouching")).toContain(
-      `href="/datekit/blob/${sha}/${Brand.configDir}/vouched.td"`
-    );
-    expect(markup.split(projectFile)).toHaveLength(4);
-  });
-
-  it("says which commit it is as of, and links each source file at that commit", () => {
-    const markup = markupOf(page);
-
-    expect(textOf(page)).toContain(`As of ${sha.slice(0, 7)}`);
-    expect(markup).toMatch(
-      new RegExp(
-        `<a\\b[^>]*href="/datekit/commit/${sha}"[^>]*>${sha.slice(0, 7)}</a>`,
-        "u"
-      )
-    );
-    expect(markup).toContain(
-      `href="/datekit/blob/${sha}/${Brand.configDir}/project.ts"`
-    );
-  });
-
   it("offers no control, only how to change it: land a change to the config folder", () => {
     const markup = markupOf(page);
-    const text = plainText(markup);
+    const facts = plainText(inspectorOf(markup));
 
     for (const control of ["<input", "<textarea", "<form", "<select"]) {
       expect(markup).not.toContain(control);
     }
 
-    expect(text).toContain(
-      `Change these by landing a change to ${Brand.configDir}/`
-    );
-    expect(text).toContain(`${Brand.cli} ask open`);
-    expect(text).toContain(`${Brand.cli} land`);
+    expect(facts).toContain(`Land a change to ${Brand.configDir}/`);
+    expect(facts).toContain(`${Brand.cli} ask open`);
+    expect(facts).toContain(`${Brand.cli} land`);
+  });
+
+  it("puts each change command on lines of its own, numbered, never one wall", () => {
+    const facts = inspectorOf(markupOf(page));
+
+    const raw = [
+      ...facts.matchAll(/<code\b[^>]*select-all[^>]*>(?<line>.*?)<\/code>/gsu),
+    ].map((found) => found.groups?.line ?? "");
+
+    expect(raw).toHaveLength(2);
+
+    for (const command of raw) {
+      expect(command.split("\n").length).toBeGreaterThan(1);
+
+      for (const line of command.split("\n")) {
+        expect(line.split("$(git rev-parse HEAD)").length).toBeLessThan(3);
+      }
+    }
+
+    expect([...facts.matchAll(/<code\b[^>]*select-all/gu)]).toHaveLength(2);
   });
 
   it("shows each command whole: a real CLI command, with every flag its payload takes and --yes", () => {
-    const lines = commandsOf(markupOf(page));
+    const lines = commandsOf(inspectorOf(markupOf(page)));
 
     expect(lines.map((line) => commandOf(line)?.contract)).toStrictEqual([
       "openAsk",
@@ -397,15 +412,12 @@ describe("a project's people page", () => {
     expect(textOf(view)).toContain(
       `This project has no ${Brand.configDir}/project.ts: the person who set it up decides everything`
     );
-    expect(rowsOf(between(markup, "<table", "</table>"))).toStrictEqual([
-      "Paths Deciders",
-      "** wren",
-    ]);
+    expect(decidersOf(markup)).toStrictEqual(["** wren"]);
     expect(markup).not.toContain(`/${Brand.configDir}/project.ts"`);
     expect(textOf(view)).toContain("vouches for nobody");
   });
 
-  it("says nothing has landed yet, and shows no tables, when there is no policy and no reason", () => {
+  it("says nothing has landed yet, and shows no rules, when there is no policy and no reason", () => {
     const view = (
       <PeopleView
         ledger={datekitLedger}
@@ -418,7 +430,7 @@ describe("a project's people page", () => {
     const markup = markupOf(view);
 
     expect(textOf(view)).toContain("Nothing has landed yet");
-    expect(markup).not.toContain("<table");
+    expect(markup).not.toContain("data-paths=");
     expect(markup).not.toContain('id="vouching"');
   });
 
@@ -451,20 +463,27 @@ describe("a project's people page", () => {
     );
     expect(text).toContain(`${Brand.configDir}/project.ts`);
     expect(text).toContain("It is evaluated again at every landing.");
-    expect(markup).not.toContain("<table");
+    // Its reason rides on the notice, and no rules are drawn.
+    expect([
+      markup.includes('data-unevaluated="noConfig"'),
+      markup.includes("data-paths="),
+    ]).toStrictEqual([true, false]);
   });
 
   it("offers the CLI lines that make a config with no config folder evaluate, each a real command", () => {
-    const lines = commandsOf(
-      markupOf(
-        <PeopleView
-          ledger={burrowLedger}
-          policy={Option.none()}
-          project={ProjectName.make("burrow")}
-          unevaluated={Option.some(noConfig)}
-        />
-      )
+    const markup = markupOf(
+      <PeopleView
+        ledger={burrowLedger}
+        policy={Option.none()}
+        project={ProjectName.make("burrow")}
+        unevaluated={Option.some(noConfig)}
+      />
     );
+
+    const lines = [
+      ...commandsOf(mainOf(markup)),
+      ...commandsOf(inspectorOf(markup)),
+    ];
 
     expect(lines.map((line) => commandOf(line)?.path.join(" "))).toStrictEqual([
       "init",
@@ -497,6 +516,7 @@ describe("a project's people page", () => {
 
     const text = textOf(view);
 
+    expect(markupOf(view)).toContain('data-unevaluated="configFailed"');
     expect(text).toContain(
       `The config at the landed commit ${sha.slice(0, 7)} has not been evaluated: ${Brand.configDir}/ at ${sha.slice(0, 7)} did not evaluate`
     );

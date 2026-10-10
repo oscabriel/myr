@@ -21,7 +21,10 @@ import { RpcTest } from "effect/rpc";
 import { EnvView, NothingLanded } from "../src/features/env/env-page.tsx";
 import { ProjectView } from "../src/features/project/project-page.tsx";
 import { readEnv } from "../src/routes/$project/env.tsx";
-import { inOrder, markupOf, textOf } from "./ask-fixtures.ts";
+import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
+import { textIn } from "./markup.ts";
+import { elementWith, inspectorOf, mainOf } from "./records.ts";
+import { renderAt } from "./render.tsx";
 
 const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
 
@@ -89,25 +92,56 @@ const itemOf = (markup: string, key: string) => {
     : markup.slice(start, next === -1 ? undefined : next);
 };
 
+/** Each item's key, in the order the page lists them. */
+const keysOf = (markup: string) =>
+  [...mainOf(markup).matchAll(/data-env-key="(?<key>[^"]*)"/gu)].map(
+    (found) => found.groups?.key
+  );
+
 describe("a project's env shape", () => {
-  it("shows a sensitive item as sensitive, required by environment, with its proxy host and who set it", () => {
-    const item = itemOf(markupOf(page), "SENTRY_AUTH_TOKEN");
-    const text = textOf(page);
+  it("is titled Env shape, and its status line counts the items and says who set the sensitive one", () => {
+    const markup = markupOf(page);
+
+    expect(markup).toMatch(/<h1\b[^>]*>Env shape<\/h1>/u);
+    expect(textIn(elementWith(markup, "data-env-status")).trim()).toBe(
+      "4 items · 1 sensitive, set by ines-v 2 d ago"
+    );
+  });
+
+  it("lists the sensitive item first, whatever its place in the schema, then the rest in the schema's order", () => {
+    expect(keysOf(markupOf(page))).toStrictEqual([
+      "SENTRY_AUTH_TOKEN",
+      "APP_ENV",
+      "SENTRY_DSN",
+      "DATEKIT_LOCALE_DIR",
+    ]);
+  });
+
+  it("says on the sensitive item's own line that it is sensitive and who set it, then its facts", () => {
+    const item = itemOf(mainOf(markupOf(page)), "SENTRY_AUTH_TOKEN");
+    const line = elementWith(item, "data-env-line");
 
     expect(item).toContain('data-sensitive="true"');
     expect(
-      inOrder(text, [
+      inOrder(plainText(line), [
         "SENTRY_AUTH_TOKEN",
+        "sensitive",
+        "set by ines-v",
+        "2 d ago",
+      ])
+    ).toBeTruthy();
+    expect(elementWith(line, "data-env-sensitive")).toMatch(/text-sealed/u);
+    expect(
+      inOrder(plainText(item), [
         "Source-map upload token.",
         "Required",
         "depends on environment",
-        "Sensitive",
-        "yes",
         "Proxy",
         "sentry.io",
-        "Value",
-        "set by ines-v",
-        "2 d ago",
+        "only",
+        "/api/**",
+        "Tags",
+        "release",
       ])
     ).toBeTruthy();
   });
@@ -115,11 +149,13 @@ describe("a project's env shape", () => {
   it("never says a value was set in the future, though it was set after the page was read", () => {
     // Served at 09:00; ines-v set the value at 09:30 while the page stayed open.
     const item = itemOf(
-      markupOf(
-        <EnvView
-          now={DateTime.makeUnsafe("2026-10-10T09:00:00Z")}
-          schema={datekit}
-        />
+      mainOf(
+        markupOf(
+          <EnvView
+            now={DateTime.makeUnsafe("2026-10-10T09:00:00Z")}
+            schema={datekit}
+          />
+        )
       ),
       "SENTRY_AUTH_TOKEN"
     );
@@ -129,7 +165,7 @@ describe("a project's env shape", () => {
   });
 
   it("shows every item's name, type and description", () => {
-    const text = textOf(page);
+    const text = plainText(mainOf(markupOf(page)));
 
     expect(
       inOrder(text, [
@@ -138,20 +174,37 @@ describe("a project's env shape", () => {
         "SENTRY_DSN",
         "Error reporting DSN.",
         "url",
-        "SENTRY_AUTH_TOKEN",
         "DATEKIT_LOCALE_DIR",
         "Where locale data lives.",
       ])
     ).toBeTruthy();
   });
 
-  it("credits the format to varlock", () => {
+  it("credits the format to varlock, linked", () => {
+    const markup = markupOf(page);
+
     expect(textOf(page)).toContain("env shape: varlock's .env.schema format");
+    expect(markup).toMatch(/<a\b[^>]*href="https:\/\/varlock\.dev"/u);
   });
 
-  it("shows no value and no control to set or read one, only the CLI line", () => {
+  it("says where it was read: the file, the landed commit and the environment", () => {
+    const facts = inspectorOf(markupOf(page));
+
+    expect(
+      inOrder(plainText(facts), [
+        "Where it was read",
+        ".env.schema",
+        "9b1c3e5",
+        "APP_ENV",
+      ])
+    ).toBeTruthy();
+    expect(facts).toContain(
+      'href="/datekit/commit/9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c"'
+    );
+  });
+
+  it("shows no value and no control to set or read one, only the CLI line, numbered", () => {
     const markup = markupOf(page);
-    const text = textOf(page);
 
     for (const control of ["<input", "<textarea", "<form", "<select"]) {
       expect(markup).not.toContain(control);
@@ -160,9 +213,20 @@ describe("a project's env shape", () => {
     expect(markup).not.toMatch(/reveal|show value/iu);
     // The placeholder unlanded code sees is not a value, but reads like one.
     expect(markup).not.toContain("placeholder-sentry-auth-token");
-    expect(text).toContain(
+    expect(plainText(inspectorOf(markup))).toContain(
       `${Brand.cli} env set <KEY> --project datekit --yes`
     );
+  });
+
+  it("shows the project's posture in its facts once the project list has it", () => {
+    const markup = markupOf(
+      <EnvView now={now} posture="openWithSealedEvidence" schema={datekit} />
+    );
+
+    expect(inspectorOf(markup)).toContain(
+      'data-posture="openWithSealedEvidence"'
+    );
+    expect(inspectorOf(markupOf(page))).not.toContain("data-posture=");
   });
 
   it("says a sensitive item nobody set is not set", () => {
@@ -171,13 +235,14 @@ describe("a project's env shape", () => {
       items: items.map(({ value: _value, ...item }) => item),
     });
 
-    const item = itemOf(
-      markupOf(<EnvView now={now} schema={unset} />),
-      "SENTRY_AUTH_TOKEN"
-    );
+    const markup = markupOf(<EnvView now={now} schema={unset} />);
+    const item = itemOf(mainOf(markup), "SENTRY_AUTH_TOKEN");
 
     expect(item).toContain("not set");
     expect(item).not.toContain("set by");
+    expect(textIn(elementWith(markup, "data-env-status")).trim()).toBe(
+      "4 items · 1 sensitive, not set"
+    );
   });
 
   it("links an item's docs only when they are a web address, and marks it deprecated", () => {
@@ -202,7 +267,7 @@ describe("a project's env shape", () => {
       ],
     });
 
-    const markup = markupOf(<EnvView now={now} schema={view} />);
+    const markup = mainOf(markupOf(<EnvView now={now} schema={view} />));
 
     expect(itemOf(markup, "OLD_LOCALE_DIR")).toContain(
       'href="https://docs.example.invalid/locales"'
@@ -222,13 +287,26 @@ describe("a project's env shape", () => {
       "No env items"
     );
   });
+
+  it.effect("sits under the project's crumbs: datekit, then Env shape", () =>
+    Effect.gen(function* () {
+      const markup = yield* renderAt("/datekit/env", page);
+      const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
+
+      expect(crumbs).toMatch(/<a\b[^>]*href="\/datekit"[^>]*>datekit<\/a>/u);
+      expect(plainText(crumbs)).toContain("Env shape");
+    })
+  );
 });
 
 describe("a project with nothing landed", () => {
-  it("says it has no env shape yet, rather than that it is unknown", () => {
-    const text = textOf(<NothingLanded project={datekit.project} />);
+  it("says it has no env shape yet, rather than that it is unknown, with the command to read it", () => {
+    const view = <NothingLanded project={datekit.project} />;
+    const text = textOf(view);
 
+    expect(markupOf(view)).toMatch(/<h1\b[^>]*>Env shape<\/h1>/u);
     expect(text).toContain("Nothing has landed in datekit yet");
+    expect(text).toContain(`${Brand.cli} env shape --project datekit`);
     expect(text).not.toContain("UnknownProject");
   });
 });

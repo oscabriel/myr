@@ -1,9 +1,13 @@
 /**
- * A project's ledger, in its own terms: the posture label the
- * platform computed, each declared layer with its audience, kinds,
- * disclosure and reason, each sealed area folded from the entries (how many
- * sealed checks, how many people wrote them, the suite's salted root, when
- * it last changed, its admission record), then every entry, newest first.
+ * A project's ledger, facts first. Its status line is one sentence: the
+ * posture label the platform computed, then each sealed area's count and
+ * authors ("Open with sealed evidence. export: 7 sealed checks by 3
+ * people."). Then each declared layer (its audience, holdings, disclosure,
+ * reason and who reads and writes it), each sealed area folded from the
+ * entries (its salted root, its admission record, when it last changed),
+ * and the history: one typed line per entry, newest first. The inspector
+ * holds the posture, what is held back, the CLI line and what each
+ * disclosure means.
  *
  * Props in, markup out: the route reads the ledger (`src/client/ledger.ts`)
  * and hands it here. The ledger carries no path, no check name and no file
@@ -12,155 +16,38 @@
  */
 import { Brand } from "@repo/brand";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
-import type { Layer, Ledger } from "@repo/protocol/domain/visibility";
-import type { AreaName, SuiteRoot } from "@repo/protocol/ids";
-import { DateTime, Option } from "effect";
+import type { Layer, Ledger, Members } from "@repo/protocol/domain/visibility";
+import type { Handle, ProjectName } from "@repo/protocol/ids";
+import { DateTime, Match, Option } from "effect";
+import { LockKeyhole } from "lucide-react";
+import { Fragment } from "react";
 import type { ReactNode } from "react";
 
-import { Field, Fields, Region } from "../ask/fields.tsx";
+import { Definition, Definitions, Region } from "../ask/fields.tsx";
+import { commitHref, shortSha } from "../code/paths.ts";
 import { postureLabel } from "../project/posture-label.ts";
-import { ProjectNav } from "../project/project-nav.tsx";
-import { CODE, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
+import { CopyAction } from "../shared/copy-action.tsx";
 import { disclosureWords } from "../shared/disclosure.ts";
 import { EmptyState } from "../shared/empty.tsx";
+import {
+  CodeValue,
+  FactBlock,
+  HeldBackFacts,
+  PostureFacts,
+} from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
-import { PageShell } from "../shared/layout.tsx";
-import { PostureBadge } from "../shared/posture.tsx";
+import { AppLink } from "../shared/link.tsx";
+import { POSTURE_MARKS } from "../shared/mark-look.ts";
+import { Mark } from "../shared/marks.tsx";
+import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
-
-/** An admission's evidence: when, how many green runs on main, how many known-bad trees it failed. */
-export interface Admission {
-  readonly at: DateTime.Utc;
-  readonly knownBadCaught: number;
-  readonly mainRuns: number;
-}
-
-/** One sealed area, as its entries leave it. */
-export interface AreaSummary {
-  /** The admission of the area's current root; none when that root joined without one. */
-  readonly admission: Option.Option<Admission>;
-  readonly area: AreaName;
-  /** How many people wrote the suite, as its latest commitment counts them. */
-  readonly authors: Option.Option<number>;
-  /** When any entry about the area was last recorded. */
-  readonly changedAt: DateTime.Utc;
-  /** How many sealed checks the area holds, as its latest count or commitment says. */
-  readonly checks: number;
-  /** The suite's salted root, as its latest commitment or admission names it. */
-  readonly root: Option.Option<SuiteRoot>;
-}
-
-/** What one entry says about an area, if it is about one. */
-interface AreaFact {
-  readonly admitted: Option.Option<Admission & { readonly suite: SuiteRoot }>;
-  readonly area: AreaName;
-  readonly at: DateTime.Utc;
-  readonly authors: Option.Option<number>;
-  readonly checks: Option.Option<number>;
-  readonly root: Option.Option<SuiteRoot>;
-}
-
-/** A fact that says nothing yet: each kind of entry fills in what it knows. */
-const noFact: Omit<AreaFact, "area" | "at"> = {
-  admitted: Option.none(),
-  authors: Option.none(),
-  checks: Option.none(),
-  root: Option.none(),
-};
-
-const factsOf = (entry: LedgerEntry): readonly AreaFact[] =>
-  LedgerEntry.match(entry, {
-    Admitted: ({ area, at, knownBadCaught, mainRuns, suite }) => [
-      {
-        ...noFact,
-        admitted: Option.some({ at, knownBadCaught, mainRuns, suite }),
-        area,
-        at,
-        root: Option.some(suite),
-      },
-    ],
-    CommitmentPublished: ({ area, at, authors, checks, suite }) => [
-      {
-        ...noFact,
-        area,
-        at,
-        authors: Option.some(authors),
-        checks: Option.some(checks),
-        root: Option.some(suite),
-      },
-    ],
-    CountChanged: ({ area, at, count }) => [
-      { ...noFact, area, at, checks: Option.some(count) },
-    ],
-    LayerDeclared: () => [],
-    PostureChanged: () => [],
-    Released: () => [],
-    ValueSet: () => [],
-  });
-
-/** The ledger's entries in the order they were recorded. */
-const recorded = (ledger: Ledger) =>
-  ledger.entries.toSorted((one, other) => one.seq - other.seq);
-
-/** An area as its facts so far leave it: each later fact overrides what it says. */
-interface Folded {
-  readonly admissions: ReadonlyMap<SuiteRoot, Admission>;
-  readonly area: AreaName;
-  readonly authors: Option.Option<number>;
-  readonly changedAt: DateTime.Utc;
-  readonly checks: Option.Option<number>;
-  readonly root: Option.Option<SuiteRoot>;
-}
-
-const foldFact = (before: Folded | undefined, fact: AreaFact): Folded => ({
-  admissions: Option.match(fact.admitted, {
-    onNone: () => before?.admissions ?? new Map(),
-    onSome: ({ suite, ...admission }) =>
-      new Map([...(before?.admissions ?? []), [suite, admission]]),
-  }),
-  area: fact.area,
-  authors: Option.orElse(fact.authors, () => before?.authors ?? Option.none()),
-  changedAt: fact.at,
-  checks: Option.orElse(fact.checks, () => before?.checks ?? Option.none()),
-  root: Option.orElse(fact.root, () => before?.root ?? Option.none()),
-});
-
-/**
- * Each sealed area's latest count, authors and root, when it last changed,
- * and the admission of its current root, folded from the entries in the
- * order they were recorded; areas by name.
- */
-export const areaSummaries = (ledger: Ledger): readonly AreaSummary[] => {
-  const areas = new Map<AreaName, Folded>();
-
-  for (const fact of recorded(ledger).flatMap(factsOf)) {
-    areas.set(fact.area, foldFact(areas.get(fact.area), fact));
-  }
-
-  return [...areas.values()]
-    .toSorted((one, other) => one.area.localeCompare(other.area))
-    .map(({ admissions, area, authors, changedAt, checks, root }) => ({
-      admission: Option.flatMap(root, (suite) =>
-        Option.fromUndefinedOr(admissions.get(suite))
-      ),
-      area,
-      authors,
-      changedAt,
-      checks: Option.getOrElse(checks, () => 0),
-      root,
-    }));
-};
-
-const plural = (count: number, one: string, many: string) =>
-  `${count} ${count === 1 ? one : many}`;
+import { areaHeadline, areaSummaries, ledgerHead, plural } from "./areas.ts";
+import type { AreaSummary } from "./areas.ts";
 
 /** A day as a reader skims it: "Oct 11", in UTC. */
 const dayOf = (at: DateTime.Utc) =>
   DateTime.formatUtc(at, { day: "numeric", locale: "en-US", month: "short" });
-
-/** A commit as git abbreviates it. */
-const short = (sha: string) => sha.slice(0, 7);
 
 /**
  * When the ledger was read, at the latest: `now`, or its newest entry's
@@ -178,27 +65,97 @@ const readAt = (ledger: Ledger, now: DateTime.Utc) => {
   return latest;
 };
 
+/** The ledger's entries, newest first. */
+const newestFirst = (ledger: Ledger) =>
+  ledger.entries.toSorted((one, other) => other.seq - one.seq);
+
 const Code = ({ children }: { readonly children: ReactNode }) => (
-  <code className={CODE}>{children}</code>
+  <code className="text-mono font-mono [overflow-wrap:anywhere]">
+    {children}
+  </code>
 );
+
+/** The posture label leads, in its role; the areas follow in ink. */
+const postureTone = {
+  open: "text-foreground",
+  openCore: "text-sealed",
+  openOnSchedule: "text-sealed",
+  openWithSealedEvidence: "text-sealed",
+  sourceAvailable: "text-foreground",
+} as const satisfies Record<Ledger["posture"], string>;
+
+/** The ledger's status line: its posture, then every sealed area, in one sentence. */
+const HeadSentence = ({ ledger }: { readonly ledger: Ledger }) => {
+  const { lead, rest } = ledgerHead(ledger);
+
+  return (
+    <p className="text-want max-w-[70ch] text-pretty" data-ledger-head="">
+      <Mark
+        className="mr-2 inline-block -translate-y-px align-middle"
+        look={POSTURE_MARKS[ledger.posture]}
+      />
+      <span
+        className={`font-semibold ${postureTone[ledger.posture]}`}
+        data-posture={ledger.posture}
+      >
+        {lead}
+      </span>
+      {rest}
+    </p>
+  );
+};
+
+/** Handles, each linked to their page, comma-separated. */
+const Handles = ({ handles }: { readonly handles: readonly Handle[] }) =>
+  handles.map((handle, index) => (
+    <Fragment key={handle}>
+      {index === 0 ? null : ", "}
+      <HandleLink handle={handle} />
+    </Fragment>
+  ));
+
+const MembersOf = ({ members }: { readonly members: Members }) =>
+  members === "deciders" ? "the deciders" : <Handles handles={members} />;
 
 const LayerBlock = ({ layer }: { readonly layer: Layer }) => (
   <li className="flex min-w-0 flex-col gap-2" data-layer={layer.name}>
-    <h3 className={`${CODE} text-sealed font-medium`}>{layer.name}</h3>
-    <Fields label={`Layer ${layer.name}`}>
-      <Field label="Audience">{layer.audience}</Field>
-      <Field label="Holds">{layer.holds.join(", ")}</Field>
-      <Field label="Disclosure">{disclosureWords[layer.disclose]}</Field>
-      <Field label="Reason">{layer.reason}</Field>
+    <h3
+      className="text-mono text-sealed flex items-center gap-2 font-mono font-medium"
+      data-layer-name=""
+    >
+      <LockKeyhole
+        aria-hidden="true"
+        className="size-4 shrink-0"
+        strokeWidth={1.75}
+      />
+      {layer.name}
+    </h3>
+    <Definitions label={`Layer ${layer.name}`}>
+      <Definition term="Audience">{layer.audience}</Definition>
+      <Definition term="Holds">{layer.holds.join(", ")}</Definition>
+      <Definition term="Disclosure">
+        {disclosureWords[layer.disclose]}
+      </Definition>
+      <Definition term="Reason">{layer.reason}</Definition>
+      <Definition term="Readers">
+        <MembersOf members={layer.readers} />
+      </Definition>
+      <Definition term="Writers">
+        <MembersOf members={layer.writers} />
+      </Definition>
       {layer.sunsetDays === undefined ? null : (
-        <Field label="Sunset">{`after ${plural(layer.sunsetDays, "day", "days")}`}</Field>
+        <Definition term="Sunset">
+          <span className="tabular-nums">{`released after ${plural(layer.sunsetDays, "day", "days")}`}</span>
+        </Definition>
       )}
       {layer.maxDays === undefined ? null : (
-        <Field label="Longest unreleased">
-          {plural(layer.maxDays, "day", "days")}
-        </Field>
+        <Definition term="Longest unreleased">
+          <span className="tabular-nums">
+            {plural(layer.maxDays, "day", "days")}
+          </span>
+        </Definition>
       )}
-    </Fields>
+    </Definitions>
   </li>
 );
 
@@ -210,16 +167,6 @@ const admissionWords = (summary: AreaSummary) =>
       `admitted ${dayOf(at)}; passes main ${mainRuns}/${mainRuns}; catches ${knownBadCaught} known-bad`,
   });
 
-/** "export: 7 sealed checks by 3 people". */
-const areaHeadline = ({ area, authors, checks }: AreaSummary) =>
-  `${area}: ${plural(checks, "sealed check", "sealed checks")}${Option.match(
-    authors,
-    {
-      onNone: () => "",
-      onSome: (count) => ` by ${plural(count, "person", "people")}`,
-    }
-  )}`;
-
 const AreaBlock = ({
   now,
   summary,
@@ -228,74 +175,160 @@ const AreaBlock = ({
   readonly summary: AreaSummary;
 }) => (
   <li className="flex min-w-0 flex-col gap-2" data-area={summary.area}>
-    <h3 className="text-sealed font-medium">{areaHeadline(summary)}</h3>
-    <Fields label={`Sealed checks in ${summary.area}`}>
-      <Field label="Root">
+    <h3
+      className="text-title text-sealed flex items-center gap-2"
+      data-area-title=""
+    >
+      <LockKeyhole
+        aria-hidden="true"
+        className="size-4 shrink-0"
+        strokeWidth={1.75}
+      />
+      {areaHeadline(summary)}
+    </h3>
+    <Definitions label={`Sealed checks in ${summary.area}`}>
+      <Definition term="Root">
         {Option.isSome(summary.root) ? (
-          <Code>{summary.root.value}</Code>
+          <span className="flex min-w-0 items-center gap-2">
+            <CodeValue value={summary.root.value} />
+            <CopyAction
+              command={summary.root.value}
+              label={`Copy ${summary.area}'s root`}
+            />
+          </span>
         ) : (
           "none published yet"
         )}
-      </Field>
-      <Field label="Last changed">
+      </Definition>
+      <Definition term="Admission">{admissionWords(summary)}</Definition>
+      <Definition term="Last changed">
         <When at={summary.changedAt} now={now} />
-      </Field>
-      <Field label="Admission">{admissionWords(summary)}</Field>
-    </Fields>
+      </Definition>
+    </Definitions>
   </li>
 );
 
-/** One entry in words, as the ledger records it. */
-const EntryWords = ({ entry }: { readonly entry: LedgerEntry }) =>
+/** Each kind of entry's word, and whether it is about something sealed. */
+const kindOf = Match.type<LedgerEntry>().pipe(
+  Match.tagsExhaustive({
+    Admitted: () => ({ sealed: true, word: "Admitted" }),
+    CommitmentPublished: () => ({ sealed: true, word: "Commitment changed" }),
+    CountChanged: () => ({ sealed: true, word: "Count changed" }),
+    LayerDeclared: () => ({ sealed: false, word: "Layer added" }),
+    PostureChanged: () => ({ sealed: false, word: "Posture changed" }),
+    Released: () => ({ sealed: false, word: "Released" }),
+    ValueSet: () => ({ sealed: true, word: "Value set" }),
+  })
+);
+
+/** One entry in words, as the ledger records it; its root, if it names one, is apart. */
+const EntryWords = ({
+  entry,
+  project,
+}: {
+  readonly entry: LedgerEntry;
+  readonly project: ProjectName;
+}): ReactNode =>
+  Match.value(entry).pipe(
+    Match.tagsExhaustive({
+      Admitted: ({ area, knownBadCaught, mainRuns }) =>
+        `${area} admitted: passes main ${mainRuns}/${mainRuns}; catches ${knownBadCaught} known-bad`,
+      CommitmentPublished: ({ area, authors, checks }) =>
+        `${area}: ${plural(checks, "sealed check", "sealed checks")} by ${plural(authors, "person", "people")}`,
+      CountChanged: ({ area, count, layer }) => (
+        <>
+          <Code>{layer}</Code>
+          {` holds ${count} in ${area}`}
+        </>
+      ),
+      LayerDeclared: ({ disclose, kinds, layer }) => (
+        <>
+          <Code>{layer}</Code>
+          {` declared, holding ${kinds.join(", ")}; ${disclose}`}
+        </>
+      ),
+      PostureChanged: ({ decision, from, to }) => (
+        <>
+          {`${postureLabel(from)} to ${postureLabel(to)}, by decision `}
+          <Code>{decision}</Code>
+        </>
+      ),
+      Released: ({ by, landing, layer, paths }) => (
+        <>
+          <HandleLink handle={by} />
+          {` released ${plural(paths, "path", "paths")} from `}
+          <Code>{layer}</Code>
+          {" in "}
+          <AppLink
+            className="text-mono decoration-rule font-mono underline hover:decoration-current"
+            title={landing}
+            to={commitHref(project, landing)}
+          >
+            {shortSha(landing)}
+          </AppLink>
+        </>
+      ),
+      ValueSet: ({ by, key }) => (
+        <>
+          <HandleLink handle={by} />
+          {" set "}
+          <Code>{key}</Code>, which nobody can read back
+        </>
+      ),
+    })
+  );
+
+/** The salted root an entry names, if it names one. */
+const rootOf = (entry: LedgerEntry): Option.Option<string> =>
   LedgerEntry.match(entry, {
-    Admitted: ({ area, knownBadCaught, mainRuns, suite }) => (
-      <>
-        {`${area} admitted: passes main ${mainRuns}/${mainRuns}; catches ${knownBadCaught} known-bad; root `}
-        <Code>{suite}</Code>
-      </>
-    ),
-    CommitmentPublished: ({ area, authors, checks, suite }) => (
-      <>
-        {`Commitment for ${area}: ${plural(checks, "sealed check", "sealed checks")} by ${plural(authors, "person", "people")}; root `}
-        <Code>{suite}</Code>
-      </>
-    ),
-    CountChanged: ({ area, count, layer }) => (
-      <>
-        <Code>{layer}</Code>
-        {` holds ${count} in ${area}`}
-      </>
-    ),
-    LayerDeclared: ({ disclose, kinds, layer }) => (
-      <>
-        {"Layer "}
-        <Code>{layer}</Code>
-        {` declared, holding ${kinds.join(", ")}; ${disclose}`}
-      </>
-    ),
-    PostureChanged: ({ decision, from, to }) => (
-      <>
-        {`Posture changed from ${postureLabel(from)} to ${postureLabel(to)}, by decision `}
-        <Code>{decision}</Code>
-      </>
-    ),
-    Released: ({ by, landing, layer, paths }) => (
-      <>
-        <HandleLink handle={by} />
-        {` released ${plural(paths, "path", "paths")} from `}
-        <Code>{layer}</Code>
-        {" in "}
-        <Code>{short(landing)}</Code>
-      </>
-    ),
-    ValueSet: ({ by, key }) => (
-      <>
-        <HandleLink handle={by} />
-        {" set the value of "}
-        <Code>{key}</Code>, which nobody can read back
-      </>
-    ),
+    Admitted: ({ suite }) => Option.some(suite),
+    CommitmentPublished: ({ suite }) => Option.some(suite),
+    CountChanged: () => Option.none(),
+    LayerDeclared: () => Option.none(),
+    PostureChanged: () => Option.none(),
+    Released: () => Option.none(),
+    ValueSet: () => Option.none(),
   });
+
+/** One entry on one line: when, its kind's word, what it says, and its root. */
+const EntryRow = ({
+  entry,
+  now,
+  project,
+}: {
+  readonly entry: LedgerEntry;
+  readonly now: DateTime.Utc;
+  readonly project: ProjectName;
+}) => {
+  const { sealed, word } = kindOf(entry);
+  const root = rootOf(entry);
+
+  return (
+    <li
+      className="border-rule text-ui tablet:flex-nowrap flex min-h-10 flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b py-2"
+      data-entry={entry._tag}
+      data-seq={entry.seq}
+    >
+      <span className="text-label text-muted-foreground w-16 shrink-0 tabular-nums">
+        <When at={entry.at} now={now} />
+      </span>
+      <span
+        className={`tablet:w-40 shrink-0 font-medium ${sealed ? "text-sealed" : "text-foreground"}`}
+        data-entry-word=""
+      >
+        {word}
+      </span>
+      <span className="tablet:basis-auto min-w-0 flex-1 basis-full [overflow-wrap:anywhere]">
+        <EntryWords entry={entry} project={project} />
+      </span>
+      {Option.isNone(root) ? null : (
+        <span className="text-muted-foreground shrink-0">
+          <CodeValue value={root.value} />
+        </span>
+      )}
+    </li>
+  );
+};
 
 const History = ({
   ledger,
@@ -307,26 +340,62 @@ const History = ({
   ledger.entries.length === 0 ? (
     <EmptyState title="Nothing recorded yet. An entry is added when a layer is declared, a count or commitment changes, a suite is admitted, a layer is released, the posture changes or a value is set." />
   ) : (
-    <ol className="border-rule flex flex-col border-b">
-      {recorded(ledger)
-        .toReversed()
-        .map((entry) => (
-          <li
-            className="border-rule grid gap-x-6 gap-y-1 border-t py-3 text-sm sm:grid-cols-[7rem_minmax(0,1fr)]"
-            data-entry={entry._tag}
-            data-seq={entry.seq}
-            key={entry.seq}
-          >
-            <span className="text-muted-foreground text-xs font-medium sm:pt-0.5">
-              <When at={entry.at} now={now} />
-            </span>
-            <p className="min-w-0 [overflow-wrap:anywhere]">
-              <EntryWords entry={entry} />
-            </p>
-          </li>
-        ))}
+    <ol className="border-rule flex flex-col border-t">
+      {newestFirst(ledger).map((entry) => (
+        <EntryRow
+          entry={entry}
+          key={entry.seq}
+          now={now}
+          project={ledger.project}
+        />
+      ))}
     </ol>
   );
+
+/** What each disclosure lets the public learn, one line each. */
+const Disclosures = () => (
+  <FactBlock label="What each disclosure shows">
+    <ul className="flex flex-col gap-1.5">
+      {Object.values(disclosureWords).map((words) => (
+        <li
+          className="text-label text-muted-foreground font-normal"
+          key={words}
+        >
+          {words}
+        </li>
+      ))}
+    </ul>
+  </FactBlock>
+);
+
+const Facts = ({
+  areas,
+  ledger,
+}: {
+  readonly areas: readonly AreaSummary[];
+  readonly ledger: Ledger;
+}) => (
+  <>
+    <PostureFacts
+      label={ledger.postureLabel}
+      posture={ledger.posture}
+      project={ledger.project}
+    />
+    <HeldBackFacts
+      areas={areas.map((summary) => ({
+        area: summary.area,
+        detail: plural(summary.checks, "sealed check", "sealed checks"),
+      }))}
+    />
+    <FactBlock label="Read it in a terminal">
+      <CommandLine
+        command={`${Brand.cli} ledger --project ${ledger.project}`}
+        numbered
+      />
+    </FactBlock>
+    <Disclosures />
+  </>
+);
 
 export const LedgerView = ({
   ledger,
@@ -340,21 +409,13 @@ export const LedgerView = ({
   const seen = readAt(ledger, now);
 
   return (
-    <PageShell title={`Ledger of ${project}`}>
-      <ProjectNav current="ledger" project={project} />
-      <div className="text-muted-foreground -mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <PostureBadge label={ledger.postureLabel} posture={ledger.posture} />
-        <span>{plural(layers.length, "layer", "layers")}</span>
-        <a className={LINK} href={`/${project}`}>
-          {`${project}'s asks and landings`}
-        </a>
-      </div>
-      <p className="max-w-[70ch]">
-        The public, append-only record of {project}&apos;s layers, counts,
-        commitments, releases and posture changes. The same record is the{" "}
-        <Code>ledger</Code> tool over MCP and a command in the CLI:
-      </p>
-      <CommandLine command={`${Brand.cli} ledger --project ${project}`} />
+    <Workspace
+      facts={<Facts areas={areas} ledger={ledger} />}
+      factsHeading="This ledger"
+      meta={`Public and append-only · ${plural(layers.length, "layer", "layers")} · ${plural(ledger.entries.length, "entry", "entries")}`}
+      status={<HeadSentence ledger={ledger} />}
+      title="Ledger"
+    >
       <Region id="layers" title="Layers">
         {layers.length === 0 ? (
           <EmptyState
@@ -369,12 +430,11 @@ export const LedgerView = ({
         )}
       </Region>
       {areas.length === 0 ? null : (
-        <Region id="sealed-checks" title="Sealed checks">
-          <p className="max-w-[70ch] text-sm">
-            Held-back checks judge every answer in their area. Their names,
-            paths and contents stay in the layer; the public sees how many there
-            are, how many people wrote them, and the salted root each judged
-            landing prints in its <Code>Held-back:</Code> trailer.
+        <Region id="sealed-areas" title="Sealed areas">
+          <p className="text-ui text-muted-foreground max-w-[70ch]">
+            Held-back checks judge every answer in their area, unseen. A landing
+            they judged names each area&apos;s root in its{" "}
+            <Code>Held-back:</Code> trailer.
           </p>
           <ul className="flex flex-col gap-6">
             {areas.map((summary) => (
@@ -386,6 +446,6 @@ export const LedgerView = ({
       <Region id="history" title="History">
         <History ledger={ledger} now={seen} />
       </Region>
-    </PageShell>
+    </Workspace>
   );
 };

@@ -52,15 +52,22 @@ test.describe("the deployed people page", () => {
 
         expect(response?.status()).toBe(200);
 
-        // The deciders table: its header and at least the whole-repo glob's row.
+        // The page reads Policy, and its deciders: their heading and at
+        // least the whole-repo glob's row.
         yield* Effect.promise(() =>
           expect(
-            browser.getByRole("columnheader", { name: "Deciders" })
+            browser.getByRole("heading", { level: 1, name: "Policy" })
           ).toBeVisible()
         );
 
         yield* Effect.promise(() =>
-          expect(browser.locator('tr[data-paths="**"]')).toBeVisible()
+          expect(
+            browser.getByRole("heading", { name: "Deciders by path" })
+          ).toBeVisible()
+        );
+
+        yield* Effect.promise(() =>
+          expect(browser.locator('main [data-paths="**"]')).toBeVisible()
         );
 
         yield* Effect.promise(() =>

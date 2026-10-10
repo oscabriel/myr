@@ -17,6 +17,7 @@ import { watchAtom } from "../../client/watch.ts";
 import { LedgerView } from "../../features/ledger/ledger-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
 import { pageHead } from "../../features/shared/head.ts";
+import { branchPage } from "../../server/cache-headers.ts";
 import { serverClient } from "../../server/client.ts";
 
 // A project's ledger, as anyone may read it. The loader reads it on the
@@ -100,7 +101,13 @@ const Unknown = () => {
 
 export const Route = createFileRoute("/$project/ledger")({
   loader: ({ params }) => ledgerPage({ data: params.project }),
-  head: ({ params }) => pageHead({ title: `Ledger of ${params.project}` }),
+  // A ledger moves with the project's next entry: kept briefly, read again behind.
+  headers: () => branchPage,
+  head: ({ params: { project } }) =>
+    pageHead({
+      title: `Ledger · ${project}`,
+      description: `${project}'s layers and sealed checks.`,
+    }),
   component: LedgerPage,
   notFoundComponent: Unknown,
 });

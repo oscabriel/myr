@@ -6,6 +6,7 @@
  * check name and no file name, and the view adds none.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Ledger, LedgerEntry } from "@repo/protocol/domain/visibility";
@@ -27,14 +28,15 @@ import { RpcTest } from "effect/rpc";
 
 import { keys } from "../src/client/keys.ts";
 import { ledgerAtom } from "../src/client/ledger.ts";
-import {
-  LedgerView,
-  areaSummaries,
-} from "../src/features/ledger/ledger-page.tsx";
+import { areaSummaries } from "../src/features/ledger/areas.ts";
+import { LedgerView } from "../src/features/ledger/ledger-page.tsx";
 import { ProjectView } from "../src/features/project/project-page.tsx";
 import { readLedger } from "../src/routes/$project/ledger.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
+import { textIn } from "./markup.ts";
+import { elementWith, inspectorOf, mainOf } from "./records.ts";
+import { renderAt } from "./render.tsx";
 
 const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
 
@@ -132,8 +134,25 @@ const entries: readonly LedgerEntry[] = [
   }),
 ];
 
-/** datekit's ledger once its maintainers layer holds the `export` suite. */
-const datekit: Ledger = { ...datekitRead, entries };
+const parserArea = AreaName.make("parser");
+
+const parserRoot = SuiteRoot.make(`sha256:7fbe4b${"2c3d".repeat(14)}a1`);
+
+/** The `parser` suite's commitment, published as the release landed. */
+const parserCommitment = LedgerEntry.cases.CommitmentPublished.make({
+  area: parserArea,
+  at: DateTime.makeUnsafe("2026-10-12T08:00:00.000Z"),
+  authors: 3,
+  checks: 4,
+  seq: 9,
+  suite: parserRoot,
+});
+
+/** datekit's ledger once its maintainers layer holds the `export` and `parser` suites. */
+const datekit: Ledger = {
+  ...datekitRead,
+  entries: [...entries, parserCommitment],
+};
 
 /** A project with no visibility config: the platform's neutral ledger. */
 const open = decodeLedger({
@@ -158,7 +177,69 @@ const whenOf = (markup: string, marker: string) =>
     markup.slice(markup.indexOf(marker))
   )?.groups?.when;
 
+/** Each history row's markup, in the order the page lists them. */
+const historyRowsOf = (markup: string) =>
+  [
+    ...mainOf(markup).matchAll(/<li\b[^>]*data-entry="[^"]*"[\s\S]*?<\/li>/gu),
+  ].map(([row]) => row);
+
+/** Each history row's typed word, in order. */
+const wordsOf = (markup: string) =>
+  historyRowsOf(markup).map((row) =>
+    plainText(elementWith(row, "data-entry-word")).trim()
+  );
+
+/** Whether a history row's word is drawn in the sealed role or in ink. */
+const toneOf = (row: string) =>
+  /text-sealed/u.test(elementWith(row, "data-entry-word")) ? "sealed" : "ink";
+
 describe("a project's ledger", () => {
+  it("is titled Ledger, and its status line says the posture and every sealed area in one sentence", () => {
+    const markup = markupOf(page);
+
+    expect(markup).toMatch(/<h1\b[^>]*>Ledger<\/h1>/u);
+    expect(textIn(elementWith(markup, "data-ledger-head")).trim()).toBe(
+      "Open with sealed evidence. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
+    );
+  });
+
+  it("leads with the posture alone when the platform's label names the areas the sentence counts", () => {
+    const named: Ledger = {
+      ...datekit,
+      postureLabel:
+        "Open with sealed evidence · sealed checks in export, parser",
+    };
+
+    const markup = markupOf(<LedgerView ledger={named} now={now} />);
+
+    expect(textIn(elementWith(markup, "data-ledger-head")).trim()).toBe(
+      "Open with sealed evidence. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
+    );
+    // The label itself is the platform's, whole, in the facts.
+    expect(plainText(inspectorOf(markup))).toContain(
+      "Open with sealed evidence · sealed checks in export, parser"
+    );
+  });
+
+  it("leads with any other label whole", () => {
+    const core: Ledger = {
+      ...datekit,
+      posture: "openCore",
+      postureLabel: "Open core · closed: maintainers",
+    };
+
+    expect(
+      textIn(
+        elementWith(
+          markupOf(<LedgerView ledger={core} now={now} />),
+          "data-ledger-head"
+        )
+      ).trim()
+    ).toBe(
+      "Open core · closed: maintainers. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."
+    );
+  });
+
   it("shows the posture label the platform computed", () => {
     const markup = markupOf(page);
 
@@ -166,11 +247,19 @@ describe("a project's ledger", () => {
     expect(textOf(page)).toContain("Open with sealed evidence");
   });
 
-  it("shows each declared layer with its audience, kinds, disclosure and reason", () => {
-    const text = textOf(page);
+  it("shows each declared layer, its name in mono, with its audience, kinds, disclosure, reason, readers and writers", () => {
+    const markup = mainOf(markupOf(page));
 
+    const layer = markup.slice(
+      markup.indexOf('data-layer="maintainers"'),
+      markup.indexOf('id="sealed-areas"')
+    );
+
+    expect(elementWith(layer, "data-layer-name")).toMatch(
+      /class="[^"]*font-mono[^"]*text-sealed|class="[^"]*text-sealed[^"]*font-mono/u
+    );
     expect(
-      inOrder(text, [
+      inOrder(plainText(layer), [
         "maintainers",
         "Audience",
         "maintainers",
@@ -180,38 +269,84 @@ describe("a project's ledger", () => {
         "sealed",
         "Reason",
         "Held-back checks judge an answer by the ask's words, not by tests it could read.",
+        "Readers",
+        "the deciders",
+        "Writers",
+        "the deciders",
       ])
     ).toBeTruthy();
   });
 
-  it("shows each sealed area's count, authors, root, last change and admission record", () => {
-    const markup = markupOf(page);
+  it("titles each sealed area in sealed violet, its root shortened and whole in its title, with its admission and last change", () => {
+    const markup = mainOf(markupOf(page));
 
-    // The area's own block: from its row to the history (which names the root too).
-    const area = plainText(
-      markup.slice(
-        markup.indexOf('data-area="export"'),
-        markup.indexOf('id="history"')
-      )
+    const area = markup.slice(
+      markup.indexOf('data-area="export"'),
+      markup.indexOf('data-area="parser"')
     );
 
+    expect(elementWith(area, "data-area-title")).toMatch(/text-sealed/u);
     expect(
-      inOrder(area, [
+      inOrder(plainText(area), [
         "export: 7 sealed checks by 3 people",
         "Root",
-        root,
-        "Last changed",
-        "1 d ago",
+        "sha256:3f9a0b…",
         "Admission",
         "admitted Oct 11; passes main 3/3; catches 2 known-bad",
+        "Last changed",
+        "1 d ago",
       ])
     ).toBeTruthy();
+    expect(area).toContain(`title="${root}"`);
+    expect(markup).toContain(`title="${parserRoot}"`);
   });
 
-  it("lists the entries newest first, each in the ledger's words", () => {
-    const text = textOf(page);
+  it("lists the history newest first, one line each, each with its typed word", () => {
+    const markup = markupOf(page);
+    const rows = historyRowsOf(markup);
 
-    expect(seqsOf(markupOf(page))).toStrictEqual([8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(seqsOf(mainOf(markup))).toStrictEqual([9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(wordsOf(markup)).toStrictEqual([
+      "Commitment changed",
+      "Released",
+      "Value set",
+      "Commitment changed",
+      "Admitted",
+      "Commitment changed",
+      "Count changed",
+      "Posture changed",
+      "Layer added",
+    ]);
+
+    for (const row of rows) {
+      // One line: inline parts, never a paragraph or a block under another.
+      expect(row.slice(row.indexOf(">") + 1)).not.toMatch(
+        /<(?:p|div|br|ul|ol)\b/u
+      );
+    }
+  });
+
+  it("draws the sealed kinds' words in sealed violet, and the rest in ink", () => {
+    const rows = historyRowsOf(markupOf(page));
+
+    expect(rows.map(toneOf)).toStrictEqual([
+      "sealed",
+      "ink",
+      "sealed",
+      "sealed",
+      "sealed",
+      "sealed",
+      "sealed",
+      "ink",
+      "ink",
+    ]);
+  });
+
+  it("says each entry in the ledger's words, a root shortened and whole in its title", () => {
+    const markup = markupOf(page);
+    const text = plainText(mainOf(markup));
+    const admitted = historyRowsOf(markup)[4] ?? "";
+
     expect(inOrder(text, ["ines-v", "set", "SENTRY_AUTH_TOKEN"])).toBeTruthy();
     expect(
       inOrder(text, ["okonkwo", "released 2 paths", "9b1c3e5"])
@@ -219,6 +354,8 @@ describe("a project's ledger", () => {
     expect(
       inOrder(text, ["Posture changed", "Open", "Open with sealed evidence"])
     ).toBeTruthy();
+    expect(plainText(admitted)).toContain("sha256:3f9a0b…");
+    expect(admitted).toContain(`title="${root}"`);
   });
 
   it("adds no path, check name or file name to what the ledger says", () => {
@@ -237,11 +374,13 @@ describe("a project's ledger", () => {
 
   it("never shows an entry as recorded in the future, though it arrived after the page was read", () => {
     // Served at 07:00; the release at 08:00 arrived while the page stayed open.
-    const markup = markupOf(
-      <LedgerView
-        ledger={datekit}
-        now={DateTime.makeUnsafe("2026-10-12T07:00:00Z")}
-      />
+    const markup = mainOf(
+      markupOf(
+        <LedgerView
+          ledger={datekit}
+          now={DateTime.makeUnsafe("2026-10-12T07:00:00Z")}
+        />
+      )
     );
 
     expect(whenOf(markup, 'data-seq="8"')).toBe("now");
@@ -249,14 +388,51 @@ describe("a project's ledger", () => {
     expect(markup).not.toMatch(/>in \d+ (?:min|h|d)</u);
   });
 
+  it("puts the posture, what is held back, the CLI line and what each disclosure means in its facts", () => {
+    const facts = inspectorOf(markupOf(page));
+    const text = plainText(facts);
+
+    expect(facts).toContain('data-posture="openWithSealedEvidence"');
+    expect(
+      inOrder(text, [
+        "Posture",
+        "Open with sealed evidence",
+        "Held back",
+        "export",
+        "7 sealed checks",
+        "parser",
+        "4 sealed checks",
+        `${Brand.cli} ledger --project datekit`,
+        "sealed: counts, authors and a salted root",
+        "write-only: names, and who set each value and when",
+      ])
+    ).toBeTruthy();
+    expect(facts).toMatch(
+      /<code\b[^>]*select-all[^>]*>[^<]*ledger --project datekit/u
+    );
+  });
+
   it("shows a project without layers as Open, with nothing held back", () => {
     const view = <LedgerView ledger={open} now={now} />;
-    const text = textOf(view);
+    const markup = markupOf(view);
 
-    expect(markupOf(view)).toMatch(/data-posture="open"[^>]*>Open</u);
-    expect(text).toContain("Nothing is held back");
-    expect(text).not.toContain("sealed checks by");
+    expect(markup).toMatch(/data-posture="open"[^>]*>Open</u);
+    expect(textIn(elementWith(markup, "data-ledger-head")).trim()).toBe(
+      "Open. Nothing is held back."
+    );
+    expect(textOf(view)).toContain("Nothing is held back");
+    expect(textOf(view)).not.toContain("sealed checks by");
   });
+
+  it.effect("sits under the project's crumbs: datekit, then Ledger", () =>
+    Effect.gen(function* () {
+      const markup = yield* renderAt("/datekit/ledger", page);
+      const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
+
+      expect(crumbs).toMatch(/<a\b[^>]*href="\/datekit"[^>]*>datekit<\/a>/u);
+      expect(plainText(crumbs)).toContain("Ledger");
+    })
+  );
 });
 
 describe(areaSummaries, () => {
@@ -274,6 +450,14 @@ describe(areaSummaries, () => {
         checks: 7,
         root: Option.some(root),
       },
+      {
+        admission: Option.none(),
+        area: parserArea,
+        authors: Option.some(3),
+        changedAt: DateTime.makeUnsafe("2026-10-12T08:00:00.000Z"),
+        checks: 4,
+        root: Option.some(parserRoot),
+      },
     ]);
   });
 
@@ -287,13 +471,13 @@ describe(areaSummaries, () => {
     const later: Ledger = {
       ...datekit,
       entries: [
-        ...entries,
+        ...datekit.entries,
         LedgerEntry.cases.CommitmentPublished.make({
           area: exportArea,
           at: DateTime.makeUnsafe("2026-10-12T09:00:00.000Z"),
           authors: 3,
           checks: 8,
-          seq: 9,
+          seq: 10,
           suite: earlierRoot,
         }),
       ],
@@ -346,7 +530,7 @@ describe(readLedger, () => {
 
       expect(read.ledger.postureLabel).toBe("Open with sealed evidence");
       expect(read.ledger.entries.map(({ seq }) => seq)).toStrictEqual([
-        1, 2, 3, 4, 5, 6, 7, 8,
+        1, 2, 3, 4, 5, 6, 7, 8, 9,
       ]);
       expect(yield* Ref.get(asked)).toBe(1);
     })
