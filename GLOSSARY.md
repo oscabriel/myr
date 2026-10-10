@@ -200,8 +200,8 @@ The .myr/ folder on main holding the project's process as TypeScript: project.ts
 _Avoid_: settings, workflow files
 
 **Policy**:
-A project's rules as the platform evaluated them from the config folder at one landed SHA, or the defaults when the project has no config folder.
-_Avoid_: settings, config (when meaning the evaluated result)
+A project's rules as the platform evaluated them from the config folder at one landed SHA, or the defaults when the project has no config folder. The web shows it on the project's Policy page: who decides which paths, who is vouched for, the limits and the agent rules.
+_Avoid_: settings, config (when meaning the evaluated result), people page
 
 **Tag**:
 A git tag on main naming one commit, as the project's history has it.

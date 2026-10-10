@@ -16,7 +16,7 @@ A list now reads each listed project's posture from that project's own record at
 
 ## Consequences
 
-- Each list makes one ledger read per listed project, and the ledger is read whole for one field. A stage that lists a few dozen projects wakes each of them on every list.
+- Each list makes one ledger read per listed project, and the ledger is read whole for one field. A stage that lists a few dozen projects wakes each of them on every list. ADR 0025 amends this: what a list read is kept until the posture can next change, so a list reads only the projects whose kept posture is missing or ran out.
 - Nothing is migrated or replayed: once deployed, a list shows the right posture for data already there.
 - The badge and the ledger are one value, so a narrowing that takes effect by the clock shows on the list at once.
 - Posture comes through the visibility port's own ledger, so a host without the visibility cartridge still lists every project as Open.

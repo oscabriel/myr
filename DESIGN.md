@@ -1,6 +1,6 @@
 ---
 name: Myr web
-description: Every page is a signed test report for a change.
+description: The gate's control room. What state a change is in, whose move it is, and the command that runs next.
 colors:
   paper: "#f5f8fa"
   paper-dark: "#0e1114"
@@ -16,6 +16,10 @@ colors:
   rule-dark: "oklch(0.33 0.01 258)"
   rule-strong: "oklch(0.21 0.015 258)"
   rule-strong-dark: "oklch(0.94 0.005 258)"
+  input: "oklch(0.62 0.01 258)"
+  input-dark: "oklch(0.55 0.01 258)"
+  skeleton: "oklch(0.8 0.008 255)"
+  skeleton-dark: "oklch(0.36 0.01 258)"
   landed: "oklch(0.47 0.11 155)"
   landed-dark: "oklch(0.78 0.13 155)"
   checking: "oklch(0.48 0.13 252)"
@@ -26,81 +30,139 @@ colors:
   refused-dark: "oklch(0.73 0.15 25)"
   sealed: "oklch(0.46 0.13 305)"
   sealed-dark: "oklch(0.76 0.11 305)"
+  syntax-string: "oklch(0.42 0.035 200)"
+  syntax-string-dark: "oklch(0.8 0.035 200)"
+  syntax-constant: "oklch(0.42 0.035 110)"
+  syntax-constant-dark: "oklch(0.82 0.035 110)"
+  syntax-comment: "oklch(0.42 0.012 258)"
+  diff-add-sign: "oklch(0.51 0.09 195)"
+  diff-add-sign-dark: "oklch(0.74 0.08 195)"
+  diff-del-sign: "oklch(0.51 0.12 345)"
+  diff-del-sign-dark: "oklch(0.72 0.1 345)"
 typography:
   headline:
     fontFamily: "Public Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "1.75rem"
+    fontSize: "1.5rem"
     fontWeight: 600
-    lineHeight: "2.2rem"
-    letterSpacing: "-0.02em"
+    lineHeight: "2rem"
+    letterSpacing: "-0.015em"
   title:
     fontFamily: "Public Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1.1875rem"
     fontWeight: 600
-    lineHeight: "1.65rem"
+    lineHeight: "1.6rem"
     letterSpacing: "-0.01em"
+  want:
+    fontFamily: "Public Sans, ui-sans-serif, system-ui, sans-serif"
+    fontSize: "1rem"
+    fontWeight: 500
+    lineHeight: "1.5rem"
   body:
     fontFamily: "Public Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1rem"
     fontWeight: 400
     lineHeight: "1.55rem"
-  small:
+  ui:
     fontFamily: "Public Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.875rem"
     fontWeight: 400
-    lineHeight: "1.35rem"
+    lineHeight: "1.3rem"
   label:
     fontFamily: "Public Sans, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.75rem"
+    fontSize: "0.8125rem"
     fontWeight: 500
-    lineHeight: "1.1rem"
-  transcript:
+    lineHeight: "1.15rem"
+  mono:
+    fontFamily: "JetBrains Mono, ui-monospace, monospace"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    lineHeight: "1.25rem"
+    fontFeature: "\"calt\" 0, \"liga\" 0"
+  terminal:
     fontFamily: "JetBrains Mono, ui-monospace, monospace"
     fontSize: "0.8125rem"
     fontWeight: 400
     lineHeight: "1.5rem"
+  code:
+    fontFamily: "JetBrains Mono, ui-monospace, monospace"
+    fontSize: "0.8125rem"
+    fontWeight: 400
+    lineHeight: "20px"
+    fontFeature: "\"calt\" 0, \"liga\" 0"
 rounded:
   none: "0px"
   sm: "1px"
   md: "2px"
 spacing:
-  cell: "6px 8px"
-  row: "12px"
-  gutter: "16px"
-  gutter-wide: "24px"
-  section: "32px"
+  hairline: "1px"
+  row-y: "10px"
+  gutter-phone: "16px"
+  gutter-tablet: "20px"
+  gutter-shell: "24px"
+  region: "32px"
+  measure: "56rem"
+  rail: "15rem"
+  inspector: "19rem"
 components:
+  context-bar:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    typography: "{typography.ui}"
+    height: "44px"
+  toolbar:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    typography: "{typography.ui}"
+    height: "40px"
+  row:
+    textColor: "{colors.ink}"
+    typography: "{typography.want}"
+    padding: "10px 0"
+    height: "64px"
+  row-selected:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    typography: "{typography.want}"
+    height: "64px"
+  row-group-header:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    typography: "{typography.ui}"
+    height: "32px"
+  rail-item-current:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    typography: "{typography.ui}"
+    height: "32px"
+  bottom-bar:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.muted}"
+    typography: "{typography.label}"
+    height: "56px"
   command-line:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
-    typography: "{typography.transcript}"
+    typography: "{typography.terminal}"
     rounded: "{rounded.none}"
     padding: "4px 4px 4px 12px"
+  copy-action:
+    textColor: "{colors.ink}"
+    rounded: "{rounded.none}"
+    size: "32px"
   refusal-headline:
     textColor: "{colors.refused}"
-    typography: "{typography.transcript}"
+    typography: "{typography.terminal}"
     padding: "8px 0"
   held-back-line:
     textColor: "{colors.sealed}"
-    typography: "{typography.transcript}"
-  posture-badge:
-    textColor: "{colors.sealed}"
+    typography: "{typography.terminal}"
+  fact-label:
+    textColor: "{colors.muted}"
     typography: "{typography.label}"
-    rounded: "{rounded.none}"
-    padding: "2px 8px"
-  posture-badge-open:
-    textColor: "{colors.ink}"
-    typography: "{typography.label}"
-    rounded: "{rounded.none}"
-    padding: "2px 8px"
   stage-cell:
     textColor: "{colors.ink}"
     typography: "{typography.label}"
-    padding: "{spacing.cell}"
-  field-label:
-    textColor: "{colors.muted}"
-    typography: "{typography.label}"
-    width: "6.5rem"
+    padding: "6px 8px"
   button-primary:
     backgroundColor: "{colors.ink}"
     textColor: "{colors.paper}"
@@ -110,205 +172,309 @@ components:
     textColor: "{colors.ink}"
     rounded: "{rounded.none}"
     height: "28px"
+  input:
+    backgroundColor: "{colors.paper}"
+    textColor: "{colors.ink}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.none}"
+    height: "32px"
   decision-choice:
     backgroundColor: "{colors.ink}"
     textColor: "{colors.paper}"
     rounded: "{rounded.none}"
-    height: "44px"
+    height: "36px"
     padding: "0 16px"
   decision-choice-default:
     backgroundColor: "{colors.paper}"
     textColor: "{colors.ink}"
     rounded: "{rounded.none}"
-    height: "44px"
+    height: "36px"
     padding: "0 16px"
+  decision-choice-phone:
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.paper}"
+    rounded: "{rounded.none}"
+    height: "44px"
 ---
 
 # Design System: the web
 
-The web's look, as built, for anyone adding or changing a page. Tokens live in `apps/web/src/styles.css`; the pieces that draw refusals, credit, posture, outcomes, stages, commands, times, people and empty lists live in `apps/web/src/features/shared/`, and the report-sheet fields in `apps/web/src/features/ask/fields.tsx`. A page uses them rather than drawing its own. Words follow `GLOSSARY.md` and `PRODUCT.md`.
+The web's look, as built, for anyone adding or changing a page. Tokens live in `apps/web/src/styles.css`. The shell lives in `apps/web/src/features/shared/shell/`, and the pieces every page shares (the row, the status line, the family fan, the fact blocks, the copy action, refusals, credit, posture, outcomes, stages, commands, marks, times, people, empty and pending states) live in `apps/web/src/features/shared/`. A page uses them rather than drawing its own. Pierre's code drawing is configured once, in `apps/web/src/features/code/pierre.ts`. Words follow `GLOSSARY.md` and `PRODUCT.md`.
 
 ## Overview
 
-**Creative North Star: "The Test Certificate"**
+**Creative North Star: "The gate's control room"**
 
-Every page is a report sheet for a change: a title over a double rule, ruled fields, a results row for the gate's stages, a nonconformance block when the gate refused, and the signatories kept apart from the instruments used. A calibration certificate lists who signed it and, separately, the equipment the test ran on; the web does the same with credit trailers (people) and `Assisted-by` (agents, never credit). Landed is the stamp; held-back checks and layers are the seal.
+The web is the console an operator keeps open beside a terminal: on the left, where you are; in the middle, what is waiting; on the right, the typed facts of the thing in your hand. Every screen answers three questions in this order: what state is it in, whose move is it, and what runs next. The answer to the last one is always a command you can copy. A reader selects one thing (a row, with a click or `j`), reads its state and its next command in the inspector, copies the command (`1`), and goes back to the terminal.
 
-The pages are for operating, not persuading. Density is set by a decider clearing Today on a phone and a contributor reading a refusal beside a terminal. Nothing is decoration that is not a rule, a field or a mark. Colour means state and nothing else, and always sits beside a word and a mark, so a page read in grayscale, by a screen reader or in a terminal says the same thing.
+The pages are for operating, not persuading. Density is set by a decider clearing Today on a phone and a contributor reading a refusal beside a terminal: two-line rows, 14 px metadata, a 13 px floor. Colour means state and nothing else, and always sits beside a word and a mark, so a page read in grayscale, by a screen reader or in a terminal says the same thing. One paper ground runs under all three panes; panes are parted by hairlines, never floated, rounded or shadowed. The landing's stamp is the one authored moment.
 
-Rejected on purpose: the developer-forge dashboard (cards in a grid, a blue accent, pill badges everywhere) and its opposite, the terminal costume (green on black, monospace for everything). Monospace appears only where the text is code: commands, refusal transcripts, trailers, SHAs, paths, ids and env keys.
+Rejected on purpose: the developer-forge dashboard (floating rounded panels on a grey ground, cards in a grid, stat tiles, a blue link colour, pill badges, avatar stacks, coloured file icons), its glossy cousin (dark glass, blur, glows, gradients), and the terminal costume (green on black, monospace for everything). Monospace appears only where the text is what a terminal prints or takes: commands, refusal transcripts, trailers, SHAs, paths, ids, env keys and code.
 
 **Key Characteristics:**
 
-- One-pixel hairline rules part sections and rows; boxes inside boxes never do.
-- A page title sits over a 3 px double rule in ink, the sheet's header; it is the one heavy line on a page.
-- State is a mark (check, dot, cross, hollow circle, dash, hourglass, stamp, lock), then a word, then a colour.
-- Every action is a command to copy, never a form for something git or the CLI does. The only web controls that change anything are a decider's choices and signing in or out.
+- Three panes on one ground: the rail (15 rem), main, and the inspector (19 rem), parted by one-pixel rules, each scrolling on its own from 1120 px.
+- State is a mark, then a word, then a colour; red belongs to refusals, violet to sealed things, and nothing else is coloured.
+- Every action is a command to copy, its text always in the page. The only web controls that change anything are a decider's choices, proposing an ask (and asking the platform's agent to draft it), and signing in or out.
 - Light and dark follow the system setting; there is no toggle, no script and no flash.
-- Motion carries state, never decoration: transitions of 150–250 ms, and one authored moment, the landing's stamp.
+- Motion carries state, never decoration: transitions of 120–200 ms, and the landing's stamp.
 
 ## Colors
 
-Cool bond paper and blue-black ink, with five state roles that never appear as decoration. Every state role measures at least 5.3:1 against paper and against the field surface, in both themes; body ink measures about 16:1.
+Cool bond paper and blue-black ink, with five state roles that never appear as decoration. Every state role measures at least 5:1 against paper and against the field surface, in both schemes; body ink measures about 16:1.
 
 ### Primary
 
-- **Blue-black Ink** (`--foreground`; `ink`, `ink-dark`): text, the page title, primary buttons, a decider's non-default choices, the focus outline. It is the only accent: the web has no brand colour.
+- **Blue-black Ink** (`--foreground`; `ink`, `ink-dark`): text, page titles, primary buttons, a decider's non-default choices, the current tab's underline, the focus outline. It is the only accent: the web has no brand colour, and links are ink.
 
 ### State roles
 
-- **Landed Green** (`--landed`): the change is on main. The landing's stamp mark and lead word, passed stages, a decision just taken.
-- **Checking Blue** (`--checking`): the gate is running a stage now. The current stage while checking, the "Checking" lead word, the text caret and the selection tint (22% of it over the paper).
-- **Waiting Ochre** (`--waiting`): passed or paused, waiting on a person or a parent ask (a decision, a finish, a parent landing); a decision that expires within the day; the mark of a retryable refusal. Waiting is never shown in the refused colour.
-- **Refused Red** (`--refused`): a refusal. The rubric colour: the nonconformance block's top rule, its headline and each refusal's tag. shadcn's `destructive` maps here, so nothing destructive may be red unless it is a refusal.
-- **Sealed Violet** (`--sealed`): held-back checks, layers and sealed evidence. The `Held-back:` trailer and the answer's held-back lines (with a lock), a posture that keeps something sealed, the ledger's layer and area headings, a sensitive env item's mark.
+- **Landed Green** (`--landed`): the change is on main. The landing's stamp and lead word, passed stages, a decision whose choice took effect.
+- **Checking Blue** (`--checking`): the gate is running a stage now. The current stage while checking, the "Checking" lead word, and the viewer's own selection (text selection and selected code lines, a tint of it over the paper).
+- **Waiting Ochre** (`--waiting`): passed or paused, waiting on a person or another ask (a decision, a finish, a parent landing); a decision that expires within the day; the mark of a retryable refusal. Waiting is never shown in the refused colour.
+- **Refused Red** (`--refused`): a refusal. The rubric colour: the refusal block's top rule, its headline and each refusal's tag. shadcn's `destructive` maps here, so nothing destructive may be red unless it is a refusal.
+- **Sealed Violet** (`--sealed`): held-back checks, layers and sealed evidence. The `Held-back:` trailer and an answer's held-back lines (with a lock), a posture that keeps something sealed, the ledger's layer and area headings, a sensitive env item's mark.
+
+### Code and diffs
+
+- **Syntax** (`--syntax-*`): one low-chroma theme drawn from the tokens and handed to Pierre as a CSS-variable theme. Keywords, functions and parameters are ink; strings lean grey-teal and constants grey-olive (chroma 0.035, at least 30° from every state hue); comments and punctuation are a step darker than muted in light and muted in dark. Each keeps 4.5:1 on the paper and on a changed word's tint.
+- **Diff tints** (`--diff-add-*`, `--diff-del-*`): additions teal, deletions rose, a family apart from landed green and refused red. The sign colour draws the `+` and `-`, the bars and a changed line's number (held to 4.5:1); a line's tint is that colour mixed into the paper (12% in light, 20% in dark, as Pierre mixes it, so the server's plain-text diff matches the drawing); emphasis marks the changed words. The file tree's status letters use the same family (A teal, D rose, M and R muted).
 
 ### Neutral
 
-- **Bond Paper** (`--background`; `paper`, `paper-dark`): the page and shadcn's `card`. Hex, because the two `theme-color` metas (one per scheme) and the web app manifest repeat it from `features/shared/theme.ts`, and a test holds the two equal.
-- **Field Surface** (`--surface`): command lines and filled fields; shadcn's `muted`, `secondary` and `accent` all resolve here.
-- **Popover White** (`--popover`): the one raised layer's ground (dialogs, menus, tooltips), a step lighter than paper; dark, a step lighter than the surface.
-- **Muted Grey** (`--muted`, used as `text-muted-foreground`): field labels, secondary lines, stages not reached or not needed, the `$` of a command line, `Assisted-by` lines.
-- **Hairline** (`--rule`): every border and rule, shadcn's `border` and `input`, and the underline of links in running text.
-- **Strong Rule** (`--rule-strong`, ink in each theme): the page title's double rule, the current nav item's underline, the open posture's badge border.
+- **Bond Paper** (`--background`; `paper`, `paper-dark`): the ground of every pane and of shadcn's `card`. Hex, because the two `theme-color` metas and the web app manifest repeat it from `features/shared/theme.ts`, and a test holds them equal.
+- **Field Surface** (`--surface`): command lines, the current rail item, a selected row, hover fills (at half strength), the current stage cell; shadcn's `muted`, `secondary` and `accent` resolve here.
+- **Popover White** (`--popover`): the one raised layer's ground (dialogs, sheets, menus, tooltips), a step lighter than paper; dark, a step lighter than the surface.
+- **Muted Grey** (`--muted`, as `text-muted-foreground`): labels, metadata lines, stages not reached or not needed, the `$` of a command line, `Assisted-by` lines, the bottom bar's other items.
+- **Hairline** (`--rule`): every pane edge, border and rule, and the underline of links in running text.
+- **Control Border** (`--input`): a form control's border at 3:1 on paper (3.4:1 light, 3.9:1 dark).
+- **Skeleton Stroke** (`--skeleton`): the outlined bars of a placeholder row or fact (about 1.75:1), with no fill.
+- **Strong Rule** (`--rule-strong`, ink in each scheme): the 2 px underline of the current filter or section tab, and the top edge of the bottom bar's current item.
 
 ### Named Rules
 
-**The Rubric Rule.** Red belongs to refusals. A destructive button, an error toast or a "danger" badge uses the refused role only when it is a refusal.
+**The Rubric Rule.** Red belongs to refusals. A destructive button, a transport failure or a deletion in a diff is never red.
 
-**The Word First Rule.** No state is carried by colour alone: every coloured mark has a word beside it ("passed", "now", "refused", "not yet", "not needed"; "Waiting", "Landed", "Checking").
+**The Word First Rule.** No state is carried by colour alone: every coloured mark has a word beside it or in its row ("passed", "now", "refused", "not yet", "not needed"; "Waiting", "Landed", "Checking").
 
 **The No Score Rule.** No colour, size or ordering ever ranks a person. Handles are links in ink; a record is never shown as a number.
 
 ## Typography
 
-**Body Font:** Public Sans (variable, self-hosted, latin and latin-ext; fallback `ui-sans-serif, system-ui`)
-**Mono Font:** JetBrains Mono (variable, self-hosted; fallback `ui-monospace`), with contextual alternates off for code
+**Body Font:** Public Sans (variable, self-hosted, latin and latin-ext, preloaded; a metric-matched fallback face over Arial keeps the swap from moving the page)
+**Mono Font:** JetBrains Mono (variable, self-hosted, preloaded; a metric-matched fallback over Courier New), with contextual alternates and ligatures off (`=>` stays `=>`)
 
 **Character:** Public Sans was drawn for government forms: a workhorse grotesque that reads as an official document without ceremony. JetBrains Mono sets only what a terminal would print.
 
 ### Hierarchy
 
-A fixed rem scale, ratio about 1.2; product type does not float with the viewport. Numbers in times and table cells are tabular.
+A fixed rem scale, ratio about 1.15–1.2; product type does not float with the viewport. Numbers that can change (counts, times, line numbers, `+n −m`) are tabular. **Nothing is set below 13 px**; `apps/web/test/type-floor.test.ts` refuses the old 12 px and 11 px sizes and any arbitrary size.
 
-- **Headline** (600, 1.75rem/2.2rem, -0.02em, balanced): the page title in `PageShell`, one per page.
-- **Title** (600, 1.1875rem/1.65rem, -0.01em): a region of a page (`Region`), a decision's subject.
-- **Body** (400, 1rem/1.55rem): prose, an ask's want, outcome sentences; prose holds to 65–75ch.
-- **Small** (400, 0.875rem/1.35rem): navigation, field values, secondary lines, Today's rows; the most used size.
-- **Label** (500, 0.75rem/1.1rem, sentence case, muted): field labels ("Credit", "Plain git: clone any project"), stage names, Today's budget labels. No uppercase tracking, and never a kicker above a heading.
-- **Transcript** (JetBrains Mono 400, 0.8125rem/1.5rem): refusal lines, command lines, trailers, held-back lines, ids, SHAs and env keys. Refusal transcripts hold to 96ch, about git's width.
+- **Headline** (`text-headline`, 600, 1.5rem/2rem, -0.015em, balanced): one page title. A want over 80 characters drops to Title by itself.
+- **Title** (`text-title`, 600, 1.1875rem/1.6rem, -0.01em): a long ask's title, a region head in main, the answer's outcome hero, a README's headings.
+- **Want** (`text-want`, 1rem/1.5rem): a row's first line at 500, and a want or brief in prose at 400.
+- **Body** (`text-body`, 400, 1rem/1.55rem): prose, held to 70ch.
+- **UI** (`text-ui`, 400, 0.875rem/1.3rem; 500 for state words): row metadata, rail items, inspector values, buttons, toolbar controls, breadcrumbs. The most used size.
+- **Label** (`text-label`, 500, 0.8125rem/1.15rem, sentence case, muted): fact block heads, field labels, group header counts, the bottom bar's words, a consequence line under a choice. No uppercase tracking, and never a kicker above a heading.
+- **Mono** (`text-mono`, JetBrains Mono 400, 0.8125rem/1.25rem inline): ids, SHAs, paths, env keys. In transcripts (refusals, commands, trailers, held-back lines) it takes `leading-terminal` (1.5rem), and refusal transcripts hold to 96ch; in code and diffs it takes `leading-code` (20 px), Pierre's line.
 
-The stage strip's state words are the one size below the label (0.6875rem), always beside their mark.
+Form fields are 16 px below 640 px (so a phone does not zoom on focus) and 14 px from there.
 
 ### Named Rules
 
-**The Code Is Mono Rule.** Monospace means "this is what git or a terminal prints or takes". Prose, labels and buttons are never mono.
+**The Code Is Mono Rule.** Monospace means "this is what git or a terminal prints or takes". Prose, labels, buttons, headings and commit bodies are never mono.
+
+**The Thirteen Floor Rule.** The smallest text on any page is 13 px, and it is a label or mono, never a sentence a reader must act on.
 
 ## Layout
 
-One centred column, 72rem wide at most (`max-w-6xl`), with a 16 px gutter on phones and 24 px from 640 px. The header is 48 px: the name, then Asks (the front page) and Today, then the session slot at the end. Every page is `PageShell`: its title over the double rule, then its regions 32 px apart; inside a region, the heading sits 12 px above its content. The footer gives the two ways in, plain git and the CLI install line, in one column on phones and two from 640 px.
+The shell is the root layout (`apps/web/src/routes/__root.tsx`, `features/shared/shell/app-shell.tsx`) and never unmounts; each page renders one `Workspace` (`features/shared/shell/workspace.tsx`) holding its main pane and its inspector, both in the server's HTML. The breakpoints are named in `styles.css`:
 
-- **Fields** (`Fields`, `Field`): a ruled grid of label and value, the label column at least 6.5rem; from 1024 px two fields share a row. Each row is 8 px top and bottom with a hairline below.
-- **Two columns from 1024 px:** the project page (its open asks and recent landings beside a 22rem column on how to take part) and the ask page (the brief beside a column of up to 26rem). Below that, one column.
-- **Lists** are ruled rows (12 to 16 px top and bottom, a hairline between), never cards in a grid.
-- **Today:** the budget as two counters in a ruled pair (decisions, finishes), then one decision per ruled row, 20 px top and bottom.
+| Name | From | What changes |
+| --- | --- | --- |
+| phone | below 40 rem | 44 px top bar, fixed 56 px bottom bar, 16 px gutters, facts inline after the head, unified diffs only, Files opens a full-height sheet |
+| `tablet` | 40 rem | 48 px top bar with Menu (the rail as a sheet from the left), the section row under the head, 20 px gutters |
+| `diffsplit` | 48 rem | a diff may go side by side |
+| `shell` | 70 rem (1120 px) | the rail and the inspector are columns, rows select, 24 px gutters, each pane scrolls on its own |
+| `codefacts` | 90 rem (1440 px) | code pages keep the inspector open as a column; below this, a Facts button opens it as a sheet from the right |
 
-Phone width (360 px) is a first-class layout: nothing scrolls sideways. Long commands, paths, SHAs and trailers wrap anywhere rather than overflow; the stage strip folds from seven cells in a row to four and three; a decision's choices become a two-column grid of 44 px buttons; the copy button keeps its label for screen readers only.
+**From 1120 px** three panes share one paper ground, parted by hairlines: the **rail** (15 rem) on the left, **main** in the middle, the **inspector** (19 rem) on the right. Nothing grows past 1440 px but main. Inside main the head and rows stop at 56 rem, left-aligned (no centred column); prose stops at 70ch; code and diffs take the whole pane. Main, top to bottom:
+
+1. **Context bar**, 44 px, sticky, on the same line as the rail's wordmark: the trail on the left, the page's state or count and its one copyable command on the right.
+2. **Page head**, not sticky: the title, the status line, a muted meta line, 24 px under it.
+3. **Toolbar**, 40 px, sticky under the context bar on list and code pages, its controls ending where the rows end.
+4. **Content**: rows under sticky group headers, a document of regions 32 px apart, or code.
+
+The sticky stack is at most 84 px on a desktop (context bar and toolbar). On a phone a decision's choice bar is fixed above the bottom bar (about 148 px with the top bar when its consequence lines wrap), and main pads its foot so the page's end is never under it.
+
+**Below 1120 px** there is no rail column and no inspector column. The project's sections become a **section row** under the head (one line of text tabs that scrolls sideways inside itself), and the inspector's blocks render **inline** in one slot after the head: open on a subject's page (ask, answer, decision, proposal, commit, ledger, env), a disclosure on a list's page whose summary keeps one fact in sight (the project's posture, Today's budget sentence). Selection is off: a row's whole width is its link.
+
+**Spacing**, on a 4 px base (4, 8, 12, 16, 24, 32): rows 10 px top and bottom, group headers 32 px, fact blocks 12 px apart inside with a hairline between, 24 px under a page head, 32 px between regions. More space above a heading than below it.
+
+Phone width (360 px) is a first-class layout: nothing scrolls sideways. Long commands break between words (a URL longer than the line breaks anywhere), paths, SHAs and trailers wrap anywhere, and code scrolls sideways inside its own box, never wrapping.
+
+### Named Rules
+
+**The One Ground Rule.** Every pane sits on the paper. A pane is parted by a hairline, never by a fill, a radius, a shadow or a gap.
+
+**The Facts Beside Rule.** A page's typed facts are its inspector's, rendered with main in one pass; below the shell's width they are the same blocks, inline after the head.
 
 ## Elevation & Depth
 
-Flat. No shadows on the page; depth is rules and the field surface. Overlays (dialog, dropdown, tooltip) are the only raised layers, on the popover colour with shadcn's own ring and shadow.
+Flat. No shadows on the page and no pane above another; depth is hairlines and the field surface. Overlays (dialogs, sheets, menus, popovers, tooltips) are the only raised layers, on the popover colour with a hairline ring and no soft shadow. Sheets slide in 200 ms; nothing else moves on the z axis.
 
 ## Shapes
 
-Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra components already square most corners. Borders are one-pixel hairlines; the page title's double rule is the one heavier line; the refusal block's 2 px top rule is the one coloured line. An empty state's border is dashed, an unfilled field; so is the rule that parts disclosed agents from credit.
+Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra components square most corners. Borders are one-pixel hairlines; the refusal block's 2 px top rule is the one coloured line, and the current tab's 2 px ink underline the one heavy one. An empty state's border is dashed (an unfilled field), and so is the rule that parts disclosed agents from credit. Marks are lucide icons at 16 px (14 px in dense places), stroke 1.75, one family.
 
 ## Components
 
-### Command line (`CommandLine`)
+### Rail (`Rail`)
 
-- **Character:** the line a reader runs next, whole and copyable.
-- **Shape:** a field-surface box with a hairline border that hugs its command, a muted `$` that selection skips, the command in mono (one tap selects all of it), and a ghost "Copy" button, icon only on phones. Copying shows "Copied" for 2 s.
+- **Character:** where you are, always in the same place.
+- **Shape:** the wordmark row (44 px, linking `/`); the site's sections, each a 32 px row of a 16 px mark and its word (Asks, Today with the count of decisions waiting for a signed-in decider, For agents); "Projects" over one 32 px row per project, its posture's mark and short word at the row's end; the current project's sections indented under it (Asks with its open count, Code, Landings, Refs, Policy, Ledger, Env shape); "All projects" opening the switcher after the first eight; the session (handle or Sign in) and a Keys button pinned at the foot.
+- **Current item:** the surface fill, ink at 600, `aria-current`. Never a coloured bar or an accent.
+- **Code form:** a route that fills the rail's slot (`staticData.rail`: the tree on tree, blob and why; the changed files on a commit and a finish) folds the site's sections and projects into a Menu button on the wordmark row and the project's sections into a one-line disclosure, and the slot fills the rest.
 
-### Refusal (`RefusalView`)
+### Top bar and bottom bar
 
-- **Character:** the nonconformance block. It reads exactly as `git push` printed it.
-- **Shape:** a 2 px refused top rule, then `headline(refusals)` in mono red with an octagon mark, then one row per refusal, parted by hairlines: its `explain` lines verbatim (indentation kept, the tag in red), then its `next` as a `CommandLine`. A retryable refusal's mark is an ochre turn-back arrow; a final one's is the red octagon. `data-refusal` and `data-retryable` carry it. The web never rewords a refusal.
+- **Top bar** (below 1120 px): on a tablet, 48 px, Menu, the wordmark, the current project as a switcher, the session; on a phone, 44 px, Back to the page above on a subject page (else the wordmark) and the project's switcher.
+- **Bottom bar** (phones): fixed, 56 px plus the safe area, `<nav aria-label="Sections">`, four items each a mark over its 13 px word: Asks, Today, Projects (the switcher as a full-height sheet), More (For agents, the project's sections, Keys, the session). The current item is ink at 600 with a 2 px ink rule on its top edge.
 
-### Outcome (`OutcomeView`) and stage strip (`StageStrip`)
+### Context bar, page head and toolbar
 
-- **Outcome:** one sentence, a mark and a lead word in the role colour, the rest in ink: "Checking at the checks stage", "Passed, waiting for a decider's finish from okonkwo", "Waiting on decision dec-000001", "Passed, waiting for drop-legacy-fetch-burrow-kit to land first", "Landed as 9b1c3e5". A refusal is drawn by `RefusalView`. `data-outcome` and `data-state` (`waiting` or `final`) carry it.
-- **The stamp:** a landed outcome's mark settles once, 420 ms, from 1.35 times its size with an exponential ease-out; reduced motion skips it.
-- **Stage strip:** the gate's results row, a ruled table of seven cells in cost order (Parse, Shape, Merge, Cheap, Checks, Held-back, Decider), each with a mark, its label and a state word: passed (green check), now (dot, blue while checking, ochre while waiting), refused (red cross), not yet (hollow circle, muted), not needed (dash, muted). `data-stage` and `data-state` on each cell; the current cell is `aria-current="step"`.
+- **Context bar:** the breadcrumb (project / section / subject, ids in mono, each a link but the last; on a phone only the page's own crumb), and at the right the subject's compact state (mark and lead word) or a list's count ("17 open asks, 3 open to take"), and the page's primary command as a copy button.
+- **Page head:** the title; the status line; the meta line (kind · asker · age). A project home's head is its name, its posture from its own ledger and its open count, and the README's first sentence as a lede.
+- **Toolbar:** filters as text tabs with their counts in label type, the current one ink at 600 with a 2 px ink underline (the one current-tab style of the whole web); view toggles (Unified | Split, Code | Why) as segmented text; on a phone the strip scrolls sideways and fades its last 2 rem.
 
-### Credit trailers (`CreditTrailers`) and held-back lines (`HeldBackBits`)
+### Inspector (`Workspace`'s facts) and fact blocks (`facts.tsx`)
 
-- **Character:** the signatories, then the seal, then the instruments, as the landing commit carries them.
-- **Credit:** a "Credit" label over one mono line per trailer, `Role: handle`, in the order of `CreditRole`'s literals (`Asked-by` first), each handle a link to `/people/<handle>`.
-- **Held-back:** one sealed-violet mono line with a lock, `Held-back: export 7/7 @ sha256:…; parser 4/4 @ sha256:…`. On an answer's page, the same seal as one line per area (`export 6/7 @ sha256:…`): the area and its count, never a check's name.
-- **Agents:** below a dashed rule and the label "Agents used, disclosed and not credit", one muted `Assisted-by:` line per agent, spelled as the trailer is (`pi:opus-4 (claimed)`).
+- **Character:** the typed facts of the thing in hand, never a repeat of the page's prose.
+- **Shape:** a 44 px heading row naming what it describes ("Start here", "Selected ask", "This ask", "This answer", "How a change lands here", "This landing", "This file", "This decision"), announced politely when it changes; then fact blocks, each a label over its content, 16 px padding, hairlines between, no box inside. A new subject settles in over 120 ms with no slide.
+- **Blocks:** State (the status line again, then the next command, numbered 1), Take it (who may take it, then clone, claim and check, numbered), Claim (the claimant from the event fold, the last push; never a deadline), Gate (the seven stages; on an answer, a vertical strip with the current stage), Posture (the platform's label, a gloss, a link to the ledger), Held back (one sealed line per area), Family (the vertical fan), Territory and check, Rounds (one 40 px row per round), Credit, Provenance (shortened ids, each copyable; a time is not), Decision, Diff stats (files, `+n −m`, then territory, tests and other), This file, Where it was read, Start here.
+- **Values:** code values are mono and wrap anywhere; a long SHA or root is shortened (`7fbe4b2`, `sha256:7fbe4b…`) with its whole value in its title and on copy.
+
+### Row (`Row`, `AskRow`) and row group (`RowGroup`)
+
+- **Character:** one anatomy for every list (asks, decisions, landings, commits, refs, forks, credits, rounds, history).
+- **Shape:** 64 px, two lines (one-line rows 40 px): a 20 px mark column; line 1 the want or subject at 16 px 500, one line, ellipsised, the link (never the id); line 2 metadata at 14 px muted, parted by ` · ` (kind, territory and id in mono, claimant), a value that means nothing left out; at the right the state word in its role over its time; then the row's action. On a phone the state word leads line 2 and the right column hides.
+- **States:** hover is the surface at half strength; selected (from 1120 px) is the surface fill and the want at 600, never a coloured edge; focus is the 2 px ink outline inside the row. A click on the want navigates; elsewhere on the row it selects and fills the inspector.
+- **Group header:** 32 px, sticky under the toolbar, paper fill, a hairline below: the group's name at 600 as a link, its facts (a project's posture, once per group, never per row; it may arrive after the rows without moving them), its counts at the end in label type ("7 open · 6 to take").
+- **Data:** every `data-*` a list carries sits on the row's `<li>` (`data-ask`, `data-takeable`, `data-project`, `data-decision`, `data-soon`, `data-entry`, `data-fork`), and `data-list-key` on its link for `j` and `k`.
+
+### Copy action (`CopyAction`, `CommandChip`) and command line (`CommandLine`)
+
+- **Copy action:** a 32 px ghost button at a row's end, named for what it copies ("Copy claim command"), its command always in the DOM as text (`<code class="sr-only">`), never only a clipboard payload or a `data-` value. After a copy it shows a check and says "Copied" for 2 s in a polite live region.
+- **Command chip:** the command shown whole, small, at the end of a status line; pressing it copies it.
+- **Command line:** a field-surface box with a hairline border that hugs its command; a muted `$` that selection skips; the command in mono at terminal leading, broken only between words, each of its own lines hanging 6ch so a wrapped line reads as one line going on; a ghost Copy button (its word hidden in a narrow column). A numbered command shows its digit before the `$` while the single keys are on, and "Copy (1)" in its title.
+
+### Status line (`StatusLine`) and state badge (`StateBadge`)
+
+- **Status line:** one sentence, the same under a title, in the State block and (compact) in the context bar: the mark, the lead word in its role at 600, the rest in ink, then whose move in muted, then the next command as a chip. "Open to take", "Claimed by tamsin, no answer pushed yet · tamsin's move", "Checking at the checks stage · the platform's move", "Refused at Shape: OutOfScope", "Waiting on decision dec-000001 · a decider's move", "Waiting for 4 of 6 children to land · the family's move", "Landed as 9b1c3e5" (the SHA links the commit). A refusal's lead and tag come from `headline`, never a paraphrase. `data-tone` and `data-mark` carry it.
+- **State badge:** the one way a state shows as a word: its mark, then its word in the role, at the size of its line. No pill, no fill, no box. Posture, stages, an ask's standing and a decision's default all draw through it; `data-mark` (and `data-posture` on a posture's label) carry it.
+
+### Marks (`marks.tsx`)
+
+Lucide, one family, the mark `aria-hidden` and its word beside it: check (landed, passed), a filled dot (checking, now), hourglass (waiting, an expiry), octagon X (refused, final), turn-back arrow in ochre (a retryable refusal), hollow circle (open, not yet), dashed circle (claimed), dash (not needed), lock (sealed), shield (a decision's default), an ink X (a failure that is not a refusal, such as a failed draft). Same mark, same meaning, on every page.
+
+### The family fan (`FamilyStrip`, `FamilyTree`)
+
+- **Character:** a split ask's siblings, side by side; never a ladder, never a sentence of ids.
+- **Row form:** the parent row's third line: one node per stored child, its mark and its short name in mono, joined by a hairline bus, an arrow to the delete child's node ("delete waits for 4", then open, then landed), "n of N landed" at the right, and a toggle ("Show 6 children") that lists the children as indented rows, each open child with its claim command. Collapsed on the front page, expanded on the project home. On a phone the strip shows marks only.
+- **Vertical form:** in the inspector's Family block and at the top of a member's page below the shell: the parent, the children on a left bus, then the delete child, the member being read at 600 on the surface.
+- **The stamp:** a child that lands while the page is open settles its mark once, and the count changes with no motion of its own.
+
+### Outcome (`OutcomeView`), stage strip (`StageStrip`) and refusal (`RefusalView`)
+
+- **Outcome:** an answer's status line at Title size, the stamp on Landed; a refusal adds `RefusalView` below. `data-outcome` and `data-state` carry it.
+- **Stage strip:** the gate's results row, seven ruled cells in cost order (Parse, Shape, Merge, Cheap, Checks, Held-back, Decider), each a mark, its label and a 13 px state word: passed, now, refused, not yet, not needed (a stage the answer never needed, such as no decision). The current cell is on the surface with `aria-current="step"`. Four cells a row on a phone. `data-stage` and `data-state` on each cell.
+- **Refusal:** a 2 px refused top rule, then `headline(refusals)` in mono red with an octagon mark, then one row per refusal parted by hairlines: its `explain` lines verbatim (indentation kept, the tag in red), then its `next` as a command line. A retryable refusal's mark is the ochre turn-back arrow. `data-refusal` and `data-retryable` carry it. The web never rewords a refusal. On a finish or a Waiver diff a refusal sits under the line its `at` names, as an annotation.
+
+### Credit trailers (`CreditTrailers`, `CompactCredit`) and held-back lines
+
+- **Credit:** a "Credit" label over one mono line per trailer, `Role: handle`, in `CreditRole`'s order (`Asked-by` first), handles linked; below a dashed rule, "Agents used, disclosed and not credit" and the muted `Assisted-by:` lines. The compact form reads "Asked by ines-v · answered by bram" on landing rows and in the project's recent landings, and never names an agent.
+- **Held back:** one sealed-violet mono line with a lock, `Held-back: export 7/7 @ sha256:…; parser 4/4 @ sha256:…`; on an answer's page one line per area. The area and its count, never a check's name.
 
 ### Posture badge (`PostureBadge`)
 
-- **Shape:** a square outline badge holding the platform's own label, never rewritten: sealed violet for postures that keep something sealed (Open with sealed evidence, Open core, Open on schedule), an ink border for Open, a hairline and muted text for Source available. `data-posture` carries the literal.
+The platform's own label, never rewritten, through the state badge: a lock mark and the word in sealed violet for postures that keep something sealed, an open lock in ink for Open, muted for Source available. Said once per project group heading, in the rail, the project's head and its Posture block; never per row. `data-posture` carries the literal.
 
-### Fields (`Fields`, `Field`) and regions (`Region`)
+### Decisions, Today and the finish
 
-- **Character:** the header block of a report sheet.
-- **Shape:** a muted label over or beside its value, one ruled row each; values that are code wrap anywhere. A region is a Title heading over its content, with no box around it.
+- **Today:** the budget as one sentence ("Decisions: 2 taken, 3 left today. Finishes are counted apart: none taken."), then sections under sticky headers: Due today, Within your budget, Waits for tomorrow (a count, as a sentence), Newcomers to welcome, Landed without a decision. A decision's row reads its subject as a sentence, then project · kind · id, then its expiry over its default. On a phone a row opens in place.
+- **Choices:** one tap each, no confirm. Ink buttons, the default the outline button with "default" beside its name; 36 px in a row from 640 px, 44 px in a two-column grid on a phone. Under each, a 13 px muted consequence line written from what the platform does ("Accept: opens the ask and lands it with you as Decided-by"; where it does nothing more, it says so). After a choice the record (by, choice, when, note) replaces the buttons, landed green only for a choice that took effect.
+- **Finish:** the code browser's layout: the changed files in the rail with status letters, `+n −m` and a local read mark; the diff in main with sticky file headers and a "Mark read" button (the word is "read", kept in this browser only); the want, verdict, choices and the three numbered finish commands in the inspector from 1440 px, or in a sticky bar at main's foot below it.
+- **Evidence:** typed by subject, labels in sentence case; never a value the platform did not send.
 
-### Ledger and env shape
+### Code browser (tree, blob, why, landings, commit)
 
-- **Ledger:** the posture badge, then each layer as a mono sealed-violet name with its audience, holdings, disclosure and reason; each sealed area as a sealed-violet heading ("export: 7 sealed checks by 3 people") with its committed root and admission; then every entry, newest first, as ruled rows of a muted date and a sentence. No path, check name or file name appears.
-- **Env shape:** a muted caption, "env shape: varlock's `.env.schema` format", linked to varlock; the fields of where it was read; the `env set` command as a `CommandLine` (never a form); then each item: its key in mono (with a hairline-bordered "Deprecated" tag when it is), its description, and its fields: type in mono, required, sensitive (a sealed-violet lock and "yes"), proxy hosts, tags, docs, and for a sensitive item who set its value and when, or "not set" in muted grey. Never a value, and never the placeholder an answer sees.
+- **Character:** a full-viewport app inside the shell.
+- **Rail:** the ref line (main, a tag or a SHA, as a switcher), a "Filter files" field, and the tree (`@pierre/trees`): Public Sans 14 px, compact, monochrome icons, single-child folders flattened, sticky folders, the current path expanded and in view; on a commit, every changed file open with its status letter and `+n −m`. A tree click moves with the router and the tree stays mounted across tree, blob and why.
+- **Main:** a sticky file header (the path as a trail with copy; "N lines · size · language" from 48 rem, which yields to the inspector's own line from 1440 px; the Code | Why toggle; Raw, Permalink, Copy), then the code at Pierre's metrics, scrolling in its own box. The server sends the file or diff as plain numbered text at the same metrics, so the highlighting lands in place.
+- **Why:** consecutive lines from one landing form one group under a band that reads ask and answer first, SHA second ("format-ordinal · answered by bram · 9b1c3e5 · 2 d ago"), with "why, one step back". No credit count and no age colour.
+- **Landings:** rows under sticky day headers: the subject, the ask answered or opened, the compact credit and a sealed "held back" word when the landing carries `Held-back:`, the short SHA over the age; filters All · Answers · Ask openings; the pager stays.
+- **Commit:** the subject as Title, the landing's status line, the body as prose, git's line ("authored by … · committed by the platform · parent …"), then the diff in a pane that sticks under the toolbar and only then scrolls. Unified | Split (split from 48 rem), Collapse all / Unfold all. Unified diffs mark changes with `+` and `-`; split diffs with bars.
+- **Missing path:** a soft landing on the nearest folder, with the refusal's own text above it.
 
-### Decision card (`DecisionCard`) and Today
+### Ledger, env shape, policy and refs
 
-- **Character:** one decision, answerable in one tap.
-- **Shape:** the project and decision id in muted mono, the subject as a Title, then its expiry (ochre and medium weight when it ends within the day, muted otherwise, with an hourglass) and its safe default (a shield mark), the evidence as fields, an optional note behind a disclosure, then the choices. Each choice is a square button, ink on paper, 44 px tall in a two-column grid on phones and 36 px in a row from 640 px; the default choice is the outline button with the word "default" beside its name.
-- **Today's budget:** two counters in a ruled pair, Decisions and Finishes, each a label over a 1.75rem tabular number and a muted line of what is left.
+- **Ledger:** the head sentence carries the facts ("Open with sealed evidence. export: 7 sealed checks by 3 people; parser: 4 sealed checks by 3 people."); layers as rows (name in sealed-violet mono, readers, writers, disclosure, reason), sealed areas as sealed-violet titles with root and admission, history as typed one-line rows, newest first. No path, check name or file name.
+- **Env shape:** the caption "env shape: varlock's `.env.schema` format", linked to varlock; items as definition rows, sensitive first: the key in mono, the sealed lock and "sensitive", "set by ines-v" or "not set", type, required, proxy hosts with paths, a hairline-bordered "Deprecated". Never a value or the placeholder an answer sees.
+- **Policy:** deciders by path, vouching, limits in tabular figures, agents, and one line per layer linking the ledger; the commands that change it, numbered, each flag on its own line.
+- **Refs:** main ("moves only by a landing"), tags, and claim forks as one-line rows with their claim's state word.
 
-### Time (`When`), people (`HandleLink`), empty lists (`EmptyState`)
+### Empty, pending and error states
 
-- **When:** "in 3 h", "2 d ago", "now"; the exact time in `dateTime` and the tooltip.
-- **HandleLink:** the handle in medium weight, underlined in the hairline colour, the underline in ink on hover.
-- **EmptyState:** a dashed-border block saying what is empty, and the command that would change it.
+- **Empty (`EmptyState`):** a dashed hairline block where the rows would be: one sentence saying what is empty, then the command that changes it or a link onward. Never a dead end.
+- **Pending:** the shell, rail and context bar stay; after 300 ms main shows its title over rows of skeleton (64 px, two outlined bars each, no shimmer), and fact blocks keep their heads with bars for values.
+- **Not found:** in the shell, the trail up to what exists, a title saying what was asked for ("No such ask"), `RefusalView` verbatim, then one or two onward links.
+- **Unreachable:** an ink block with a muted unplugged mark: "The platform did not answer.", "Try again in a minute; nothing was changed. Git and the CLI reach it directly." and Reload. Never red.
 
-### Buttons
+### Buttons and fields
 
-- **Shape:** square (no radius), Label type (0.75rem at 500 weight); a decision's choices step up to 0.875rem.
-- **Primary:** ink on paper, 32 px high; hover lightens the ink.
-- **Ghost:** no fill until hover, which fills with the field surface; used for Copy and secondary actions.
-- **Outline:** paper with a hairline border; the default choice on a decision.
-- **Focus:** the global 2 px ink outline, 2 px out, on every control; a pressed button drops 1 px.
+- **Shape:** square, UI type (14 px, 500).
+- **Primary:** ink on paper, 32 px; hover lightens the ink.
+- **Ghost:** no fill until hover, then the surface; Copy and secondary actions.
+- **Outline:** paper with a control border; the default choice.
+- **Fields:** a 3:1 control border on paper, 32 px (36 px and 16 px text on a phone); a disabled Propose says why ("Write the want first").
+- **Focus:** the global 2 px ink outline, 2 px out, on every control; inside a row, inside the row's box.
 
-### Navigation
+### Navigation and keys
 
-- Text links in muted ink, ink on hover; the current page in ink at medium weight with a 2 px strong-rule underline at the header's foot (`aria-current="page"`). A skip link to `#main` appears on focus. Links in running text are underlined in the hairline colour, ink on hover.
+- **Links:** every link between pages is the router's (`AppLink`), preloading on hover or focus, so moving never reloads the document; the page being read is `aria-current="page"`. Links in running text are ink, underlined in the hairline colour, ink on hover; links in rows and the rail are not underlined. A skip link to `#main` is the first tab stop.
+- **Keys:** `?` opens the keys dialog with the switch "Single-key shortcuts: On / Off" (kept in this browser, on by default); `j`/`k` move through a list's rows (and from 1120 px select them), Enter opens; `J`/`K` move between files on code, commit and finish pages; `1`–`9` copy the page's numbered commands, the inspector's first; Escape closes a sheet or clears the selection. No key acts in a field, a combobox or the tree's filter. Every key has a pointer twin.
+- **Selection:** in the address (`?ask=`, `?decision=`), replaced in history, so a selected row and its facts render on the server and can be shared.
+
+### The platform's own pages
+
+Sign-in (the MCP consent), sign-up, the Google handle page, the problem page and the platform's `/` load nothing (no script, no web font), so they carry the tokens as literals in their inline style: paper and ink for both schemes, rule, muted, the 3:1 control border, refused only for a refusal, an ochre-marked "Warning" line for the loopback case, the ink focus outline; `color-scheme: light dark`; the system sans at 16 px; one 26 rem column (44 rem for the `/` document), 48 px from the top, square 44 px inputs and buttons. On sign-in the consent comes first, as its own ruled block.
 
 ### shadcn
 
-shadcn 4.21.2, style `base-lyra` on Base UI, in `src/components/ui/` (generated). The pages use its button, badge, table (an answer's lanes), textarea (a decision's note), tooltip and skeleton.
+shadcn 4.21.2, style `base-lyra` on Base UI, in `src/components/ui/` (generated, restyled to the tokens). The pages use its button, badge, table, textarea, tooltip, dialog and sheet, select, combobox, popover and skeleton. Overlays load after hydration in their own chunk.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** draw refusals, credit, held-back lines, posture, outcomes and stages with the shared components; change the component, not a page's copy of it.
-- **Do** show the command for every action, through `CommandLine`.
-- **Do** part sections with hairline rules and space: 32 px between page regions, 12 px between a region's heading and its content.
+- **Do** render every page through one `Workspace`, with its typed facts as fact blocks, and put a page's facts in the inspector rather than in its prose.
+- **Do** draw rows, status lines, the fan, refusals, credit, held-back lines, posture, outcomes and stages with the shared components; change the component, not a page's copy of it.
+- **Do** show the command for every action, its text in the DOM, through `CommandLine` or `CopyAction`, and number a page's main commands.
 - **Do** carry every state as a mark, then a word, then a colour, and key tests and styles on the `data-*` attribute that names it.
-- **Do** keep text contrast at 4.5:1 or more and every control reachable and visibly focused by keyboard; give an icon `aria-hidden` and put its meaning in the text beside it.
-- **Do** check every page at 360 px with no horizontal scroll, and with the system's text size raised.
-- **Do** honour `prefers-reduced-motion`: every animation and transition drops to nothing.
-- **Do** take the platform URL from the root route's loader data (`getRouteApi("__root__").useLoaderData().platformUrl`).
+- **Do** link between pages with `AppLink`, and read a list's rows in its loader so they arrive in the HTML.
+- **Do** keep text at 4.5:1, controls and borders at 3:1, every control reachable and visibly focused by keyboard, and nothing below 13 px.
+- **Do** check every page at 1440, 1164 and 390 px in both schemes, and at 360 px with no horizontal scroll.
+- **Do** honour `prefers-reduced-motion`: every animation and transition drops to an instant change.
 
 ### Don't:
 
+- **Don't** float a pane, round it, shadow it, or give it another ground; part panes with hairlines.
+- **Don't** put cards in a grid, stat tiles, a big number over a small label, pill badges, avatar stacks or coloured file icons on any page.
 - **Don't** reword a refusal or compute your own explanation of one; render `explain` and `headline`.
-- **Don't** show a score, a rank, a count of a person's landings as a measure, or a leaderboard.
-- **Don't** put cards in a grid or boxes inside boxes; a section is a heading and rules.
-- **Don't** use red for anything but a refusal, violet for anything but sealed things, or colour without a word.
-- **Don't** use monospace for prose, labels or buttons.
+- **Don't** show a score, a rank, a count of a person's landings or credits, or a leaderboard.
+- **Don't** use red for anything but a refusal, violet for anything but sealed things, green for anything but on main, or colour without a word; a diff uses its own teal and rose.
+- **Don't** use monospace for prose, labels, buttons, headings or commit bodies.
 - **Don't** show an env value, or the placeholder an answer sees, anywhere.
-- **Don't** add a form for something git or the CLI does, a theme toggle, or a second component kit.
+- **Don't** add a form for something git or the CLI does (claim, push, check, land, env set), a theme toggle, or a second component kit.
+- **Don't** put on screen the words review, approve, PR, pull request, issue (for an ask), merge (for a landing), lease, reputation, inbox, queue, dashboard, explore or trending.
+- **Don't** use kickers, uppercase tracked labels, section numerals, shimmer, spinners in content, page-load choreography or toasts as the only feedback.

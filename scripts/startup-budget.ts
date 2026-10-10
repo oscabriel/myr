@@ -39,7 +39,12 @@
  * the platform's entry, its only module, measured 1,679,675 (both its
  * limits now 1,900,000, 13% above); the sandbox's 570,582 (656,000, 15%);
  * the web's entry 711,006 (818,000, 15%) and its JavaScript 3,567,682
- * (4,075,000, 14%).
+ * (4,075,000, 14%). Once the web was rebuilt as one shell with the code
+ * browser as an app, no limit was raised: the platform's entry measured
+ * 1,693,131 (1,900,000, 12%), the sandbox's 570,831 (656,000, 15%), the
+ * web's JavaScript 4,074,781 (4,075,000: no room left, until the server
+ * build is minified) and the web's entry 696,419, which fell, so its limit
+ * is tightened to 801,000 (15%).
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, Path, pipe } from "effect";
@@ -55,7 +60,7 @@ interface Budget {
 export const budgets = {
   "apps/platform": { entry: 1_900_000, javascript: 1_900_000 },
   "apps/sandbox": { entry: 656_000, javascript: 656_000 },
-  "apps/web": { entry: 818_000, javascript: 4_075_000 },
+  "apps/web": { entry: 801_000, javascript: 4_075_000 },
 } as const satisfies Record<string, Budget>;
 
 /**

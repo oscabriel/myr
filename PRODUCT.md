@@ -57,33 +57,38 @@ What it declines:
 - **No model's opinion in the gate.** Checks are commands with exit statuses and counts; an answer is judged by them, and taste is a decider's finish.
 - **No scores.** A person appears by handle and role; their record serves trust rules only and is never shown as a number, rank or leaderboard.
 - **No overclaiming.** Held-back checks are hidden from people and agents, not from the code under test, so they are no security boundary. Myr is a prototype, not a whole forge; it makes no claim about speed or scale beyond measured, dated numbers.
-- **No second way to land.** The web adds no form for what git or the CLI does, and shows a diff only to the decider finishing an answer.
+- **No second way to land.** The web adds no form for what git or the CLI does. Its only writes are a decider's choices, proposing an ask (and asking the platform's agent to draft it), and signing in or out. Landed code and each landing's diff are public, as a clone already makes them; an answer that has not landed shows its diff only to the decider finishing it.
 
 ## Operating Context
 
 - Work happens in git and the CLI (`Brand.cli` in code; the name lives only in `packages/brand`). The CLI is a single binary served by the platform itself (`/install.sh`, `/releases/…`), with a versioned `--json` envelope on every command, `--dry-run` and `--yes` where a command writes, and `mcp` to serve the platform's tools over stdio. Every web page that suggests an action shows its command, copyable.
 - Harnesses plug in without installing anything: the project's AGENTS.md block and skill, `/llms.txt`, an ask as Markdown, and `/.well-known/mcp.json`. The CLI also answers harness hooks (`hook`), and pi users can load a user-level adapter.
+- Every page sits in one shell: a rail of where you are (the site's sections, the projects with their posture, the current project's sections, the file tree on code pages), the page, and an inspector of the typed facts of the thing in hand, each with its command numbered to copy. Below 1120 px the rail opens from a Menu and the facts follow the page's head; phones get a bottom bar (Asks, Today, Projects, More).
 - Pages per job on the web:
-  - **Front page** (`/`): open asks across projects a viewer may take, filtered by kind and by asks held for newcomers, and the projects with their posture.
-  - **Project** (`/$project`): its asks, its posture, its recent landings with their credit trailers, links to its ledger and env shape, and how to take part (clone, `asks`, `claim`, `check`).
+  - **Front page** (`/`): open asks across projects a viewer may take, grouped by project with each project's posture said once, filtered by kind, by open to take and by asks held for newcomers; a split family is one row with its children as a fan. Selecting an ask fills the inspector with its state and its claim command. The same list as Markdown by `Accept: text/markdown`.
+  - **Project** (`/$project`): its asks (families expanded as fans), then its README; beside them, how a change lands here: its posture, the gate, who decides, what is held back, how to take part (clone, `asks`, `claim`, `check`) and its last three landings with their credit. The same as the project's `llms.txt` by `Accept: text/markdown`.
+  - **Code** (`/$project/tree/…`, `blob/…`, `why/…`, `commits/…`, `commit/…`, `refs`): the files at any commit with a persistent tree, highlighted code with `#L` links, why each line is there, the landings by day, each commit's diff, and the refs; raw bytes under a sandboxing CSP.
   - **Ask** (`/$project/asks/$ask`): the want, the territory, the check, who may claim, and the commands; the same as Markdown by `Accept: text/markdown` or at `/$project/asks/$ask.md`.
   - **Answer** (`/$project/answers/$ask`): the outcome, the gate's stages, the lanes, held-back results as one line per area, the refusal, and the landing's trailers.
-  - **Person** (`/people/$handle`): their credits by role and area, never a score.
-  - **Today** (`/today`): a decider's decisions, each with its evidence, safe default and expiry, against the budget, with newcomers to welcome and a sample of landings that needed nobody; each decision has its own page (`/$project/decisions/$decision`), where a finish shows the answer's diff. ASSUMPTION until the platform opens finish decisions (it does not yet): the finish view is built and tested, but no live decision reaches it.
+  - **Person** (`/people/$handle`): their credits by role and area, in words, never a number or a score.
+  - **Policy** (`/$project/people`): who decides which paths, who is vouched for or denounced, the limits and the agent rules, read from the config folder at the landed commit, with the commands that change them.
+  - **Proposals** (`/$project/proposals/new`, `/$project/proposals/$proposal`): a want proposed from the web or the CLI, the platform's agent's draft if one was asked for (the ask file, the check, its red-first runs), and the decision it waits on.
+  - **Today** (`/today`): a decider's decisions in sections (due today, within the budget, waiting for tomorrow), each with its evidence, safe default, expiry and one-tap choices whose consequence is written under each, against the budget said as a sentence, with newcomers to welcome and a sample of landings that needed nobody; each decision has its own page (`/$project/decisions/$decision`), where a finish shows the answer's diff with refusals marked at their lines and the decider's own read marks, kept only in their browser. ASSUMPTION until the platform opens finish decisions (it does not yet): the finish view is built and tested, but no live decision reaches it.
   - **Ledger** (`/$project/ledger`): the posture label, each declared layer with its reason, each sealed area's count, authors, committed root and admission, and every entry, newest first.
   - **Env shape** (`/$project/env`): every item the project's committed `.env.schema` declares, parsed at the landed commit and never resolved; for a sensitive item, who set its value and when. Never a value.
   - **Sign-in** (`/auth/signin`): through the platform's own accounts; the session lives in an HttpOnly cookie the browser cannot read.
-  - **For agents**: `/llms.txt`, each project's `/$project/llms.txt`, `/.well-known/mcp.json` and the skills under `/.well-known/agent-skills/`.
-- The project and answer pages update live while open (the project's `watch` stream), and fall back to reading again every 5 s when the stream cannot be held.
-- A project may not take a name the web uses for its own pages (`today`, `people`, `auth`, `rpc`, `releases`, `icons`, `assets`).
+  - **For agents** (`/agents`, and `/agents.md`): a reference in the voice of a man page (Synopsis, Connect, Endpoints, Limits, Refusals) over `/llms.txt`, `/llms-full.txt`, each project's `/$project/llms.txt`, `/.well-known/mcp.json` and the skills under `/.well-known/agent-skills/`.
+- Pages arrive with their data in the server's HTML, and moving between them never reloads the document. The project, ask and answer pages update live while open (the project's `watch` stream), and fall back to reading again every 5 s when the stream cannot be held; a landing seen while a page is open settles its mark once.
+- A minimal keyboard set works on every page: `?` (the keys, with a switch that turns the rest off), `j`/`k` through a list, `J`/`K` through files, `1`–`9` to copy the page's numbered commands, and Escape.
+- A project may not take a name the web uses for its own pages (`agents`, `today`, `people`, `auth`, `rpc`, `releases`, `icons`, `assets`).
 - Phone width is a first-class target (Today installs as a PWA). ASSUMPTION: deciders use Today mostly on a phone, and the other pages mostly on a laptop beside a terminal.
 
 ## Capabilities and Constraints
 
 - The web Worker holds no storage binding and no secrets; every read goes through `/rpc` to the platform, and no public-serving Worker can reach the private namespace (AGENTS.md principle 7). It cannot show what the platform does not return.
 - Refusal text comes only from `@repo/protocol/render` (`explain`, `headline`), the one renderer for git, the CLI, MCP and the web (principle 3).
-- The web never: shows a diff to anyone but a decider finishing an answer; shows a score, rank or count of a person as a measure of quality; reads a write-only value back, or shows the placeholder an answer sees (it reads like a value); names a held-back path, check or case to someone outside its layer.
-- Undecided: a light or dark default per page (it follows the system setting); a custom domain.
+- The web never: shows an unlanded answer's diff to anyone but the decider finishing it; shows a score, rank or count of a person as a measure of quality; reads a write-only value back, or shows the placeholder an answer sees (it reads like a value); names a held-back path, check or case to someone outside its layer.
+- Undecided: a theme beyond following the system's light or dark setting (no toggle); a custom domain.
 
 ## Brand Commitments
 
@@ -104,8 +109,8 @@ What it declines:
 2. **Render the typed value, not a paraphrase.** Refusals, credits, postures and outcomes read the same on every surface, because one renderer and one component draw each.
 3. **Waiting is not refusing.** Checking, waiting on a parent ask, a finish or a decision each read as waiting, never as an error.
 4. **Credit people, disclose agents, score no one.**
-5. **Decisions fit a phone.** Today's density is set by a decider clearing it in a few minutes on a small screen.
+5. **Decisions fit a phone.** Today's density is set by a decider clearing it in a few minutes on a small screen: one tap a choice, its consequence said under it.
 
 ## Accessibility & Inclusion
 
-WCAG 2.2 AA: text contrast at least 4.5:1 (every state colour measures at least 5:1 in both themes), visible focus on every control, every state carried by a word and a mark as well as a colour, `prefers-reduced-motion` honoured, and usable at 360 px wide with no horizontal scroll.
+WCAG 2.2 AA: text contrast at least 4.5:1 (every state colour measures at least 5:1 in both themes), controls and borders at 3:1, nothing set below 13 px, visible focus on every control and a skip link to the page, every state carried by a word and a mark as well as a colour, single-key shortcuts that one switch turns off, `prefers-reduced-motion` honoured, and usable at 360 px wide with no horizontal scroll. `apps/web/e2e/a11y.e2e.ts` runs axe and a keyboard walk over every page in both schemes at 1440 and 390 px against the dev world.

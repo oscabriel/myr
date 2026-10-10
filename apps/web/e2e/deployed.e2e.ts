@@ -84,8 +84,11 @@ const at = (path: string) =>
   `${Option.getOrElse(settings.web, () => "")}${path}`;
 
 /**
- * Opens `path` as a page, waits for each of `texts`, checks the platform
- * answered it, and saves the screenshot `shot`.
+ * Opens `path` as a page, waits for each of `texts` on screen, checks the
+ * platform answered it, and saves the screenshot `shot`. A text may also sit
+ * in markup a width hides (the facts render once as the inspector and once
+ * inline, and a folded family keeps its children's rows), so each text is
+ * found among the visible matches.
  */
 const page = (
   browser: Page,
@@ -102,7 +105,9 @@ const page = (
       texts,
       (text) =>
         Effect.promise(() =>
-          expect(browser.getByText(text).first()).toBeVisible()
+          expect(
+            browser.getByText(text).filter({ visible: true }).first()
+          ).toBeVisible()
         ),
       { discard: true }
     );
@@ -247,9 +252,24 @@ test.describe("the deployed web", () => {
       })
     ));
 
+  // The landings are grouped under one heading per day, each naming its
+  // date in words ("October 7, 2026") over that day's commits.
   test(`${project}'s log groups its commits by day`, ({ page: browser }) =>
     Effect.runPromise(
-      code(browser, `/${project}/commits/main`, "code-log", ["Commits on"])
+      Effect.gen(function* () {
+        yield* code(browser, `/${project}/commits/main`, "code-log", [
+          "Landings",
+        ]);
+
+        yield* Effect.promise(() =>
+          expect(
+            browser
+              .locator("[data-day] h2")
+              .first()
+              .getByText(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/u)
+          ).toBeVisible()
+        );
+      })
     ));
 
   test(`${project}'s newest commit shows what it changed`, ({

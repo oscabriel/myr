@@ -1,5 +1,5 @@
 /**
- * The deployed people page, as a browser shows it: who decides which paths
+ * The deployed Policy page (`/<project>/people`), as a browser shows it: who decides which paths
  * and the commit the config is read at, saved as `e2e/out/people.png` for
  * the shot list.
  *
@@ -33,13 +33,13 @@ const out = decodeURIComponent(new URL("out/", import.meta.url).pathname);
 /** What every page that could not reach the platform says instead of its content. */
 const UNREACHABLE = "The platform did not answer";
 
-test.describe("the deployed people page", () => {
+test.describe("the deployed policy page", () => {
   test.skip(
     Option.isNone(settings.web),
     "WEB_URL is not set: point it at a deployed web's origin to run this check"
   );
 
-  test(`${project}'s people page shows its deciders and the commit they are read at`, ({
+  test(`${project}'s policy page shows its deciders and the commit they are read at`, ({
     page: browser,
   }) =>
     Effect.runPromise(

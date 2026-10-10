@@ -227,7 +227,7 @@ describe("the byte alarm", () => {
     expect(budgets).toStrictEqual({
       "apps/platform": { entry: 1_900_000, javascript: 1_900_000 },
       "apps/sandbox": { entry: 656_000, javascript: 656_000 },
-      "apps/web": { entry: 818_000, javascript: 4_075_000 },
+      "apps/web": { entry: 801_000, javascript: 4_075_000 },
     });
     expect(Object.keys(budgets).toSorted()).toStrictEqual(
       workers.map(({ dir }) => dir).toSorted()
