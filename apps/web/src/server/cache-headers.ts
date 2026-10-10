@@ -13,6 +13,15 @@
  *   change is kept below the page, by object id (ADR 0019, ADR 0020).
  * - A page about the person reading it (Today, a decision, a proposal) is
  *   kept nowhere.
+ *
+ * Workers Cache keeps these at the edge too, shared by every reader, keyed
+ * by path and query and never by cookie (ADR 0026). So a page that gives
+ * `branchPage` reads as nobody: its loader never reaches the reader's
+ * request, and its markup is the same for everyone. The Worker's entry
+ * (`edge-cache.ts`) has the last word on every answer: one to a request
+ * that carries a cookie is kept nowhere whatever its route says, and one
+ * the edge may keep varies by `Cookie`, so it reaches only a reader with
+ * none (`test/edge-cache.test.ts`).
  */
 
 export const branchPage = {

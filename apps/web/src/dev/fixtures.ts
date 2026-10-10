@@ -61,7 +61,7 @@ import {
   Semaphore,
 } from "effect";
 
-import { DevClock } from "./clock.ts";
+import { DevClock, devStart } from "./clock.ts";
 import { seedFillers } from "./fixtures/fillers.ts";
 import {
   creditsIn,
@@ -273,13 +273,9 @@ const overlay: Layer.Layer<
             }
 
             yield* write((story) =>
-              Effect.gen(function* () {
-                const landedAt = DateTime.add(yield* now, { minutes: 1 });
-
-                yield* devClock.set(landedAt);
-
-                return yield* landLintChild(story, landedAt);
-              })
+              Effect.flatMap(devClock.step, (landedAt) =>
+                landLintChild(story, landedAt)
+              )
             );
           }).pipe(Effect.provideService(Clock.Clock, clock)),
       });
@@ -448,7 +444,8 @@ const overlay: Layer.Layer<
 /**
  * The fixtures told into a world the default seed has seeded: the fillers,
  * then vellum (made and first pushed through the service, its record told
- * over its repo), and the world's clock left at the record's morning.
+ * over its repo), and the world's clock left at the record's morning,
+ * `fixturesNow`.
  */
 const seedFixtures = Effect.gen(function* () {
   const fixtures = yield* Fixtures;
@@ -470,13 +467,14 @@ const seedFixtures = Effect.gen(function* () {
 }).pipe(Effect.orDie);
 
 /**
- * A fresh world with the fixtures, seeded: the default seed, then the
- * fixtures. In `live` mode the lint child lands `liveAfter` after vellum's
- * `watch` is first answered.
+ * A fresh world with the fixtures, seeded, its calendar starting at
+ * `start`: the default seed, then the fixtures. In `live` mode the lint
+ * child lands `liveAfter` after vellum's `watch` is first answered.
  */
 export const withFixtures = (
   mode: "on" | "live",
-  liveAfter: Duration.Duration = LIVE_AFTER
+  liveAfter: Duration.Duration = LIVE_AFTER,
+  start: DateTime.Utc = devStart
 ) =>
   Layer.effectDiscard(Effect.andThen(seedDev, seedFixtures)).pipe(
     Layer.provideMerge(
@@ -487,7 +485,8 @@ export const withFixtures = (
               mode === "live" ? Option.some(liveAfter) : Option.none()
             )
           )
-        )
+        ),
+        start
       )
     )
   );

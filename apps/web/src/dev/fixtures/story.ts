@@ -93,7 +93,7 @@ export const headOf = (label: string) => CommitSha.make(hexOf(label, 40));
 export const suiteOf = (area: string) =>
   SuiteRoot.make(`sha256:${hexOf(`suite:${area}`, 64)}`);
 
-/** An instant, from `2026-10-07T10:00`, in UTC. */
+/** An instant of the dev world's calendar (`clock.ts`), from `2026-10-07T10:00`, in UTC. */
 export const instant = (text: string): DateTime.Utc =>
   DateTime.toUtc(DateTime.makeUnsafe(`${text}:00Z`));
 

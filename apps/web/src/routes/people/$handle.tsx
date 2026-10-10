@@ -11,6 +11,7 @@ import {
 } from "../../features/people/person-page.tsx";
 import { pageHead } from "../../features/shared/head.ts";
 import { Reading, Unreachable } from "../../features/shared/pending.tsx";
+import { branchPage } from "../../server/cache-headers.ts";
 
 // A person's page: the roles they hold in each project's landings, by area,
 // read once by the browser. An address whose last part cannot be a handle
@@ -39,6 +40,8 @@ const PersonPage = () => {
 
 export const Route = createFileRoute("/people/$handle")({
   component: PersonPage,
+  // The same for every reader: the credits are read in the browser.
+  headers: () => branchPage,
   head: ({ params }) =>
     pageHead({
       description: `What ${params.handle} is credited for, by project and area.`,
