@@ -3,6 +3,7 @@
  * script), and plain text for a person where a table reads better padded.
  * A contract without a view here prints its encoded JSON in a fenced block.
  */
+import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported";
 import { Brand } from "@repo/brand";
 import type { View } from "@repo/protocol/cli";
 import {
@@ -24,6 +25,7 @@ import type { Contract } from "@repo/protocol/contracts";
 import { LandReceipt } from "@repo/protocol/domain/answer";
 import type { AnswerReceipt } from "@repo/protocol/domain/answer";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
+import type { ImportSource } from "@repo/protocol/domain/import";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
@@ -438,7 +440,14 @@ const pendingText = ({ at, reason }: PolicyPending) => {
       ];
 };
 
-const policy = viewOf(PolicyOf.successSchema, (read) => {
+/** Where an imported project came from, and what a copy is (ADR 0031). */
+const importedText = ({ branch, url }: ImportSource) =>
+  prose(
+    `Imported from ${url}${branch === undefined ? "" : ` (branch ${branch})`}: this project is ${IMPORTED_NOTE}.`
+  );
+
+/** The policy's own view: evaluated, why not yet, or nothing landed. */
+const policyText = (read: typeof PolicyOf.successSchema.Type): View => {
   if (read.policy !== undefined) {
     return evaluated(read.policy);
   }
@@ -452,7 +461,13 @@ const policy = viewOf(PolicyOf.successSchema, (read) => {
   const lines = pendingText(read.unevaluated);
 
   return { markdown: lines.join("\n\n"), text: lines.join("\n") };
-});
+};
+
+const policy = viewOf(PolicyOf.successSchema, (read) =>
+  read.importedFrom === undefined
+    ? policyText(read)
+    : joined(importedText(read.importedFrom), policyText(read))
+);
 
 const ledger = viewOf(LedgerOf.successSchema, (book) =>
   joined(

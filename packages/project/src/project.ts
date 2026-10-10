@@ -1404,6 +1404,10 @@ const holds = (ask: Ask, wanted: AskKind["requires"][number]) =>
     Match.exhaustive
   );
 
+/** Whether two import sources name the same repo and branch (ADR 0031). */
+const sameSource = (a: ImportSource, b: ImportSource) =>
+  a.url === b.url && a.branch === b.branch;
+
 /** An optional field as an object to spread: the field when present, nothing when not. */
 const field = <K extends string, A>(
   key: K,
@@ -3863,10 +3867,6 @@ export const projectService = (
         return Option.none<LandingView>();
       });
 
-    /** Whether two sources name the same repo and branch. */
-    const sameSource = (a: ImportSource, b: ImportSource) =>
-      a.url === b.url && a.branch === b.branch;
-
     /**
      * An import asked again by its initializer converges (ADR 0031): with
      * the source the row keeps, it answers as the first call did; for a row
@@ -3924,7 +3924,13 @@ export const projectService = (
           if (Option.isSome(h.project)) {
             return input.import === undefined
               ? yield* new ProjectExists({ project: name })
-              : yield* keepSource(caller, input.import, h.project.value, h, writes);
+              : yield* keepSource(
+                  caller,
+                  input.import,
+                  h.project.value,
+                  h,
+                  writes
+                );
           }
 
           const remote = `${yield* GatewayUrl}/${name}.git`;

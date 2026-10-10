@@ -181,6 +181,38 @@ const answering = (success: typeof PolicyOf.successSchema.Type) =>
     Contracts.toLayerHandler("projectPolicy", () => Effect.succeed(success))
   );
 
+describe("policy's view of an imported project", () => {
+  const imported = decodeSuccess({
+    importedFrom: {
+      branch: "master",
+      url: "https://github.com/dtolnay/anyhow",
+    },
+    unevaluated: { at: sha, reason: "noConfig" },
+  });
+
+  it("leads with where it came from and its branch, as a copy read-only here, then the policy", () => {
+    const lines = linesOf(textOf(imported));
+
+    expect(lines[0]).toBe(
+      "Imported from https://github.com/dtolnay/anyhow (branch master): this project is a copy of a public repo, read-only here and not run by its maintainers."
+    );
+    expect(
+      lines.some((line) => line.includes("has not been evaluated"))
+    ).toBeTruthy();
+  });
+
+  it("names no branch when the import named none, and no source for a project that started empty", () => {
+    expect(
+      textOf(
+        decodeSuccess({
+          importedFrom: { url: "https://codeberg.org/dnkl/fuzzel" },
+        })
+      )
+    ).toContain("Imported from https://codeberg.org/dnkl/fuzzel: this project");
+    expect(textOf(noConfig)).not.toContain("Imported from");
+  });
+});
+
 describe("policy on the command line", () => {
   it.effect("prints the text view for a person", () =>
     Effect.gen(function* () {

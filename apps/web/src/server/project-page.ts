@@ -4,11 +4,10 @@
  * root folder and README, then each family's parent in full), and its GET,
  * which gives a request for Markdown the project's `llms.txt`.
  */
-import { Client } from "@repo/protocol/contracts";
+import { Client, PolicyOf } from "@repo/protocol/contracts";
 import { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { FileView, TreeListing } from "@repo/protocol/domain/code";
 import { ProjectEvent } from "@repo/protocol/domain/event";
-import { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
 import { Ledger } from "@repo/protocol/domain/visibility";
 import { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
@@ -45,13 +44,8 @@ export const ProjectPageData = Schema.Struct({
   ledger: Schema.optionalKey(Ledger),
   now: Schema.DateTimeUtcFromString,
   parents: Schema.Array(Ask),
-  /** The project's policy, as `projectPolicy` gives it. */
-  policy: Schema.optionalKey(
-    Schema.Struct({
-      policy: Schema.optionalKey(PublicPolicy),
-      unevaluated: Schema.optionalKey(PolicyPending),
-    })
-  ),
+  /** The project's policy, and where it was imported from, as `projectPolicy` gives them. */
+  policy: Schema.optionalKey(PolicyOf.successSchema),
   project: ProjectName,
 });
 

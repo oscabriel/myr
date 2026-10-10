@@ -393,6 +393,38 @@ describe(ProjectView, () => {
   );
 
   it.effect(
+    "names where an imported project came from, with its branch, as a copy read-only here; and nothing for one that started empty",
+    () =>
+      Effect.gen(function* () {
+        const facts = inspectorOf(
+          yield* page({
+            importedFrom: {
+              branch: "master",
+              url: "https://github.com/dtolnay/anyhow",
+            },
+          })
+        );
+
+        const text = textIn(facts);
+
+        expect(
+          missingFrom(text, [
+            "Imported from",
+            "https://github.com/dtolnay/anyhow",
+            "branch master",
+            "This project is a copy of a public repo, read-only here and not run by its maintainers.",
+          ])
+        ).toStrictEqual([]);
+        expect(facts).toMatch(
+          /<a[^>]*href="https:\/\/github\.com\/dtolnay\/anyhow"[^>]*rel="noreferrer"/u
+        );
+        expect(textIn(inspectorOf(yield* page()))).not.toContain(
+          "Imported from"
+        );
+      })
+  );
+
+  it.effect(
     "gives the four commands that take part, numbered, and the last three landings as one-line credits",
     () =>
       Effect.gen(function* () {
@@ -618,6 +650,7 @@ const sentFrom = (
       code={data.code}
       deciders={data.policy?.policy?.deciders}
       heldBack={data.ledger === undefined ? undefined : heldBackOf(data.ledger)}
+      importedFrom={data.policy?.importedFrom}
       landings={recentLandings(events)}
       lastLanded={latest?.landedAt}
       listing={homeListing({

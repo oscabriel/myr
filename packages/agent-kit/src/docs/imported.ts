@@ -7,6 +7,13 @@
  */
 import { ProjectName } from "@repo/protocol/ids";
 
+/**
+ * What an imported project is, in the words the docs' Imported projects
+ * page and the project's own page share.
+ */
+export const IMPORTED_NOTE =
+  "a copy of a public repo, read-only here and not run by its maintainers";
+
 /** One imported project: its name here, its source, its licence, and what it is. */
 export interface ImportedProject {
   readonly project: ProjectName;

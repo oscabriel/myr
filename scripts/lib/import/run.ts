@@ -381,7 +381,11 @@ const recordedImports = (stage: Option.Option<Stage>) =>
 
     return new Set(
       examples.flatMap(({ project }) =>
-        isRecorded(imported, { kind: "project", name: project, stage: stage.value })
+        isRecorded(imported, {
+          kind: "project",
+          name: project,
+          stage: stage.value,
+        })
           ? [project]
           : []
       )
@@ -398,12 +402,8 @@ const sourceOne = (example: ImportExample) =>
     const target = yield* ImportTarget;
 
     const outcome = yield* target.initProject(example).pipe(
-      Effect.map(
-        () => `source kept: ${example.url} (${example.branch})`
-      ),
-      Effect.catch(({ reason }) =>
-        Effect.succeed(`source not kept: ${reason}`)
-      )
+      Effect.map(() => `source kept: ${example.url} (${example.branch})`),
+      Effect.catch(({ reason }) => Effect.succeed(`source not kept: ${reason}`))
     );
 
     yield* Console.log(`  ${example.project}: ${outcome}`);
