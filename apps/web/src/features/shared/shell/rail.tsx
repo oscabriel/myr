@@ -152,10 +152,11 @@ export const PostureMark = ({ posture }: { readonly posture: Posture }) => {
   );
 };
 
-/** A project's row: its name, and its posture once the list has it. */
-/** The current project's row: in ink at 600, unfilled, so the page being read (a section under it) is the one filled row. */
-const PROJECT_ROW = RAIL_BASE;
-
+/**
+ * A project's row: its name, and its posture once the list has it. The
+ * current project's is in ink at 600 but unfilled, so the page being read
+ * (a section under it) is the one filled row.
+ */
 const ProjectRow = ({
   current,
   listing,
@@ -168,7 +169,7 @@ const ProjectRow = ({
   <AppLink
     activeOptions={EXACT}
     aria-current={current ? "true" : undefined}
-    className={PROJECT_ROW}
+    className={RAIL_BASE}
     data-project={project}
     to={`/${project}`}
   >
@@ -294,6 +295,16 @@ const Projects = () => {
   );
 };
 
+/**
+ * A ghost button set in muted text, ink on hover. The colour comes from
+ * around the button, not through its `className`: the kit merges classes,
+ * reads an unknown `text-*` as a colour, and would drop the button's
+ * `text-ui` size for a colour given there.
+ */
+const Quiet = ({ children }: { readonly children: ReactNode }) => (
+  <span className="text-muted-foreground flex shrink-0">{children}</span>
+);
+
 /** The rail's foot: the session, and the Keys button that opens the `?` dialog. */
 export const RailFoot = () => {
   const { open } = useShell();
@@ -301,17 +312,18 @@ export const RailFoot = () => {
   return (
     <div className="border-rule flex min-h-12 shrink-0 items-center justify-between gap-2 border-t py-1.5 pr-1.5 pl-3">
       <SessionSlot layout="rail" />
-      <Button
-        className="text-muted-foreground shrink-0"
-        onClick={() => {
-          open("keys");
-        }}
-        size="sm"
-        variant="ghost"
-      >
-        <Keyboard aria-hidden="true" strokeWidth={1.75} />
-        Keys
-      </Button>
+      <Quiet>
+        <Button
+          onClick={() => {
+            open("keys");
+          }}
+          size="sm"
+          variant="ghost"
+        >
+          <Keyboard aria-hidden="true" strokeWidth={1.75} />
+          Keys
+        </Button>
+      </Quiet>
     </div>
   );
 };
@@ -384,17 +396,18 @@ export const Rail = () => {
       <div className="border-rule flex h-11 shrink-0 items-center justify-between gap-2 border-b pr-1.5 pl-4">
         <Wordmark />
         {slotted ? (
-          <Button
-            className="text-muted-foreground"
-            onClick={() => {
-              open("menu");
-            }}
-            size="sm"
-            variant="ghost"
-          >
-            <Menu aria-hidden="true" strokeWidth={1.75} />
-            Menu
-          </Button>
+          <Quiet>
+            <Button
+              onClick={() => {
+                open("menu");
+              }}
+              size="sm"
+              variant="ghost"
+            >
+              <Menu aria-hidden="true" strokeWidth={1.75} />
+              Menu
+            </Button>
+          </Quiet>
         ) : null}
       </div>
       {slotted ? (

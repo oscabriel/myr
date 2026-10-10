@@ -49,13 +49,23 @@ export interface AppLinkProps extends Omit<
   readonly resetScroll?: boolean;
 }
 
+/**
+ * `path` with the router's own marks escaped: a `$` (a param, or the splat)
+ * and the braces of an optional segment are, in a path built whole, part of
+ * a name (a file at `routes/$project/$.tsx`), never a param for the router
+ * to fill from the page being read. Escaped, they reach the address as
+ * written, and the router decodes them back when it reads the page's params.
+ */
+export const literalPath = (path: string): string =>
+  path.replaceAll("$", "%24").replaceAll("{", "%7B").replaceAll("}", "%7D");
+
 /** The address an `AppLink` names, as the router would write it. */
 export const hrefOf = ({
   hash,
   search,
   to,
 }: Pick<AppLinkProps, "hash" | "search" | "to">): string =>
-  `${to}${
+  `${literalPath(to)}${
     search === undefined || Object.keys(search).length === 0
       ? ""
       : defaultStringifySearch(search)
@@ -71,7 +81,7 @@ export const AppLink = (props: AppLinkProps): ReactNode => {
   const router = useRouter({ warn: false });
 
   if (Predicate.isNotNullish(router)) {
-    return <PathLink {...props} />;
+    return <PathLink {...props} to={literalPath(props.to)} />;
   }
 
   // A router is always there in the app; only a view rendered alone has none.

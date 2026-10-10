@@ -4,7 +4,8 @@
  * A sheet: Base UI's dialog drawn against an edge of the screen. It slides
  * in over 200 ms (none under reduced motion, which the stylesheet's switch
  * turns off), traps focus while open, and closes on Escape, a press outside
- * or its Close button. The page behind dims in ink, without blur.
+ * or its Close button. The page behind dims in ink, without blur; the
+ * sheet itself is flat paper parted from it by a hairline, with no shadow.
  */
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { cva } from "class-variance-authority";
@@ -27,7 +28,7 @@ function SheetClose({ ...props }: DialogPrimitive.Close.Props) {
 }
 
 const sheetVariants = cva(
-  "bg-background text-foreground border-rule fixed z-50 flex flex-col overflow-hidden shadow-[0_8px_32px_-8px_color-mix(in_oklch,var(--foreground)_28%,transparent)] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none",
+  "bg-background text-foreground border-rule fixed z-50 flex flex-col overflow-hidden transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] outline-none",
   {
     variants: {
       side: {

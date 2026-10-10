@@ -161,6 +161,14 @@ describe("the switch", () => {
       /<button\b[^>]*aria-pressed="false"[^>]*>On<\/button>/u
     );
 
+    // Each key cap at the label size, whatever face it is set in.
+    expect(
+      [...markup.matchAll(/<kbd\b[^>]*class="(?<classes>[^"]*)"/gu)].filter(
+        ({ groups }) =>
+          groups?.classes?.split(" ").includes("text-label") !== true
+      )
+    ).toStrictEqual([]);
+
     for (const key of ["?", "j", "k", "J", "K", "1", "9", "Esc"]) {
       expect(markup).toContain(`<kbd`);
       expect(text).toContain(key);

@@ -117,12 +117,14 @@ const ProjectSwitcher = ({
                 <ComboboxItem className="h-10 gap-3" key={name} value={name}>
                   <span className="min-w-0 truncate font-medium">{name}</span>
                   {listing === undefined ? null : (
-                    <>
-                      <span className="text-muted-foreground text-label ml-auto tabular-nums">
+                    // One group at the row's end, so the count sits beside
+                    // the posture rather than midway along the row.
+                    <span className="ml-auto flex shrink-0 items-center gap-3">
+                      <span className="text-muted-foreground text-label tabular-nums">
                         {listing.openAsks} open
                       </span>
                       <PostureMark posture={listing.posture} />
-                    </>
+                    </span>
                   )}
                 </ComboboxItem>
               );

@@ -7,6 +7,11 @@
 import { describe, expect, it } from "@effect/vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import {
+  NotFoundPage,
+  PendingPage,
+  RouteError,
+} from "../src/features/shared/pending.tsx";
 import { themeColors } from "../src/features/shared/theme.ts";
 import { getRouter } from "../src/router.tsx";
 import { rootHead, ThemeColors } from "../src/routes/__root.tsx";
@@ -92,12 +97,12 @@ describe("the router", () => {
 
   it("waits 300 ms before drawing a page as pending, so a quick move never flashes", () => {
     expect(options.defaultPendingMs).toBe(300);
-    expect(options.defaultPendingComponent).toBeDefined();
+    expect(options.defaultPendingComponent).toBe(PendingPage);
   });
 
   it("draws a failure and a missing page in the shell, never the router's own", () => {
-    expect(options.defaultErrorComponent).toBeDefined();
-    expect(options.defaultNotFoundComponent).toBeDefined();
+    expect(options.defaultErrorComponent).toBe(RouteError);
+    expect(options.defaultNotFoundComponent).toBe(NotFoundPage);
   });
 
   it("scrolls each new page's main pane back to its top", () => {

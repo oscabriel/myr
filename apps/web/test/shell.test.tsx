@@ -19,6 +19,7 @@ import { Effect } from "effect";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { PageShell } from "../src/features/shared/layout.tsx";
+import { AppLink } from "../src/features/shared/link.tsx";
 import { RouteError } from "../src/features/shared/pending.tsx";
 import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
 import { RailSlot } from "../src/features/shared/shell/rail-slot.tsx";
@@ -284,6 +285,72 @@ describe("the shell", () => {
         expect(ledger).not.toContain("src/add.ts");
       })
   );
+});
+
+describe("the shell's controls", () => {
+  // A colour given to a kit button must not cost it the UI size: the
+  // class merger reads an unknown `text-*` as a colour, so a colour class
+  // drops `text-ui` and the button falls back to the body's 16 px.
+  it.effect("set every button in the rail at the UI size", () =>
+    Effect.gen(function* () {
+      const rail = elementOf(
+        yield* renderAt("/datekit/tree/main", ledgerPage(false), {
+          rail: Tree,
+        }),
+        "nav",
+        'aria-label="Site"'
+      );
+
+      const buttons = [
+        ...rail.matchAll(/<button\b[^>]*class="(?<classes>[^"]*)"/gu),
+      ].map(({ groups }) => groups?.classes?.split(" ") ?? []);
+
+      expect(buttons.length).toBeGreaterThanOrEqual(2);
+      expect(
+        buttons.filter((classes) => !classes.includes("text-ui"))
+      ).toStrictEqual([]);
+    })
+  );
+});
+
+describe(AppLink, () => {
+  // A path is built whole, and a file's path may hold the router's own
+  // marks (`routes/$project/route.tsx`, `{-$x}`): they are the file's
+  // name, never a param to fill from the page being read.
+  it.effect("leads to a path holding $ or braces as written", () =>
+    Effect.gen(function* () {
+      const markup = yield* renderAt(
+        "/datekit/ledger",
+        <p>
+          <AppLink to="/datekit/blob/main/src/routes/$project/$.tsx">
+            route
+          </AppLink>
+          <AppLink to="/datekit/blob/main/src/{-$x}.ts">optional</AppLink>
+        </p>
+      );
+
+      const hrefs = linksOf(markup).map(({ href }) => href);
+
+      expect(hrefs.map((href) => decodeURIComponent(href ?? ""))).toStrictEqual(
+        [
+          "/datekit/blob/main/src/routes/$project/$.tsx",
+          "/datekit/blob/main/src/{-$x}.ts",
+        ]
+      );
+    })
+  );
+
+  it("draws the same address with no router around it", () => {
+    expect(
+      renderToStaticMarkup(
+        <AppLink to="/datekit/blob/main/src/routes/$project/$.tsx">
+          route
+        </AppLink>
+      )
+    ).toMatch(
+      /href="\/datekit\/blob\/main\/src\/routes\/(?:\$|%24)project\/(?:\$|%24)\.tsx"/u
+    );
+  });
 });
 
 describe("the shell's sources", () => {
