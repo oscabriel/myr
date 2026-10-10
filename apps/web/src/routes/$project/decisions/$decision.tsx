@@ -18,7 +18,7 @@ import { FinishView } from "../../../features/finish/finish-view.tsx";
 import { isFinishDecision } from "../../../features/finish/patch.ts";
 import type { FinishDecision } from "../../../features/finish/patch.ts";
 import { EmptyState } from "../../../features/shared/empty.tsx";
-import { pageTitle } from "../../../features/shared/head.ts";
+import { pageHead } from "../../../features/shared/head.ts";
 import { PageShell } from "../../../features/shared/layout.tsx";
 import {
   DecidedNotice,
@@ -154,8 +154,6 @@ const DecisionPage = () => {
 
 export const Route = createFileRoute("/$project/decisions/$decision")({
   component: DecisionPage,
-  head: ({ params }) => ({
-    meta: [{ title: pageTitle(`Decision ${params.decision}`) }],
-  }),
+  head: ({ params }) => pageHead({ title: `Decision ${params.decision}` }),
   ssr: false,
 });

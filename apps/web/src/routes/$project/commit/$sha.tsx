@@ -15,7 +15,7 @@ import {
 } from "../../../features/code/commit-view.tsx";
 import { CodeNotFound } from "../../../features/code/not-found.tsx";
 import { diffAnchor } from "../../../features/code/paths.ts";
-import { pageTitle } from "../../../features/shared/head.ts";
+import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { serverClient } from "../../../server/client.ts";
 
@@ -112,9 +112,8 @@ export const Route = createFileRoute("/$project/commit/$sha")({
     style: search.style === "split" ? ("split" as const) : undefined,
   }),
   loader: ({ params }) => commitPage({ data: params }),
-  head: ({ params: { project, sha } }) => ({
-    meta: [{ title: pageTitle(`${project}: commit ${sha.slice(0, 7)}`) }],
-  }),
+  head: ({ params: { project, sha } }) =>
+    pageHead({ title: `${project}: commit ${sha.slice(0, 7)}` }),
   component: CommitPage,
   notFoundComponent: CodeNotFound,
 });

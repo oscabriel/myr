@@ -17,7 +17,7 @@ import {
 } from "../../../../features/code/blob-view.tsx";
 import { ClientFile } from "../../../../features/code/client-code.tsx";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
-import { pageTitle } from "../../../../features/shared/head.ts";
+import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { PathsTree } from "../../tree/-paths-tree.tsx";
@@ -109,9 +109,8 @@ export const Route = createFileRoute("/$project/blob/$rev/$")({
     plain: plain === 1 || plain === "1" ? (1 as const) : undefined,
   }),
   loader: ({ params }) => blobPage({ data: params }),
-  head: ({ params: { _splat, project, rev } }) => ({
-    meta: [{ title: pageTitle(`${_splat ?? project} at ${rev}`) }],
-  }),
+  head: ({ params: { _splat, project, rev } }) =>
+    pageHead({ title: `${_splat ?? project} at ${rev}` }),
   component: BlobPage,
   notFoundComponent: CodeNotFound,
 });

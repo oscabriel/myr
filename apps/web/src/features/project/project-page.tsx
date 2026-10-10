@@ -16,13 +16,13 @@ import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 
 import { EntriesTable, ReadmeSection } from "../code/tree-view.tsx";
-import { ReadingRows } from "../front/reading.tsx";
 import { SignedInProposeLink } from "../propose/propose-link.tsx";
 import { ID, SECTION } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
 import { askPath } from "../shared/paths.ts";
+import { ReadingRows } from "../shared/pending.tsx";
 import { PostureBadge } from "../shared/posture.tsx";
 import { When } from "../shared/time.tsx";
 import { AskFields, AskStanding } from "./asks.tsx";

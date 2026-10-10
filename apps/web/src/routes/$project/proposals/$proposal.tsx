@@ -29,7 +29,7 @@ import { UnknownProjectView } from "../../../features/project/unknown-project.ts
 import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { ProposalView } from "../../../features/proposal/proposal-view.tsx";
 import { EmptyState } from "../../../features/shared/empty.tsx";
-import { pageTitle } from "../../../features/shared/head.ts";
+import { pageHead } from "../../../features/shared/head.ts";
 import { PageShell } from "../../../features/shared/layout.tsx";
 import { serverClient } from "../../../server/client.ts";
 
@@ -199,9 +199,8 @@ const Unknown = () => {
 
 export const Route = createFileRoute("/$project/proposals/$proposal")({
   loader: ({ params }) => proposalPage({ data: params }),
-  head: ({ params: { project, proposal } }) => ({
-    meta: [{ title: pageTitle(`${project}: proposal ${proposal}`) }],
-  }),
+  head: ({ params: { project, proposal } }) =>
+    pageHead({ title: `${project}: proposal ${proposal}` }),
   component: ProposalPage,
   notFoundComponent: Unknown,
 });

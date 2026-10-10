@@ -6,8 +6,8 @@ import { AsyncResult } from "effect/reactivity";
 import { frontPageAtom, projectsAtom } from "../client/front.ts";
 import { readFilter } from "../features/front/filter.ts";
 import { FrontPageView } from "../features/front/front-page.tsx";
-import { Reading, Unreachable } from "../features/front/reading.tsx";
-import { pageTitle } from "../features/shared/head.ts";
+import { pageHead } from "../features/shared/head.ts";
+import { Reading, Unreachable } from "../features/shared/pending.tsx";
 
 // The front page: every open ask, read once, filtered here by the address's
 // `?kind=` and `?reserved=` (each decoded with its schema; one that does not
@@ -44,6 +44,6 @@ const FrontPage = () => {
 
 export const Route = createFileRoute("/")({
   component: FrontPage,
-  head: () => ({ meta: [{ title: pageTitle(TITLE) }] }),
+  head: () => pageHead({ title: TITLE }),
   validateSearch: readFilter,
 });

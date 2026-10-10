@@ -7,7 +7,7 @@ import {
 
 import { commands } from "../features/agents/catalog.ts";
 import { AgentSetupView } from "../features/agents/setup-page.tsx";
-import { pageTitle } from "../features/shared/head.ts";
+import { pageHead } from "../features/shared/head.ts";
 import { PageShell } from "../features/shared/layout.tsx";
 
 // `/agents`: how each agent connects, drawn from `@repo/agent-kit`'s
@@ -33,5 +33,5 @@ const AgentsPage = () => {
 
 export const Route = createFileRoute("/agents")({
   component: AgentsPage,
-  head: () => ({ meta: [{ title: pageTitle("Agents") }] }),
+  head: () => pageHead({ title: "Agents" }),
 });

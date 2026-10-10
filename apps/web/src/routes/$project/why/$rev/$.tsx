@@ -12,7 +12,7 @@ import {
   revisionOf,
 } from "../../../../features/code/address.ts";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
-import { pageTitle } from "../../../../features/shared/head.ts";
+import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { ClientWhy } from "../../../../features/why/client-why.tsx";
 import { WhyFallback, WhyLines } from "../../../../features/why/why-view.tsx";
@@ -112,9 +112,8 @@ const WhyPage = () => {
 
 export const Route = createFileRoute("/$project/why/$rev/$")({
   loader: ({ params }) => whyPage({ data: params }),
-  head: ({ params: { _splat, project, rev } }) => ({
-    meta: [{ title: pageTitle(`Why ${_splat ?? project} at ${rev}`) }],
-  }),
+  head: ({ params: { _splat, project, rev } }) =>
+    pageHead({ title: `Why ${_splat ?? project} at ${rev}` }),
   component: WhyPage,
   notFoundComponent: CodeNotFound,
 });

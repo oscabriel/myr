@@ -15,7 +15,7 @@ import {
 import { LOG_PAGE } from "../../../features/code/log-page.ts";
 import { LogView } from "../../../features/code/log-view.tsx";
 import { CodeNotFound } from "../../../features/code/not-found.tsx";
-import { pageTitle } from "../../../features/shared/head.ts";
+import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { serverClient } from "../../../server/client.ts";
 
@@ -106,9 +106,8 @@ export const Route = createFileRoute("/$project/commits/$rev")({
   }),
   loaderDeps: ({ search }) => ({ from: search.from, path: search.path }),
   loader: ({ deps, params }) => logPage({ data: { ...params, ...deps } }),
-  head: ({ params: { project, rev } }) => ({
-    meta: [{ title: pageTitle(`${project}: commits on ${rev}`) }],
-  }),
+  head: ({ params: { project, rev } }) =>
+    pageHead({ title: `${project}: commits on ${rev}` }),
   component: LogPage,
   notFoundComponent: CodeNotFound,
 });

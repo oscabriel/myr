@@ -9,7 +9,7 @@ import { offsetOf, projectOf } from "../../features/code/address.ts";
 import { CodeNotFound } from "../../features/code/not-found.tsx";
 import { packageParamOf } from "../../features/code/refs-param.ts";
 import { RefsView } from "../../features/code/refs-view.tsx";
-import { pageTitle } from "../../features/shared/head.ts";
+import { pageHead } from "../../features/shared/head.ts";
 import { notFoundFor } from "../../features/shared/refusals.ts";
 import { serverClient } from "../../server/client.ts";
 
@@ -58,9 +58,7 @@ export const Route = createFileRoute("/$project/refs")({
     package: Option.getOrUndefined(packageParamOf(search.package)),
   }),
   loader: ({ params }) => refsPage({ data: params.project }),
-  head: ({ params: { project } }) => ({
-    meta: [{ title: pageTitle(`${project}: refs`) }],
-  }),
+  head: ({ params: { project } }) => pageHead({ title: `${project}: refs` }),
   component: RefsPage,
   notFoundComponent: CodeNotFound,
 });

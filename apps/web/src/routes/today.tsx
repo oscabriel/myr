@@ -5,7 +5,7 @@ import { DateTime, Option, Schema } from "effect";
 
 import { decideAtom } from "../client/decide.ts";
 import { todayAtom } from "../client/today.ts";
-import { pageTitle } from "../features/shared/head.ts";
+import { pageHead } from "../features/shared/head.ts";
 import { PageShell } from "../features/shared/layout.tsx";
 import { TodayView } from "../features/today/today-page.tsx";
 
@@ -34,7 +34,7 @@ const TodayPage = () => {
 
 export const Route = createFileRoute("/today")({
   component: TodayPage,
-  head: () => ({ meta: [{ title: pageTitle("Today") }] }),
+  head: () => pageHead({ title: "Today" }),
   ssr: false,
   validateSearch: (search: {
     readonly project?: unknown;

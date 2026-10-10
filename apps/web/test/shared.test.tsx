@@ -25,11 +25,6 @@ import { CommandLine } from "../src/features/shared/command.tsx";
 import { CreditTrailers } from "../src/features/shared/credits.tsx";
 import { EmptyState } from "../src/features/shared/empty.tsx";
 import { HandleLink } from "../src/features/shared/handle.tsx";
-import {
-  PageShell,
-  SiteFooter,
-  SiteHeader,
-} from "../src/features/shared/layout.tsx";
 import { OutcomeView, StageStrip } from "../src/features/shared/outcome.tsx";
 import { PostureBadge } from "../src/features/shared/posture.tsx";
 import { RefusalView } from "../src/features/shared/refusal.tsx";
@@ -382,72 +377,7 @@ describe(EmptyState, () => {
   });
 });
 
-describe(PageShell, () => {
-  it("gives a page one main region headed by its title", () => {
-    const markup = markupOf(
-      <PageShell title="Today">
-        <p>Decisions 2 of 5</p>
-      </PageShell>
-    );
-
-    expect(markup).toMatch(/<main\b[^>]*>.*<h1\b[^>]*>Today<\/h1>.*<\/main>/u);
-    expect(markup).toContain("<p>Decisions 2 of 5</p>");
-  });
-});
-
-describe("the shell", () => {
-  const platformUrl = "https://platform-test.example.workers.dev";
-
-  it("marks the page the reader is on in the header", () => {
-    const markup = markupOf(
-      <SiteHeader
-        pathname="/today"
-        session={<a href="/auth/signin">Sign in</a>}
-      />
-    );
-
-    expect(markup).toMatch(/<a\b[^>]*aria-current="page"[^>]*>Today<\/a>/u);
-    expect(markup).not.toMatch(/<a\b[^>]*aria-current="page"[^>]*>Asks<\/a>/u);
-    expect(markup).toContain(">Sign in</a>");
-  });
-
-  it("links Asks, Today and Agents in the header, marking Agents current on its page", () => {
-    const markup = markupOf(<SiteHeader pathname="/agents" session={null} />);
-
-    const links = [
-      ...markup.matchAll(
-        /<a\b[^>]*href="(?<href>[^"]+)"[^>]*>(?<label>[^<]+)<\/a>/gu
-      ),
-    ].map(({ groups }) => [groups?.href, groups?.label]);
-
-    expect(links).toStrictEqual([
-      ["#main", "Skip to content"],
-      ["/", Brand.name],
-      ["/", "Asks"],
-      ["/today", "Today"],
-      ["/agents", "Agents"],
-    ]);
-    expect(markup).toMatch(/<a\b[^>]*aria-current="page"[^>]*>Agents<\/a>/u);
-    expect(markup).not.toMatch(/<a\b[^>]*aria-current="page"[^>]*>Today<\/a>/u);
-  });
-
-  it("gives the command-line ways in at the foot of every page: plain git and the CLI", () => {
-    const text = textOf(<SiteFooter platformUrl={platformUrl} />);
-
-    expect(text).toContain("Plain git: clone any project");
-    expect(text).toContain(`git clone ${platformUrl}/<project>.git`);
-    expect(text).toContain(`curl -fsSL ${platformUrl}/install.sh | sh`);
-  });
-
-  it("sends a reader who wants to connect an agent to the Agents page", () => {
-    const markup = markupOf(<SiteFooter platformUrl={platformUrl} />);
-
-    expect(markup).toMatch(/<a\b[^>]*href="\/agents"[^>]*>/u);
-    expect(textOf(<SiteFooter platformUrl={platformUrl} />)).toContain(
-      "Connect an agent"
-    );
-  });
-
+describe("the theme", () => {
   it("names the paper colours the theme-color meta repeats", () => {
     expect(styles).toContain(`--background: ${themeColors.light};`);
     expect(styles).toContain(`--background: ${themeColors.dark};`);

@@ -1,46 +1,22 @@
 /**
- * The tabs every project page shares: Overview, Code, Landings, Refs,
- * People, Ledger and Env shape (the glossary's word). The page being read is marked `aria-current`; a
- * page under none of them (a proposal) marks none.
+ * A project's section row: Asks, Code, Landings, Refs, Policy, Ledger and
+ * Env shape, one line under the page's head where the rail is not drawn
+ * (below 1120 px; from there the rail lists them). The line scrolls
+ * sideways inside itself and never wraps, so it never pushes the page
+ * sideways. The page being read is marked `aria-current` and underlined in
+ * ink; a page under none of them (a proposal) marks none.
  *
- * Each tab is a plain `<a>` drawn as a ghost button (`buttonVariants`), as
- * every link between the web's pages is a plain link: a page loads whole
- * from its own route, and a view renders without a router around it, as
- * its tests render it. Base UI's `Button` rendered as `<a>` would give each
- * link `role="button"`, which a nav of pages must not have.
+ * Its links are the router's (`AppLink`), so moving between sections never
+ * reloads the page.
  */
 import type { ProjectName } from "@repo/protocol/ids";
 import type { ReactNode } from "react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { AppLink } from "../shared/link.tsx";
+import { projectSections } from "../shared/shell/sections.ts";
+import type { ProjectTab } from "../shared/shell/sections.ts";
 
-import { envPath, ledgerPath } from "../shared/paths.ts";
-
-/** Which of a project's pages is being read. */
-export type ProjectTab =
-  | "code"
-  | "env"
-  | "landings"
-  | "ledger"
-  | "overview"
-  | "people"
-  | "refs";
-
-/** Each tab: its label and its page's address, in the order the nav shows them. */
-const tabs = (project: ProjectName) =>
-  [
-    { href: `/${project}`, label: "Overview", tab: "overview" },
-    { href: `/${project}/tree/main`, label: "Code", tab: "code" },
-    { href: `/${project}/commits/main`, label: "Landings", tab: "landings" },
-    { href: `/${project}/refs`, label: "Refs", tab: "refs" },
-    { href: `/${project}/people`, label: "People", tab: "people" },
-    { href: ledgerPath(project), label: "Ledger", tab: "ledger" },
-    { href: envPath(project), label: "Env shape", tab: "env" },
-  ] as const satisfies readonly {
-    readonly href: string;
-    readonly label: string;
-    readonly tab: ProjectTab;
-  }[];
+export type { ProjectTab } from "../shared/shell/sections.ts";
 
 export const ProjectNav = ({
   current,
@@ -51,22 +27,18 @@ export const ProjectNav = ({
 }): ReactNode => (
   <nav
     aria-label={project}
-    className="border-rule -mt-2 flex flex-wrap gap-1 border-b pb-2"
+    className="border-rule shell:hidden -mt-2 flex [scrollbar-width:none] overflow-x-auto overscroll-x-contain border-b"
   >
-    {tabs(project).map(({ href, label, tab }) => (
-      <a
+    {projectSections(project).map(({ label, tab, to }) => (
+      <AppLink
+        activeOptions={{ exact: true, includeSearch: false }}
         aria-current={tab === current ? "page" : undefined}
-        className={buttonVariants({
-          className:
-            "text-muted-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground no-underline",
-          size: "sm",
-          variant: "ghost",
-        })}
-        href={href}
+        className="text-ui text-muted-foreground hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:text-foreground -mb-px flex h-10 shrink-0 items-center border-b-2 border-transparent px-3 whitespace-nowrap no-underline transition-colors duration-[120ms] first:pl-0 focus-visible:outline-offset-[-2px] aria-[current=page]:font-semibold"
         key={tab}
+        to={to}
       >
         {label}
-      </a>
+      </AppLink>
     ))}
   </nav>
 );

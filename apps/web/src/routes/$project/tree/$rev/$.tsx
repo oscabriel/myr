@@ -13,7 +13,7 @@ import {
 } from "../../../../features/code/address.ts";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
 import { TreeView } from "../../../../features/code/tree-view.tsx";
-import { pageTitle } from "../../../../features/shared/head.ts";
+import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { readFolderWithReadme } from "../../../../server/folder.ts";
@@ -99,15 +99,10 @@ const TreePage = () => {
 
 export const Route = createFileRoute("/$project/tree/$rev/$")({
   loader: ({ params }) => treePage({ data: params }),
-  head: ({ params: { _splat, project, rev } }) => ({
-    meta: [
-      {
-        title: pageTitle(
-          `${_splat === undefined || _splat === "" ? project : _splat} at ${rev}`
-        ),
-      },
-    ],
-  }),
+  head: ({ params: { _splat, project, rev } }) =>
+    pageHead({
+      title: `${_splat === undefined || _splat === "" ? project : _splat} at ${rev}`,
+    }),
   component: TreePage,
   notFoundComponent: CodeNotFound,
 });

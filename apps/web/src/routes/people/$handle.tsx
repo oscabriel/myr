@@ -5,12 +5,12 @@ import { Effect, Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
 import { creditsAtom } from "../../client/people.ts";
-import { Reading, Unreachable } from "../../features/front/reading.tsx";
 import {
   NoSuchPersonView,
   PersonView,
 } from "../../features/people/person-page.tsx";
-import { pageTitle } from "../../features/shared/head.ts";
+import { pageHead } from "../../features/shared/head.ts";
+import { Reading, Unreachable } from "../../features/shared/pending.tsx";
 
 // A person's page: their credit by project, area and role, read once by the
 // browser. An address whose last part cannot be a handle is a 404.
@@ -38,7 +38,7 @@ const PersonPage = () => {
 
 export const Route = createFileRoute("/people/$handle")({
   component: PersonPage,
-  head: ({ params }) => ({ meta: [{ title: pageTitle(params.handle) }] }),
+  head: ({ params }) => pageHead({ title: params.handle }),
   // A 404 for an address that names no handle.
   loader: ({ params }) =>
     Effect.runPromise(

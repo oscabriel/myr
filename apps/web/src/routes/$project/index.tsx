@@ -14,13 +14,13 @@ import { recentLandingsAtom } from "../../client/events.ts";
 import { projectsAtom } from "../../client/front.ts";
 import { asksAtom } from "../../client/project.ts";
 import { watchAtom } from "../../client/watch.ts";
-import { Unreachable } from "../../features/front/reading.tsx";
 import {
   ProjectReadingView,
   ProjectView,
 } from "../../features/project/project-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageTitle } from "../../features/shared/head.ts";
+import { pageHead } from "../../features/shared/head.ts";
+import { Unreachable } from "../../features/shared/pending.tsx";
 import { serverClient } from "../../server/client.ts";
 import { readFolderWithReadme } from "../../server/folder.ts";
 
@@ -186,7 +186,7 @@ const Unknown = () => {
 
 export const Route = createFileRoute("/$project/")({
   component: ProjectPage,
-  head: ({ params }) => ({ meta: [{ title: pageTitle(params.project) }] }),
+  head: ({ params }) => pageHead({ title: params.project }),
   loader: ({ params }) => projectPage({ data: params.project }),
   notFoundComponent: Unknown,
 });

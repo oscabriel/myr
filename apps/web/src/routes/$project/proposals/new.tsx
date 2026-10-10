@@ -21,7 +21,7 @@ import { UnknownProjectView } from "../../../features/project/unknown-project.ts
 import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { ProposeView } from "../../../features/propose/propose-view.tsx";
 import type { About } from "../../../features/propose/propose-view.tsx";
-import { pageTitle } from "../../../features/shared/head.ts";
+import { pageHead } from "../../../features/shared/head.ts";
 import { PageShell } from "../../../features/shared/layout.tsx";
 
 // `/$project/proposals/new`: the propose form. Who is signed in and the
@@ -145,7 +145,6 @@ export const Route = createFileRoute("/$project/proposals/new")({
     at: Option.getOrUndefined(decodeText(search.at)),
     line: Option.getOrUndefined(decodeLine(search.line)),
   }),
-  head: ({ params: { project } }) => ({
-    meta: [{ title: pageTitle(`${project}: propose an ask`) }],
-  }),
+  head: ({ params: { project } }) =>
+    pageHead({ title: `${project}: propose an ask` }),
 });

@@ -14,7 +14,7 @@ import {
   wantsMarkdown,
 } from "../../../features/ask/markdown.ts";
 import { NoSuchAsk } from "../../../features/ask/refused.tsx";
-import { pageTitle } from "../../../features/shared/head.ts";
+import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { serverClient } from "../../../server/client.ts";
 import { AskPath, askMarkdownHandler } from "./{$ask}[.]md.ts";
@@ -153,15 +153,11 @@ export const Route = createFileRoute("/$project/asks/$ask")({
   // TanStack infers each option from the ones before it: the loader comes
   // first, so `head` reads its data.
   loader: ({ params }) => askPage({ data: params }),
-  head: ({ loaderData }) => ({
-    meta: [
-      {
-        title: pageTitle(
-          loaderData === undefined ? "No such ask" : loaderData.ask.brief.want
-        ),
-      },
-    ],
-  }),
+  head: ({ loaderData }) =>
+    pageHead({
+      title:
+        loaderData === undefined ? "No such ask" : loaderData.ask.brief.want,
+    }),
   headers: askPageHeaders,
   component: AskPage,
   notFoundComponent: NoSuchAsk,

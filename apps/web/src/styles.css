@@ -230,6 +230,20 @@
   }
 }
 
+/*
+  The shell's widths, by name: a phone below `tablet`; from `tablet` a top
+  bar with the rail as a sheet; from `diffsplit` a diff may go side by
+  side; from `shell` (1120 px, so the 110% zoom of a 1280 frame keeps it)
+  the rail and the inspector are columns; from `codefacts` code pages keep
+  the inspector open beside the code.
+*/
+@theme {
+  --breakpoint-tablet: 40rem;
+  --breakpoint-diffsplit: 48rem;
+  --breakpoint-shell: 70rem;
+  --breakpoint-codefacts: 90rem;
+}
+
 @theme inline {
   --font-sans:
     "Public Sans", "Public Sans Fallback", ui-sans-serif, system-ui,

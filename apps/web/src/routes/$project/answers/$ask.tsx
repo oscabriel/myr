@@ -17,7 +17,7 @@ import { watchAtom } from "../../../client/watch.ts";
 import { AnswerView } from "../../../features/answer/answer-page.tsx";
 import { NoSuchAsk } from "../../../features/ask/refused.tsx";
 import { CODE, LINK } from "../../../features/shared/classes.ts";
-import { pageTitle } from "../../../features/shared/head.ts";
+import { pageHead } from "../../../features/shared/head.ts";
 import { PageShell } from "../../../features/shared/layout.tsx";
 import { answerPath } from "../../../features/shared/paths.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
@@ -204,9 +204,7 @@ export const Route = createFileRoute("/$project/answers/$ask")({
     Predicate.isString(head) ? { head } : {},
   loaderDeps: ({ search }) => ({ head: search.head }),
   loader: ({ deps, params }) => answerPage({ data: { ...params, ...deps } }),
-  head: ({ params }) => ({
-    meta: [{ title: pageTitle(`Answer to ${params.ask}`) }],
-  }),
+  head: ({ params }) => pageHead({ title: `Answer to ${params.ask}` }),
   component: AnswerPage,
   notFoundComponent: AnswerNotFound,
 });

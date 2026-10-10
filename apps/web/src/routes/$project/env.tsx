@@ -16,7 +16,7 @@ import { envSchemaAtom } from "../../client/env.ts";
 import { watchAtom } from "../../client/watch.ts";
 import { EnvView, NothingLanded } from "../../features/env/env-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageTitle } from "../../features/shared/head.ts";
+import { pageHead } from "../../features/shared/head.ts";
 import { serverClient } from "../../server/client.ts";
 
 // A project's env shape, as anyone may read it: never a value, and no form
@@ -124,9 +124,7 @@ const Unknown = () => {
 
 export const Route = createFileRoute("/$project/env")({
   loader: ({ params }) => envPage({ data: params.project }),
-  head: ({ params }) => ({
-    meta: [{ title: pageTitle(`Env shape of ${params.project}`) }],
-  }),
+  head: ({ params }) => pageHead({ title: `Env shape of ${params.project}` }),
   component: EnvPage,
   notFoundComponent: Unknown,
 });

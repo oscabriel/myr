@@ -8,6 +8,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { themeColors } from "../src/features/shared/theme.ts";
+import { getRouter } from "../src/router.tsx";
 import { rootHead, ThemeColors } from "../src/routes/__root.tsx";
 
 describe("the document's head", () => {
@@ -72,5 +73,35 @@ describe("the document's head", () => {
         type: "font/woff2",
       },
     ]);
+  });
+});
+
+describe("the router", () => {
+  const { options } = getRouter();
+
+  // A link fetches its page's code and loader data on hover or focus, and
+  // a click soon after reads nothing twice.
+  it("preloads a link's page on intent, and keeps what it read for a click", () => {
+    expect(options.defaultPreload).toBe("intent");
+    expect(options.defaultPreloadDelay).toBe(50);
+    expect(options.defaultStaleTime).toBeGreaterThan(0);
+    expect(options.defaultPreloadStaleTime).toBeGreaterThanOrEqual(
+      options.defaultStaleTime ?? 0
+    );
+  });
+
+  it("waits 300 ms before drawing a page as pending, so a quick move never flashes", () => {
+    expect(options.defaultPendingMs).toBe(300);
+    expect(options.defaultPendingComponent).toBeDefined();
+  });
+
+  it("draws a failure and a missing page in the shell, never the router's own", () => {
+    expect(options.defaultErrorComponent).toBeDefined();
+    expect(options.defaultNotFoundComponent).toBeDefined();
+  });
+
+  it("scrolls each new page's main pane back to its top", () => {
+    expect(options.scrollRestoration).toBeTruthy();
+    expect(options.scrollToTopSelectors).toContain("#main");
   });
 });
