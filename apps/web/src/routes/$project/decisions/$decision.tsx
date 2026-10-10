@@ -13,6 +13,7 @@ import { Effect, Option, Schema } from "effect";
 import type { DateTime } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { useCallback, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 import { decideAtom } from "../../../client/decide.ts";
 import { projectEventsAtom } from "../../../client/events.ts";
@@ -42,6 +43,7 @@ import {
 } from "../../../features/finish/patch.ts";
 import type { FinishDecision } from "../../../features/finish/patch.ts";
 import { marksKey, useReadMarks } from "../../../features/finish/read-marks.ts";
+import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { pageHead } from "../../../features/shared/head.ts";
 import { personalPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
@@ -99,6 +101,7 @@ const takenHere = (
 const Finish = ({
   busy,
   decision,
+  failure,
   found,
   now,
   onDecide,
@@ -110,6 +113,7 @@ const Finish = ({
   readonly onDecide: (input: DecideInput) => void;
   readonly busy: boolean;
   readonly taken: Decision | undefined;
+  readonly failure: ReactNode;
 }) => {
   const { platformUrl } = root.useLoaderData();
   const router = useRouter();
@@ -215,6 +219,7 @@ const Finish = ({
         taken === undefined ? decision : { ...taken, subject: decision.subject }
       }
       draw
+      failure={failure}
       files={files}
       filesButton={<FinishFilesButton />}
       folded={folded}
@@ -239,9 +244,27 @@ const Finish = ({
 };
 
 const DecisionPage = () => {
-  const data = Schema.decodeSync(DecisionPageData)(Route.useLoaderData());
+  const loaded = Route.useLoaderData();
+
+  // Decoded once per read, so what is built from it (the diff's parsed
+  // files above all) is built once too.
+  const data = useMemo(
+    () => Schema.decodeSync(DecisionPageData)(loaded),
+    [loaded]
+  );
+
   const [decided, decide] = useAtom(decideAtom);
   const here = useLocation({ select: hereOf });
+
+  // A choice that failed says why where the choices are: its refusal, the
+  // way to sign in, or that the platform did not answer.
+  const failure = AsyncResult.isFailure(decided) ? (
+    <ProposalFailure
+      cause={decided.cause}
+      doing="take this decision"
+      here={here}
+    />
+  ) : undefined;
 
   const waiverFiles = useMemo(
     () =>
@@ -262,6 +285,7 @@ const DecisionPage = () => {
     <Finish
       busy={decided.waiting}
       decision={found.value.decision}
+      failure={failure}
       found={found.value.found}
       now={data.now}
       onDecide={decide}
@@ -273,6 +297,7 @@ const DecisionPage = () => {
     <DecisionView
       busy={decided.waiting}
       data={data}
+      failure={failure}
       files={waiverFiles}
       finish={finish}
       here={here}

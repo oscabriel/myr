@@ -46,6 +46,7 @@ import {
 import type { DecisionPageData } from "../src/features/decision/decision-page.tsx";
 import { patchFiles } from "../src/features/finish/files.ts";
 import { waiverPatchOf } from "../src/features/finish/patch.ts";
+import { ProposalFailure } from "../src/features/proposal/failure.tsx";
 import {
   DraftRead,
   draftReadOf,
@@ -546,7 +547,11 @@ const waiver: Decision = {
   }),
 };
 
-const pageOf = (read: DecisionRead, chosen?: Decision) => {
+const pageOf = (
+  read: DecisionRead,
+  chosen?: Decision,
+  failure?: ReactElement
+) => {
   const data: DecisionPageData = {
     decision: waiver.id,
     now,
@@ -568,6 +573,7 @@ const pageOf = (read: DecisionRead, chosen?: Decision) => {
       here="/vellum/decisions/dec-000002"
       onDecide={() => {}}
       taken={chosen}
+      {...(failure === undefined ? {} : { failure })}
     />
   );
 };
@@ -623,6 +629,25 @@ describe(DecisionView, () => {
     expect(markup).toContain('data-decided="accept"');
     expect(plainTextOf(markup)).toContain("Accepted");
     expect(plainTextOf(markup)).toContain("Split out.");
+  });
+
+  it("says why a choice came back refused, before the choices", () => {
+    const closed = new DecisionClosed({ decision: waiver.id });
+
+    const markup = pageOf(
+      found,
+      undefined,
+      <ProposalFailure
+        cause={Cause.fail(closed)}
+        doing="take this decision"
+        here="/vellum/decisions/dec-000002"
+      />
+    );
+
+    const refusal = markup.indexOf('data-refusal="DecisionClosed"');
+
+    expect(refusal).toBeGreaterThan(-1);
+    expect(refusal).toBeLessThan(markup.indexOf("data-choices="));
   });
 
   it("signed out, says what a decision is and who takes it, with no choices and no evidence", () => {

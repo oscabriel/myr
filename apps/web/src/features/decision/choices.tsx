@@ -182,7 +182,7 @@ export const DecisionRecord = ({
  */
 export const stuckAboveBar = (node: ReactNode) => (
   <div
-    className="border-rule bg-background tablet:static tablet:border-t-0 tablet:p-0 tablet:mx-0 sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[6] -mx-4 border-t px-4 pt-3 pb-3"
+    className="border-rule bg-background tablet:static tablet:border-t-0 tablet:p-0 tablet:mx-0 sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[6] -mx-4 border-t px-4 py-2"
     data-choices-bar=""
   >
     {node}

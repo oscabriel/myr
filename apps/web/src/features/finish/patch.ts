@@ -67,33 +67,6 @@ const pathOf = (block: readonly string[]): Option.Option<string> => {
   );
 };
 
-/**
- * The files a unified diff changes, in its order: each `diff --git` block's
- * new path (its old path when the file is deleted). A diff without git's
- * headers counts as one block per `---`/`+++` pair.
- */
-export const changedFiles = (patch: string): readonly string[] => {
-  const lines = patch.split("\n");
-  const gitHeaders = lines.some((line) => HEADER.test(line));
-
-  const starts = (line: string, next: string | undefined) =>
-    gitHeaders
-      ? line.startsWith("diff --git ")
-      : OLD_FILE.test(line) && next !== undefined && NEW_FILE.test(next);
-
-  const blocks: string[][] = [];
-
-  for (const [index, line] of lines.entries()) {
-    if (starts(line, lines[index + 1])) {
-      blocks.push([line]);
-    } else {
-      blocks.at(-1)?.push(line);
-    }
-  }
-
-  return Arr.dedupe(blocks.flatMap((block) => Option.toArray(pathOf(block))));
-};
-
 /** The text of each file's block of a unified diff, by the path it ends up at. */
 export const fileBlocks = (patch: string): ReadonlyMap<string, string> => {
   const lines = patch.split("\n");
@@ -122,6 +95,15 @@ export const fileBlocks = (patch: string): ReadonlyMap<string, string> => {
     )
   );
 };
+
+/**
+ * The files a unified diff changes, in its order: each `diff --git` block's
+ * new path (its old path when the file is deleted). A diff without git's
+ * headers counts as one block per `---`/`+++` pair.
+ */
+export const changedFiles = (patch: string): readonly string[] => [
+  ...fileBlocks(patch).keys(),
+];
 
 /**
  * A short, stable id for one file's change: a polynomial hash over its

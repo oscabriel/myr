@@ -63,15 +63,18 @@ const ENTITIES: ReadonlyMap<string, string> = new Map([
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
-/** What a reader sees: the markup without its tags, entities decoded. */
-const textOf = (element: ReactElement) =>
-  markupOf(element)
+/** What a reader sees of `markup`: the text without its tags, entities decoded. */
+const textIn = (markup: string) =>
+  markup
     .replaceAll(/<[^>]+>/gu, " ")
     .replaceAll(
       /&(?:#x27|amp|gt|lt|quot);/gu,
       (entity) => ENTITIES.get(entity) ?? entity
     )
     .replaceAll(/\s+/gu, " ");
+
+/** What a reader sees of `element`. */
+const textOf = (element: ReactElement) => textIn(markupOf(element));
 
 const PLATFORM_URL = "https://platform-test.example.workers.dev";
 
@@ -347,6 +350,25 @@ describe(FinishView, () => {
     );
     expect(text).toContain(
       "Nothing lands; the answer keeps waiting for a finish."
+    );
+  });
+});
+
+describe("a finish taken on its page", () => {
+  it("keeps the choice's record at the diff's foot, where its choices were, and offers them no more", () => {
+    const markup = markupOf(
+      pageOf({
+        ...withPatch,
+        decided: { at: now, by: okonkwo, choice: "accept" },
+      })
+    );
+
+    const bar = markup.slice(markup.indexOf("data-decision-bar"));
+
+    expect(markup).not.toContain("data-choice=");
+    expect(bar).toContain('data-decided="accept"');
+    expect(textIn(bar)).toContain(
+      "Accepted · Lands the answer as it is, with you as Finished-by."
     );
   });
 });

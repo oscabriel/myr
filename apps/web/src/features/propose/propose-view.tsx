@@ -257,10 +257,13 @@ const Form = ({
       {children}
 
       <Button
-        className="tablet:h-9 tablet:w-fit h-11 w-full min-w-28 px-4"
+        // Waiting for a want, it says so at full strength, dashed like any
+        // field still to fill, rather than sitting grey.
+        className={`tablet:h-9 tablet:w-fit h-11 w-full min-w-28 px-4 ${written ? "" : "text-muted-foreground border-dashed disabled:opacity-100"}`}
         data-written={written}
         disabled={busy || !written}
         type="submit"
+        variant={written ? "default" : "outline"}
       >
         {busy ? <Spinner /> : null}
         {proposeWords(written, busy)}

@@ -1,9 +1,10 @@
 /**
- * A call the propose and proposal pages sent, failed. A session that ended
- * (or never began) asks the reader to sign in and come back to the same
- * address, so the form or the proposal is where they left it; a refusal
- * reads as the platform gave it, through `RefusalView`; anything else is
- * the platform not answering, in ink, never as a refusal.
+ * A call the propose, proposal or decision pages sent, failed. A session
+ * that ended (or never began) asks the reader to sign in and come back to
+ * the same address, so the form, the proposal or the decision is where
+ * they left it; a refusal reads as the platform gave it, through
+ * `RefusalView`; anything else is the platform not answering, in ink,
+ * never as a refusal.
  */
 import { Unauthenticated } from "@repo/protocol/principal";
 import { Refusal } from "@repo/protocol/refusal";

@@ -21,6 +21,7 @@ import type { Decision } from "@repo/protocol/domain/decision";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import type { DecisionId, ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
+import { Hourglass, Shield } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { signInHref } from "../auth/session-slot.tsx";
@@ -90,6 +91,11 @@ const DecisionFacts = ({
       </dd>
       <dt className="text-label text-muted-foreground pt-0.5">Expires</dt>
       <dd className={soon ? "text-waiting font-medium" : ""} data-soon={soon}>
+        <Hourglass
+          aria-hidden="true"
+          className="mr-1.5 inline size-4 align-[-0.1875rem]"
+          strokeWidth={1.75}
+        />
         <When at={decision.expiresAt} now={now} />
         <span className="text-muted-foreground font-normal">
           {" "}
@@ -97,7 +103,14 @@ const DecisionFacts = ({
         </span>
       </dd>
       <dt className="text-label text-muted-foreground pt-0.5">Default</dt>
-      <dd data-default={decision.default}>{decision.default}</dd>
+      <dd data-default={decision.default}>
+        <Shield
+          aria-hidden="true"
+          className="text-muted-foreground mr-1.5 inline size-4 align-[-0.1875rem]"
+          strokeWidth={1.75}
+        />
+        {decision.default}
+      </dd>
     </dl>
   </FactBlock>
 );
@@ -202,11 +215,14 @@ export interface DecisionViewProps {
   /** The page for a finish, when the decision is one (the route draws it whole). */
   readonly finish?: ReactNode;
   readonly here: string;
+  /** What the reader's last choice came back with, when it failed: shown above the choices. */
+  readonly failure?: ReactNode;
 }
 
 /** A decision the reader may take, whole. */
 const Found = ({
   busy,
+  failure,
   files,
   found,
   now,
@@ -219,6 +235,7 @@ const Found = ({
   readonly busy: boolean;
   readonly files: readonly PatchFile[];
   readonly taken: Decision | undefined;
+  readonly failure: ReactNode;
 }) => {
   const decision = taken ?? found.decision;
 
@@ -270,6 +287,9 @@ const Found = ({
         stamp={taken !== undefined}
       >
         <WaiverDiff decision={decision} files={files} />
+        <div aria-live="polite" className="empty:hidden">
+          {failure}
+        </div>
       </DecisionCard>
     </Workspace>
   );
@@ -294,6 +314,7 @@ const Apart = ({
 export const DecisionView = ({
   busy = false,
   data,
+  failure,
   files = NO_FILES,
   finish,
   here,
@@ -307,6 +328,7 @@ export const DecisionView = ({
       ) : (
         <Found
           busy={busy}
+          failure={failure}
           files={files}
           found={found}
           now={data.now}

@@ -7,14 +7,8 @@
  * someone decided first, or it expired to its default) or names a decision
  * Today no longer has (`UnknownDecision`) fails with that refusal, and Today
  * reads again so the stale decision leaves the list.
- *
- * Also here: the public reads a `Finish` decision's page shows beside the
- * diff, the ask and the verdict on the answer's head (no other client module
- * holds them; the same `ContractsClient.query` atoms
- * serve any other page that asks for them with the same keys).
  */
 import type { Decide } from "@repo/protocol/contracts";
-import type { AskId, CommitSha, ProjectName } from "@repo/protocol/ids";
 import { Effect } from "effect";
 import { Reactivity } from "effect/reactivity";
 
@@ -36,23 +30,3 @@ export const decideAtom = ContractsClient.runtime.fn<
     );
   })
 );
-
-/** The ask a `Finish` decision's answer answers: its want, beside the diff. */
-export const finishAskAtom = (project: ProjectName, ask: AskId) =>
-  ContractsClient.query(
-    "showAsk",
-    { ask, project },
-    { reactivityKeys: keys.ask(project, ask) }
-  );
-
-/** The verdict on the answer's head a `Finish` decision names. */
-export const finishVerdictAtom = (
-  project: ProjectName,
-  ask: AskId,
-  head: CommitSha
-) =>
-  ContractsClient.query(
-    "verdict",
-    { ask, head, project },
-    { reactivityKeys: keys.ask(project, ask) }
-  );

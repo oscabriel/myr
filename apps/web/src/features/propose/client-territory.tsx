@@ -22,7 +22,7 @@ const StandIn = ({ choices, labelledBy, value }: TerritorySelectProps) => (
   <>
     <button
       aria-labelledby={labelledBy}
-      className="border-input tablet:text-ui flex h-11 w-full max-w-xs items-center justify-between gap-1.5 border bg-transparent py-2 pr-2 pl-2.5 text-base sm:h-9"
+      className="border-input tablet:text-ui tablet:h-9 flex h-11 w-full max-w-xs items-center justify-between gap-1.5 border bg-transparent py-2 pr-2 pl-2.5 text-base"
       data-slot="select-trigger"
       disabled
       type="button"

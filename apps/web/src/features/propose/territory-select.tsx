@@ -25,7 +25,8 @@ export interface TerritorySelectProps {
 }
 
 /** The trigger's look, shared with the server's stand-in for it. */
-export const TRIGGER = "tablet:text-ui h-11 w-full max-w-xs text-base sm:h-9";
+export const TRIGGER =
+  "tablet:text-ui tablet:h-9 h-11 w-full max-w-xs text-base";
 
 export const TerritorySelect = ({
   choices,

@@ -40,7 +40,11 @@ import { statsOf } from "../code/diff-model.ts";
 import { DiffPane, PANE_SCROLLER } from "../code/diff-pane.tsx";
 import type { DiffAnnotation, DiffFileSlot } from "../code/diff-view.tsx";
 import { shortSha } from "../code/paths.ts";
-import { Choices, stuckAboveBar } from "../decision/choices.tsx";
+import {
+  Choices,
+  DecisionRecord,
+  stuckAboveBar,
+} from "../decision/choices.tsx";
 import { DecisionCard, ExpiryLines } from "../decision/decision-card.tsx";
 import type { DecideInput } from "../decision/decision-card.tsx";
 import { describeSubject } from "../decision/subject.ts";
@@ -187,6 +191,8 @@ export interface FinishViewProps {
   readonly filesButton?: ReactNode;
   /** Settle the record's mark: the choice was taken while the page was open. */
   readonly stamp?: boolean;
+  /** What the reader's last choice came back with, when it failed. */
+  readonly failure?: ReactNode;
 }
 
 const NO_FILES: ReadonlySet<string> = new Set();
@@ -242,42 +248,71 @@ const NewerHead = ({ head }: { readonly head: CommitSha }) => (
   </output>
 );
 
-/** The choices kept at the foot of the diff below 1440 px, where the inspector is a sheet. */
+/**
+ * The choices kept at the foot of the diff below 1440 px, where the
+ * inspector is a sheet; once taken, the choice's record in their place.
+ */
 const DecisionBar = ({
   busy,
   decision,
   now,
   onDecide,
   soon,
+  stamp,
 }: {
   readonly decision: FinishDecision;
   readonly busy: boolean;
   readonly now: DateTime.Utc;
   readonly onDecide: (input: DecideInput) => void;
   readonly soon: boolean;
+  readonly stamp: boolean;
 }) => (
   <section
     aria-label="Your choice"
     className="border-rule bg-background codefacts:hidden flex shrink-0 flex-wrap items-start gap-x-6 gap-y-2 border-t px-4 py-3"
     data-decision-bar=""
   >
-    <div className="min-w-0 flex-1 basis-56">
-      <ExpiryLines decision={decision} now={now} soon={soon} />
-    </div>
-    <div className="max-w-[34rem] min-w-0 flex-[2] basis-80">
-      <Choices
-        busy={busy}
+    {decision.decided === undefined ? (
+      <>
+        <div className="min-w-0 flex-1 basis-56">
+          <ExpiryLines decision={decision} now={now} soon={soon} />
+        </div>
+        <div className="max-w-[34rem] min-w-0 flex-[2] basis-80">
+          <Choices
+            busy={busy}
+            decision={decision}
+            onChoose={(choice) => {
+              onDecide({
+                choice,
+                decision: decision.id,
+                project: decision.project,
+              });
+            }}
+          />
+        </div>
+      </>
+    ) : (
+      <DecisionRecord
+        decided={decision.decided}
         decision={decision}
-        onChoose={(choice) => {
-          onDecide({
-            choice,
-            decision: decision.id,
-            project: decision.project,
-          });
-        }}
+        now={now}
+        stamp={stamp}
       />
-    </div>
+    )}
   </section>
+);
+
+/** A choice that came back failed: said where the reader looks next, and politely. */
+const Failure = ({
+  children,
+  className = "",
+}: {
+  readonly children: ReactNode;
+  readonly className?: string;
+}) => (
+  <div aria-live="polite" className={`empty:hidden ${className}`}>
+    {children}
+  </div>
 );
 
 /** On a phone: the diff one file at a time, with the way to the next and the one before. */
@@ -360,6 +395,7 @@ const WideDiff = ({
   busy,
   decision,
   draw,
+  failure,
   files,
   folded,
   newerHead,
@@ -371,6 +407,7 @@ const WideDiff = ({
   read,
   soon,
   split,
+  stamp,
 }: Required<
   Pick<
     FinishViewProps,
@@ -384,9 +421,13 @@ const WideDiff = ({
     | "read"
     | "soon"
     | "split"
+    | "stamp"
   >
 > &
-  Pick<FinishViewProps, "folded" | "newerHead" | "onFold" | "onMark">) => {
+  Pick<
+    FinishViewProps,
+    "failure" | "folded" | "newerHead" | "onFold" | "onMark"
+  >) => {
   const refused = new Set(placed.map(({ path }) => path));
 
   const plain = (
@@ -421,6 +462,7 @@ const WideDiff = ({
 
   return (
     <div className="tablet:contents hidden">
+      <Failure className={`py-3 ${GUTTER}`}>{failure}</Failure>
       {newerHead === undefined ? null : <NewerHead head={newerHead} />}
       <DiffPane>
         {draw ? (
@@ -443,6 +485,7 @@ const WideDiff = ({
           now={now}
           onDecide={onDecide}
           soon={soon}
+          stamp={stamp}
         />
       </DiffPane>
     </div>
@@ -454,6 +497,7 @@ const PhoneFinish = ({
   ask,
   busy,
   decision,
+  failure,
   files,
   newerHead,
   now,
@@ -478,7 +522,10 @@ const PhoneFinish = ({
     | "stamp"
   >
 > &
-  Pick<FinishViewProps, "ask" | "newerHead" | "onMark" | "verdict">) => (
+  Pick<
+    FinishViewProps,
+    "ask" | "failure" | "newerHead" | "onMark" | "verdict"
+  >) => (
   <div className={`tablet:hidden flex flex-col gap-6 ${GUTTER}`}>
     {ask === undefined ? null : (
       <p className="text-want max-w-[70ch]">{ask.brief.want}</p>
@@ -497,6 +544,7 @@ const PhoneFinish = ({
       </div>
     )}
     {newerHead === undefined ? null : <NewerHead head={newerHead} />}
+    <Failure>{failure}</Failure>
     <DecisionCard
       busy={busy}
       choices={stuckAboveBar}

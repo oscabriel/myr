@@ -53,14 +53,16 @@ const FactRow = ({
 }) => (
   <div className="contents">
     <dt className="text-label text-muted-foreground pt-0.5">{label}</dt>
-    <dd className="text-ui tablet:mb-0 mb-1.5 min-w-0 [overflow-wrap:anywhere]">
+    <dd className="text-ui mb-1.5 min-w-0 [overflow-wrap:anywhere] @lg:mb-0">
       {children}
     </dd>
   </div>
 );
 
 const FactList = ({ children }: { readonly children: ReactNode }) => (
-  <dl className="tablet:grid-cols-[minmax(7rem,auto)_1fr] grid grid-cols-1 gap-x-4 gap-y-1.5">
+  // Label beside value where the evidence has the width (main), label over
+  // value where it has not (the inspector, a phone).
+  <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 @lg:grid-cols-[minmax(7rem,auto)_1fr]">
     {children}
   </dl>
 );
@@ -335,7 +337,7 @@ export const DecisionEvidence = ({
   const files = filesOf(decision);
 
   return (
-    <div className="flex min-w-0 flex-col gap-3" data-evidence="">
+    <div className="@container flex min-w-0 flex-col gap-3" data-evidence="">
       <SubjectFacts decision={decision} />
       <OtherFacts decision={decision} files={files} />
       {files.map(({ label, value }) => (
