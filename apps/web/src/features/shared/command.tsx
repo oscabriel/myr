@@ -11,6 +11,22 @@ import { Button } from "../../components/ui/button.tsx";
 import { useCopy } from "./copy-action.tsx";
 import { useNumberedCommand } from "./keys.tsx";
 
+/** How far a line of the command hangs, in ch, when the column breaks it. */
+const HANG = 6;
+
+/**
+ * A line's hang: 6ch, or less on a line so short that its longest word
+ * would not fit beside the hang. The box hugs its longest line, so a line's
+ * room beside its hang is its own length less the hang; a word wider than
+ * that room is broken in two (`<cli> today` read "tod" / "<cli> ay"). Such a
+ * line fits whole wherever its box does, so its hang never shows.
+ */
+const hangOf = (words: readonly string[], line: string) =>
+  Math.min(
+    HANG,
+    line.length - Math.max(0, ...words.map(({ length }) => length))
+  );
+
 // The command's words, each kept whole on its line: a narrow column breaks
 // the line between words, never after a word's own hyphen
 // (`lint-heading-levels`, `--project`) nor before a closing ` \`; a word
@@ -18,24 +34,37 @@ import { useNumberedCommand } from "./keys.tsx";
 // command's own lines hangs, so a line the column breaks reads as one line
 // going on. The text is the command's, space for space.
 const wordsOf = (command: string) =>
-  command.split("\n").map((line, at, lines) => (
-    // A line never moves: its place in the command is its key.
-    <span className="block pl-[6ch] -indent-[6ch]" key={at}>
-      {line.split(/(?<space>\s+)(?!\\$)/u).map((part, index) =>
-        part.trim() === "" ? (
-          part
-        ) : (
-          <span
-            className="inline-block max-w-full indent-0 [overflow-wrap:anywhere]"
-            key={index}
-          >
-            {part}
-          </span>
-        )
-      )}
-      {at < lines.length - 1 ? "\n" : null}
-    </span>
-  ));
+  command.split("\n").map((line, at, lines) => {
+    const parts = line.split(/(?<space>\s+)(?!\\$)/u);
+
+    const hang = hangOf(
+      parts.filter((part) => part.trim() !== ""),
+      line
+    );
+
+    return (
+      // A line never moves: its place in the command is its key.
+      <span
+        className="block"
+        key={at}
+        style={{ paddingLeft: `${hang}ch`, textIndent: `-${hang}ch` }}
+      >
+        {parts.map((part, index) =>
+          part.trim() === "" ? (
+            part
+          ) : (
+            <span
+              className="inline-block max-w-full indent-0 [overflow-wrap:anywhere]"
+              key={index}
+            >
+              {part}
+            </span>
+          )
+        )}
+        {at < lines.length - 1 ? "\n" : null}
+      </span>
+    );
+  });
 
 const Line = ({
   command,
