@@ -117,13 +117,103 @@ const README = [
   "readme.rst",
 ];
 
-const readmeOf = (entries: readonly CodeEntry[]) =>
-  Array.findFirst(README, (name) =>
-    Array.findFirst(
-      entries,
-      (entry) => entry.type === "blob" && entry.name.toLowerCase() === name
-    )
-  ).pipe(Option.map(({ path, sha }) => ({ path, sha: BlobSha.make(sha) })));
+/**
+ * Where a symlink in `folder` points, as a path from the repo's root: its
+ * target read against the folder, `.` and `..` resolved. None when the
+ * target is absolute or climbs out of the repo.
+ */
+export const linkTargetOf = (
+  folder: string,
+  target: string
+): Option.Option<string> => {
+  if (target.startsWith("/")) {
+    return Option.none();
+  }
+
+  const resolved: string[] = folder === "" ? [] : folder.split("/");
+
+  for (const segment of target.split("/")) {
+    if (segment === "..") {
+      if (resolved.pop() === undefined) {
+        return Option.none();
+      }
+    } else if (segment !== "" && segment !== ".") {
+      resolved.push(segment);
+    }
+  }
+
+  return Option.liftPredicate(resolved.join("/"), (path) => path !== "");
+};
+
+/** The file the symlink blob `link` in `folder` names, if it is one in the repo. */
+const linkedFile = (
+  repo: RepoName,
+  root: Effect.Effect<string, never, RepoHost>,
+  folder: string,
+  link: string
+) =>
+  Effect.gen(function* () {
+    const bytes = yield* RepoHost.use((host) =>
+      host.readBlob(repo, ObjectId.make(link))
+    ).pipe(Effect.orDie);
+
+    const path = Option.flatMap(bytes, (read) =>
+      linkTargetOf(folder, new TextDecoder().decode(read))
+    );
+
+    if (Option.isNone(path)) {
+      return Option.none();
+    }
+
+    const entry = yield* entryAt(repo, yield* root, path.value).pipe(
+      Effect.orDie
+    );
+
+    return Option.flatMap(entry, ({ sha, type }) =>
+      type === "blob"
+        ? Option.some({
+            path: RepoPath.make(path.value),
+            sha: BlobSha.make(sha),
+          })
+        : Option.none()
+    );
+  });
+
+/**
+ * The folder's README by GitLab's precedence, any case: a file, or a
+ * symlink to a file elsewhere in the repo (axum's root README.md links to
+ * its crate's), read where it points, so its relative links resolve there.
+ * A link out of the repo, to nothing or to a folder is no README.
+ */
+const readmeOf = (
+  repo: RepoName,
+  root: Effect.Effect<string, never, RepoHost>,
+  folder: string,
+  entries: readonly CodeEntry[]
+) =>
+  Effect.gen(function* () {
+    for (const name of README) {
+      const found = entries.find(
+        (entry) =>
+          (entry.type === "blob" || entry.type === "symlink") &&
+          entry.name.toLowerCase() === name
+      );
+
+      if (found?.type === "blob") {
+        return Option.some({ path: found.path, sha: BlobSha.make(found.sha) });
+      }
+
+      if (found?.type === "symlink") {
+        const linked = yield* linkedFile(repo, root, folder, found.sha);
+
+        if (Option.isSome(linked)) {
+          return linked;
+        }
+      }
+    }
+
+    return Option.none();
+  });
 
 /** The tree `path` names at `commit`, or `UnknownPath`. */
 export const folderAt = (
@@ -182,6 +272,19 @@ export const listing = (
       byKindThenName
     );
 
+    const root = commitAt(project.repo, commit).pipe(
+      Effect.flatMap(Effect.fromOption),
+      Effect.map(({ tree: id }) => id),
+      Effect.orDie
+    );
+
+    const readme = yield* readmeOf(
+      project.repo,
+      root,
+      Option.getOrElse(path, () => ""),
+      entries
+    );
+
     return {
       at: commit,
       entries,
@@ -189,9 +292,9 @@ export const listing = (
         onNone: () => ({}),
         onSome: (folder) => ({ path: folder }),
       }),
-      ...Option.match(readmeOf(entries), {
+      ...Option.match(readme, {
         onNone: () => ({}),
-        onSome: (readme) => ({ readme }),
+        onSome: (found) => ({ readme: found }),
       }),
     };
   });

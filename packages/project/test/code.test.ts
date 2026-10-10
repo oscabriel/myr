@@ -49,6 +49,7 @@ import {
   Content,
   datekit,
   fork,
+  linkedReadmes,
   longHistory,
   project,
   overlappingTrees,
@@ -163,6 +164,40 @@ describe("a folder", () => {
       ]);
       expect(listing.readme?.path).toBe("lib/readme.md");
     }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "follows a README that is a symlink to the file it names in the repo, and reads it there",
+    () =>
+      Effect.gen(function* () {
+        const { code } = yield* linkedReadmes;
+        const root = yield* treeOf(code, main, Option.none());
+        const crate = yield* treeOf(code, main, path("crate"));
+        const docs = yield* treeOf(code, main, path("docs"));
+        const target = crate.entries.find(({ name }) => name === "README.md");
+
+        expect(
+          root.entries.find(({ name }) => name === "README.md")?.type
+        ).toBe("symlink");
+        expect([root.readme, docs.readme]).toStrictEqual([
+          { path: "crate/README.md", sha: target?.sha },
+          { path: "crate/README.md", sha: target?.sha },
+        ]);
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "has no README where its symlink leaves the repo, names nothing, or names a folder",
+    () =>
+      Effect.gen(function* () {
+        const { code } = yield* linkedReadmes;
+
+        const readmes = yield* Effect.forEach(["out", "gone", "folder"], (at) =>
+          Effect.map(treeOf(code, main, path(at)), ({ readme }) => readme)
+        );
+
+        expect(readmes).toStrictEqual([undefined, undefined, undefined]);
+      }).pipe(Effect.provide(RepoHostMemory))
   );
 
   it.effect("is UnknownPath when missing, or a file", () =>
