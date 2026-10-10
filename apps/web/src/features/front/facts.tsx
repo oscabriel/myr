@@ -9,6 +9,7 @@
  * (its territory's paths, its check, its mentor) fills in once the browser
  * has read it, in a block of the same size.
  */
+import { installCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
@@ -78,10 +79,7 @@ export const ForAgents = ({ href }: { readonly href: string }) => (
 /** The three ways in from the front page: the CLI, the asks it lists, a claim. */
 export const StartHere = ({ webUrl }: { readonly webUrl: string }) => (
   <FactBlock label="Take an ask">
-    <Step
-      command={`curl -fsSL ${webUrl}/install.sh | sh`}
-      label="Install the command line"
-    />
+    <Step command={installCommand(webUrl)} label="Install the command line" />
     <Step command={`${Brand.cli} front`} label="List every open ask" />
     <Step
       command={`${Brand.cli} claim <ask> --project <project>`}

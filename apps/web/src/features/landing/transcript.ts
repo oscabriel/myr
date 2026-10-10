@@ -2,8 +2,10 @@
  * The landing's evidence: the screen `git push` prints when an answer
  * strays outside its ask's territory, as the platform's gateway writes it.
  * The refusal's lines come from the one renderer (`explain`, `headline`),
- * so the page cannot drift from what git shows; the fork is the README's
- * (`apps/platform/test/core-loop.test.ts` asserts the same screen).
+ * so they cannot drift from what the gateway sends; git's own lines around
+ * them (`To`, `! [remote rejected]`, `error:`) and the fork are the README's
+ * screen, which `apps/platform/test/core-loop.test.ts` asserts from real
+ * git.
  */
 import { RepoPath } from "@repo/protocol/ids";
 import { OutOfScope } from "@repo/protocol/refusal";
@@ -25,11 +27,12 @@ export interface TranscriptLine {
 /** The push and what git prints back, against the platform at `platformUrl`. */
 export const pushTranscript = (platformUrl: string) => {
   const remote = `${platformUrl.replace(/\/+$/u, "")}/${FORK}`;
+  const tag = headline(refusals);
 
   return {
     command: "git push",
     /** The refusal's tag, which the page sets in the refused colour. */
-    tag: headline(refusals),
+    tag,
     lines: [
       ...explain(refusals).map((text): TranscriptLine => ({
         remote: true,
@@ -38,7 +41,7 @@ export const pushTranscript = (platformUrl: string) => {
       { remote: false, text: `To ${remote}` },
       {
         remote: false,
-        text: ` ! [remote rejected] HEAD -> main (${headline(refusals)})`,
+        text: ` ! [remote rejected] HEAD -> main (${tag})`,
       },
       {
         remote: false,

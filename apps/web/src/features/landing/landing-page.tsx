@@ -5,12 +5,14 @@
  * the README's or the glossary's. A view: the platform's address, the web's
  * own and the projects in; markup out.
  */
+import { installCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import type { ReactNode } from "react";
 
-import { Skeleton } from "../../components/ui/skeleton.tsx";
+import { buttonVariants } from "../../components/ui/button.tsx";
 import { signInHref } from "../auth/session-slot.tsx";
 import { postureLabel } from "../project/posture-label.ts";
+import { ID, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { SkipLink } from "../shared/layout.tsx";
 import { AppLink } from "../shared/link.tsx";
@@ -20,6 +22,7 @@ import {
   HOME_PATH,
   projectPath,
 } from "../shared/paths.ts";
+import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
 import { LandingProjects } from "./projects.ts";
 import { pushTranscript } from "./transcript.ts";
 
@@ -27,17 +30,18 @@ import { pushTranscript } from "./transcript.ts";
 const WHAT_IT_IS =
   "A Git platform for the boundary between a project and everyone else.";
 
-/** Running text's link: ink, underlined in the hairline colour. */
-const LINK =
-  "decoration-rule hover:decoration-foreground underline underline-offset-4";
+/** A link in a plain row (the top, the foot): ink, underlined only on hover. */
+const ROW_LINK = "no-underline hover:underline";
 
-/** A link in a plain row: muted, ink on hover, no underline. */
-const QUIET =
-  "text-muted-foreground hover:text-foreground no-underline transition-colors duration-150";
+/** The primary action: an ink button that is a link. */
+const PRIMARY = buttonVariants({ className: "no-underline" });
+
+/** Where an agent's reference is. */
+const AGENTS_PATH = "/agents";
 
 /** Text git prints or takes, inside a sentence. */
 const Code = ({ children }: { readonly children: ReactNode }) => (
-  <code className="text-mono font-mono">{children}</code>
+  <code className={ID}>{children}</code>
 );
 
 /** One part of the page under its name, parted from the last by a hairline. */
@@ -61,27 +65,38 @@ const Part = ({
   </section>
 );
 
-/** The four nouns a contributor meets, in the README's words. */
-const NOUNS: readonly (readonly [string, string, ReactNode])[] = [
-  [
-    "ask",
-    "An ask",
-    <>
-      a file on <Code>main</Code> stating one change the project wants, with a
-      territory and a check that fails on <Code>main</Code>.
-    </>,
-  ],
-  [
-    "answer",
-    "An answer",
-    "a commit in the claimant's fork, offered for one ask.",
-  ],
-  [
-    "check",
-    "A check",
-    "what judges the answer, run by the platform on the exact merged tree.",
-  ],
-  ["refusal", "A refusal", "what the platform returns instead of landing."],
+/** A noun a contributor meets, and what GLOSSARY.md says it is. */
+interface Noun {
+  readonly noun: string;
+  readonly means: ReactNode;
+}
+
+/** The four nouns, in the glossary's words. */
+const NOUNS: readonly Noun[] = [
+  {
+    means: (
+      <>
+        A file on <Code>main</Code> in which a project states one change it
+        wants: a behavioural want, a territory, and a check that fails on{" "}
+        <Code>main</Code>.
+      </>
+    ),
+    noun: "Ask",
+  },
+  {
+    means: "A commit in a claimant's fork offered to satisfy one ask.",
+    noun: "Answer",
+  },
+  {
+    means:
+      "The predicate that judges an answer: the ask's own check plus the project's checks, run by the platform on the exact merged tree.",
+    noun: "Check",
+  },
+  {
+    means:
+      "One or more members of the closed, typed union the platform returns instead of landing, all from the cheapest failing stage, each with a reason, a reproducing command, a next step, and whether retrying can help.",
+    noun: "Refusal",
+  },
 ];
 
 /** The core loop, in the README's six lines. */
@@ -110,40 +125,53 @@ const LOOP: readonly ReactNode[] = [
   </>,
 ];
 
-/** What a platform can do that a setting on a code host cannot, one sentence each. */
-const CAN: readonly (readonly [string, ReactNode])[] = [
-  [
-    "Judge with checks the answer cannot touch.",
-    <>
-      A push that edits the files that decide what the checks do, or adds a{" "}
-      <Code>.skip</Code> or a lint disable without a reason, is refused at the
-      push.
-    </>,
-  ],
-  [
-    "Hold checks back.",
-    "A maintainer's held-back checks run on every answer, and the answerer learns one result per area.",
-  ],
-  [
-    "Refuse in git's own words.",
-    <>
-      A refusal is a member of one closed, typed union, printed in{" "}
-      <Code>git push</Code>&apos;s <Code>remote:</Code> lines with the command
-      to run next and whether retrying can help.
-    </>,
-  ],
-  [
-    "Give an ask one claimant.",
-    "A claim is an exclusive, expiring right to answer an ask, so two agents never race on the same change.",
-  ],
-  [
-    "Credit the asker too.",
-    <>
-      A landing names every person by trailer (<Code>Asked-by</Code>,{" "}
-      <Code>Signed-off-by</Code>, <Code>Decided-by</Code> and more), and an
-      agent is disclosed, never credited.
-    </>,
-  ],
+/** One thing a platform can do that a setting cannot: the README's lead, and its words. */
+interface Power {
+  readonly lead: string;
+  readonly says: ReactNode;
+}
+
+/** What a platform can do that a setting on a code host cannot, in the README's words. */
+const POWERS: readonly Power[] = [
+  {
+    lead: "Judge with checks the answer cannot touch.",
+    says: (
+      <>
+        The files that decide what the checks do form the project&apos;s judge
+        closure; a push that edits one, or adds a <Code>.skip</Code> or a lint
+        disable without a reason, is refused at the push.
+      </>
+    ),
+  },
+  {
+    lead: "Hold checks back.",
+    says: "A maintainer's held-back checks run on every answer; the answerer learns one result per area, and each landing names the suite's salted commitment.",
+  },
+  {
+    lead: "Refuse in git's own words.",
+    says: (
+      <>
+        A refusal is a member of one closed, typed union about the contribution,
+        printed in <Code>git push</Code>&apos;s <Code>remote:</Code> lines with
+        the command to run next and whether retrying can help.
+      </>
+    ),
+  },
+  {
+    lead: "Give an ask one claimant.",
+    says: "A claim is an exclusive, expiring right to answer an ask, so two agents never race on the same change; racing is opt-in, for the kinds of ask where parallel attempts are the point.",
+  },
+  {
+    lead: "Credit the asker too.",
+    says: (
+      <>
+        A landing names every person by trailer (<Code>Asked-by</Code>,{" "}
+        <Code>Signed-off-by</Code>, <Code>Decided-by</Code>,{" "}
+        <Code>Finished-by</Code> and more), and a person&apos;s record carries
+        across projects. An agent is disclosed, never credited.
+      </>
+    ),
+  },
 ];
 
 /** The wordmark and the ways in, as a plain row. */
@@ -153,16 +181,16 @@ const Top = () => (
       {Brand.name}
     </AppLink>
     <nav aria-label="Site" className="text-ui flex flex-wrap gap-x-5 gap-y-1">
-      <AppLink className={QUIET} to={ASKS_PATH}>
+      <AppLink className={ROW_LINK} to={ASKS_PATH}>
         Asks
       </AppLink>
-      <AppLink className={QUIET} to={docsPath()}>
+      <AppLink className={ROW_LINK} to={docsPath()}>
         Docs
       </AppLink>
-      <AppLink className={QUIET} to="/agents">
+      <AppLink className={ROW_LINK} to={AGENTS_PATH}>
         For agents
       </AppLink>
-      <a className={QUIET} href={signInHref(HOME_PATH)}>
+      <a className={ROW_LINK} href={signInHref(HOME_PATH)}>
         Sign in
       </a>
     </nav>
@@ -226,7 +254,7 @@ const Transcript = ({ platformUrl }: { readonly platformUrl: string }) => {
   );
 };
 
-/** The projects on the platform, each with its posture, and the way to every ask. */
+/** The projects on the platform, each with its posture word, or why none shows yet. */
 const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
   LandingProjects.match(projects, {
     Listed: ({ projects: listed }) => (
@@ -243,6 +271,9 @@ const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
             >
               {project}
             </AppLink>
+            {/* The word alone, not the posture badge: the badge's marks
+                would split into chunks every page preloads, past the
+                root's byte ceiling (production-bundle.test.ts). */}
             <span
               className="text-ui text-muted-foreground"
               data-posture={posture}
@@ -253,26 +284,8 @@ const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
         ))}
       </ul>
     ),
-    Pending: () => (
-      <div aria-busy="true" className="flex flex-col">
-        <output className="sr-only">Reading from the platform</output>
-        {["first", "second", "third"].map((row) => (
-          <div
-            aria-hidden="true"
-            className="border-rule flex h-11 items-center border-b"
-            key={row}
-          >
-            <Skeleton className="h-3 w-32" />
-          </div>
-        ))}
-      </div>
-    ),
-    Unreachable: () => (
-      <p className="text-body">
-        The projects did not come: the platform did not answer. Git and the CLI
-        reach it directly.
-      </p>
-    ),
+    Pending: () => <ReadingRows />,
+    Unreachable: () => <UnreachableNotice />,
   });
 
 /** The landing, as everyone reads it. */
@@ -288,7 +301,11 @@ export const LandingView = ({
   <div className="tablet:px-8 mx-auto flex min-h-dvh max-w-3xl flex-col px-4">
     <SkipLink />
     <Top />
-    <main className="flex flex-1 flex-col gap-12 py-12" id="main">
+    <main
+      className="flex flex-1 flex-col gap-12 py-12 outline-none"
+      id="main"
+      tabIndex={-1}
+    >
       <div className="flex flex-col gap-8">
         <div className="flex max-w-[60ch] flex-col gap-3">
           <h1 className="text-headline text-balance">{WHAT_IT_IS}</h1>
@@ -299,28 +316,24 @@ export const LandingView = ({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <AppLink
-            className="bg-primary text-primary-foreground hover:bg-primary/80 text-ui inline-flex h-9 items-center px-3 font-medium no-underline transition-colors duration-150"
-            data-action="asks"
-            to={ASKS_PATH}
-          >
+          <AppLink className={PRIMARY} data-action="asks" to={ASKS_PATH}>
             See the open asks
           </AppLink>
-          <CommandLine command={`curl -fsSL ${webUrl}/install.sh | sh`} />
+          <CommandLine command={installCommand(webUrl)} />
         </div>
         <Transcript platformUrl={platformUrl} />
       </div>
 
       <Part id="nouns" title="Four nouns">
         <dl className="flex flex-col gap-3">
-          {NOUNS.map(([noun, term, meaning]) => (
+          {NOUNS.map(({ means, noun }) => (
             <div
               className="tablet:grid tablet:grid-cols-[8rem_1fr] tablet:gap-4 flex flex-col gap-0.5"
-              data-noun={noun}
+              data-noun={noun.toLowerCase()}
               key={noun}
             >
-              <dt className="text-want font-semibold">{term}</dt>
-              <dd className="text-body">{meaning}</dd>
+              <dt className="text-want font-semibold">{noun}</dt>
+              <dd className="text-body">{means}</dd>
             </div>
           ))}
         </dl>
@@ -342,9 +355,9 @@ export const LandingView = ({
         title="What a platform can do that a setting on a code host cannot"
       >
         <ul className="flex max-w-[70ch] flex-col gap-4">
-          {CAN.map(([lead, sentence]) => (
+          {POWERS.map(({ lead, says }) => (
             <li className="text-body" key={lead}>
-              <span className="font-semibold">{lead}</span> {sentence}
+              <span className="font-semibold">{lead}</span> {says}
             </li>
           ))}
         </ul>
@@ -364,16 +377,16 @@ export const LandingView = ({
       </Part>
     </main>
     <footer className="border-rule text-ui flex flex-wrap gap-x-5 gap-y-2 border-t py-6">
-      <AppLink className={QUIET} to={docsPath()}>
+      <AppLink className={ROW_LINK} to={docsPath()}>
         Docs
       </AppLink>
-      <AppLink className={QUIET} to="/agents">
+      <AppLink className={ROW_LINK} to={AGENTS_PATH}>
         For agents
       </AppLink>
-      <a className={QUIET} href="/llms.txt">
+      <a className={`${ROW_LINK} ${ID}`} href="/llms.txt">
         /llms.txt
       </a>
-      <a className={`${QUIET} text-mono font-mono`} href={platformUrl}>
+      <a className={`${ROW_LINK} ${ID}`} href={platformUrl}>
         {platformUrl.replace(/^https?:\/\//u, "")}
       </a>
     </footer>

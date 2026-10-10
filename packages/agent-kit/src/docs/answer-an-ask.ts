@@ -5,6 +5,7 @@
  */
 import { Brand } from "@repo/brand";
 
+import { installCommand } from "../install.ts";
 import { code } from "../text.ts";
 import type { DocSource } from "./page.ts";
 import { cli, shell } from "./page.ts";
@@ -15,10 +16,7 @@ export const answerAnAsk: DocSource = {
   body: ({ platformUrl, webUrl }) => [
     "## Install the CLI and sign in",
     "",
-    ...shell(
-      `curl -fsSL ${webUrl}/install.sh | sh`,
-      `${Brand.cli} login --url ${platformUrl}`
-    ),
+    ...shell(installCommand(webUrl), `${Brand.cli} login --url ${platformUrl}`),
     "",
     "Signing in stores your token, and git uses it from then on through the CLI's credential helper: no token in a URL, and no prompt.",
     "",

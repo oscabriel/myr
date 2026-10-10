@@ -126,7 +126,7 @@ describe(LandingView, () => {
           LandingProjects.cases.Unreachable.make({})
         );
 
-        expect(textIn(markup)).toContain("The projects did not come");
+        expect(textIn(markup)).toContain("The platform did not answer.");
         expect(hrefsOf(markup)).toContain("/asks");
       })
   );
@@ -138,13 +138,14 @@ describe(LandingView, () => {
         const markup = yield* pageWith(listed);
         const text = textIn(markup).toLowerCase();
 
-        // DESIGN.md's list. "Merge" is banned for a landing and "issue" for
-        // an ask; the page says neither ("merges onto main" is the gate's
-        // step, in the README's words).
+        // DESIGN.md's list, and the glossary's words to avoid. "Merge" is
+        // banned for a landing, and the page never says it of one ("merges
+        // onto main" is the gate's step, in the README's words).
         expect(
           [
             "review",
             "approve",
+            "issue",
             "pull request",
             "lease",
             "reputation",

@@ -26,7 +26,9 @@
 import { expect, test } from "@playwright/test";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { Brand } from "@repo/brand";
-import { Config, Effect, Option, Schema } from "effect";
+import { Config, Effect, Option } from "effect";
+
+import { axeOn, sideways } from "./axe.ts";
 
 const settings = Effect.runSync(
   Effect.gen(function* () {
@@ -46,9 +48,6 @@ const { project } = settings;
 
 const at = (path: string) =>
   `${Option.getOrElse(settings.web, () => "")}${path}`;
-
-/** axe-core, from cdnjs, at the version this check was written against. */
-const AXE = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js";
 
 /** The decider the dev world signs in. */
 const DECIDER = "ines-v";
@@ -70,8 +69,9 @@ const COMMIT = "<the newest ask opening>";
 
 /** Every page group, over the fixture project's states. */
 const VISITS: readonly Visit[] = [
-  { name: "front", path: "/" },
-  { name: "front, signed in", path: "/", signedIn: true },
+  { name: "landing", path: "/" },
+  { name: "front", path: "/asks" },
+  { name: "front, signed in", path: "/asks", signedIn: true },
   { name: "today", path: "/today", signedIn: true },
   { name: "today, signed out", path: "/today" },
   { name: "project home", path: `/${project}` },
@@ -229,54 +229,6 @@ const open = (page: Page, path: string) =>
 
     return response?.status();
   });
-
-/** What axe's `run` resolves to, as much of it as this check reads. */
-const AxeRun = Schema.Struct({
-  violations: Schema.Array(
-    Schema.Struct({
-      id: Schema.String,
-      impact: Schema.NullOr(Schema.String),
-      nodes: Schema.Array(
-        Schema.Struct({ target: Schema.Array(Schema.Unknown) })
-      ),
-    })
-  ),
-});
-
-const decodeAxeRun = Schema.decodeUnknownEffect(AxeRun);
-
-/** axe's serious and critical violations on the page, as `rule (n): targets`. */
-const axeOn = (page: Page) =>
-  Effect.gen(function* () {
-    yield* Effect.promise(() => page.addScriptTag({ url: AXE }));
-
-    // axe's results come from the page: decoded here, as any outside input.
-    const raw: unknown = yield* Effect.promise(() =>
-      page.evaluate("axe.run()")
-    );
-
-    const result = yield* Effect.orDie(decodeAxeRun(raw));
-
-    return result.violations
-      .filter(({ impact }) => impact === "serious" || impact === "critical")
-      .map(
-        ({ id, impact, nodes }) =>
-          `${impact} ${id} (${nodes.length}): ${nodes
-            .slice(0, 3)
-            .map(({ target }) => target.join(" "))
-            .join(", ")}`
-      );
-  });
-
-/** How far the page scrolls sideways, in px; 0 when it does not. */
-const sideways = (page: Page) =>
-  Effect.promise(() =>
-    page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth
-    )
-  );
 
 /** The page's own words that the web keeps off its screens. */
 const forbiddenOn = (page: Page) =>
@@ -560,7 +512,7 @@ test.describe("the keyboard", () => {
   }) =>
     Effect.runPromise(
       Effect.gen(function* () {
-        const { context, page } = yield* keyboardPage(browser, "/", 1440);
+        const { context, page } = yield* keyboardPage(browser, "/asks", 1440);
 
         // A row selected, so the inspector holds its commands; then the
         // same address again, tabbed from its start.
@@ -602,7 +554,7 @@ test.describe("the keyboard", () => {
     Effect.runPromise(
       Effect.gen(function* () {
         for (const [path, param, signedIn] of [
-          ["/", "ask", false],
+          ["/asks", "ask", false],
           ["/today", "decision", true],
         ] as const) {
           const { context, page } = yield* keyboardPage(
@@ -662,7 +614,7 @@ test.describe("the keyboard", () => {
   test("1 copies the inspector's first command", ({ browser }) =>
     Effect.runPromise(
       Effect.gen(function* () {
-        const { context, page } = yield* keyboardPage(browser, "/", 1440);
+        const { context, page } = yield* keyboardPage(browser, "/asks", 1440);
 
         yield* Effect.promise(() => page.keyboard.press("j"));
         yield* Effect.promise(() => page.waitForTimeout(500));
@@ -740,7 +692,7 @@ test.describe("the keyboard", () => {
             path: `/${project}/blob/main/packages/render/src/page.ts`,
             width: 390,
           },
-          { button: "Projects", path: "/", width: 390 },
+          { button: "Projects", path: "/asks", width: 390 },
           { button: "More", path: `/${project}`, width: 390 },
         ] as const;
 
