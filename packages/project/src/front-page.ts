@@ -2,7 +2,11 @@
  * The `FrontPage` port: the read side of the projection every project feeds
  * (the write side is `Projection`, whose rows come from each project's
  * outbox). The front page, the project list and a person's credits read from
- * here without waking any project.
+ * here without waking any project. A listed project's `posture` is the
+ * fallback only: a list's callers read each project's posture from its own
+ * ledger at list time (`withStandingPosture`), since its standing changes
+ * without any event this read model hears, and keep this one for a project
+ * whose ledger could not be read.
  *
  * Adapters: `/memory` here, seeded from data, for tests; `projection-d1`
  * over D1 in the Worker.
@@ -26,7 +30,10 @@ export interface FrontPageFilter {
 export class FrontPage extends Context.Service<
   FrontPage,
   {
-    /** Every project, with its posture and how many asks it has open. */
+    /**
+     * Every project, with how many asks it has open and the posture last
+     * projected (the fallback for its standing posture).
+     */
     readonly projects: () => Effect.Effect<readonly ProjectListing[]>;
     /** The open asks across every project, as the anonymous viewer sees them. */
     readonly entries: (

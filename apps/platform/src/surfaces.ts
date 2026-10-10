@@ -368,7 +368,8 @@ const fromWeb =
 const home = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const services = Context.make(FrontPage, yield* FrontPage).pipe(
-      Context.add(HostInfo, yield* HostInfo)
+      Context.add(HostInfo, yield* HostInfo),
+      Context.add(Projects, yield* Projects)
     );
 
     yield* router.add(

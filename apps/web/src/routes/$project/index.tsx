@@ -99,9 +99,10 @@ const projectPage = createServerFn({ method: "GET" })
 const root = getRouteApi("__root__");
 
 /**
- * The project as listed; a project the list has not heard from yet (its
- * projection catches up after its first event) reads as the platform lists
- * every project until a `PostureChanged` entry projects a posture: open.
+ * The project as listed, its posture the one its own ledger stands at (the
+ * list reads it from each project); a project the list has not heard from
+ * yet (its projection catches up after its first event) reads open, as
+ * the projection lists a project before any posture is projected.
  */
 const listingOf = (
   project: ProjectName,

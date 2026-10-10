@@ -8,7 +8,8 @@
  * it waits on is still on the page, and it is held for nobody; newest first.
  * A project is listed from its first event, `open` until a `PostureChanged`
  * ledger entry moves it, with when it last landed (the `projects`
- * table). A person's credits are each project's own count, joined
+ * table); `listProjects` reads each one's standing posture from its own
+ * ledger (`withStandingPosture`), and keeps this one only as the fallback. A person's credits are each project's own count, joined
  * (`creditsFor`): the rule D1's `credits` table is fed by, read at the source.
  */
 import { FrontPage } from "@repo/project/front-page";

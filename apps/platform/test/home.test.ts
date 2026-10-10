@@ -10,9 +10,13 @@ import { commandDocs } from "@repo/agent-kit/command-doc";
 import { frontLlms } from "@repo/agent-kit/host-doc";
 import { Brand } from "@repo/brand";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
+import type { ProjectApi } from "@repo/project/project";
+import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { ProjectName } from "@repo/protocol/ids";
+import { UnknownProject } from "@repo/protocol/refusal";
+import { untouchable } from "@repo/testkit/untouchable";
 import { Effect, Layer, Option } from "effect";
 
 import { MemorySessions } from "../src/sessions/memory.ts";
@@ -30,13 +34,54 @@ const projects: readonly ProjectListing[] = [
   },
 ];
 
-/** The platform listing `listed`, on a host whose web app is `web`. */
+/**
+ * The platform's projects where datekit's ledger stands sealed: its first
+ * config declared sealed checks, which writes no `PostureChanged` row, so
+ * the projection still lists it `open`. burrow was never made here.
+ */
+const datekitSealed = Layer.succeed(
+  Projects,
+  Projects.of({
+    create: () => Effect.die("the home page makes no project"),
+    get: (project) =>
+      project === "datekit"
+        ? Effect.succeed(
+            untouchable<ProjectApi>("ProjectApi", {
+              ledger: () =>
+                Effect.succeed({
+                  entries: [],
+                  layers: [],
+                  posture: "openWithSealedEvidence",
+                  postureLabel: "Open with sealed evidence",
+                  project,
+                }),
+            })
+          )
+        : Effect.fail(new UnknownProject({ project })),
+  })
+);
+
+/** The platform's projects before any is made: each listed one keeps its listed posture. */
+const noneMade = Layer.succeed(
+  Projects,
+  Projects.of({
+    create: () => Effect.die("the home page makes no project"),
+    get: (project) => Effect.fail(new UnknownProject({ project })),
+  })
+);
+
+/**
+ * The platform listing `listed`, on a host whose web app is `web`, with
+ * `made` for its projects.
+ */
 const platform = (
   listed: readonly ProjectListing[],
-  web: Option.Option<string> = Option.some(webUrl)
+  web: Option.Option<string> = Option.some(webUrl),
+  made: Layer.Layer<Projects> = noneMade
 ) =>
   served(
     Layer.mergeAll(
+      made,
       noProjects,
       MemorySessions.layer({}),
       FrontPageMemory.layer({ credits: [], entries: [], projects: listed }),
@@ -51,10 +96,11 @@ const platform = (
 const home = (
   listed: readonly ProjectListing[],
   init: RequestInit = {},
-  web?: Option.Option<string>
+  web?: Option.Option<string>,
+  made?: Layer.Layer<Projects>
 ) =>
   Effect.gen(function* () {
-    const { fetch } = yield* platform(listed, web);
+    const { fetch } = yield* platform(listed, web, made);
     const response = yield* fetch(new Request(`${origin}/`, init));
 
     return {
@@ -158,6 +204,42 @@ describe("the platform's /", () => {
       });
       expect(plain.text).toBe(expected);
     })
+  );
+
+  it.effect(
+    "gives each project the posture its own ledger stands at, as the web's /llms.txt does",
+    () =>
+      Effect.gen(function* () {
+        const { text } = yield* home(
+          projects,
+          { headers: { accept: "text/markdown" } },
+          undefined,
+          datekitSealed
+        );
+
+        expect(text).toBe(
+          frontLlms({
+            commands: commandDocs(Contracts),
+            platformUrl: origin,
+            projects: [
+              {
+                openAsks: 3,
+                posture: "openWithSealedEvidence",
+                project: ProjectName.make("datekit"),
+              },
+              {
+                openAsks: 1,
+                posture: "openWithSealedEvidence",
+                project: ProjectName.make("burrow"),
+              },
+            ],
+            webUrl,
+          })
+        );
+        expect(text).toContain(
+          `- [datekit](${webUrl}/datekit/llms.txt): Open with sealed evidence, 3 open asks.`
+        );
+      })
   );
 
   it.effect(
