@@ -18,13 +18,20 @@
  * past them a file (or a line, or a changed line's pair) is drawn as plain
  * text, so a minified bundle or a lockfile cannot stall the page.
  *
- * No React and no DOM here: the module loads in Node for its test, and in
- * the browser only through the views that draw. A drawing hands its code
- * boxes over once drawn, so code too wide for its pane is a stop for Tab.
+ * The server draws a file or a diff with these same options
+ * (`prerender-server.ts`), so the browser's drawing takes the place of the
+ * server's with nothing on the screen changing.
+ *
+ * No React and no DOM here: the module loads in Node for its test, in the
+ * Worker for the server's drawing, and in the browser only through the
+ * views that draw. A drawing hands its code boxes over once drawn, so code
+ * too wide for its pane is a stop for Tab.
  */
 import {
+  createCSSVariablesTheme,
   DEFAULT_TOKENIZE_MAX_LENGTH,
-  registerCustomCSSVariableTheme,
+  formatCSSVariablePrefix,
+  registerCustomTheme,
 } from "@pierre/diffs";
 
 /** The token theme's registered name. */
@@ -80,6 +87,28 @@ export const diffsOptions = {
   unsafeCSS: FOCUS_CSS,
 } as const;
 
+/** A file's drawing: no header of its own (the page's sits above it), its lines selectable, scrolling sideways. */
+export const fileOptions = {
+  ...diffsOptions,
+  disableFileHeader: true,
+  enableLineSelection: true,
+  lineHoverHighlight: "number",
+  overflow: "scroll",
+} as const;
+
+/** A diff's drawing, unified or split: signs or side bars, changed words marked, unchanged runs folded into bars. */
+export const diffOptionsFor = (split: boolean) =>
+  ({
+    ...diffsOptions,
+    diffIndicators: split ? "bars" : "classic",
+    diffStyle: split ? "split" : "unified",
+    enableLineSelection: true,
+    hunkSeparators: "line-info",
+    lineDiffType: "word-line",
+    lineHoverHighlight: "both",
+    overflow: "scroll",
+  }) as const;
+
 /** The file tree's look: compact rows, plain icons (`styles.css` greys them). */
 export const treesOptions = { density: "compact", icons: "minimal" } as const;
 
@@ -101,6 +130,20 @@ const variableDefaults = {
   "token-string-expression": "var(--foreground)",
 };
 
+/**
+ * The token theme itself, made as Pierre's `registerCustomCSSVariableTheme`
+ * makes it. The browser registers it by name; the server attaches it to
+ * its highlighter directly, since Pierre refuses to resolve a theme by name
+ * in a Worker's global scope.
+ */
+export const codeTheme = () =>
+  createCSSVariablesTheme({
+    fontStyle: false,
+    name: CODE_THEME,
+    variableDefaults,
+    variablePrefix: formatCSSVariablePrefix("global"),
+  });
+
 /** Whether this page has registered the theme yet; Pierre refuses a name twice. */
 const registered = { done: false };
 
@@ -108,6 +151,6 @@ const registered = { done: false };
 export const registerCodeTheme = () => {
   if (!registered.done) {
     registered.done = true;
-    registerCustomCSSVariableTheme(CODE_THEME, variableDefaults);
+    registerCustomTheme(CODE_THEME, () => Promise.resolve(codeTheme()));
   }
 };

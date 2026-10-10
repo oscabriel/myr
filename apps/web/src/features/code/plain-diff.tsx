@@ -6,7 +6,9 @@
  * 13 px code on 20 px lines, line numbers in a gutter of at least three
  * figures with two before and one after, a sign in the first of two
  * leading columns, unchanged runs as 32 px "N unmodified lines" bars. So
- * the highlighting arrives in place and nothing moves.
+ * the highlighting arrives in place and nothing moves. The first files the
+ * server highlights (`prerenderedPaths`, ADR 0027) are its drawing instead
+ * of plain lines, under the same header.
  *
  * Each file is a disclosure whose summary is its header: folded, only the
  * header shows (an added or deleted file past 80 lines starts folded).
@@ -24,6 +26,8 @@ import type { ReactNode } from "react";
 import { drawnFiles, splitRows, unifiedRows } from "./diff-model.ts";
 import type { DrawnFile, PlainRow, SplitRow } from "./diff-model.ts";
 import { diffAnchor } from "./paths.ts";
+import { diffDrawing } from "./prerender.ts";
+import { ServerCode } from "./server-code.tsx";
 
 /** One numbered line: its text, and which side it is on. */
 type Line = Extract<PlainRow, { readonly number: number }>;
@@ -187,12 +191,18 @@ const Unshown = ({ file }: { readonly file: ChangedFile }) => (
   </p>
 );
 
-/** A file's lines, unified or split; why it has none when it has none. */
+/**
+ * A file's lines, unified or split; why it has none when it has none. A
+ * file the server highlighted (unified, `prerenderedPaths`) is its drawing,
+ * and the plain lines only where the document did not bring it.
+ */
 const FileBody = ({
   file,
+  prerendered,
   split,
 }: {
   readonly file: DrawnFile;
+  readonly prerendered: boolean;
   readonly split: boolean;
 }) => {
   const diff = Option.getOrUndefined(file.diff);
@@ -201,10 +211,18 @@ const FileBody = ({
     return <Unshown file={file.file} />;
   }
 
-  return split ? (
-    <SplitBody rows={splitRows(diff)} />
+  if (split) {
+    return <SplitBody rows={splitRows(diff)} />;
+  }
+
+  const plain = <UnifiedBody rows={unifiedRows(diff)} />;
+
+  return prerendered ? (
+    <div className="min-w-0" data-code="prerendered">
+      <ServerCode drawing={() => diffDrawing(file)} plain={plain} />
+    </div>
   ) : (
-    <UnifiedBody rows={unifiedRows(diff)} />
+    plain
   );
 };
 
@@ -271,6 +289,8 @@ export interface PlainDiffProps {
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;
   /** `files` already parsed (`drawnFiles`), so a page parses each once. */
   readonly drawn?: readonly DrawnFile[] | undefined;
+  /** The paths the server sends highlighted (`prerenderedPaths`); none when absent. */
+  readonly prerendered?: ReadonlySet<string> | undefined;
 }
 
 /**
@@ -283,6 +303,7 @@ export const PlainDiff = ({
   files,
   folded,
   onFold,
+  prerendered,
   split = false,
 }: PlainDiffProps) => {
   const drawnList = useMemo(() => parsed ?? drawnFiles(files), [files, parsed]);
@@ -316,7 +337,11 @@ export const PlainDiff = ({
               >
                 <FileHeaderLine file={drawn} />
               </summary>
-              <FileBody file={drawn} split={split} />
+              <FileBody
+                file={drawn}
+                prerendered={prerendered?.has(file.path) === true}
+                split={split}
+              />
             </details>
           </section>
         );

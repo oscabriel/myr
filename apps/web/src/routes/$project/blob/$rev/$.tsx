@@ -14,7 +14,8 @@ import {
 import { BlobView } from "../../../../features/code/blob-view.tsx";
 import { ClientFile } from "../../../../features/code/client-code.tsx";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
-import { NumberedLines } from "../../../../features/code/numbered-lines.tsx";
+import { showsCode } from "../../../../features/code/paths.ts";
+import { FileFallback } from "../../../../features/code/server-code.tsx";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
@@ -24,9 +25,10 @@ import { FilesButton } from "../../tree/-files-button.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
 // A file at a revision, read on the server with the commit that last
-// changed it: its text arrives as numbered, anchored lines, and the
-// browser then draws it highlighted, the `#L10-L20` selection kept in the
-// address. `?plain=1` shows a Markdown file's source. A path missing at a
+// changed it: its text arrives highlighted when the server highlights its
+// language and size (`features/code/prerender.ts`), else as numbered,
+// anchored lines, and the browser's drawing then takes its place, the
+// `#L10-L20` selection kept in the address. `?plain=1` shows a Markdown file's source. A path missing at a
 // revision that exists lands on the nearest folder above it; any other
 // address naming nothing is a 404 showing the platform's refusal.
 
@@ -104,7 +106,9 @@ const BlobPage = () => {
       code={
         file.text === undefined ? undefined : (
           <ClientFile
-            fallback={<NumberedLines text={file.text} />}
+            fallback={
+              <FileFallback path={file.path} sha={file.sha} text={file.text} />
+            }
             key={file.sha}
             path={file.path}
             sha={file.sha}
@@ -130,8 +134,34 @@ export const Route = createFileRoute("/$project/blob/$rev/$")({
   validateSearch: ({ plain }: { readonly plain?: unknown }) => ({
     plain: plain === 1 || plain === "1" ? (1 as const) : undefined,
   }),
-  loader: ({ params, preload }) => {
+  loader: ({ location, params, preload }) => {
     const page = blobPage({ data: params });
+
+    // A document's file is highlighted on the server before the page
+    // renders, so the render waits for nothing and sends it highlighted.
+    // Imported here, not at the top: a loader stays in the chunks every
+    // page preloads, and the browser's build drops this branch whole.
+    if (import.meta.env.SSR) {
+      const plain =
+        new URLSearchParams(location.searchStr).get("plain") === "1";
+
+      // A failed read rejects as it would have (the router's not-found).
+      return Effect.runPromise(
+        Effect.gen(function* () {
+          const data = yield* Effect.promise(() => page);
+
+          if (showsCode(data.file, plain)) {
+            const { drawFileAhead } = yield* Effect.promise(
+              () => import("../../../../features/code/prerender.ts")
+            );
+
+            yield* Effect.promise(() => drawFileAhead(data.file));
+          }
+
+          return data;
+        })
+      );
+    }
 
     // A hover's preload warms the file's highlighting too, so the click
     // draws it at once; a failed read or warm-up changes nothing here.

@@ -44,7 +44,13 @@
  * 1,693,131 (1,900,000, 12%), the sandbox's 570,831 (656,000, 15%), the
  * web's JavaScript 4,074,781 (4,075,000: no room left, until the server
  * build is minified) and the web's entry 696,419, which fell, so its limit
- * is tightened to 801,000 (15%).
+ * is tightened to 801,000 (15%). Minifying the web's server build took
+ * its JavaScript to 1,528,378 and its entry to 308,418. Highlighting code
+ * on the server (ADR 0027) then added its grammars and `@pierre/diffs/ssr`
+ * as chunks off the entry, with no limit raised. Once Workers Cache's
+ * entry had landed beside them, the web's JavaScript measured 2,774,689
+ * and its entry 309,341, so its limits are tightened to 3,191,000 and
+ * 356,000 (15%).
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, Path, pipe } from "effect";
@@ -60,7 +66,7 @@ interface Budget {
 export const budgets = {
   "apps/platform": { entry: 1_900_000, javascript: 1_900_000 },
   "apps/sandbox": { entry: 656_000, javascript: 656_000 },
-  "apps/web": { entry: 801_000, javascript: 4_075_000 },
+  "apps/web": { entry: 356_000, javascript: 3_191_000 },
 } as const satisfies Record<string, Budget>;
 
 /**

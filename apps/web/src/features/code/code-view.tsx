@@ -15,13 +15,14 @@
  */
 import { File } from "@pierre/diffs/react";
 import type { FileOptions, SelectedLineRange } from "@pierre/diffs/react";
-import { Option } from "effect";
+import { Effect, Option } from "effect";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { lineHash, parseLineHash } from "./line-hash.ts";
 import type { LineRange } from "./line-hash.ts";
-import { diffsOptions, registerCodeTheme } from "./pierre.ts";
-import { CodePool } from "./pool.tsx";
+import { diffsOptions, fileOptions, registerCodeTheme } from "./pierre.ts";
+import { CodePool, poolReady } from "./pool.tsx";
+import { warmFile } from "./warm.ts";
 
 registerCodeTheme();
 
@@ -91,9 +92,7 @@ export const FileCode = ({ path, sha, text }: FileCodeProps) => {
 
   const options = useMemo(
     (): FileOptions<undefined, undefined> => ({
-      ...diffsOptions,
-      enableLineSelection: true,
-      lineHoverHighlight: "number",
+      ...fileOptions,
       onLineSelected: (range: SelectedLineRange | null) => {
         const lines =
           range === null
@@ -117,8 +116,6 @@ export const FileCode = ({ path, sha, text }: FileCodeProps) => {
         pending.current.node = node;
         reveal(pending.current);
       },
-      disableFileHeader: true,
-      overflow: "scroll",
     }),
     []
   );
@@ -131,6 +128,17 @@ export const FileCode = ({ path, sha, text }: FileCodeProps) => {
     </CodePool>
   );
 };
+
+/**
+ * Ready to draw `file` highlighted at once: the pool up, and the file
+ * highlighted in it, keyed as `FileCode` draws it. Settles either way; a
+ * file the pool could not highlight is drawn as it would have been.
+ */
+export const prepareFile = (file: FileCodeProps) =>
+  Effect.tryPromise(() => poolReady()).pipe(
+    Effect.andThen(Effect.tryPromise(() => warmFile(file))),
+    Effect.ignore
+  );
 
 // `React.lazy` takes a module's default export.
 export default FileCode;

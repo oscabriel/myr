@@ -3,9 +3,11 @@
  * `why/why-view.tsx`, the same page). The file header stays under the
  * context bar: the path once, the file in words, Code | Why, Raw,
  * Permalink (`y`) and Copy. The code takes the pane's whole width and
- * scrolls sideways inside itself, never wrapping: the server sends it as
- * numbered, anchored plain text (`NumberedLines`), which the browser's
- * highlighted drawing (`code`, from `client-code.tsx`) replaces in place.
+ * scrolls sideways inside itself, never wrapping: the server sends it
+ * highlighted where it highlights its language and size (`ServerCode`,
+ * ADR 0027), else as numbered, anchored plain text (`NumberedLines`), and
+ * the browser's drawing (`code`, from `client-code.tsx`) replaces it in
+ * place.
  *
  * A Markdown file is rendered (its source on `?plain=1`), an image is shown
  * from raw, and a binary file or one past the read cap says its size and

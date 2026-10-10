@@ -10,8 +10,11 @@
  * module, no memory adapter, no seed, no dev sign-in and no test kit.
  *
  * Its root route, whose chunks every page preloads, carries no Markdown
- * renderer and stays under a size ceiling, and the hashed assets it serves
- * are kept by browsers for good (`public/_headers`).
+ * renderer, no grammar and nothing of the server's highlighting, and stays
+ * under a size ceiling, and the hashed assets it serves are kept by
+ * browsers for good (`public/_headers`). The Worker bundles the grammars
+ * it highlights in and no others, none on its entry, and no theme
+ * collection or WebAssembly (ADR 0027).
  *
  * Modules are read from the build's source maps (each map's `sources`),
  * strings from every other file it wrote. The Cloudflare plugin rewrites
@@ -63,6 +66,31 @@ const DEV_MODULES = [
  * in 31 before).
  */
 const ROOT_PRELOADS_GZIP = 244_000;
+
+/** A Shiki grammar module, by its name. */
+const GRAMMAR = /node_modules\/@shikijs\/langs\/dist\/(?<name>[\w-]+)\.mjs$/u;
+
+/**
+ * The grammars the Worker highlights in (`features/code/prerender-server.ts`,
+ * ADR 0027), by Shiki's module names: HTML brings JavaScript and CSS with it.
+ */
+const SERVER_GRAMMARS = [
+  "css",
+  "html",
+  "javascript",
+  "json",
+  "jsx",
+  "markdown",
+  "shellscript",
+  "toml",
+  "tsx",
+  "typescript",
+  "yaml",
+];
+
+/** Whether a file's modules hold the server's highlighting. */
+const drawing = (held: readonly string[]) =>
+  held.some((module) => module.endsWith("features/code/prerender-server.ts"));
 
 /** Files whose bytes are not text: fonts and images. */
 const BINARY = /\.(?:ico|png|woff2)$/u;
@@ -373,6 +401,69 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
             ),
             underCeiling: total <= ROOT_PRELOADS_GZIP,
           }).toStrictEqual({ markdown: [], missing: [], underCeiling: true });
+        })
+    );
+
+    it.effect(
+      "preloads on every page no grammar and nothing of the server's highlighting",
+      () =>
+        Effect.gen(function* () {
+          const output = yield* Built;
+
+          expect(
+            rootPreloads(output).flatMap((chunk) =>
+              (output.holding.get(`client${chunk}`) ?? []).filter(
+                (module) => GRAMMAR.test(module) || module.includes("prerender")
+              )
+            )
+          ).toStrictEqual([]);
+
+          // The server's highlighting is the Worker's alone.
+          expect({
+            browser: [...output.holding].flatMap(([at, held]) =>
+              at.startsWith("client/") && drawing(held) ? [at] : []
+            ),
+            worker: [...output.holding].some(
+              ([at, held]) => at.startsWith("server/") && drawing(held)
+            ),
+          }).toStrictEqual({ browser: [], worker: true });
+        })
+    );
+
+    it.effect(
+      "bundles into the Worker its few grammars alone, off its entry, and no theme collection or WebAssembly",
+      () =>
+        Effect.gen(function* () {
+          const output = yield* Built;
+
+          const server = [...output.holding].filter(([at]) =>
+            at.startsWith("server/")
+          );
+
+          const grammars = new Set(
+            server.flatMap(([, held]) =>
+              held.flatMap((module) => {
+                const name = GRAMMAR.exec(module)?.groups?.name;
+
+                return name === undefined ? [] : [name];
+              })
+            )
+          );
+
+          expect([...grammars].toSorted()).toStrictEqual(SERVER_GRAMMARS);
+          expect(
+            server.flatMap(([at, held]) =>
+              held.filter(
+                (module) =>
+                  module.includes("node_modules/@shikijs/themes/") ||
+                  module.includes("node_modules/@pierre/theme/") ||
+                  module.includes("node_modules/@shikijs/engine-oniguruma/") ||
+                  (at === "server/index.js" &&
+                    (GRAMMAR.test(module) ||
+                      module.includes("features/code/prerender-server.ts")))
+              )
+            )
+          ).toStrictEqual([]);
         })
     );
 

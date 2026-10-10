@@ -119,5 +119,22 @@ export const isImage = (path: string) => IMAGE.test(path);
 /** Whether `path` is Markdown, rendered on its page. */
 export const isMarkdown = (path: string) => MARKDOWN.test(path);
 
+/**
+ * Whether a file's page shows it as code: text it has, and not an image
+ * or Markdown shown as itself (`?plain=1` shows their source). The server
+ * highlights a file ahead only then.
+ */
+export const showsCode = (
+  file: {
+    readonly binary: boolean;
+    readonly path: string;
+    readonly text?: string | undefined;
+  },
+  plain: boolean
+) =>
+  !file.binary &&
+  file.text !== undefined &&
+  (plain || !(isImage(file.path) || isMarkdown(file.path)));
+
 /** The id of a changed file's diff on its commit's page. */
 export const diffAnchor = (path: string) => `diff-${encodeURIComponent(path)}`;

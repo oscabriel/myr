@@ -64,17 +64,30 @@ const readyOf = (pool: Pool) => {
   }
 
   // A pool already up is marked settled the way React reads a promise it
-  // has seen, so `use` does not hold the drawing back for a turn.
+  // has seen, so `use` does not hold the drawing back for a turn; one
+  // still starting is marked so once it is up, whoever awaited it first.
   const made = pool.isInitialized()
     ? Object.assign(Promise.resolve(), { status: "fulfilled" })
     : Effect.runPromise(
         Effect.ignore(Effect.tryPromise(() => pool.initialize()))
       );
 
+  Effect.runFork(
+    Effect.promise(() => made).pipe(
+      Effect.map(() => Object.assign(made, { status: "fulfilled" }))
+    )
+  );
   readiness.set(pool, made);
 
   return made;
 };
+
+/**
+ * Settles once the tab's pool is up (at once where there are no workers):
+ * a drawing awaited on this then mounts with nothing left to wait for.
+ */
+export const poolReady = () =>
+  "Worker" in globalThis ? readyOf(workerPool()) : Promise.resolve();
 
 /**
  * The pool, for the drawings under it; none outside a browser. Until the
