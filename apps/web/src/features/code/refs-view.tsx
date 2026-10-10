@@ -164,8 +164,9 @@ const MainRow = ({ refs }: { readonly refs: Refs }) => {
     <RowList label="main">
       <Row
         action={
+          // At the top of the row, on the state word's line, not centred below it.
           <AppLink
-            className={`text-ui shrink-0 font-medium ${META_LINK}`}
+            className={`text-ui shrink-0 self-start leading-6 font-medium ${META_LINK}`}
             to={treeHref(project, "main")}
           >
             Browse files

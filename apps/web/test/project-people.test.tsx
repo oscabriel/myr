@@ -250,6 +250,15 @@ describe("a project's policy page", () => {
     }
   });
 
+  it("heads the layers' line as its own section, so it never reads as part of Agents", () => {
+    const markup = mainOf(markupOf(page));
+    const layers = sectionOf(markup, "layers");
+
+    expect(layers).toMatch(/<h2\b[^>]*id="layers"[^>]*>Layers<\/h2>/u);
+    expect(layers).toContain("data-layers");
+    expect(sectionOf(markup, "agents")).not.toContain("data-layers");
+  });
+
   it("shows the caps, budget, claim timing and record window, the numbers tabular", () => {
     const limits = sectionOf(mainOf(markupOf(page)), "limits");
 

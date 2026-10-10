@@ -25,6 +25,7 @@ import { Fragment } from "react";
 import type { ReactNode } from "react";
 
 import { Definition, Definitions, Region } from "../ask/fields.tsx";
+import { blobHref, commitHref, shortSha, treeHref } from "../code/paths.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { FactBlock } from "../shared/facts.tsx";
@@ -60,21 +61,6 @@ const spanOf = (ms: number) => {
     ? plural(hours / 24, "day", "days")
     : plural(hours, "hour", "hours");
 };
-
-/** A commit as git abbreviates it. */
-const short = (sha: string) => sha.slice(0, 7);
-
-/** A file at a commit, on the code browser. */
-const blobPath = (project: ProjectName, at: string, path: string) =>
-  `/${project}/blob/${at}/${path}`;
-
-/** A folder at a commit, on the code browser. */
-const treePath = (project: ProjectName, at: string, path: string) =>
-  `/${project}/tree/${at}/${path}`;
-
-/** A commit's page. */
-const commitPath = (project: ProjectName, at: string) =>
-  `/${project}/commit/${at}`;
 
 /** What a vouch gates, in words. */
 const vouchModes = {
@@ -123,11 +109,13 @@ const AsOf = ({
 }) => (
   <>
     {"As of "}
-    <CodeLink to={commitPath(project, policy.at)}>{short(policy.at)}</CodeLink>
+    <CodeLink to={commitHref(project, policy.at)}>
+      {shortSha(policy.at)}
+    </CodeLink>
     {policy.source === "config" ? (
       <>
         {", from "}
-        <CodeLink to={blobPath(project, policy.at, PROJECT_FILE)}>
+        <CodeLink to={blobHref(project, policy.at, PROJECT_FILE)}>
           {PROJECT_FILE}
         </CodeLink>
       </>
@@ -218,7 +206,7 @@ const Vouching = ({
       {policy.source === "config" || vouches.length > 0 ? (
         <p className="text-ui text-muted-foreground">
           {"From "}
-          <CodeLink to={blobPath(project, policy.at, vouch.file)}>
+          <CodeLink to={blobHref(project, policy.at, vouch.file)}>
             {vouch.file}
           </CodeLink>
         </p>
@@ -283,11 +271,8 @@ const Agents = ({ policy }: { readonly policy: PublicPolicy }) => (
   </Region>
 );
 
-/**
- * The layers in one line: each by name and disclosure, held back, and the
- * ledger, where who reads and writes each one is told. Nothing else.
- */
-const Layers = ({
+/** The layers' one line: each by name and disclosure, and a link to the ledger. */
+const LayersLine = ({
   ledger,
   project,
 }: {
@@ -328,6 +313,23 @@ const Layers = ({
     </p>
   );
 
+/**
+ * The layers in one line, under a heading of their own: each by name and
+ * disclosure, held back, and the ledger, where who reads and writes each
+ * one is told. Nothing else.
+ */
+const Layers = ({
+  ledger,
+  project,
+}: {
+  readonly ledger: Ledger;
+  readonly project: ProjectName;
+}) => (
+  <Region id="layers" title="Layers">
+    <LayersLine ledger={ledger} project={project} />
+  </Region>
+);
+
 /** The page over an evaluated policy: each of its sections. */
 const Evaluated = ({
   ledger,
@@ -362,7 +364,7 @@ const NotEvaluated = ({
 }) => (
   <>
     {"The config at the landed commit "}
-    <CodeLink to={commitPath(project, at)}>{short(at)}</CodeLink>
+    <CodeLink to={commitHref(project, at)}>{shortSha(at)}</CodeLink>
     {" has not been evaluated"}
   </>
 );
@@ -410,10 +412,10 @@ const Pending = ({
         <p className="max-w-[70ch] font-medium">
           <NotEvaluated at={pending.at} project={project} />
           {": "}
-          <CodeLink to={treePath(project, pending.at, Brand.configDir)}>
+          <CodeLink to={treeHref(project, pending.at, Brand.configDir)}>
             {CONFIG_DIR}
           </CodeLink>
-          {` at ${short(pending.at)} did not evaluate.`}
+          {` at ${shortSha(pending.at)} did not evaluate.`}
         </p>
         <p className="text-ui max-w-[70ch]">
           {`Fix it by landing a change to ${CONFIG_DIR}.`}
