@@ -41,3 +41,7 @@ infra/.recording
 # The Playwright check of a deployed web: one screenshot per page, for the
 # shot list.
 apps/web/e2e/out/
+
+# impeccable's working files: its design context and surface briefs, a
+# machine's own design notes, never committed.
+.impeccable/
