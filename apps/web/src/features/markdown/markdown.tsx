@@ -2,7 +2,8 @@
  * A Markdown file from a project's repo, rendered: a README on the
  * project and tree pages, a `.md` file on the blob page. Its links and
  * images resolve against `dir` at the commit `at`, so they stay inside the
- * project at that commit.
+ * project at that commit. The site's own Markdown (the docs) is drawn the
+ * same way by `SiteMarkdown`, with nothing to resolve.
  *
  * react-markdown builds React elements (no `dangerouslySetInnerHTML`), so
  * the same component renders in the Worker and in the browser. What may
@@ -17,7 +18,7 @@ import Markdown, { defaultUrlTransform } from "react-markdown";
 import type { Components, ExtraProps } from "react-markdown";
 
 import { literalPath } from "../shared/link.tsx";
-import { rehypePluginsFor, remarkPlugins } from "./pipeline.ts";
+import { rehypePluginsFor, remarkPlugins, sitePlugins } from "./pipeline.ts";
 
 export interface RepoMarkdownProps {
   /** The commit the file was read at; links and images point there. */
@@ -148,6 +149,28 @@ export const RepoMarkdown = ({
     <Markdown
       components={components}
       rehypePlugins={rehypePluginsFor({ dir, project, sha: at })}
+      remarkPlugins={remarkPlugins}
+      urlTransform={defaultUrlTransform}
+    >
+      {source}
+    </Markdown>
+  </div>
+);
+
+/**
+ * The site's own Markdown (a page of the docs), in the README's type: its
+ * links are the site's paths, through the router, and leave nothing to
+ * resolve against a repo.
+ */
+export const SiteMarkdown = ({
+  source,
+}: {
+  readonly source: string;
+}): ReactNode => (
+  <div className={PROSE}>
+    <Markdown
+      components={components}
+      rehypePlugins={sitePlugins}
       remarkPlugins={remarkPlugins}
       urlTransform={defaultUrlTransform}
     >

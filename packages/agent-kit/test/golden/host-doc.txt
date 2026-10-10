@@ -4,6 +4,8 @@
 
 The same facts read as Markdown: each project at https://web-test.example.workers.dev/<project>/llms.txt, and each ask at https://web-test.example.workers.dev/<project>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in https://web-test.example.workers.dev/llms-full.txt.
 
+Guides and a reference written for people are at https://web-test.example.workers.dev/docs, each page also as Markdown at https://web-test.example.workers.dev/docs/<page>.md.
+
 ## Install the CLI
 
 ```sh

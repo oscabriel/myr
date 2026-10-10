@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import type { CommandDoc } from "@repo/agent-kit/command-doc";
+import { fullLlms } from "@repo/agent-kit/full-llms";
 import { Brand } from "@repo/brand";
 import { claimForkName, workingForkName } from "@repo/project/repo-names";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -20,7 +21,6 @@ import { RpcTest } from "effect/rpc";
 import { commands as catalog } from "../src/features/agents/catalog.ts";
 import {
   frontLlms,
-  fullLlms,
   indexBanner,
   mcpCard,
   missingProjectLlms,
