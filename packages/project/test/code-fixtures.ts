@@ -439,6 +439,41 @@ export const wide = (count: number) =>
   });
 
 /**
+ * A workspace whose root README is a symlink to its crate's, as axum's is,
+ * with links elsewhere that a README must not follow: one up out of the
+ * repo, one to nothing, one to a folder, one to a link (the root's) and
+ * one absolute. `docs` links up one level to the crate's README, and
+ * `both` holds a dangling `README.md` link beside a `readme.md` file.
+ */
+export const linkedReadmes = Effect.gen(function* () {
+  const git = yield* writer;
+  const name = RepoName.make("linkkit");
+
+  const sha = yield* git.commit(
+    "Link the READMEs",
+    [
+      ["README.md", Content.Link({ target: "crate/README.md" })],
+      ["crate/README.md", text("# the crate\n")],
+      ["crate/src/lib.rs", text("pub fn crate() {}\n")],
+      ["docs/README.md", Content.Link({ target: "../crate/README.md" })],
+      ["out/README.md", Content.Link({ target: "../../README.md" })],
+      ["gone/README.md", Content.Link({ target: "missing.md" })],
+      ["folder/README.md", Content.Link({ target: "../crate" })],
+      ["chain/README.md", Content.Link({ target: "../README.md" })],
+      ["rooted/README.md", Content.Link({ target: "/crate/README.md" })],
+      ["both/README.md", Content.Link({ target: "missing.md" })],
+      ["both/readme.md", text("# beside the link\n")],
+    ],
+    [],
+    1
+  );
+
+  yield* git.push(name, [["refs/heads/main", sha]]);
+
+  return { code: recordOf(name, sha, []) };
+});
+
+/**
  * The memory store, each `readTree` (or each `readBlob`, for `"blob"`)
  * taking 10 ms once `reading` is set (a history is written fast, then
  * read), with the most reads ever under way at once kept in `peak`: a live

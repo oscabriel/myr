@@ -117,13 +117,128 @@ const README = [
   "readme.rst",
 ];
 
-const readmeOf = (entries: readonly CodeEntry[]) =>
-  Array.findFirst(README, (name) =>
-    Array.findFirst(
-      entries,
-      (entry) => entry.type === "blob" && entry.name.toLowerCase() === name
-    )
-  ).pipe(Option.map(({ path, sha }) => ({ path, sha: BlobSha.make(sha) })));
+/**
+ * Where a symlink in `folder` points, as a path from the repo's root: its
+ * target read against the folder, `.` and `..` resolved. None when the
+ * target is absolute or climbs out of the repo.
+ */
+const linkTargetOf = (
+  folder: string,
+  target: string
+): Option.Option<string> => {
+  if (target.startsWith("/")) {
+    return Option.none();
+  }
+
+  const resolved: string[] = folder === "" ? [] : folder.split("/");
+
+  for (const segment of target.split("/")) {
+    if (segment === "..") {
+      if (resolved.pop() === undefined) {
+        return Option.none();
+      }
+    } else if (segment !== "" && segment !== ".") {
+      resolved.push(segment);
+    }
+  }
+
+  return Option.liftPredicate(resolved.join("/"), (path) => path !== "");
+};
+
+/** The longest path a symlink's target may be: git's own `PATH_MAX`. */
+const LINK_TARGET_MAX = 4096;
+
+/** A symlink's target text, kept by its blob id; none when it is too long to be a path. */
+const linkTextOf = (repo: RepoName, link: string) =>
+  Effect.gen(function* () {
+    const cache = yield* CodeCache;
+
+    return yield* cache.through(
+      `${repo}:link:${link}`,
+      RepoHost.use((host) => host.readBlob(repo, ObjectId.make(link))).pipe(
+        Effect.map(
+          Option.flatMap((bytes) =>
+            bytes.length > LINK_TARGET_MAX
+              ? Option.none()
+              : Option.some(new TextDecoder().decode(bytes))
+          )
+        )
+      )
+    );
+  });
+
+/**
+ * The file the symlink blob `link` in `folder` names, if it is a file in
+ * the repo: one link followed, never a chain (a link's entry is a blob too,
+ * so its kind is asked, not its type).
+ */
+const linkedFile = (
+  repo: RepoName,
+  root: Effect.Effect<string, never, RepoHost>,
+  folder: string,
+  link: string
+) =>
+  Effect.gen(function* () {
+    const path = Option.flatMap(
+      yield* Effect.orDie(linkTextOf(repo, link)),
+      (target) => linkTargetOf(folder, target)
+    );
+
+    if (Option.isNone(path)) {
+      return Option.none();
+    }
+
+    const entry = yield* entryAt(repo, yield* root, path.value).pipe(
+      Effect.orDie
+    );
+
+    return Option.flatMap(entry, (found) =>
+      kindOf(found) === "blob"
+        ? Option.some({
+            path: RepoPath.make(path.value),
+            sha: BlobSha.make(found.sha),
+          })
+        : Option.none()
+    );
+  });
+
+/**
+ * The folder's README by GitLab's precedence, any case: a file, or a
+ * symlink to a file elsewhere in the repo (axum's root README.md links to
+ * its crate's), read where it points, so its relative links resolve there.
+ * A link out of the repo, to nothing or to a folder is no README.
+ */
+const readmeOf = (
+  repo: RepoName,
+  root: Effect.Effect<string, never, RepoHost>,
+  folder: string,
+  entries: readonly CodeEntry[]
+) =>
+  Effect.gen(function* () {
+    // Every entry by each name, so a dangling `README.md` link still lets
+    // a `readme.md` file beside it be the README.
+    const candidates = README.flatMap((name) =>
+      entries.filter(
+        (entry) =>
+          (entry.type === "blob" || entry.type === "symlink") &&
+          entry.name.toLowerCase() === name
+      )
+    );
+
+    for (const found of candidates) {
+      if (found.type === "blob") {
+        return Option.some({ path: found.path, sha: BlobSha.make(found.sha) });
+      }
+
+      const linked = yield* linkedFile(repo, root, folder, found.sha);
+
+      if (Option.isSome(linked)) {
+        return linked;
+      }
+    }
+
+    return Option.none();
+  });
 
 /** The tree `path` names at `commit`, or `UnknownPath`. */
 export const folderAt = (
@@ -182,6 +297,19 @@ export const listing = (
       byKindThenName
     );
 
+    const root = commitAt(project.repo, commit).pipe(
+      Effect.flatMap(Effect.fromOption),
+      Effect.map(({ tree: id }) => id),
+      Effect.orDie
+    );
+
+    const readme = yield* readmeOf(
+      project.repo,
+      root,
+      Option.getOrElse(path, () => ""),
+      entries
+    );
+
     return {
       at: commit,
       entries,
@@ -189,9 +317,9 @@ export const listing = (
         onNone: () => ({}),
         onSome: (folder) => ({ path: folder }),
       }),
-      ...Option.match(readmeOf(entries), {
+      ...Option.match(readme, {
         onNone: () => ({}),
-        onSome: (readme) => ({ readme }),
+        onSome: (found) => ({ readme: found }),
       }),
     };
   });
