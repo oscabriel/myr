@@ -39,7 +39,9 @@ const webAppManifest = (): Plugin => ({
 // stage from `CLOUDFLARE_ENV` (infra/deploy.ts sets it).
 export default defineConfig(({ mode }) => {
   // This machine's Caddy name for the dev server, from the gitignored
-  // `apps/web/.env`; without one, the dev server answers on localhost alone.
+  // `apps/web/.env.development.local`, which Vite reads in dev and Wrangler
+  // never loads as a Worker secret; without one, the dev server answers on
+  // 127.0.0.1 alone.
   const caddyDevHost = loadEnv(mode, process.cwd(), "").CADDY_DEV_HOST;
 
   const server: ServerOptions = {
@@ -65,5 +67,10 @@ export default defineConfig(({ mode }) => {
     // tsconfig.json's `paths` maps to `src/`.
     resolve: { tsconfigPaths: true },
     server,
+    // The Worker's own code is minified like the browser's: about a third
+    // of its bytes. Its source maps go up with each deploy
+    // (`upload_source_maps` in wrangler.jsonc), so a stack trace in the
+    // Worker's logs still names the source.
+    environments: { ssr: { build: { minify: true, sourcemap: true } } },
   };
 });

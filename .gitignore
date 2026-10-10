@@ -45,3 +45,6 @@ apps/web/e2e/out/
 # impeccable's working files: its design context and surface briefs, a
 # machine's own design notes, never committed.
 .impeccable/
+
+# Agent worktrees Claude Code makes inside the checkout.
+.claude/worktrees/

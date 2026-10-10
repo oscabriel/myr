@@ -20,6 +20,9 @@
   "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },
+  // The server build is minified (vite.config.ts); its source maps let a
+  // stack trace in the logs name the source.
+  "upload_source_maps": true,
   "services": [{ "binding": "PLATFORM", "service": "platform" }],
   "vars": {
     // Where a browser reaches the platform itself: its sign-in pages and
