@@ -73,7 +73,7 @@ The cost-ordered chain of stages that narrows a push to a checked tree or a refu
 _Avoid_: CI, pipeline, merge queue
 
 **Landing**:
-The platform's commit of a checked tree to main, written by the platform with credit trailers. An ask's opening is a landing too: it opens an ask and answers none.
+The platform's commit of a checked tree to main, written by the platform with credit trailers. An ask's opening is a landing too: it opens an ask and answers none. So is a project's adoption, its first `main` from the initializer's first push or an import: it answers no ask, has no parent and credits no one.
 _Avoid_: merge, ship
 
 **Landed SHA**:

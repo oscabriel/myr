@@ -1225,7 +1225,9 @@ describe("the project's outbox", () => {
             fork: false,
             outbox: ["MakeFork", "Projected"],
           });
-          // The adoption's landing is the event refused; the alarm projects it.
+          // The adoption's landing is the event refused; the alarm projects it
+          // again, after the later events (the memory projection keeps no
+          // cursor).
           expect(after).toStrictEqual({
             fork: true,
             outbox: [],

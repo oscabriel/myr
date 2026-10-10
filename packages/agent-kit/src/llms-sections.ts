@@ -121,7 +121,7 @@ const eventLines = {
   Decided: "A decider took a decision.",
   Judged: "An answer was checked, with the outcome its verdict holds.",
   Landed:
-    "A landing reached `main`; the first is the project's adopted `main`, from its first push or its import.",
+    "A landing reached `main`, a project's adoption (its first push or its import) among them.",
   Lapsed: "A claim lapsed: no push for too long.",
   LedgerAppended: "The project's public ledger gained an entry.",
   ProposalDrafted:
