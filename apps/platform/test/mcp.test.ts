@@ -329,6 +329,14 @@ const ToolResult = Schema.Struct({
   isError: Schema.Boolean,
 });
 
+/** A tools/call result whose one content block is plain text, not JSON. */
+const ToolText = Schema.Struct({
+  content: Schema.Tuple([
+    Schema.Struct({ text: Schema.String, type: Schema.Literal("text") }),
+  ]),
+  isError: Schema.Boolean,
+});
+
 /** A tools/call result that answered: whether it failed, and its structured content. */
 const Answered = Schema.Struct({
   isError: Schema.Boolean,
@@ -759,19 +767,21 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
 
         const listing = yield* Schema.decodeUnknownEffect(
           Schema.Struct({
-            entries: Schema.Array(Schema.Struct({ name: Schema.String })),
+            entries: Schema.Array(
+              Schema.Struct({ name: Schema.String, type: Schema.String })
+            ),
           })
         )(result.structuredContent);
 
         expect(result.isError).toBeFalsy();
-        expect(listing.entries.map(({ name }) => name)).toStrictEqual(
-          expect.arrayContaining([
-            Brand.configDir,
-            "README.md",
-            "package.json",
-            "src",
-          ])
-        );
+        // Folders first, then by name: fix-week added `test/`.
+        expect(listing.entries).toStrictEqual([
+          { name: Brand.configDir, type: "tree" },
+          { name: "src", type: "tree" },
+          { name: "test", type: "tree" },
+          { name: "README.md", type: "blob" },
+          { name: "package.json", type: "blob" },
+        ]);
       })
     );
 
@@ -815,20 +825,10 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
         Effect.gen(function* () {
           const { fetch } = yield* Seeded;
 
-          const result = yield* resultOf(
-            fetch,
-            Schema.Struct({
-              content: Schema.Tuple([
-                Schema.Struct({
-                  text: Schema.String,
-                  type: Schema.Literal("text"),
-                }),
-              ]),
-              isError: Schema.Boolean,
-            }),
-            "tools/call",
-            { arguments: { limit: 101, project }, name: "log" }
-          );
+          const result = yield* resultOf(fetch, ToolText, "tools/call", {
+            arguments: { limit: 101, project },
+            name: "log",
+          });
 
           const [{ text }] = result.content;
 
