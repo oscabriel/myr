@@ -3,7 +3,9 @@
  * The gate's stages in a strip, each lane's result and time, held-back
  * checks only as one line per area (its counts and suite root, nothing
  * more), the outcome, and a refusal as `git push` printed it. A landed
- * answer shows its landing's credit trailers and the commit.
+ * answer shows its landing's credit trailers and the commit. The base and
+ * the landing link their commit pages; the head and the merged tree, which
+ * live in the claim's fork, do not.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
