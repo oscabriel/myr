@@ -230,14 +230,16 @@ const rootPreloads = (output: Output) => {
   )?.[1];
 
   // Lazily up to the first `preloads`, the root's own: a child route's path
-  // may hold a brace (`/$project/asks/{$ask}.md`).
+  // may hold a brace (`/$project/asks/{$ask}.md`). The minified server
+  // build writes the list as one string it splits on commas
+  // (`` `/assets/a.js,/assets/b.js`.split(`,`) ``), an unminified one as an array.
   const preloads =
-    /__root__:\s*\{[\s\S]*?preloads:\s*\[(?<list>[^\]]*)\]/u.exec(
+    /__root__:\s*\{[\s\S]*?preloads:\s*(?<list>\[[^\]]*\]|`[^`]*`)/u.exec(
       manifest ?? ""
     )?.groups?.list;
 
-  return [...(preloads ?? "").matchAll(/"(?<chunk>[^"]+)"/gu)].flatMap(
-    ({ groups }) => (groups?.chunk === undefined ? [] : [groups.chunk])
+  return [...(preloads ?? "").matchAll(/\/assets\/[^"`,\s]+/gu)].map(
+    ([chunk]) => chunk
   );
 };
 
