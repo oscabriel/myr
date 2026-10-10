@@ -114,6 +114,21 @@ describe(ProvenanceFacts, () => {
     expect(markup.split(patch).length - 1).toBeLessThanOrEqual(3);
   });
 
+  it("keeps each entry's copy button inside its value, so the list holds only terms and values", () => {
+    const markup = markupOf(
+      <ProvenanceFacts entries={verdictProvenance(verdictOf(checking), now)} />
+    );
+
+    const [list] = /<dl\b.*<\/dl>/su.exec(markup) ?? [""];
+
+    const outside = list
+      .replaceAll(/<dt\b.*?<\/dt>/gsu, "")
+      .replaceAll(/<dd\b.*?<\/dd>/gsu, "");
+
+    expect(list).toContain("<button");
+    expect(outside).not.toContain("<button");
+  });
+
   it("shortens a hash named by its algorithm, keeping the algorithm", () => {
     const markup = markupOf(
       <ProvenanceFacts entries={[{ label: "Suite", value: suite }]} />

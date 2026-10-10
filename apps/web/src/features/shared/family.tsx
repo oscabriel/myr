@@ -117,9 +117,16 @@ const finaleOf = (
     return { mark: "landed", words: "landed" };
   }
 
-  return remaining === 0
-    ? { mark: markFor(markOf(states.get(finale))), words: "open to take" }
-    : { mark: "waiting", words: `waits for ${remaining}` };
+  if (remaining > 0) {
+    return { mark: "waiting", words: `waits for ${remaining}` };
+  }
+
+  const mark = markOf(states.get(finale));
+
+  return {
+    mark: markFor(mark),
+    words: mark === "open" ? "open to take" : words[mark],
+  };
 };
 
 const NODE =
@@ -255,12 +262,16 @@ export const FamilyStrip = ({
                 to={askPath(project, ask)}
               >
                 {wants?.get(ask) ?? (
-                  <span className="text-mono font-mono">{ask}</span>
+                  <span className="text-mono font-mono">
+                    {family.nameOf(ask)}
+                  </span>
                 )}
               </AppLink>
-              <span className="text-mono text-muted-foreground tablet:inline hidden shrink-0 font-mono">
-                {family.nameOf(ask)}
-              </span>
+              {wants?.has(ask) === true ? (
+                <span className="text-mono text-muted-foreground tablet:inline hidden shrink-0 font-mono">
+                  {family.nameOf(ask)}
+                </span>
+              ) : null}
               <span className="text-label text-muted-foreground ml-auto shrink-0">
                 {words[mark]}
               </span>

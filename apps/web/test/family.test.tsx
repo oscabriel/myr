@@ -217,6 +217,70 @@ describe(FamilyStrip, () => {
   );
 });
 
+describe("FamilyStrip, once every child landed", () => {
+  const landedAll = askStates([
+    ...children.map((child, index) =>
+      ProjectEvent.cases.AskClosed.make({
+        ask: child,
+        at,
+        landing: sha,
+        seq: index + 1,
+      })
+    ),
+    ProjectEvent.cases.Claimed.make({
+      ask: finale,
+      at,
+      claimant: tamsin,
+      seq: 10,
+    }),
+  ]);
+
+  it.effect("says where the delete child stands in its own mark's word", () =>
+    Effect.gen(function* () {
+      const text = textIn(
+        yield* renderAt(
+          "/burrow",
+          <FamilyStrip
+            expanded={false}
+            finale={finale}
+            parent={parent}
+            project={burrow}
+            stamps={new Set()}
+            states={landedAll}
+          />
+        )
+      );
+
+      expect(text).toContain("6 of 6 landed");
+      expect(text).toContain("delete claimed");
+      expect(text).not.toContain("open to take");
+    })
+  );
+});
+
+describe("FamilyStrip's listed children", () => {
+  it.effect(
+    "names a child with no want by its short name, its whole id kept in the title",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* strip({ expanded: true });
+
+        const links = [
+          ...markup.matchAll(
+            /<li\b[^>]*data-family-child[^>]*>.*?<a\b(?<attributes>[^>]*)>(?<body>.*?)<\/a>/gsu
+          ),
+        ].map((match) => [
+          attributeOf(match.groups?.attributes ?? "", "title"),
+          textIn(match.groups?.body ?? ""),
+        ]);
+
+        expect(links).toStrictEqual(
+          children.map((child, index) => [child, modules[index]])
+        );
+      })
+  );
+});
+
 describe(FamilyTree, () => {
   it.effect(
     "draws the parent, its children and the delete child, marking the member being read",

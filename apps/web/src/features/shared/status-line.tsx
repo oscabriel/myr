@@ -33,7 +33,7 @@ import type { Family, Move } from "./ask-progress.ts";
 import { CommandChip } from "./copy-action.tsx";
 import { HandleLink } from "./handle.tsx";
 import { AppLink } from "./link.tsx";
-import { STATE_MARKS, StateMarkIcon } from "./marks.tsx";
+import { StateMarkIcon } from "./marks.tsx";
 import type { StateMark } from "./marks.tsx";
 import { askPath, decisionPath } from "./paths.ts";
 import { distanceInWords } from "./time.tsx";
@@ -553,7 +553,6 @@ export const StatusLine = ({
         className="text-ui inline-flex min-w-0 items-center gap-1.5"
         data-mark={reading.mark}
         data-tone={reading.tone}
-        title={STATE_MARKS[reading.mark].word}
       >
         <StateMarkIcon mark={reading.mark} stamp={stamp} />
         <strong className={`font-semibold ${leadTone[reading.tone]}`}>

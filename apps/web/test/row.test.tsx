@@ -8,7 +8,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { AskListing } from "@repo/protocol/domain/ask";
-import { ProjectName } from "@repo/protocol/ids";
+import { Outcome } from "@repo/protocol/domain/outcome";
+import { CommitSha, ProjectName } from "@repo/protocol/ids";
+import { StaleBase } from "@repo/protocol/refusal";
 import { Effect, Schema } from "effect";
 import type { ReactElement } from "react";
 
@@ -142,6 +144,42 @@ describe(AskRow, () => {
         expect(held).not.toContain("Copy claim command");
       })
   );
+  it.effect(
+    "draws a refusal's word in the refused role even when it can be retried, its mark apart",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* rowsAt(
+          <AskRow
+            listing={listing("@burrow/auth")}
+            progress={{
+              lastSeq: 2,
+              latest: Outcome.cases.Refused.make({
+                refusals: [
+                  new StaleBase({
+                    base: CommitSha.make("a".repeat(40)),
+                    conflicts: [],
+                    main: CommitSha.make("b".repeat(40)),
+                  }),
+                ],
+              }),
+              rounds: [],
+            }}
+            project={burrow}
+          />
+        );
+
+        const words = [
+          ...markup.matchAll(/<span class="(?<classes>[^"]*)">Refused</gu),
+        ].map((match) => match.groups?.classes ?? "");
+
+        expect(words.length).toBeGreaterThan(0);
+
+        for (const classes of words) {
+          expect(classes).toContain("text-refused");
+          expect(classes).not.toContain("text-waiting");
+        }
+      })
+  );
 });
 
 describe(Row, () => {
@@ -173,6 +211,53 @@ describe(Row, () => {
 
         expect(markup).toContain('data-selected="true"');
         expect(markup).toContain('data-list-key="a"');
+      })
+  );
+
+  it.effect(
+    "keeps the whole row the link's to press when the list does not select, at every width",
+    () =>
+      Effect.gen(function* () {
+        const plain = yield* rowsAt(
+          <Row href="/datekit/asks/a" id="a" title="Format ordinals" />
+        );
+
+        const selecting = yield* rowsAt(
+          <Row
+            href="/datekit/asks/a"
+            id="a"
+            onSelect={() => {}}
+            title="Format ordinals"
+          />
+        );
+
+        const [link] = tagsWith(plain, "data-list-key");
+        const [selectingLink] = tagsWith(selecting, "data-list-key");
+
+        expect(link).not.toContain("shell:after:pointer-events-none");
+        expect(selectingLink).toContain("shell:after:pointer-events-none");
+      })
+  );
+
+  it.effect(
+    "keeps its raised controls inside its own layer, under the sticky headers",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* rowsAt(
+          <Row
+            action={<button type="button">Copy</button>}
+            data={{ "data-ask": "a" }}
+            href="/datekit/asks/a"
+            id="a"
+            title="Format ordinals"
+          />
+        );
+
+        const [row] = tagsWith(markup, "data-ask");
+
+        expect(attributeOf(row ?? "", "class")?.split(" ")).toContain(
+          "isolate"
+        );
       })
   );
 

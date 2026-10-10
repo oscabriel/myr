@@ -1,4 +1,3 @@
-import { Brand } from "@repo/brand";
 /**
  * One row for every list: asks, decisions, landings, commits, refs, forks,
  * credits, rounds, history. Two lines, the thing first and its state at
@@ -20,6 +19,7 @@ import { Brand } from "@repo/brand";
  * press. `j` and `k` reach each row's link (`data-list-key`). Every
  * `data-*` a list carries sits on the row's `<li>`.
  */
+import { Brand } from "@repo/brand";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -80,11 +80,18 @@ export interface RowProps {
 /** The shell's width, from which a row selects rather than opens. */
 const SHELL_WIDTH = "(min-width: 70rem)";
 
-/** The word's colour: the state's role; ink for open and claimed, which have none. */
-const wordTone = (mark: StateMark) =>
-  mark === "open" || mark === "claimed"
-    ? "text-foreground"
-    : STATE_MARKS[mark].tone;
+/**
+ * The word's colour: the state's role; ink for open and claimed, which have
+ * none. A refusal that can be retried keeps its ochre mark, but its word is
+ * a refusal's, as the status line says it.
+ */
+const wordTone = (mark: StateMark) => {
+  if (mark === "open" || mark === "claimed") {
+    return "text-foreground";
+  }
+
+  return mark === "retry" ? "text-refused" : STATE_MARKS[mark].tone;
+};
 
 /** Whether a press on `target` was meant for a link or a control in the row. */
 const onControl = (target: EventTarget) =>
@@ -122,7 +129,10 @@ export const territoryPart = (territory: string) =>
   );
 
 const LINK =
-  "text-foreground no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring focus-visible:after:outline-solid shell:after:pointer-events-none";
+  "text-foreground no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring focus-visible:after:outline-solid";
+
+/** From the shell's width a row that selects lets a press off its link through to the row. */
+const SELECTS = "shell:after:pointer-events-none";
 
 /** A press on the row, off its link and its controls, selects it from the shell's width. */
 const selectOnPress =
@@ -187,7 +197,7 @@ export const Row = ({
   const link = (
     <AppLink
       aria-current={selected ? "true" : undefined}
-      className={LINK}
+      className={onSelect === undefined ? LINK : `${LINK} ${SELECTS}`}
       data-list-key={id}
       search={search}
       title={title}
@@ -202,7 +212,9 @@ export const Row = ({
       <StateMarkIcon mark={state.mark} stamp={state.stamp === true} />
     );
 
-  const rowClass = `group/row border-rule relative -mx-2 border-b px-2 transition-colors duration-[120ms] ${
+  // `isolate` keeps the row's raised controls (its copy button, a fan's
+  // nodes) inside the row, so a sticky header passes over them.
+  const rowClass = `group/row border-rule relative isolate -mx-2 border-b px-2 transition-colors duration-[120ms] ${
     selected ? "bg-surface" : "hover:bg-surface/50"
   }`;
 

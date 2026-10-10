@@ -662,13 +662,12 @@ export const ProvenanceFacts = ({
             <dt className="text-label text-muted-foreground w-24 shrink-0">
               {label}
             </dt>
-            <dd className="text-ui min-w-0 flex-1 truncate">
-              {shown ?? <CodeValue value={value} />}
+            <dd className="text-ui flex min-w-0 flex-1 items-center gap-3">
+              <span className="min-w-0 flex-1 truncate">
+                {shown ?? <CodeValue value={value} />}
+              </span>
+              <CopyAction command={value} label={`Copy ${label}`} />
             </dd>
-            <CopyAction
-              command={value}
-              label={`Copy the ${label.toLowerCase()}`}
-            />
           </div>
         ))}
       </dl>
