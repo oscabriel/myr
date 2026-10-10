@@ -6,17 +6,23 @@
  * as it landed. Anyone may read them, with no credential or a stale one.
  * Through the platform's fetch handler over the Node world, with real git;
  * and `agentSkills` itself over memory adapters, for a `main` that moved
- * past the landed mirror.
+ * past the landed mirror, and for skills kept by each project's landed
+ * commit, so the index reads a file only for a project whose main moved.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
+import { CodeStoreMemory } from "@repo/project/code-store/memory";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { landedRef } from "@repo/project/lander";
-import { ProjectName, RepoName } from "@repo/protocol/ids";
+import type { ProjectApi } from "@repo/project/project";
+import { Projects } from "@repo/project/projects";
+import { LandedSha, ProjectName, RepoName } from "@repo/protocol/ids";
+import { UnknownProject } from "@repo/protocol/refusal";
 import { gitClient } from "@repo/testkit/git-client";
-import { Effect, Layer, Option, Schema } from "effect";
+import { untouchable } from "@repo/testkit/untouchable";
+import { Effect, Layer, Option, Ref, Schema } from "effect";
 
 import { agentSkills } from "../src/well-known.ts";
 import { coreLoopWorld } from "./world.ts";
@@ -179,6 +185,15 @@ const at = (path: string) =>
     read
   );
 
+/** Projects the platform never made: each skill is read at its repo's refs. */
+const noneMade = Layer.succeed(
+  Projects,
+  Projects.of({
+    create: () => Effect.die("the skills make no project"),
+    get: (project) => Effect.fail(new UnknownProject({ project })),
+  })
+);
+
 describe(agentSkills, () => {
   it.effect(
     "reads each skill at the landed mirror, not at a main that moved past it",
@@ -238,8 +253,156 @@ describe(agentSkills, () => {
               entries: [],
               projects: [listing(datekit)],
             })
-          )
+          ).pipe(Layer.merge(noneMade))
         )
       )
+  );
+});
+
+/** The memory store, each file read and each refs read counted. */
+const countedHost = (counts: Ref.Ref<{ files: number; refs: number }>) =>
+  Layer.effect(
+    RepoHost,
+    Effect.gen(function* () {
+      const host = yield* RepoHost;
+
+      return RepoHost.of({
+        ...host,
+        readFile: (name, rev, path) =>
+          Ref.update(counts, ({ files, refs }) => ({
+            files: files + 1,
+            refs,
+          })).pipe(Effect.andThen(host.readFile(name, rev, path))),
+        refs: (name) =>
+          Ref.update(counts, ({ files, refs }) => ({
+            files,
+            refs: refs + 1,
+          })).pipe(Effect.andThen(host.refs(name))),
+      });
+    })
+  ).pipe(Layer.provide(RepoHostMemory));
+
+/** Projects whose record says each one's main landed where `landed` holds. */
+const landedWhere = (landed: Ref.Ref<ReadonlyMap<ProjectName, LandedSha>>) =>
+  Layer.succeed(
+    Projects,
+    Projects.of({
+      create: () => Effect.die("the skills make no project"),
+      get: (project) =>
+        Effect.succeed(
+          untouchable<ProjectApi>("ProjectApi", {
+            head: () =>
+              Effect.map(Ref.get(landed), (all) =>
+                Option.match(Option.fromUndefinedOr(all.get(project)), {
+                  onNone: () => ({}),
+                  onSome: (sha) => ({ landed: sha }),
+                })
+              ),
+          })
+        ),
+    })
+  );
+
+describe("the agent skills index, kept by each project's landed commit", () => {
+  it.effect(
+    "reads each skill once while no main moves, and again only for a project whose main moved",
+    () =>
+      Effect.gen(function* () {
+        const counts = yield* Ref.make({ files: 0, refs: 0 });
+
+        const landed = yield* Ref.make<ReadonlyMap<ProjectName, LandedSha>>(
+          new Map()
+        );
+
+        yield* Effect.gen(function* () {
+          const host = yield* RepoHost;
+          const client = yield* gitClient(memoryFs());
+
+          const first = yield* client.commit("Land", [[skillPath, skill]]);
+
+          const moved = yield* client.commit(
+            "Land again",
+            [[skillPath, skill.replace("Answer one", "Answer any one")]],
+            [first]
+          );
+
+          const bare = yield* client.commit("Start burrow", [
+            ["README.md", "burrow\n"],
+          ]);
+
+          for (const [project, sha] of [
+            [datekit, moved],
+            [burrow, bare],
+          ] as const) {
+            yield* host.create(RepoName.make(project));
+            yield* host.push(RepoName.make(project), client.source, [
+              { from: Option.none(), ref: landedRef, to: sha },
+            ]);
+          }
+
+          yield* Ref.set(
+            landed,
+            new Map([
+              [datekit, LandedSha.make(first)],
+              [burrow, LandedSha.make(bare)],
+            ])
+          );
+
+          const described = Effect.map(
+            Effect.flatMap(
+              at("/.well-known/agent-skills/index.json"),
+              ({ body }) => Schema.decodeEffect(Index)(body)
+            ),
+            ({ skills }) => skills.map(({ description }) => description)
+          );
+
+          /** What one request read: files and refs, since the last. */
+          const reads = Effect.flatMap(
+            Ref.getAndSet(counts, { files: 0, refs: 0 }),
+            Effect.succeed
+          );
+
+          const once = yield* described;
+          const readOnce = yield* reads;
+          const twice = yield* described;
+          const readTwice = yield* reads;
+
+          yield* Ref.update(
+            landed,
+            (all) => new Map([...all, [datekit, LandedSha.make(moved)]])
+          );
+
+          const afterMove = yield* described;
+
+          expect({
+            afterMove,
+            once,
+            readAfterMove: yield* reads,
+            readOnce,
+            readTwice,
+            twice,
+          }).toStrictEqual({
+            afterMove: ["Answer any one of datekit's asks."],
+            once: ["Answer one of datekit's asks."],
+            readAfterMove: { files: 1, refs: 0 },
+            readOnce: { files: 2, refs: 0 },
+            readTwice: { files: 0, refs: 0 },
+            twice: ["Answer one of datekit's asks."],
+          });
+        }).pipe(
+          Effect.provide(
+            Layer.mergeAll(
+              countedHost(counts),
+              CodeStoreMemory,
+              landedWhere(landed),
+              FrontPageMemory.layer({
+                credits: [],
+                entries: [],
+                projects: [listing(burrow), listing(datekit)],
+              })
+            )
+          )
+        );
+      })
   );
 });

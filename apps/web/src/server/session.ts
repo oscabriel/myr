@@ -13,9 +13,20 @@
  * HTTP `Authorization` header, the only credential the platform reads,
  * and drops the browser's own cookies and any `authorization` it
  * set: the browser never chooses the credential.
+ *
+ * Who is signed in is kept beside the token, in a second HttpOnly cookie
+ * (`HANDLE_COOKIE`): the callback asks the platform's `status` once, with
+ * the new token, and keeps the handle it names, bound to that token by its
+ * SHA-256, so `/auth/whoami` answers every page from the cookie with no
+ * platform call. The handle only shapes what a page shows: every read and
+ * write still carries the token, and the platform decides who the caller
+ * is. A handle kept for another token is not believed, a session from
+ * before the handle was kept asks `status` once, and sign-out and any
+ * `Unauthenticated` expire both cookies.
  */
 import { Brand } from "@repo/brand";
 import { Client } from "@repo/protocol/contracts";
+import { Handle as HandleSchema } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Data, Effect, Option, Redacted, Schema } from "effect";
 import type { Layer } from "effect";
@@ -27,6 +38,9 @@ import type { Layer } from "effect";
  * shadow it.
  */
 export const SESSION_COOKIE = "__Host-session";
+
+/** The cookie the signed-in handle is kept in beside the session, for `whoami`. */
+export const HANDLE_COOKIE = "__Host-handle";
 
 /** The cookie a sign-in in progress waits in: its state, PKCE verifier and way back. */
 const SIGN_IN_COOKIE = "__Host-sign-in";
@@ -118,6 +132,12 @@ export const sessionCookie = (token: string, maxAgeSeconds: number) =>
 /** The `Set-Cookie` value that ends the session now. */
 export const clearedCookie = () => lockedCookie(SESSION_COOKIE, "", 0);
 
+/** The `Set-Cookie` values that end the session and forget its handle, now. */
+export const clearedCookies = () => [
+  clearedCookie(),
+  lockedCookie(HANDLE_COOKIE, "", 0),
+];
+
 const clearedSignIn = () => lockedCookie(SIGN_IN_COOKIE, "", 0);
 
 /** `headers`, also setting each of `cookies` (each its own `Set-Cookie` line). */
@@ -164,6 +184,66 @@ export const pkce = Effect.gen(function* () {
     verifier,
   };
 });
+
+// --- The handle kept beside the session --------------------------------------
+
+/**
+ * How long a handle `whoami` learned for a session from before handles were
+ * kept is kept: the session's own lifetime is not known there. Bound to its
+ * token, it is never believed past the session.
+ */
+const HANDLE_LEARNED_SECONDS = 24 * 60 * 60;
+
+/** The token's SHA-256, in base64url: what binds a kept handle to its session. */
+const fingerprintOf = (token: string) =>
+  Effect.promise(() =>
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(token))
+  ).pipe(
+    Effect.flatMap((digest) => encodeBase64Url(new Uint8Array(digest))),
+    Effect.orDie
+  );
+
+/**
+ * The `Set-Cookie` value that keeps `handle` for the session `token`, for
+ * `maxAgeSeconds`: `<fingerprint>.<handle>` (a fingerprint is base64url,
+ * which has no `.`).
+ */
+const handleCookie = (token: string, handle: Handle, maxAgeSeconds: number) =>
+  Effect.map(fingerprintOf(token), (fingerprint) =>
+    lockedCookie(HANDLE_COOKIE, `${fingerprint}.${handle}`, maxAgeSeconds)
+  );
+
+const decodeHandle = Schema.decodeUnknownOption(HandleSchema);
+
+/** The handle kept for the session `token`, if the request carries one kept for it. */
+const keptHandle = (request: Request, token: string) =>
+  Effect.map(fingerprintOf(token), (fingerprint) =>
+    Option.flatMap(cookieValue(request, HANDLE_COOKIE), (value) => {
+      const at = value.indexOf(".");
+
+      return at > 0 && value.slice(0, at) === fingerprint
+        ? decodeHandle(value.slice(at + 1))
+        : Option.none();
+    })
+  );
+
+/** The handle the platform's `status` names for the session `token`, asked through `clientFor`. */
+const handleOf = (
+  clientFor: (request: Request) => Layer.Layer<Client>,
+  origin: string,
+  token: string
+) =>
+  Effect.service(Client).pipe(
+    Effect.flatMap((client) => client.status({})),
+    Effect.map(({ handle }) => handle),
+    Effect.provide(
+      clientFor(
+        new Request(`${origin}/auth/whoami`, {
+          headers: { cookie: `${SESSION_COOKIE}=${encodeURIComponent(token)}` },
+        })
+      )
+    )
+  );
 
 // --- Where the browser goes -------------------------------------------------
 
@@ -366,10 +446,13 @@ const exchange = (
  * `GET /auth/callback?code=…&state=…`: the state must be the one this
  * browser's sign-in cookie holds; then the code and its verifier go to the
  * platform's `/token`, and the token comes back only as the session cookie,
- * set to expire before the token does, on a 302 to the way back.
+ * set to expire before the token does, on a 302 to the way back. The
+ * platform's `status`, asked once with the new token through `clientFor`,
+ * names the handle kept beside it for as long; a `status` that fails keeps
+ * none, and the first `whoami` asks again.
  */
 export const callbackHandler =
-  (env: Env) =>
+  (env: Env, clientFor: (request: Request) => Layer.Layer<Client>) =>
   ({ request }: Handled): Promise<Response> =>
     Effect.runPromise(
       Effect.gen(function* () {
@@ -395,11 +478,19 @@ export const callbackHandler =
           verifier: pending.verifier,
         });
 
+        const token = Redacted.value(answer.access_token);
+        const lives = answer.expires_in - SESSION_MARGIN_SECONDS;
+
+        // Signing in never waits on this: whatever stops it keeps no handle.
+        const handle = yield* handleOf(clientFor, here.origin, token).pipe(
+          Effect.flatMap((named) => handleCookie(token, named, lives)),
+          Effect.map(Option.some),
+          Effect.catchCause(() => Effect.succeedNone)
+        );
+
         return redirect(returnPath(here.origin, pending.return), [
-          sessionCookie(
-            Redacted.value(answer.access_token),
-            answer.expires_in - SESSION_MARGIN_SECONDS
-          ),
+          sessionCookie(token, lives),
+          ...Option.toArray(handle),
           clearedSignIn(),
         ]);
       }).pipe(
@@ -411,9 +502,9 @@ export const callbackHandler =
 
 // --- Sign-out, who, and the client -------------------------------------------
 
-/** `POST` (or a plain link's `GET`) `/auth/signout`: the session cookie ends, and the browser goes home. */
+/** `POST` (or a plain link's `GET`) `/auth/signout`: the session and its kept handle end, and the browser goes home. */
 export const signOutHandler = (_handled: Handled): Response =>
-  redirect("/", [clearedCookie()]);
+  redirect("/", clearedCookies());
 
 /** `/auth/whoami`'s answer: the handle signed in, or nothing (`features/auth/who.ts` reads it). */
 const whoAnswer = (
@@ -425,26 +516,47 @@ const whoAnswer = (
   });
 
 /**
- * `GET /auth/whoami`: `{ handle }` as the platform's `status` names the
- * session's caller, or `{}`. With no session the platform is not asked. A
- * session the platform no longer knows answers `Unauthenticated` (the
- * backend asks again with no credential), so its cookie is expired here.
+ * `GET /auth/whoami`: `{ handle }` for the session, or `{}`, with no
+ * platform call when the handle kept beside the session was kept for its
+ * token. A session without one (from before handles were kept, or whose
+ * kept handle is another token's) asks the platform's `status` once and
+ * keeps the handle it names. With no session the platform is not asked,
+ * and a handle left over is expired. A session the platform no longer
+ * knows answers `Unauthenticated` (the backend asks again with no
+ * credential), so both cookies are expired here.
  */
 export const whoamiHandler =
   (clientFor: (request: Request) => Layer.Layer<Client>) =>
   ({ request }: Handled): Promise<Response> =>
     Effect.runPromise(
       Option.match(credentialFrom(request), {
-        onNone: () => Effect.succeed(whoAnswer({})),
-        onSome: () =>
-          Effect.service(Client).pipe(
-            Effect.flatMap((client) => client.status({})),
-            Effect.map(({ handle }) => whoAnswer({ handle })),
-            Effect.catchTag("Unauthenticated", () =>
-              Effect.succeed(whoAnswer({}, [clearedCookie()]))
-            ),
-            Effect.orElseSucceed(() => whoAnswer({})),
-            Effect.provide(clientFor(request))
+        onNone: () =>
+          Effect.succeed(
+            whoAnswer(
+              {},
+              Option.isSome(cookieValue(request, HANDLE_COOKIE))
+                ? [lockedCookie(HANDLE_COOKIE, "", 0)]
+                : []
+            )
+          ),
+        onSome: (token) =>
+          Effect.flatMap(keptHandle(request, token), (kept) =>
+            Option.match(kept, {
+              onNone: () =>
+                handleOf(clientFor, new URL(request.url).origin, token).pipe(
+                  Effect.flatMap((handle) =>
+                    Effect.map(
+                      handleCookie(token, handle, HANDLE_LEARNED_SECONDS),
+                      (cookie) => whoAnswer({ handle }, [cookie])
+                    )
+                  ),
+                  Effect.catchTag("Unauthenticated", () =>
+                    Effect.succeed(whoAnswer({}, clearedCookies()))
+                  ),
+                  Effect.orElseSucceed(() => whoAnswer({}))
+                ),
+              onSome: (handle) => Effect.succeed(whoAnswer({ handle })),
+            })
           ),
       })
     );

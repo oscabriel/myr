@@ -12,7 +12,9 @@
  *   project's order, once each, so a replayed or late row changes nothing.
  *
  * A migration is never edited once it has run anywhere: the project list adds
- * its tables in `0004_projects_credits.sql` (`ProjectsCreditsDdl`).
+ * its tables in `0004_projects_credits.sql` (`ProjectsCreditsDdl`), and the
+ * kept standing postures theirs in `0005_standing_postures.sql`
+ * (`StandingPosturesDdl`).
  */
 import type { Handle } from "@repo/protocol/ids";
 
@@ -106,4 +108,36 @@ SELECT cursor.project, 'open',
   (SELECT COUNT(*) FROM front_page WHERE front_page.project = cursor.project),
   NULL
 FROM cursor;
+`;
+
+/**
+ * The kept standing postures' table in D1, as the platform's fifth D1
+ * migration (`apps/platform/migrations/0005_standing_postures.sql`) creates
+ * it. The file holds exactly this text, and the postures' test applies the
+ * file and checks that it does.
+ *
+ * - `standing_postures`: one row per project a list has read the posture
+ *   of (`withStandingPosture`): the posture, when it moves by the clock
+ *   alone (`moves_at`, ISO 8601; null when only an event moves it), and
+ *   the project's last event the read saw (`seen`). The projection deletes
+ *   a project's row with any event that can move its posture; a list
+ *   writes one only while `cursor` stands at or before `seen`
+ *   (`postures.ts`).
+ */
+export const StandingPosturesDdl = `-- Each listed project's standing posture, as a list last read it from the
+-- project's own record, kept by packages/project/src/projection-d1 (its
+-- tables.ts holds this text). A cache: a row lost costs one read. The
+-- projection deletes a project's row in the same write as any event that
+-- can move its posture, and a list writes a row only while the projection
+-- has applied no event of the project later than the one the read saw.
+
+CREATE TABLE standing_postures (
+  project TEXT PRIMARY KEY,
+  posture TEXT NOT NULL,
+  -- when the posture moves by the clock alone (ISO 8601), absent when only
+  -- an event moves it
+  moves_at TEXT,
+  -- the project's last event the read saw
+  seen INTEGER NOT NULL
+);
 `;

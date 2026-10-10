@@ -47,14 +47,8 @@ const datekitSealed = Layer.succeed(
       project === "datekit"
         ? Effect.succeed(
             untouchable<ProjectApi>("ProjectApi", {
-              ledger: () =>
-                Effect.succeed({
-                  entries: [],
-                  layers: [],
-                  posture: "openWithSealedEvidence",
-                  postureLabel: "Open with sealed evidence",
-                  project,
-                }),
+              standing: () =>
+                Effect.succeed({ posture: "openWithSealedEvidence", seen: 1 }),
             })
           )
         : Effect.fail(new UnknownProject({ project })),

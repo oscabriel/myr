@@ -133,6 +133,7 @@ const apiOf = (
     showAsk: (caller, ask) => assumingMade(on("showAsk", [caller, ask])),
     showProposal: (caller, proposal) =>
       assumingMade(on("showProposal", [caller, proposal])),
+    standing: () => on("standing", []),
     status: (caller) => assumingMade(on("status", [caller])),
     submitAnswer: (caller, input) =>
       assumingMade(on("submitAnswer", [caller, input])),

@@ -26,6 +26,16 @@
  * `apply` fails with `ProjectionFailed` once the rest is in: the outbox keeps
  * those rows and sends them again after the missing one.
  *
+ * - A list keeps each project's standing posture beside these tables
+ *   (`postures.ts`, migration 0005). An event that can move a project's
+ *   posture deletes its kept row in the same write: a `Landed` (a config
+ *   lands, a narrowing opens its decision), a `Decided` (an accepted
+ *   narrowing starts to stand, now or once its notice runs out) and a
+ *   `LedgerAppended` (a `PostureChanged` row; any other entry too, which
+ *   costs one read). The table is looked for once per isolate until it is
+ *   found, so a database the migration has not reached yet projects as
+ *   before.
+ *
  * One call is one atomic write: a D1 batch when the `SqlClient` is D1's
  * (D1 has no interactive transactions), and a transaction anywhere else,
  * such as sqlite-node in tests. The client itself says which it is, so the
@@ -38,7 +48,7 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import { ProjectName } from "@repo/protocol/ids";
 import type { AskId } from "@repo/protocol/ids";
-import { Array, DateTime, Effect, Layer, Order, Schema } from "effect";
+import { Array, DateTime, Effect, Layer, Order, Ref, Schema } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 import type { SqlError } from "effect/sql/SqlError";
 import type { Statement } from "effect/sql/Statement";
@@ -103,6 +113,25 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
           ? sql.batch(statements)
           : sql.withTransaction(Effect.all(statements));
 
+      const posturesFound = yield* Ref.make(false);
+
+      /**
+       * Whether the kept postures' table is there (migration 0005): looked
+       * for until it is found, and never again after.
+       */
+      const keepsPostures = Effect.gen(function* () {
+        if (yield* Ref.get(posturesFound)) {
+          return true;
+        }
+
+        const tables =
+          yield* sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'standing_postures'`;
+
+        yield* Ref.set(posturesFound, tables.length > 0);
+
+        return tables.length > 0;
+      });
+
       /** Whether the project's cursor stands just before event `seq`. */
       const isNext = (project: ProjectName, seq: number) =>
         sql`(SELECT COALESCE(MAX(seq), 0) FROM cursor WHERE project = ${project}) = ${seq - 1}`;
@@ -111,8 +140,19 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
        * What one event changes in the read model, if anything: the project's
        * row first, so every event lists its project.
        */
-      const writes = ({ event, project }: ProjectedEvent) => {
+      const writes = (
+        { event, project }: ProjectedEvent,
+        postures: boolean
+      ) => {
         const next = isNext(project, event.seq);
+
+        /** The project's kept posture, cleared: this event may move it. */
+        const unkept = postures
+          ? [
+              sql`DELETE FROM standing_postures
+                WHERE project = ${project} AND ${next}`,
+            ]
+          : [];
 
         const listed = sql`INSERT INTO projects (project, posture, open_asks, landed_at)
           SELECT ${project}, 'open', 0, NULL WHERE ${next}
@@ -167,21 +207,24 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
             counted,
           ],
           Claimed: ({ ask }) => [claims(ask, 1)],
-          Decided: () => [],
+          Decided: () => unkept,
           Judged: () => [],
           Landed: ({ landing }) => [
             sql`UPDATE projects SET landed_at = ${DateTime.formatIso(landing.landedAt)}
               WHERE project = ${project} AND ${next}`,
             ...credited(landing),
+            ...unkept,
           ],
           Lapsed: ({ ask }) => [claims(ask, -1)],
-          LedgerAppended: ({ entry }) =>
-            LedgerEntry.guards.PostureChanged(entry)
+          LedgerAppended: ({ entry }) => [
+            ...(LedgerEntry.guards.PostureChanged(entry)
               ? [
                   sql`UPDATE projects SET posture = ${entry.to}
                     WHERE project = ${project} AND ${next}`,
                 ]
-              : [],
+              : []),
+            ...unkept,
+          ],
           ProposalDrafted: () => [],
           ProposalOpened: () => [],
           Pushed: () => [],
@@ -209,9 +252,15 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
         Effect.gen(function* () {
           const last = lastOf(events);
 
+          const postures = yield* keepsPostures.pipe(
+            Effect.mapError(
+              (failed) => new ProjectionFailed({ reason: failed.message })
+            )
+          );
+
           const results = yield* atomically([
             ...events.flatMap((projected) => [
-              ...writes(projected),
+              ...writes(projected, postures),
               advance(projected.project, projected.event.seq),
             ]),
             cursorsOf([...last.keys()]),

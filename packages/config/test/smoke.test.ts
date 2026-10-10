@@ -8,6 +8,7 @@ import {
   HttpServerResponse,
 } from "effect/http";
 
+import { AGENT_BUDGET_MS, agentProbes } from "../../../infra/smoke.ts";
 import { NoStage, UnknownStage } from "../../../infra/stages.ts";
 import {
   main,
@@ -19,11 +20,12 @@ import {
   webProbes,
 } from "../../../scripts/smoke.ts";
 
-/** What the fake platform answers one request with. */
+/** What the fake platform answers one request with, after `delayMs` when given. */
 interface Reply {
   readonly status: number;
   readonly body?: string;
   readonly contentType?: string;
+  readonly delayMs?: number;
 }
 
 /** A request as the fake platform sees it. */
@@ -47,56 +49,64 @@ const ListAsksCall = Schema.fromJsonString(
 );
 
 /**
- * The platform's `/rpc` reply to `body`: the bytes its server sent for an
- * anonymous `listAsks` of a project it doesn't hold (captured from
+ * The platform's `/rpc` reply to `body`: for an anonymous `listAsks` of a
+ * project in `held`, its open asks (none); of any other, the bytes its
+ * server sent for a project it doesn't hold (captured from
  * `apps/platform`'s `serve` before any project existed, the refusal's
- * `next` aside), or a 400 for anything else.
+ * `next` aside); a 400 for anything else.
  */
-const rpcReply = (body: string): Reply =>
+const rpcReply = (body: string, held: readonly string[]): Reply =>
   Option.match(Schema.decodeOption(ListAsksCall)(body), {
     onNone: () => ({ status: 400 }),
     onSome: ([{ id, payload }]) => ({
-      body: `[{"_tag":"Exit","requestId":${JSON.stringify(id)},"exit":{"_tag":"Failure","cause":[{"_tag":"Fail","error":{"_tag":"UnknownProject","next":"asks","retryable":false,"project":${JSON.stringify(payload.project)}}}]}}]`,
+      body: held.includes(payload.project)
+        ? `[{"_tag":"Exit","requestId":${JSON.stringify(id)},"exit":{"_tag":"Success","value":{"asks":[]}}}]`
+        : `[{"_tag":"Exit","requestId":${JSON.stringify(id)},"exit":{"_tag":"Failure","cause":[{"_tag":"Fail","error":{"_tag":"UnknownProject","next":"asks","retryable":false,"project":${JSON.stringify(payload.project)}}}]}}]`,
       status: 200,
     }),
   });
 
+/** The platform as `healthy` below, holding only the projects `held` names: a stage not seeded holds none. */
+const holding =
+  (held: readonly string[]) =>
+  ({ authorized, body, method, path }: Seen): Reply => {
+    if (method === "GET" && path === "/") {
+      return {
+        body: "<!doctype html><p><code>http://127.0.0.1/mcp</code></p><pre>curl -fsSL http://127.0.0.1/install.sh | sh</pre>",
+        contentType: "text/html; charset=utf-8",
+        status: 200,
+      };
+    }
+
+    if (method === "GET" && path === "/health") {
+      return { body: '{"ok":true,"stage":"dev-oscabriel"}', status: 200 };
+    }
+
+    if (method === "GET" && path === "/.well-known/oauth-protected-resource") {
+      return {
+        body: '{"resource":"https://platform-dev-oscabriel.example.workers.dev","authorization_servers":["https://platform-dev-oscabriel.example.workers.dev"]}',
+        status: 200,
+      };
+    }
+
+    if (method === "POST" && path === "/mcp") {
+      return authorized ? { body: "{}", status: 200 } : { status: 401 };
+    }
+
+    if (method === "POST" && path === "/rpc" && !authorized) {
+      return rpcReply(body, held);
+    }
+
+    return { status: 404 };
+  };
+
 /**
  * The platform as smoke expects to find it: healthy, OAuth's resource
  * metadata published, MCP closed to anyone without a credential, anonymous
- * reads open, no repo it doesn't hold, and a `/` that names MCP and the
- * CLI's installer.
+ * reads open, the seeded example `datekit` held and no repo it doesn't
+ * hold, and a `/` that names MCP and the CLI's installer.
  */
-const healthy = ({ authorized, body, method, path }: Seen): Reply => {
-  if (method === "GET" && path === "/") {
-    return {
-      body: "<!doctype html><p><code>http://127.0.0.1/mcp</code></p><pre>curl -fsSL http://127.0.0.1/install.sh | sh</pre>",
-      contentType: "text/html; charset=utf-8",
-      status: 200,
-    };
-  }
-
-  if (method === "GET" && path === "/health") {
-    return { body: '{"ok":true,"stage":"dev-oscabriel"}', status: 200 };
-  }
-
-  if (method === "GET" && path === "/.well-known/oauth-protected-resource") {
-    return {
-      body: '{"resource":"https://platform-dev-oscabriel.example.workers.dev","authorization_servers":["https://platform-dev-oscabriel.example.workers.dev"]}',
-      status: 200,
-    };
-  }
-
-  if (method === "POST" && path === "/mcp") {
-    return authorized ? { body: "{}", status: 200 } : { status: 401 };
-  }
-
-  if (method === "POST" && path === "/rpc" && !authorized) {
-    return rpcReply(body);
-  }
-
-  return { status: 404 };
-};
+const healthy = holding(["datekit"]);
 
 /**
  * A platform whose 401 gate is gone and whose stage is down: `/health` and
@@ -140,6 +150,10 @@ const fakePlatform = (answer: (seen: Seen) => Reply) =>
         method: request.method,
         path: url.pathname,
       });
+
+      if (reply.delayMs !== undefined) {
+        yield* Effect.sleep(`${reply.delayMs} millis`);
+      }
 
       return reply.body === undefined
         ? HttpServerResponse.empty({ status: reply.status })
@@ -304,9 +318,10 @@ describe("smoke against a live stage", () => {
 });
 
 /**
- * The web as smoke expects to find it: its front page renders, and
- * its `/llms.txt` answers with the Markdown it builds from the platform's
- * project list, which only a web that reaches the platform can.
+ * The web as smoke expects to find it: its front page renders, its
+ * `/llms.txt` answers with the Markdown it builds from the platform's
+ * project list, which only a web that reaches the platform can, and so do
+ * a seeded example's `llms.txt` and ask, and the agent skills' index.
  */
 const healthyWeb = ({ method, path }: Seen): Reply => {
   if (method === "GET" && path === "/") {
@@ -321,6 +336,25 @@ const healthyWeb = ({ method, path }: Seen): Reply => {
     return {
       body: "# Platform\n\n> A Git platform.\n",
       contentType: "text/markdown; charset=utf-8",
+      status: 200,
+    };
+  }
+
+  if (
+    method === "GET" &&
+    (path === "/datekit/llms.txt" || path === "/datekit/asks/format-ordinal.md")
+  ) {
+    return {
+      body: "# datekit\n",
+      contentType: "text/markdown; charset=utf-8",
+      status: 200,
+    };
+  }
+
+  if (method === "GET" && path === "/.well-known/agent-skills/index.json") {
+    return {
+      body: '{"skills":[]}',
+      contentType: "application/json",
       status: 200,
     };
   }
@@ -340,7 +374,114 @@ describe("smoke against a stage's web", () => {
         expect(report.probes.map(({ probe }) => probe)).toStrictEqual([
           ...probes,
         ]);
-        expect(webProbes).toStrictEqual(["web-front-page", "web-llms-txt"]);
+        expect(webProbes).toStrictEqual([
+          "web-front-page",
+          "web-llms-txt",
+          "web-project-llms-txt",
+          "web-ask-md",
+          "web-agent-skills",
+        ]);
+        expect(report.warnings).toStrictEqual([]);
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  it("probes each agent surface by its path and content type, against a 500 ms budget", () => {
+    expect({ agentProbes, budget: AGENT_BUDGET_MS }).toStrictEqual({
+      agentProbes: [
+        {
+          contentType: "text/markdown",
+          path: "/llms.txt",
+          probe: "web-llms-txt",
+        },
+        {
+          contentType: "text/markdown",
+          path: "/datekit/llms.txt",
+          probe: "web-project-llms-txt",
+        },
+        {
+          contentType: "text/markdown",
+          path: "/datekit/asks/format-ordinal.md",
+          probe: "web-ask-md",
+        },
+        {
+          contentType: "application/json",
+          path: "/.well-known/agent-skills/index.json",
+          probe: "web-agent-skills",
+        },
+      ],
+      budget: 500,
+    });
+  });
+
+  it.live(
+    "skips the seeded example's two probes, with a warning, on a stage that does not hold it",
+    () =>
+      Effect.gen(function* () {
+        // A stage deployed before its examples are seeded: smoke runs after
+        // every deploy, the seed only after the first.
+        const origin = yield* fakePlatform(holding([]));
+        const asked: string[] = [];
+
+        const web = yield* fakePlatform((seen) => {
+          asked.push(seen.path);
+
+          return healthyWeb(seen);
+        });
+
+        const report = yield* smoke(origin, { web });
+
+        expect({
+          asked,
+          probes: report.probes.map(({ probe }) => probe),
+          warnings: report.warnings,
+        }).toStrictEqual({
+          asked: ["/", "/llms.txt", "/.well-known/agent-skills/index.json"],
+          probes: probes.filter(
+            (probe) =>
+              probe !== "web-project-llms-txt" && probe !== "web-ask-md"
+          ),
+          warnings: [
+            "web-project-llms-txt was skipped: datekit is not on this stage (bun run seed puts it there)",
+            "web-ask-md was skipped: datekit is not on this stage (bun run seed puts it there)",
+          ],
+        });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  it.live(
+    "warns, and still passes, when an agent surface answers past its budget",
+    () =>
+      Effect.gen(function* () {
+        const origin = yield* fakePlatform(healthy);
+
+        const web = yield* fakePlatform((seen) =>
+          seen.path === "/.well-known/agent-skills/index.json"
+            ? { ...healthyWeb(seen), delayMs: AGENT_BUDGET_MS + 100 }
+            : healthyWeb(seen)
+        );
+
+        const report = yield* smoke(origin, { web });
+
+        expect({
+          budgets: report.probes.flatMap(({ budgetMs, probe }) =>
+            budgetMs === undefined ? [] : [[probe, budgetMs]]
+          ),
+          probes: report.probes.map(({ probe }) => probe),
+          warnings: report.warnings.map((line) =>
+            line.replace(/\d+ ms,/u, "N ms,")
+          ),
+        }).toStrictEqual({
+          budgets: [
+            ["web-llms-txt", 500],
+            ["web-project-llms-txt", 500],
+            ["web-ask-md", 500],
+            ["web-agent-skills", 500],
+          ],
+          probes: [...probes],
+          warnings: [
+            "web-agent-skills answered in N ms, over its 500 ms budget",
+          ],
+        });
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
@@ -352,11 +493,12 @@ describe("smoke against a stage's web", () => {
     () =>
       Effect.gen(function* () {
         const origin = yield* fakePlatform(healthy);
-        const asked = { front: 0, llms: 0 };
+        const asked = new Map<string, number>();
 
         const web = yield* fakePlatform((seen) => {
-          const count =
-            seen.path === "/" ? (asked.front += 1) : (asked.llms += 1);
+          const count = (asked.get(seen.path) ?? 0) + 1;
+
+          asked.set(seen.path, count);
 
           return count <= 2 ? { status: 404 } : healthyWeb(seen);
         });
@@ -364,10 +506,21 @@ describe("smoke against a stage's web", () => {
         const report = yield* smoke(origin, { settling: "10 seconds", web });
 
         expect({
-          asked,
+          asked: Object.fromEntries(asked),
           probes: report.probes.map(({ probe }) => probe),
-        }).toStrictEqual({ asked: { front: 3, llms: 3 }, probes: [...probes] });
-      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+        }).toStrictEqual({
+          asked: {
+            "/": 3,
+            "/.well-known/agent-skills/index.json": 3,
+            "/datekit/asks/format-ordinal.md": 3,
+            "/datekit/llms.txt": 3,
+            "/llms.txt": 3,
+          },
+          probes: [...probes],
+        });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer)),
+    // Five paths, each asked three times a second apart.
+    30_000
   );
 
   it.live(
@@ -400,6 +553,16 @@ describe("smoke against a stage's web", () => {
           {
             probe: "web-llms-txt",
             reason: "GET /llms.txt on the web answered 503, not 200",
+          },
+          {
+            probe: "web-project-llms-txt",
+            reason:
+              "GET /datekit/llms.txt on the web answered application/json, not text/markdown",
+          },
+          {
+            probe: "web-ask-md",
+            reason:
+              "GET /datekit/asks/format-ordinal.md on the web answered application/json, not text/markdown",
           },
         ]);
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
@@ -527,7 +690,8 @@ describe("the smoke command", () => {
   it.live("probes the web at --web-url, and only there, beside --url", () =>
     Effect.gen(function* () {
       const origin = yield* fakePlatform(healthy);
-      // A web that answers, wrongly: JSON where a page and Markdown belong.
+      // A web that answers, wrongly: JSON where a page and Markdown belong
+      // (only the agent skills' index is JSON).
       const web = yield* fakePlatform(() => ({ body: "{}", status: 200 }));
 
       yield* main(["--stage", "dev-oscabriel", "--url", origin]);
@@ -540,7 +704,9 @@ describe("the smoke command", () => {
         Schema.is(SmokeFailed)(failed)
           ? failed.failures.map(({ probe }) => probe)
           : []
-      ).toStrictEqual([...webProbes]);
+      ).toStrictEqual(
+        webProbes.filter((probe) => probe !== "web-agent-skills")
+      );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 

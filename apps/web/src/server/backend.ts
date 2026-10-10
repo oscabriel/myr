@@ -19,7 +19,7 @@ import { Effect, Option } from "effect";
 
 import type { Backend } from "./rpc.ts";
 import {
-  clearedCookie,
+  clearedCookies,
   credentialFrom,
   settingCookies,
   withCredential,
@@ -32,10 +32,10 @@ const onPlatform = (request: Request, platformUrl: string) => {
   return new Request(new URL(`${pathname}${search}`, platformUrl), request);
 };
 
-/** `response` as it came, also expiring the session cookie. */
+/** `response` as it came, also expiring the session cookie and its kept handle. */
 const expiringSession = (response: Response) =>
   new Response(response.body, {
-    headers: settingCookies(response.headers, [clearedCookie()]),
+    headers: settingCookies(response.headers, clearedCookies()),
     status: response.status,
     statusText: response.statusText,
   });

@@ -33,6 +33,7 @@ import {
   SuiteRoot,
 } from "@repo/protocol/ids";
 import type { AskId, Handle, ProjectName, RequestId } from "@repo/protocol/ids";
+import type { Posture } from "@repo/protocol/posture";
 import type { Principal } from "@repo/protocol/principal";
 import type { AttemptsExhausted, HeldBackFailed } from "@repo/protocol/refusal";
 import { Context, Effect, Layer, Option, Schema } from "effect";
@@ -261,6 +262,15 @@ export interface VisibilityPort {
   }) => ProjectWrites;
   /** The public ledger. */
   readonly ledger: (project: ProjectName, snapshot: ProjectSnapshot) => Ledger;
+  /**
+   * The posture the ledger shows now, and the next instant it moves by the
+   * clock alone (an accepted narrowing whose notice still runs), if any:
+   * what a list keeps a project's posture by (`standing-posture.ts`).
+   */
+  readonly standing: (snapshot: ProjectSnapshot) => {
+    readonly posture: Posture;
+    readonly until: Option.Option<DateTime.Utc>;
+  };
   /** Runs one effect a plan asked for: true once it is done, false to try again later. */
   readonly settle: (effect: VisibilityEffect) => Effect.Effect<boolean>;
 }
@@ -286,6 +296,7 @@ export const noVisibility: VisibilityPort = {
   readableLayers: () => new Set(),
   recordRead: () => ({}),
   settle: () => Effect.succeed(true),
+  standing: () => ({ posture: "open", until: Option.none() }),
 };
 
 /**

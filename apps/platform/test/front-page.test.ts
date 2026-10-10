@@ -24,6 +24,7 @@ import { Lander } from "@repo/project/lander";
 import { LanderIsogit } from "@repo/project/lander/isogit";
 import { FinishersFromChecks } from "@repo/project/project";
 import { FrontPageD1 } from "@repo/project/projection-d1/front-page";
+import { StandingPosturesD1 } from "@repo/project/projection-d1/postures";
 import { ProjectionD1 } from "@repo/project/projection-d1/projection";
 import { Projects } from "@repo/project/projects";
 import { ProjectsMemory } from "@repo/project/projects/memory";
@@ -183,6 +184,7 @@ const frontPageWorld: Effect.Effect<FrontPageWorld, never, Scope.Scope> =
         MemoryRateLimits(WorkerCaps),
         ProjectionD1,
         rules,
+        StandingPosturesD1,
         UpstreamRepoHost
       ).pipe(
         Layer.provideMerge(migrated),
@@ -263,7 +265,7 @@ const frontPageWorld: Effect.Effect<FrontPageWorld, never, Scope.Scope> =
 
 describe("the project list and credits over the platform's /rpc", () => {
   it.effect(
-    "after a landing, lists the project from D1, asking it only its posture, and its people's credits without calling a project",
+    "after a landing, lists the project from D1, asking it only its posture and only once, and its people's credits without calling a project",
     () =>
       Effect.gen(function* () {
         yield* advanceTo(noon);
@@ -299,6 +301,13 @@ describe("the project list and credits over the platform's /rpc", () => {
             ],
           },
         });
+
+        yield* world.forget;
+
+        // The posture read is kept in D1 beside the projection: the next
+        // list asks no project.
+        expect(yield* world.anyone.listProjects({})).toStrictEqual(listed);
+        expect(yield* world.calls).toStrictEqual([]);
       }).pipe(Effect.scoped)
   );
 });

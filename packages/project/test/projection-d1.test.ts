@@ -8,14 +8,17 @@ import { describe, expect, it } from "@effect/vitest";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
+import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import {
   AskId,
+  DecisionId,
+  EnvKey,
   Handle,
   KindName,
   LandedSha,
   ProjectName,
 } from "@repo/protocol/ids";
-import { DateTime, Effect, Layer } from "effect";
+import { DateTime, Effect, Layer, Logger } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 
 import { FrontPage } from "../src/front-page.ts";
@@ -23,13 +26,20 @@ import type { FrontPageFilter } from "../src/front-page.ts";
 import { projectedRows } from "../src/outbox.ts";
 import type { OutboxRow } from "../src/project-store/rows.ts";
 import { FrontPageD1 } from "../src/projection-d1/front-page.ts";
+import { StandingPosturesD1 } from "../src/projection-d1/postures.ts";
 import { ProjectionD1 } from "../src/projection-d1/projection.ts";
-import { FrontPageDdl } from "../src/projection-d1/tables.ts";
+import {
+  FrontPageDdl,
+  StandingPosturesDdl,
+} from "../src/projection-d1/tables.ts";
 import { Projection, ProjectionFailed } from "../src/projection.ts";
+import { StandingPostures } from "../src/standing-posture.ts";
+import type { StandingEntry } from "../src/standing-posture.ts";
 import {
   frontPageMigration,
   migrated,
   migration,
+  posturesMigration,
   projectsMigration,
 } from "./projection-d1.fixtures.ts";
 
@@ -412,5 +422,183 @@ describe("the front page's D1 projection", () => {
         ]);
         expect(yield* front.credits(Handle.make("bram"))).toStrictEqual([]);
       }).pipe(Effect.provide(world))
+  );
+});
+
+/** The projection and the kept postures over a database with every migration. */
+const withPostures = Layer.mergeAll(ProjectionD1, StandingPosturesD1).pipe(
+  Layer.provideMerge(
+    migrated([frontPageMigration, projectsMigration, posturesMigration])
+  )
+);
+
+/** The same over a database the postures' migration has not reached yet. */
+const beforePostures = Layer.mergeAll(ProjectionD1, StandingPosturesD1).pipe(
+  Layer.provideMerge(migrated([frontPageMigration, projectsMigration]))
+);
+
+const sealed: StandingEntry = {
+  posture: "openWithSealedEvidence",
+  seen: 1,
+  until: DateTime.makeUnsafe("2026-10-14T12:00:00Z"),
+};
+
+const open: StandingEntry = { posture: "open", seen: 1 };
+
+const keep = (kept: readonly (readonly [ProjectName, StandingEntry])[]) =>
+  Effect.flatMap(Effect.service(StandingPostures), (store) =>
+    store.put(new Map(kept))
+  );
+
+const keptFor = (projects: readonly ProjectName[]) =>
+  Effect.flatMap(Effect.service(StandingPostures), (store) =>
+    store.get(projects)
+  );
+
+const decided = (seq: number): ProjectEvent =>
+  ProjectEvent.cases.Decided.make({
+    at: at(41),
+    choice: "accept",
+    decision: DecisionId.make("dec-000001"),
+    seq,
+  });
+
+const ledgerAppended = (seq: number): ProjectEvent =>
+  ProjectEvent.cases.LedgerAppended.make({
+    at: at(42),
+    entry: LedgerEntry.cases.ValueSet.make({
+      at: at(42),
+      by: Handle.make("ines-v"),
+      key: EnvKey.make("API_KEY"),
+      seq: 1,
+    }),
+    seq,
+  });
+
+describe("the kept standing postures in D1", () => {
+  it.effect("reads the migration the platform's D1 applies", () =>
+    Effect.gen(function* () {
+      expect(yield* migration(posturesMigration)).toBe(StandingPosturesDdl);
+    })
+  );
+
+  it.effect("keeps each project's posture, when it moves and what it saw", () =>
+    Effect.gen(function* () {
+      yield* keep([
+        [datekit, sealed],
+        [burrow, open],
+      ]);
+
+      expect(
+        yield* keptFor([datekit, burrow, ProjectName.make("ghost")])
+      ).toStrictEqual(
+        new Map([
+          [datekit, sealed],
+          [burrow, open],
+        ])
+      );
+      expect(yield* keptFor([])).toStrictEqual(new Map());
+    }).pipe(Effect.provide(withPostures))
+  );
+
+  it.effect(
+    "clears a project's posture with each event that can move it, and keeps it through the rest",
+    () =>
+      Effect.gen(function* () {
+        const after = (event: (seq: number) => ProjectEvent, seq: number) =>
+          Effect.gen(function* () {
+            yield* keep([
+              [datekit, { ...open, seen: seq - 1 }],
+              [burrow, open],
+            ]);
+            yield* apply(rows(datekit, seq, [event]));
+
+            return [...(yield* keptFor([datekit, burrow])).keys()].toSorted();
+          });
+
+        expect([
+          yield* after(opened(parseIsoAsk, 1), 1),
+          yield* after(claimed(parseIso), 2),
+          yield* after(landed(datekit, parseIso), 3),
+          yield* after(decided, 4),
+          yield* after(ledgerAppended, 5),
+          yield* after(closedBy(parseIso), 6),
+        ]).toStrictEqual([
+          [burrow, datekit],
+          [burrow, datekit],
+          [burrow],
+          [burrow],
+          [burrow],
+          [burrow, datekit],
+        ]);
+      }).pipe(Effect.provide(withPostures))
+  );
+
+  it.effect(
+    "keeps nothing from a read the projection has since moved past, nor an older read over a newer",
+    () =>
+      Effect.gen(function* () {
+        yield* apply(
+          rows(datekit, 1, [opened(parseIsoAsk, 1), claimed(parseIso)])
+        );
+
+        // Read when datekit had one event; the projection has applied two.
+        yield* keep([[datekit, { ...open, seen: 1 }]]);
+
+        const stale = yield* keptFor([datekit]);
+
+        yield* keep([[datekit, { ...sealed, seen: 2 }]]);
+        yield* keep([[datekit, { ...open, seen: 2 }]]);
+        yield* keep([[burrow, { ...open, seen: 3 }]]);
+        yield* keep([[burrow, { ...sealed, seen: 2 }]]);
+
+        expect({
+          kept: yield* keptFor([datekit, burrow]),
+          stale,
+        }).toStrictEqual({
+          kept: new Map([
+            [datekit, { ...open, seen: 2 }],
+            [burrow, { ...open, seen: 3 }],
+          ]),
+          stale: new Map(),
+        });
+      }).pipe(Effect.provide(withPostures))
+  );
+
+  it.effect(
+    "before its migration, projects every event and keeps nothing, with a warning",
+    () =>
+      Effect.gen(function* () {
+        const warnings: string[] = [];
+
+        const keeper = Logger.make(({ logLevel, message }) => {
+          warnings.push(`${logLevel}: ${String(message)}`);
+        });
+
+        yield* Effect.gen(function* () {
+          yield* apply(
+            rows(datekit, 1, [
+              opened(parseIsoAsk, 1),
+              landed(datekit, parseIso),
+              decided,
+            ])
+          );
+          yield* keep([[datekit, { ...open, seen: 3 }]]);
+
+          expect(yield* keptFor([datekit])).toStrictEqual(new Map());
+
+          const cursor = yield* Effect.flatMap(
+            Effect.service(SqlClient),
+            (sql) => sql<{ readonly seq: number }>`SELECT seq FROM cursor`
+          );
+
+          expect(cursor.map(({ seq }) => seq)).toStrictEqual([3]);
+        }).pipe(Effect.provide(Logger.layer([keeper])));
+
+        expect(warnings.map((line) => line.split(":")[0])).toStrictEqual([
+          "Warn",
+          "Warn",
+        ]);
+      }).pipe(Effect.provide(beforePostures))
   );
 });

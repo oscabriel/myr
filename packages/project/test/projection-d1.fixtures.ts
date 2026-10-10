@@ -15,6 +15,9 @@ export const frontPageMigration = "0001_front_page.sql";
 /** The project list's and the credits' migration (`ProjectsCreditsDdl`). */
 export const projectsMigration = "0004_projects_credits.sql";
 
+/** The kept standing postures' migration (`StandingPosturesDdl`). */
+export const posturesMigration = "0005_standing_postures.sql";
+
 /** A migration of the platform's D1 database, as its file holds it. */
 export const migration = (file: string) =>
   Effect.gen(function* () {

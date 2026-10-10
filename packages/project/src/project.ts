@@ -133,6 +133,7 @@ import {
   sameHandle,
 } from "@repo/protocol/ids";
 import type { DecisionId, LaneName, ProjectName } from "@repo/protocol/ids";
+import { Posture } from "@repo/protocol/posture";
 import { Person, Principal } from "@repo/protocol/principal";
 import {
   AskFull,
@@ -364,6 +365,19 @@ export interface AskFile {
   readonly path: RepoPath;
 }
 
+/**
+ * A project's posture as a list keeps it: the posture its ledger shows
+ * now, the next instant it moves by the clock alone, if one is set, and the
+ * project's last event the read saw (`ProjectApi.standing`).
+ */
+export const StandingNow = Schema.Struct({
+  posture: Posture,
+  seen: Schema.Int,
+  until: Schema.optionalKey(Schema.DateTimeUtcFromString),
+});
+
+export type StandingNow = typeof StandingNow.Type;
+
 /** The refusals `submitAnswer` answers with. */
 export type SubmitRefusal =
   | NotClaimed
@@ -415,6 +429,13 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   ) => Effect.Effect<readonly LandingView[]>;
   /** Every claim's fork, with its ask, claimant and the claim's state. */
   readonly forks: () => Effect.Effect<readonly ForkRef[]>;
+  /**
+   * The posture the ledger shows now, the next instant it moves by the
+   * clock alone (none when only an event moves it), and the project's last
+   * event this read saw. Platform-only, on no surface: what a list keeps
+   * each project's posture by (`standing-posture.ts`).
+   */
+  readonly standing: () => Effect.Effect<StandingNow>;
   /**
    * The policy at the landed commit as anyone may read it (no layers, no
    * function-valued rules, no asks), once it has evaluated; until then, after
@@ -865,6 +886,11 @@ export const MethodSchemas = {
     args: [Principal, ProposalId],
     error: ShowProposal.errorSchema,
     success: ShowProposal.successSchema,
+  },
+  standing: {
+    args: [],
+    error: Schema.Never,
+    success: StandingNow,
   },
   status: {
     args: [Person],
@@ -5786,6 +5812,19 @@ export const projectService = (
           MethodSchemas.showProposal,
           [caller, proposal],
           decided.showProposal(proposal)
+        ),
+      standing: () =>
+        checked(
+          MethodSchemas.standing,
+          [],
+          Effect.map(hydrate, (h): StandingNow => {
+            const { posture, until } = visibility.standing(h.snapshot);
+
+            return Option.match(until, {
+              onNone: () => ({ posture, seen: h.lastSeq }),
+              onSome: (at) => ({ posture, seen: h.lastSeq, until: at }),
+            });
+          })
         ),
       status: (caller) =>
         checked(MethodSchemas.status, [caller], statusOf(caller)),
