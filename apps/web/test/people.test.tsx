@@ -1,26 +1,21 @@
 /**
- * A person's page, rendered to HTML with `react-dom/server` from fixtures
- * decoded with the protocol's own schemas: their credit by project, area
- * and role, counted, and never ranked.
+ * A person's page, rendered inside a router from fixtures decoded with the
+ * protocol's own schemas: their credit by project and area, each area one
+ * sentence of the roles they hold there, and no number anywhere (the No
+ * Score Rule): the counts the read carries are never drawn.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { CreditSummary } from "@repo/protocol/domain/record";
 import { Handle } from "@repo/protocol/ids";
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 
-import { PersonView } from "../src/features/people/person-page.tsx";
+import {
+  areaSentence,
+  PersonView,
+} from "../src/features/people/person-page.tsx";
+import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
-
-const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
-
-/** What a reader sees: the markup without its tags, entities decoded. */
-const textOf = (element: ReactElement) =>
-  markupOf(element)
-    .replaceAll(/<[^>]+>/gu, "")
-    .replaceAll("&#x27;", "'")
-    .replaceAll("&amp;", "&");
 
 const handle = Schema.decodeSync(Handle)("ines-v");
 
@@ -29,61 +24,136 @@ const credits = Schema.decodeSync(Schema.Array(CreditSummary))([
   { area: "docs", count: 1, project: "datekit", role: "Signed-off-by" },
   { area: "format", count: 1, project: "burrow", role: "Finished-by" },
   { area: "core", count: 2, project: "datekit", role: "Asked-by" },
+  { area: ".", count: 7, project: "burrow", role: "Decided-by" },
+  { area: "core", count: 12, project: "datekit", role: "Signed-off-by" },
 ]);
 
-const page = <PersonView credits={credits} handle={handle} />;
+const markupOf = (element: ReactElement) =>
+  renderAt(`/people/${handle}`, element);
 
-/** Each group heading's text, top to bottom: projects as `h2`, areas as `h3`. */
-const headingsOf = (element: ReactElement) =>
-  [
-    ...markupOf(element).matchAll(
-      /<(?<level>h[23])\b[^>]*>(?<text>.*?)<\/h[23]>/gu
-    ),
-  ].map(
-    ({ groups }) =>
-      `${groups?.level}:${groups?.text?.replaceAll(/<[^>]+>/gu, "")}`
+/** What a reader sees: the markup without its tags, entities decoded. */
+const textOf = (html: string) =>
+  html
+    .replaceAll(/<[^>]+>/gu, "")
+    .replaceAll("&#x27;", "'")
+    .replaceAll("&amp;", "&");
+
+/** The credits: every project's group, from the first to the last. */
+const creditsOf = (html: string) => {
+  const start = html.indexOf('data-credits=""');
+  const end = html.indexOf("</main>", start);
+
+  expect(start).toBeGreaterThanOrEqual(0);
+
+  return html.slice(start, end);
+};
+
+const page = markupOf(<PersonView credits={credits} handle={handle} />);
+
+describe("a person's page", () => {
+  it.effect("is titled with the handle, and has no inspector", () =>
+    Effect.gen(function* () {
+      const html = yield* page;
+
+      expect(html).toMatch(/<h1\b[^>]*>ines-v<\/h1>/u);
+      expect(html).not.toContain('data-facts="inspector"');
+      expect(html).not.toContain("<img");
+    })
   );
 
-describe(PersonView, () => {
-  it("groups credit by project, then by area", () => {
-    expect(headingsOf(page)).toStrictEqual([
-      "h2:burrow",
-      "h3:format",
-      "h2:datekit",
-      "h3:core",
-      "h3:docs",
-    ]);
+  it.effect("groups credit by project, each area one sentence of roles", () =>
+    Effect.gen(function* () {
+      const html = creditsOf(yield* page);
+
+      const groups = [...html.matchAll(/<h2\b[^>]*>(?<name>.*?)<\/h2>/gu)].map(
+        ({ groups: found }) => textOf(found?.name ?? "")
+      );
+
+      expect(groups).toStrictEqual(["burrow", "datekit"]);
+
+      const sentences = [
+        ...html.matchAll(/data-area="(?<area>[^"]*)"[^>]*>/gu),
+      ].map(({ groups: found }) => found?.area);
+
+      expect(sentences).toStrictEqual([".", "format", "core", "docs"]);
+
+      const text = textOf(html);
+
+      for (const sentence of [
+        "Decided in the whole project",
+        "Finished in burrow/format",
+        "Answered and asked in datekit/core",
+        "Answered in datekit/docs",
+      ]) {
+        expect(text).toContain(sentence);
+      }
+    })
+  );
+
+  it.effect("links each project, and each area to the project's landings", () =>
+    Effect.gen(function* () {
+      const html = creditsOf(yield* page);
+
+      for (const project of ["datekit", "burrow"]) {
+        expect(html).toContain(`href="/${project}"`);
+        expect(html).toContain(`href="/${project}/commits/main"`);
+      }
+    })
+  );
+
+  it.effect("draws no number in its credits, whatever the read counts", () =>
+    Effect.gen(function* () {
+      const html = yield* page;
+
+      expect(textOf(creditsOf(html))).not.toMatch(/\d/u);
+      expect(html).not.toMatch(
+        /\b(?:landings?|credits?)\b\s*\d|\d+\s*(?:landings?|credits?)\b/iu
+      );
+    })
+  );
+
+  it.effect("says credit is the trailers, and nothing on it is a score", () =>
+    Effect.gen(function* () {
+      const text = textOf(yield* page);
+
+      expect(text).toContain(
+        "Credit is the trailers on each landing; nothing here is a score."
+      );
+
+      for (const word of ["rank", "points", "reputation"]) {
+        expect(text.toLowerCase()).not.toContain(word);
+      }
+    })
+  );
+
+  it.effect(
+    "says a person with no credit has none yet, with a way onward",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* markupOf(
+          <PersonView credits={[]} handle={handle} />
+        );
+
+        expect(textOf(html)).toContain("No credited landings yet.");
+        expect(html).toContain('href="/"');
+      })
+  );
+});
+
+describe("an area's sentence", () => {
+  it("names the roles in words, the answer first, then in trailer order", () => {
+    expect(
+      areaSentence("datekit", "src", [
+        "Asked-by",
+        "Signed-off-by",
+        "Decided-by",
+      ])
+    ).toBe("Answered, asked and decided in datekit/src");
   });
 
-  it("lists the roles in each area with their counts, in trailer order", () => {
-    const text = textOf(page);
-    const core = text.slice(text.indexOf("core"), text.indexOf("docs"));
-
-    expect(core.indexOf("Asked-by")).toBeGreaterThanOrEqual(0);
-    expect(core.indexOf("Signed-off-by")).toBeGreaterThan(
-      core.indexOf("Asked-by")
-    );
-    expect(core).toMatch(/Asked-by\D*2 landings/u);
-    expect(core).toMatch(/Signed-off-by\D*4 landings/u);
-    expect(text).toMatch(/Finished-by\D*1 landing(?!s)/u);
-  });
-
-  it("links each project to its page", () => {
-    expect(markupOf(page)).toContain('href="/datekit"');
-    expect(markupOf(page)).toContain('href="/burrow"');
-  });
-
-  it("never reads as a score", () => {
-    const markup = markupOf(page).toLowerCase();
-
-    for (const word of ["score", "rank", "points", "reputation"]) {
-      expect(markup).not.toContain(word);
-    }
-  });
-
-  it("says a person with no credit has none yet", () => {
-    expect(textOf(<PersonView credits={[]} handle={handle} />)).toContain(
-      "No credited landings yet"
+  it("reads the whole project for an area of '.'", () => {
+    expect(areaSentence("datekit", ".", ["Mentored-by"])).toBe(
+      "Mentored in the whole project"
     );
   });
 });

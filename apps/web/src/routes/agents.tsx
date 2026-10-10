@@ -1,4 +1,3 @@
-import { agentSetup } from "@repo/agent-kit/agent-setup";
 import {
   createFileRoute,
   getRouteApi,
@@ -6,14 +5,13 @@ import {
 } from "@tanstack/react-router";
 
 import { commands } from "../features/agents/catalog.ts";
-import { AgentSetupView } from "../features/agents/setup-page.tsx";
+import { AgentsView } from "../features/agents/setup-page.tsx";
 import { pageHead } from "../features/shared/head.ts";
-import { PageShell } from "../features/shared/layout.tsx";
 
-// `/agents`: how each agent connects, drawn from `@repo/agent-kit`'s
-// `agentSetup` for this stage's platform and the web's own origin (the
-// router's: the request's on the server, the page's in the browser), so
-// the server's render and the browser's agree. `/agents.md` is the same
+// `/agents`: the reference an agent and the person running it read, drawn
+// from `@repo/agent-kit` for this stage's platform and the web's own origin
+// (the router's: the request's on the server, the page's in the browser),
+// so the server's render and the browser's agree. `/agents.md` is the same
 // text as Markdown.
 
 const root = getRouteApi("__root__");
@@ -23,15 +21,16 @@ const AgentsPage = () => {
   const { origin } = useRouter();
 
   return (
-    <PageShell title="Agents">
-      <AgentSetupView
-        channels={agentSetup({ commands, platformUrl, webUrl: origin })}
-      />
-    </PageShell>
+    <AgentsView commands={commands} platformUrl={platformUrl} webUrl={origin} />
   );
 };
 
 export const Route = createFileRoute("/agents")({
   component: AgentsPage,
-  head: () => pageHead({ title: "Agents" }),
+  head: () =>
+    pageHead({
+      description:
+        "How an agent reaches the platform: the CLI's commands, the ways to connect, the endpoints, the limits and the refusals.",
+      title: "For agents",
+    }),
 });

@@ -1,8 +1,10 @@
 /**
- * How an agent connects to the platform, one channel at a time: remote MCP
- * for a client that signs in over OAuth, MCP over stdio through the CLI,
- * the CLI itself, a sentence any agent can be handed, and the skills. Each
- * channel says when to use it and gives the snippets to copy. The web draws
+ * How an agent reaches the platform, set as a reference: a synopsis of the
+ * CLI's commands; the channels it connects through (remote MCP for a client
+ * that signs in over OAuth, MCP over stdio through the CLI, the CLI itself,
+ * a sentence any agent can be handed, and the skills), each saying when to
+ * use it and giving the snippets to copy; the endpoints an agent reads; the
+ * limits a project's policy sets by default; and the refusals. The web draws
  * it as `/agents` and serves `agentSetupMarkdown` as `/agents.md`.
  *
  * Pure: the hosts hand in the CLI's commands as this package's one list
@@ -17,11 +19,14 @@
  * remote entry being `{type: "http", url}`.
  */
 import { Brand } from "@repo/brand";
-import { Array as Arr } from "effect";
+import { PolicyInput } from "@repo/protocol/domain/policy";
+import { groups } from "@repo/protocol/refusal";
+import { Array as Arr, Schema } from "effect";
 
 import type { CommandDoc } from "./command-doc.ts";
 import { mcpServersFor } from "./platform.ts";
-import { page, printJson } from "./text.ts";
+import { span } from "./sections.ts";
+import { code, listed, page, printJson, table } from "./text.ts";
 
 export interface SetupSnippet {
   /** What the snippet is, or where it goes: a client, a file. */
@@ -149,6 +154,150 @@ export const agentSetup = (input: SetupInput): readonly SetupChannel[] => [
   skills(input),
 ];
 
+// --- Synopsis -------------------------------------------------------------------
+
+/** One command as a synopsis gives it: how it is typed, and what it does. */
+export interface SynopsisLine {
+  /** The CLI's name, its words, its arguments, then each flag it takes in brackets. */
+  readonly usage: string;
+  readonly summary: string;
+}
+
+/** Every command, one line each, in the catalog's order. */
+export const synopsis = (
+  commands: readonly CommandDoc[]
+): readonly SynopsisLine[] =>
+  commands.map(({ flags, path, positional, summary }) => ({
+    summary,
+    usage: [
+      Brand.cli,
+      ...path,
+      ...positional.map((name) => `<${name}>`),
+      ...flags
+        .filter((flag) => !positional.includes(flag.replace(/^--/u, "")))
+        .map((flag) => `[${flag}]`),
+    ].join(" "),
+  }));
+
+// --- Endpoints ------------------------------------------------------------------
+
+/** One address an agent reads or calls. */
+export interface Endpoint {
+  /** The address whole; `<…>` marks a part the reader fills in. */
+  readonly url: string;
+  readonly what: string;
+  /** A plain GET in a browser shows it. */
+  readonly readable: boolean;
+}
+
+/** Every address an agent reads, the web's first, then the platform's. */
+export const agentEndpoints = ({
+  platformUrl,
+  webUrl,
+}: Pick<SetupInput, "platformUrl" | "webUrl">): readonly Endpoint[] => [
+  {
+    readable: true,
+    url: `${webUrl}/llms.txt`,
+    what: "The index: how to take an ask, every command and every project.",
+  },
+  {
+    readable: true,
+    url: `${webUrl}/llms-full.txt`,
+    what: "The rest in one file: every refusal, git here, how a landing happens, the events a watcher hears.",
+  },
+  {
+    readable: false,
+    url: `${webUrl}/<project>/llms.txt`,
+    what: "One project: its posture, how to clone it and its open asks.",
+  },
+  {
+    readable: false,
+    url: `${webUrl}/<project>/asks/<ask>.md`,
+    what: "One ask's brief as Markdown.",
+  },
+  {
+    readable: true,
+    url: `${webUrl}/agents.md`,
+    what: "This reference as Markdown.",
+  },
+  {
+    readable: true,
+    url: `${webUrl}/.well-known/mcp.json`,
+    what: "The MCP server's card: its endpoint, transport and protocol, and how to sign in.",
+  },
+  {
+    readable: true,
+    url: `${webUrl}/.well-known/agent-skills/index.json`,
+    what: "Every project's contribute skill, with its digest.",
+  },
+  {
+    readable: false,
+    url: `${platformUrl}/mcp`,
+    what: "MCP over streamable HTTP, signed in over OAuth.",
+  },
+  {
+    readable: false,
+    url: `${platformUrl}/<repo>.git`,
+    what: "Git over smart HTTP: clone a project, push an answer to your fork.",
+  },
+];
+
+// --- Limits ---------------------------------------------------------------------
+
+/** One limit and its value, as a person says them. */
+export interface Limit {
+  readonly limit: string;
+  readonly value: string;
+}
+
+/** What a policy that sets nothing takes: the defaults its schema fills in. */
+const policyDefaults = () =>
+  Schema.decodeSync(
+    Schema.Struct({
+      budget: PolicyInput.fields.budget,
+      caps: PolicyInput.fields.caps,
+      claims: PolicyInput.fields.claims,
+    })
+  )({});
+
+/**
+ * The limits an agent meets: each project's policy may set its own, so the
+ * values are the defaults; the platform's own rate limits stand in front.
+ */
+export const agentLimits = (): readonly Limit[] => {
+  const { budget, caps, claims } = policyDefaults();
+
+  return [
+    {
+      limit: "Claims one person holds at once, in a project",
+      value: `${caps.claimsPerPerson} by default`,
+    },
+    {
+      limit: "Open proposals one person holds, in a project",
+      value: `${caps.proposalsPerPerson} by default; 0 turns proposals off`,
+    },
+    {
+      limit: "A claim without a push",
+      value: `Warned after ${span(claims.warnAfterMs)}, lapses after ${span(claims.lapseAfterMs)}, by default`,
+    },
+    {
+      limit: "Decisions a decider takes a day",
+      value: `${budget.decisionsPerDay} by default`,
+    },
+    {
+      limit: "A decision nobody takes",
+      value: `${span(budget.expireDays * 86_400_000)} by default, then it takes its default`,
+    },
+    {
+      limit: "Claims, proposals and drafts across the platform, per person",
+      value:
+        "A set number a minute; past it, CapReached says when to try again",
+    },
+  ];
+};
+
+// --- Markdown -------------------------------------------------------------------
+
 const snippetLines = ({ label, language, text }: SetupSnippet) => [
   `${label}:`,
   "",
@@ -159,19 +308,66 @@ const snippetLines = ({ label, language, text }: SetupSnippet) => [
 ];
 
 const channelLines = ({ snippets, title, useWhen }: SetupChannel) => [
-  `## ${title}`,
+  `### ${title}`,
   "",
   `Use this when ${useWhen.charAt(0).toLowerCase()}${useWhen.slice(1)}`,
   "",
   ...snippets.flatMap(snippetLines),
 ];
 
-/** The same channels as one Markdown document: `/agents.md`. */
+const synopsisLines = (commands: readonly CommandDoc[]) => [
+  "## Synopsis",
+  "",
+  ...synopsis(commands).map(
+    ({ summary, usage }) => `- ${code(usage)}: ${summary}`
+  ),
+  "",
+];
+
+const endpointLines = (input: SetupInput) => [
+  "## Endpoints",
+  "",
+  ...table(
+    ["Address", "What it is"],
+    agentEndpoints(input).map(({ url, what }) => [code(url), what])
+  ),
+  "",
+];
+
+const limitLines = () => [
+  "## Limits",
+  "",
+  ...table(
+    ["Limit", "Value"],
+    agentLimits().map(({ limit, value }) => [limit, value])
+  ),
+  "",
+];
+
+const refusalLines = ({ webUrl }: SetupInput) => [
+  "## Refusals",
+  "",
+  `Every refusal the platform gives, by group. Each one's row in ${webUrl}/llms-full.txt says whether retrying helps, its \`next\` and what to do.`,
+  "",
+  ...groups.map(
+    ({ members, name }) =>
+      `- ${name}: ${listed(members.map((member) => code(member.identifier)))}`
+  ),
+  "",
+];
+
+/** The whole reference as one Markdown document: `/agents.md`. */
 export const agentSetupMarkdown = (input: SetupInput) =>
   page([
-    "# Agents",
+    "# For agents",
     "",
-    `> How an agent connects to ${Brand.name}: over MCP, through the CLI, with a sentence to paste, or as skills. Each section says when to use it.`,
+    `> How an agent reaches ${Brand.name}: the CLI's commands, the ways to connect (over MCP, through the CLI, with a sentence to paste, or as skills), the endpoints, the limits and the refusals.`,
+    "",
+    ...synopsisLines(input.commands),
+    "## Connect",
     "",
     ...agentSetup(input).flatMap(channelLines),
+    ...endpointLines(input),
+    ...limitLines(),
+    ...refusalLines(input),
   ]);

@@ -12,8 +12,9 @@ import {
 import { pageHead } from "../../features/shared/head.ts";
 import { Reading, Unreachable } from "../../features/shared/pending.tsx";
 
-// A person's page: their credit by project, area and role, read once by the
-// browser. An address whose last part cannot be a handle is a 404.
+// A person's page: the roles they hold in each project's landings, by area,
+// read once by the browser. An address whose last part cannot be a handle
+// is a 404.
 
 const decodeHandle = Schema.decodeUnknownOption(Handle);
 
@@ -38,7 +39,11 @@ const PersonPage = () => {
 
 export const Route = createFileRoute("/people/$handle")({
   component: PersonPage,
-  head: ({ params }) => pageHead({ title: params.handle }),
+  head: ({ params }) =>
+    pageHead({
+      description: `What ${params.handle} is credited for, by project and area.`,
+      title: params.handle,
+    }),
   // A 404 for an address that names no handle.
   loader: ({ params }) =>
     Effect.runPromise(
