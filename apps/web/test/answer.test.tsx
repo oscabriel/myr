@@ -3,7 +3,9 @@
  * The gate's stages in a strip, each lane's result and time, held-back
  * checks only as one line per area (its counts and suite root, nothing
  * more), the outcome, and a refusal as `git push` printed it. A landed
- * answer shows its landing's credit trailers and the commit.
+ * answer shows its landing's credit trailers and the commit. The base and
+ * the landing link their commit pages; the head and the merged tree, which
+ * live in the claim's fork, do not.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -72,6 +74,18 @@ const lanesOf = (markup: string) =>
 
     return lane === undefined || result === undefined ? [] : [[lane, result]];
   });
+
+/** Each link to a commit page, in page order, as `[href, text]`. */
+const commitLinksOf = (markup: string) =>
+  [
+    ...markup.matchAll(
+      /<a\b[^>]*href="(?<href>[^"]*\/commit\/[^"]*)"[^>]*>(?<inner>.*?)<\/a>/gu
+    ),
+  ].flatMap(({ groups }) =>
+    groups?.href === undefined || groups.inner === undefined
+      ? []
+      : [[groups.href, plainText(groups.inner).trim()]]
+  );
 
 describe(AnswerView, () => {
   const page = <AnswerView now={now} verdict={refused} />;
@@ -152,6 +166,37 @@ describe(AnswerView, () => {
     expect(text).toContain(`Held-back: export 7/7 @ ${suite}`);
     expect(text).toContain("Assisted-by: claude-code:opus-5 (verified)");
     expect(text).toContain(`git show ${landedSha}`);
+  });
+
+  it("links a landed answer's landing and its base to their commit pages, and keeps the git show command", () => {
+    const landed = verdictOf(Outcome.cases.Landed.make({ sha: landedSha }));
+
+    const markup = markupOf(
+      <AnswerView landing={landing} now={now} verdict={landed} />
+    );
+
+    expect(commitLinksOf(markup)).toStrictEqual([
+      [`/${project}/commit/${landed.base}`, landed.base.slice(0, 7)],
+      [`/${project}/commit/${landedSha}`, "The landing commit"],
+    ]);
+    expect(markup).toContain(`git show ${landedSha}`);
+  });
+
+  it("links neither the head nor the merged tree: they live in the claim's fork", () => {
+    const landed = verdictOf(Outcome.cases.Landed.make({ sha: landedSha }));
+
+    const markup = markupOf(
+      <AnswerView landing={landing} now={now} verdict={landed} />
+    );
+
+    expect(markup).not.toContain(`/commit/${landed.head}`);
+    expect(markup).not.toContain(`/commit/${landed.tree}`);
+  });
+
+  it("links the base and no landing when the answer has not landed", () => {
+    expect(commitLinksOf(markupOf(page))).toStrictEqual([
+      [`/${project}/commit/${refused.base}`, refused.base.slice(0, 7)],
+    ]);
   });
 });
 
