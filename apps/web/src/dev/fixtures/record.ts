@@ -14,8 +14,11 @@
 import { creditsByArea } from "@repo/project/attention/credits";
 import { today } from "@repo/project/attention/today";
 import { listingOf } from "@repo/project/events";
-import type { AnswerView, Verdict } from "@repo/protocol/domain/answer";
-import { Verdict as VerdictSchema } from "@repo/protocol/domain/answer";
+import type { Verdict } from "@repo/protocol/domain/answer";
+import {
+  AnswerView,
+  Verdict as VerdictSchema,
+} from "@repo/protocol/domain/answer";
 import { Ask } from "@repo/protocol/domain/ask";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { ClaimView } from "@repo/protocol/domain/claim";
@@ -105,6 +108,7 @@ export const decodeRecord = (
     yield* many(Ask, [...record.asks.values()]);
     yield* many(ProjectEvent, record.events);
     yield* many(VerdictSchema, [...record.verdicts.values()].flat());
+    yield* many(AnswerView, record.answers);
     yield* many(LandingView, record.landings);
     yield* many(Decision, record.decisions);
     yield* many(ClaimView, record.claims);

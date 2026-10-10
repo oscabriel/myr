@@ -258,17 +258,20 @@ const overlay: Layer.Layer<
                   : [Option.none(), Option.some(at)]
             );
 
-            if (Option.isNone(armed) || (yield* Ref.get(fixtures.landed))) {
+            if (Option.isNone(armed)) {
               return;
             }
 
             const waited = Duration.nanos(at - armed.value);
 
-            if (Duration.isLessThan(waited, after)) {
+            // Taken in one step, so two reads at once land it only once.
+            if (
+              Duration.isLessThan(waited, after) ||
+              (yield* Ref.getAndSet(fixtures.landed, true))
+            ) {
               return;
             }
 
-            yield* Ref.set(fixtures.landed, true);
             yield* write((story) =>
               Effect.gen(function* () {
                 const landedAt = DateTime.add(yield* now, { minutes: 1 });
@@ -314,30 +317,36 @@ const overlay: Layer.Layer<
               .map((event) => ({ event, seq: event.seq }))
           )
         ),
+      // As the service answers: a decider here or the log's claimant may
+      // read; anyone else hears `NotDecider` whether or not a log is kept,
+      // so the reply tells no one which logs exist.
       evidence: (caller, ref) =>
         Effect.gen(function* () {
           const record = yield* current;
-          const log = record.logs.get(ref);
-          const who = callerOf(caller);
+          const log = Option.fromUndefinedOr(record.logs.get(ref));
 
-          const allowed = Option.exists(who, ({ handle }) =>
-            log === undefined
-              ? false
-              : sameHandle(log.claimant, handle) ||
-                record.decisions.some(({ deciders }) =>
-                  deciders.some((each) => sameHandle(each, handle))
-                )
+          const allowed = Option.exists(
+            callerOf(caller),
+            ({ handle }) =>
+              record.decisions.some(({ deciders }) =>
+                deciders.some((each) => sameHandle(each, handle))
+              ) ||
+              Option.exists(log, ({ claimant }) => sameHandle(claimant, handle))
           );
-
-          if (log === undefined) {
-            return yield* new UnknownProject({ project: vellum });
-          }
 
           if (!allowed) {
             return yield* new NotDecider({});
           }
 
-          return { lane: log.lane, text: log.text, truncated: false };
+          if (Option.isNone(log)) {
+            return yield* new UnknownProject({ project: vellum });
+          }
+
+          return {
+            lane: log.value.lane,
+            text: log.value.text,
+            truncated: false,
+          };
         }),
       forks: () => Effect.map(current, ({ forks }) => forks),
       head: () => Effect.map(current, ({ head }) => ({ landed: head })),

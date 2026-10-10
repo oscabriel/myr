@@ -223,11 +223,22 @@ const ENV_SCHEMA = [
   "",
 ].join("\n");
 
+/** How many decisions a vellum decider takes a day (its `policy.json`'s budget). */
+export const decisionsPerDay = 5;
+
+/** How long a claim goes without a push before it is warned, then lapses. */
+const CLAIMS = { lapseAfter: { hours: 96 }, warnAfter: { hours: 48 } } as const;
+
+const HOUR_MS = 3_600_000;
+
 const policy = policyJson({
   asks: [],
-  budget: { decisionsPerDay: 5, expireDays: 3 },
+  budget: { decisionsPerDay, expireDays: 3 },
   caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },
-  claims: { lapseAfterMs: 345_600_000, warnAfterMs: 172_800_000 },
+  claims: {
+    lapseAfterMs: CLAIMS.lapseAfter.hours * HOUR_MS,
+    warnAfterMs: CLAIMS.warnAfter.hours * HOUR_MS,
+  },
   deciders: [
     { handles: [people.ines], paths: "**" },
     { handles: [people.ines, people.lin], paths: `${dir}/**` },
@@ -713,7 +724,7 @@ const WRAP_PATCH = [
   "index 5d1c0e2..a8f4b71 100644",
   "--- a/packages/render/src/table.ts",
   "+++ b/packages/render/src/table.ts",
-  "@@ -1,9 +1,14 @@",
+  "@@ -1,8 +1,14 @@",
   ' import type { Token } from "@vellum/parser";',
   " ",
   "+const MAX_CELL = 40;",
@@ -884,10 +895,10 @@ export const tellVellum = (base: LandedSha) =>
       base,
       files: vellumFiles,
       lanes: LANES,
-      lapseAfter: { hours: 96 },
+      lapseAfter: CLAIMS.lapseAfter,
       project: vellum,
       test: TEST,
-      warnAfter: { hours: 48 },
+      warnAfter: CLAIMS.warnAfter,
     });
 
     const answerAndLand = (input: {
@@ -1965,6 +1976,3 @@ export const landLintChild = (story: Story, at: DateTime.Utc) =>
       ]),
     });
   });
-
-/** How many decisions a vellum decider takes a day (its `policy.json`'s budget). */
-export const decisionsPerDay = 5;

@@ -147,6 +147,46 @@ const refusalsOf = (outcome: Outcome | undefined) =>
     : [];
 
 /**
+ * Each hunk of a unified diff, as its header declares its old and new
+ * lengths and as its lines count them, so a patch a diff view cannot parse
+ * shows as a mismatch.
+ */
+const hunksOf = (patch: string) => {
+  const hunks: { declared: string; counted: string }[] = [];
+  let old = 0;
+  let fresh = 0;
+  let declared: string | undefined;
+
+  const close = () => {
+    if (declared !== undefined) {
+      hunks.push({ counted: `${old}/${fresh}`, declared });
+    }
+  };
+
+  for (const line of patch.split("\n")) {
+    const header =
+      /^@@ -\d+(?:,(?<old>\d+))? \+\d+(?:,(?<fresh>\d+))? @@/u.exec(line);
+
+    if (header !== null) {
+      close();
+      declared = `${header.groups?.old ?? "1"}/${header.groups?.fresh ?? "1"}`;
+      old = 0;
+      fresh = 0;
+    } else if (line.startsWith("diff --git ")) {
+      close();
+      declared = undefined;
+    } else if (declared !== undefined && line !== "") {
+      old += line.startsWith("+") ? 0 : 1;
+      fresh += line.startsWith("-") ? 0 : 1;
+    }
+  }
+
+  close();
+
+  return hunks;
+};
+
+/**
  * Each test seeds a whole world with its fixtures while turbo runs every
  * package's tests at once, as `dev-backend.test.ts` does.
  */
@@ -236,6 +276,49 @@ describe("the dev world's fixtures", seededWorlds, () => {
             .map(({ lane, logRef }) => [lane, logRef !== undefined])
         ).toStrictEqual([["unit", true]]);
       })
+  );
+
+  it.live(
+    "give a failed lane's log to its claimant, and the same NotDecider to anyone else whether or not a log is kept",
+    () =>
+      inWorld(withFixtures, (as) =>
+        Effect.gen(function* () {
+          const anyone = yield* as();
+          const nested = ask("render-nested-lists");
+
+          const { verdict } = yield* anyone.verdict({
+            ask: nested,
+            project: vellum,
+          });
+
+          const ref = verdict?.lanes.find(
+            ({ logRef }) => logRef !== undefined
+          )?.logRef;
+
+          const claimant = askStates(yield* eventsOf(anyone)).get(
+            nested
+          )?.claimant;
+
+          const read = (client: Reader, logRef: string) =>
+            Effect.match(client.evidence({ project: vellum, ref: logRef }), {
+              onFailure: ({ _tag }): string => _tag,
+              onSuccess: ({ lane }): string => lane,
+            });
+
+          const owner = yield* as(signedIn(claimant ?? "nobody"));
+          const stranger = yield* as(signedIn("wren"));
+
+          expect(claimant).toBeDefined();
+          expect([
+            yield* read(owner, ref ?? ""),
+            yield* read(stranger, ref ?? ""),
+            yield* read(
+              stranger,
+              "push-0000000000000000000000000000000000000000-wren/unit"
+            ),
+          ]).toStrictEqual(["unit", "NotDecider", "NotDecider"]);
+        })
+      )
   );
 
   it.live(
@@ -400,17 +483,9 @@ describe("the dev world's fixtures", seededWorlds, () => {
             mine.unattended.length > 0,
             merged.overflow >= 3,
           ]).toStrictEqual([true, true, true]);
-          expect([...kinds].toSorted()).toStrictEqual([
-            "Finish",
-            "OpenProposal",
-            "PostureChange",
-            "ProxyWidened",
-            "RaiseRatchet",
-            "SecretInTree",
-            "StrayPush",
-            "Vouch",
-            "Waiver",
-          ]);
+          expect([...kinds].toSorted()).toStrictEqual(
+            Object.keys(DecisionSubject.cases).toSorted()
+          );
         })
       )
   );
@@ -442,6 +517,14 @@ describe("the dev world's fixtures", seededWorlds, () => {
           expect(finish?.evidence.map(({ label }) => label)).toContain("fork");
           expect(placed).toHaveLength(1);
           expect(patch).toContain(`+++ b/${placed[0]?.path}`);
+
+          // Every hunk holds the lines its header declares, or the diff view refuses it.
+          const hunks = hunksOf(patch ?? "");
+
+          expect(hunks.length).toBeGreaterThan(0);
+          expect(hunks.map(({ counted }) => counted)).toStrictEqual(
+            hunks.map(({ declared }) => declared)
+          );
         })
       )
   );

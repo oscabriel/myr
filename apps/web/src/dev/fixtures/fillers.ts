@@ -192,8 +192,9 @@ const filesOf = (project: Filler, stated: readonly StatedAsk[]): Files =>
   ]);
 
 /**
- * Every filler made and adopted, one every two minutes from `minute`, each
- * one's ask opened by its decider a minute after its first push.
+ * Every filler made and adopted, one every three minutes from `minute`,
+ * each one's ask (or, in mossgate, a visitor's proposal) a minute after its
+ * first push.
  */
 export const seedFillers = (minute: number) =>
   Effect.forEach(

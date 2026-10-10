@@ -149,8 +149,8 @@ export const storyOf = (input: {
   readonly lanes: Lanes;
   readonly project: ProjectName;
   readonly test: string;
-  readonly warnAfter: { readonly hours: number };
   readonly lapseAfter: { readonly hours: number };
+  readonly warnAfter: { readonly hours: number };
 }) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -823,21 +823,24 @@ export const storyOf = (input: {
           })),
         ];
 
+        // A copy of each part: a later step writes the story's own arrays
+        // and maps in place, and a record already served must not change
+        // under a read while that step is under way.
         return {
-          answers,
-          asks,
+          answers: [...answers],
+          asks: new Map(asks),
           claims: claimViews,
-          decisions,
+          decisions: [...decisions],
           env: apart.env,
-          events,
+          events: [...events],
           firstClaims: [...firstClaims].map(([handle, at]) => ({ at, handle })),
           forks,
           head,
-          landings,
-          ledger: { ...apart.ledger, entries: ledger },
-          logs,
-          proposals,
-          verdicts,
+          landings: [...landings],
+          ledger: { ...apart.ledger, entries: [...ledger] },
+          logs: new Map(logs),
+          proposals: new Map(proposals),
+          verdicts: new Map(verdicts),
         };
       },
     };
