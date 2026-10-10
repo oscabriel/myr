@@ -431,7 +431,7 @@ describe("the shell", () => {
     expect(markup).not.toMatch(/<a\b[^>]*aria-current="page"[^>]*>Today<\/a>/u);
   });
 
-  it("gives the two ways in at the foot of every page: plain git and the CLI", () => {
+  it("gives the command-line ways in at the foot of every page: plain git and the CLI", () => {
     const text = textOf(<SiteFooter platformUrl={platformUrl} />);
 
     expect(text).toContain("Plain git: clone any project");

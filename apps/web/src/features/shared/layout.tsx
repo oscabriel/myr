@@ -103,8 +103,13 @@ export const SiteFooter = ({
           Connect an agent
         </h2>
         <p className="text-sm">
-          <a href="/agents">MCP, the CLI, llms.txt and skills</a>, with the
-          setup for each agent.
+          <a
+            className="decoration-rule underline hover:decoration-current"
+            href="/agents"
+          >
+            MCP, the CLI, llms.txt and skills
+          </a>
+          , with the setup for each agent.
         </p>
       </section>
     </div>

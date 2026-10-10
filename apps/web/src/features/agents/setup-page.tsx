@@ -11,7 +11,7 @@ import { LINK, Region } from "../ask/fields.tsx";
 import { CopyButton } from "../code/copy.tsx";
 import { CommandLine } from "../shared/command.tsx";
 
-/** A channel's heading id, from its title: `remote-mcp`. */
+/** A channel's heading id, from its title: `agents-remote-mcp`. */
 const idOf = (title: string) =>
   `agents-${title.toLowerCase().replaceAll(/[^a-z0-9]+/gu, "-")}`;
 
