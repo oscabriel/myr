@@ -353,7 +353,12 @@ const ProposalFacts = ({
           </span>
         </dd>
         <dt className="text-label text-muted-foreground pt-0.5">State</dt>
-        <dd data-standing={standing(proposal)}>{proposal.state}</dd>
+        <dd
+          className="first-letter:uppercase"
+          data-standing={standing(proposal)}
+        >
+          {proposal.state}
+        </dd>
       </dl>
     </FactBlock>
     {Option.isSome(decision) ? (

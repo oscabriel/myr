@@ -17,6 +17,7 @@ import {
   projectLlms,
 } from "../features/agents/llms.ts";
 import { markdown, unavailable } from "../features/agents/respond.ts";
+import { stillWaiting } from "../features/front/families.ts";
 
 /** A route's client, for the request it answers. */
 export type ClientFor = (request: Request) => Layer.Layer<Client>;
@@ -97,7 +98,8 @@ export const projectLlmsHandler =
 
         return markdown(
           projectLlms({
-            asks: asks.value,
+            // An ask waits only on asks still open, as the page says.
+            asks: stillWaiting(asks.value),
             commands,
             listing: listing.value,
             platformUrl,

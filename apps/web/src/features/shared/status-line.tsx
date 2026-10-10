@@ -391,12 +391,15 @@ const askReading = ({
     };
   }
 
-  return {
-    after: heldFor(ask),
-    lead: takeable ? "Open to take" : "Open",
-    mark: "open",
-    tone: "muted",
-  };
+  // Not takeable while it waits on others: waiting, as its row says.
+  return !takeable && ask.blockedBy.length > 0
+    ? { after: [], lead: "Waiting", mark: "waiting", tone: "waiting" }
+    : {
+        after: heldFor(ask),
+        lead: takeable ? "Open to take" : "Open",
+        mark: "open",
+        tone: "muted",
+      };
 };
 
 /** A decider's choice in the past tense, and whether it took effect. */

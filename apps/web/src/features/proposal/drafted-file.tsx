@@ -12,6 +12,7 @@ import type { FileOptions } from "@pierre/diffs/react";
 import { useMemo } from "react";
 
 import { diffsOptions, registerCodeTheme } from "../code/pierre.ts";
+import { CodePool } from "../code/pool.tsx";
 
 registerCodeTheme();
 
@@ -34,9 +35,11 @@ export const DraftedFile = ({ content, path }: DraftedFileProps) => {
   );
 
   return (
-    <div className="border-rule min-w-0 border" data-code="pierre">
-      <File file={file} options={options} />
-    </div>
+    <CodePool>
+      <div className="border-rule min-w-0 border" data-code="pierre">
+        <File file={file} options={options} />
+      </div>
+    </CodePool>
   );
 };
 

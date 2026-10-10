@@ -337,7 +337,14 @@ export const FamilyTree = ({
   readonly project: ProjectName;
 }) => {
   const family = familyOf(parent, states, finale);
-  const own = markOf(states.get(parent.id));
+  const progress = markOf(states.get(parent.id));
+
+  // An open parent waits while anything it waits on has not landed.
+  const own =
+    progress === "open" &&
+    parent.blockedBy.some((ask) => states.get(ask)?.landed === undefined)
+      ? "waiting"
+      : progress;
 
   const end =
     finale === undefined

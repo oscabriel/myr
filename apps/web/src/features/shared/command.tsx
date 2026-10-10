@@ -1,12 +1,10 @@
-/**
- * A shell line a reader runs next: a refusal's `next`, a clone URL, the
- * install line. The terminal is where work happens, so every page that
- * suggests an action shows its command, whole and copyable, never a form.
- *
- * A page marks its main commands `numbered`: while the single keys are on,
- * each shows its number before the `$`, and that number key copies it
- * ("Copy (1)" in the button's title).
- */
+// A shell line a reader runs next: a refusal's `next`, a clone URL, the
+// install line. The terminal is where work happens, so every page that
+// suggests an action shows its command, whole and copyable, never a form.
+//
+// A page marks its main commands `numbered`: while the single keys are on,
+// each shows its number before the `$`, and that number key copies it
+// ("Copy (1)" in the button's title).
 import { Check, Copy } from "lucide-react";
 
 import { Button } from "../../components/ui/button.tsx";
@@ -15,22 +13,29 @@ import { useNumberedCommand } from "./keys.tsx";
 
 // The command's words, each kept whole on its line: a narrow column breaks
 // the line between words, never after a word's own hyphen
-// (`lint-heading-levels`, `--project`); a word longer than the line (a URL)
-// still breaks, anywhere. The text is the command's, space for space.
+// (`lint-heading-levels`, `--project`) nor before a closing ` \`; a word
+// longer than the line (a URL) still breaks, anywhere. Each of the
+// command's own lines hangs, so a line the column breaks reads as one line
+// going on. The text is the command's, space for space.
 const wordsOf = (command: string) =>
-  command.split(/(?<space>\s+)/u).map((part, index) =>
-    part.trim() === "" ? (
-      part
-    ) : (
-      <span
-        className="inline-block max-w-full [overflow-wrap:anywhere]"
-        // The parts never move: their place in the command is their key.
-        key={index}
-      >
-        {part}
-      </span>
-    )
-  );
+  command.split("\n").map((line, at, lines) => (
+    // A line never moves: its place in the command is its key.
+    <span className="block pl-[6ch] -indent-[6ch]" key={at}>
+      {line.split(/(?<space>\s+)(?!\\$)/u).map((part, index) =>
+        part.trim() === "" ? (
+          part
+        ) : (
+          <span
+            className="inline-block max-w-full indent-0 [overflow-wrap:anywhere]"
+            key={index}
+          >
+            {part}
+          </span>
+        )
+      )}
+      {at < lines.length - 1 ? "\n" : null}
+    </span>
+  ));
 
 const Line = ({
   command,

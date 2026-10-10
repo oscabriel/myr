@@ -609,6 +609,33 @@ describe(DecisionView, () => {
     expect(markup.slice(note, after)).toContain('data-marker=".skip("');
   });
 
+  it("says each fact of the evidence once: who pushed the answer, and no second answer or restated escape", () => {
+    const text = plainTextOf(
+      pageOf(
+        DecisionRead.cases.Found.make({
+          decision: {
+            ...waiver,
+            evidence: [
+              ...waiver.evidence,
+              { label: "answer", value: "bram at 97caa5b (push-97caa5b-bram)" },
+              {
+                label: "escape",
+                value:
+                  "test/attributes.test.ts:9: .skip( -- A quote in a code span needs the escaper's context.",
+              },
+            ],
+          },
+          placed: [],
+          soon: true,
+        })
+      )
+    );
+
+    expect(text).toContain("Pushed by bram at 97caa5b (push-97caa5b-bram)");
+    expect(text.match(/\bAnswer\b/gu)).toHaveLength(1);
+    expect(text).not.toContain("test/attributes.test.ts:9: .skip(");
+  });
+
   it("says under each choice what it does", () => {
     const markup = pageOf(found);
 

@@ -1,15 +1,13 @@
-/**
- * Which listed asks form a family, read from the names a migrate ask's split
- * gives its members: the platform opens a child per module as
- * `<parent>-<module>` and a delete child as `<parent>-delete`, and the
- * parent waits on all of them. A listing names no parent (the full ask does,
- * one read away), so a family is read from what the list holds: an ask that
- * waits on an ask named after it is a family's parent, and its members are
- * the listed asks it waits on, and its delete child.
- *
- * An ask that waits on another not named after it (one fix after another)
- * is no family: it stays a row of its own that reads as waiting.
- */
+// Which listed asks form a family, read from the names a migrate ask's split
+// gives its members: the platform opens a child per module as
+// `<parent>-<module>` and a delete child as `<parent>-delete`, and the
+// parent waits on all of them. A listing names no parent (the full ask does,
+// one read away), so a family is read from what the list holds: an ask that
+// waits on an ask named after it is a family's parent, and its members are
+// the listed asks it waits on, and its delete child.
+//
+// An ask that waits on another not named after it (one fix after another)
+// is no family: it stays a row of its own that reads as waiting.
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { AskId } from "@repo/protocol/ids";
 
@@ -97,4 +95,16 @@ export const arrange = <L extends AskListing>(
           },
         ];
   });
+};
+
+// The listings with each ask's blockers cut to those still listed: an ask
+// that landed has left the list, and nothing waits on it any more (as the
+// front page's entries name only what they still wait on).
+export const stillWaiting = <L extends AskListing>(listings: readonly L[]) => {
+  const listed = new Set(listings.map(({ ask }) => ask));
+
+  return listings.map((listing) => ({
+    ...listing,
+    blockedBy: listing.blockedBy.filter((blocker) => listed.has(blocker)),
+  }));
 };

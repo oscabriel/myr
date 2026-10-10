@@ -1,15 +1,13 @@
 import type { Evidence as Fact } from "@repo/protocol/domain/common";
-/**
- * A decision's evidence, typed by what it is about: the commits a stray
- * push moved between (each a link to its page), the proposal's draft and
- * files, a ratchet's before and after, a waiver's marker at its line, a
- * posture's from and to beside the ledger, the hosts a proxy may now reach,
- * the item a stored value matched, the person a vouch admits, the answer a
- * finish lands. Then whatever else the platform put on it, as label and
- * value, the diff and the fork left to the finish.
- *
- * Every value that is code is mono; every link is the router's.
- */
+// A decision's evidence, typed by what it is about: the commits a stray
+// push moved between (each a link to its page), the proposal's draft and
+// files, a ratchet's before and after, a waiver's marker at its line, a
+// posture's from and to beside the ledger, the hosts a proxy may now reach,
+// the item a stored value matched, the person a vouch admits, the answer a
+// finish lands. Then whatever else the platform put on it, as label and
+// value, the diff and the fork left to the finish.
+//
+// Every value that is code is mono; every link is the router's.
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import type { Posture } from "@repo/protocol/posture";
@@ -280,8 +278,14 @@ const ShortShas = ({ text }: { readonly text: string }) =>
     )
   );
 
-/** The labels the subject's own facts already say, or the finish draws. */
-const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([PATCH_LABEL, FORK_LABEL]);
+// The labels the subject's own facts already say (a waiver's escape, a
+// ratchet's count), or the finish draws.
+const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
+  PATCH_LABEL,
+  FORK_LABEL,
+  "escape",
+  "ratchet",
+]);
 
 /** The rest of what the platform put on the decision, as label and value. */
 const OtherFacts = ({
@@ -298,7 +302,12 @@ const OtherFacts = ({
   return facts.length === 0 ? null : (
     <FactList>
       {facts.map(({ href, label, value }) => (
-        <FactRow key={`${label}:${value}`} label={label}>
+        <FactRow
+          key={`${label}:${value}`}
+          // Who pushed the answer, at which head: the subject's own row
+          // is already the answer.
+          label={label === "answer" ? "Pushed by" : label}
+        >
           {href === undefined ? (
             <ShortShas text={value} />
           ) : (

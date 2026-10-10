@@ -275,6 +275,25 @@ describe(ProjectView, () => {
   );
 
   it.effect(
+    "reads an ask whose blockers have all landed (left the list) as open to take, and counts it",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* page({
+          asks: asks.map((each) =>
+            each.ask === "fix-week-start"
+              ? { ...each, blockedBy: [AskId.make("landed-before")] }
+              : each
+          ),
+        });
+
+        expect(textIn(rowOf(markup, "fix-week-start"))).toContain(
+          "Open to take"
+        );
+        expect(textIn(markup)).toContain("5 open asks, 2 open to take");
+      })
+  );
+
+  it.effect(
     "draws a family as its parent's row with the fan, its children listed under it",
     () =>
       Effect.gen(function* () {

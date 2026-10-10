@@ -313,7 +313,8 @@ export const FileHeader = ({
     <div className="flex min-w-0 flex-1 items-center gap-3">
       <PathTrail path={path} project={project} rev={rev} />
       {file === undefined ? null : (
-        <p className="text-ui text-muted-foreground diffsplit:block hidden shrink-0 truncate tabular-nums">
+        // From 1440 px the inspector says the same, beside the path.
+        <p className="text-ui text-muted-foreground diffsplit:block codefacts:hidden hidden min-w-0 truncate tabular-nums">
           {fileWords(file).join(" · ")}
         </p>
       )}

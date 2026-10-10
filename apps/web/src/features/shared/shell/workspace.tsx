@@ -265,10 +265,15 @@ const WorkspaceView = ({
           ) : null}
           {toolbar === undefined ? null : (
             <div
-              className={`border-rule bg-background tablet:top-[2.9375rem] shell:top-[2.6875rem] sticky top-[2.6875rem] z-10 flex h-10 shrink-0 items-center gap-3 border-y ${GUTTER}`}
+              className={`border-rule bg-background tablet:top-[2.9375rem] shell:top-[2.6875rem] sticky top-[2.6875rem] z-10 h-10 shrink-0 border-y ${GUTTER}`}
               data-toolbar=""
             >
-              {toolbar}
+              {/* Its controls end where the rows end; its rules run the pane. */}
+              <div
+                className={`flex h-full items-center gap-3 ${code ? "" : MEASURE}`}
+              >
+                {toolbar}
+              </div>
             </div>
           )}
           <div

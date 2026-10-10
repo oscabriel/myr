@@ -199,6 +199,18 @@ describe(StatusLine, () => {
     expect(tone).toBe("landed");
   });
 
+  it("says an open ask that still waits on others is waiting, as its row says, never open", () => {
+    const { text, tone } = line({
+      ask: { ...formatOrdinal, blockedBy: [AskId.make("split-a")] },
+      kind: "ask",
+      takeable: false,
+    });
+
+    expect(text).toContain("Waiting");
+    expect(text).not.toContain("Open");
+    expect(tone).toBe("waiting");
+  });
+
   it("says what a delete child waits on in its family's terms", () => {
     const { text, tone } = line({
       ask: {

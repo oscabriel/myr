@@ -311,6 +311,27 @@ describe("FamilyStrip's listed children", () => {
 
 describe(FamilyTree, () => {
   it.effect(
+    "marks the parent waiting while a child it waits on has not landed, as its own page says",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/burrow",
+          <FamilyTree
+            finale={finale}
+            parent={parent}
+            project={burrow}
+            states={states}
+          />
+        );
+
+        const head = markup.slice(0, markup.indexOf("</a>"));
+
+        expect(head).toContain(`/burrow/asks/${parent.id}`);
+        expect(head).toContain("lucide-hourglass");
+      })
+  );
+
+  it.effect(
     "draws the parent, its children and the delete child, marking the member being read",
     () =>
       Effect.gen(function* () {

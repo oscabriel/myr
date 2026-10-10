@@ -30,7 +30,7 @@ import {
   Step,
   plural,
 } from "../front/facts.tsx";
-import { finaleOf } from "../front/families.ts";
+import { finaleOf, stillWaiting } from "../front/families.ts";
 import { ledeOf } from "../front/head.ts";
 import { ProposeLink } from "../propose/propose-link.tsx";
 import type { AskProgress } from "../shared/ask-progress.ts";
@@ -339,16 +339,20 @@ const ProjectLine = ({
 }) => (
   <div className="flex flex-col gap-3">
     <p className="text-ui text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* Each part keeps its dot after it, so a line never opens on one; on
+          a phone the posture has a line of its own. */}
       {posture === undefined ? null : (
-        <>
+        <span className="max-tablet:basis-full flex items-center gap-x-2">
           <PostureBadge label={posture.label} posture={posture.posture} />
-          <span aria-hidden="true">·</span>
-        </>
+          <span aria-hidden="true" className="max-tablet:hidden">
+            ·
+          </span>
+        </span>
       )}
-      <span className="tabular-nums">
+      <span className="inline-flex gap-x-2 tabular-nums">
         {plural(count, "open ask", "open asks")}
+        <span aria-hidden="true">·</span>
       </span>
-      <span aria-hidden="true">·</span>
       <span>
         {landedAt === undefined ? (
           "nothing landed yet"
@@ -589,9 +593,15 @@ const Selectable = ({ props }: { readonly props: ProjectViewProps }) => {
  * and `k` walk it; a view rendered alone draws the same page with nothing
  * selected.
  */
-export const ProjectView = (props: ProjectViewProps) =>
-  Predicate.isNotNullish(useRouter({ warn: false })) ? (
+export const ProjectView = (given: ProjectViewProps) => {
+  const props = {
+    ...given,
+    asks: given.asks && stillWaiting(given.asks),
+  };
+
+  return Predicate.isNotNullish(useRouter({ warn: false })) ? (
     <Selectable props={props} />
   ) : (
     <ProjectPanes props={props} select={undefined} selected={undefined} />
   );
+};

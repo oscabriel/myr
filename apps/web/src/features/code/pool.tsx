@@ -10,8 +10,9 @@
  */
 import { WorkerPoolContext } from "@pierre/diffs/react";
 import { getOrCreateWorkerPoolSingleton } from "@pierre/diffs/worker";
+import { Effect } from "effect";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
+import { use, useMemo } from "react";
 
 import { diffsOptions, registerCodeTheme } from "./pierre.ts";
 
@@ -44,13 +45,52 @@ export const workerPool = () => {
   });
 };
 
-/** The pool, for the drawings under it; none outside a browser. */
+type Pool = ReturnType<typeof workerPool>;
+
+/** One promise per pool, so `use` sees the same one on every render. */
+const readiness = new WeakMap<Pool, Promise<void>>();
+
+/**
+ * Settles once the pool's own highlighter is up (or has failed, when
+ * Pierre draws on the main thread instead). Before that, Pierre draws a
+ * file it would not highlight (a `.vm`, plain text) as nothing, and never
+ * draws it again.
+ */
+const readyOf = (pool: Pool) => {
+  const known = readiness.get(pool);
+
+  if (known !== undefined) {
+    return known;
+  }
+
+  // A pool already up is marked settled the way React reads a promise it
+  // has seen, so `use` does not hold the drawing back for a turn.
+  const made = pool.isInitialized()
+    ? Object.assign(Promise.resolve(), { status: "fulfilled" })
+    : Effect.runPromise(
+        Effect.ignore(Effect.tryPromise(() => pool.initialize()))
+      );
+
+  readiness.set(pool, made);
+
+  return made;
+};
+
+/**
+ * The pool, for the drawings under it; none outside a browser. Until the
+ * pool is up the drawings wait in their `Suspense`, whose fallback is the
+ * server's plain text.
+ */
 export const CodePool = ({ children }: { readonly children: ReactNode }) => {
   // Pierre keeps one pool for the tab: asking again hands back the same.
   const pool = useMemo(
     () => ("Worker" in globalThis ? workerPool() : undefined),
     []
   );
+
+  if (pool !== undefined) {
+    use(readyOf(pool));
+  }
 
   return <WorkerPoolContext value={pool}>{children}</WorkerPoolContext>;
 };
