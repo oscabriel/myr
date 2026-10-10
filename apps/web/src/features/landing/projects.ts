@@ -1,37 +1,49 @@
 /**
- * The landing's projects: the platform's list, as the rail reads it in the
- * browser after the page is up (the same read, so no second request), and
- * what the page says while it comes or when it does not. The page is the
- * same for everyone, so the edge may keep it.
+ * The landing's projects: the platform's list, read on the server as
+ * nobody by the route's loader, so the page arrives with them for every
+ * reader (a crawler and a reader with no script included) and the edge may
+ * keep it; and what the page says when the list did not come. The list
+ * ignores the caller, so nobody's read is everyone's.
  */
+import { Client } from "@repo/protocol/contracts";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
-import { Schema } from "effect";
-import { AsyncResult } from "effect/reactivity";
+import { Effect, Schema } from "effect";
 
 /** The projects the page names; the rest are a step away, at `/asks`. */
 export const PROJECTS_SHOWN = 8;
 
-/** The projects block: the first few on the platform, still coming, or that the list did not come. */
+/** The projects block: the first few on the platform, or that the list did not come. */
 export const LandingProjects = Schema.TaggedUnion({
   Listed: { projects: Schema.Array(ProjectListing) },
-  Pending: {},
   Unreachable: {},
 });
 
 export type LandingProjects = typeof LandingProjects.Type;
 
-/** The list's read, as the block says it. */
-export const landingProjects = (
-  read: AsyncResult.AsyncResult<
-    { readonly projects: readonly ProjectListing[] },
-    unknown
-  >
+/** The block from a list that came. */
+export const listedProjects = (
+  projects: readonly ProjectListing[]
 ): LandingProjects =>
-  AsyncResult.match(read, {
-    onFailure: () => LandingProjects.cases.Unreachable.make({}),
-    onInitial: () => LandingProjects.cases.Pending.make({}),
-    onSuccess: ({ value }) =>
-      LandingProjects.cases.Listed.make({
-        projects: value.projects.slice(0, PROJECTS_SHOWN),
-      }),
+  LandingProjects.cases.Listed.make({
+    projects: projects.slice(0, PROJECTS_SHOWN),
   });
+
+/**
+ * The list's read on the server: the first few projects, or, when the
+ * platform did not answer (a refusal, or a call that died on the way), the
+ * block that says so. It never fails: the page leads to the asks either way.
+ */
+export const readLandingProjects: Effect.Effect<
+  LandingProjects,
+  never,
+  Client
+> = Effect.gen(function* () {
+  const client = yield* Client;
+  const { projects } = yield* client.listProjects({});
+
+  return listedProjects(projects);
+}).pipe(
+  Effect.catchCause(() =>
+    Effect.succeed(LandingProjects.cases.Unreachable.make({}))
+  )
+);

@@ -22,13 +22,11 @@ import {
   HOME_PATH,
   projectPath,
 } from "../shared/paths.ts";
-import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
+import { UnreachableNotice } from "../shared/pending.tsx";
+import { PostureBadge } from "../shared/posture.tsx";
 import { LandingProjects } from "./projects.ts";
 import { pushTranscript } from "./transcript.ts";
-
-/** The README's opening line: what the platform is. */
-const WHAT_IT_IS =
-  "A Git platform for the boundary between a project and everyone else.";
+import { WHAT_IT_IS } from "./words.ts";
 
 /** A link in a plain row (the top, the foot): ink, underlined only on hover. */
 const ROW_LINK = "no-underline hover:underline";
@@ -254,7 +252,7 @@ const Transcript = ({ platformUrl }: { readonly platformUrl: string }) => {
   );
 };
 
-/** The projects on the platform, each with its posture word, or why none shows yet. */
+/** The projects on the platform, each with its posture, or that the list did not come. */
 const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
   LandingProjects.match(projects, {
     Listed: ({ projects: listed }) => (
@@ -271,20 +269,11 @@ const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
             >
               {project}
             </AppLink>
-            {/* The word alone, not the posture badge: the badge's marks
-                would split into chunks every page preloads, past the
-                root's byte ceiling (production-bundle.test.ts). */}
-            <span
-              className="text-ui text-muted-foreground"
-              data-posture={posture}
-            >
-              {postureLabel(posture)}
-            </span>
+            <PostureBadge label={postureLabel(posture)} posture={posture} />
           </li>
         ))}
       </ul>
     ),
-    Pending: () => <ReadingRows />,
     Unreachable: () => <UnreachableNotice />,
   });
 
