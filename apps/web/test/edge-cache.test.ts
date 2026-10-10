@@ -459,6 +459,7 @@ describe("a page", () => {
 
     expect(reading.toSorted()).toStrictEqual([
       "../src/routes/$project/decisions/$decision.tsx",
+      "../src/routes/home.tsx",
       "../src/routes/today.tsx",
     ]);
 

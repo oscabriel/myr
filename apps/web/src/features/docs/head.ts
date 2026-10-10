@@ -21,7 +21,6 @@ export const docsHead = (page: DocEntry) => ({
 /** The index's head. */
 export const docsIndexHead = () =>
   pageHead({
-    description:
-      "Guides for answering asks, running a project and connecting an agent, and a reference read from the platform's own schema.",
+    description: "Guides, and a reference read from the platform's schema.",
     title: "Docs",
   });
