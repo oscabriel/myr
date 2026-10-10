@@ -34,6 +34,7 @@ import {
   Path,
   Predicate,
   Schema,
+  Stdio,
 } from "effect";
 import { CliConfig, Command, Flag, GlobalFlag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
@@ -210,7 +211,11 @@ const make = ({ targets, version }: BuildOptions) =>
 
     // 1. The npm build, one entry at a time: the first cleans `dist/`.
     for (const config of npm(version)) {
-      yield* tsdown("tsdown", { ...config, config: false, cwd: root });
+      yield* tsdown(`tsdown ${Object.keys(config.entry).join(", ")}`, {
+        ...config,
+        config: false,
+        cwd: root,
+      });
     }
 
     // 2. The library entries' types. tsgo declares them in a folder at a
@@ -462,9 +467,8 @@ export const parseBuild = <E, R>(
 
 if (import.meta.main) {
   BunRuntime.runMain(
-    Command.run(command(make), { version: UNSTAMPED }).pipe(
-      Effect.provideService(CliConfig.CliConfig, builtIns),
-      Effect.provide(BunServices.layer)
-    )
+    Stdio.Stdio.use(({ args }) =>
+      Effect.flatMap(args, (argv) => parseBuild(argv, make))
+    ).pipe(Effect.provide(BunServices.layer))
   );
 }
