@@ -137,16 +137,19 @@ const servedOn = {
   landing: SurfaceName.literals,
   ledger: SurfaceName.literals,
   listAsks: SurfaceName.literals,
-  // The code reads: git already reads code locally, so no command or tool.
+  // The code reads an agent without git can use, each capped (1 MiB a file,
+  // 100 commits a page, 200 scanned for why); a commit's diff and every path
+  // stay off MCP until a cap fits a transcript. No command: git reads code
+  // locally.
   listPaths: ["rpc", "web"],
   listProjects: SurfaceName.literals,
-  listRefs: ["rpc", "web"],
-  log: ["rpc", "web"],
+  listRefs: ["rpc", "mcp", "web"],
+  log: ["rpc", "mcp", "web"],
   openAsk: ["rpc", "mcp", "cli"],
   projectPolicy: SurfaceName.literals,
   proposeAsk: SurfaceName.literals,
-  readFile: ["rpc", "web"],
-  readTree: ["rpc", "web"],
+  readFile: ["rpc", "mcp", "web"],
+  readTree: ["rpc", "mcp", "web"],
   release: ["rpc", "mcp", "cli"],
   // A value must never pass through an agent's transcript, so never MCP.
   setEnv: ["rpc", "cli"],
@@ -160,7 +163,7 @@ const servedOn = {
   vouch: ["rpc", "mcp", "cli"],
   // A stream has no tool or command form.
   watch: ["rpc", "web"],
-  why: ["rpc", "web"],
+  why: ["rpc", "mcp", "web"],
 } as const satisfies Record<string, readonly SurfaceName[]>;
 
 /**
