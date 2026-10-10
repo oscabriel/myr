@@ -113,7 +113,7 @@ npx skills add https://web-test.example.workers.dev
 | Limit | Value |
 | --- | --- |
 | Claims one person holds at once, in a project | 3 by default |
-| Open proposals one person holds, in a project | 2 by default; 0 takes none |
+| Open proposals one person holds, in a project | 2 by default; 0 turns proposals off |
 | A claim without a push | Warned after 2 hours, lapses after 1 day, by default |
 | Decisions a decider takes a day | 5 by default |
 | A decision nobody takes | 2 weeks by default, then it takes its default |

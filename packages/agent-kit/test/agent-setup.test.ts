@@ -246,7 +246,7 @@ describe("the Agents page's reference sections", () => {
 
     expect(values).toStrictEqual([
       "3 by default",
-      "2 by default; 0 takes none",
+      "2 by default; 0 turns proposals off",
       "Warned after 2 hours, lapses after 1 day, by default",
       "5 by default",
       "2 weeks by default, then it takes its default",

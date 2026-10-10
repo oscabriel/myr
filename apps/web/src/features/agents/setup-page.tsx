@@ -28,6 +28,7 @@ import { Workspace } from "../shared/shell/workspace.tsx";
 import {
   Endpoints,
   Limits,
+  LINK,
   ReferenceSection,
   Refusals,
   Synopsis,
@@ -120,10 +121,7 @@ export const AgentsView = (input: SetupInput) => (
       <>
         Every way in reaches the same asks, claims and verdicts. As Markdown:{" "}
         {/* A server route, not a page of the app. */}
-        <a
-          className="text-foreground decoration-rule underline underline-offset-[0.2em] hover:decoration-current"
-          href="/agents.md"
-        >
+        <a className={`text-foreground ${LINK}`} href="/agents.md">
           agents.md
         </a>
       </>

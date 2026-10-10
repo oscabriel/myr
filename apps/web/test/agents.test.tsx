@@ -127,6 +127,27 @@ describe("the For agents page", () => {
     })
   );
 
+  it.effect(
+    "lands each anchor's heading below the sticky bars, not under them",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* page;
+
+        for (const [id] of SECTIONS) {
+          // The element the fragment scrolls to is the one with the id: its
+          // own scroll margin is the one the browser reads.
+          const target = new RegExp(
+            `<[a-z0-9]+\\b[^>]*\\bid="${id}"[^>]*>`,
+            "u"
+          )
+            .exec(html)
+            ?.at(0);
+
+          expect(target, `#${id}`).toMatch(/\bscroll-mt-\d+\b/u);
+        }
+      })
+  );
+
   it.effect("gives every command of the CLI a synopsis line, in mono", () =>
     Effect.gen(function* () {
       const synopsis = codeOf(sectionOf(yield* page, "synopsis"));

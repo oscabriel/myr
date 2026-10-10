@@ -16,7 +16,7 @@ import { Fragment } from "react";
 import type { ReactNode } from "react";
 
 /** A link in running text: the rule colour's underline, ink on hover. */
-const LINK =
+export const LINK =
   "decoration-rule underline underline-offset-[0.2em] hover:decoration-current";
 
 /** One section of the reference: its heading at Title size, in the sans, then its body. */
@@ -29,11 +29,9 @@ export const ReferenceSection = ({
   readonly id: string;
   readonly title: string;
 }) => (
-  <section
-    aria-labelledby={id}
-    className="flex min-w-0 scroll-mt-16 flex-col gap-4"
-  >
-    <h2 className="text-title" id={id}>
+  <section aria-labelledby={id} className="flex min-w-0 flex-col gap-4">
+    {/* The anchor's target: its margin clears the sticky bars above main. */}
+    <h2 className="text-title scroll-mt-16" id={id}>
       {title}
     </h2>
     {children}

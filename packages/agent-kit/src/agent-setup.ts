@@ -274,7 +274,7 @@ export const agentLimits = (): readonly Limit[] => {
     },
     {
       limit: "Open proposals one person holds, in a project",
-      value: `${caps.proposalsPerPerson} by default; 0 takes none`,
+      value: `${caps.proposalsPerPerson} by default; 0 turns proposals off`,
     },
     {
       limit: "A claim without a push",
