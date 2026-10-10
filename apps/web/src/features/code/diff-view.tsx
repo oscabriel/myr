@@ -26,7 +26,7 @@ import { CodeView } from "@pierre/diffs/react";
 import type { CodeViewHandle, CodeViewReactOptions } from "@pierre/diffs/react";
 import type { ChangedFile } from "@repo/protocol/domain/code";
 import { useLocation, useRouter } from "@tanstack/react-router";
-import { Option, Predicate } from "effect";
+import { Effect, Option, Predicate } from "effect";
 import { Check, ChevronDown, OctagonX } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -35,8 +35,9 @@ import { drawnFiles, emptyDiffOf } from "./diff-model.ts";
 import type { DrawnFile } from "./diff-model.ts";
 import { PANE_SCROLLER } from "./diff-pane.tsx";
 import { diffLinesHash, parseDiffHash } from "./line-hash.ts";
-import { diffsOptions, registerCodeTheme } from "./pierre.ts";
-import { CodePool } from "./pool.tsx";
+import { diffOptionsFor, diffsOptions, registerCodeTheme } from "./pierre.ts";
+import { CodePool, poolReady, workerPool } from "./pool.tsx";
+import { SERVER_FILES } from "./prerender.ts";
 
 registerCodeTheme();
 
@@ -240,15 +241,8 @@ export const DiffCode = ({
 
   const options = useMemo(
     (): CodeViewReactOptions<DiffAnnotation, undefined> => ({
-      ...diffsOptions,
-      diffIndicators: split ? "bars" : "classic",
-      diffStyle: split ? "split" : "unified",
-      enableLineSelection: true,
-      hunkSeparators: "line-info",
+      ...diffOptionsFor(split),
       layout: { gap: 0, paddingBottom: 16, paddingTop: 0 },
-      lineDiffType: "word-line",
-      lineHoverHighlight: "both",
-      overflow: "scroll",
       stickyHeaders: true,
       unsafeCSS: `${diffsOptions.unsafeCSS}\n${HEADER_CSS}`,
     }),
@@ -356,6 +350,35 @@ export const DiffCode = ({
     </CodePool>
   );
 };
+
+/**
+ * Ready to draw the first files of a diff highlighted at once: the pool
+ * up, and the files a reader sees first (those the server may have sent
+ * highlighted) highlighted in it, keyed as `DiffCode` draws them. The rest
+ * are highlighted as they scroll into view. Settles either way.
+ */
+export const prepareDiffs = ({
+  drawn,
+  files,
+}: Pick<DiffCodeProps, "drawn" | "files">) =>
+  Effect.tryPromise(() => poolReady()).pipe(
+    Effect.andThen(
+      Effect.forEach(
+        (drawn ?? drawnFiles(files))
+          .filter((file) => !file.folded)
+          .flatMap((file) => Option.toArray(file.diff))
+          .slice(0, SERVER_FILES),
+        (diff) =>
+          "Worker" in globalThis
+            ? Effect.tryPromise(() =>
+                workerPool().primeDiffHighlightCache(diff)
+              )
+            : Effect.void,
+        { concurrency: "unbounded", discard: true }
+      )
+    ),
+    Effect.ignore
+  );
 
 // `React.lazy` takes a module's default export.
 export default DiffCode;

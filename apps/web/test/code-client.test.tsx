@@ -5,8 +5,9 @@
  * (which draws nothing until it mounts, so its server markup is its
  * marked host alone; `code.test.tsx` holds the plain text it replaces), and
  * the repo's file tree by `@pierre/trees` (`<file-tree-container>`). The
- * pages import these only behind `ClientOnly` and a lazy import, so the
- * Worker never bundles them.
+ * pages import these only through a dynamic import the Worker's build
+ * drops, so the Worker never bundles them (the server's own highlighting
+ * is `code-prerender.test.tsx`'s).
  *
  * The tree moves the page through the router: choosing a file calls the
  * page's own `onOpen`, never `location.assign`, so the document stays.

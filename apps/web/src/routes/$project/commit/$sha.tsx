@@ -13,6 +13,7 @@ import { PANE_SCROLLER } from "../../../features/code/diff-pane.tsx";
 import { SPLIT_QUERY, useMedia } from "../../../features/code/media.ts";
 import { CodeNotFound } from "../../../features/code/not-found.tsx";
 import { PlainDiff } from "../../../features/code/plain-diff.tsx";
+import { prerenderedPaths } from "../../../features/code/prerender.ts";
 import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { branchPage } from "../../../server/cache-headers.ts";
@@ -23,8 +24,10 @@ import { FilesButton } from "../tree/-files-button.tsx";
 
 // One commit and what it changed, read on the server, with the territory
 // of the ask it answered (the diff's stats split by it): the page arrives
-// with the landing and the diff as plain text, and the browser draws the
-// diff over it, the changed files as a tree in the rail. A commit never
+// with the landing and the diff, its first files highlighted where the
+// server highlights them (`features/code/prerender.ts`) and the rest as
+// plain text, and the browser's drawing then takes its place, the changed
+// files as a tree in the rail. A commit never
 // changes, but its page carries its landing, which the project records
 // after main has moved, and times reckoned from the read: a browser keeps
 // it briefly, as a page at `main`. Within a visit the router keeps what it
@@ -100,6 +103,10 @@ const CommitPage = () => {
   // and the folds all read this.
   const drawn = useMemo(() => drawnFiles(diff.files), [diff.files]);
 
+  // The files the server sends highlighted: the same on both sides, since
+  // both decide from the diff alone.
+  const prerendered = useMemo(() => prerenderedPaths(drawn), [drawn]);
+
   const defaults = useMemo(
     () =>
       new Set(
@@ -159,6 +166,7 @@ const CommitPage = () => {
                   files={diff.files}
                   folded={folded}
                   onFold={onFold}
+                  prerendered={prerendered}
                   split={split}
                 />
               </div>
@@ -191,7 +199,38 @@ export const Route = createFileRoute("/$project/commit/$sha")({
   validateSearch: (search: { readonly style?: unknown }) => ({
     style: search.style === "split" ? ("split" as const) : undefined,
   }),
-  loader: ({ params }) => commitPage({ data: params }),
+  loader: ({ params }) => {
+    const page = commitPage({ data: params });
+
+    // A document's first files are highlighted on the server before the
+    // page renders, so the render waits for nothing and sends them so.
+    // Imported here, not at the top: a loader stays in the chunks every
+    // page preloads, and the browser's build drops this branch whole.
+    // A failed read rejects as it would have (the router's not-found).
+    return import.meta.env.SSR
+      ? Effect.runPromise(
+          Effect.gen(function* () {
+            const data = yield* Effect.promise(() => page);
+
+            const decoded = yield* Schema.decodeEffect(CommitPageData)(
+              data
+            ).pipe(Effect.option);
+
+            if (Option.isSome(decoded) && !decoded.value.diff.truncated) {
+              const { drawDiffAhead } = yield* Effect.promise(
+                () => import("../../../features/code/prerender.ts")
+              );
+
+              yield* Effect.promise(() =>
+                drawDiffAhead(decoded.value.diff.files)
+              );
+            }
+
+            return data;
+          })
+        )
+      : page;
+  },
   // The diff never changes: a layout change (`?style=split`) rewrites the
   // address, and must not read it again.
   staleTime: Number.POSITIVE_INFINITY,

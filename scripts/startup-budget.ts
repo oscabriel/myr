@@ -44,7 +44,11 @@
  * 1,693,131 (1,900,000, 12%), the sandbox's 570,831 (656,000, 15%), the
  * web's JavaScript 4,074,781 (4,075,000: no room left, until the server
  * build is minified) and the web's entry 696,419, which fell, so its limit
- * is tightened to 801,000 (15%).
+ * is tightened to 801,000 (15%). Minifying the web's server build took
+ * its JavaScript to 1,528,378 and its entry to 308,418. Highlighting code
+ * on the server (ADR 0026) then added its grammars and `@pierre/diffs/ssr`
+ * as chunks off the entry, with no limit raised: the web's JavaScript
+ * measured 2,773,744 (4,075,000) and its entry stayed 308,418 (801,000).
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Console, Data, Effect, FileSystem, Path, pipe } from "effect";
