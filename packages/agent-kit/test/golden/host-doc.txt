@@ -2,7 +2,7 @@
 
 > __NAME__ is a Git platform where everything a project ships is public. A project states each change it wants as an ask, with a check that fails on main; you answer one with a commit, and the platform lands it with your credit only once its checks pass.
 
-The same facts read as Markdown: each project at https://web-test.example.workers.dev/<project>/llms.txt, and each ask at https://web-test.example.workers.dev/<project>/asks/<ask>.md.
+The same facts read as Markdown: each project at https://web-test.example.workers.dev/<project>/llms.txt, and each ask at https://web-test.example.workers.dev/<project>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in https://web-test.example.workers.dev/llms-full.txt.
 
 ## Install the CLI
 

@@ -33,8 +33,9 @@ const visibility = Context.get(ShowAsk.annotations, Visibility);
 
 /**
  * The `.md` route's handler as a function of its client, which its test
- * drives with a stub platform: the brief `showAsk` gives, a refusal as a
- * 404, or a 404 without asking when the path can name no ask.
+ * drives with a stub platform: the brief `showAsk` gives, under the banner
+ * naming this host's indexes, a refusal as a 404, or a 404 without asking
+ * when the path can name no ask.
  */
 export const askMarkdownHandler =
   (clientFor: ClientFor) =>
@@ -53,7 +54,12 @@ export const askMarkdownHandler =
             client.showAsk(path)
           ).pipe(
             Effect.exit,
-            Effect.map((exit) => askMarkdownResponse(exit, visibility)),
+            Effect.map((exit) =>
+              askMarkdownResponse(exit, visibility, {
+                project: path.project,
+                webUrl: new URL(request.url).origin,
+              })
+            ),
             Effect.provide(clientFor(request))
           ),
       })

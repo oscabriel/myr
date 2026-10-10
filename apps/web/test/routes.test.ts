@@ -48,6 +48,7 @@ describe("the web's own paths", () => {
       "favicon.ico",
       "icons",
       "install.sh",
+      "llms-full.txt",
       "llms.txt",
       "people",
       "releases",

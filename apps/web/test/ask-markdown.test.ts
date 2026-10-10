@@ -1,8 +1,9 @@
 /**
  * An ask answers as Markdown, so a harness reads it with one plain fetch:
  * the ask's URL with `Accept: text/markdown`, or the same URL with `.md`.
- * The body is the brief the platform rendered (`showAsk`), untouched; an
- * unknown ask is a 404 whose body is the refusal, as git would print it.
+ * The body is the banner naming the web's indexes, then the brief the
+ * platform rendered (`showAsk`), untouched; an unknown ask is a 404 whose
+ * body is the refusal, as git would print it.
  * A browser asking for HTML gets the page.
  */
 import { describe, expect, it } from "@effect/vitest";
@@ -15,6 +16,7 @@ import { asTester, unanswered } from "@repo/protocol/testing";
 import { Effect, Exit, Layer, Ref } from "effect";
 import { RpcTest } from "effect/rpc";
 
+import { indexBanner } from "../src/features/agents/llms.ts";
 import {
   askMarkdownResponse,
   refusalsMarkdown,
@@ -28,6 +30,12 @@ import { askMarkdownHandler } from "../src/routes/$project/asks/{$ask}[.]md.ts";
 import { ask, askId, brief, project } from "./ask-fixtures.ts";
 
 const WEB = "https://web-test.example.workers.dev";
+
+/** Where the web's indexes are for datekit's asks, as the routes find them. */
+const index = { project, webUrl: WEB };
+
+/** An ask's Markdown as served: the banner naming the indexes, then the brief unchanged. */
+const served = `${indexBanner(index)}\n\n${brief}`;
 
 const MARKDOWN = "text/markdown; charset=utf-8";
 
@@ -113,7 +121,7 @@ describe("an ask's URL with Accept: text/markdown", () => {
         );
 
         expect(yield* read(response)).toStrictEqual({
-          body: brief,
+          body: served,
           cacheControl: "public, max-age=60",
           contentType: MARKDOWN,
           status: 200,
@@ -156,7 +164,7 @@ describe("an ask's .md URL", () => {
         );
 
         expect(yield* read(response)).toStrictEqual({
-          body: brief,
+          body: served,
           cacheControl: "public, max-age=60",
           contentType: MARKDOWN,
           status: 200,
@@ -287,15 +295,48 @@ describe(askMarkdownResponse, () => {
     () =>
       Effect.gen(function* () {
         const seen = yield* read(
-          askMarkdownResponse(Exit.succeed({ brief }), "maintainers")
+          askMarkdownResponse(Exit.succeed({ brief }), "maintainers", index)
         );
 
         expect([seen.status, seen.cacheControl, seen.body]).toStrictEqual([
           200,
           "private, no-store",
-          brief,
+          served,
         ]);
       })
+  );
+});
+
+describe("an ask's Markdown with the index named", () => {
+  it.effect(
+    "opens with the banner naming its project's llms.txt, then the brief unchanged",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* read(
+          askMarkdownResponse(Exit.succeed({ brief }), "public", index)
+        );
+
+        expect(seen.status).toBe(200);
+        expect(seen.body).toBe(served);
+        expect(seen.body.split("\n")[0]).toContain(
+          `${WEB}/${project}/llms.txt`
+        );
+      })
+  );
+
+  it.effect("keeps a refusal's Markdown as it is, with no banner", () =>
+    Effect.gen(function* () {
+      const refusal = new UnknownAsk({ ask: AskId.make("no-such-ask") });
+
+      const seen = yield* read(
+        askMarkdownResponse(Exit.fail(refusal), "public", index)
+      );
+
+      expect([seen.status, seen.body]).toStrictEqual([
+        404,
+        refusalsMarkdown([refusal]),
+      ]);
+    })
   );
 });
 
