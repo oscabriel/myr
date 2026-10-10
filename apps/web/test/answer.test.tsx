@@ -73,10 +73,16 @@ const lanesOf = (markup: string) =>
     return lane === undefined || result === undefined ? [] : [[lane, result]];
   });
 
-/** Each link to a commit page, in page order. */
+/** Each link to a commit page, in page order, as `[href, text]`. */
 const commitLinksOf = (markup: string) =>
-  [...markup.matchAll(/href="(?<href>[^"]*\/commit\/[^"]*)"/gu)].flatMap(
-    ({ groups }) => (groups?.href === undefined ? [] : [groups.href])
+  [
+    ...markup.matchAll(
+      /<a\b[^>]*href="(?<href>[^"]*\/commit\/[^"]*)"[^>]*>(?<inner>.*?)<\/a>/gu
+    ),
+  ].flatMap(({ groups }) =>
+    groups?.href === undefined || groups.inner === undefined
+      ? []
+      : [[groups.href, plainText(groups.inner).trim()]]
   );
 
 describe(AnswerView, () => {
@@ -168,11 +174,10 @@ describe(AnswerView, () => {
     );
 
     expect(commitLinksOf(markup)).toStrictEqual([
-      `/${project}/commit/${landed.base}`,
-      `/${project}/commit/${landedSha}`,
+      [`/${project}/commit/${landed.base}`, landed.base.slice(0, 7)],
+      [`/${project}/commit/${landedSha}`, "The landing commit"],
     ]);
     expect(markup).toContain(`git show ${landedSha}`);
-    expect(markup).toContain("The landing commit");
   });
 
   it("links neither the head nor the merged tree: they live in the claim's fork", () => {
@@ -188,7 +193,7 @@ describe(AnswerView, () => {
 
   it("links the base and no landing when the answer has not landed", () => {
     expect(commitLinksOf(markupOf(page))).toStrictEqual([
-      `/${project}/commit/${refused.base}`,
+      [`/${project}/commit/${refused.base}`, refused.base.slice(0, 7)],
     ]);
   });
 });
