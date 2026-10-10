@@ -122,7 +122,7 @@ const README = [
  * target read against the folder, `.` and `..` resolved. None when the
  * target is absolute or climbs out of the repo.
  */
-export const linkTargetOf = (
+const linkTargetOf = (
   folder: string,
   target: string
 ): Option.Option<string> => {
@@ -145,7 +145,33 @@ export const linkTargetOf = (
   return Option.liftPredicate(resolved.join("/"), (path) => path !== "");
 };
 
-/** The file the symlink blob `link` in `folder` names, if it is one in the repo. */
+/** The longest path a symlink's target may be: git's own `PATH_MAX`. */
+const LINK_TARGET_MAX = 4096;
+
+/** A symlink's target text, kept by its blob id; none when it is too long to be a path. */
+const linkTextOf = (repo: RepoName, link: string) =>
+  Effect.gen(function* () {
+    const cache = yield* CodeCache;
+
+    return yield* cache.through(
+      `${repo}:link:${link}`,
+      RepoHost.use((host) => host.readBlob(repo, ObjectId.make(link))).pipe(
+        Effect.map(
+          Option.flatMap((bytes) =>
+            bytes.length > LINK_TARGET_MAX
+              ? Option.none()
+              : Option.some(new TextDecoder().decode(bytes))
+          )
+        )
+      )
+    );
+  });
+
+/**
+ * The file the symlink blob `link` in `folder` names, if it is a file in
+ * the repo: one link followed, never a chain (a link's entry is a blob too,
+ * so its kind is asked, not its type).
+ */
 const linkedFile = (
   repo: RepoName,
   root: Effect.Effect<string, never, RepoHost>,
@@ -153,12 +179,9 @@ const linkedFile = (
   link: string
 ) =>
   Effect.gen(function* () {
-    const bytes = yield* RepoHost.use((host) =>
-      host.readBlob(repo, ObjectId.make(link))
-    ).pipe(Effect.orDie);
-
-    const path = Option.flatMap(bytes, (read) =>
-      linkTargetOf(folder, new TextDecoder().decode(read))
+    const path = Option.flatMap(
+      yield* Effect.orDie(linkTextOf(repo, link)),
+      (target) => linkTargetOf(folder, target)
     );
 
     if (Option.isNone(path)) {
@@ -169,11 +192,11 @@ const linkedFile = (
       Effect.orDie
     );
 
-    return Option.flatMap(entry, ({ sha, type }) =>
-      type === "blob"
+    return Option.flatMap(entry, (found) =>
+      kindOf(found) === "blob"
         ? Option.some({
             path: RepoPath.make(path.value),
-            sha: BlobSha.make(sha),
+            sha: BlobSha.make(found.sha),
           })
         : Option.none()
     );
@@ -192,23 +215,25 @@ const readmeOf = (
   entries: readonly CodeEntry[]
 ) =>
   Effect.gen(function* () {
-    for (const name of README) {
-      const found = entries.find(
+    // Every entry by each name, so a dangling `README.md` link still lets
+    // a `readme.md` file beside it be the README.
+    const candidates = README.flatMap((name) =>
+      entries.filter(
         (entry) =>
           (entry.type === "blob" || entry.type === "symlink") &&
           entry.name.toLowerCase() === name
-      );
+      )
+    );
 
-      if (found?.type === "blob") {
+    for (const found of candidates) {
+      if (found.type === "blob") {
         return Option.some({ path: found.path, sha: BlobSha.make(found.sha) });
       }
 
-      if (found?.type === "symlink") {
-        const linked = yield* linkedFile(repo, root, folder, found.sha);
+      const linked = yield* linkedFile(repo, root, folder, found.sha);
 
-        if (Option.isSome(linked)) {
-          return linked;
-        }
+      if (Option.isSome(linked)) {
+        return linked;
       }
     }
 

@@ -187,16 +187,32 @@ describe("a folder", () => {
   );
 
   it.effect(
-    "has no README where its symlink leaves the repo, names nothing, or names a folder",
+    "passes over a dangling README link to a readme file beside it",
+    () =>
+      Effect.gen(function* () {
+        const { code } = yield* linkedReadmes;
+        const listing = yield* treeOf(code, main, path("both"));
+
+        expect(listing.readme?.path).toBe("both/readme.md");
+      }).pipe(Effect.provide(RepoHostMemory))
+  );
+
+  it.effect(
+    "has no README where its symlink leaves the repo, names nothing, names a folder, names another link, or is absolute",
     () =>
       Effect.gen(function* () {
         const { code } = yield* linkedReadmes;
 
-        const readmes = yield* Effect.forEach(["out", "gone", "folder"], (at) =>
-          Effect.map(treeOf(code, main, path(at)), ({ readme }) => readme)
+        const readmes = yield* Effect.forEach(
+          ["out", "gone", "folder", "chain", "rooted"],
+          (at) =>
+            Effect.map(treeOf(code, main, path(at)), ({ readme }) =>
+              Option.fromUndefinedOr(readme)
+            )
         );
 
-        expect(readmes).toStrictEqual([undefined, undefined, undefined]);
+        expect(readmes.every(Option.isNone)).toBeTruthy();
+        expect(readmes).toHaveLength(5);
       }).pipe(Effect.provide(RepoHostMemory))
   );
 

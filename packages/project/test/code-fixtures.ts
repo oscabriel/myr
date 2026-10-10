@@ -441,8 +441,9 @@ export const wide = (count: number) =>
 /**
  * A workspace whose root README is a symlink to its crate's, as axum's is,
  * with links elsewhere that a README must not follow: one up out of the
- * repo, one to nothing, and one to a folder. `docs` links up one level to
- * the crate's README.
+ * repo, one to nothing, one to a folder, one to a link (the root's) and
+ * one absolute. `docs` links up one level to the crate's README, and
+ * `both` holds a dangling `README.md` link beside a `readme.md` file.
  */
 export const linkedReadmes = Effect.gen(function* () {
   const git = yield* writer;
@@ -458,6 +459,10 @@ export const linkedReadmes = Effect.gen(function* () {
       ["out/README.md", Content.Link({ target: "../../README.md" })],
       ["gone/README.md", Content.Link({ target: "missing.md" })],
       ["folder/README.md", Content.Link({ target: "../crate" })],
+      ["chain/README.md", Content.Link({ target: "../README.md" })],
+      ["rooted/README.md", Content.Link({ target: "/crate/README.md" })],
+      ["both/README.md", Content.Link({ target: "missing.md" })],
+      ["both/readme.md", text("# beside the link\n")],
     ],
     [],
     1
