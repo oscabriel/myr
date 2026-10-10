@@ -220,3 +220,14 @@ export const rehypePluginsFor = (at: MarkdownAt): PluggableList => [
   rehypeSlug,
   rehypeFragmentLinks,
 ];
+
+/**
+ * The rehype half of the chain for the site's own text (the docs): no raw
+ * HTML and no repo to resolve links against, still sanitized, with heading
+ * ids and fragment links as a README gets.
+ */
+export const sitePlugins: PluggableList = [
+  [rehypeSanitize, schema],
+  rehypeSlug,
+  rehypeFragmentLinks,
+];

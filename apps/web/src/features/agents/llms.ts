@@ -1,13 +1,12 @@
 /**
  * What an agent, or a person, reads first on the web host: `/llms.txt`,
- * `/llms-full.txt`, `/<project>/llms.txt` and the MCP card at
- * `/.well-known/mcp.json`, and the banner under the title of the web's
- * other Markdown. The text lives in `@repo/agent-kit` (`host-doc`, which the
- * platform's own `/` serves too, so both hosts say the same thing, and
- * `full-llms`, which only the web serves); the routes import it from here.
+ * `/<project>/llms.txt` and the MCP card at `/.well-known/mcp.json`, and the
+ * banner under the title of the web's other Markdown. The text lives in
+ * `@repo/agent-kit`'s `host-doc`, which the platform's own `/` serves too,
+ * so both hosts say the same thing; the routes import it from here.
+ * `/llms-full.txt` imports its text from `@repo/agent-kit/full-llms` itself,
+ * so no page that loads this module carries the sections the docs share.
  */
-export { fullLlms } from "@repo/agent-kit/full-llms";
-
 export {
   frontLlms,
   indexBanner,

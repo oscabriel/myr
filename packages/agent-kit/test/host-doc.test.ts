@@ -150,6 +150,19 @@ describe("the host's Markdown", () => {
       "llms-full.txt"
     );
   });
+
+  it("with a web app, names the docs for people under its opening", () => {
+    const lines = linesOf(
+      frontLlms({ commands, platformUrl, projects, webUrl })
+    );
+
+    expect(lines[6]).toBe(
+      `Guides and a reference written for people are at ${webUrl}/docs, each page also as Markdown at ${webUrl}/docs/<page>.md.`
+    );
+    expect(frontLlms({ commands, platformUrl, projects })).not.toContain(
+      "/docs"
+    );
+  });
 });
 
 describe("the index banner", () => {

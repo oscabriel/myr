@@ -1,3 +1,4 @@
+import { fullLlms } from "@repo/agent-kit/full-llms";
 import { Client } from "@repo/protocol/contracts";
 import { createFileRoute } from "@tanstack/react-router";
 import { env } from "cloudflare:workers";
@@ -5,7 +6,6 @@ import { Effect } from "effect";
 import type { Layer } from "effect";
 
 import { commands } from "../features/agents/catalog.ts";
-import { fullLlms } from "../features/agents/llms.ts";
 import { markdown, unavailable } from "../features/agents/respond.ts";
 import { serverClient } from "../server/client.ts";
 

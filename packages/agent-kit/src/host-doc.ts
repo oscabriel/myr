@@ -217,6 +217,8 @@ export const frontLlms = (input: {
       onSome: (web) => [
         `The same facts read as Markdown: each project at ${web}/<project>/llms.txt, and each ask at ${web}/<project>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in ${web}/llms-full.txt.`,
         "",
+        `Guides and a reference written for people are at ${web}/docs, each page also as Markdown at ${web}/docs/<page>.md.`,
+        "",
       ],
     }),
     "## Install the CLI",

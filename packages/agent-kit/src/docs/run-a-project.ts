@@ -1,0 +1,87 @@
+/**
+ * The maintainer's guide: make a project, write how it takes changes in
+ * its config folder, open asks, take proposals and drafts, spend Today's
+ * decisions, finish an answer, land your own change and vouch.
+ */
+import { Brand } from "@repo/brand";
+
+import { code } from "../text.ts";
+import type { DocSource } from "./page.ts";
+import { cli, shell } from "./page.ts";
+
+const dir = Brand.configDir;
+
+export const runAProject: DocSource = {
+  body: () => [
+    "## Make a project",
+    "",
+    `In a repo of your own, ${cli("init --project <project>")} makes it a project: it finds the repo's checks (its test and lint commands, and its CI), writes the config folder, ${code(`${dir}/`)}, and pushes. To bring a public repo over HTTPS instead: ${cli("init --project <project> --import <url>")}, with ${code("--branch")} when its default branch is not the one you want. You are the project's first decider.`,
+    "",
+    "## The config folder",
+    "",
+    `How the project takes changes is TypeScript on \`main\`, in ${code(`${dir}/`)}. The platform reads it only from the commit it last landed, in a sandbox with no network and frozen time, so it changes the way everything else does: by a landing.`,
+    "",
+    `- ${code(`${dir}/project.ts`)}: who decides which paths, the kinds of ask the project takes, the daily budget of decisions, caps on claims and proposals, the commands the checks run, and who must be vouched for to claim.`,
+    `- ${code(`${dir}/asks/`)}: one file per ask.`,
+    `- ${code(`${dir}/vouched.td`)}: who is vouched for, and who is denounced.`,
+    `- ${code(`${dir}/visibility.ts`)}: layers and held-back checks, if any (see [Held-back checks and layers](/docs/held-back-checks)).`,
+    "",
+    "```ts",
+    `import { kinds, project } from "${Brand.cliPackage}/rules";`,
+    "",
+    "export default project({",
+    '  budget: { decisionsPerDay: 5, expire: "14 days" },',
+    "  caps: { claimsPerPerson: 3, proposalsPerPerson: 2 },",
+    '  deciders: { "**": ["ines-v"], "src/tz.ts": ["okonkwo"] },',
+    "  kinds: [kinds.fix],",
+    '  run: { checks: { unit: "bun test" }, test: "bun test {path}" },',
+    '  vouch: "forCode",',
+    "});",
+    "```",
+    "",
+    `The project's Policy page shows what the folder evaluated to at the landed commit, and ${cli("policy --project <project>")} prints the same.`,
+    "",
+    "## Open an ask",
+    "",
+    `An ask is a file in ${code(`${dir}/asks/`)} with its check beside it: the want, the territory, what is out of scope, and a test that fails on \`main\` today. Some kinds also name a mentor, or hold the ask for newcomers.`,
+    "",
+    "```ts",
+    `import { kinds, territory } from "${Brand.cliPackage}/rules";`,
+    "",
+    "export default kinds.fix.ask({",
+    '  want: "The Do token of format prints the day of the month as an English ordinal.",',
+    '  path: "test/asks/format-ordinal.test.ts",',
+    '  territory: territory.paths("src/format.ts", "test/format.test.ts"),',
+    '  reserve: "newcomers",',
+    "});",
+    "```",
+    "",
+    `${cli("ask open <ask> --project <project>")} lands the ask, but only once its check fails on \`main\` twice the same way, by an assertion: a check that cannot fail, or fails by not loading, opens nothing. ${cli("schema ask open")} prints what it takes.`,
+    "",
+    "## Proposals and drafts",
+    "",
+    `Anyone not denounced may propose an ask: ${cli('propose --project <project> --want "<what should be true>"')}. A proposal expires unless a decider accepts it. With ${code("--draft")}, the platform's agent drafts the ask file and its failing check, runs them red first, and puts the draft to a decider with its evidence; ${cli("proposal <proposal> --project <project>")} follows it, and ${cli("ask draft <proposal> --project <project>")} asks for another round. Nothing lands until a decider accepts, and the landing discloses the agent in \`Assisted-by\`.`,
+    "",
+    "## Today",
+    "",
+    `A decider's day is a short list of decisions, each with its evidence and a safe default taken if nobody decides before it expires, held to the project's budget. Read it on the web at [Today](/today), or with ${cli("today")}, and take one with ${cli("decide --project <project> --decision <decision> --choice accept")} (or \`decline\`, \`adopt\`, \`revert\`).`,
+    "",
+    "## Finish an answer, or land your own change",
+    "",
+    `When an ask's kind requires a finish, a passing answer waits for a decider's own commits on top: ${cli("finish <ask> --project <project> --base <base> --head <head>")}. They are checked again, and the landing credits you with \`Finished-by\`.`,
+    "",
+    `A decider's own change goes through the same gate. Make your working fork, push to it, and land it:`,
+    "",
+    ...shell(
+      `${Brand.cli} fork --project <project>`,
+      `git push <fork remote> HEAD:main`,
+      `${Brand.cli} land --project <project> --base <base> --head <head>`
+    ),
+    "",
+    "## Vouch",
+    "",
+    `${cli("vouch --project <project> --handle <handle> --verdict vouch")} admits a person to claim, by landing a line in the vouch file; \`--verdict denounce\` bars them from proposing.`,
+    "",
+  ],
+  slug: "run-a-project",
+};
