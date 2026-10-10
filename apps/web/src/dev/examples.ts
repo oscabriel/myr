@@ -39,13 +39,13 @@ const decodeCheck = Schema.decodeSync(CheckSpec);
 const encodeMeasure = Schema.encodeSync(RatchetMeasure);
 
 /** What a project's `policy.json` states, as the file holds it. */
-type Stated = typeof PolicyInput.Encoded;
+export type Stated = typeof PolicyInput.Encoded;
 
 /** One ask as `policy.json` states it. */
-type StatedAsk = Stated["asks"][number];
+export type StatedAsk = Stated["asks"][number];
 
 /** A `policy.json` from what its project states, with every default written out. */
-const policyJson = (stated: Stated) =>
+export const policyJson = (stated: Stated) =>
   `${JSON.stringify(
     Schema.encodeSync(PolicyInput)(Schema.decodeSync(PolicyInput)(stated)),
     null,
@@ -53,7 +53,7 @@ const policyJson = (stated: Stated) =>
   )}\n`;
 
 /** One file an ask opens with. */
-interface AskFile {
+export interface AskFile {
   readonly content: string;
   readonly path: RepoPath;
 }
@@ -100,7 +100,7 @@ const territoryOf = ({ module, paths }: StatedAsk["territory"]) =>
     : `{ module: ${spelled(module)}, paths: ${spelled(paths)} }`;
 
 /** An ask's file: the SDK call that states `stated`, as its maintainer writes it. */
-const askFileOf = (stated: StatedAsk): AskFile => {
+export const askFileOf = (stated: StatedAsk): AskFile => {
   const territory = territoryOf(stated.territory);
 
   const passed = Object.entries({

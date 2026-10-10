@@ -13,18 +13,32 @@ import { Projects } from "@repo/project/projects";
 import { Contracts } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
 import { Context, Effect, Layer, Option, Schema } from "effect";
+import type { Duration } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
 
+import { withFixtures } from "./fixtures.ts";
+import type { FixtureMode } from "./fixtures.ts";
 import { devHandlers } from "./handlers.ts";
 import { seedDev } from "./seed.ts";
 import { devSessions } from "./sessions.ts";
 import { devWorld } from "./world.ts";
 
-/** A fresh world, seeded. */
-const seededWorld = Layer.effectDiscard(seedDev).pipe(
-  Layer.provideMerge(devWorld)
-);
+/** How a dev world is made: with the fixtures or without, and how soon the live landing comes. */
+export interface DevWorldOptions {
+  readonly fixtures?: FixtureMode;
+  /** In `live` mode, how long after vellum's `watch` is first answered its lint child lands. */
+  readonly liveAfter?: Duration.Duration;
+}
+
+/** A fresh world, seeded; with the fixtures when `options` asks for them. */
+const seededWorld = (options: DevWorldOptions) => {
+  const { fixtures = "off" } = options;
+
+  return fixtures === "off"
+    ? Layer.effectDiscard(seedDev).pipe(Layer.provideMerge(devWorld))
+    : withFixtures(fixtures, options.liveAfter);
+};
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
@@ -62,7 +76,7 @@ const raw = Layer.unwrap(
  * that moment, and a request that arrives before the seed is done waits for
  * it. `dispose` ends the world.
  */
-export const devServer = () =>
+export const devServer = (options: DevWorldOptions = {}) =>
   HttpRouter.toWebHandler(
     Layer.merge(
       RpcServer.layerHttp({
@@ -73,6 +87,6 @@ export const devServer = () =>
         Layer.provide([devHandlers, devSessions, RpcSerialization.layerJson])
       ),
       raw
-    ).pipe(Layer.provide(seededWorld)),
+    ).pipe(Layer.provide(seededWorld(options))),
     { disableLogger: true }
   );
