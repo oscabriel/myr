@@ -18,6 +18,8 @@ import type { ReactNode } from "react";
 import { buttonVariants } from "@/components/ui/button";
 
 import { useCopy } from "../shared/copy-action.tsx";
+import { useKeys } from "../shared/keys.tsx";
+import type { KeyPress } from "../shared/keys.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { CopyButton } from "./copy.tsx";
 import {
@@ -77,23 +79,43 @@ export const fileWords = (file: FileView): readonly string[] => [
   ...(languageOf(file.path) === undefined ? [] : [languageOf(file.path) ?? ""]),
 ];
 
+/**
+ * Whether `press` asks for the permalink: `y`, with no modifier, outside a
+ * field, and only while the single keys are on (the switch in the keys
+ * dialog turns this one off too).
+ */
+export const permalinkPress = (press: KeyPress, on: boolean) =>
+  on &&
+  press.key === "y" &&
+  !press.inField &&
+  !press.altKey &&
+  !press.ctrlKey &&
+  !press.metaKey;
+
 /** `y` rewrites the address to the page at its commit, keeping the line anchor. */
 export const PermalinkKey = ({ href }: { readonly href: string }) => {
+  const on = useKeys()?.on ?? true;
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const [target] = event.composedPath();
 
-      const typing =
+      const inField =
         target instanceof HTMLElement &&
         (target.isContentEditable ||
           target.closest("input, select, textarea, [role=combobox]") !== null);
 
       if (
-        event.key === "y" &&
-        !typing &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.altKey
+        permalinkPress(
+          {
+            altKey: event.altKey,
+            ctrlKey: event.ctrlKey,
+            inField,
+            key: event.key,
+            metaKey: event.metaKey,
+          },
+          on
+        )
       ) {
         globalThis.history.replaceState(
           globalThis.history.state,
@@ -108,7 +130,7 @@ export const PermalinkKey = ({ href }: { readonly href: string }) => {
     return () => {
       globalThis.removeEventListener("keydown", onKey);
     };
-  }, [href]);
+  }, [href, on]);
 
   return null;
 };

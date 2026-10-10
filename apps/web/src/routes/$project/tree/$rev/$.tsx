@@ -119,11 +119,14 @@ const TreePage = () => {
 export const Route = createFileRoute("/$project/tree/$rev/$")({
   staticData: { rail: CodeRail },
   loader: ({ params }) => treePage({ data: params }),
-  headers: ({ params }) => codePageHeaders(params.rev),
+  headers: ({ loaderData, params }) =>
+    codePageHeaders(params.rev, loaderData !== undefined),
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({
       title: `${_splat === undefined || _splat === "" ? project : _splat} at ${rev}`,
     }),
   component: TreePage,
-  notFoundComponent: CodeNotFound,
+  notFoundComponent: ({ data }) => (
+    <CodeNotFound data={data} files={<FilesButton />} />
+  ),
 });

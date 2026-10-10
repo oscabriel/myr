@@ -150,9 +150,12 @@ export const Route = createFileRoute("/$project/blob/$rev/$")({
 
     return page;
   },
-  headers: ({ params }) => codePageHeaders(params.rev),
+  headers: ({ loaderData, params }) =>
+    codePageHeaders(params.rev, loaderData !== undefined),
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({ title: `${_splat ?? project} at ${rev}` }),
   component: BlobPage,
-  notFoundComponent: CodeNotFound,
+  notFoundComponent: ({ data }) => (
+    <CodeNotFound data={data} files={<FilesButton />} />
+  ),
 });

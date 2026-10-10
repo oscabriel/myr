@@ -18,6 +18,7 @@ import type { ChangedFile } from "@repo/protocol/domain/code";
 import { Option } from "effect";
 import { ChevronDown, SquareDot, SquareMinus, SquarePlus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { drawnFiles, splitRows, unifiedRows } from "./diff-model.ts";
@@ -268,6 +269,8 @@ export interface PlainDiffProps {
   readonly folded?: ReadonlySet<string> | undefined;
   /** A header's fold was pressed. */
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;
+  /** `files` already parsed (`drawnFiles`), so a page parses each once. */
+  readonly drawn?: readonly DrawnFile[] | undefined;
 }
 
 /**
@@ -276,43 +279,48 @@ export interface PlainDiffProps {
  * of the pane that scrolls it.
  */
 export const PlainDiff = ({
+  drawn: parsed,
   files,
   folded,
   onFold,
   split = false,
-}: PlainDiffProps) => (
-  <div className="text-mono leading-code font-mono" data-diff="plain">
-    {drawnFiles(files).map((drawn) => {
-      const { file } = drawn;
+}: PlainDiffProps) => {
+  const drawnList = useMemo(() => parsed ?? drawnFiles(files), [files, parsed]);
 
-      const closed =
-        folded === undefined ? drawn.folded : folded.has(file.path);
+  return (
+    <div className="text-mono leading-code font-mono" data-diff="plain">
+      {drawnList.map((drawn) => {
+        const { file } = drawn;
 
-      return (
-        <section
-          aria-label={file.path}
-          data-file={file.path}
-          data-folded={closed}
-          id={diffAnchor(file.path)}
-          key={file.path}
-        >
-          <details
-            className="group/file"
-            onToggle={(event) => {
-              onFold?.(file.path, !event.currentTarget.open);
-            }}
-            open={!closed}
+        const closed =
+          folded === undefined ? drawn.folded : folded.has(file.path);
+
+        return (
+          <section
+            aria-label={file.path}
+            data-file={file.path}
+            data-folded={closed}
+            id={diffAnchor(file.path)}
+            key={file.path}
           >
-            <summary
-              className="border-rule bg-background text-mono hover:bg-surface sticky top-0 z-[1] flex h-11 cursor-pointer list-none items-center gap-2 border-y px-4 font-sans [&::-webkit-details-marker]:hidden"
-              data-diffs-header=""
+            <details
+              className="group/file"
+              onToggle={(event) => {
+                onFold?.(file.path, !event.currentTarget.open);
+              }}
+              open={!closed}
             >
-              <FileHeaderLine file={drawn} />
-            </summary>
-            <FileBody file={drawn} split={split} />
-          </details>
-        </section>
-      );
-    })}
-  </div>
-);
+              <summary
+                className="border-rule bg-background text-mono hover:bg-surface sticky top-0 z-[1] flex h-11 cursor-pointer list-none items-center gap-2 border-y px-4 font-sans [&::-webkit-details-marker]:hidden"
+                data-diffs-header=""
+              >
+                <FileHeaderLine file={drawn} />
+              </summary>
+              <FileBody file={drawn} split={split} />
+            </details>
+          </section>
+        );
+      })}
+    </div>
+  );
+};

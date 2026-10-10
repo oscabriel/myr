@@ -20,6 +20,7 @@ import {
   treeOrder,
   unifiedRows,
 } from "../src/features/code/diff-model.ts";
+import { permalinkPress } from "../src/features/code/file-header.tsx";
 import { stepFrom } from "../src/features/code/file-keys.ts";
 
 const decode = Schema.decodeSync(ChangedFile);
@@ -203,5 +204,28 @@ describe("the keys between files", () => {
     expect(stepFrom(paths, undefined, 1)).toBe("a.ts");
     expect(stepFrom(paths, undefined, -1)).toBe("c.ts");
     expect(stepFrom([], undefined, 1)).toBeUndefined();
+  });
+});
+
+describe("the permalink key", () => {
+  const press = {
+    altKey: false,
+    ctrlKey: false,
+    inField: false,
+    key: "y",
+    metaKey: false,
+  };
+
+  it("takes y to the page at its commit while the single keys are on", () => {
+    expect(permalinkPress(press, true)).toBeTruthy();
+  });
+
+  it("does nothing once the single keys are switched off, in a field, or with a modifier", () => {
+    expect([
+      permalinkPress(press, false),
+      permalinkPress({ ...press, inField: true }, true),
+      permalinkPress({ ...press, ctrlKey: true }, true),
+      permalinkPress({ ...press, key: "Y" }, true),
+    ]).toStrictEqual([false, false, false, false]);
   });
 });

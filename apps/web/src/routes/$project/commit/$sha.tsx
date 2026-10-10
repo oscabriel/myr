@@ -15,18 +15,18 @@ import { CodeNotFound } from "../../../features/code/not-found.tsx";
 import { PlainDiff } from "../../../features/code/plain-diff.tsx";
 import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
-import { immutablePage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 import { CommitRail } from "../tree/-code-rail.tsx";
 import { CommitPageData } from "../tree/-commit-files.ts";
 import { FilesButton } from "../tree/-files-button.tsx";
+import { codePageHeaders } from "../tree/-headers.ts";
 
 // One commit and what it changed, read on the server, with the territory
 // of the ask it answered (the diff's stats split by it): the page arrives
 // with the landing and the diff as plain text, and the browser draws the
 // diff over it, the changed files as a tree in the rail. A commit never
-// changes, so neither does its page: it is kept for good, and the router
-// never reads it again.
+// changes, so neither does its page: it is kept for good (a 404 only
+// briefly), and the router never reads it again.
 
 interface CommitParams {
   readonly project: string;
@@ -78,8 +78,13 @@ const commitPage = createServerFn({ method: "GET" })
   );
 
 const CommitPage = () => {
-  const { diff, now, project, territory } = Schema.decodeSync(CommitPageData)(
-    Route.useLoaderData()
+  const loaded = Route.useLoaderData();
+
+  // Decoded once per read: the diff's files keep one identity while the
+  // reader folds, splits and moves, so nothing is parsed or drawn again.
+  const { diff, now, project, territory } = useMemo(
+    () => Schema.decodeSync(CommitPageData)(loaded),
+    [loaded]
   );
 
   const router = useRouter();
@@ -89,14 +94,16 @@ const CommitPage = () => {
   // Split only where the screen has room for two sides.
   const split = chosen && roomy;
 
+  // Each file parsed once for the page: the head's stats, the plain text
+  // and the folds all read this.
+  const drawn = useMemo(() => drawnFiles(diff.files), [diff.files]);
+
   const defaults = useMemo(
     () =>
       new Set(
-        drawnFiles(diff.files)
-          .filter(({ folded }) => folded)
-          .map(({ file }) => file.path)
+        drawn.filter(({ folded }) => folded).map(({ file }) => file.path)
       ),
-    [diff.files]
+    [drawn]
   );
 
   const [folded, setFolded] = useState<ReadonlySet<string>>(defaults);
@@ -146,6 +153,7 @@ const CommitPage = () => {
             fallback={
               <div className={PANE_SCROLLER}>
                 <PlainDiff
+                  drawn={drawn}
                   files={diff.files}
                   folded={folded}
                   onFold={onFold}
@@ -160,6 +168,7 @@ const CommitPage = () => {
           />
         )
       }
+      drawn={drawn}
       files={<FilesButton commit />}
       folded={folded}
       now={now}
@@ -183,7 +192,8 @@ export const Route = createFileRoute("/$project/commit/$sha")({
   loader: ({ params }) => commitPage({ data: params }),
   // A commit never changes: what was read stays fresh for good.
   staleTime: Number.POSITIVE_INFINITY,
-  headers: () => immutablePage,
+  headers: ({ loaderData, params }) =>
+    codePageHeaders(params.sha, loaderData !== undefined),
   head: ({ params: { project, sha } }) =>
     pageHead({ title: `${project}: commit ${sha.slice(0, 7)}` }),
   component: CommitPage,

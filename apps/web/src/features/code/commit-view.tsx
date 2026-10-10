@@ -19,6 +19,7 @@ import type { ProjectName } from "@repo/protocol/ids";
 import { Option } from "effect";
 import type { DateTime } from "effect";
 import { Columns2, FoldVertical, Rows3, UnfoldVertical } from "lucide-react";
+import { useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
 import { drawnFiles, statsOf } from "./diff-model.ts";
-import type { DiffStats } from "./diff-model.ts";
+import type { DiffStats, DrawnFile } from "./diff-model.ts";
 import { DiffPane, PANE_SCROLLER } from "./diff-pane.tsx";
 import { commitHref, shortSha, treeHref } from "./paths.ts";
 import { ChangeCounts, PlainDiff } from "./plain-diff.tsx";
@@ -366,11 +367,14 @@ export interface CommitViewProps {
   readonly drawing?: ReactNode;
   /** The Files button, below the shell's width. */
   readonly files?: ReactNode;
+  /** The diff's files already parsed (`drawnFiles`), so a page parses each once. */
+  readonly drawn?: readonly DrawnFile[] | undefined;
 }
 
 export const CommitView = ({
   diff,
   drawing,
+  drawn: parsed,
   files: filesButton,
   folded,
   now,
@@ -383,8 +387,8 @@ export const CommitView = ({
 }: CommitViewProps) => {
   const { commit, files, truncated } = diff;
   const body = bodyWithoutTrailers(commit);
-  const drawn = drawnFiles(files);
-  const stats = statsOf(drawn, territory);
+  const drawn = useMemo(() => parsed ?? drawnFiles(files), [files, parsed]);
+  const stats = useMemo(() => statsOf(drawn, territory), [drawn, territory]);
 
   const allFolded = drawn.every((file) =>
     folded === undefined ? file.folded : folded.has(file.file.path)
@@ -447,6 +451,7 @@ export const CommitView = ({
         {drawing ?? (
           <div className={PANE_SCROLLER}>
             <PlainDiff
+              drawn={drawn}
               files={files}
               folded={folded}
               onFold={onFold}

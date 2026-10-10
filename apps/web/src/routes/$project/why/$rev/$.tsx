@@ -146,10 +146,13 @@ const WhyPage = () => {
 
 export const Route = createFileRoute("/$project/why/$rev/$")({
   staticData: { rail: CodeRail },
-  headers: ({ params }) => codePageHeaders(params.rev),
+  headers: ({ loaderData, params }) =>
+    codePageHeaders(params.rev, loaderData !== undefined),
   loader: ({ params }) => whyPage({ data: params }),
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({ title: `Why ${_splat ?? project} at ${rev}` }),
   component: WhyPage,
-  notFoundComponent: CodeNotFound,
+  notFoundComponent: ({ data }) => (
+    <CodeNotFound data={data} files={<FilesButton />} />
+  ),
 });

@@ -21,6 +21,7 @@ import {
 } from "@tanstack/react-router";
 import { Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
+import { useMemo } from "react";
 
 import { pathsAtom, refsAtom } from "../../../client/code.ts";
 import { ClientTree } from "../../../features/code/client-tree.tsx";
@@ -51,10 +52,15 @@ const useCommitFiles = (): readonly ChangedFile[] => {
     shouldThrow: false,
   });
 
-  return Option.match(decode(data), {
-    onNone: () => NONE,
-    onSome: ({ diff }) => diff.files,
-  });
+  // Decoded once per read, not on every move between files.
+  return useMemo(
+    () =>
+      Option.match(decode(data), {
+        onNone: () => NONE,
+        onSome: ({ diff }) => diff.files,
+      }),
+    [data]
+  );
 };
 
 /** Which page of a file the address is: its folder, its code, or why. */
@@ -153,7 +159,9 @@ const ProjectTree = ({
     );
   };
 
-  useCodeFileKeys((paths ?? []).toSorted(treeOrder), path, open);
+  const ordered = useMemo(() => (paths ?? []).toSorted(treeOrder), [paths]);
+
+  useCodeFileKeys(ordered, path, open);
 
   return shown && paths !== undefined ? (
     <ClientTree
@@ -207,8 +215,18 @@ export const CommitFiles = ({
     Option.map(parseDiffHash(hash), ({ path }) => path)
   );
 
-  const drawn = drawnFiles(files);
-  const paths = drawn.map(({ file }) => file.path);
+  const drawn = useMemo(() => drawnFiles(files), [files]);
+  const paths = useMemo(() => drawn.map(({ file }) => file.path), [drawn]);
+
+  const counts = useMemo(
+    () => new Map(drawn.map(({ counts: each, file }) => [file.path, each])),
+    [drawn]
+  );
+
+  const status = useMemo(
+    () => drawn.map(({ file }) => ({ path: file.path, status: file.status })),
+    [drawn]
+  );
 
   const open = (path: string) => {
     const { pathname, searchStr } = router.state.location;
@@ -221,16 +239,13 @@ export const CommitFiles = ({
   return always || wide ? (
     <div className="min-h-0 flex-1 pt-1">
       <ClientTree
-        counts={new Map(drawn.map(({ counts, file }) => [file.path, counts]))}
+        counts={counts}
         current={current}
         key={paths.join("\n")}
         onOpen={open}
         open
         paths={paths}
-        status={drawn.map(({ file }) => ({
-          path: file.path,
-          status: file.status,
-        }))}
+        status={status}
       />
     </div>
   ) : null;

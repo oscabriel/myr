@@ -1,6 +1,6 @@
 /**
- * The soft landing for a missing path (GitLab's: the nearest folder, with
- * the refusal above it): when a code page's path is not at a revision
+ * The soft landing for a missing path (the nearest folder, with the
+ * refusal above it): when a code page's path is not at a revision
  * that exists, the folders above it are read, nearest first, and the
  * first that exists travels in the 404 with the platform's `UnknownPath`,
  * so the page shows that folder with the refusal's own words as its

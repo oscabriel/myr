@@ -188,6 +188,15 @@ export const DiffCode = ({
 
   const slotOf = (path: string) => slots.find((slot) => slot.path === path);
 
+  // The folds as they are now, read when the address moves: a fold the
+  // reader makes later must neither unfold the named file again nor
+  // scroll back to it.
+  const folds = useRef({ folded, onFold });
+
+  useEffect(() => {
+    folds.current = { folded, onFold };
+  });
+
   // An address naming a file scrolls to it, and its lines are selected.
   useEffect(() => {
     const named = parseDiffHash(hash);
@@ -198,8 +207,8 @@ export const DiffCode = ({
 
     const { lines, path } = named.value;
 
-    if (folded?.has(path) === true) {
-      onFold?.(path, false);
+    if (folds.current.folded?.has(path) === true) {
+      folds.current.onFold?.(path, false);
     }
 
     reveal(handle.current, container.current, path);
@@ -221,7 +230,7 @@ export const DiffCode = ({
         type: "line",
       });
     }
-  }, [byPath, folded, hash, onFold]);
+  }, [byPath, hash]);
 
   const options = useMemo(
     (): CodeViewReactOptions<DiffAnnotation, undefined> => ({

@@ -63,7 +63,9 @@ const openFor = (current: string | undefined) =>
 const decorationOf = (counts: Counts): FileTreeRowDecoration => ({
   parts: [
     { color: "var(--diff-add-sign)", text: `+${counts.additions}` },
-    { text: " " },
+    // A no-break space: the row lays its parts out as boxes, where a
+    // plain space between them collapses to nothing.
+    { text: "\u00A0" },
     { color: "var(--diff-del-sign)", text: `−${counts.deletions}` },
   ],
   text: `+${counts.additions} −${counts.deletions}`,

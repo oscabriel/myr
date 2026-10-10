@@ -116,7 +116,8 @@ export const Route = createFileRoute("/$project/commits/$rev")({
   }),
   loaderDeps: ({ search }) => ({ from: search.from, path: search.path }),
   loader: ({ deps, params }) => logPage({ data: { ...params, ...deps } }),
-  headers: ({ params }) => codePageHeaders(params.rev),
+  headers: ({ loaderData, params }) =>
+    codePageHeaders(params.rev, loaderData !== undefined),
   head: ({ params: { project, rev } }) =>
     pageHead({ title: `${project}: landings on ${rev}` }),
   component: LogPage,

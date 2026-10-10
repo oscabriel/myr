@@ -52,12 +52,19 @@ import { RefsView, TAGS_PAGE } from "../src/features/code/refs-view.tsx";
 import { SoftLanding } from "../src/features/code/soft-landing.ts";
 import { TreeView } from "../src/features/code/tree-view.tsx";
 import { Refusals } from "../src/features/shared/refusals.ts";
-import { readBlobPage } from "../src/routes/$project/blob/$rev/$.tsx";
+import {
+  readBlobPage,
+  Route as BlobRoute,
+} from "../src/routes/$project/blob/$rev/$.tsx";
 import { readCommitPage } from "../src/routes/$project/commit/$sha.tsx";
 import { readLogPage } from "../src/routes/$project/commits/$rev.tsx";
 import { readRefsPage } from "../src/routes/$project/refs.tsx";
-import { readTreePage } from "../src/routes/$project/tree/$rev/$.tsx";
+import {
+  readTreePage,
+  Route as TreeRoute,
+} from "../src/routes/$project/tree/$rev/$.tsx";
 import { codePageHeaders } from "../src/routes/$project/tree/-headers.ts";
+import { Route as WhyRoute } from "../src/routes/$project/why/$rev/$.tsx";
 import { branchPage, immutablePage } from "../src/server/cache-headers.ts";
 import { reachingTransport } from "./transport.ts";
 
@@ -792,6 +799,28 @@ describe(LogView, () => {
     expect(hrefsOf(pager)).toStrictEqual([
       "/datekit/commits/main?path=src%2Fparse.ts",
       "/datekit/commits/main?path=src%2Fparse.ts&from=60",
+    ]);
+  });
+
+  it("keeps the filter on both pages: Older and Newer show the same kind", () => {
+    const pager = navOf(
+      markupOf(
+        <LogView
+          commits={commits}
+          from={30}
+          next={60}
+          now={now}
+          project={datekit}
+          rev="main"
+          show="answers"
+        />
+      ),
+      'data-slot="pagination"'
+    );
+
+    expect(hrefsOf(pager)).toStrictEqual([
+      "/datekit/commits/main?show=answers",
+      "/datekit/commits/main?from=60&show=answers",
     ]);
   });
 
@@ -1609,6 +1638,35 @@ describe("a missing path", () => {
     );
   });
 
+  it("keeps the Files button on the folder it lands on, so a phone still reaches the tree", () => {
+    const data = Schema.encodeSync(SoftLanding)({
+      nearest: nested,
+      now,
+      project: datekit,
+      refusals: [noPath(RepoPath.make("src/format/locale/gone/x.ts"))],
+      rev: "main",
+    });
+
+    const pages = [
+      ["tree", TreeRoute],
+      ["blob", BlobRoute],
+      ["why", WhyRoute],
+    ] as const;
+
+    const withoutFiles = pages.flatMap(([page, route]) => {
+      const Landing = route.options.notFoundComponent;
+
+      return Landing !== undefined &&
+        /aria-haspopup="dialog"[^>]*>[\s\S]*?Files<\/button>/u.test(
+          markupOf(<Landing data={data} isNotFound routeId={route.id} />)
+        )
+        ? []
+        : [page];
+    });
+
+    expect(withoutFiles).toStrictEqual([]);
+  });
+
   it("keeps any other refusal verbatim, with a way onward", () => {
     const refusal = new UnknownRevision({ rev: "v9" });
 
@@ -1623,17 +1681,21 @@ describe("a missing path", () => {
 
 /** The line a code page's route answers its headers with. */
 const headersLine = (path: string) =>
-  path.includes("/commit/")
-    ? "headers: () => immutablePage"
-    : "headers: ({ params }) => codePageHeaders(params.rev)";
+  `headers: ({ loaderData, params }) => codePageHeaders(params.${
+    path.includes("/commit/") ? "sha" : "rev"
+  }, loaderData !== undefined)`;
 
 describe("a code page's caching", () => {
   it("keeps a page at a whole commit id for good, and a page at main or a tag briefly", () => {
-    expect([AT, "main", TAG].map((rev) => codePageHeaders(rev))).toStrictEqual([
-      immutablePage,
-      branchPage,
-      branchPage,
-    ]);
+    expect(
+      [AT, "main", TAG].map((rev) => codePageHeaders(rev, true))
+    ).toStrictEqual([immutablePage, branchPage, branchPage]);
+  });
+
+  it("keeps a page that found nothing only briefly, even at a whole commit id, since a later landing or import may fill it", () => {
+    expect(
+      [AT, "main"].map((rev) => codePageHeaders(rev, false))
+    ).toStrictEqual([branchPage, branchPage]);
   });
 
   const routes: Readonly<Record<string, string>> = import.meta.glob(
@@ -1652,7 +1714,9 @@ describe("a code page's caching", () => {
     expect(Object.keys(pages)).toHaveLength(5);
     expect(
       Object.entries(pages).flatMap(([path, source]) =>
-        source.includes(headersLine(path)) ? [] : [path]
+        source.replaceAll(/\s+/gu, " ").includes(headersLine(path))
+          ? []
+          : [path]
       )
     ).toStrictEqual([]);
   });

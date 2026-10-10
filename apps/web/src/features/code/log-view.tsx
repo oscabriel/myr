@@ -221,6 +221,8 @@ export const LogView = ({
   show = "all",
 }: LogViewProps) => {
   const filter = path === undefined ? {} : { path };
+  // The pager keeps the kind the page shows.
+  const kind = show === "all" ? {} : { show };
   const shown = commits.filter((commit) => shows(show, commit));
   const base = commitsHref(project, rev, filter);
   const [to, query = ""] = base.split("?");
@@ -287,13 +289,13 @@ export const LogView = ({
       <Pager
         newer={
           from > 0
-            ? commitsHref(project, rev, newerPage(from, path))
+            ? commitsHref(project, rev, { ...newerPage(from, path), ...kind })
             : undefined
         }
         older={
           next === undefined
             ? undefined
-            : commitsHref(project, rev, { ...filter, from: next })
+            : commitsHref(project, rev, { ...filter, ...kind, from: next })
         }
       />
     </Workspace>
