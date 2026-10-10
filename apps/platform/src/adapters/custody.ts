@@ -7,10 +7,13 @@
  * repo takes no push (`DirectPush`) but its initializer's first
  * (`firstPusher`); a claim's fork takes its claimant's pushes while the claim
  * is live, and a decider's commits on top when they finish its answer; a
- * working fork takes its owner's. `ProjectApi` has no read of the push facts the gate's parse
- * stage takes (the policy, the ask, the claim), so `admit` asks the
- * claimant's own `status` and leaves the full parse to `review`, where
- * `recordPush` runs it.
+ * working fork takes its owner's. A fork takes branches only: a push of its
+ * notes, a tag or the platform's own refs is `DirectPush`, whoever makes it,
+ * and refuses the whole push. The platform writes those refs straight to
+ * the store (`RepoHost.push`, the Lander), never through the gateway.
+ * `ProjectApi` has no read of the push facts the gate's parse stage takes
+ * (the policy, the ask, the claim), so `admit` asks the claimant's own
+ * `status` and leaves the full parse to `review`, where `recordPush` runs it.
  *
  * `custodyFor` reads what `admit` needs before the gateway starts, and
  * `admit` answers at once. The gateway makes the push's upstream body as
@@ -73,6 +76,19 @@ const pushEventId = (repo: RepoName, head: CommitSha) => `push-${repo}-${head}`;
 /** Every ref in the push turned away: main moves only by a landing. */
 const directPushes = (commands: readonly Command[]) =>
   commands.map(({ ref }) => new DirectPush({ ref }));
+
+/** Where a person's work goes on a fork: its branches. */
+const branchPrefix = "refs/heads/";
+
+/**
+ * A fork takes branches only: every other ref, created, moved or deleted,
+ * is the platform's (its verdict notes, the Lander's merge refs) or no one's
+ * (a tag), so each is a direct push, whoever pushes it.
+ */
+const branchesOnly = (commands: readonly Command[]): readonly Refusal[] =>
+  commands.flatMap(({ ref }) =>
+    ref.startsWith(branchPrefix) ? [] : [new DirectPush({ ref })]
+  );
 
 /** Where a push moves `main`, if it moves it to a commit; a deletion moves it nowhere. */
 const mainTip = (commands: readonly Command[]) =>
@@ -255,7 +271,7 @@ const claimFork = (
     );
 
     return custodyOf(
-      () => refused,
+      (commands) => [...branchesOnly(commands), ...refused],
       // A decider's commits are judged by `<cli> finish`, not by the push.
       (repo, commands) =>
         Option.match(
@@ -314,11 +330,8 @@ const annotated = (custody: Custody["Service"], annotations: PushAnnotations) =>
         ),
   });
 
-/** Custody that takes every push as it comes: a person's own working fork. */
-const takeAll = custodyOf(
-  () => [],
-  () => Effect.succeed([])
-);
+/** Custody of a person's own working fork: every branch push as it comes. */
+const ownBranches = custodyOf(branchesOnly, () => Effect.succeed([]));
 
 /** Custody that takes no push at all: every ref is a direct push. */
 export const refuseAll = custodyOf(directPushes, (_repo, commands) =>
@@ -358,7 +371,9 @@ export const custodyFor = (
       Unknown: () => Effect.succeed(refuseAll),
       // A person's working fork: only its owner pushes; their `land` judges it.
       WorkingFork: ({ handle }) =>
-        Effect.succeed(sameHandle(pusher.handle, handle) ? takeAll : refuseAll),
+        Effect.succeed(
+          sameHandle(pusher.handle, handle) ? ownBranches : refuseAll
+        ),
     });
 
     return annotated(custody, annotations);

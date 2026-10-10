@@ -41,6 +41,9 @@ import {
 
 const datekit = ProjectName.make("datekit");
 
+/** The ref the platform keeps a fork's verdict notes under. */
+const notesRef = `refs/notes/${Brand.slug}`;
+
 const parseIso = AskId.make("parse-iso");
 
 /** A project made empty, awaiting its first push. */
@@ -102,6 +105,12 @@ const remoteLines = (stderr: string) =>
     .split("\n")
     .filter((line) => line.startsWith("remote: "))
     .map((line) => line.trimEnd());
+
+/** What git says of a push custody turned away as a direct push of `ref`. */
+const refusedAs = (ref: string) => ({
+  exitCode: 1,
+  remote: explain([new DirectPush({ ref })]).map((line) => `remote: ${line}`),
+});
 
 /**
  * A GET of `url`, with `authorization` if given, through the Worker's fetch:
@@ -451,6 +460,151 @@ describe("git through the platform", () => {
   );
 
   it.live(
+    "a claimant's push of the notes ref, a tag or the platform's merge ref to their claim fork is DirectPush, and the fork keeps only its branches",
+    () =>
+      Effect.gen(function* () {
+        const { api, repos, root, seen, urlOf } = yield* withDatekit;
+        const { claim } = yield* api.claim(alice, parseIso).pipe(Effect.orDie);
+        const clone = `${root}/alices`;
+        const forkRepo = `${repos}/${claim.fork}.git`;
+
+        yield* gitOk(
+          root,
+          ...as(tokens.alice),
+          "clone",
+          "--quiet",
+          urlOf(claim.fork),
+          clone
+        );
+        yield* gitOk(clone, "notes", `--ref=${Brand.slug}`, "add", "-m", "{}");
+        yield* gitOk(clone, "tag", "v1");
+
+        const refsBefore = yield* gitOk(forkRepo, "for-each-ref");
+
+        const pushOf = (refspec: string) =>
+          Effect.map(
+            git(clone, ...as(tokens.alice), "push", "origin", refspec),
+            ({ exitCode, stderr }) => ({
+              exitCode,
+              remote: remoteLines(stderr),
+            })
+          );
+
+        const merge = `${Brand.refsPrefix}merge/${"a".repeat(40)}`;
+
+        expect({
+          merge: yield* pushOf(`HEAD:${merge}`),
+          notes: yield* pushOf(notesRef),
+          tag: yield* pushOf("refs/tags/v1"),
+        }).toStrictEqual({
+          merge: refusedAs(merge),
+          notes: refusedAs(notesRef),
+          tag: refusedAs("refs/tags/v1"),
+        });
+        expect(yield* gitOk(forkRepo, "for-each-ref")).toBe(refsBefore);
+        expect(
+          (yield* Ref.get(seen.upstream)).filter(
+            ({ method, path }) =>
+              method === "POST" && path.endsWith("/git-receive-pack")
+          )
+        ).toStrictEqual([]);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    30_000
+  );
+
+  it.live(
+    "a claimant's deletion of their claim fork's notes ref is DirectPush, and the verdict notes stay",
+    () =>
+      Effect.gen(function* () {
+        const { api, repos, root, urlOf } = yield* withDatekit;
+        const { claim } = yield* api.claim(alice, parseIso).pipe(Effect.orDie);
+        const clone = `${root}/alices`;
+        const forkRepo = `${repos}/${claim.fork}.git`;
+
+        yield* gitOk(
+          root,
+          ...as(tokens.alice),
+          "clone",
+          "--quiet",
+          urlOf(claim.fork),
+          clone
+        );
+
+        // The platform's own verdict note, written straight to the fork as
+        // `RepoHost.push` writes it, never through the gateway.
+        yield* gitOk(clone, "notes", `--ref=${Brand.slug}`, "add", "-m", "{}");
+        yield* gitOk(clone, "push", "--quiet", forkRepo, notesRef);
+
+        const noted = yield* gitOk(forkRepo, "rev-parse", notesRef);
+
+        const pushed = yield* git(
+          clone,
+          ...as(tokens.alice),
+          "push",
+          "origin",
+          `:${notesRef}`
+        );
+
+        expect({
+          exitCode: pushed.exitCode,
+          remote: remoteLines(pushed.stderr),
+        }).toStrictEqual(refusedAs(notesRef));
+        expect(yield* gitOk(forkRepo, "rev-parse", notesRef)).toBe(noted);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    30_000
+  );
+
+  it.live(
+    "a claimant's push of main beside a tag is refused whole: main stays and nothing is offered",
+    () =>
+      Effect.gen(function* () {
+        const { api, repos, root, seen, urlOf } = yield* withDatekit;
+        const { claim } = yield* api.claim(alice, parseIso).pipe(Effect.orDie);
+        const clone = `${root}/alices`;
+        const forkRepo = `${repos}/${claim.fork}.git`;
+
+        yield* gitOk(
+          root,
+          ...as(tokens.alice),
+          "clone",
+          "--quiet",
+          urlOf(claim.fork),
+          clone
+        );
+        yield* commit(clone, "parse the year", {
+          "packages/parser/src/parse.ts":
+            "export const parse = (s) => ({ year: 2026 });\n",
+        });
+        yield* gitOk(clone, "tag", "v1");
+
+        const before = yield* gitOk(forkRepo, "rev-parse", "main");
+
+        const pushed = yield* git(
+          clone,
+          ...as(tokens.alice),
+          "push",
+          "origin",
+          "HEAD:main",
+          "refs/tags/v1"
+        );
+
+        expect({
+          exitCode: pushed.exitCode,
+          remote: remoteLines(pushed.stderr),
+        }).toStrictEqual(refusedAs("refs/tags/v1"));
+        expect(
+          [" HEAD -> main (DirectPush)", " v1 -> v1 (DirectPush)"].map(
+            (rejected) =>
+              pushed.stderr.includes(` ! [remote rejected]${rejected}`)
+          )
+        ).toStrictEqual([true, true]);
+        expect(yield* gitOk(forkRepo, "rev-parse", "main")).toBe(before);
+        expect(yield* Ref.get(seen.started)).toStrictEqual([]);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    30_000
+  );
+
+  it.live(
     "a fork is read by signed-in people, and a name the platform never makes is a 404",
     () =>
       Effect.gen(function* () {
@@ -599,6 +753,45 @@ describe("custody of one push", () => {
         expect(
           (yield* judged(projects, bob, fork, push)).admitted
         ).toStrictEqual([new DirectPush({ ref: mainRef })]);
+      }).pipe(Effect.provide(NodeServices.layer)),
+    30_000
+  );
+
+  it.live(
+    "a fork takes branches only, whoever pushes: a working fork's owner and a finishing decider hear DirectPush for a tag",
+    () =>
+      Effect.gen(function* () {
+        const { api, landed, projects } = yield* withDatekit;
+        const { claim } = yield* api.claim(bob, parseIso).pipe(Effect.orDie);
+        const working = `${datekit}--me--alice`;
+        const tag = RefName.make("refs/tags/v1");
+        const side = RefName.make("refs/heads/side");
+        const tagged = Array.of(moving(tag, Option.none()));
+
+        const deletion = Array.of<Command>({
+          from: Option.some(CommitSha.make(landed)),
+          ref: RefName.make(notesRef),
+          to: Option.none(),
+        });
+
+        expect({
+          decider: (yield* judged(projects, alice, claim.fork, tagged))
+            .admitted,
+          deletion: (yield* judged(projects, bob, claim.fork, deletion))
+            .admitted,
+          owner: (yield* judged(projects, alice, working, tagged)).admitted,
+          ownerBranch: (yield* judged(
+            projects,
+            alice,
+            working,
+            Array.of(moving(side, Option.none()))
+          )).admitted,
+        }).toStrictEqual({
+          decider: [new DirectPush({ ref: tag })],
+          deletion: [new DirectPush({ ref: notesRef })],
+          owner: [new DirectPush({ ref: tag })],
+          ownerBranch: [],
+        });
       }).pipe(Effect.provide(NodeServices.layer)),
     30_000
   );
