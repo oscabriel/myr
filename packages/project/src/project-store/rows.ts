@@ -2,6 +2,7 @@ import { Ask } from "@repo/protocol/domain/ask";
 import { AgentTrailer } from "@repo/protocol/domain/credit";
 import { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
+import { ImportSource } from "@repo/protocol/domain/import";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { Proposal } from "@repo/protocol/domain/proposal";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
@@ -28,10 +29,13 @@ import { Schema } from "effect";
 
 /**
  * A project: whether it waits for its initializer's first push or is live,
- * the SHA the platform last landed, and the policy cached for one landed SHA.
+ * the SHA the platform last landed, the policy cached for one landed SHA,
+ * and where it was imported from, when it was.
  */
 export const ProjectRow = Schema.Struct({
   createdAt: Schema.DateTimeUtcFromString,
+  /** The public repo it was imported from; absent for a project that started empty. */
+  importedFrom: Schema.optionalKey(ImportSource),
   initializer: Handle,
   landed: Schema.optionalKey(LandedSha),
   /** The encoded `Policy` evaluated at `policyAt`. */

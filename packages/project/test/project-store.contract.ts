@@ -688,6 +688,24 @@ export const describeProjectStore = (
         }).pipe(Effect.provide(layer))
     );
 
+    it.effect("keeps an import's source with its row", () =>
+      Effect.gen(function* () {
+        const store = yield* ProjectStore;
+
+        const imported = {
+          ...project,
+          importedFrom: {
+            branch: "master",
+            url: "https://github.com/dtolnay/anyhow",
+          },
+        } satisfies (typeof ProjectRow)["Encoded"];
+
+        yield* store.commit({ project: decoded(ProjectRow, imported) });
+
+        expect((yield* loaded).project).toStrictEqual(imported);
+      }).pipe(Effect.provide(layer))
+    );
+
     it.effect("keeps a claim's pinned suite with its row", () =>
       Effect.gen(function* () {
         const store = yield* ProjectStore;
