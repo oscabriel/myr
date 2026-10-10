@@ -1,10 +1,12 @@
 /**
- * The front page's reads: the open asks across every project,
- * and the list of projects (which the project page also reads, for its
- * posture and counts). Read once per page; `watch` makes them live.
+ * The front page's reads: the open asks across every project, and the list
+ * of projects (which the shell's rail also reads, for each posture). The
+ * page's loader reads the asks on the server and seeds their atom
+ * (`seeded.ts`); the events of the projects whose families it draws are
+ * `project.ts`'s.
  *
- * Each atom renders as waiting on the server (`withServerValueInitial`): the
- * browser calls `/rpc`, and a server render never fetches into the
+ * Each atom renders as waiting on the server unless a loader seeded it
+ * (`withServerValueInitial`): a server render never fetches into the
  * registry that every request on the Worker shares.
  */
 import type { Reserve } from "@repo/protocol/domain/ask";

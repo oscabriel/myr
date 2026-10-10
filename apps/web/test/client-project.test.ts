@@ -4,6 +4,7 @@
  * Over the dev world in process (`dev-browser.ts`).
  */
 import { describe, expect, it } from "@effect/vitest";
+import { ProjectName } from "@repo/protocol/ids";
 import { Effect, Exit } from "effect";
 
 import {
@@ -12,8 +13,11 @@ import {
   recentLandingsAtom,
 } from "../src/client/events.ts";
 import { keys } from "../src/client/keys.ts";
+import { familyEventsAtom, projectsKey } from "../src/client/project.ts";
 import { ContractsClient } from "../src/surfaces.ts";
 import { datekit, registryAs, seededWorld, settled } from "./dev-browser.ts";
+
+const burrow = ProjectName.make("burrow");
 
 describe("a project's page, through the web's atoms", seededWorld, () => {
   it.live("lists a project's asks", () =>
@@ -56,3 +60,27 @@ describe("a project's page, through the web's atoms", seededWorld, () => {
       })
   );
 });
+
+describe(
+  "the events of the projects a page's families are in",
+  seededWorld,
+  () => {
+    it.live(
+      "reads each project's replay once, keyed by the projects together",
+      () =>
+        Effect.gen(function* () {
+          const registry = registryAs();
+          const key = projectsKey([burrow, datekit]);
+
+          yield* settled(registry, projectEventsAtom(burrow));
+          yield* settled(registry, projectEventsAtom(datekit));
+
+          const read = registry.get(familyEventsAtom(key));
+
+          expect(key).toBe("burrow datekit");
+          expect([...read.keys()]).toStrictEqual([burrow, datekit]);
+          expect(read.get(datekit)?.length).toBeGreaterThan(0);
+        })
+    );
+  }
+);

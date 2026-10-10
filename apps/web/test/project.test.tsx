@@ -1,59 +1,90 @@
 /**
- * A project's page, rendered to HTML with `react-dom/server` from fixtures
- * decoded with the protocol's own schemas: its posture label, how to take
- * part, its open asks (a blocked one names what it waits on) and its recent
- * landings, each with its author and its credit trailers as the commit
- * carries them.
+ * A project's home, which is its list of asks: read on the server by the
+ * route's loader (its asks, its own ledger, its events, its policy, its
+ * README) and rendered inside the router. Its asks come first, a family
+ * expanded as a fan with its children listed; then its README; beside them,
+ * how a change lands here, with the commands that take part and the last
+ * landings as one-line credits. A child that lands while the page is open
+ * stamps its node once.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { AskListing } from "@repo/protocol/domain/ask";
+import type { Ask } from "@repo/protocol/domain/ask";
 import { FileView, TreeListing } from "@repo/protocol/domain/code";
+import { Glob } from "@repo/protocol/domain/common";
+import type { ProjectEvent } from "@repo/protocol/domain/event";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { LandingView } from "@repo/protocol/domain/landing";
+import { LedgerEntry } from "@repo/protocol/domain/visibility";
+import type { Ledger } from "@repo/protocol/domain/visibility";
+import {
+  AreaName,
+  AskId,
+  Handle,
+  KindName,
+  LayerName,
+  ProjectName,
+} from "@repo/protocol/ids";
 import { UnknownRevision } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { DateTime, Effect, Layer, Schema } from "effect";
+import { DateTime, Duration, Effect, Layer, Ref, Schema, Stream } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { RpcClient, RpcSerialization, RpcTest } from "effect/rpc";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 
+import { recentLandings } from "../src/client/events.ts";
+import type { DevWorldOptions } from "../src/dev/server.ts";
 import { devServer } from "../src/dev/server.ts";
+import { ledeOf } from "../src/features/front/head.ts";
+import { stampStep } from "../src/features/front/stamps.ts";
+import { recentShown } from "../src/features/project/landings.tsx";
 import {
-  ProjectReadingView,
   ProjectView,
+  heldBackOf,
+  homeListing,
 } from "../src/features/project/project-page.tsx";
+import type { ProjectViewProps } from "../src/features/project/project-page.tsx";
 import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
+import { askStates } from "../src/features/shared/ask-progress.ts";
 import {
   ProjectPageData,
   readProjectPage,
-} from "../src/routes/$project/index.tsx";
+} from "../src/server/project-page.ts";
+import { ask as parseIsoWeek } from "./ask-fixtures.ts";
+import { markupOf, textIn, textOf } from "./markup.ts";
+import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
-const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
-
-/** What a reader sees: the markup without its tags, entities decoded. */
-const textOf = (element: ReactElement) =>
-  markupOf(element)
-    .replaceAll(/<[^>]+>/gu, "")
-    .replaceAll("&#x27;", "'")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&");
-
-/** The markup of the row for `ask`: from its `<li>` to the next ask's row. */
+/** The markup of the row for `ask`: from its `<li>` to the next row or the list's end. */
 const rowOf = (markup: string, ask: string) => {
   const start = markup.indexOf(`data-ask="${ask}"`);
-  const next = markup.indexOf("data-ask=", start + 1);
 
-  return start === -1
-    ? ""
-    : markup.slice(start, next === -1 ? undefined : next);
+  const ends = ['data-ask="', "</ul></section>", "</main>"].flatMap((end) => {
+    const at = markup.indexOf(end, start + 1);
+
+    return at === -1 ? [] : [at];
+  });
+
+  return start === -1 ? "" : markup.slice(start, Math.min(...ends));
 };
+
+/** Which of `parts` `text` does not hold. */
+const missingFrom = (text: string, parts: readonly string[]) =>
+  parts.filter((part) => !text.includes(part));
+
+/** Which of `parts` `text` holds. */
+const foundIn = (text: string, parts: readonly string[]) =>
+  parts.filter((part) => text.includes(part));
+
+/** The page's main pane, the inline facts left in (they sit after its head). */
+const mainOf = (markup: string) =>
+  markup.slice(markup.indexOf("<main"), markup.indexOf("</main>"));
+
+/** The inspector, as the shell's width shows it. */
+const inspectorOf = (markup: string) =>
+  markup.slice(markup.indexOf('data-facts="inspector"'));
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
@@ -77,227 +108,401 @@ const asks = Schema.decodeSync(Schema.Array(AskListing))([
   },
   {
     ask: "drop-legacy-parse",
-    blockedBy: ["split-core", "split-format"],
+    blockedBy: [
+      "drop-legacy-parse-core",
+      "drop-legacy-parse-format",
+      "drop-legacy-parse-delete",
+    ],
     claimed: false,
     kind: "migrate",
-    territory: "parse",
+    territory: ".",
     want: "Nothing calls the legacy parser any more.",
   },
+  {
+    ask: "drop-legacy-parse-core",
+    blockedBy: [],
+    claimed: false,
+    kind: "migrate",
+    territory: "core",
+    want: "core: 2 callers of legacyParse → parse",
+  },
+  {
+    ask: "drop-legacy-parse-format",
+    blockedBy: [],
+    claimed: true,
+    kind: "migrate",
+    territory: "format",
+    want: "format: 1 caller of legacyParse → parse",
+  },
+  {
+    ask: "drop-legacy-parse-delete",
+    blockedBy: ["drop-legacy-parse-core", "drop-legacy-parse-format"],
+    claimed: false,
+    kind: "migrate",
+    territory: ".",
+    want: "Delete legacyParse: nothing calls it any more",
+  },
+  {
+    ask: "trim-week-names",
+    blockedBy: ["fix-week-start"],
+    claimed: false,
+    kind: "bug",
+    reserve: "newcomers",
+    territory: "core",
+    want: "Week names are trimmed.",
+  },
 ]);
 
-const landings = Schema.decodeSync(Schema.Array(LandingView))([
-  {
-    ask: "parse-iso-week",
-    assisted: [{ harness: "claude-code", verified: true }],
-    author: "bram",
+const parent: Ask = {
+  ...parseIsoWeek,
+  blockedBy: [
+    AskId.make("drop-legacy-parse-core"),
+    AskId.make("drop-legacy-parse-format"),
+    AskId.make("drop-legacy-parse-delete"),
+  ],
+  brief: { want: "Nothing calls the legacy parser any more." },
+  id: AskId.make("drop-legacy-parse"),
+  kind: KindName.make("migrate"),
+};
+
+/** A landing of `ask` (or an opening of it), credited to `answerer`. */
+const landingOf = (
+  sha: string,
+  more: { readonly ask?: string; readonly opened?: string },
+  answerer?: string
+) =>
+  Schema.decodeSync(LandingView)({
+    ...more,
+    assisted: [],
+    author: answerer ?? "ines-v",
     credits: [
-      { handle: "bram", role: "Signed-off-by" },
       { handle: "ines-v", role: "Asked-by" },
+      ...(answerer === undefined
+        ? []
+        : [{ handle: answerer, role: "Signed-off-by" as const }]),
     ],
     landedAt: "2026-10-06T09:00:00.000Z",
-    parent: "1111111111111111111111111111111111111111",
+    parent: "2".repeat(40),
     project: "datekit",
-    sha: "9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c",
-  },
-  {
-    ask: "format-era",
-    assisted: [],
-    author: "okonkwo",
-    credits: [
-      { handle: "okonkwo", role: "Signed-off-by" },
-      { handle: "lin-h", role: "Asked-by" },
-    ],
-    landedAt: "2026-10-04T09:00:00.000Z",
-    parent: "2222222222222222222222222222222222222222",
-    project: "datekit",
-    sha: "1111111111111111111111111111111111111111",
-  },
-]);
+    sha: sha.repeat(40),
+  });
 
-const page = (
-  <ProjectView
-    asks={asks}
-    landings={landings}
-    listing={listing}
-    now={now}
-    platformUrl={platformUrl}
-  />
-);
+const landings = [
+  landingOf("a", { ask: "parse-iso-week" }, "bram"),
+  landingOf("b", { opened: "format-ordinal" }),
+  landingOf("c", { ask: "format-era" }, "okonkwo"),
+  landingOf("d", { opened: "add-months-clamp" }),
+];
+
+const AT = "a".repeat(40);
+
+const root = Schema.decodeSync(TreeListing)({
+  at: AT,
+  entries: [
+    {
+      mode: "040000",
+      name: "src",
+      path: "src",
+      sha: "b".repeat(40),
+      type: "tree",
+    },
+    {
+      mode: "100644",
+      name: "README.md",
+      path: "README.md",
+      sha: "c".repeat(40),
+      type: "blob",
+    },
+  ],
+  readme: { path: "README.md", sha: "c".repeat(40) },
+});
+
+const readme = Schema.decodeSync(FileView)({
+  at: AT,
+  binary: false,
+  path: "README.md",
+  sha: "c".repeat(40),
+  size: 26,
+  text: "# datekit\n\nDates, kept.\n",
+  truncated: false,
+});
+
+const vellumLedger: Ledger = {
+  entries: [
+    LedgerEntry.cases.CountChanged.make({
+      area: AreaName.make("export"),
+      at: now,
+      count: 7,
+      layer: LayerName.make("maintainers"),
+      seq: 1,
+    }),
+  ],
+  layers: [],
+  posture: "openWithSealedEvidence",
+  postureLabel: "Open with sealed evidence",
+  project: ProjectName.make("vellum"),
+};
+
+const props = (more: Partial<ProjectViewProps> = {}): ProjectViewProps => ({
+  asks,
+  landings,
+  listing,
+  now,
+  parents: [parent],
+  platformUrl,
+  ...more,
+});
+
+const page = (more: Partial<ProjectViewProps> = {}) =>
+  renderAt("/datekit", <ProjectView {...props(more)} />);
 
 describe(ProjectView, () => {
-  it("shows each landing's subject line and links its author to their page", () => {
-    const text = textOf(page);
-    const markup = markupOf(page);
+  it.effect(
+    "lists every open ask with its want as the link, then its kind, territory and id",
+    () =>
+      Effect.gen(function* () {
+        const row = rowOf(yield* page(), "fix-week-start");
 
-    expect(text).toContain("Answer parse-iso-week");
-    expect(text).toContain("Answer format-era");
-    expect(markup).toMatch(/<a\b[^>]*href="\/people\/bram"[^>]*>bram<\/a>/u);
-    expect(markup).toMatch(
-      /<a\b[^>]*href="\/people\/okonkwo"[^>]*>okonkwo<\/a>/u
-    );
-  });
+        expect(row).toMatch(
+          /<a\b[^>]*href="\/datekit\/asks\/fix-week-start"[^>]*>A week starts on the locale&#x27;s first day, not always on Sunday\.<\/a>/u
+        );
+        expect(textIn(row)).toContain("bug · core · fix-week-start");
+        expect(textIn(row)).toContain("Open to take");
+        expect(textIn(row)).toContain(
+          `${Brand.cli} claim fix-week-start --project datekit`
+        );
+      })
+  );
 
-  it("shows each landing's credit trailers as the commit carries them, Assisted-by apart", () => {
-    const text = textOf(page);
+  it.effect(
+    "draws a family as its parent's row with the fan, its children listed under it",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* page();
+        const family = rowOf(markup, "drop-legacy-parse");
 
-    const at = [
-      "Asked-by: ines-v",
-      "Signed-off-by: bram",
-      "not credit",
-      "Assisted-by: claude-code (verified)",
-      "Asked-by: lin-h",
-      "Signed-off-by: okonkwo",
-    ].map((part) => text.indexOf(part));
+        expect(family).toContain('data-family="drop-legacy-parse"');
+        expect(
+          missingFrom(textIn(family), [
+            "0 of 2 landed",
+            "Hide 2 children",
+            "core: 2 callers of legacyParse → parse",
+            "delete waits for 2",
+          ])
+        ).toStrictEqual([]);
+        expect(family.match(/data-family-child="/gu)).toHaveLength(2);
+        // Its members are drawn in the fan, not again as rows of their own.
+        expect(
+          foundIn(markup, [
+            'data-ask="drop-legacy-parse-core"',
+            'data-ask="drop-legacy-parse-delete"',
+          ])
+        ).toStrictEqual([]);
+      })
+  );
 
-    // Each landing's credit in trailer order, then its agents, apart.
-    expect(at.every((position) => position >= 0)).toBeTruthy();
-    expect(at.toSorted((one, other) => one - other)).toStrictEqual(at);
-  });
+  it.effect(
+    "reads an ask that waits on another as waiting, with the one it waits on listed",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* page();
+        const row = rowOf(markup, "trim-week-names");
 
-  it("shows a blocked ask as blocked, linking every ask it waits on", () => {
-    const markup = markupOf(page);
-    const row = rowOf(markup, "drop-legacy-parse");
+        expect(textIn(row)).toContain("Waiting");
+        expect(row).not.toContain(`${Brand.cli} claim trim-week-names`);
+        expect(markup).toContain('data-ask="fix-week-start"');
+      })
+  );
 
-    expect(row).toMatch(/Blocked/u);
-    expect(row).toContain('href="/datekit/asks/split-core"');
-    expect(row).toContain('href="/datekit/asks/split-format"');
-  });
+  it.effect(
+    "says its posture once, in the platform's words, then its open asks and when it last landed",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* page({
+          postureLabel: "Open with sealed evidence · sealed checks in export",
+        });
 
-  it("lists every open ask with its want, kind and territory", () => {
-    const row = rowOf(markupOf(page), "fix-week-start");
+        const head = markup.slice(
+          markup.indexOf("<h1"),
+          markup.indexOf('id="open-asks"')
+        );
 
-    expect(row).toContain('href="/datekit/asks/fix-week-start"');
-    expect(row).toContain(
-      "A week starts on the locale&#x27;s first day, not always on Sunday."
-    );
-    expect(row).toMatch(/>Kind<\/dt><dd\b[^>]*>bug<\/dd>/u);
-    expect(row).toMatch(/>Territory<\/dt><dd\b[^>]*>core<\/dd>/u);
-  });
+        expect(head).toContain('data-posture="openWithSealedEvidence"');
+        expect(textIn(head)).toContain(
+          "Open with sealed evidence · sealed checks in export"
+        );
+        expect(textIn(head)).toContain("5 open asks");
+        expect(textIn(head)).toContain("last landed 1 d ago");
+        // The delete child waits on its siblings, so it is not counted open yet.
+        expect(textIn(markup)).toContain("5 open asks, 2 open to take");
+      })
+  );
 
-  it("shows the posture label of the project as it is listed", () => {
-    const markup = markupOf(page);
+  it.effect(
+    "says how a change lands here: the posture, the gate, who decides, what is held back",
+    () =>
+      Effect.gen(function* () {
+        const facts = inspectorOf(
+          yield* page({
+            deciders: [
+              {
+                handles: [Handle.make("ines-v"), Handle.make("okonkwo")],
+                paths: Glob.make("src/**"),
+              },
+            ],
+            heldBack: heldBackOf(vellumLedger),
+          })
+        );
 
-    expect(markup).toContain('data-posture="openWithSealedEvidence"');
-    expect(textOf(page)).toContain("Open with sealed evidence");
-  });
+        const text = textIn(facts);
 
-  it("shows how to take part: clone over plain git, then the CLI's asks, claim and check", () => {
-    const text = textOf(page);
+        expect(
+          missingFrom(text, [
+            "How a change lands here",
+            "Parse · Shape · Merge · Cheap · Checks · Held-back · Decider",
+            "export: 7 sealed checks",
+          ])
+        ).toStrictEqual([]);
+        expect(text).toMatch(/src\/\*\*\s*·\s*ines-v, okonkwo/u);
+        expect(
+          missingFrom(facts, [
+            'href="/datekit/people"',
+            'href="/datekit/llms.txt"',
+          ])
+        ).toStrictEqual([]);
+      })
+  );
 
-    expect(text).toContain(`git clone ${platformUrl}/datekit.git`);
-    expect(text).toContain(`${Brand.cli} asks --project datekit`);
-    expect(text).toContain(`${Brand.cli} claim <ask>`);
-    expect(text).toContain(`${Brand.cli} check`);
-  });
+  it.effect(
+    "gives the four commands that take part, numbered, and the last three landings as one-line credits",
+    () =>
+      Effect.gen(function* () {
+        const facts = inspectorOf(yield* page());
+        const text = textIn(facts);
 
-  it("says an empty project is empty, with the commands that would fill it", () => {
-    const { landedAt: _landed, ...unlanded } = listing;
+        const steps = [
+          `git clone ${platformUrl}/datekit.git`,
+          `${Brand.cli} asks --project datekit`,
+          `${Brand.cli} claim <ask>`,
+          `${Brand.cli} check`,
+        ].map((command) => text.indexOf(command));
 
-    const text = textOf(
-      <ProjectView
-        asks={[]}
-        landings={[]}
-        listing={{ ...unlanded, openAsks: 0 }}
-        now={now}
-        platformUrl={platformUrl}
-      />
-    );
+        expect(steps.every((at) => at >= 0)).toBeTruthy();
+        expect(steps.toSorted((a, b) => a - b)).toStrictEqual(steps);
+        expect(facts.match(/data-landing="/gu)).toHaveLength(3);
+        expect(
+          missingFrom(text, [
+            "Answer parse-iso-week",
+            "Asked by ines-v · answered by bram",
+          ])
+        ).toStrictEqual([]);
+        expect(text).not.toContain("Asked-by: ines-v");
+      })
+  );
 
-    expect(text).toContain("No open asks");
-    expect(text).toContain(`${Brand.cli} ask open`);
-    expect(text).toContain("Nothing has landed");
-    // The project exists, so `init` would refuse it: its first push lands main.
-    expect(text).toContain(`git push ${platformUrl}/datekit.git HEAD:main`);
-    expect(text).not.toContain(`${Brand.cli} init`);
-  });
+  it.effect(
+    "has no code table and no clone box: the Code section has those",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* page({ code: { readme, root } });
+        const main = mainOf(markup);
 
-  it("never says nothing has landed on a project whose main has landed", () => {
-    const text = textOf(
-      <ProjectView
-        asks={asks}
-        landings={[]}
-        listing={listing}
-        now={now}
-        platformUrl={platformUrl}
-      />
-    );
+        expect(main).not.toContain('href="/datekit/tree/main/src"');
+        expect(main).not.toContain("data-clone");
+        expect(main).toContain('data-readme="README.md"');
+        expect(textIn(main)).toContain("Dates, kept.");
+        // The README comes after the asks.
+        expect(main.indexOf('id="open-asks"')).toBeLessThan(
+          main.indexOf("data-readme")
+        );
+      })
+  );
 
-    expect(text).toContain("Last landed");
-    expect(text).not.toContain("Nothing has landed");
-    expect(text).not.toContain("git push");
+  it.effect(
+    "says an empty project is empty, with the commands that would fill it",
+    () =>
+      Effect.gen(function* () {
+        const { landedAt: _landed, ...unlanded } = listing;
+
+        const text = textIn(
+          yield* page({
+            asks: [],
+            landings: [],
+            listing: { ...unlanded, openAsks: 0 },
+          })
+        );
+
+        expect(text).toContain("No open asks");
+        expect(text).toContain(`${Brand.cli} ask open`);
+        expect(text).toContain("Nothing has landed");
+        // The project exists, so `init` would refuse it: its first push lands main.
+        expect(text).toContain(`git push ${platformUrl}/datekit.git HEAD:main`);
+        expect(text).not.toContain(`${Brand.cli} init`);
+      })
+  );
+
+  it.effect(
+    "never says nothing has landed on a project whose main has landed",
+    () =>
+      Effect.gen(function* () {
+        const text = textIn(yield* page({ landings: [] }));
+
+        expect(text).toContain("last landed");
+        expect(text).not.toContain("Nothing has landed");
+        expect(text).not.toContain("git push");
+      })
+  );
+
+  it("draws the same page with no router around it, nothing selected", () => {
+    const text = textOf(<ProjectView {...props()} />);
+
+    expect(text).toContain("How a change lands here");
+    expect(text).toContain("fix-week-start");
   });
 });
 
-describe("the project's code on its page", () => {
-  const AT = "a".repeat(40);
+describe(recentShown, () => {
+  it("shows the last three answers once three have landed, the setup's landings dropped", () => {
+    const answers = [
+      landingOf("1", { ask: "one" }, "bram"),
+      landingOf("2", { opened: "two" }),
+      landingOf("3", { ask: "three" }, "bram"),
+      landingOf("4", { ask: "four" }, "bram"),
+      landingOf("5", {}),
+    ];
 
-  const root = Schema.decodeSync(TreeListing)({
-    at: AT,
-    entries: [
-      {
-        mode: "040000",
-        name: "src",
-        path: "src",
-        sha: "b".repeat(40),
-        type: "tree",
-      },
-      {
-        mode: "100644",
-        name: "README.md",
-        path: "README.md",
-        sha: "c".repeat(40),
-        type: "blob",
-      },
-    ],
-    readme: { path: "README.md", sha: "c".repeat(40) },
+    expect(recentShown(answers).map(({ ask }) => ask)).toStrictEqual([
+      "one",
+      "three",
+      "four",
+    ]);
   });
 
-  const readme = Schema.decodeSync(FileView)({
-    at: AT,
-    binary: false,
-    path: "README.md",
-    sha: "c".repeat(40),
-    size: 26,
-    text: "# datekit\n\nDates, kept.\n",
-    truncated: false,
+  it("shows the last three of any kind before three answers have landed", () => {
+    expect(recentShown(landings).map(({ sha }) => sha[0])).toStrictEqual([
+      "a",
+      "b",
+      "c",
+    ]);
   });
+});
 
-  const withCode = (
-    <ProjectView
-      asks={asks}
-      code={{ readme, root }}
-      landings={landings}
-      listing={listing}
-      now={now}
-      platformUrl={platformUrl}
-    />
-  );
-
-  it("shows the clone line in a box of its own, above the asks", () => {
-    const markup = markupOf(withCode);
-    const clone = markup.indexOf('data-clone=""');
-
-    expect(clone).toBeGreaterThan(-1);
+describe(ledeOf, () => {
+  it("is a README's first sentence, past its title, as plain words", () => {
     expect(
-      markup.indexOf(`git clone ${platformUrl}/datekit.git`, clone)
-    ).toBeGreaterThan(clone);
-    expect(clone).toBeLessThan(markup.indexOf('id="open-asks"'));
+      ledeOf(
+        "# datekit\n\nSmall, dependency-free date helpers for `TypeScript`. datekit reads ISO 8601 text.\n"
+      )
+    ).toBe("Small, dependency-free date helpers for TypeScript.");
+    expect(
+      ledeOf(
+        "# burrow\n\nThe services behind [burrow's](https://x.test) shop: six packages.\n"
+      )
+    ).toBe("The services behind burrow's shop: six packages.");
   });
 
-  it("lists the root's entries, each linking its page at main", () => {
-    const markup = markupOf(withCode);
-
-    expect(markup).toContain('href="/datekit/tree/main/src"');
-    expect(markup).toContain('href="/datekit/blob/main/README.md"');
-  });
-
-  it("renders the root README", () => {
-    expect(markupOf(withCode)).toContain('data-readme="README.md"');
-    expect(textOf(withCode)).toContain("Dates, kept.");
-  });
-
-  it("shows no code section before the code is read", () => {
-    expect(markupOf(page)).not.toContain("data-readme=");
+  it("is none when the README opens with no prose", () => {
+    expect(ledeOf("# title\n\n| a | b |\n| - | - |\n")).toBeUndefined();
   });
 });
 
@@ -314,18 +519,46 @@ const clientOver = (answer: (request: Request) => Promise<Response>) =>
   );
 
 /**
- * The contracts over a fresh dev world, as the Worker's loader reaches
- * them in process; the world ends with the scope.
+ * `handler`, but with the list of projects failing when `listed` counts its
+ * calls.
  */
-const devWorld = Layer.unwrap(
-  Effect.gen(function* () {
-    const { dispose, handler } = devServer();
+const failingProjects =
+  (
+    handler: (request: Request) => Promise<Response>,
+    listed: Ref.Ref<number> | undefined
+  ) =>
+  (request: Request) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const body = yield* Effect.promise(() => request.clone().text());
 
-    yield* Effect.addFinalizer(() => Effect.promise(dispose));
+        if (listed !== undefined && body.includes('"listProjects"')) {
+          yield* Ref.update(listed, (count) => count + 1);
 
-    return clientOver(handler);
-  })
-);
+          return new Response("", { status: 503 });
+        }
+
+        return yield* Effect.promise(() => handler(request));
+      })
+    );
+
+/**
+ * A fresh dev world with `options`, served; with `listed`, its list of
+ * projects fails and each call to it is counted. The world ends with the
+ * scope.
+ */
+const devWorldWith = (options: DevWorldOptions, listed?: Ref.Ref<number>) =>
+  Layer.unwrap(
+    Effect.gen(function* () {
+      const { dispose, handler } = devServer(options);
+
+      yield* Effect.addFinalizer(() => Effect.promise(dispose));
+
+      return clientOver(failingProjects(handler, listed));
+    })
+  );
+
+const devWorld = devWorldWith({});
 
 /** A platform that does not answer: every call comes back a 503. */
 const unanswering = clientOver(() =>
@@ -339,7 +572,8 @@ const nothingLanded = Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
       unanswered,
       Contracts.toLayerHandler("readTree", ({ at }) =>
         Effect.fail(new UnknownRevision({ rev: at ?? "main" }))
-      )
+      ),
+      Contracts.toLayerHandler("listAsks", () => Effect.succeed({ asks: [] }))
     ),
     asTester,
   ])
@@ -350,80 +584,153 @@ const decodePage = Schema.decodeEffect(ProjectPageData);
 /** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
 const seededWorld = { timeout: 30_000 };
 
-describe("the project's page as the server sends it", () => {
+/** The page as the route draws it from what its loader read. */
+const sentFrom = (
+  data: ProjectPageData,
+  more: Partial<ProjectViewProps> = {}
+) => {
+  const events = data.events ?? [];
+  const [latest] = recentLandings(events);
+
+  return renderAt(
+    `/${data.project}`,
+    <ProjectView
+      asks={data.asks}
+      code={data.code}
+      deciders={data.policy?.policy?.deciders}
+      heldBack={data.ledger === undefined ? undefined : heldBackOf(data.ledger)}
+      landings={recentLandings(events)}
+      lastLanded={latest?.landedAt}
+      listing={homeListing({
+        asks: data.asks,
+        ledger: data.ledger,
+        project: data.project,
+      })}
+      now={data.now}
+      parents={data.parents}
+      platformUrl={platformUrl}
+      postureLabel={data.ledger?.postureLabel}
+      states={askStates(events)}
+      {...more}
+    />
+  );
+};
+
+const readFrom = (name: string, world: Layer.Layer<Client>) =>
+  readProjectPage(name).pipe(Effect.flatMap(decodePage), Effect.provide(world));
+
+describe("the project's home as the server sends it", () => {
   it.effect(
-    "carries datekit's README and its root entries, read on the server",
+    "carries datekit's asks and its README, with no code table and no clone box",
     () =>
       Effect.gen(function* () {
-        const { code } = yield* readProjectPage("datekit").pipe(
-          Effect.flatMap(decodePage),
-          Effect.provide(devWorld)
-        );
+        const data = yield* readFrom("datekit", devWorld);
+        const markup = yield* sentFrom(data);
+        const main = mainOf(markup);
 
-        const sent = (
-          <ProjectReadingView
-            code={code}
-            platformUrl={platformUrl}
-            project={listing.project}
-          />
+        expect(main).toMatch(
+          /<a\b[^>]*href="\/datekit\/asks\/add-months-clamp"[^>]*>[^<]+<\/a>/u
         );
+        expect(
+          missingFrom(main, [
+            "Small, dependency-free date helpers",
+            'data-readme="README.md"',
+          ])
+        ).toStrictEqual([]);
+        expect(
+          foundIn(main, [
+            'href="/datekit/tree/main/src"',
+            "data-clone",
+            "Reading from the platform",
+          ])
+        ).toStrictEqual([]);
 
-        expect(textOf(sent)).toContain("Small, dependency-free date helpers");
-        expect(markupOf(sent)).toContain('data-readme="README.md"');
-        expect(markupOf(sent)).toContain('href="/datekit/tree/main/src"');
-        expect(textOf(sent)).toContain(`git clone ${platformUrl}/datekit.git`);
+        const facts = inspectorOf(markup);
+
+        expect(textIn(facts)).toContain("How a change lands here");
+        expect(
+          (facts.match(/data-landing="/gu) ?? []).length
+        ).toBeLessThanOrEqual(3);
       }),
     seededWorld
+  );
+
+  it.effect(
+    "draws burrow's family expanded, its six children listed",
+    () =>
+      Effect.gen(function* () {
+        const data = yield* readFrom("burrow", devWorld);
+
+        const family = rowOf(
+          mainOf(yield* sentFrom(data)),
+          "drop-legacy-fetch"
+        );
+
+        expect(family.match(/data-family-child="/gu)).toHaveLength(6);
+        expect(textIn(family)).toContain("0 of 6 landed");
+        expect(textIn(family)).toContain("Hide 6 children");
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "takes its posture from the project's own ledger, never the list of projects",
+    () =>
+      Effect.gen(function* () {
+        const listed = yield* Ref.make(0);
+
+        const data = yield* readFrom(
+          "vellum",
+          devWorldWith({ fixtures: "on" }, listed)
+        );
+
+        const head = mainOf(yield* sentFrom(data));
+
+        expect(yield* Ref.get(listed)).toBe(0);
+        expect(head).toContain('data-posture="openWithSealedEvidence"');
+        expect(textIn(head)).toContain("Open with sealed evidence");
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "says no posture while its own ledger is unread, never one it was not told",
+    () =>
+      Effect.gen(function* () {
+        const { ledger: _unread, ...data } = yield* readFrom(
+          "vellum",
+          devWorldWith({ fixtures: "on" })
+        );
+
+        const markup = yield* sentFrom(data);
+
+        expect({
+          badges: markup.match(/data-posture="/gu)?.length ?? 0,
+          open: textIn(inspectorOf(markup)).includes("Everything it ships"),
+        }).toStrictEqual({ badges: 0, open: false });
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "is sent without its asks and code, not as a not-found, when the platform does not answer",
+    () =>
+      Effect.gen(function* () {
+        const { asks: read, code } = yield* readFrom("datekit", unanswering);
+
+        expect(read).toBeUndefined();
+        expect(code).toBeUndefined();
+      })
   );
 
   it.effect(
     "shows a project whose main has not landed with no code, and no error",
     () =>
       Effect.gen(function* () {
-        const { code } = yield* readProjectPage("datekit").pipe(
-          Effect.flatMap(decodePage),
-          Effect.provide(nothingLanded)
-        );
+        const data = yield* readFrom("datekit", nothingLanded);
 
-        expect(code).toBeUndefined();
-
-        const sent = (
-          <ProjectReadingView
-            code={code}
-            platformUrl={platformUrl}
-            project={listing.project}
-          />
-        );
-
-        const shown = (
-          <ProjectView
-            asks={asks}
-            code={code}
-            landings={[]}
-            listing={listing}
-            now={now}
-            platformUrl={platformUrl}
-          />
-        );
-
-        expect(markupOf(sent)).not.toContain('id="code"');
-        expect(markupOf(shown)).not.toContain('id="code"');
-        expect(rowOf(markupOf(shown), "fix-week-start")).toContain(
-          'href="/datekit/asks/fix-week-start"'
-        );
-      })
-  );
-
-  it.effect(
-    "is sent without its code, not as a not-found, when the platform does not answer",
-    () =>
-      Effect.gen(function* () {
-        const { code } = yield* readProjectPage("datekit").pipe(
-          Effect.flatMap(decodePage),
-          Effect.provide(unanswering)
-        );
-
-        expect(code).toBeUndefined();
+        expect(data.code).toBeUndefined();
+        expect(mainOf(yield* sentFrom(data))).not.toContain("data-readme");
       })
   );
 
@@ -441,13 +748,89 @@ describe("the project's page as the server sends it", () => {
   );
 });
 
-describe(UnknownProjectView, () => {
-  it("shows the platform's UnknownProject refusal for a name that could be a project", () => {
-    const markup = markupOf(<UnknownProjectView name="no-such-project" />);
+const vellum = ProjectName.make("vellum");
 
-    expect(markup).toContain('data-refusal="UnknownProject"');
-    expect(markup).toContain("no-such-project");
-  });
+describe("a family child landing while the page is open", () => {
+  it.live(
+    "stamps nothing the first read holds, then stamps the child that landed, once, and moves the count",
+    () =>
+      Effect.gen(function* () {
+        const world = devWorldWith({
+          fixtures: "live",
+          liveAfter: Duration.zero,
+        });
+
+        const [data, later] = yield* Effect.gen(function* () {
+          const first = yield* readProjectPage("vellum").pipe(
+            Effect.flatMap(decodePage)
+          );
+
+          const client = yield* Client;
+
+          const second: readonly ProjectEvent[] = yield* Stream.runCollect(
+            client.watch({ project: vellum, since: 0 })
+          );
+
+          return [first, second] as const;
+        }).pipe(Effect.provide(world));
+
+        const mounted = stampStep(undefined, data.events ?? []);
+        const read = stampStep(mounted, later);
+        const again = stampStep(read, later);
+
+        expect([...mounted.stamped]).toStrictEqual([]);
+        expect([...read.stamped]).toStrictEqual([
+          "retire-old-tokenizer-vellum-lint",
+        ]);
+        expect(again.stamped).toBe(read.stamped);
+
+        const before = rowOf(
+          mainOf(yield* sentFrom(data, { stamps: mounted.stamped })),
+          "retire-old-tokenizer"
+        );
+
+        const after = rowOf(
+          mainOf(
+            yield* sentFrom(
+              { ...data, events: later },
+              { stamps: read.stamped }
+            )
+          ),
+          "retire-old-tokenizer"
+        );
+
+        expect({
+          after: textIn(after).includes("3 of 6 landed"),
+          before: textIn(before).includes("2 of 6 landed"),
+          stampedAfter: after.match(/animate-stamp/gu)?.length,
+          stampedBefore: before.includes("animate-stamp"),
+        }).toStrictEqual({
+          after: true,
+          before: true,
+          // The child's node in the fan, and its row in the list under it.
+          stampedAfter: 2,
+          stampedBefore: false,
+        });
+      }),
+    seededWorld
+  );
+});
+
+describe(UnknownProjectView, () => {
+  it.effect(
+    "shows the platform's UnknownProject refusal for a name that could be a project, and the way onward",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/no-such-project",
+          <UnknownProjectView name="no-such-project" />
+        );
+
+        expect(markup).toContain('data-refusal="UnknownProject"');
+        expect(markup).toContain("no-such-project");
+        expect(markup).toMatch(/<a\b[^>]*href="\/"[^>]*>Open asks<\/a>/u);
+      })
+  );
 
   it("says in a sentence that an address naming no possible project names none", () => {
     const markup = markupOf(<UnknownProjectView name="Not_A_Project" />);

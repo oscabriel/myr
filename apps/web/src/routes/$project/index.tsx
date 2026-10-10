@@ -1,93 +1,65 @@
 import { useAtomMount, useAtomValue } from "@effect/atom-react";
-import { FileView, TreeListing } from "@repo/protocol/domain/code";
-import type { ProjectListing } from "@repo/protocol/domain/front-page";
-import { ProjectName } from "@repo/protocol/ids";
-import { UnknownProject } from "@repo/protocol/refusal";
-import { createFileRoute, getRouteApi, notFound } from "@tanstack/react-router";
+import type { Ask } from "@repo/protocol/domain/ask";
+import { AskId } from "@repo/protocol/ids";
+import type { ProjectName } from "@repo/protocol/ids";
+import {
+  createFileRoute,
+  getRouteApi,
+  useHydrated,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
-import { DateTime, Effect, Option, Schema } from "effect";
+import { Effect, Option, Predicate, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
+import { useMemo } from "react";
+import type { ReactNode } from "react";
 
+import { askAtom } from "../../client/ask.ts";
 import { projectCodeAtom } from "../../client/code.ts";
-import { recentLandingsAtom } from "../../client/events.ts";
-import { projectsAtom } from "../../client/front.ts";
-import { asksAtom } from "../../client/project.ts";
-import { watchAtom } from "../../client/watch.ts";
+import { projectEventsAtom, recentLandings } from "../../client/events.ts";
 import {
-  ProjectReadingView,
+  asksAtom,
+  projectLedgerAtom,
+  projectPolicyAtom,
+} from "../../client/project.ts";
+import { SeededAtoms, seedSuccess } from "../../client/seeded.ts";
+import type { Seed } from "../../client/seeded.ts";
+import { watchAtom } from "../../client/watch.ts";
+import { useSignedIn } from "../../features/auth/session-slot.tsx";
+import { ledeOf } from "../../features/front/head.ts";
+import {
+  markdownAlternateLink,
+  markdownLink,
+} from "../../features/front/markdown.ts";
+import { useStamps } from "../../features/front/stamps.ts";
+import {
   ProjectView,
+  heldBackOf,
+  homeListing,
 } from "../../features/project/project-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
+import { askStates } from "../../features/shared/ask-progress.ts";
 import { pageHead } from "../../features/shared/head.ts";
-import { Unreachable } from "../../features/shared/pending.tsx";
+import { reloadOnEnter } from "../../features/shared/shell/selection.ts";
+import { branchPage } from "../../server/cache-headers.ts";
 import { serverClient } from "../../server/client.ts";
-import { readFolderWithReadme } from "../../server/folder.ts";
+import {
+  ProjectPageData,
+  decodeName,
+  projectPageHandler,
+  readProjectPage,
+} from "../../server/project-page.ts";
 
-// A project's page. The loader asks the platform, on the server, for the
-// project's root folder at main and its README, so the page arrives with
-// its code and a crawler reads the README; the same read says whether the
-// project exists, so an address naming none is a 404 that shows the
-// platform's `UnknownProject` refusal. The page's other reads (asks,
-// landings, the listing) are atoms the browser calls, and the code's atom
-// keeps it live once it has a value.
-
-const decodeName = Schema.decodeUnknownOption(ProjectName);
-
-const isUnknownProject = Schema.is(UnknownProject);
-
-/** What the loader hands the page: the project's code, when it could be read. */
-export const ProjectPageData = Schema.Struct({
-  code: Schema.optionalKey(
-    Schema.Struct({
-      readme: Schema.optionalKey(FileView),
-      root: TreeListing,
-    })
-  ),
-});
-
-const encodePage = Schema.encodeEffect(ProjectPageData);
-
-/**
- * The project's page data, read over `Client`, or a not-found for a name
- * that is none or a project the platform does not know. A project whose
- * main has not landed, or whose code the platform cannot read now, has a
- * page without its code; when the platform did not answer, the page's own
- * reads say so.
- */
-export const readProjectPage = (name: string) =>
-  Effect.gen(function* () {
-    const project = yield* Effect.fromOption(decodeName(name));
-
-    const code = yield* readFolderWithReadme({
-      path: Option.none(),
-      project,
-      rev: "main",
-    }).pipe(
-      Effect.map(({ listing, readme }) =>
-        Option.some({
-          root: listing,
-          ...Option.match(readme, {
-            onNone: () => ({}),
-            onSome: (file) => ({ readme: file }),
-          }),
-        })
-      ),
-      Effect.catchTag("UnknownProject", () => Effect.fail(notFound())),
-      Effect.catchTag(
-        ["RpcClientError", "Unauthenticated", "UnknownPath", "UnknownRevision"],
-        () => Effect.succeedNone
-      )
-    );
-
-    // What the platform sent decoded, so it encodes; a failure is a defect.
-    return yield* encodePage(
-      Option.match(code, {
-        onNone: () => ({}),
-        onSome: (read) => ({ code: read }),
-      })
-    ).pipe(Effect.orDie);
-  }).pipe(Effect.catchTag("NoSuchElementError", () => Effect.fail(notFound())));
+// A project's home, which is its list of asks. The loader reads, on the
+// server and at once, the project's asks, its own ledger (its posture), its
+// events (each ask's progress, a family's marks, its landings), its policy
+// (who decides) and its root folder with its README, then each family's
+// parent in full; so the page, and an agent fetching it, arrive with the
+// asks and the README. A read the platform cannot give now leaves its
+// section to the browser; an address naming no project is a 404 that shows
+// the platform's `UnknownProject` refusal. The list of projects is never
+// read here. The same URL answers `Accept: text/markdown` with the
+// project's `llms.txt`.
 
 const projectPage = createServerFn({ method: "GET" })
   .validator((name: string) => name)
@@ -97,85 +69,212 @@ const projectPage = createServerFn({ method: "GET" })
     )
   );
 
-const root = getRouteApi("__root__");
+/** Where a project's Markdown is; none for a name that can name no project. */
+const markdownOf = (name: string) =>
+  Option.map(decodeName(name), (project) => `/${project}/llms.txt`);
 
 /**
- * The project as listed, its posture the one its own ledger stands at (the
- * list reads it from each project); a project the list has not heard from
- * yet (its projection catches up after its first event) reads open, as
- * the projection lists a project before any posture is projected.
+ * The page's headers: varied by `Accept`; for a name that can be a
+ * project's, kept briefly with its Markdown named. A path that cannot names
+ * nothing, so no raw path text reaches a header.
  */
-const listingOf = (
-  project: ProjectName,
-  projects: readonly ProjectListing[],
-  openAsks: number
-): ProjectListing =>
-  projects.find((listed) => listed.project === project) ?? {
-    openAsks,
-    posture: "open",
-    project,
+export const projectPageHeaders = ({
+  params,
+}: {
+  readonly params: { readonly project: string };
+}): Readonly<Record<string, string>> =>
+  Option.match(markdownOf(params.project), {
+    onNone: () => ({ vary: "Accept" }),
+    onSome: (href) => ({
+      ...branchPage,
+      link: markdownLink(href),
+      vary: "Accept",
+    }),
+  });
+
+/** The page's head: its name, its README's first sentence, and its Markdown. */
+export const projectPageHead = ({
+  loaderData,
+  params,
+}: {
+  readonly params: { readonly project: string };
+  readonly loaderData?: typeof ProjectPageData.Encoded | undefined;
+}) => {
+  const text = loaderData?.code?.readme?.text;
+  const lede = Predicate.isString(text) ? ledeOf(text) : undefined;
+
+  return {
+    ...pageHead({
+      title: params.project,
+      ...Option.match(Option.fromUndefinedOr(lede), {
+        onNone: () => ({}),
+        onSome: (description) => ({ description }),
+      }),
+    }),
+    links: Option.match(markdownOf(params.project), {
+      onNone: () => [],
+      onSome: (href) => [markdownAlternateLink(href)],
+    }),
   };
+};
 
-const decodePage = Schema.decodeSync(ProjectPageData);
+const root = getRouteApi("__root__");
 
-const ProjectBody = ({ project }: { readonly project: ProjectName }) => {
-  const { platformUrl } = root.useLoaderData();
-  const read = decodePage(Route.useLoaderData());
+/** The selected ask in full, read in the browser once it is selected. */
+const WithFull = ({
+  ask,
+  children,
+  project,
+}: {
+  readonly ask: AskId;
+  readonly project: ProjectName;
+  readonly children: (full: Ask | undefined) => ReactNode;
+}) => {
+  const read = useAtomValue(askAtom(project, ask));
+
+  return children(AsyncResult.isSuccess(read) ? read.value.ask : undefined);
+};
+
+const decodeAsk = Schema.decodeUnknownOption(AskId);
+
+/** An atom's value once it has one, else what the loader read. */
+const valueOr = <A, E, B>(
+  read: AsyncResult.AsyncResult<A, E>,
+  seeded: B | undefined,
+  pick: (value: A) => B
+): B | undefined =>
+  Option.getOrElse(Option.map(AsyncResult.value(read), pick), () => seeded);
+
+/** The page over its atoms, each section as its read arrives, all kept live. */
+const LiveProject = ({
+  data,
+  platformUrl,
+  selected,
+  signedIn,
+}: {
+  readonly data: ProjectPageData;
+  readonly platformUrl: string;
+  readonly selected: string | undefined;
+  readonly signedIn: boolean;
+}) => {
+  const { project } = data;
+  const hydrated = useHydrated();
 
   // Live: each event the project commits makes these reads fetch again.
   useAtomMount(watchAtom(project));
 
-  const reads = AsyncResult.all({
-    asks: useAtomValue(asksAtom(project)),
-    landings: useAtomValue(recentLandingsAtom(project)),
-    listed: useAtomValue(projectsAtom),
-  });
+  const asksRead = useAtomValue(asksAtom(project));
+  const asks = valueOr(asksRead, data.asks, ({ asks: listed }) => listed);
 
-  // The root folder and README: the loader's, read on the server, until the
-  // atom has its own (it reads again on each landing). A project whose main
-  // has not landed (or whose code cannot be read now) shows its page
-  // without them.
-  const code = Option.getOrElse(
-    AsyncResult.value(useAtomValue(projectCodeAtom(project))),
-    () => read.code
+  const events = valueOr(
+    useAtomValue(projectEventsAtom(project)),
+    data.events,
+    (read) => read
   );
 
-  return AsyncResult.matchWithError(reads, {
-    onDefect: () => <Unreachable title={project} />,
-    onError: (error) =>
-      isUnknownProject(error) ? (
-        <UnknownProjectView name={project} />
-      ) : (
-        <Unreachable title={project} />
-      ),
-    onInitial: () => (
-      <ProjectReadingView
-        code={code}
-        platformUrl={platformUrl}
-        project={project}
-      />
-    ),
-    onSuccess: ({ value: { asks, landings, listed } }) => (
-      <ProjectView
-        asks={asks.asks}
-        code={code}
-        landings={landings}
-        listing={listingOf(project, listed.projects, asks.asks.length)}
-        now={DateTime.nowUnsafe()}
-        platformUrl={platformUrl}
-      />
-    ),
-  });
+  const ledger = valueOr(
+    useAtomValue(projectLedgerAtom(project)),
+    data.ledger,
+    (read) => read
+  );
+
+  const code = valueOr(
+    useAtomValue(projectCodeAtom(project)),
+    data.code,
+    (read) => read
+  );
+
+  const deciders = valueOr(
+    useAtomValue(projectPolicyAtom(project)),
+    data.policy,
+    (read) => read
+  )?.policy?.deciders;
+
+  const reads = useMemo(
+    () => new Map(events === undefined ? [] : [[project, events]]),
+    [events, project]
+  );
+
+  const stamps = useStamps(reads)(project);
+  const states = useMemo(() => askStates(events ?? []), [events]);
+  const landings = useMemo(() => recentLandings(events ?? []), [events]);
+  const [latest] = landings;
+
+  const view = (selectedAsk?: Ask) => (
+    <ProjectView
+      asks={asks}
+      code={code}
+      deciders={deciders}
+      heldBack={ledger === undefined ? undefined : heldBackOf(ledger)}
+      landings={landings}
+      lastLanded={latest?.landedAt}
+      listing={homeListing({ asks, ledger, project })}
+      now={data.now}
+      parents={data.parents}
+      platformUrl={platformUrl}
+      postureLabel={ledger?.postureLabel}
+      selectedAsk={selectedAsk}
+      signedIn={signedIn}
+      stamps={stamps}
+      states={states}
+      unreachable={AsyncResult.isFailure(asksRead)}
+    />
+  );
+
+  const picked = Option.filter(decodeAsk(selected), (ask) =>
+    (asks ?? []).some((listing) => listing.ask === ask)
+  );
+
+  return hydrated && Option.isSome(picked) ? (
+    <WithFull ask={picked.value} project={project}>
+      {view}
+    </WithFull>
+  ) : (
+    view()
+  );
 };
 
-/** The page, for a name the loader found; a name that is none reads as unknown. */
 const ProjectPage = () => {
-  const { project } = Route.useParams();
+  const loaded = Route.useLoaderData();
 
-  return Option.match(decodeName(project), {
-    onNone: () => <UnknownProjectView name={project} />,
-    onSome: (name) => <ProjectBody project={name} />,
-  });
+  const data = useMemo(
+    () => Schema.decodeSync(ProjectPageData)(loaded),
+    [loaded]
+  );
+
+  const { ask } = Route.useSearch();
+  const { platformUrl } = root.useLoaderData();
+  const signedIn = useSignedIn();
+  const { project } = data;
+
+  const seeds: readonly Seed[] = [
+    ...(data.asks === undefined
+      ? []
+      : [seedSuccess(asksAtom(project), { asks: data.asks })]),
+    ...(data.events === undefined
+      ? []
+      : [seedSuccess(projectEventsAtom(project), data.events)]),
+    ...(data.ledger === undefined
+      ? []
+      : [seedSuccess(projectLedgerAtom(project), data.ledger)]),
+    ...(data.code === undefined
+      ? []
+      : [seedSuccess(projectCodeAtom(project), data.code)]),
+    ...(data.policy === undefined
+      ? []
+      : [seedSuccess(projectPolicyAtom(project), data.policy)]),
+  ];
+
+  return (
+    <SeededAtoms id={project} seeds={seeds}>
+      <LiveProject
+        data={data}
+        platformUrl={platformUrl}
+        selected={ask}
+        signedIn={signedIn}
+      />
+    </SeededAtoms>
+  );
 };
 
 const Unknown = () => {
@@ -185,8 +284,21 @@ const Unknown = () => {
 };
 
 export const Route = createFileRoute("/$project/")({
-  component: ProjectPage,
-  head: ({ params }) => pageHead({ title: params.project }),
+  // TanStack infers each option from the ones before it.
+  validateSearch: ({ ask }: { readonly ask?: unknown }) =>
+    Predicate.isString(ask) ? { ask } : {},
   loader: ({ params }) => projectPage({ data: params.project }),
+  shouldReload: reloadOnEnter,
+  head: projectPageHead,
+  headers: projectPageHeaders,
+  component: ProjectPage,
   notFoundComponent: Unknown,
+  server: {
+    handlers: {
+      GET: projectPageHandler(
+        (request) => serverClient(env, request),
+        env.PUBLIC_PLATFORM_URL
+      ),
+    },
+  },
 });

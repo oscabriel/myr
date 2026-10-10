@@ -1,50 +1,83 @@
 /**
- * The front page, rendered to HTML with `react-dom/server` from fixtures
- * decoded with the protocol's own schemas: open asks across projects, the
- * ones a viewer may take first, each other one with the reason it is not
- * theirs to take, narrowed by kind and by who an ask is held for.
+ * The front page: the open asks of every project, read on the server by the
+ * route's loader and rendered inside the router, grouped by project with
+ * each project's posture said once on its group's header, a family drawn
+ * as one fan row, each ask the viewer may take with its claim command as
+ * text, narrowed by kind, by whether it is open to take or held for
+ * newcomers, and by project.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { deleteChildId, splitFamily } from "@repo/project/migrate";
+import { Client, Contracts } from "@repo/protocol/contracts";
+import { AskListing } from "@repo/protocol/domain/ask";
+import type { Ask } from "@repo/protocol/domain/ask";
+import { CheckSpec } from "@repo/protocol/domain/check";
+import { Command, Glob, SymbolName } from "@repo/protocol/domain/common";
 import {
   FrontPageEntry,
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
-import { KindName } from "@repo/protocol/ids";
-import { DateTime, Schema } from "effect";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
+import { AskId, KindName, ProjectName } from "@repo/protocol/ids";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { DateTime, Effect, Layer, Option, Schema } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { RpcClient, RpcSerialization, RpcTest } from "effect/rpc";
 
-import { filterEntries, readFilter } from "../src/features/front/filter.ts";
+import { devServer } from "../src/dev/server.ts";
+import { arrange, familiesIn } from "../src/features/front/families.ts";
+import {
+  filterEntries,
+  frontPath,
+  readFilter,
+} from "../src/features/front/filter.ts";
 import type { FrontFilter } from "../src/features/front/filter.ts";
 import { FrontPageView } from "../src/features/front/front-page.tsx";
+import type { FrontPageProps } from "../src/features/front/front-page.tsx";
+import { FrontPageData, readFrontPage } from "../src/server/front-page.ts";
+import { ask as parseIsoWeek } from "./ask-fixtures.ts";
+import { textIn } from "./markup.ts";
+import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
-
-const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
-
-/** What a reader sees: the markup without its tags, entities decoded. */
-const textOf = (element: ReactElement) =>
-  markupOf(element)
-    .replaceAll(/<[^>]+>/gu, "")
-    .replaceAll("&#x27;", "'")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&amp;", "&");
 
 const kind = Schema.decodeSync(KindName);
 
-/** The markup of the row for `ask`: from its `<li>` to the next ask's row. */
+/** The markup of the row for `ask`: from its `<li>` to the next row or group. */
 const rowOf = (markup: string, ask: string) => {
   const start = markup.indexOf(`data-ask="${ask}"`);
-  const next = markup.indexOf("data-ask=", start + 1);
 
-  return start === -1
-    ? ""
-    : markup.slice(start, next === -1 ? undefined : next);
+  const ends = ["data-ask=", "<section", "</main>"].flatMap((end) => {
+    const at = markup.indexOf(end, start + 1);
+
+    return at === -1 ? [] : [at];
+  });
+
+  return start === -1 ? "" : markup.slice(start, Math.min(...ends));
 };
 
+/** The ask ids of the rows on the page, top to bottom. */
+const rowsIn = (markup: string) =>
+  [...markup.matchAll(/<li\b[^>]*data-ask="(?<ask>[^"]+)"/gu)].map(
+    (row) => row.groups?.ask
+  );
+
+/** The markup of each project group's sticky header, by its project. */
+const headersIn = (markup: string) =>
+  [
+    ...markup.matchAll(
+      /<section aria-label="(?<project>[^"]+)"[^>]*>(?<header><div\b[\s\S]*?<\/div><\/div>)/gu
+    ),
+  ].map((match) => [match.groups?.project, match.groups?.header] as const);
+
+/** The list itself: from the toolbar to the end of main, the facts left out. */
+const listIn = (markup: string) =>
+  markup.slice(markup.indexOf("data-toolbar"), markup.indexOf("</main>"));
+
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
+
+const platformUrl = "https://platform-test.example.workers.dev";
+
+const webUrl = "https://web-test.example.workers.dev";
 
 const entries = Schema.decodeSync(Schema.Array(FrontPageEntry))([
   {
@@ -102,20 +135,27 @@ const projects = Schema.decodeSync(Schema.Array(ProjectListing))([
 const asksOf = (shown: readonly FrontPageEntry[]) =>
   shown.map(({ ask }) => ask.ask);
 
-/** The ask ids of the rows on the page, top to bottom. */
-const rowsOf = (element: ReactElement) =>
-  [...markupOf(element).matchAll(/<li\b[^>]*data-ask="(?<ask>[^"]+)"/gu)].map(
-    (row) => row.groups?.ask
-  );
+/** The page's props, with nothing the loader read beyond `entries`. */
+const props = (
+  filter: FrontFilter,
+  more: Partial<FrontPageProps> = {}
+): FrontPageProps => ({
+  entries,
+  events: new Map(),
+  filter,
+  now,
+  parents: [],
+  platformUrl,
+  projects,
+  webUrl,
+  ...more,
+});
 
-const front = (filter: FrontFilter) => (
-  <FrontPageView
-    entries={entries}
-    filter={filter}
-    now={now}
-    projects={projects}
-  />
-);
+const front = (filter: FrontFilter, more: Partial<FrontPageProps> = {}) =>
+  renderAt(
+    filter.kind === undefined ? "/" : frontPath(filter),
+    <FrontPageView {...props(filter, more)} />
+  );
 
 describe(filterEntries, () => {
   it("puts the asks the viewer may take first, keeping the order given", () => {
@@ -137,98 +177,513 @@ describe(filterEntries, () => {
       asksOf(filterEntries(entries, { reserved: "newcomers" }))
     ).toStrictEqual(["explain-iso-week"]);
   });
+
+  it("narrows the list to the asks open to take", () => {
+    expect(asksOf(filterEntries(entries, { take: "open" }))).toStrictEqual([
+      "fix-week-start",
+      "split-format",
+    ]);
+  });
+
+  it("narrows the list to one project", () => {
+    expect(
+      asksOf(filterEntries(entries, { project: ProjectName.make("burrow") }))
+    ).toStrictEqual(["split-format"]);
+  });
 });
 
 describe(readFilter, () => {
-  it("keeps a valid kind and reserve from the address, and drops what is not one", () => {
-    expect(readFilter({ kind: "bug", reserved: "newcomers" })).toStrictEqual({
+  it("keeps a valid kind, reserve, take and project from the address, and drops what is not one", () => {
+    expect(
+      readFilter({
+        kind: "bug",
+        project: "datekit",
+        reserved: "newcomers",
+        take: "open",
+      })
+    ).toStrictEqual({
       kind: "bug",
+      project: "datekit",
       reserved: "newcomers",
+      take: "open",
     });
     expect(
-      readFilter({ kind: "Not A Kind", reserved: "everyone" })
+      readFilter({
+        kind: "Not A Kind",
+        project: "Not_A_Project",
+        reserved: "everyone",
+        take: "all",
+      })
     ).toStrictEqual({});
   });
 });
 
-describe(FrontPageView, () => {
-  it("shows the asks the viewer may take first", () => {
-    expect(rowsOf(front({}))).toStrictEqual([
+/** A listing as the contracts return one. */
+const listing = (id: string, blockedBy: readonly string[] = []) =>
+  Schema.decodeSync(AskListing)({
+    ask: id,
+    blockedBy,
+    claimed: false,
+    kind: "migrate",
+    territory: ".",
+    want: `The want of ${id}.`,
+  });
+
+describe(familiesIn, () => {
+  const children = ["drop-fetch-auth", "drop-fetch-kit"];
+
+  it("reads a family from a parent waiting on asks named after it, with its delete child", () => {
+    const listed = [
+      listing("drop-fetch", [...children, "drop-fetch-delete"]),
+      listing("drop-fetch-auth"),
+      listing("drop-fetch-kit"),
+      listing("drop-fetch-delete", children),
+      listing("fix-week-start"),
+    ];
+
+    expect(familiesIn(listed)).toStrictEqual([
+      {
+        finale: "drop-fetch-delete",
+        members: ["drop-fetch-auth", "drop-fetch-kit", "drop-fetch-delete"],
+        parent: "drop-fetch",
+      },
+    ]);
+  });
+
+  it("reads one where the list leaves its delete child out, or holds only it", () => {
+    expect(
+      familiesIn([
+        listing("drop-fetch", children),
+        listing("drop-fetch-auth"),
+        listing("drop-fetch-kit"),
+      ]).map(({ members }) => members)
+    ).toStrictEqual([children]);
+    expect(
+      familiesIn([
+        listing("drop-fetch", ["drop-fetch-delete"]),
+        listing("drop-fetch-delete"),
+      ]).map(({ members }) => members)
+    ).toStrictEqual([["drop-fetch-delete"]]);
+  });
+
+  it("reads no family from an ask that waits on an ask not named after it", () => {
+    expect(
+      familiesIn([
+        listing("footnote-backrefs", ["number-footnotes"]),
+        listing("number-footnotes"),
+      ])
+    ).toStrictEqual([]);
+  });
+
+  it("finds the family the platform's split opens, by the names it gives", () => {
+    const migrateParent: Ask = {
+      ...parseIsoWeek,
+      blockedBy: [],
+      brief: { want: "Replace legacyFetch with http.get." },
+      check: CheckSpec.cases.Migrate.make({
+        count: Command.make("bun run count"),
+        from: SymbolName.make("legacyFetch"),
+        to: SymbolName.make("http.get"),
+      }),
+      id: AskId.make("drop-fetch"),
+      kind: KindName.make("migrate"),
+      project: ProjectName.make("burrow"),
+      territory: { module: ".", paths: [Glob.make("packages/**")] },
+    };
+
+    const counted = Option.getOrThrow(
+      splitFamily({
+        configDir: Brand.configDir,
+        counts: { byModule: { auth: 2, kit: 1 }, total: 3 },
+        modules: [
+          { module: "auth", paths: [Glob.make("packages/auth/**")] },
+          { module: "kit", paths: [Glob.make("packages/kit/**")] },
+        ],
+        parent: migrateParent,
+      })
+    );
+
+    const listed = [
+      counted.parent,
+      ...counted.children,
+      counted.deleteChild,
+    ].map((ask) => listing(ask.id, ask.blockedBy));
+
+    expect(familiesIn(listed)).toStrictEqual([
+      {
+        finale: deleteChildId(counted.parent.id),
+        members: [
+          ...counted.children.map(({ id }) => id),
+          counted.deleteChild.id,
+        ],
+        parent: counted.parent.id,
+      },
+    ]);
+  });
+});
+
+describe(arrange, () => {
+  it("puts each family at its parent's place, its members out of the list", () => {
+    const listed = [
+      listing("fix-week-start"),
+      listing("drop-fetch-auth"),
+      listing("drop-fetch", ["drop-fetch-auth"]),
+      listing("parse-iso"),
+    ];
+
+    expect(
+      arrange(listed).map((item) =>
+        item.kind === "family"
+          ? `${item.parent.ask}: ${item.members.map(({ ask }) => ask).join(", ")}`
+          : item.listing.ask
+      )
+    ).toStrictEqual([
       "fix-week-start",
-      "split-format",
-      "explain-iso-week",
+      "drop-fetch: drop-fetch-auth",
+      "parse-iso",
     ]);
   });
+});
 
-  it("marks an ask the viewer may not take with the reason", () => {
-    const markup = markupOf(front({}));
-    const row = rowOf(markup, "explain-iso-week");
+describe(FrontPageView, () => {
+  it.effect(
+    "shows the asks the viewer may take first, grouped by project",
+    () =>
+      Effect.gen(function* () {
+        expect(rowsIn(yield* front({}))).toStrictEqual([
+          "fix-week-start",
+          "explain-iso-week",
+          "split-format",
+        ]);
+      })
+  );
 
-    expect(row).toContain('data-takeable="false"');
-    expect(row).toContain("Held for newcomers");
-    expect(row).not.toContain("Open to take");
-    expect(row).not.toContain(`${Brand.cli} claim explain-iso-week`);
-    expect(rowOf(markup, "fix-week-start")).toContain("Open to take");
-  });
+  it.effect(
+    "says each project's posture once, on its group's header, and on no row",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front({});
+        const headers = headersIn(markup);
 
-  it("shows each ask's project, want, kind and territory, and links its project", () => {
-    const row = rowOf(markupOf(front({})), "split-format");
+        const [datekit, burrow] = headers.map(([, header]) => header ?? "");
 
-    expect(row).toContain('href="/burrow"');
-    expect(row).toContain('href="/burrow/asks/split-format"');
-    expect(row).toContain("The format package calls the new parser.");
-    expect(row).toMatch(/>Kind<\/dt><dd\b[^>]*>migrate<\/dd>/u);
-    expect(row).toMatch(/>Territory<\/dt><dd\b[^>]*>format<\/dd>/u);
-  });
+        expect(headers.map(([project]) => project)).toStrictEqual([
+          "datekit",
+          "burrow",
+        ]);
+        expect({
+          burrowLink: burrow?.includes('href="/burrow"'),
+          burrowPosture: burrow?.includes(
+            'data-posture="openWithSealedEvidence"'
+          ),
+          burrowWords: textIn(burrow ?? "").includes(
+            "Open with sealed evidence"
+          ),
+          datekitCounts: textIn(datekit ?? "").includes("2 open · 1 to take"),
+        }).toStrictEqual({
+          burrowLink: true,
+          burrowPosture: true,
+          burrowWords: true,
+          datekitCounts: true,
+        });
+        expect(listIn(markup).match(/data-posture=/gu)).toHaveLength(2);
+        expect(
+          ["fix-week-start", "explain-iso-week", "split-format"].filter((ask) =>
+            rowOf(markup, ask).includes("data-posture")
+          )
+        ).toStrictEqual([]);
+      })
+  );
 
-  it("gives an ask the viewer may take the command that claims it", () => {
-    expect(textOf(front({}))).toContain(
-      `${Brand.cli} claim fix-week-start --project datekit`
-    );
-  });
+  it.effect(
+    "draws its rows when the list of projects has not arrived, with no posture yet",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front({}, { projects: undefined });
 
-  it("narrows the list by kind, and offers every kind on the page as a filter", () => {
-    const markup = markupOf(front({ kind: kind("migrate") }));
+        expect(rowsIn(markup)).toHaveLength(3);
+        expect(listIn(markup)).not.toContain("data-posture=");
+      })
+  );
 
-    expect(rowsOf(front({ kind: kind("migrate") }))).toStrictEqual([
-      "split-format",
-    ]);
-    expect(markup).toContain('href="/?kind=bug"');
-    expect(markup).toContain('href="/?kind=migrate"');
-    expect(markup).toContain('href="/?kind=migrate&amp;reserved=newcomers"');
-    expect(markupOf(front({}))).toContain('href="/?reserved=newcomers"');
-  });
+  it.effect(
+    "marks an ask the viewer may not take with the reason, and no command",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front({});
+        const row = rowOf(markup, "explain-iso-week");
 
-  it("lists every project with its posture label and open asks", () => {
-    const markup = markupOf(front({}));
-    const listed = markup.slice(markup.indexOf('aria-labelledby="projects"'));
+        expect(row).toContain('data-takeable="false"');
+        expect(textIn(row)).toMatch(
+          /Not open to you[\s\S]*held for newcomers/u
+        );
+        expect(row).not.toContain("Open to take");
+        expect(row).not.toContain(`${Brand.cli} claim explain-iso-week`);
+        expect(rowOf(markup, "fix-week-start")).toContain("Open to take");
+      })
+  );
 
-    expect(markup).toContain('aria-labelledby="projects"');
-    expect(listed).toMatch(
-      /href="\/burrow"[^>]*>burrow<\/a>.*?Open with sealed evidence.*?1 open ask\b/u
-    );
-    expect(listed).toMatch(
-      /href="\/datekit"[^>]*>datekit<\/a>.*?>Open<.*?2 open asks/u
-    );
-  });
+  it.effect("links each ask's want, and shows its kind, territory and id", () =>
+    Effect.gen(function* () {
+      const row = rowOf(yield* front({}), "split-format");
 
-  it("says an empty front page is empty, with the command that starts a project", () => {
-    const text = textOf(
-      <FrontPageView entries={[]} filter={{}} now={now} projects={[]} />
-    );
+      expect(row).toMatch(
+        /<a\b[^>]*href="\/burrow\/asks\/split-format"[^>]*>The format package calls the new parser\.<\/a>/u
+      );
+      expect(textIn(row)).toContain("migrate · format · split-format");
+    })
+  );
 
-    expect(text).toContain("No open asks");
-    expect(text).toContain(`${Brand.cli} init`);
-  });
+  it.effect(
+    "gives an ask the viewer may take its claim command as text in its copy button, with no command box",
+    () =>
+      Effect.gen(function* () {
+        const row = rowOf(yield* front({}), "fix-week-start");
 
-  it("says a front page with projects but no asks needs an ask opened", () => {
-    const text = textOf(
-      <FrontPageView entries={[]} filter={{}} now={now} projects={projects} />
-    );
+        expect(row).toMatch(
+          new RegExp(
+            `<button[^>]*aria-label="Copy claim command"[\\s\\S]*?<code[^>]*>${Brand.cli} claim fix-week-start --project datekit</code>`,
+            "u"
+          )
+        );
+        // A command box's text is selectable whole; a row's command is a button's.
+        expect(row).not.toContain("select-all");
+      })
+  );
 
-    expect(text).toContain("No open asks");
-    expect(text).toContain(`${Brand.cli} ask open`);
-  });
+  it.effect("counts the asks shown, and those open to take", () =>
+    Effect.gen(function* () {
+      expect(textIn(yield* front({}))).toContain("3 open asks, 2 open to take");
+    })
+  );
+
+  it.effect(
+    "narrows by kind, offering each kind, who an ask is for, and each project, with counts",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front({ kind: kind("migrate") });
+        const all = yield* front({});
+        const toolbar = all.slice(all.indexOf("data-toolbar"));
+
+        expect(rowsIn(markup)).toStrictEqual(["split-format"]);
+        expect(
+          [
+            'href="/?kind=bug"',
+            'href="/?kind=migrate&amp;reserved=newcomers"',
+          ].filter((href) => !markup.includes(href))
+        ).toStrictEqual([]);
+        expect(
+          [
+            'href="/?reserved=newcomers"',
+            'href="/?take=open"',
+            'href="/?project=burrow"',
+          ].filter((href) => !all.includes(href))
+        ).toStrictEqual([]);
+        expect(textIn(toolbar)).toMatch(
+          /Open to take\s*2[\s\S]*Held for newcomers\s*1/u
+        );
+        expect(
+          ["Reserved", "For people, not agents"].filter((words) =>
+            textIn(toolbar).includes(words)
+          )
+        ).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "with nothing selected, says where to start and lists every project with its posture",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front({});
+        const facts = markup.slice(markup.indexOf('data-facts="inspector"'));
+        const text = textIn(facts);
+
+        expect(
+          [
+            "Start here",
+            `curl -fsSL ${webUrl}/install.sh | sh`,
+            `${Brand.cli} claim <ask> --project <project>`,
+          ].filter((words) => !text.includes(words))
+        ).toStrictEqual([]);
+        expect(facts).toContain('href="/llms.txt"');
+        expect(facts).toMatch(
+          /href="\/burrow"[\s\S]*?1 open ask\b[\s\S]*?Open with sealed evidence/u
+        );
+        expect(facts).toMatch(
+          /href="\/datekit"[\s\S]*?2 open asks[\s\S]*?>Open</u
+        );
+      })
+  );
+
+  it.effect(
+    "with an ask selected, shows its state, the claim numbered first, and a link to it",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/?ask=fix-week-start",
+          <FrontPageView {...props({})} />
+        );
+
+        const facts = markup.slice(markup.indexOf('data-facts="inspector"'));
+
+        expect(textIn(facts)).toContain("Selected ask");
+        expect(textIn(facts)).toContain(
+          `${Brand.cli} claim fix-week-start --project datekit`
+        );
+        expect(facts).toContain('href="/datekit/asks/fix-week-start"');
+        expect(textIn(facts)).toContain("Open the ask");
+      })
+  );
+
+  it.effect("never uses the words a forge's lists use", () =>
+    Effect.gen(function* () {
+      const text = textIn(yield* front({})).toLowerCase();
+
+      for (const word of ["queue", "inbox", "explore", "trending"]) {
+        expect(text).not.toContain(word);
+      }
+    })
+  );
+
+  it.effect(
+    "says an empty front page is empty, with the command that starts a project",
+    () =>
+      Effect.gen(function* () {
+        const text = textIn(yield* front({}, { entries: [], projects: [] }));
+
+        expect(text).toContain("No open asks");
+        expect(text).toContain(`${Brand.cli} init`);
+      })
+  );
+
+  it.effect(
+    "says a front page with projects but no asks needs an ask opened",
+    () =>
+      Effect.gen(function* () {
+        const text = textIn(yield* front({}, { entries: [] }));
+
+        expect(text).toContain("No open asks");
+        expect(text).toContain(`${Brand.cli} ask open`);
+      })
+  );
+});
+
+/** The contracts over HTTP, each request answered by `answer`. */
+const clientOver = (answer: (request: Request) => Promise<Response>) =>
+  Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
+    Layer.provide(RpcClient.layerProtocolHttp({ url: "http://localhost/rpc" })),
+    Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson]),
+    Layer.provide(
+      Layer.succeed(FetchHttpClient.Fetch, (input, init) =>
+        answer(new Request(input, init))
+      )
+    )
+  );
+
+/** The contracts over a fresh dev world; the world ends with the scope. */
+const devWorld = Layer.unwrap(
+  Effect.gen(function* () {
+    const { dispose, handler } = devServer();
+
+    yield* Effect.addFinalizer(() => Effect.promise(dispose));
+
+    return clientOver(handler);
+  })
+);
+
+/** A platform that answers the front page and never answers the list of projects. */
+const projectsNeverAnswer = Layer.effect(
+  Client,
+  RpcTest.makeClient(Contracts)
+).pipe(
+  Layer.provide([
+    Layer.mergeAll(
+      unanswered,
+      Contracts.toLayerHandler("frontPage", () => Effect.succeed({ entries })),
+      Contracts.toLayerHandler("listProjects", () => Effect.never)
+    ),
+    asTester,
+  ])
+);
+
+const decodeData = Schema.decodeEffect(FrontPageData);
+
+/** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
+const seededWorld = { timeout: 30_000 };
+
+/** The page as the route renders it from what its loader read. */
+const sentFrom = (data: FrontPageData, filter: FrontFilter = {}) =>
+  renderAt(
+    "/",
+    <FrontPageView
+      entries={data.entries}
+      events={
+        new Map(data.events.map(({ events, project }) => [project, events]))
+      }
+      filter={filter}
+      now={data.now}
+      parents={data.parents}
+      platformUrl={platformUrl}
+      projects={undefined}
+      webUrl={webUrl}
+    />
+  );
+
+describe("the front page as the server sends it", () => {
+  it.effect(
+    "holds every open ask's want as a link, grouped by project, burrow's family as one fan row",
+    () =>
+      Effect.gen(function* () {
+        const data = yield* readFrontPage.pipe(
+          Effect.flatMap(decodeData),
+          Effect.provide(devWorld)
+        );
+
+        const markup = yield* sentFrom(data);
+        const text = textIn(markup);
+
+        expect(listIn(markup)).not.toContain("Reading from the platform");
+        expect(markup).toMatch(
+          /<a\b[^>]*href="\/datekit\/asks\/add-months-clamp"[^>]*>[^<]+<\/a>/u
+        );
+        expect(headersIn(markup).map(([project]) => project)).toStrictEqual([
+          "burrow",
+          "datekit",
+        ]);
+        expect(text).toContain("10 open asks, 7 open to take");
+
+        const family = rowOf(markup, "drop-legacy-fetch");
+        const nodes = family.match(/<li class="flex items-center gap-1.5"/gu);
+
+        expect({
+          familyRows: rowsIn(markup).filter(
+            (ask) => ask?.startsWith("drop-legacy-fetch") === true
+          ),
+          nodes: nodes?.length,
+          noCommandBox: !listIn(markup).includes("select-all"),
+          strip: /0 of 6 landed[\s\S]*Show 6 children/u.test(textIn(family)),
+        }).toStrictEqual({
+          familyRows: ["drop-legacy-fetch"],
+          nodes: 6,
+          noCommandBox: true,
+          strip: true,
+        });
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "is read without the list of projects, which may never answer",
+    () =>
+      Effect.gen(function* () {
+        const data = yield* readFrontPage.pipe(
+          Effect.flatMap(decodeData),
+          Effect.provide(projectsNeverAnswer)
+        );
+
+        expect(rowsIn(yield* sentFrom(data))).toHaveLength(3);
+      })
+  );
 });
 
 describe("the front page's views", () => {

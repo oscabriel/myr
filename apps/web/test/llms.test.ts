@@ -26,7 +26,14 @@ import {
   missingProjectLlms,
   projectLlms,
 } from "../src/features/agents/llms.ts";
+import {
+  projectPageHead,
+  projectPageHeaders,
+} from "../src/routes/$project/index.tsx";
+import { frontPageHead, frontPageHeaders } from "../src/routes/index.tsx";
 import { llmsFullHandler } from "../src/routes/llms-full[.]txt.ts";
+import { frontPageHandler } from "../src/server/front-page.ts";
+import { projectPageHandler } from "../src/server/project-page.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
 
@@ -436,5 +443,149 @@ describe(mcpCard, () => {
       protocolVersion: "2026-07-28",
       transport: { endpoint: `${platformUrl}/mcp`, type: "streamable-http" },
     });
+  });
+});
+
+/** A platform that lists `listed` as its projects and `listedAsks` as datekit's asks. */
+const listingWithAsks =
+  (listed: readonly ProjectListing[], listedAsks: readonly AskListing[]) =>
+  () =>
+    Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+      Layer.provide([
+        Layer.mergeAll(
+          unanswered,
+          Contracts.toLayerHandler("listProjects", () =>
+            Effect.succeed({ projects: listed })
+          ),
+          Contracts.toLayerHandler("listAsks", () =>
+            Effect.succeed({ asks: listedAsks })
+          )
+        ),
+        asTester,
+      ])
+    );
+
+/** A request for `path` on the web host, accepting `accept`. */
+const getAt = (path: string, accept: string) =>
+  new Request(`${webUrl}${path}`, { headers: { accept } });
+
+const BROWSER =
+  "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+
+/** What a handler answered: a response, or the page it fell through to. */
+const answered = (result: Promise<Response> | "the page") =>
+  result === "the page"
+    ? Effect.void
+    : Effect.flatMap(
+        Effect.promise(() => result),
+        (response) =>
+          Effect.map(read(response), (seen) => ({
+            ...seen,
+            vary: response.headers.get("vary"),
+          }))
+      );
+
+/** The head's link naming `href` as a page's Markdown. */
+const alternate = (href: string) => ({
+  href,
+  rel: "alternate",
+  type: "text/markdown",
+});
+
+describe("the list pages, asked for Markdown", () => {
+  it.effect("answers / with llms.txt, varied by Accept", () =>
+    Effect.gen(function* () {
+      const seen = yield* answered(
+        frontPageHandler(
+          listing(projects),
+          platformUrl
+        )({
+          next: () => "the page" as const,
+          request: getAt("/", "text/markdown"),
+        })
+      );
+
+      expect(seen).toStrictEqual({
+        body: frontLlms({ commands: catalog, platformUrl, projects, webUrl }),
+        contentType: "text/markdown; charset=utf-8",
+        status: 200,
+        vary: "Accept",
+      });
+    })
+  );
+
+  it.effect(
+    "answers /datekit with the project's llms.txt, varied by Accept",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* answered(
+          projectPageHandler(
+            listingWithAsks(projects, asks),
+            platformUrl
+          )({
+            next: () => "the page" as const,
+            params: { project: "datekit" },
+            request: getAt("/datekit", "text/markdown"),
+          })
+        );
+
+        expect(seen).toStrictEqual({
+          body: projectLlms({
+            asks,
+            commands: catalog,
+            listing: { openAsks: 3, posture: "open", project: datekit },
+            platformUrl,
+            webUrl,
+          }),
+          contentType: "text/markdown; charset=utf-8",
+          status: 200,
+          vary: "Accept",
+        });
+      })
+  );
+
+  it("gives a browser the page", () => {
+    expect(
+      frontPageHandler(
+        listing(projects),
+        platformUrl
+      )({
+        next: () => "the page" as const,
+        request: getAt("/", BROWSER),
+      })
+    ).toBe("the page");
+    expect(
+      projectPageHandler(
+        listing(projects),
+        platformUrl
+      )({
+        next: () => "the page" as const,
+        params: { project: "datekit" },
+        request: getAt("/datekit", BROWSER),
+      })
+    ).toBe("the page");
+  });
+
+  it("names each page's Markdown as an alternate, in its head and its Link header", () => {
+    expect(frontPageHeaders()).toMatchObject({
+      link: '</llms.txt>; rel="alternate"; type="text/markdown"',
+      vary: "Accept",
+    });
+    expect(frontPageHead().links).toContainEqual(alternate("/llms.txt"));
+    expect(
+      projectPageHeaders({ params: { project: "datekit" } })
+    ).toMatchObject({
+      link: '</datekit/llms.txt>; rel="alternate"; type="text/markdown"',
+      vary: "Accept",
+    });
+    expect(
+      projectPageHead({ params: { project: "datekit" } }).links
+    ).toContainEqual(alternate("/datekit/llms.txt"));
+  });
+
+  it("names no Markdown for a path that can name no project", () => {
+    expect(
+      projectPageHeaders({ params: { project: "Not_A_Project" } })
+    ).toStrictEqual({ vary: "Accept" });
   });
 });
