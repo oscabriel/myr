@@ -12,7 +12,12 @@ import { ProjectName } from "@repo/protocol/ids";
 import { Effect } from "effect";
 
 import type { CommandDoc } from "../src/command-doc.ts";
-import { frontLlms, indexBanner, projectLlms } from "../src/host-doc.ts";
+import {
+  frontLlms,
+  indexBanner,
+  projectLlms,
+  underTitle,
+} from "../src/host-doc.ts";
 import { expectGolden } from "./golden.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
@@ -157,13 +162,24 @@ describe("the index banner", () => {
     expect(banner).toContain(`${webUrl}/llms-full.txt`);
   });
 
+  it("goes under a page's title, and on top of a page without one", () => {
+    const banner = indexBanner({ webUrl });
+
+    expect(underTitle("# A title\n\nThe body.\n", banner)).toBe(
+      `# A title\n\n${banner}\n\nThe body.\n`
+    );
+    expect(underTitle("No title here.\n", banner)).toBe(
+      `${banner}\n\nNo title here.\n`
+    );
+  });
+
   it("names a project's own index when it has one", () => {
     expect(
       indexBanner({ project: ProjectName.make("datekit"), webUrl })
     ).toContain(`${webUrl}/datekit/llms.txt`);
   });
 
-  it("opens a project's llms.txt, then its heading", () => {
+  it("follows a project's heading and summary in its llms.txt", () => {
     const lines = linesOf(
       projectLlms({
         asks: [],
@@ -178,13 +194,12 @@ describe("the index banner", () => {
       })
     );
 
-    expect(lines.slice(0, 3)).toStrictEqual([
+    expect(lines[0]).toBe("# datekit");
+    expect(lines[2]?.startsWith("> A project on ")).toBeTruthy();
+    expect(lines.slice(3, 6)).toStrictEqual([
+      "",
       indexBanner({ project: ProjectName.make("datekit"), webUrl }),
       "",
-      "# datekit",
     ]);
-    expect(lines[0]).toContain(`${webUrl}/llms.txt`);
-    expect(lines[0]).toContain(`${webUrl}/llms-full.txt`);
-    expect(lines[0]).toContain(`${webUrl}/datekit/llms.txt`);
   });
 });
