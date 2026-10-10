@@ -25,7 +25,10 @@
  *    answers 200 with JSON.
  *
  * The web's probes run when smoke knows where the web lives: bootstrap's
- * workers.dev record, or `--web-url`. The agent surfaces among them
+ * workers.dev record, or `--web-url`. 9 and 10 need the seeded example,
+ * which a stage holds only once it is seeded, after its first deploy (and
+ * that deploy's smoke): when the platform refuses the example as unknown,
+ * each is skipped with a warning line. The agent surfaces among them
  * (`agentProbes`, 8 to 11) are what an agent reads first, so each is timed
  * against `AGENT_BUDGET_MS`: one over it is a warning line, never a failure,
  * since a cold isolate's first answer is slower than the rest.
@@ -83,6 +86,12 @@ export const AGENT_BUDGET_MS = 500;
 
 /** An example every seeded stage holds, and one of its asks. */
 const SEEDED = { ask: "format-ordinal", project: "datekit" } as const;
+
+/** The probes that read the seeded example, skipped on a stage that does not hold it. */
+export const seededProbes: ReadonlySet<Probe> = new Set([
+  "web-project-llms-txt",
+  "web-ask-md",
+]);
 
 /** The agent surfaces on the web smoke reads, each by its path and the media type it answers with. */
 export const agentProbes = [
@@ -345,25 +354,28 @@ const decodeDefect = Schema.decodeUnknownOption(
   )
 );
 
+/** An anonymous `/rpc` `listAsks` of `project`, as the platform answers it. */
+const listAsks = (origin: string, project: string, label: string) =>
+  send(
+    label,
+    HttpClientRequest.bodyJsonUnsafe(HttpClientRequest.post(`${origin}/rpc`), [
+      RpcRequest.make({
+        headers: [],
+        id: "1",
+        payload: { project },
+        tag: "listAsks",
+      }),
+    ])
+  );
+
 /** A read anyone may make, refused for a project that doesn't exist. */
 const anonymousUnknownProject = (origin: string) =>
   Effect.gen(function* () {
     const label = "POST /rpc listAsks";
 
-    const call = RpcRequest.make({
-      headers: [],
-      id: "1",
-      payload: { project: MISSING },
-      tag: "listAsks",
-    });
-
-    const { text } = yield* send(
-      label,
-      HttpClientRequest.bodyJsonUnsafe(
-        HttpClientRequest.post(`${origin}/rpc`),
-        [call]
-      )
-    ).pipe(Effect.flatMap(statusIs(label, 200)));
+    const { text } = yield* listAsks(origin, MISSING, label).pipe(
+      Effect.flatMap(statusIs(label, 200))
+    );
 
     const [reply] = yield* decodeRefused(text).pipe(
       Effect.mapError(() =>
@@ -388,6 +400,23 @@ const anonymousUnknownProject = (origin: string) =>
           })
         );
   });
+
+/**
+ * Whether the platform at `origin` holds the seeded example: false only
+ * when it refuses the example as an unknown project; any other answer
+ * leaves the example's probes to say what is wrong.
+ */
+const holdsSeeded = (origin: string) =>
+  listAsks(origin, SEEDED.project, `POST /rpc listAsks ${SEEDED.project}`).pipe(
+    Effect.flatMap(({ text }) => Effect.option(decodeRefused(text))),
+    Effect.map(
+      Option.match({
+        onNone: () => true,
+        onSome: ([{ exit }]) => exit.cause[0].error.project !== SEEDED.project,
+      })
+    ),
+    Effect.orElseSucceed(() => true)
+  );
 
 /** git's discovery for a repo that doesn't exist. */
 const missingRepo = (origin: string) => {
@@ -523,6 +552,12 @@ export const smoke = (
 
     const { web } = options;
 
+    const seeded = web === undefined ? true : yield* holdsSeeded(origin);
+
+    const skipped = seeded
+      ? []
+      : agentProbes.filter(({ probe }) => seededProbes.has(probe));
+
     const rest = yield* Effect.forEach(
       [
         ["oauth-metadata", oauthMetadata(origin)],
@@ -534,14 +569,17 @@ export const smoke = (
           ? []
           : ([
               ["web-front-page", webFrontPage(web)],
-              ...agentProbes.map(
-                (agent) =>
-                  [
-                    agent.probe,
-                    agent.probe === "web-llms-txt"
-                      ? webLlmsTxt(web, agent)
-                      : Effect.asVoid(agentSurface(web, agent)),
-                  ] as const
+              ...agentProbes.flatMap((agent) =>
+                skipped.includes(agent)
+                  ? []
+                  : [
+                      [
+                        agent.probe,
+                        agent.probe === "web-llms-txt"
+                          ? webLlmsTxt(web, agent)
+                          : Effect.asVoid(agentSurface(web, agent)),
+                      ] as const,
+                    ]
               ),
             ] as const)),
       ] as const,
@@ -577,13 +615,19 @@ export const smoke = (
       origin,
       probes: timings,
       stage: first.outcome.success,
-      warnings: timings.flatMap(({ budgetMs, elapsedMs, probe }) =>
-        budgetMs !== undefined && elapsedMs > budgetMs
-          ? [
-              `${probe} answered in ${elapsedMs} ms, over its ${budgetMs} ms budget`,
-            ]
-          : []
-      ),
+      warnings: [
+        ...skipped.map(
+          ({ probe }) =>
+            `${probe} was skipped: ${SEEDED.project} is not on this stage (bun run seed puts it there)`
+        ),
+        ...timings.flatMap(({ budgetMs, elapsedMs, probe }) =>
+          budgetMs !== undefined && elapsedMs > budgetMs
+            ? [
+                `${probe} answered in ${elapsedMs} ms, over its ${budgetMs} ms budget`,
+              ]
+            : []
+        ),
+      ],
     };
   });
 

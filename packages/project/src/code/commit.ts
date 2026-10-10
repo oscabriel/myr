@@ -24,8 +24,8 @@ import { RepoHost } from "@repo/artifacts/repo-host";
 import type { RepoNotFound, TreeEntry } from "@repo/artifacts/repo-host";
 import { treeDiff } from "@repo/git/tree-diff";
 import type { Change } from "@repo/git/tree-diff";
-import type { ChangedFile, CommitDiff } from "@repo/protocol/domain/code";
-import { CommitDiff as CommitDiffSchema } from "@repo/protocol/domain/code";
+import { CommitDiff } from "@repo/protocol/domain/code";
+import type { ChangedFile } from "@repo/protocol/domain/code";
 import { BlobSha, TreeSha } from "@repo/protocol/ids";
 import type { CommitSha, RepoName } from "@repo/protocol/ids";
 import { UnknownCommit } from "@repo/protocol/refusal";
@@ -227,7 +227,7 @@ const withText = (repo: RepoName, changes: readonly Changed[]) =>
   });
 
 /** A diff as the store keeps it: JSON, by the protocol's own schema. */
-const Kept = Schema.fromJsonString(CommitDiffSchema);
+const Kept = Schema.fromJsonString(CommitDiff);
 
 const decodeKept = Schema.decodeUnknownOption(Kept);
 

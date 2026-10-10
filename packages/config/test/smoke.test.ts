@@ -49,56 +49,64 @@ const ListAsksCall = Schema.fromJsonString(
 );
 
 /**
- * The platform's `/rpc` reply to `body`: the bytes its server sent for an
- * anonymous `listAsks` of a project it doesn't hold (captured from
+ * The platform's `/rpc` reply to `body`: for an anonymous `listAsks` of a
+ * project in `held`, its open asks (none); of any other, the bytes its
+ * server sent for a project it doesn't hold (captured from
  * `apps/platform`'s `serve` before any project existed, the refusal's
- * `next` aside), or a 400 for anything else.
+ * `next` aside); a 400 for anything else.
  */
-const rpcReply = (body: string): Reply =>
+const rpcReply = (body: string, held: readonly string[]): Reply =>
   Option.match(Schema.decodeOption(ListAsksCall)(body), {
     onNone: () => ({ status: 400 }),
     onSome: ([{ id, payload }]) => ({
-      body: `[{"_tag":"Exit","requestId":${JSON.stringify(id)},"exit":{"_tag":"Failure","cause":[{"_tag":"Fail","error":{"_tag":"UnknownProject","next":"asks","retryable":false,"project":${JSON.stringify(payload.project)}}}]}}]`,
+      body: held.includes(payload.project)
+        ? `[{"_tag":"Exit","requestId":${JSON.stringify(id)},"exit":{"_tag":"Success","value":{"asks":[]}}}]`
+        : `[{"_tag":"Exit","requestId":${JSON.stringify(id)},"exit":{"_tag":"Failure","cause":[{"_tag":"Fail","error":{"_tag":"UnknownProject","next":"asks","retryable":false,"project":${JSON.stringify(payload.project)}}}]}}]`,
       status: 200,
     }),
   });
 
+/** The platform as `healthy` below, holding only the projects `held` names: a stage not seeded holds none. */
+const holding =
+  (held: readonly string[]) =>
+  ({ authorized, body, method, path }: Seen): Reply => {
+    if (method === "GET" && path === "/") {
+      return {
+        body: "<!doctype html><p><code>http://127.0.0.1/mcp</code></p><pre>curl -fsSL http://127.0.0.1/install.sh | sh</pre>",
+        contentType: "text/html; charset=utf-8",
+        status: 200,
+      };
+    }
+
+    if (method === "GET" && path === "/health") {
+      return { body: '{"ok":true,"stage":"dev-oscabriel"}', status: 200 };
+    }
+
+    if (method === "GET" && path === "/.well-known/oauth-protected-resource") {
+      return {
+        body: '{"resource":"https://platform-dev-oscabriel.example.workers.dev","authorization_servers":["https://platform-dev-oscabriel.example.workers.dev"]}',
+        status: 200,
+      };
+    }
+
+    if (method === "POST" && path === "/mcp") {
+      return authorized ? { body: "{}", status: 200 } : { status: 401 };
+    }
+
+    if (method === "POST" && path === "/rpc" && !authorized) {
+      return rpcReply(body, held);
+    }
+
+    return { status: 404 };
+  };
+
 /**
  * The platform as smoke expects to find it: healthy, OAuth's resource
  * metadata published, MCP closed to anyone without a credential, anonymous
- * reads open, no repo it doesn't hold, and a `/` that names MCP and the
- * CLI's installer.
+ * reads open, the seeded example `datekit` held and no repo it doesn't
+ * hold, and a `/` that names MCP and the CLI's installer.
  */
-const healthy = ({ authorized, body, method, path }: Seen): Reply => {
-  if (method === "GET" && path === "/") {
-    return {
-      body: "<!doctype html><p><code>http://127.0.0.1/mcp</code></p><pre>curl -fsSL http://127.0.0.1/install.sh | sh</pre>",
-      contentType: "text/html; charset=utf-8",
-      status: 200,
-    };
-  }
-
-  if (method === "GET" && path === "/health") {
-    return { body: '{"ok":true,"stage":"dev-oscabriel"}', status: 200 };
-  }
-
-  if (method === "GET" && path === "/.well-known/oauth-protected-resource") {
-    return {
-      body: '{"resource":"https://platform-dev-oscabriel.example.workers.dev","authorization_servers":["https://platform-dev-oscabriel.example.workers.dev"]}',
-      status: 200,
-    };
-  }
-
-  if (method === "POST" && path === "/mcp") {
-    return authorized ? { body: "{}", status: 200 } : { status: 401 };
-  }
-
-  if (method === "POST" && path === "/rpc" && !authorized) {
-    return rpcReply(body);
-  }
-
-  return { status: 404 };
-};
+const healthy = holding(["datekit"]);
 
 /**
  * A platform whose 401 gate is gone and whose stage is down: `/health` and
@@ -404,6 +412,41 @@ describe("smoke against a stage's web", () => {
       budget: 500,
     });
   });
+
+  it.live(
+    "skips the seeded example's two probes, with a warning, on a stage that does not hold it",
+    () =>
+      Effect.gen(function* () {
+        // A stage deployed before its examples are seeded: smoke runs after
+        // every deploy, the seed only after the first.
+        const origin = yield* fakePlatform(holding([]));
+        const asked: string[] = [];
+
+        const web = yield* fakePlatform((seen) => {
+          asked.push(seen.path);
+
+          return healthyWeb(seen);
+        });
+
+        const report = yield* smoke(origin, { web });
+
+        expect({
+          asked,
+          probes: report.probes.map(({ probe }) => probe),
+          warnings: report.warnings,
+        }).toStrictEqual({
+          asked: ["/", "/llms.txt", "/.well-known/agent-skills/index.json"],
+          probes: probes.filter(
+            (probe) =>
+              probe !== "web-project-llms-txt" && probe !== "web-ask-md"
+          ),
+          warnings: [
+            "web-project-llms-txt was skipped: datekit is not on this stage (bun run seed puts it there)",
+            "web-ask-md was skipped: datekit is not on this stage (bun run seed puts it there)",
+          ],
+        });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
 
   it.live(
     "warns, and still passes, when an agent surface answers past its budget",
