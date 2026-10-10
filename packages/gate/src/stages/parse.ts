@@ -58,21 +58,29 @@ const standingOf = (policy: Policy, handle: Handle) => {
   return decides ? "vouched" : "unknown";
 };
 
+/** Where a person's work goes on a fork: its branches, never another ref. */
+const branchPrefix = "refs/heads/";
+
 /**
  * Main moves only by a landing: no push reaches a canonical ref.
- * A working fork takes pushes from its owner only, and a layer's repo takes
- * none here: its writers arrive with the visibility cartridge.
+ * A fork takes branches only: its notes and merge refs are the platform's
+ * to write and a tag is no one's, so a push of any ref outside `refs/heads/`
+ * is a direct push, whoever makes it. A working fork takes pushes from its
+ * owner only, and a layer's repo takes none here: its writers arrive with
+ * the visibility cartridge.
  */
-const directPush: Rule = (facts) =>
-  PushTarget.$match(facts.target, {
-    Canonical: () => Option.some(new DirectPush({ ref: facts.ref })),
-    ClaimFork: () => Option.none(),
-    Layer: () => Option.some(new DirectPush({ ref: facts.ref })),
+const directPush: Rule = (facts) => {
+  const refused = Option.some(new DirectPush({ ref: facts.ref }));
+  const onBranch = facts.ref.startsWith(branchPrefix);
+
+  return PushTarget.$match(facts.target, {
+    Canonical: () => refused,
+    ClaimFork: () => (onBranch ? Option.none() : refused),
+    Layer: () => refused,
     WorkingFork: ({ owner }) =>
-      isPusher(facts, owner)
-        ? Option.none()
-        : Option.some(new DirectPush({ ref: facts.ref })),
+      onBranch && isPusher(facts, owner) ? Option.none() : refused,
   });
+};
 
 /**
  * A denounced person pushes nothing. An unvouched one pushes to a working

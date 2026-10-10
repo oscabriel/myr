@@ -55,6 +55,8 @@ const danasWorkingForkPush = (mode: PushFacts["policy"]["vouch"]["mode"]) =>
 
 const main = RefNameText.make("refs/heads/main");
 
+const tag = RefNameText.make("refs/tags/v1");
+
 // Each row is one push; parse answers with at most one refusal, the first
 // rule the push breaks.
 const rows: readonly {
@@ -222,6 +224,34 @@ const rows: readonly {
     }),
     name: "a push to a layer's repo, which W6 opens to its writers",
     refusals: [new DirectPush({ ref: main })],
+  },
+  // A fork takes branches only: every other ref is the platform's or no one's.
+  {
+    facts: testFacts({ ref: tag }),
+    name: "the claimant's push of a tag to their claim's fork",
+    refusals: [new DirectPush({ ref: tag })],
+  },
+  {
+    facts: testFacts({
+      ask: Option.none(),
+      claim: Option.none(),
+      pusher: Person.make({ handle: alice }),
+      ref: tag,
+      target: PushTarget.WorkingFork({ owner: alice, project: ask.project }),
+    }),
+    name: "an owner's push of a tag to their own working fork",
+    refusals: [new DirectPush({ ref: tag })],
+  },
+  {
+    facts: testFacts({
+      ask: Option.none(),
+      claim: Option.none(),
+      pusher: Person.make({ handle: alice }),
+      ref: RefNameText.make("refs/heads/wip"),
+      target: PushTarget.WorkingFork({ owner: alice, project: ask.project }),
+    }),
+    name: "an owner's push of another branch to their own working fork",
+    refusals: [],
   },
 ];
 
