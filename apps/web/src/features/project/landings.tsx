@@ -8,11 +8,12 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import { Option } from "effect";
 import type { DateTime } from "effect";
 
+import { ID } from "../shared/classes.ts";
 import { CreditTrailers } from "../shared/credits.tsx";
 import { HandleLink } from "../shared/handle.tsx";
+import { askPath } from "../shared/paths.ts";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
-import { ID, askPath } from "./asks.tsx";
 
 /**
  * A landing's subject line. The platform writes `Answer <ask>` on a landing

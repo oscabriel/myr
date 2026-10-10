@@ -23,6 +23,7 @@ import type { ReactNode } from "react";
 
 import { DecisionCard } from "../decision/decision-card.tsx";
 import type { DecideInput } from "../decision/decision-card.tsx";
+import { LABEL } from "../shared/classes.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { RefusalView } from "../shared/refusal.tsx";
@@ -102,8 +103,6 @@ const plural = (count: number, one: string, many: string) =>
 const SECTION = "flex flex-col gap-3";
 
 const TITLE = "text-lg font-semibold";
-
-const LABEL = "text-muted-foreground text-xs font-medium";
 
 /** A one-line notice under a rule: an icon, then what to know. */
 export const Notice = ({

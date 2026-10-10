@@ -7,7 +7,8 @@
  */
 import { Client } from "@repo/protocol/contracts";
 import type { FileView, Rev, TreeListing } from "@repo/protocol/domain/code";
-import type { ProjectName, RepoPath } from "@repo/protocol/ids";
+import type { ProjectName } from "@repo/protocol/ids";
+import { RepoPath } from "@repo/protocol/ids";
 import type { Unauthenticated } from "@repo/protocol/principal";
 import type {
   UnknownPath,
@@ -17,12 +18,20 @@ import type {
 import { Effect, Option } from "effect";
 import type { RpcClientError } from "effect/rpc";
 
+/** The name most folders give their README, read beside the folder rather than after it. */
+const GUESS = "README.md";
+
 /**
  * The folder `path` (the root when none) of `project` at `rev`, and its
  * README; a README that cannot be read leaves the folder without it, while
  * a folder that cannot be read is the platform's refusal (or the call's
  * own failure: the platform did not answer, or turned the credential
  * away).
+ *
+ * The folder and a `README.md` in it are read at once, saving a round trip
+ * on most pages. The guess stands only when it is the README the folder
+ * names, read at the folder's commit (`main` may move between the two
+ * reads); otherwise the folder's own README is read at its commit.
  */
 export const readFolderWithReadme = (input: {
   readonly path: Option.Option<RepoPath>;
@@ -41,20 +50,43 @@ export const readFolderWithReadme = (input: {
     const { path, project, rev } = input;
     const client = yield* Client;
 
-    const listing = yield* client.readTree({
-      at: rev,
-      project,
-      ...Option.match(path, {
-        onNone: () => ({}),
-        onSome: (at) => ({ path: at }),
-      }),
-    });
+    const guessed = RepoPath.make(
+      Option.match(path, {
+        onNone: () => GUESS,
+        onSome: (folder) => `${folder}/${GUESS}`,
+      })
+    );
+
+    const [listing, guess] = yield* Effect.all(
+      [
+        client.readTree({
+          at: rev,
+          project,
+          ...Option.match(path, {
+            onNone: () => ({}),
+            onSome: (at) => ({ path: at }),
+          }),
+        }),
+        client
+          .readFile({ at: rev, path: guessed, project })
+          .pipe(Effect.option),
+      ],
+      { concurrency: 2 }
+    );
+
+    const named = listing.readme;
+
+    if (named === undefined) {
+      return { listing, readme: Option.none() };
+    }
 
     const readme =
-      listing.readme === undefined
-        ? Option.none()
+      Option.isSome(guess) &&
+      guess.value.path === named.path &&
+      guess.value.at === listing.at
+        ? guess
         : yield* client
-            .readFile({ at: listing.at, path: listing.readme.path, project })
+            .readFile({ at: listing.at, path: named.path, project })
             .pipe(Effect.option);
 
     return { listing, readme };

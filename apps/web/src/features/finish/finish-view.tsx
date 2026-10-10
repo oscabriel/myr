@@ -19,6 +19,7 @@ import { Array as Arr, Option } from "effect";
 import { FileDiff } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { LABEL } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { OutcomeView, StageStrip } from "../shared/outcome.tsx";
 import { ClientPatchDiffs } from "./client-diff.tsx";
@@ -61,8 +62,6 @@ const finishLines = (
 const SECTION = "flex flex-col gap-3";
 
 const TITLE = "text-base font-semibold";
-
-const LABEL = "text-muted-foreground text-xs font-medium";
 
 /** How the diff is drawn by default: in the browser, after the page loads. */
 const inBrowser = (patch: string) => (

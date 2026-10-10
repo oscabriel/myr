@@ -14,7 +14,9 @@ import { buttonVariants } from "@/components/ui/button";
 
 import { NumberedLines } from "../code/blob-view.tsx";
 import { blobHref, commitHref, commitsHref, shortSha } from "../code/paths.ts";
-import { CodeBreadcrumb, CodeLayout, revLabel } from "../code/tree-view.tsx";
+import { revLabel } from "../code/rev.ts";
+import { CodeBreadcrumb, CodeLayout } from "../code/tree-view.tsx";
+import { LINK } from "../shared/classes.ts";
 import { RangeLinks, RangeSummary } from "./range-summary.tsx";
 import { linesWords, rowsOf } from "./rows.ts";
 
@@ -23,8 +25,6 @@ const TOOL = buttonVariants({
   size: "sm",
   variant: "ghost",
 });
-
-const LINK = "decoration-rule underline hover:decoration-current";
 
 /** The ranges as a table: lines a–b, then who and why. */
 export const WhyTable = ({

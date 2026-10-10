@@ -13,8 +13,9 @@ import {
   markdownAlternate,
   wantsMarkdown,
 } from "../../../features/ask/markdown.ts";
-import { NoSuchAsk, notFoundFor } from "../../../features/ask/refused.tsx";
-import { pageTitle } from "../../../features/shared/layout.tsx";
+import { NoSuchAsk } from "../../../features/ask/refused.tsx";
+import { pageTitle } from "../../../features/shared/head.ts";
+import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { serverClient } from "../../../server/client.ts";
 import { AskPath, askMarkdownHandler } from "./{$ask}[.]md.ts";
 import type { AskParams, ClientFor } from "./{$ask}[.]md.ts";

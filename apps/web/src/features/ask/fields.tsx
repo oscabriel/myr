@@ -6,12 +6,6 @@
  */
 import type { ReactNode } from "react";
 
-/** Text that is code: an id, a path, a SHA, a command's name. */
-export const CODE = "font-mono text-[0.8125rem] [overflow-wrap:anywhere]";
-
-/** A link in running text: underlined in the rule colour, darker on hover. */
-export const LINK = "decoration-rule underline hover:decoration-current";
-
 export const Fields = ({
   children,
   label,

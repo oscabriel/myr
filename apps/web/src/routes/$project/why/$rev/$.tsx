@@ -6,14 +6,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { Effect, Schema } from "effect";
 
-import { notFoundFor } from "../../../../features/ask/refused.tsx";
 import {
   projectOf,
   repoPathOf,
   revisionOf,
 } from "../../../../features/code/address.ts";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
-import { pageTitle } from "../../../../features/shared/layout.tsx";
+import { pageTitle } from "../../../../features/shared/head.ts";
+import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { ClientWhy } from "../../../../features/why/client-why.tsx";
 import { WhyFallback, WhyLines } from "../../../../features/why/why-view.tsx";
 import { serverClient } from "../../../../server/client.ts";

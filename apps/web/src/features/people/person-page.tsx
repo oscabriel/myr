@@ -10,10 +10,10 @@ import type { CreditSummary } from "@repo/protocol/domain/record";
 import type { Handle, ProjectName } from "@repo/protocol/ids";
 import { Array, Order } from "effect";
 
-import { projectPath } from "../project/asks.tsx";
-import { SECTION } from "../project/project-page.tsx";
+import { SECTION } from "../shared/classes.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
+import { projectPath } from "../shared/paths.ts";
 
 /** One area of a project: each role a person holds there, with its count. */
 export interface AreaCredit {

@@ -13,20 +13,16 @@
 import { packageOf } from "@repo/protocol/domain/code";
 import type { RefsView as Refs, TagRef } from "@repo/protocol/domain/code";
 import { defaultStringifySearch } from "@tanstack/react-router";
-import { Option, Schema } from "effect";
+import { Option } from "effect";
 
-import { answerPath } from "../ask/ask-page.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
+import { ID, LINK, SECTION } from "../shared/classes.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
+import { answerPath } from "../shared/paths.ts";
 import { Pager } from "./pager.tsx";
 import { commitHref, shortSha, treeHref } from "./paths.ts";
-
-/** A `?package=` from the address, decoded; none for anything but a name. */
-export const packageParamOf = Schema.decodeUnknownOption(
-  Schema.NonEmptyString.check(Schema.isMaxLength(255))
-);
 
 /** One package's tags: its name, its newest tag and how many it has. */
 interface PackageRun {
@@ -61,12 +57,6 @@ const packagesOf = (tags: readonly TagRef[]): readonly PackageRun[] => {
 
 /** How many tags a page lists. */
 export const TAGS_PAGE = 100;
-
-const LINK = "decoration-rule underline hover:decoration-current";
-
-const ID = "font-mono text-[0.8125rem]";
-
-const SECTION = "text-lg font-semibold tracking-[-0.01em]";
 
 /**
  * The refs page from the `from`th tag, of one package's tags or all. The

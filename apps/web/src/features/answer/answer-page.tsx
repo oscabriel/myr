@@ -39,13 +39,14 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table.tsx";
-import { askPath } from "../ask/ask-page.tsx";
-import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
+import { Field, Fields, Region } from "../ask/fields.tsx";
 import { commitHref } from "../code/paths.ts";
+import { CODE, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { CreditTrailers } from "../shared/credits.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { OutcomeView, StageStrip } from "../shared/outcome.tsx";
+import { askPath } from "../shared/paths.ts";
 import { When } from "../shared/time.tsx";
 
 /** How long a lane ran: "640 ms", "8.3 s", "2 min 5 s". */

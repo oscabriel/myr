@@ -14,8 +14,7 @@ import type { ReactNode } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 
-import { envPath } from "../env/path.ts";
-import { ledgerPath } from "../ledger/path.ts";
+import { envPath, ledgerPath } from "../shared/paths.ts";
 
 /** Which of a project's pages is being read. */
 export type ProjectTab =

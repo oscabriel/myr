@@ -4,9 +4,10 @@ import { DateTime } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
 import { frontPageAtom, projectsAtom } from "../client/front.ts";
-import { FrontPageView, readFilter } from "../features/front/front-page.tsx";
+import { readFilter } from "../features/front/filter.ts";
+import { FrontPageView } from "../features/front/front-page.tsx";
 import { Reading, Unreachable } from "../features/front/reading.tsx";
-import { pageTitle } from "../features/shared/layout.tsx";
+import { pageTitle } from "../features/shared/head.ts";
 
 // The front page: every open ask, read once, filtered here by the address's
 // `?kind=` and `?reserved=` (each decoded with its schema; one that does not

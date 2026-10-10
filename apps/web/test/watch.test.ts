@@ -1,10 +1,11 @@
 /**
  * The page's live view: `watchAtom(project)`, mounted by the
- * project and answer pages, follows the project's events and invalidates
- * the keys each one changes, so the page's reads fetch again; a stream
- * that fails before it hears anything turns into a poll every `POLL_MS`.
- * Each test runs the atom in a registry of its own, over a stub stream
- * and the test's own `Reactivity`, on the TestClock.
+ * project and answer pages, follows the project's events from the last
+ * number of the replay the page read and invalidates the keys each one
+ * changes, so the page's reads fetch again; a stream that fails before it
+ * hears anything turns into a poll every `POLL_MS`. Each test runs the atom
+ * in a registry of its own, over a stub stream, a replay given as the
+ * project's events and the test's own `Reactivity`, on the TestClock.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectEvent } from "@repo/protocol/domain/event";
@@ -19,10 +20,12 @@ import {
   ProjectName,
   ProposalId,
 } from "@repo/protocol/ids";
+import { UnknownProject } from "@repo/protocol/refusal";
 import { Clock, DateTime, Effect, Layer, Queue, Ref, Stream } from "effect";
-import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
+import { AsyncResult, Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { TestClock } from "effect/testing";
 
+import { projectEventsAtom } from "../src/client/events.ts";
 import { keys } from "../src/client/keys.ts";
 import {
   POLL_MS,
@@ -80,12 +83,16 @@ const invalidations = Effect.gen(function* () {
 });
 
 /**
- * A registry standing for one browser tab: `watchAtom`'s runtime follows
- * `follow` and invalidates through `reactivity`, its time the TestClock's.
+ * A registry standing for one browser tab: the page has read `replay` as
+ * the project's events, and `watchAtom`'s runtime follows `follow` and
+ * invalidates through `reactivity`, its time the TestClock's.
  */
 const tab = (
   follow: (since: number) => Stream.Stream<ProjectEvent, string>,
-  reactivity: Reactivity.Reactivity
+  reactivity: Reactivity.Reactivity,
+  replay: Atom.Type<ReturnType<typeof projectEventsAtom>> = AsyncResult.success(
+    []
+  )
 ) =>
   Effect.gen(function* () {
     const clock = yield* Clock.Clock;
@@ -94,6 +101,7 @@ const tab = (
       Effect.sync(() =>
         AtomRegistry.make({
           initialValues: [
+            Atom.initialValue(projectEventsAtom(datekit), replay),
             Atom.initialValue(
               watchRuntime.layer,
               Layer.mergeAll(
@@ -306,6 +314,100 @@ describe(watchAtom, () => {
         yield* runUntil(() => Ref.getUnsafe(asked).length > 1);
 
         expect(yield* Ref.get(asked)).toStrictEqual([0, 7]);
+      })
+  );
+
+  it.effect(
+    "follows from the last number of the replay the page read, not from the first event",
+    () =>
+      Effect.gen(function* () {
+        const { reactivity } = yield* invalidations;
+        const asked = yield* Ref.make<readonly number[]>([]);
+
+        yield* tab(
+          (since) =>
+            Stream.unwrap(
+              Effect.as(
+                Ref.update(asked, (all) => [...all, since]),
+                Stream.never
+              )
+            ),
+          reactivity,
+          AsyncResult.success(
+            Array.from({ length: 7 }, (_, index) =>
+              ProjectEvent.cases.Warned.make({
+                ask: parseIso,
+                at,
+                seq: index + 1,
+              })
+            )
+          )
+        );
+
+        yield* runUntil(() => Ref.getUnsafe(asked).length > 0);
+
+        expect(yield* Ref.get(asked)).toStrictEqual([7]);
+      })
+  );
+
+  it.effect(
+    "hears once an event that came between the replay and the follow",
+    () =>
+      Effect.gen(function* () {
+        const { fired, reactivity } = yield* invalidations;
+
+        const kept = Array.from({ length: 8 }, (_, index) =>
+          ProjectEvent.cases.Claimed.make({
+            ask: parseIso,
+            at,
+            claimant: Handle.make("alice"),
+            seq: index + 1,
+          })
+        );
+
+        yield* tab(
+          (since) =>
+            Stream.concat(
+              Stream.fromIterable(kept.filter(({ seq }) => seq > since)),
+              Stream.never
+            ),
+          reactivity,
+          AsyncResult.success(kept.slice(0, 7))
+        );
+
+        const heard = yield* firedNow(fired);
+
+        yield* runUntil(() => fired.length > 0);
+
+        expect({ after: [...fired], heard }).toStrictEqual({
+          after: [],
+          heard: [projectKey],
+        });
+      })
+  );
+
+  it.effect(
+    "follows from the first event when the replay could not be read",
+    () =>
+      Effect.gen(function* () {
+        const { reactivity } = yield* invalidations;
+        const asked = yield* Ref.make<readonly number[]>([]);
+
+        yield* tab(
+          (since) =>
+            Stream.unwrap(
+              Effect.as(
+                Ref.update(asked, (all) => [...all, since]),
+                Stream.never
+              )
+            ),
+          reactivity,
+          AsyncResult.fail(new UnknownProject({ project: datekit }))
+        );
+
+        yield* runUntil(() => Ref.getUnsafe(asked).length > 0);
+
+        expect(yield* Ref.get(asked)).toStrictEqual([0]);
       })
   );
 });

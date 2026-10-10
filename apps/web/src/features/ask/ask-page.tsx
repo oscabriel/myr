@@ -15,20 +15,14 @@ import { Circle, CircleDot, Hourglass, Minus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { CODE, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
+import { answerPath, askPath } from "../shared/paths.ts";
 import { When } from "../shared/time.tsx";
-import { CODE, Field, Fields, LINK, Region } from "./fields.tsx";
+import { Field, Fields, Region } from "./fields.tsx";
 import { markdownPath } from "./markdown.ts";
-
-/** An ask's page. */
-export const askPath = (project: ProjectName, ask: AskId) =>
-  `/${project}/asks/${ask}`;
-
-/** The page of the verdict on an ask's latest answer. */
-export const answerPath = (project: ProjectName, ask: AskId) =>
-  `/${project}/answers/${ask}`;
 
 /** Each state as a mark, a word and its role colour (none for open: nothing is happening yet). */
 const states = {

@@ -7,8 +7,9 @@
  */
 import type { SetupChannel, SetupSnippet } from "@repo/agent-kit/agent-setup";
 
-import { LINK, Region } from "../ask/fields.tsx";
+import { Region } from "../ask/fields.tsx";
 import { CopyButton } from "../code/copy.tsx";
+import { LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 
 /** A channel's heading id, from its title: `agents-remote-mcp`. */

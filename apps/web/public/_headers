@@ -1,0 +1,4 @@
+# A file under /assets/ is named by its content hash, so it never changes:
+# browsers keep it for good instead of asking again on every load.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

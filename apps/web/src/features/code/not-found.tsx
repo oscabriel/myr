@@ -6,7 +6,8 @@
  */
 import { Option, Schema } from "effect";
 
-import { NotFoundView, Refusals } from "../ask/refused.tsx";
+import { NotFoundView } from "../ask/refused.tsx";
+import { Refusals } from "../shared/refusals.ts";
 
 const decodeRefusals = Schema.decodeUnknownOption(Refusals);
 

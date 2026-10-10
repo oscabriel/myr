@@ -17,9 +17,10 @@ import type { AreaName, SuiteRoot } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
 import type { ReactNode } from "react";
 
-import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
+import { Field, Fields, Region } from "../ask/fields.tsx";
 import { postureLabel } from "../project/posture-label.ts";
 import { ProjectNav } from "../project/project-nav.tsx";
+import { CODE, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { disclosureWords } from "../shared/disclosure.ts";
 import { EmptyState } from "../shared/empty.tsx";

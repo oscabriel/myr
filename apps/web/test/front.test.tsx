@@ -15,12 +15,9 @@ import { DateTime, Schema } from "effect";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import {
-  FrontPageView,
-  filterEntries,
-  readFilter,
-} from "../src/features/front/front-page.tsx";
-import type { FrontFilter } from "../src/features/front/front-page.tsx";
+import { filterEntries, readFilter } from "../src/features/front/filter.ts";
+import type { FrontFilter } from "../src/features/front/filter.ts";
+import { FrontPageView } from "../src/features/front/front-page.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 

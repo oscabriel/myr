@@ -15,87 +15,21 @@ import type {
   FrontPageEntry,
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
-import { KindName } from "@repo/protocol/ids";
-import { Option, Schema } from "effect";
+import type { KindName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
-import {
-  AskFields,
-  AskStanding,
-  ID,
-  askPath,
-  projectPath,
-} from "../project/asks.tsx";
+import { AskFields, AskStanding } from "../project/asks.tsx";
 import { postureLabel } from "../project/posture-label.ts";
-import { SECTION } from "../project/project-page.tsx";
+import { ID, SECTION } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
+import { askPath, projectPath } from "../shared/paths.ts";
 import { PostureBadge } from "../shared/posture.tsx";
 import { When } from "../shared/time.tsx";
-
-/** What the front page is narrowed to: one kind, and asks held for someone. */
-export interface FrontFilter {
-  readonly kind?: KindName;
-  readonly reserved?: Reserve;
-}
-
-const decodeKind = Schema.decodeUnknownOption(KindName);
-
-const decodeReserve = Schema.decodeUnknownOption(Reserve);
-
-/**
- * The filter in an address's search (`?kind=bug&reserved=newcomers`): each
- * value that decodes is kept, and one that does not is dropped, so a stale
- * or mistyped link shows the whole list rather than an error.
- */
-export const readFilter = (search: {
-  readonly kind?: unknown;
-  readonly reserved?: unknown;
-}): FrontFilter => ({
-  ...Option.match(decodeKind(search.kind), {
-    onNone: () => ({}),
-    onSome: (kind) => ({ kind }),
-  }),
-  ...Option.match(decodeReserve(search.reserved), {
-    onNone: () => ({}),
-    onSome: (reserved) => ({ reserved }),
-  }),
-});
-
-/** The front page's address for `filter`; a key set to `undefined` is no filter. */
-export const frontPath = (filter: {
-  readonly kind?: KindName | undefined;
-  readonly reserved?: Reserve | undefined;
-}) => {
-  const search = new URLSearchParams([
-    ...(filter.kind === undefined ? [] : [["kind", filter.kind]]),
-    ...(filter.reserved === undefined ? [] : [["reserved", filter.reserved]]),
-  ]).toString();
-
-  return search === "" ? "/" : `/?${search}`;
-};
-
-/**
- * The entries `filter` keeps, the ones the viewer may take first; each group
- * keeps the order given (the platform's: newest ask first).
- */
-export const filterEntries = (
-  entries: readonly FrontPageEntry[],
-  filter: FrontFilter
-): readonly FrontPageEntry[] => {
-  const kept = entries.filter(
-    ({ ask }) =>
-      (filter.kind === undefined || ask.kind === filter.kind) &&
-      (filter.reserved === undefined || ask.reserve === filter.reserved)
-  );
-
-  return [
-    ...kept.filter(({ takeable }) => takeable),
-    ...kept.filter(({ takeable }) => !takeable),
-  ];
-};
+import { filterEntries, frontPath } from "./filter.ts";
+import type { FrontFilter } from "./filter.ts";
 
 const Entry = ({ entry }: { readonly entry: FrontPageEntry }) => {
   const { ask, posture, project, takeable } = entry;

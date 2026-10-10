@@ -4,8 +4,7 @@
  */
 import type { Handle } from "@repo/protocol/ids";
 
-/** A person's page: `/people/<handle>` (a handle is URL-safe by its schema). */
-export const personPath = (handle: Handle) => `/people/${handle}`;
+import { personPath } from "./paths.ts";
 
 export const HandleLink = ({ handle }: { readonly handle: Handle }) => (
   <a

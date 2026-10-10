@@ -40,16 +40,14 @@ import type { Rpc } from "effect/rpc";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { Refusals } from "../src/features/ask/refused.tsx";
 import { BlobView } from "../src/features/code/blob-view.tsx";
 import { CommitView } from "../src/features/code/commit-view.tsx";
-import { LOG_PAGE, LogView } from "../src/features/code/log-view.tsx";
-import {
-  packageParamOf,
-  RefsView,
-  TAGS_PAGE,
-} from "../src/features/code/refs-view.tsx";
+import { LOG_PAGE } from "../src/features/code/log-page.ts";
+import { LogView } from "../src/features/code/log-view.tsx";
+import { packageParamOf } from "../src/features/code/refs-param.ts";
+import { RefsView, TAGS_PAGE } from "../src/features/code/refs-view.tsx";
 import { TreeView } from "../src/features/code/tree-view.tsx";
+import { Refusals } from "../src/features/shared/refusals.ts";
 import { readBlobPage } from "../src/routes/$project/blob/$rev/$.tsx";
 import { readCommitPage } from "../src/routes/$project/commit/$sha.tsx";
 import { readLogPage } from "../src/routes/$project/commits/$rev.tsx";

@@ -18,7 +18,8 @@ import { FinishView } from "../../../features/finish/finish-view.tsx";
 import { isFinishDecision } from "../../../features/finish/patch.ts";
 import type { FinishDecision } from "../../../features/finish/patch.ts";
 import { EmptyState } from "../../../features/shared/empty.tsx";
-import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
+import { pageTitle } from "../../../features/shared/head.ts";
+import { PageShell } from "../../../features/shared/layout.tsx";
 import {
   DecidedNotice,
   FailureView,

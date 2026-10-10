@@ -16,7 +16,7 @@ import { envSchemaAtom } from "../../client/env.ts";
 import { watchAtom } from "../../client/watch.ts";
 import { EnvView, NothingLanded } from "../../features/env/env-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageTitle } from "../../features/shared/layout.tsx";
+import { pageTitle } from "../../features/shared/head.ts";
 import { serverClient } from "../../server/client.ts";
 
 // A project's env shape, as anyone may read it: never a value, and no form

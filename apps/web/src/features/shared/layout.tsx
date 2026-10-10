@@ -13,9 +13,6 @@ import { CommandLine } from "./command.tsx";
 /** The content column every region lines up on. */
 const COLUMN = "mx-auto w-full max-w-6xl px-4 sm:px-6";
 
-/** A page's `<title>`: the page, then the product. */
-export const pageTitle = (title: string) => `${title} · ${Brand.name}`;
-
 export const PageShell = ({
   children,
   title,

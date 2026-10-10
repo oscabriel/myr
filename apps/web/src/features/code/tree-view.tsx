@@ -36,10 +36,10 @@ import {
 
 import { RepoMarkdown } from "../markdown/markdown.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
+import { LINK } from "../shared/classes.ts";
 import { PageShell } from "../shared/layout.tsx";
 import { ancestorsOf, blobHref, dirOf, treeHref } from "./paths.ts";
-
-const LINK = "decoration-rule underline hover:decoration-current";
+import { revLabel } from "./rev.ts";
 
 /** Each kind of entry: its mark and the word a screen reader says for it. */
 const kinds = Match.type<CodeEntry["type"]>().pipe(
@@ -188,10 +188,6 @@ export const ReadmeSection = ({
     )}
   </section>
 );
-
-/** The revision a page reads, beside its title: a commit by its short id. */
-export const revLabel = (rev: string) =>
-  /^[0-9a-f]{40}$/u.test(rev) ? rev.slice(0, 7) : rev;
 
 /** A code page's frame: title, nav, and the file tree's column beside the content. */
 export const CodeLayout = ({

@@ -6,7 +6,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { Effect, Schema } from "effect";
 
-import { notFoundFor } from "../../../../features/ask/refused.tsx";
 import {
   projectOf,
   repoPathOf,
@@ -18,7 +17,8 @@ import {
 } from "../../../../features/code/blob-view.tsx";
 import { ClientFile } from "../../../../features/code/client-code.tsx";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
-import { pageTitle } from "../../../../features/shared/layout.tsx";
+import { pageTitle } from "../../../../features/shared/head.ts";
+import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { PathsTree } from "../../tree/-paths-tree.tsx";
 

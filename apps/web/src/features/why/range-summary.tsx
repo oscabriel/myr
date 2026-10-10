@@ -13,10 +13,11 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import type { ProjectName } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
 
-import { answerPath, askPath } from "../ask/ask-page.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
+import { ID, LABEL, LINK } from "../shared/classes.ts";
 import { CreditTrailers } from "../shared/credits.tsx";
 import { HandleLink } from "../shared/handle.tsx";
+import { answerPath, askPath } from "../shared/paths.ts";
 import {
   askOf,
   creditWords,
@@ -25,10 +26,6 @@ import {
   verdictWords,
 } from "./rows.ts";
 import type { LandingAsk, WhyRow } from "./rows.ts";
-
-const LINK = "decoration-rule underline hover:decoration-current";
-
-const ID = "font-mono text-[0.8125rem]";
 
 const DOT = (
   <span aria-hidden="true" className="text-muted-foreground">
@@ -199,8 +196,6 @@ export const RangeLinks = ({
     </span>
   );
 };
-
-const LABEL = "text-xs font-medium text-muted-foreground";
 
 /** A landing whole: its ask, author, verdict, when it landed, its credit and agents. */
 export const LandingDetails = ({

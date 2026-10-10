@@ -24,6 +24,7 @@ import { Label } from "../../components/ui/label.tsx";
 import { Spinner } from "../../components/ui/spinner.tsx";
 import { Textarea } from "../../components/ui/textarea.tsx";
 import { signInHref } from "../auth/session-slot.tsx";
+import { LABEL } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 
 /** What `proposeAsk` takes, from its one schema. */
@@ -74,8 +75,6 @@ export const proposeFormPath = (
     onSome: ({ at, line, path }) =>
       `/${project}/proposals/new?${new URLSearchParams({ about: path, at, line: String(line) }).toString()}`,
   });
-
-const LABEL = "text-muted-foreground text-xs font-medium";
 
 const SignInFirst = ({
   about,

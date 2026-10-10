@@ -18,7 +18,7 @@ import { policyAtom } from "../../client/policy.ts";
 import { watchAtom } from "../../client/watch.ts";
 import { PeopleView } from "../../features/project-people/people-view.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageTitle } from "../../features/shared/layout.tsx";
+import { pageTitle } from "../../features/shared/head.ts";
 import { serverClient } from "../../server/client.ts";
 
 // Who decides what in a project, who is vouched for, and who reads and

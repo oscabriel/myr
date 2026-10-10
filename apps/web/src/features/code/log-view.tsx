@@ -10,26 +10,21 @@ import { Outcome } from "@repo/protocol/domain/outcome";
 import type { ProjectName, RepoPath } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
 
-import { askPath } from "../project/asks.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
+import { ID, LINK } from "../shared/classes.ts";
 import { CreditTrailers } from "../shared/credits.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
+import { askPath } from "../shared/paths.ts";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
+import { LOG_PAGE } from "./log-page.ts";
 import { Pager } from "./pager.tsx";
 import { blobHref, commitHref, commitsHref, shortSha } from "./paths.ts";
-import { revLabel } from "./tree-view.tsx";
-
-/** How many commits a page holds (the platform's default `limit`). */
-export const LOG_PAGE = 30;
+import { revLabel } from "./rev.ts";
 
 const isLanded = Outcome.isAnyOf(["Landed"]);
-
-const LINK = "decoration-rule underline hover:decoration-current";
-
-const ID = "font-mono text-[0.8125rem]";
 
 /** A day as its heading says it: "October 6, 2026". */
 const dayWords = new Intl.DateTimeFormat("en", {

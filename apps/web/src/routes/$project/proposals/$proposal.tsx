@@ -29,7 +29,8 @@ import { UnknownProjectView } from "../../../features/project/unknown-project.ts
 import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { ProposalView } from "../../../features/proposal/proposal-view.tsx";
 import { EmptyState } from "../../../features/shared/empty.tsx";
-import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
+import { pageTitle } from "../../../features/shared/head.ts";
+import { PageShell } from "../../../features/shared/layout.tsx";
 import { serverClient } from "../../../server/client.ts";
 
 // `/$project/proposals/$proposal`: one proposal and the platform's draft of

@@ -10,10 +10,8 @@ import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { AskListing } from "@repo/protocol/domain/ask";
 import { FileView, TreeListing } from "@repo/protocol/domain/code";
-import { ProjectEvent } from "@repo/protocol/domain/event";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { LandingView } from "@repo/protocol/domain/landing";
-import { AskId, Handle, LandedSha } from "@repo/protocol/ids";
 import { UnknownRevision } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
@@ -23,7 +21,6 @@ import { RpcClient, RpcSerialization, RpcTest } from "effect/rpc";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { recentLandings } from "../src/client/project.ts";
 import { devServer } from "../src/dev/server.ts";
 import {
   ProjectReadingView,
@@ -458,57 +455,6 @@ describe(UnknownProjectView, () => {
     expect(textOf(<UnknownProjectView name="Not_A_Project" />)).toContain(
       "No such project"
     );
-  });
-});
-
-/** The 40-hex sha of the `n`th landing. */
-const shaOf = (n: number) => LandedSha.make(n.toString(16).padStart(40, "0"));
-
-describe(recentLandings, () => {
-  const at = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
-
-  const one = Schema.decodeSync(LandingView)({
-    assisted: [],
-    author: "bram",
-    credits: [{ handle: "bram", role: "Signed-off-by" }],
-    landedAt: "2026-10-07T12:00:00.000Z",
-    project: "datekit",
-    sha: "0000000000000000000000000000000000000000",
-  });
-
-  const landed = (seq: number) =>
-    ProjectEvent.cases.Landed.make({
-      at,
-      landing: { ...one, sha: shaOf(seq) },
-      seq,
-    });
-
-  it("keeps only the landings among a project's events, newest first", () => {
-    const events = [
-      landed(1),
-      ProjectEvent.cases.Claimed.make({
-        ask: AskId.make("fix-week-start"),
-        at,
-        claimant: Handle.make("bram"),
-        seq: 2,
-      }),
-      landed(3),
-    ];
-
-    expect(recentLandings(events).map(({ sha }) => sha)).toStrictEqual([
-      shaOf(3),
-      shaOf(1),
-    ]);
-  });
-
-  it("keeps at most the twenty newest", () => {
-    const events = Array.from({ length: 25 }, (_, index) => landed(index + 1));
-
-    const shown = recentLandings(events).map(({ sha }) => sha);
-
-    expect(shown).toHaveLength(20);
-    expect(shown.at(0)).toBe(shaOf(25));
-    expect(shown.at(-1)).toBe(shaOf(6));
   });
 });
 

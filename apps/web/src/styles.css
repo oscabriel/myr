@@ -31,6 +31,36 @@
 */
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
+/*
+  Until a face arrives (font-display: swap), text is drawn in a local face
+  scaled to its metrics, so the swap moves nothing: Arial (or its metric
+  twin Liberation Sans) for Public Sans, Courier New (or Liberation Mono)
+  for JetBrains Mono. Measured in Chromium from the latin files: Public Sans
+  sets 103.89% wider than Arial, ascent 0.95 em and descent 0.225 em;
+  JetBrains Mono sets as wide as Courier New, ascent 1.02 em and descent
+  0.3 em. Each override is the face's metric over its size-adjust.
+*/
+@font-face {
+  font-family: "Public Sans Fallback";
+  src:
+    local("Arial"), local("ArialMT"), local("Liberation Sans"), local("Arimo");
+  size-adjust: 103.89%;
+  ascent-override: 91.45%;
+  descent-override: 21.66%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback";
+  src:
+    local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"),
+    local("Cousine");
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30%;
+  line-gap-override: 0%;
+}
+
 @font-face {
   font-family: "Public Sans";
   font-style: normal;
@@ -202,11 +232,11 @@
 
 @theme inline {
   --font-sans:
-    "Public Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
-    sans-serif;
+    "Public Sans", "Public Sans Fallback", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
   --font-mono:
-    "JetBrains Mono", ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo,
-    monospace;
+    "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, "SFMono-Regular",
+    "Cascadia Mono", Menlo, monospace;
 
   /*
     The type scale, by role: a fixed rem scale, nothing fluid, and nothing

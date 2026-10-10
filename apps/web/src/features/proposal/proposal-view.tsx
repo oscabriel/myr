@@ -25,6 +25,7 @@ import { Badge } from "../../components/ui/badge.tsx";
 import { Button } from "../../components/ui/button.tsx";
 import { Spinner } from "../../components/ui/spinner.tsx";
 import { Textarea } from "../../components/ui/textarea.tsx";
+import { LABEL } from "../shared/classes.ts";
 import { HandleLink } from "../shared/handle.tsx";
 import { DraftedCode } from "./client-file.tsx";
 
@@ -51,8 +52,6 @@ const failedNow = DraftState.isAnyOf(["Failed"]);
 /** Whether the platform's agent is drafting the proposal's ask right now. */
 export const isDrafting = (proposal: Proposal) =>
   proposal.draft !== undefined && draftingNow(proposal.draft);
-
-const LABEL = "text-muted-foreground text-xs font-medium";
 
 /** The badge each standing wears: an ending that opened nothing reads as refused. */
 const badgeVariant = {

@@ -6,7 +6,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { DateTime, Effect, Schema } from "effect";
 
-import { notFoundFor } from "../../../features/ask/refused.tsx";
 import { commitOf, projectOf } from "../../../features/code/address.ts";
 import { ClientDiffs } from "../../../features/code/client-code.tsx";
 import { ClientTree } from "../../../features/code/client-tree.tsx";
@@ -16,7 +15,8 @@ import {
 } from "../../../features/code/commit-view.tsx";
 import { CodeNotFound } from "../../../features/code/not-found.tsx";
 import { diffAnchor } from "../../../features/code/paths.ts";
-import { pageTitle } from "../../../features/shared/layout.tsx";
+import { pageTitle } from "../../../features/shared/head.ts";
+import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { serverClient } from "../../../server/client.ts";
 
 // One commit and what it changed, read on the server: the browser then

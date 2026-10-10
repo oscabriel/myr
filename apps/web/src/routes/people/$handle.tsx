@@ -10,7 +10,7 @@ import {
   NoSuchPersonView,
   PersonView,
 } from "../../features/people/person-page.tsx";
-import { pageTitle } from "../../features/shared/layout.tsx";
+import { pageTitle } from "../../features/shared/head.ts";
 
 // A person's page: their credit by project, area and role, read once by the
 // browser. An address whose last part cannot be a handle is a 404.

@@ -38,6 +38,7 @@ import {
 } from "../finish/patch.ts";
 import { DraftedCode } from "../proposal/client-file.tsx";
 import { DraftRead, useLiveDraft } from "../proposal/live-draft.ts";
+import { LABEL } from "../shared/classes.ts";
 import { When } from "../shared/time.tsx";
 
 /** What a decider sends when they choose: the `decide` contract's payload, from its one schema. */
@@ -107,8 +108,6 @@ export const describeDefault = (decision: Decision) =>
 /** A decision's own page: for a `Finish`, the answer's diff and how to finish it. */
 export const decisionPath = (decision: Decision) =>
   `/${decision.project}/decisions/${decision.id}`;
-
-const LABEL = "text-muted-foreground text-xs font-medium";
 
 const words = {
   accept: "Accept",

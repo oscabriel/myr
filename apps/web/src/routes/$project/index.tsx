@@ -10,8 +10,9 @@ import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 
 import { projectCodeAtom } from "../../client/code.ts";
+import { recentLandingsAtom } from "../../client/events.ts";
 import { projectsAtom } from "../../client/front.ts";
-import { asksAtom, recentLandingsAtom } from "../../client/project.ts";
+import { asksAtom } from "../../client/project.ts";
 import { watchAtom } from "../../client/watch.ts";
 import { Unreachable } from "../../features/front/reading.tsx";
 import {
@@ -19,7 +20,7 @@ import {
   ProjectView,
 } from "../../features/project/project-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageTitle } from "../../features/shared/layout.tsx";
+import { pageTitle } from "../../features/shared/head.ts";
 import { serverClient } from "../../server/client.ts";
 import { readFolderWithReadme } from "../../server/folder.ts";
 

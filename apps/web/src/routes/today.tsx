@@ -5,7 +5,8 @@ import { DateTime, Option, Schema } from "effect";
 
 import { decideAtom } from "../client/decide.ts";
 import { todayAtom } from "../client/today.ts";
-import { PageShell, pageTitle } from "../features/shared/layout.tsx";
+import { pageTitle } from "../features/shared/head.ts";
+import { PageShell } from "../features/shared/layout.tsx";
 import { TodayView } from "../features/today/today-page.tsx";
 
 // `/today`: the signed-in decider's decisions across their projects, or in

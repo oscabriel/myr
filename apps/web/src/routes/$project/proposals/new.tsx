@@ -21,7 +21,8 @@ import { UnknownProjectView } from "../../../features/project/unknown-project.ts
 import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { ProposeView } from "../../../features/propose/propose-view.tsx";
 import type { About } from "../../../features/propose/propose-view.tsx";
-import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
+import { pageTitle } from "../../../features/shared/head.ts";
+import { PageShell } from "../../../features/shared/layout.tsx";
 
 // `/$project/proposals/new`: the propose form. Who is signed in and the
 // project's top folders are read in the browser (the server paints the

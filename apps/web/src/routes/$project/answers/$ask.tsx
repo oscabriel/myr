@@ -1,8 +1,4 @@
-import {
-  RegistryProvider,
-  useAtomMount,
-  useAtomValue,
-} from "@effect/atom-react";
+import { useAtomMount, useAtomValue } from "@effect/atom-react";
 import { Client } from "@repo/protocol/contracts";
 import { Verdict } from "@repo/protocol/domain/answer";
 import { LandingView } from "@repo/protocol/domain/landing";
@@ -13,15 +9,18 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { DateTime, Effect, Option, Predicate, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/reactivity";
+import { AsyncResult } from "effect/reactivity";
 
 import { landingAtom, verdictAtom } from "../../../client/answer.ts";
+import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
 import { watchAtom } from "../../../client/watch.ts";
 import { AnswerView } from "../../../features/answer/answer-page.tsx";
-import { answerPath } from "../../../features/ask/ask-page.tsx";
-import { CODE, LINK } from "../../../features/ask/fields.tsx";
-import { NoSuchAsk, notFoundFor } from "../../../features/ask/refused.tsx";
-import { PageShell, pageTitle } from "../../../features/shared/layout.tsx";
+import { NoSuchAsk } from "../../../features/ask/refused.tsx";
+import { CODE, LINK } from "../../../features/shared/classes.ts";
+import { pageTitle } from "../../../features/shared/head.ts";
+import { PageShell } from "../../../features/shared/layout.tsx";
+import { answerPath } from "../../../features/shared/paths.ts";
+import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { serverClient } from "../../../server/client.ts";
 
 // The answer page: the latest verdict on an answer to an ask, stage by
@@ -166,18 +165,10 @@ const AnswerPage = () => {
   const atom = verdictAtom(project, ask, head);
 
   const seeds = [
-    Atom.initialValue(
-      atom,
-      AsyncResult.success(verdict === undefined ? {} : { verdict })
-    ),
+    seedSuccess(atom, verdict === undefined ? {} : { verdict }),
     ...(landing === undefined
       ? []
-      : [
-          Atom.initialValue(
-            landingAtom(project, landing.sha),
-            AsyncResult.success({ landing })
-          ),
-        ]),
+      : [seedSuccess(landingAtom(project, landing.sha), { landing })]),
   ];
 
   return (
@@ -191,12 +182,9 @@ const AnswerPage = () => {
           </a>
         </p>
       )}
-      <RegistryProvider
-        initialValues={seeds}
-        key={`${project}/${ask}/${head ?? ""}`}
-      >
+      <SeededAtoms id={`${project}/${ask}/${head ?? ""}`} seeds={seeds}>
         <FreshAnswer atom={atom} read={read} />
-      </RegistryProvider>
+      </SeededAtoms>
     </PageShell>
   );
 };

@@ -31,14 +31,15 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
-import { ledgerPath } from "../ledger/path.ts";
+import { Field, Fields, Region } from "../ask/fields.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
+import { CODE, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { disclosureWords } from "../shared/disclosure.ts";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
+import { ledgerPath } from "../shared/paths.ts";
 
 type Vouches = PublicPolicy["vouches"];
 

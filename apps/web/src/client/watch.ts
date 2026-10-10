@@ -15,10 +15,13 @@
  *   verdict fetches again too.
  *
  * The project and answer pages mount it (`useAtomMount`), so it runs only
- * in the browser, from the page's mount to its unmount. The first events a
- * stream hears are the kept ones a page has already read, so a new watcher
- * makes the page read once more; that read also catches whatever happened
- * between the page's first read and the stream's start.
+ * in the browser, from the page's mount to its unmount. It follows from the
+ * last number of the project's replay (`projectEventsAtom`, which the page
+ * reads anyway), not from the first event, so a new watcher hears none of
+ * the kept events again and makes the page read nothing twice; whatever
+ * happened between that replay and the stream's start comes first on the
+ * stream, so it is heard once. A replay that cannot be read starts the
+ * follow from the first event, as before.
  */
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -36,6 +39,7 @@ import { constVoid } from "effect/Function";
 import { Atom, Reactivity } from "effect/reactivity";
 
 import { framedClient } from "../surfaces.ts";
+import { lastSeq, projectEventsAtom } from "./events.ts";
 import { keys } from "./keys.ts";
 
 /** How long a page waits before it follows again, or between polls. */
@@ -90,12 +94,12 @@ export const keysOf = (
     Warned: ({ ask }) => keys.ask(project, ask),
   });
 
-/** `project` followed for as long as it runs: the stream while it works, then the poll. */
-const followed = (project: ProjectName) =>
+/** `project` followed from `since` for as long as it runs: the stream while it works, then the poll. */
+const followed = (project: ProjectName, since: Effect.Effect<number>) =>
   Effect.gen(function* () {
     const watch = yield* ProjectWatch;
     const reactivity = yield* Reactivity.Reactivity;
-    const last = yield* Ref.make(0);
+    const last = yield* Ref.make(yield* since);
 
     /** One stream from the last number heard, to its end: whether it failed before it heard anything. */
     const once = Effect.gen(function* () {
@@ -134,5 +138,17 @@ const followed = (project: ProjectName) =>
  * events and invalidates the keys they change. Its value says nothing.
  */
 export const watchAtom = Atom.family((project: ProjectName) =>
-  Atom.map(watchRuntime.atom(followed(project)), constVoid)
+  Atom.map(
+    watchRuntime.atom((get) =>
+      followed(
+        project,
+        // Read once, not followed: a new replay must not start the stream over.
+        get.resultOnce(projectEventsAtom(project)).pipe(
+          Effect.map(lastSeq),
+          Effect.orElseSucceed(() => 0)
+        )
+      )
+    ),
+    constVoid
+  )
 );

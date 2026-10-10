@@ -16,7 +16,7 @@ import { ledgerAtom } from "../../client/ledger.ts";
 import { watchAtom } from "../../client/watch.ts";
 import { LedgerView } from "../../features/ledger/ledger-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageTitle } from "../../features/shared/layout.tsx";
+import { pageTitle } from "../../features/shared/head.ts";
 import { serverClient } from "../../server/client.ts";
 
 // A project's ledger, as anyone may read it. The loader reads it on the

@@ -19,15 +19,8 @@ import type { LucideIcon } from "lucide-react";
 import { Fragment } from "react";
 import type { ReactNode } from "react";
 
-/** A project's page. */
-export const projectPath = (project: ProjectName) => `/${project}`;
-
-/** An ask's page. */
-export const askPath = (project: ProjectName, ask: AskId) =>
-  `/${project}/asks/${ask}`;
-
-/** The mono face for names a terminal prints: ids, kinds, territories. */
-export const ID = "font-mono text-[0.8125rem]";
+import { ID } from "../shared/classes.ts";
+import { askPath } from "../shared/paths.ts";
 
 /** Who a reserved ask is held for, in the words of the ask's page. */
 const heldFor = {

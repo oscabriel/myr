@@ -6,7 +6,6 @@ import { env } from "cloudflare:workers";
 import { Effect, Option, Schema } from "effect";
 
 import { PathsTree } from "../-paths-tree.tsx";
-import { notFoundFor } from "../../../../features/ask/refused.tsx";
 import {
   projectOf,
   repoPathOf,
@@ -14,7 +13,8 @@ import {
 } from "../../../../features/code/address.ts";
 import { CodeNotFound } from "../../../../features/code/not-found.tsx";
 import { TreeView } from "../../../../features/code/tree-view.tsx";
-import { pageTitle } from "../../../../features/shared/layout.tsx";
+import { pageTitle } from "../../../../features/shared/head.ts";
+import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { readFolderWithReadme } from "../../../../server/folder.ts";
 

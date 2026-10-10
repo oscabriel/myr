@@ -5,11 +5,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { Effect, Option, Schema } from "effect";
 
-import { notFoundFor } from "../../features/ask/refused.tsx";
 import { offsetOf, projectOf } from "../../features/code/address.ts";
 import { CodeNotFound } from "../../features/code/not-found.tsx";
-import { packageParamOf, RefsView } from "../../features/code/refs-view.tsx";
-import { pageTitle } from "../../features/shared/layout.tsx";
+import { packageParamOf } from "../../features/code/refs-param.ts";
+import { RefsView } from "../../features/code/refs-view.tsx";
+import { pageTitle } from "../../features/shared/head.ts";
+import { notFoundFor } from "../../features/shared/refusals.ts";
 import { serverClient } from "../../server/client.ts";
 
 // Main, the tags and the forks, read on the server; `?from=` pages the

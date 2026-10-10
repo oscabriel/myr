@@ -22,8 +22,11 @@ const firstSegment = (file: string, root: string) =>
     .replace(/\.tsx?$/u, "")
     .replaceAll("[.]", ".");
 
-/** Route files that serve no segment of their own: the shell, `/`, a project. */
-const notSegments = new Set(["__root", "index"]);
+/**
+ * Files that serve no segment of their own: the shell, `/`, a project, and
+ * `_headers`, which the asset host reads and never serves.
+ */
+const notSegments = new Set(["__root", "_headers", "index"]);
 
 const segments = [
   ...new Set([

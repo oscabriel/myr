@@ -23,3 +23,7 @@ const asRev = Schema.decodeUnknownOption(Rev);
  */
 export const revOf = (segment: string): Option.Option<string> =>
   Option.flatMap(decodeSegment(segment), asRev);
+
+/** The revision a page reads, beside its title: a commit by its short id. */
+export const revLabel = (rev: string) =>
+  /^[0-9a-f]{40}$/u.test(rev) ? rev.slice(0, 7) : rev;

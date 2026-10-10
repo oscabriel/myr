@@ -1,7 +1,7 @@
 /**
  * A project's page: its posture, how to take part, its open asks, and its
  * recent landings with their credit trailers. Props in, markup out: the
- * route reads the listing, the asks and the landings (`src/client/project.ts`),
+ * route reads the listing, the asks and the landings (`src/client/project.ts`, `src/client/events.ts`),
  * the code (its loader on the server, then `src/client/code.ts`) and the
  * platform URL (the root loader), and hands them here. "Propose an
  * ask" shows for signed-in members only, once the browser knows who that is
@@ -18,18 +18,17 @@ import type { DateTime } from "effect";
 import { EntriesTable, ReadmeSection } from "../code/tree-view.tsx";
 import { ReadingRows } from "../front/reading.tsx";
 import { SignedInProposeLink } from "../propose/propose-link.tsx";
+import { ID, SECTION } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
+import { askPath } from "../shared/paths.ts";
 import { PostureBadge } from "../shared/posture.tsx";
 import { When } from "../shared/time.tsx";
-import { AskFields, AskStanding, ID, askPath } from "./asks.tsx";
+import { AskFields, AskStanding } from "./asks.tsx";
 import { LandingList } from "./landings.tsx";
 import { postureLabel } from "./posture-label.ts";
 import { ProjectNav } from "./project-nav.tsx";
-
-/** A section's heading, the "title" step of the type scale. */
-export const SECTION = "text-lg font-semibold tracking-[-0.01em]";
 
 const AskRow = ({
   listing,

@@ -10,6 +10,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import type { ReactNode } from "react";
 
+import monoFont from "../assets/fonts/jetbrains-mono-latin.woff2?url";
+import sansFont from "../assets/fonts/public-sans-latin.woff2?url";
 import { TooltipProvider } from "../components/ui/tooltip.tsx";
 import { MANIFEST_PATH } from "../features/agents/manifest.ts";
 import { SessionSlot } from "../features/auth/session-slot.tsx";
@@ -84,7 +86,22 @@ const Root = () => {
 const ICON_PATH = "/icons/icon.svg";
 
 /**
- * The document's head on every page: the stylesheet, the manifest, the icon
+ * A font every page draws with, fetched with the page rather than once the
+ * stylesheet names it. Fonts are fetched without credentials whatever their
+ * origin, so the preload says so too, or the browser fetches the file twice.
+ */
+const fontPreload = (href: string) =>
+  ({
+    as: "font",
+    crossOrigin: "anonymous",
+    href,
+    rel: "preload",
+    type: "font/woff2",
+  }) as const;
+
+/**
+ * The document's head on every page: the stylesheet, the latin fonts (the
+ * latin-ext files load only when a page needs them), the manifest, the icon
  * and the metas. TanStack keeps one meta per `name` (the last a route gives),
  * so each meta here must have a name of its own; the two theme colours are
  * `ThemeColors`, in the document itself.
@@ -92,6 +109,8 @@ const ICON_PATH = "/icons/icon.svg";
 export const rootHead = () => ({
   links: [
     { href: styles, rel: "stylesheet" },
+    fontPreload(sansFont),
+    fontPreload(monoFont),
     // Written from `Brand.name` at each build by `vite.config.ts`.
     { href: MANIFEST_PATH, rel: "manifest" },
     { href: ICON_PATH, rel: "icon", type: "image/svg+xml" },

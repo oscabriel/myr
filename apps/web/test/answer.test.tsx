@@ -29,7 +29,7 @@ import {
   HeldBackBits,
   LaneTable,
 } from "../src/features/answer/answer-page.tsx";
-import { Refusals } from "../src/features/ask/refused.tsx";
+import { Refusals } from "../src/features/shared/refusals.ts";
 import { readAnswer } from "../src/routes/$project/answers/$ask.tsx";
 import {
   askId,

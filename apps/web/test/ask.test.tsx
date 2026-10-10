@@ -17,7 +17,8 @@ import { Effect, Layer, Ref, Schema } from "effect";
 import { RpcTest } from "effect/rpc";
 
 import { AskView } from "../src/features/ask/ask-page.tsx";
-import { NoSuchAsk, Refusals } from "../src/features/ask/refused.tsx";
+import { NoSuchAsk } from "../src/features/ask/refused.tsx";
+import { Refusals } from "../src/features/shared/refusals.ts";
 import { readAsk } from "../src/routes/$project/asks/$ask.tsx";
 import {
   ask,

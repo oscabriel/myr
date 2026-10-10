@@ -7,7 +7,8 @@ import {
 
 import { commands } from "../features/agents/catalog.ts";
 import { AgentSetupView } from "../features/agents/setup-page.tsx";
-import { PageShell, pageTitle } from "../features/shared/layout.tsx";
+import { pageTitle } from "../features/shared/head.ts";
+import { PageShell } from "../features/shared/layout.tsx";
 
 // `/agents`: how each agent connects, drawn from `@repo/agent-kit`'s
 // `agentSetup` for this stage's platform and the web's own origin (the

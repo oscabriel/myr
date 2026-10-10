@@ -21,8 +21,9 @@ import { DateTime } from "effect";
 import { Lock } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { CODE, Field, Fields, LINK, Region } from "../ask/fields.tsx";
+import { Field, Fields, Region } from "../ask/fields.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
+import { CODE, LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import { HandleLink } from "../shared/handle.tsx";

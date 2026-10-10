@@ -20,21 +20,15 @@ import { Match, Option, Schema } from "effect";
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
-import { answerPath } from "../ask/ask-page.tsx";
-import { askPath } from "../project/asks.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
+import { ID, LABEL, LINK } from "../shared/classes.ts";
 import { HandleLink } from "../shared/handle.tsx";
 import { PageShell } from "../shared/layout.tsx";
 import { OutcomeView } from "../shared/outcome.tsx";
+import { answerPath, askPath } from "../shared/paths.ts";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
 import { blobHref, commitHref, shortSha, treeHref } from "./paths.ts";
-
-const LINK = "decoration-rule underline hover:decoration-current";
-
-const ID = "font-mono text-[0.8125rem]";
-
-const LABEL = "text-muted-foreground text-xs font-medium";
 
 const isRole = Schema.is(CreditRole);
 

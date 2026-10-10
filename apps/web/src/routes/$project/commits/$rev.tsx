@@ -6,16 +6,17 @@ import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { DateTime, Effect, Option, Predicate, Schema } from "effect";
 
-import { notFoundFor } from "../../../features/ask/refused.tsx";
 import {
   offsetOf,
   projectOf,
   repoPathOf,
   revisionOf,
 } from "../../../features/code/address.ts";
-import { LOG_PAGE, LogView } from "../../../features/code/log-view.tsx";
+import { LOG_PAGE } from "../../../features/code/log-page.ts";
+import { LogView } from "../../../features/code/log-view.tsx";
 import { CodeNotFound } from "../../../features/code/not-found.tsx";
-import { pageTitle } from "../../../features/shared/layout.tsx";
+import { pageTitle } from "../../../features/shared/head.ts";
+import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { serverClient } from "../../../server/client.ts";
 
 // The log from a revision, a page at a time (`?from=` is where the page

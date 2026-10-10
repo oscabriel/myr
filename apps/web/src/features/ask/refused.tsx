@@ -6,23 +6,14 @@
  * `Refusals`; `NoSuchAsk` decodes them where they arrive (AGENTS.md
  * principle 2).
  */
-import { Refusal } from "@repo/protocol/refusal";
-import { notFound } from "@tanstack/react-router";
-import { Effect, Option, Schema } from "effect";
+import type { Refusal } from "@repo/protocol/refusal";
+import { Option, Schema } from "effect";
 import type { Array } from "effect";
 
 import { EmptyState } from "../shared/empty.tsx";
 import { PageShell } from "../shared/layout.tsx";
 import { RefusalView } from "../shared/refusal.tsx";
-
-/** Refusals as a not-found carries them. */
-export const Refusals = Schema.NonEmptyArray(Refusal);
-
-/** A loader's 404 for `refusal`: a not-found that carries it, encoded, to the page. */
-export const notFoundFor = (refusal: Refusal) =>
-  Effect.flatMap(Schema.encodeEffect(Refusals)([refusal]), (data) =>
-    Effect.fail(notFound({ data }))
-  );
+import { Refusals } from "../shared/refusals.ts";
 
 /** What a 404 says when the address could name no ask, so no refusal came back. */
 export const NAMES_ONLY =

@@ -9,6 +9,10 @@
  * `PLATFORM`; and nothing in it comes from the dev world: no `src/dev/`
  * module, no memory adapter, no seed, no dev sign-in and no test kit.
  *
+ * Its root route, whose chunks every page preloads, carries no Markdown
+ * renderer and stays under a size ceiling, and the hashed assets it serves
+ * are kept by browsers for good (`public/_headers`).
+ *
  * Modules are read from the build's source maps (each map's `sources`),
  * strings from every other file it wrote. The Cloudflare plugin rewrites
  * `.wrangler/deploy/config.json` at each build to point at its output; the
@@ -52,6 +56,14 @@ const DEV_MODULES = [
   "packages/artifacts/src/repo-host/memory",
 ] as const;
 
+/**
+ * The most the chunks every page preloads (the root route's) may weigh,
+ * gzipped: about 10% above what they weighed (222,169 bytes in 19 chunks)
+ * once the Markdown renderer and the views it came with left them (322,049
+ * in 31 before).
+ */
+const ROOT_PRELOADS_GZIP = 244_000;
+
 /** Files whose bytes are not text: fonts and images. */
 const BINARY = /\.(?:ico|png|woff2)$/u;
 
@@ -78,6 +90,8 @@ interface Output {
   readonly paths: ReadonlySet<string>;
   /** Every module it bundled, by its path from the repo root, without a query. */
   readonly modules: ReadonlySet<string>;
+  /** The modules each file holds, by the file's path under the output folder. */
+  readonly holding: ReadonlyMap<string, readonly string[]>;
 }
 
 const where = Effect.gen(function* () {
@@ -126,6 +140,7 @@ const readOutput = (out: string, repo: string) =>
     const texts = new Map<string, string>();
     const modules = new Set<string>();
     const paths = new Set<string>();
+    const holding = new Map<string, readonly string[]>();
 
     for (const entry of entries) {
       const at = path.join(out, entry);
@@ -137,11 +152,11 @@ const readOutput = (out: string, repo: string) =>
       paths.add(entry);
 
       if (entry.endsWith(".map")) {
-        for (const module of yield* modulesIn(
-          at,
-          yield* fs.readFileString(at),
-          repo
-        )) {
+        const held = yield* modulesIn(at, yield* fs.readFileString(at), repo);
+
+        holding.set(entry.replace(/\.map$/u, ""), held);
+
+        for (const module of held) {
           modules.add(module);
         }
       } else if (!BINARY.test(entry)) {
@@ -149,7 +164,7 @@ const readOutput = (out: string, repo: string) =>
       }
     }
 
-    return { modules, paths, texts } satisfies Output;
+    return { holding, modules, paths, texts } satisfies Output;
   });
 
 /** The web's production build, into a folder of its own, read back whole. */
@@ -203,6 +218,41 @@ const routePath = (path: string) =>
   new RegExp(
     `(?<quote>["'\`])${path.replaceAll(/[$.]/gu, "\\$&")}\\k<quote>`,
     "u"
+  );
+
+/**
+ * The chunks every page preloads: the root route's, as Start's manifest in
+ * the server output names them (`/assets/…`).
+ */
+const rootPreloads = (output: Output) => {
+  const manifest = textsUnder(output, "server").find(([at]) =>
+    at.includes("tanstack-start-manifest")
+  )?.[1];
+
+  // Lazily up to the first `preloads`, the root's own: a child route's path
+  // may hold a brace (`/$project/asks/{$ask}.md`).
+  const preloads =
+    /__root__:\s*\{[\s\S]*?preloads:\s*\[(?<list>[^\]]*)\]/u.exec(
+      manifest ?? ""
+    )?.groups?.list;
+
+  return [...(preloads ?? "").matchAll(/"(?<chunk>[^"]+)"/gu)].flatMap(
+    ({ groups }) => (groups?.chunk === undefined ? [] : [groups.chunk])
+  );
+};
+
+/** `text`'s size gzipped, in bytes. */
+const gzipped = (text: string) =>
+  Stream.fromReadableStream({
+    evaluate: () =>
+      new Blob([text]).stream().pipeThrough(new CompressionStream("gzip")),
+    onError: (cause) => cause,
+  }).pipe(
+    Stream.runFold(
+      () => 0,
+      (size, chunk: Uint8Array) => size + chunk.byteLength
+    ),
+    Effect.orDie
   );
 
 layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
@@ -293,6 +343,45 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
             )
           ).toStrictEqual([]);
         })
+    );
+
+    it.effect(
+      "preloads on every page no chunk that holds the Markdown renderer, and stays under its ceiling",
+      () =>
+        Effect.gen(function* () {
+          const output = yield* Built;
+          const preloads = rootPreloads(output);
+
+          expect(preloads.length).toBeGreaterThan(0);
+
+          const sizes = yield* Effect.forEach(preloads, (chunk) =>
+            gzipped(output.texts.get(`client${chunk}`) ?? "")
+          );
+
+          const total = sizes.reduce((sum, size) => sum + size, 0);
+
+          expect({
+            markdown: preloads.filter((chunk) =>
+              (output.holding.get(`client${chunk}`) ?? []).some((module) =>
+                module.includes("node_modules/react-markdown/")
+              )
+            ),
+            missing: preloads.filter(
+              (chunk) => !output.texts.has(`client${chunk}`)
+            ),
+            underCeiling: total <= ROOT_PRELOADS_GZIP,
+          }).toStrictEqual({ markdown: [], missing: [], underCeiling: true });
+        })
+    );
+
+    it.effect("tells browsers to keep the hashed assets for good", () =>
+      Effect.gen(function* () {
+        const output = yield* Built;
+
+        expect(output.texts.get("client/_headers")).toMatch(
+          /^\/assets\/\*\n {2}Cache-Control: public, max-age=31536000, immutable$/mu
+        );
+      })
     );
   }
 );

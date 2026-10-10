@@ -18,6 +18,7 @@ import type { ReactNode } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 
+import { LINK } from "../shared/classes.ts";
 import { CopyButton } from "./copy.tsx";
 import {
   blobHref,
@@ -28,12 +29,8 @@ import {
   sizeInWords,
   whyHref,
 } from "./paths.ts";
-import {
-  CodeBreadcrumb,
-  CodeLayout,
-  ReadmeSection,
-  revLabel,
-} from "./tree-view.tsx";
+import { revLabel } from "./rev.ts";
+import { CodeBreadcrumb, CodeLayout, ReadmeSection } from "./tree-view.tsx";
 
 /** How many lines the server sends; the browser's drawing shows them all. */
 export const FALLBACK_LINES = 2000;
@@ -43,8 +40,6 @@ const TOOL = buttonVariants({
   size: "sm",
   variant: "ghost",
 });
-
-const LINK = "decoration-rule underline hover:decoration-current";
 
 /** A text's lines, without the empty one after its last newline. */
 export const linesOf = (text: string): readonly string[] => {
