@@ -120,6 +120,47 @@ export const platformSkill = (
 ): Effect.Effect<readonly GeneratedFile[]> =>
   skillFile(input).pipe(Effect.map((content) => [{ content, path: SKILL }]));
 
+// --- The MCP server, as each client's config names it ----------------------------
+
+/**
+ * How each config spells the platform's MCP server: Claude Code's `.mcp.json`
+ * (and VS Code's `servers`, the same entry), Agent Plugins 1.0's `mcp.json`,
+ * and Cursor's `mcp.json`, whose remote entry is a bare `url` (its docs give
+ * a `type` only for stdio).
+ */
+const servers = {
+  "agent-plugins": {
+    remote: (url: string) => ({ type: "streamable-http", url }),
+    stdio: { args: ["mcp"], command: Brand.cli, type: "stdio" },
+  },
+  claude: {
+    remote: (url: string) => ({ type: "http", url }),
+    stdio: { args: ["mcp"], command: Brand.cli },
+  },
+  cursor: {
+    remote: (url: string) => ({ url }),
+    stdio: { args: ["mcp"], command: Brand.cli, type: "stdio" },
+  },
+} as const;
+
+export type McpFlavour = keyof typeof servers;
+
+/**
+ * The `mcpServers` object a client's config holds: the platform's `/mcp`
+ * over HTTP, or `<cli> mcp` over stdio without a URL, under the brand's
+ * slug. The plugin bundles and the Agents page (`agent-setup.ts`) both
+ * build theirs here, so no client's snippet can drift from a bundle's.
+ */
+export const mcpServersFor = (
+  platformUrl: string | undefined,
+  flavour: McpFlavour
+) => ({
+  [Brand.slug]:
+    platformUrl === undefined
+      ? servers[flavour].stdio
+      : servers[flavour].remote(`${platformUrl}/mcp`),
+});
+
 // --- The Claude Code plugin ------------------------------------------------------
 
 const hookCommand = (event: HookEvent) => ({
@@ -172,12 +213,7 @@ export const claudePlugin = (
       { content: skill, path: `${PLUGIN}/${SKILL}` },
       {
         content: printJson({
-          mcpServers: {
-            [Brand.slug]:
-              input.platformUrl === undefined
-                ? { args: ["mcp"], command: Brand.cli }
-                : { type: "http", url: `${input.platformUrl}/mcp` },
-          },
+          mcpServers: mcpServersFor(input.platformUrl, "claude"),
         }),
         path: `${PLUGIN}/.mcp.json`,
       },
@@ -213,12 +249,7 @@ export const agentPluginsBundle = (
       {
         content: printJson({
           $schema: `${SCHEMAS}/mcp.schema.json`,
-          mcpServers: {
-            [Brand.slug]:
-              input.platformUrl === undefined
-                ? { args: ["mcp"], command: Brand.cli, type: "stdio" }
-                : { type: "streamable-http", url: `${input.platformUrl}/mcp` },
-          },
+          mcpServers: mcpServersFor(input.platformUrl, "agent-plugins"),
         }),
         path: `${PLUGIN}/mcp.json`,
       },

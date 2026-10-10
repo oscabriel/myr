@@ -229,13 +229,15 @@ export type RepoPath = typeof RepoPath.Type;
 
 /**
  * Words a project may not be named: the web serves its own pages and files
- * at these first path segments (`/today`, `/people/<handle>`, `/auth/…`,
- * `/rpc`, `/releases/…`, `/icons/…` and the client build's `/assets/…`), so a
- * project so named would be unreachable at `<web>/<project>`. A name with a
- * dot (`llms.txt`, `install.sh`, `.well-known`) is no project's name anyway.
+ * at these first path segments (`/agents`, `/today`, `/people/<handle>`,
+ * `/auth/…`, `/rpc`, `/releases/…`, `/icons/…` and the client build's
+ * `/assets/…`), so a project so named would be unreachable at
+ * `<web>/<project>`. A name with a dot (`llms.txt`, `agents.md`,
+ * `install.sh`, `.well-known`) is no project's name anyway.
  * `apps/web/test/routes.test.ts` holds this list to the web's routes.
  */
 export const reservedProjectNames = [
+  "agents",
   "assets",
   "auth",
   "icons",

@@ -1,8 +1,9 @@
 /**
- * The shell every page shares: the site header (front page, Today, the
- * session), one main region per page headed by its title over a double
- * rule, and the footer's two ways in (plain git, and the CLI). The root
- * route composes them (`src/routes/__root.tsx`); a page renders `PageShell`.
+ * The shell every page shares: the site header (front page, Today, Agents,
+ * the session), one main region per page headed by its title over a double
+ * rule, and the footer's ways in (plain git, the CLI, and the Agents page).
+ * The root route composes them (`src/routes/__root.tsx`); a page renders
+ * `PageShell`.
  */
 import { Brand } from "@repo/brand";
 import type { ReactNode } from "react";
@@ -33,6 +34,7 @@ export const PageShell = ({
 const NAV = [
   { href: "/", label: "Asks" },
   { href: "/today", label: "Today" },
+  { href: "/agents", label: "Agents" },
 ] as const;
 
 /** Whether `href` is the page at `pathname`, or the section it heads. */
@@ -83,7 +85,7 @@ export const SiteFooter = ({
   readonly platformUrl: string;
 }) => (
   <footer className="border-rule border-t">
-    <div className={`${COLUMN} grid gap-6 py-8 sm:grid-cols-2`}>
+    <div className={`${COLUMN} grid gap-6 py-8 sm:grid-cols-3`}>
       <section className="flex min-w-0 flex-col gap-2">
         <h2 className="text-muted-foreground text-xs font-medium">
           Plain git: clone any project
@@ -95,6 +97,15 @@ export const SiteFooter = ({
           Install the {Brand.cli} CLI
         </h2>
         <CommandLine command={`curl -fsSL ${platformUrl}/install.sh | sh`} />
+      </section>
+      <section className="flex min-w-0 flex-col gap-2">
+        <h2 className="text-muted-foreground text-xs font-medium">
+          Connect an agent
+        </h2>
+        <p className="text-sm">
+          <a href="/agents">MCP, the CLI, llms.txt and skills</a>, with the
+          setup for each agent.
+        </p>
       </section>
     </div>
   </footer>

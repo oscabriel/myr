@@ -411,12 +411,41 @@ describe("the shell", () => {
     expect(markup).toContain(">Sign in</a>");
   });
 
+  it("links Asks, Today and Agents in the header, marking Agents current on its page", () => {
+    const markup = markupOf(<SiteHeader pathname="/agents" session={null} />);
+
+    const links = [
+      ...markup.matchAll(
+        /<a\b[^>]*href="(?<href>[^"]+)"[^>]*>(?<label>[^<]+)<\/a>/gu
+      ),
+    ].map(({ groups }) => [groups?.href, groups?.label]);
+
+    expect(links).toStrictEqual([
+      ["#main", "Skip to content"],
+      ["/", Brand.name],
+      ["/", "Asks"],
+      ["/today", "Today"],
+      ["/agents", "Agents"],
+    ]);
+    expect(markup).toMatch(/<a\b[^>]*aria-current="page"[^>]*>Agents<\/a>/u);
+    expect(markup).not.toMatch(/<a\b[^>]*aria-current="page"[^>]*>Today<\/a>/u);
+  });
+
   it("gives the two ways in at the foot of every page: plain git and the CLI", () => {
     const text = textOf(<SiteFooter platformUrl={platformUrl} />);
 
     expect(text).toContain("Plain git: clone any project");
     expect(text).toContain(`git clone ${platformUrl}/<project>.git`);
     expect(text).toContain(`curl -fsSL ${platformUrl}/install.sh | sh`);
+  });
+
+  it("sends a reader who wants to connect an agent to the Agents page", () => {
+    const markup = markupOf(<SiteFooter platformUrl={platformUrl} />);
+
+    expect(markup).toMatch(/<a\b[^>]*href="\/agents"[^>]*>/u);
+    expect(textOf(<SiteFooter platformUrl={platformUrl} />)).toContain(
+      "Connect an agent"
+    );
   });
 
   it("names the paper colours the theme-color meta repeats", () => {
