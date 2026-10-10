@@ -148,6 +148,14 @@ describe(When, () => {
   });
 });
 
+/** Each line's hang, in ch, as the command line sets it. */
+const hangs = (command: string) =>
+  [
+    ...markupOf(<CommandLine command={command} />).matchAll(
+      /padding-left:(?<hang>\d+)ch;text-indent:-\k<hang>ch/gu
+    ),
+  ].map((found) => Number(found.groups?.hang));
+
 describe(CommandLine, () => {
   it("shows the command, with a button that copies it", () => {
     const command = `${Brand.cli} claim fix-week-start`;
@@ -170,6 +178,18 @@ describe(CommandLine, () => {
     expect(words).toStrictEqual(command.split(" "));
     // The words keep the command's own spaces between them.
     expect(textOf(<CommandLine command={command} />)).toContain(command);
+  });
+
+  it("hangs a line 6ch, less when its longest word would not fit beside the hang", () => {
+    // `today` (5ch) beside a 6ch hang needs 11ch; the line is 9ch, so the
+    // box hugging it would break the word in two. It never wraps, so its
+    // hang never shows.
+    expect(hangs(`${Brand.cli} today`)).toStrictEqual([4]);
+    expect(
+      hangs(
+        `${Brand.cli} claim lint-heading-levels --project vellum \\\n  --json`
+      )
+    ).toStrictEqual([6, 2]);
   });
 });
 

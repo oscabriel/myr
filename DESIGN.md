@@ -366,7 +366,7 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 
 - **Copy action:** a 32 px ghost button at a row's end, named for what it copies ("Copy claim command"), its command always in the DOM as text (`<code class="sr-only">`), never only a clipboard payload or a `data-` value. After a copy it shows a check and says "Copied" for 2 s in a polite live region.
 - **Command chip:** the command shown whole, small, at the end of a status line; pressing it copies it.
-- **Command line:** a field-surface box with a hairline border that hugs its command; a muted `$` that selection skips; the command in mono at terminal leading, broken only between words, each of its own lines hanging 6ch so a wrapped line reads as one line going on; a ghost Copy button (its word hidden in a narrow column). A numbered command shows its digit before the `$` while the single keys are on, and "Copy (1)" in its title.
+- **Command line:** a field-surface box with a hairline border that hugs its command; a muted `$` that selection skips; the command in mono at terminal leading, broken only between words, each of its own lines hanging 6ch so a wrapped line reads as one line going on (a line too short to wrap hangs less, so its box hugging it never breaks a word; `e2e/command-line.e2e.ts` holds it); a ghost Copy button (its word hidden in a narrow column). A numbered command shows its digit before the `$` while the single keys are on, and "Copy (1)" in its title.
 
 ### Status line (`StatusLine`) and state badge (`StateBadge`)
 
