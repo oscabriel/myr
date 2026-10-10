@@ -175,7 +175,7 @@ _Avoid_: hidden test, private test, holdout, sealed test
 The salted SHA-256 root of a held-back suite, printed on every landing it judged.
 
 **Posture**:
-The label the platform computes from a project's visibility config: Open, Open with sealed evidence, Open on schedule, Open core, or Source available.
+The label the platform computes from a project's visibility config as it stands now: Open, Open with sealed evidence, Open on schedule, Open core, or Source available. A narrowing stands only once a decider accepts it and its notice runs out. Every page and list shows the posture the ledger shows.
 _Avoid_: licence (they are different things)
 
 **Ledger**:

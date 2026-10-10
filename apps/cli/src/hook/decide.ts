@@ -227,7 +227,11 @@ const brief = ({ ask, checkCommand, project, territory, want }: HookClaim) =>
     "",
     `**Want:** ${want}`,
     "",
-    `**Territory:** the module \`${territory.module}\`. Change only these paths:`,
+    // A paths territory (module `.`) is no module a reader would know: it
+    // reads as its paths alone, as the project's own brief does.
+    territory.module === "."
+      ? "**Territory:** these paths. Change only these:"
+      : `**Territory:** the module \`${territory.module}\`. Change only these paths:`,
     ...bullets(territory.paths),
     ...(territory.publicFiles === undefined ||
     territory.publicFiles.length === 0

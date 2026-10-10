@@ -547,10 +547,11 @@ const projection: FrontPageSeed = {
 
 describe("reads across projects", () => {
   it.effect(
-    "come from the front-page projection, without waking any project",
+    "come from the front-page projection, and a project the platform never made keeps its listed posture",
     () =>
       Effect.gen(function* () {
-        // No project is made: only the projection answers.
+        // No project is made: only the projection answers, so each listed
+        // posture is the projection's own fallback.
         const bob = yield* as("bob");
 
         expect(yield* bob.listProjects({})).toStrictEqual({

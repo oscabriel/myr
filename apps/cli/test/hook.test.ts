@@ -273,6 +273,29 @@ describe("session-start", () => {
     );
   });
 
+  it("briefs a paths territory as its paths, not as the module `.`", () => {
+    const { territory } = Schema.decodeSync(Ask)({
+      ...askWire,
+      territory: { module: ".", paths: ["src/trim.ts", "test/trim.test.ts"] },
+    });
+
+    const { output } = decideHook("session-start", start, {
+      ...facts,
+      claim: Option.some({ ...claim, territory }),
+    });
+
+    const context = Schema.decodeUnknownSync(
+      Schema.Struct({
+        hookSpecificOutput: Schema.Struct({ additionalContext: Schema.String }),
+      })
+    )(output).hookSpecificOutput.additionalContext;
+
+    expect(context.split("\n")).toContain(
+      "**Territory:** these paths. Change only these:"
+    );
+    expect(context).not.toContain("module");
+  });
+
   it("says nothing to the agent without a claim", () => {
     expect(
       decideHook("session-start", start, { ...facts, claim: Option.none() })
