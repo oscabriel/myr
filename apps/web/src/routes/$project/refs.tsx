@@ -11,10 +11,12 @@ import { packageParamOf } from "../../features/code/refs-param.ts";
 import { RefsView } from "../../features/code/refs-view.tsx";
 import { pageHead } from "../../features/shared/head.ts";
 import { notFoundFor } from "../../features/shared/refusals.ts";
+import { branchPage } from "../../server/cache-headers.ts";
 import { serverClient } from "../../server/client.ts";
 
 // Main, the tags and the forks, read on the server; `?from=` pages the
-// tags, and `?package=` lists one package's tags alone.
+// tags, and `?package=` lists one package's tags alone. Where the project
+// is cloned from comes with them.
 
 /** The refs for their page, or a not-found carrying the platform's refusal. */
 export const readRefsPage = (name: string) =>
@@ -33,16 +35,26 @@ const refsPage = createServerFn({ method: "GET" })
   .validator((name: string) => name)
   .handler(({ data }) =>
     Effect.runPromise(
-      readRefsPage(data).pipe(Effect.provide(serverClient(env)))
+      readRefsPage(data).pipe(
+        // Where the project is cloned from rides with its refs.
+        Effect.map((refs) => ({ platformUrl: env.PUBLIC_PLATFORM_URL, refs })),
+        Effect.provide(serverClient(env))
+      )
     )
   );
 
 const RefsPage = () => {
-  const refs = Schema.decodeSync(Refs)(Route.useLoaderData());
+  const { platformUrl, refs: read } = Route.useLoaderData();
+  const refs = Schema.decodeSync(Refs)(read);
   const search = Route.useSearch();
 
   return (
-    <RefsView from={search.from ?? 0} package={search.package} refs={refs} />
+    <RefsView
+      from={search.from ?? 0}
+      package={search.package}
+      platformUrl={platformUrl}
+      refs={refs}
+    />
   );
 };
 
@@ -58,7 +70,13 @@ export const Route = createFileRoute("/$project/refs")({
     package: Option.getOrUndefined(packageParamOf(search.package)),
   }),
   loader: ({ params }) => refsPage({ data: params.project }),
-  head: ({ params: { project } }) => pageHead({ title: `${project}: refs` }),
+  // Refs move with the next landing or claim: kept briefly, read again behind.
+  headers: () => branchPage,
+  head: ({ params: { project } }) =>
+    pageHead({
+      title: `Refs · ${project}`,
+      description: `${project}'s main, tags and forks.`,
+    }),
   component: RefsPage,
   notFoundComponent: CodeNotFound,
 });

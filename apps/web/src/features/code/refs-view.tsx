@@ -1,26 +1,37 @@
 /**
- * A project's refs as a reader sees them: main at its landed commit, the
- * tags (newest first, as `listRefs` orders them, `TAGS_PAGE` a page), and
- * the forks: each claim's, linking the answer page of its ask, and each
- * person's working fork. Only what `listRefs` returns is shown, so the
- * platform's own refs never appear. The page says tags, never releases: a release is something else here.
+ * A project's refs as a reader sees them, one row each: main at its landed
+ * commit (it moves only by a landing), the tags (newest first, as
+ * `listRefs` orders them, `TAGS_PAGE` a page), and the forks: each claim's
+ * on one line with its answer, its claimant and the claim's state, then
+ * each person's working fork. Only what `listRefs` returns is shown, so
+ * the platform's own refs never appear. The page says tags, never
+ * releases: a release is something else here.
  *
  * A monorepo's tags version several packages (`@changesets/cli@2.27.1`):
  * when they hold more than one, a list of packages, each with its newest
  * tag and its count, sits above the tags, and `?package=` lists one
  * package's tags alone.
  */
+import type { ClaimState } from "@repo/protocol/domain/claim";
 import { packageOf } from "@repo/protocol/domain/code";
-import type { RefsView as Refs, TagRef } from "@repo/protocol/domain/code";
+import type {
+  ForkRef,
+  RefsView as Refs,
+  TagRef,
+} from "@repo/protocol/domain/code";
 import { defaultStringifySearch } from "@tanstack/react-router";
 import { Option } from "effect";
+import type { ReactNode } from "react";
 
-import { ProjectNav } from "../project/project-nav.tsx";
-import { ID, LINK, SECTION } from "../shared/classes.ts";
+import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
+import { FactBlock } from "../shared/facts.tsx";
 import { HandleLink } from "../shared/handle.tsx";
-import { PageShell } from "../shared/layout.tsx";
-import { answerPath } from "../shared/paths.ts";
+import { AppLink } from "../shared/link.tsx";
+import { answerPath, personPath } from "../shared/paths.ts";
+import { MetaCode, MetaLine, Row, RowGroup, RowList } from "../shared/row.tsx";
+import type { RowState } from "../shared/row.tsx";
+import { Workspace } from "../shared/shell/workspace.tsx";
 import { Pager } from "./pager.tsx";
 import { commitHref, shortSha, treeHref } from "./paths.ts";
 
@@ -58,16 +69,128 @@ const packagesOf = (tags: readonly TagRef[]): readonly PackageRun[] => {
 /** How many tags a page lists. */
 export const TAGS_PAGE = 100;
 
+/** The refs page itself. */
+const refsPath = (project: string) => `/${project}/refs`;
+
 /**
  * The refs page from the `from`th tag, of one package's tags or all. The
  * router writes the search, so a name it would read back as JSON (a
  * package called `2048`) is quoted and arrives as the name.
  */
 const refsHref = (project: string, from: number, only?: string) =>
-  `/${project}/refs${defaultStringifySearch({
+  `${refsPath(project)}${defaultStringifySearch({
     package: only,
     from: from > 0 ? from : undefined,
   })}`;
+
+const plural = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+/** A link inside a row's metadata, raised over the row's own link. */
+const META_LINK =
+  "decoration-rule relative z-10 underline hover:decoration-current";
+
+/** A commit in a row's metadata: short, whole in its title, linked. */
+const CommitLink = ({
+  project,
+  sha,
+}: {
+  readonly project: Refs["project"];
+  readonly sha: string;
+}) => (
+  <AppLink
+    className={`text-mono font-mono ${META_LINK}`}
+    title={sha}
+    to={commitHref(project, sha)}
+  >
+    {shortSha(sha)}
+  </AppLink>
+);
+
+/** Someone in a row's metadata, linked over the row's own link. */
+const Person = ({ handle }: { readonly handle: ForkRef["handle"] }) => (
+  <span className="relative z-10">
+    <HandleLink handle={handle} />
+  </span>
+);
+
+/** Each claim state as a row says it: its mark and its word. */
+const CLAIM_STATES = {
+  answered: { mark: "landed", word: "Answered" },
+  lapsed: { mark: "notNeeded", word: "Lapsed" },
+  live: { mark: "claimed", word: "Claimed" },
+  released: { mark: "notNeeded", word: "Given up" },
+  warned: { mark: "waiting", word: "Warned, no push lately" },
+} as const satisfies Record<ClaimState, RowState>;
+
+/** A group of rows, or what it would hold said plainly when it holds none. */
+const Group = ({
+  children,
+  counts,
+  empty,
+  facts,
+  name,
+}: {
+  readonly name: string;
+  readonly counts?: string;
+  readonly facts?: ReactNode;
+  /** What the group would hold, when it holds nothing. */
+  readonly empty?: string | undefined;
+  readonly children: ReactNode;
+}) => (
+  <div className="flex min-w-0 flex-col gap-3">
+    <RowGroup
+      {...(counts === undefined ? {} : { counts })}
+      facts={facts}
+      label={name}
+      name={name}
+      under="bar"
+    >
+      {children}
+    </RowGroup>
+    {empty === undefined ? null : <EmptyState title={empty} />}
+  </div>
+);
+
+/** main: where it stands, and that only a landing moves it. */
+const MainRow = ({ refs }: { readonly refs: Refs }) => {
+  const { landed, project } = refs;
+
+  return landed === undefined ? (
+    <section aria-label="main" className="flex flex-col" data-ref="main">
+      <EmptyState title="Nothing has landed on main yet." />
+    </section>
+  ) : (
+    <RowList label="main">
+      <Row
+        action={
+          <AppLink
+            className={`text-ui shrink-0 font-medium ${META_LINK}`}
+            to={treeHref(project, "main")}
+          >
+            Browse files
+          </AppLink>
+        }
+        data={{ "data-ref": "main" }}
+        href={treeHref(project, "main")}
+        id="main"
+        meta={
+          <MetaLine
+            parts={[
+              "moves only by a landing",
+              <span key="at">
+                landed at <CommitLink project={project} sha={landed} />
+              </span>,
+            ]}
+          />
+        }
+        mono
+        state={{ mark: "landed", word: "Landed" }}
+        title="main"
+      />
+    </RowList>
+  );
+};
 
 const Packages = ({
   packages,
@@ -76,51 +199,147 @@ const Packages = ({
   readonly packages: readonly PackageRun[];
   readonly project: Refs["project"];
 }) => (
-  <section aria-labelledby="packages" className="flex flex-col gap-2">
-    <h2 className={SECTION} id="packages">
-      Packages{" "}
-      <span className="text-muted-foreground text-sm font-normal">
-        {packages.length}
-      </span>
-    </h2>
-    <ul className="border-rule flex flex-col border-b">
-      {packages.map(({ count, name, newest }) => (
-        <li
-          className={`border-rule flex flex-wrap items-baseline justify-between gap-x-4 border-t py-2 ${ID}`}
-          data-package={name}
-          key={name}
-        >
-          <a
-            className={`${LINK} [overflow-wrap:anywhere]`}
-            href={refsHref(project, 0, name)}
-          >
-            {name}
-          </a>
-          <span className="text-muted-foreground flex flex-wrap items-baseline gap-x-4">
-            <a
-              className={`${LINK} [overflow-wrap:anywhere]`}
-              href={treeHref(project, newest.name)}
-              title="Newest tag"
-            >
-              {newest.name}
-            </a>
-            <span>{count === 1 ? "1 tag" : `${count} tags`}</span>
-          </span>
-        </li>
-      ))}
-    </ul>
-  </section>
+  <Group
+    counts={plural(packages.length, "package", "packages")}
+    name="Packages"
+  >
+    {packages.map(({ count, name, newest }) => (
+      <Row
+        data={{ "data-package": name }}
+        href={refsPath(project)}
+        id={`package:${name}`}
+        key={name}
+        meta={
+          <MetaLine
+            parts={[
+              <AppLink
+                className={`text-mono font-mono ${META_LINK}`}
+                key="newest"
+                title="Newest tag"
+                to={treeHref(project, newest.name)}
+              >
+                {newest.name}
+              </AppLink>,
+              plural(count, "tag", "tags"),
+            ]}
+          />
+        }
+        mono
+        search={{ package: name }}
+        size="one-line"
+        title={name}
+      />
+    ))}
+  </Group>
+);
+
+const TagRow = ({
+  project,
+  tag,
+}: {
+  readonly project: Refs["project"];
+  readonly tag: TagRef;
+}) => (
+  <Row
+    data={{ "data-tag": tag.name }}
+    href={treeHref(project, tag.name)}
+    id={`tag:${tag.name}`}
+    meta={<CommitLink project={project} sha={tag.sha} />}
+    mono
+    size="one-line"
+    title={tag.name}
+  />
+);
+
+const ClaimFork = ({
+  fork,
+  project,
+}: {
+  readonly fork: ForkRef;
+  readonly project: Refs["project"];
+}) => (
+  <Row
+    data={{ "data-fork": fork.repo, "data-state": fork.state }}
+    href={
+      fork.ask === undefined
+        ? personPath(fork.handle)
+        : answerPath(project, fork.ask)
+    }
+    id={fork.repo}
+    meta={
+      <MetaLine
+        parts={[
+          fork.ask === undefined ? undefined : (
+            <span key="ask">
+              answer to <MetaCode>{fork.ask}</MetaCode>
+            </span>
+          ),
+          <Person handle={fork.handle} key="handle" />,
+        ]}
+      />
+    }
+    mono
+    size="one-line"
+    state={fork.state === undefined ? undefined : CLAIM_STATES[fork.state]}
+    title={fork.repo}
+  />
+);
+
+const WorkingFork = ({ fork }: { readonly fork: ForkRef }) => (
+  <Row
+    data={{ "data-fork": fork.repo }}
+    href={personPath(fork.handle)}
+    id={fork.repo}
+    meta={
+      <>
+        Working fork of <Person handle={fork.handle} />
+      </>
+    }
+    mono
+    size="one-line"
+    title={fork.repo}
+  />
+);
+
+/** What an empty list of tags says: none at all, or none of one package. */
+const noTags = (only: string | undefined) =>
+  only === undefined ? "No tags." : `No tags for ${only}.`;
+
+const Facts = ({
+  platformUrl,
+  project,
+}: {
+  readonly platformUrl: string;
+  readonly project: Refs["project"];
+}) => (
+  <>
+    <FactBlock label="Clone it">
+      <CommandLine
+        command={`git clone ${platformUrl}/${project}.git`}
+        numbered
+      />
+    </FactBlock>
+    <FactBlock label="Claim forks">
+      <p className="text-ui text-muted-foreground">
+        A claim fork is the copy a claim gives its claimant, the one place their
+        answer is pushed.
+      </p>
+    </FactBlock>
+  </>
 );
 
 export const RefsView = ({
   from = 0,
   package: only,
+  platformUrl,
   refs,
 }: {
   /** The first tag this page lists. */
-  readonly from?: number;
+  readonly from?: number | undefined;
   /** The one package whose tags this page lists; all when none. */
   readonly package?: string | undefined;
+  /** Where the project is cloned from. */
+  readonly platformUrl: string;
   readonly refs: Refs;
 }) => {
   const { forks, landed, project } = refs;
@@ -138,79 +357,46 @@ export const RefsView = ({
   const working = forks.filter((fork) => fork.kind === "working");
 
   return (
-    <PageShell title={`${project}: refs`}>
-      <ProjectNav current="refs" project={project} />
-      <section
-        aria-labelledby="main-ref"
-        className="flex flex-col gap-2"
-        data-ref="main"
-      >
-        <h2 className={SECTION} id="main-ref">
-          main
-        </h2>
-        {landed === undefined ? (
-          <EmptyState title="Nothing has landed on main yet." />
-        ) : (
-          <p className="flex flex-wrap items-baseline gap-x-3 text-sm">
-            <span>Landed at</span>
-            <a
-              className={`${ID} ${LINK}`}
-              href={commitHref(project, landed)}
-              title={landed}
-            >
-              {shortSha(landed)}
-            </a>
-            <a className={LINK} href={treeHref(project, "main")}>
-              Browse files
-            </a>
-          </p>
-        )}
-      </section>
+    <Workspace
+      facts={<Facts platformUrl={platformUrl} project={project} />}
+      factsHeading="These refs"
+      meta={
+        <MetaLine
+          parts={[
+            landed === undefined
+              ? "main has not landed"
+              : `main at ${shortSha(landed)}`,
+            plural(refs.tags.length, "tag", "tags"),
+            plural(claims.length, "claim fork", "claim forks"),
+          ]}
+        />
+      }
+      title="Refs"
+    >
+      <MainRow refs={refs} />
       {only === undefined && packages.length > 1 ? (
         <Packages packages={packages} project={project} />
       ) : null}
-      <section aria-labelledby="tags" className="flex flex-col gap-2">
-        <h2 className={SECTION} id="tags">
-          {only === undefined ? "Tags" : `Tags of ${only}`}{" "}
-          <span className="text-muted-foreground text-sm font-normal">
-            {tags.length}
-          </span>
-        </h2>
-        {only === undefined ? null : (
-          <p className="text-sm">
-            <a className={LINK} href={refsHref(project, 0)}>
-              All tags
-            </a>
-          </p>
-        )}
-        {tags.length === 0 ? (
-          <EmptyState
-            title={only === undefined ? "No tags." : `No tags for ${only}.`}
-          />
-        ) : (
-          <ol className="border-rule flex flex-col border-b">
-            {shown.map((tag) => (
-              <li
-                className={`border-rule flex flex-wrap items-baseline justify-between gap-x-4 border-t py-2 ${ID}`}
-                data-tag={tag.name}
-                key={tag.name}
+      <div className="flex min-w-0 flex-col gap-3">
+        <Group
+          counts={plural(tags.length, "tag", "tags")}
+          empty={tags.length === 0 ? noTags(only) : undefined}
+          facts={
+            only === undefined ? undefined : (
+              <AppLink
+                className="decoration-rule underline hover:decoration-current"
+                to={refsPath(project)}
               >
-                <a
-                  className={`${LINK} [overflow-wrap:anywhere]`}
-                  href={treeHref(project, tag.name)}
-                >
-                  {tag.name}
-                </a>
-                <a
-                  className={`${LINK} text-muted-foreground`}
-                  href={commitHref(project, tag.sha)}
-                >
-                  {shortSha(tag.sha)}
-                </a>
-              </li>
-            ))}
-          </ol>
-        )}
+                All tags
+              </AppLink>
+            )
+          }
+          name={only === undefined ? "Tags" : `Tags of ${only}`}
+        >
+          {shown.map((tag) => (
+            <TagRow key={tag.name} project={project} tag={tag} />
+          ))}
+        </Group>
         <Pager
           newer={
             from > 0
@@ -223,54 +409,38 @@ export const RefsView = ({
               : undefined
           }
         />
-      </section>
-      <section aria-labelledby="forks" className="flex flex-col gap-2">
-        <h2 className={SECTION} id="forks">
-          Forks
-        </h2>
-        {forks.length === 0 ? (
-          <EmptyState title="No forks: nobody holds a claim or a working fork." />
-        ) : (
-          <ul className="border-rule flex flex-col border-b text-sm">
-            {claims.map((fork) => (
-              <li
-                className="border-rule flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t py-2"
-                data-fork={fork.repo}
-                key={fork.repo}
-              >
-                <code className={`${ID} [overflow-wrap:anywhere]`}>
-                  {fork.repo}
-                </code>
-                {fork.ask === undefined ? null : (
-                  <a className={LINK} href={answerPath(project, fork.ask)}>
-                    Answer to {fork.ask}
-                  </a>
-                )}
-                <HandleLink handle={fork.handle} />
-                {fork.state === undefined ? null : (
-                  <span className="text-muted-foreground">
-                    Claim {fork.state}
-                  </span>
-                )}
-              </li>
-            ))}
-            {working.map((fork) => (
-              <li
-                className="border-rule flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t py-2"
-                data-fork={fork.repo}
-                key={fork.repo}
-              >
-                <code className={`${ID} [overflow-wrap:anywhere]`}>
-                  {fork.repo}
-                </code>
-                <span>
-                  Working fork of <HandleLink handle={fork.handle} />
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </PageShell>
+      </div>
+      {forks.length === 0 ? (
+        <Group
+          empty="No forks: nobody holds a claim or a working fork."
+          name="Forks"
+        >
+          {null}
+        </Group>
+      ) : (
+        <>
+          {claims.length === 0 ? null : (
+            <Group
+              counts={plural(claims.length, "fork", "forks")}
+              name="Claim forks"
+            >
+              {claims.map((fork) => (
+                <ClaimFork fork={fork} key={fork.repo} project={project} />
+              ))}
+            </Group>
+          )}
+          {working.length === 0 ? null : (
+            <Group
+              counts={plural(working.length, "fork", "forks")}
+              name="Working forks"
+            >
+              {working.map((fork) => (
+                <WorkingFork fork={fork} key={fork.repo} />
+              ))}
+            </Group>
+          )}
+        </>
+      )}
+    </Workspace>
   );
 };
