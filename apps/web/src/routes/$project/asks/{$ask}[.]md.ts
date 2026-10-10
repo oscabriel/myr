@@ -33,8 +33,8 @@ const visibility = Context.get(ShowAsk.annotations, Visibility);
 
 /**
  * The `.md` route's handler as a function of its client, which its test
- * drives with a stub platform: the brief `showAsk` gives, under the banner
- * naming this host's indexes, a refusal as a 404, or a 404 without asking
+ * drives with a stub platform: the brief `showAsk` gives, with the banner
+ * naming this host's indexes under its title, a refusal as a 404, or a 404 without asking
  * when the path can name no ask.
  */
 export const askMarkdownHandler =

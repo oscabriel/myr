@@ -238,13 +238,13 @@ describe(projectLlms, () => {
 
   const lines = linesOf(text);
 
-  it("opens with the banner, then the project, its posture and how many asks are open", () => {
+  it("opens with the project, its posture and how many asks are open, then the banner", () => {
     expect(lines.slice(0, 5)).toStrictEqual([
-      indexBanner({ project: datekit, webUrl }),
-      "",
       "# datekit",
       "",
       `> A project on ${Brand.name}. Posture: Open with sealed evidence. 3 open asks.`,
+      "",
+      indexBanner({ project: datekit, webUrl }),
     ]);
   });
 

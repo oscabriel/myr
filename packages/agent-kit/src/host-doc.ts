@@ -8,7 +8,7 @@
  * `projectLlms` is the web's `/<project>/llms.txt`, with the project's open
  * asks, and `mcpCard` its `/.well-known/mcp.json`. With a web app,
  * `frontLlms` names `/llms-full.txt` (`full-llms.ts`), and `indexBanner`
- * opens every other Markdown answer the web serves, so a reader that lands
+ * sits under the title of every other Markdown answer the web serves, so a reader that lands
  * on one finds the rest.
  *
  * Pure: the hosts hand in what the platform lists and the CLI's commands
@@ -280,9 +280,11 @@ const askLine = (webUrl: string, project: string, listing: AskListing) =>
   `- [${listing.ask}](${projectPage(webUrl, project)}/asks/${listing.ask}.md): ${[sentence(listing.want), ...askNotes(listing)].join(" ")}`;
 
 /**
- * The line that opens a Markdown answer the web serves: where the index is,
- * where the full text is, and, for a project's answer, the project's own
- * index. One blockquote, so a reader that lands on any page finds the rest.
+ * The line under the title of a Markdown answer the web serves: where the
+ * index is, where the full text is, and, for a project's answer, the
+ * project's own index. One blockquote, so a reader that lands on any page
+ * finds the rest. It never comes first: an `llms.txt` opens with its `#`
+ * heading.
  */
 export const indexBanner = (input: {
   readonly webUrl: string;
@@ -291,6 +293,15 @@ export const indexBanner = (input: {
   const { project, webUrl } = input;
 
   return `> For agents: the index is ${webUrl}/llms.txt, and everything beyond it (refusals, git, landings, events, guides) is ${webUrl}/llms-full.txt${project === undefined ? "" : `; this project's index is ${projectPage(webUrl, project)}/llms.txt`}.`;
+};
+
+/** `banner` under `text`'s `#` title, or on top of a text that has none. */
+export const underTitle = (text: string, banner: string) => {
+  const end = text.indexOf("\n");
+
+  return text.startsWith("# ") && end !== -1
+    ? `${text.slice(0, end)}\n\n${banner}\n\n${text.slice(end).replace(/^\n+/u, "")}`
+    : `${banner}\n\n${text}`;
 };
 
 /** `/<project>/llms.txt`: the project, its posture, how to clone it, its open asks and how to take one. */
@@ -305,11 +316,11 @@ export const projectLlms = (input: {
   const { project } = listing;
 
   return page([
-    indexBanner({ project, webUrl }),
-    "",
     `# ${project}`,
     "",
     `> A project on ${Brand.name}. Posture: ${postureWords[listing.posture]}. ${counted(asks.length, "open ask")}.`,
+    "",
+    indexBanner({ project, webUrl }),
     "",
     `- Page: ${projectPage(webUrl, project)}`,
     `- Clone: ${code(`git clone ${platformUrl}/${project}.git`)}`,

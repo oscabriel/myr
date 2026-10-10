@@ -1,8 +1,8 @@
 /**
  * An ask answers as Markdown, so a harness reads it with one plain fetch:
  * the ask's URL with `Accept: text/markdown`, or the same URL with `.md`.
- * The body is the banner naming the web's indexes, then the brief the
- * platform rendered (`showAsk`), untouched; an unknown ask is a 404 whose
+ * The body is the brief the platform rendered (`showAsk`), with the banner
+ * naming the web's indexes under its title; an unknown ask is a 404 whose
  * body is the refusal, as git would print it.
  * A browser asking for HTML gets the page.
  */
@@ -34,8 +34,10 @@ const WEB = "https://web-test.example.workers.dev";
 /** Where the web's indexes are for datekit's asks, as the routes find them. */
 const index = { project, webUrl: WEB };
 
-/** An ask's Markdown as served: the banner naming the indexes, then the brief unchanged. */
-const served = `${indexBanner(index)}\n\n${brief}`;
+/** An ask's Markdown as served: the brief's title, the banner naming the indexes, then the rest of the brief unchanged. */
+const [title = "", ...rest] = brief.split("\n");
+
+const served = [title, "", indexBanner(index), ...rest].join("\n");
 
 const MARKDOWN = "text/markdown; charset=utf-8";
 
@@ -309,7 +311,7 @@ describe(askMarkdownResponse, () => {
 
 describe("an ask's Markdown with the index named", () => {
   it.effect(
-    "opens with the banner naming its project's llms.txt, then the brief unchanged",
+    "opens with the brief's title, then the banner naming its project's llms.txt",
     () =>
       Effect.gen(function* () {
         const seen = yield* read(
@@ -318,7 +320,8 @@ describe("an ask's Markdown with the index named", () => {
 
         expect(seen.status).toBe(200);
         expect(seen.body).toBe(served);
-        expect(seen.body.split("\n")[0]).toContain(
+        expect(seen.body.startsWith("# ")).toBeTruthy();
+        expect(seen.body.split("\n")[2]).toContain(
           `${WEB}/${project}/llms.txt`
         );
       })

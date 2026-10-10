@@ -4,12 +4,12 @@
  * same URL with `.md`. The request decides; no user-agent list does.
  *
  * The brief is the platform's: `showAsk` renders it once, and the web only
- * serves it, under the banner that names the web's indexes. A refusal is
+ * serves it, with the banner that names the web's indexes under its title. A refusal is
  * set the way `git push` printed it, from `@repo/protocol/render`
  * (AGENTS.md principle 3), then its next command.
  * Pure: a `Request` or an `Exit` in, a string or a `Response` out.
  */
-import { indexBanner } from "@repo/agent-kit/host-doc";
+import { indexBanner, underTitle } from "@repo/agent-kit/host-doc";
 import { Brand } from "@repo/brand";
 import type { Visibility } from "@repo/protocol/annotations";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -153,7 +153,7 @@ const UNANSWERED = [
   "",
 ].join("\n");
 
-/** Where the web's indexes are, for the banner over an ask's brief. */
+/** Where the web's indexes are, for the banner under an ask's title. */
 export interface AskIndex {
   readonly project: ProjectName;
   readonly webUrl: string;
@@ -161,8 +161,8 @@ export interface AskIndex {
 
 /**
  * How reading an ask ended, as the Markdown response: the brief (200,
- * cacheable as its contract's visibility allows), opened by the banner
- * naming `index`'s `llms.txt` files; a refusal (404, its
+ * cacheable as its contract's visibility allows), with the banner naming
+ * `index`'s `llms.txt` files under its title; a refusal (404, its
  * Markdown, no banner); or no answer from the platform (502). Only a brief
  * is cached.
  */
@@ -179,7 +179,11 @@ export const askMarkdownResponse = <E>(
           markdown(refusalsMarkdown([refusal]), 404, "no-store"),
       }),
     onSuccess: ({ brief }) =>
-      markdown(`${indexBanner(index)}\n\n${brief}`, 200, cacheFor(visibility)),
+      markdown(
+        underTitle(brief, indexBanner(index)),
+        200,
+        cacheFor(visibility)
+      ),
   });
 
 /**
