@@ -7,29 +7,51 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
-import { Glob } from "@repo/protocol/domain/common";
-import { AskId, Handle } from "@repo/protocol/ids";
-import { UnknownAsk } from "@repo/protocol/refusal";
+import type { Ask } from "@repo/protocol/domain/ask";
+import { Outcome } from "@repo/protocol/domain/outcome";
+import {
+  AskId,
+  BlobSha,
+  CommitSha,
+  Handle,
+  ProjectName,
+  RepoPath,
+} from "@repo/protocol/ids";
+import {
+  OutOfScope,
+  UnknownAsk,
+  UnknownPath,
+  UnknownProject,
+} from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { Effect, Layer, Ref, Schema } from "effect";
+import { Effect, Layer, Ref, Schema, Stream } from "effect";
 import { RpcTest } from "effect/rpc";
 
+import { readAsk } from "../src/features/answer/reads.ts";
 import { AskView } from "../src/features/ask/ask-page.tsx";
 import { NoSuchAsk } from "../src/features/ask/refused.tsx";
+import { askStates } from "../src/features/shared/ask-progress.ts";
 import { Refusals } from "../src/features/shared/refusals.ts";
-import { readAsk } from "../src/routes/$project/asks/$ask.tsx";
 import {
   ask,
   askId,
   brief,
+  claimedEvent,
+  closedEvent,
+  family,
   inOrder,
+  judgedEvent,
+  landedSha,
   markupOf,
   now,
+  plainText,
   project,
   textOf,
+  verdictOf,
 } from "./ask-fixtures.ts";
+import { textIn } from "./markup.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
 
@@ -37,9 +59,40 @@ const platformUrl = "https://platform-test.example.workers.dev";
 const inPre = (markup: string) =>
   /<pre\b[^>]*>(?<inner>.*?)<\/pre>/su.exec(markup)?.groups?.inner;
 
-const page = (shown = ask) => (
-  <AskView ask={shown} brief={brief} now={now} platformUrl={platformUrl} />
+/** The page's main pane, without the inspector. */
+const mainOf = (markup: string) =>
+  /<main\b[^>]*>(?<inner>.*)<\/main>/su.exec(markup)?.groups?.inner ?? "";
+
+/** The inspector. */
+const asideOf = (markup: string) =>
+  /<aside\b[^>]*>(?<inner>.*)<\/aside>/su.exec(markup)?.groups?.inner ?? "";
+
+/** The context bar's trail. */
+const trailOf = (markup: string) =>
+  /<nav aria-label="Breadcrumb"[^>]*>(?<inner>.*?)<\/nav>/su.exec(markup)
+    ?.groups?.inner ?? "";
+
+type AskProps = Parameters<typeof AskView>[0];
+
+const page = (shown = ask, more: Partial<AskProps> = {}) => (
+  <AskView
+    ask={shown}
+    brief={brief}
+    now={now}
+    platformUrl={platformUrl}
+    {...more}
+  />
 );
+
+/** The check's source, as the platform reads it. */
+const checkSource = (lines: number) => ({
+  path: RepoPath.make("test/parse-week.test.ts"),
+  sha: "f".repeat(40),
+  text: Array.from(
+    { length: lines },
+    (_, index) => `expect(parseWeek("2026-W41-${index}")).not.toBeNull();`
+  ).join("\n"),
+});
 
 describe(AskView, () => {
   it("titles the page with the want, then reads the brief's sections in order", () => {
@@ -62,6 +115,22 @@ describe(AskView, () => {
     ).toBeTruthy();
   });
 
+  it("sets a want of 80 characters at the headline, and a longer one a step down, whole", () => {
+    const want =
+      "The linter reports a heading that skips a level, such as a level-two heading followed by a level-four one.";
+
+    const long = markupOf(page({ ...ask, brief: { ...ask.brief, want } }));
+
+    expect(
+      /<h1\b[^>]*class="(?<classes>[^"]*)"/u.exec(long)?.groups?.classes
+    ).toContain("text-title");
+    expect(long).toContain(`>${want}</h1>`);
+    expect(
+      /<h1\b[^>]*class="(?<classes>[^"]*)"/u.exec(markupOf(page()))?.groups
+        ?.classes
+    ).toContain("text-headline");
+  });
+
   it("leaves out a section the brief does not have", () => {
     const text = textOf(
       page({ ...ask, brief: { want: "Parse ISO week dates like 2026-W41-3" } })
@@ -72,55 +141,44 @@ describe(AskView, () => {
     expect(text).not.toContain("Terms");
   });
 
-  it("gives the ask's name, kind, state and check", () => {
-    expect(
-      inOrder(textOf(page()), [
-        "Ask",
-        askId,
-        "State",
-        "Open",
-        "Kind",
-        "fix",
-        "Check",
-        "test/parse-week.test.ts",
-      ])
-    ).toBeTruthy();
+  it("names the project, its asks and the ask in the context bar's trail", () => {
+    const trail = trailOf(markupOf(page()));
+
+    expect(inOrder(plainText(trail), ["datekit", "Asks", askId])).toBeTruthy();
+    expect(trail).toContain('href="/datekit"');
   });
 
-  it("gives the ask's territory, and who asked it when", () => {
-    const text = textOf(page());
+  it("says an open ask is open to take, who it is held for, and gives its kind, asker and age", () => {
+    const held = {
+      ...ask,
+      mentor: Handle.make("okonkwo"),
+      reserve: "newcomers" as const,
+    };
 
+    const text = textOf(page(held));
+
+    expect(text).toContain("Open to take");
+    expect(text).toContain("Held for newcomers, mentored by okonkwo");
     expect(
-      inOrder(text, ["Asked by", "ines-v", "opened 2 d ago"])
+      inOrder(text, ["fix", "asked by", "ines-v", "opened 2 d ago"])
     ).toBeTruthy();
-    expect(
-      inOrder(text, ["Territory", "@datekit/parse", "packages/parse/**"])
-    ).toBeTruthy();
+    expect(markupOf(page(held))).toContain('href="/people/okonkwo"');
     expect(markupOf(page())).toContain('href="/people/ines-v"');
   });
 
-  // A paths territory (`territory.paths(...)`) has module `.`, which names
-  // nothing a reader knows: the field gives its paths alone.
-  it("gives a paths territory as its paths, with no module `.`", () => {
-    const text = textOf(
-      page({
-        ...ask,
-        territory: {
-          module: ".",
-          paths: [Glob.make("src/parse.ts"), Glob.make("test/parse.test.ts")],
-        },
-      })
-    );
-
-    const field = text.slice(
-      text.indexOf("Territory"),
-      text.indexOf("Check", text.indexOf("Territory"))
-    );
+  it("gives the ask's territory and its check", () => {
+    const text = textOf(page());
 
     expect(
-      inOrder(field, ["The paths", "src/parse.ts", "test/parse.test.ts"])
+      inOrder(text, [
+        "Territory and check",
+        "@datekit/parse",
+        "test/parse-week.test.ts",
+      ])
     ).toBeTruthy();
-    expect(field).not.toMatch(/\s\.\s|\s\.:/u);
+    expect(markupOf(page())).toContain(
+      'href="/datekit/blob/main/test/parse-week.test.ts"'
+    );
   });
 
   it("gives the lines that clone the project, claim the ask and check an answer, with the CLI's own name", () => {
@@ -128,12 +186,194 @@ describe(AskView, () => {
       inOrder(textOf(page()), [
         `git clone ${platformUrl}/datekit.git`,
         `${Brand.cli} claim ${askId} --project datekit`,
-        `${Brand.cli} check --ask ${askId}`,
+        `${Brand.cli} check`,
       ])
     ).toBeTruthy();
   });
 
-  it("names the asks a blocked ask waits on, each linking to its page", () => {
+  it("names who holds a claimed ask and offers no way to take it", () => {
+    const states = askStates([claimedEvent(1, "tamsin")]);
+
+    const text = textIn(
+      markupOf(page({ ...ask, state: "claimed" }, { states }))
+    );
+
+    expect(text).toContain("Claimed by tamsin, no answer pushed yet");
+    expect(text).toContain("tamsin's move");
+    expect(text).not.toContain("Take it");
+    expect(text).not.toContain(`${Brand.cli} claim`);
+  });
+
+  it("says where a refused answer was refused, whose move it is and what to run", () => {
+    const refusal = new OutOfScope({ paths: [RepoPath.make("README.md")] });
+    const outcome = Outcome.cases.Refused.make({ refusals: [refusal] });
+
+    const states = askStates([
+      claimedEvent(1, "tamsin"),
+      judgedEvent(2, outcome),
+    ]);
+
+    const text = textOf(
+      page(
+        { ...ask, state: "claimed" },
+        { states, verdict: { ...verdictOf(outcome), stage: "shape" } }
+      )
+    );
+
+    expect(
+      inOrder(text, [
+        "Refused",
+        "at Shape",
+        "OutOfScope",
+        "tamsin's move",
+        refusal.next,
+      ])
+    ).toBeTruthy();
+  });
+
+  it("says a landed ask landed, with its commit", () => {
+    const states = askStates([
+      claimedEvent(1, "tamsin"),
+      judgedEvent(2, Outcome.cases.Landed.make({ sha: landedSha })),
+      closedEvent(3),
+    ]);
+
+    const markup = markupOf(page({ ...ask, state: "closed" }, { states }));
+
+    expect(textOf(page({ ...ask, state: "closed" }, { states }))).toContain(
+      "Landed as 9b1c3e5"
+    );
+    expect(markup).toContain(`href="/datekit/commit/${landedSha}"`);
+  });
+
+  it("gives a round the word its landing or verdict has since said, not the one it was judged with", () => {
+    const states = askStates([
+      claimedEvent(1, "tamsin"),
+      judgedEvent(2, Outcome.cases.Checking.make({ stage: "human" })),
+      closedEvent(3),
+    ]);
+
+    const answers = plainText(
+      mainOf(markupOf(page({ ...ask, state: "closed" }, { states })))
+    );
+
+    expect(inOrder(answers, ["Round 1", "bbbbbbb", "Landed"])).toBeTruthy();
+    expect(answers).not.toContain("Checking");
+  });
+
+  it("lists one answer row per judged round, each linking its answer", () => {
+    const states = askStates([
+      claimedEvent(1, "tamsin"),
+      judgedEvent(
+        2,
+        Outcome.cases.Refused.make({
+          refusals: [new OutOfScope({ paths: [RepoPath.make("README.md")] })],
+        }),
+        CommitSha.make("e".repeat(40))
+      ),
+      judgedEvent(3, Outcome.cases.Checking.make({ stage: "checks" })),
+    ]);
+
+    const main = mainOf(
+      markupOf(page({ ...ask, state: "claimed" }, { states }))
+    );
+
+    const rows = [
+      ...main.matchAll(
+        /href="\/datekit\/answers\/parse-iso-week\?head=(?<head>[0-9a-f]+)"/gu
+      ),
+    ].map(({ groups }) => groups?.head);
+
+    expect(rows).toStrictEqual(["e".repeat(40), "b".repeat(40)]);
+    expect(
+      inOrder(plainText(main), [
+        "Answers",
+        "Round 1",
+        "eeeeeee",
+        "Refused",
+        "Round 2",
+        "bbbbbbb",
+        "Checking",
+      ])
+    ).toBeTruthy();
+  });
+
+  it("shows the check's source inline when it was read, its first 30 lines until asked for the whole", () => {
+    const markup = mainOf(markupOf(page(ask, { check: checkSource(45) })));
+    const text = plainText(markup);
+
+    expect(text).toContain('expect(parseWeek("2026-W41-29")).not.toBeNull();');
+    expect(text).not.toContain(
+      'expect(parseWeek("2026-W41-30")).not.toBeNull();'
+    );
+    expect(text).toContain("Show the whole check");
+    expect(markup).toContain('data-code="plain"');
+  });
+
+  it("shows only the check's path when its source could not be read", () => {
+    const markup = mainOf(markupOf(page()));
+
+    expect(markup).not.toContain('data-code="plain"');
+    expect(markup).toContain(
+      'href="/datekit/blob/main/test/parse-week.test.ts"'
+    );
+  });
+
+  it("says a family's delete child waits for its siblings in the family's terms", () => {
+    const { children, deleteChild, parent } = family;
+    const states = askStates([closedEvent(1, children[0] ?? parent.id)]);
+    const text = textOf(page(deleteChild, { parent, states }));
+
+    expect(text).toContain("Waiting for 2 of 3 children to land");
+    expect(text).not.toContain("Waits on");
+  });
+
+  it("says a delete child whose siblings all landed is open to take, and never that it waits", () => {
+    const { children, deleteChild, parent } = family;
+
+    const states = askStates(
+      children.map((child, index) => closedEvent(index + 1, child))
+    );
+
+    const markup = markupOf(
+      page({ ...deleteChild, state: "open" }, { parent, states })
+    );
+
+    const text = textOf(
+      page({ ...deleteChild, state: "open" }, { parent, states })
+    );
+
+    expect(text).toContain("Open to take");
+    expect(text).not.toContain("Waits on");
+    expect(text).not.toContain("to land first");
+    expect(asideOf(markup)).toContain(`data-family="${parent.id}"`);
+  });
+
+  it("says a family's parent waits for its family in the family's terms, never as a list of ids", () => {
+    const { children, deleteChild, parent } = family;
+    const states = askStates([closedEvent(1, children[0] ?? parent.id)]);
+    const markup = mainOf(markupOf(page(parent, { states })));
+
+    expect(plainText(markup)).toContain(
+      "Waits for 2 of 3 children and the delete step to land first; a claim waits until they do."
+    );
+    expect(plainText(markup)).not.toContain("Waits on");
+    expect(markup).toContain(`href="/datekit/asks/${deleteChild.id}"`);
+  });
+
+  it("says a family's parent whose children all landed waits only for the delete step", () => {
+    const { children, parent } = family;
+
+    const states = askStates(
+      children.map((child, index) => closedEvent(index + 1, child))
+    );
+
+    expect(plainText(mainOf(markupOf(page(parent, { states }))))).toContain(
+      "Waits for the delete step to land first"
+    );
+  });
+
+  it("names the asks an ask outside a family waits on, each linking to its page", () => {
     const blocked = {
       ...ask,
       blockedBy: [AskId.make("split-format"), AskId.make("split-parse")],
@@ -154,29 +394,16 @@ describe(AskView, () => {
     expect(markup).toContain('href="/datekit/asks/split-parse"');
   });
 
-  it("names nothing it waits on when nothing blocks it", () => {
+  it("names nothing it waits on when nothing blocks it, or what blocked it landed", () => {
     expect(textOf(page())).not.toContain("Waits on");
-  });
 
-  it("links a step of a migrate to its parent ask", () => {
-    const child = { ...ask, parent: AskId.make("migrate-week-api") };
+    const states = askStates([closedEvent(1, AskId.make("split-format"))]);
 
-    expect(markupOf(page(child))).toContain(
-      'href="/datekit/asks/migrate-week-api"'
-    );
-  });
-
-  it("says when an ask is held for newcomers, and who mentors them", () => {
-    const held = {
-      ...ask,
-      mentor: Handle.make("okonkwo"),
-      reserve: "newcomers" as const,
-    };
-
-    const text = textOf(page(held));
-
-    expect(text).toContain("Held for newcomers");
-    expect(markupOf(page(held))).toContain('href="/people/okonkwo"');
+    expect(
+      textOf(
+        page({ ...ask, blockedBy: [AskId.make("split-format")] }, { states })
+      )
+    ).not.toContain("Waits on");
   });
 
   it("gives no claim line once the ask is closed", () => {
@@ -195,6 +422,12 @@ describe(AskView, () => {
 
   it("shows the brief exactly as an agent reads it", () => {
     expect(inPre(markupOf(page()))).toBe(inPre(markupOf(<pre>{brief}</pre>)));
+  });
+
+  it("gives the project's posture when the list of projects has it", () => {
+    const text = textOf(page(ask, { posture: "openWithSealedEvidence" }));
+
+    expect(text).toContain("Open with sealed evidence");
   });
 });
 
@@ -218,6 +451,39 @@ describe(NoSuchAsk, () => {
     expect(textOf(<NoSuchAsk />)).toContain("Nothing is at this address");
   });
 
+  it("offers the way onward: the project, and the open asks", () => {
+    const markup = markupOf(<NoSuchAsk project="datekit" />);
+
+    expect(markup).toContain('href="/datekit"');
+    expect(markup).toContain('href="/"');
+    expect(textOf(<NoSuchAsk project="datekit" />)).toContain("Open asks");
+  });
+
+  it("names the project and its asks in the trail, and no crumb for the ask that is not there", () => {
+    const refusal = new UnknownAsk({ ask: AskId.make("no-such-ask") });
+    const data = structuredClone(Schema.encodeSync(Refusals)([refusal]));
+
+    const trail = trailOf(
+      markupOf(<NoSuchAsk data={data} project="datekit" />)
+    );
+
+    expect(inOrder(plainText(trail), ["datekit", "Asks"])).toBeTruthy();
+    expect(trail).toContain('href="/datekit"');
+    expect(trail).not.toContain("no-such-ask");
+  });
+
+  it("links no project the platform says it does not have", () => {
+    const refusal = new UnknownProject({
+      project: ProjectName.make("nowhere"),
+    });
+
+    const data = structuredClone(Schema.encodeSync(Refusals)([refusal]));
+    const markup = markupOf(<NoSuchAsk data={data} project="nowhere" />);
+
+    expect(markup).not.toContain('href="/nowhere"');
+    expect(markup).toContain('href="/"');
+  });
+
   it("says what its route gives it when a not-found carries no refusal", () => {
     expect(
       textOf(<NoSuchAsk nothing="No answer is at this head." />)
@@ -225,21 +491,84 @@ describe(NoSuchAsk, () => {
   });
 });
 
-/** A platform that knows datekit's one ask, counting `showAsk` calls. */
-const platformOf = (calls: Ref.Ref<number>) =>
+/** What the stub platform was asked. */
+interface Asked {
+  readonly asks: number;
+  readonly files: number;
+  readonly replays: number;
+  readonly verdicts: number;
+}
+
+const nothingAsked: Asked = { asks: 0, files: 0, replays: 0, verdicts: 0 };
+
+const count = (asked: Ref.Ref<Asked>, key: keyof Asked) =>
+  Ref.update(asked, (seen) => ({ ...seen, [key]: seen[key] + 1 }));
+
+/** Events in datekit: tamsin claimed the ask, and another ask was claimed too. */
+const replay = [
+  claimedEvent(1, "tamsin"),
+  claimedEvent(2, "okafor", AskId.make("format-week")),
+];
+
+/**
+ * A platform that knows datekit's ask (`shown`, under its id) and the
+ * family parent, its events, no verdict yet, and the check's file when
+ * `readable`.
+ */
+const platformOf = (
+  asked: Ref.Ref<Asked>,
+  {
+    readable = true,
+    shown = ask,
+  }: { readonly readable?: boolean; readonly shown?: Ask } = {}
+) =>
   Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
     Layer.provide([
       Layer.mergeAll(
         unanswered,
         Contracts.toLayerHandler("showAsk", (payload) =>
           Effect.gen(function* () {
-            yield* Ref.update(calls, (count) => count + 1);
+            yield* count(asked, "asks");
+
+            if (payload.ask === family.parent.id) {
+              return { ask: family.parent, brief };
+            }
 
             if (payload.ask !== askId) {
               return yield* new UnknownAsk({ ask: payload.ask });
             }
 
-            return { ask, brief };
+            return { ask: shown, brief };
+          })
+        ),
+        Contracts.toLayerHandler("verdict", () =>
+          Effect.as(count(asked, "verdicts"), {})
+        ),
+        Contracts.toLayerHandler("watch", () =>
+          Stream.fromEffect(count(asked, "replays")).pipe(
+            Stream.flatMap(() => Stream.fromIterable(replay))
+          )
+        ),
+        Contracts.toLayerHandler("readFile", (payload) =>
+          Effect.gen(function* () {
+            yield* count(asked, "files");
+
+            if (!readable) {
+              return yield* new UnknownPath({
+                commit: CommitSha.make("a".repeat(40)),
+                path: payload.path,
+              });
+            }
+
+            return {
+              at: CommitSha.make("a".repeat(40)),
+              binary: false,
+              path: payload.path,
+              sha: BlobSha.make("f".repeat(40)),
+              size: 42,
+              text: 'test("parses", () => {});',
+              truncated: false,
+            };
           })
         )
       ),
@@ -248,29 +577,71 @@ const platformOf = (calls: Ref.Ref<number>) =>
   );
 
 describe(readAsk, () => {
-  it.effect("reads the ask and its brief for the page", () =>
-    Effect.gen(function* () {
-      const calls = yield* Ref.make(0);
+  it.effect(
+    "reads the ask, its brief, its events and its check's source for the page",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
 
-      const read = yield* readAsk({ ask: askId, project }).pipe(
-        Effect.provide(platformOf(calls))
-      );
+        const read = yield* readAsk({ ask: askId, project }).pipe(
+          Effect.provide(platformOf(asked))
+        );
 
-      expect([read.ask.id, read.brief]).toStrictEqual([askId, brief]);
-      expect(yield* Ref.get(calls)).toBe(1);
-    })
+        expect({
+          ask: read.ask.id,
+          brief: read.brief,
+          check: read.check?.text,
+          events: read.events.map(({ seq }) => seq),
+          lastSeq: read.lastSeq,
+          parent: read.parent,
+        }).toStrictEqual({
+          ask: askId,
+          brief,
+          check: 'test("parses", () => {});',
+          events: [1],
+          lastSeq: 2,
+          parent: undefined,
+        });
+        expect(yield* Ref.get(asked)).toStrictEqual({
+          asks: 1,
+          files: 1,
+          replays: 1,
+          verdicts: 1,
+        });
+      })
+  );
+
+  it.effect(
+    "reads a family member's parent, and shows the ask without its check's source when the file cannot be read",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
+
+        const read = yield* readAsk({ ask: askId, project }).pipe(
+          Effect.provide(
+            platformOf(asked, {
+              readable: false,
+              shown: { ...family.child(0), check: ask.check, id: askId },
+            })
+          )
+        );
+
+        expect(read.parent?.id).toBe(family.parent.id);
+        expect(read.check).toBeUndefined();
+        expect((yield* Ref.get(asked)).asks).toBe(2);
+      })
   );
 
   it.effect(
     "is a not-found carrying the UnknownAsk refusal for an ask the project lacks",
     () =>
       Effect.gen(function* () {
-        const calls = yield* Ref.make(0);
+        const asked = yield* Ref.make(nothingAsked);
         const missing = AskId.make("no-such-ask");
 
         const failed = yield* Effect.flip(
           readAsk({ ask: missing, project }).pipe(
-            Effect.provide(platformOf(calls))
+            Effect.provide(platformOf(asked))
           )
         );
 
@@ -290,11 +661,11 @@ describe(readAsk, () => {
     "is a not-found with no refusal, and asks nothing, for a name no ask can have",
     () =>
       Effect.gen(function* () {
-        const calls = yield* Ref.make(0);
+        const asked = yield* Ref.make(nothingAsked);
 
         const failed = yield* Effect.flip(
           readAsk({ ask: "Not_An-Ask", project }).pipe(
-            Effect.provide(platformOf(calls))
+            Effect.provide(platformOf(asked))
           )
         );
 
@@ -302,7 +673,7 @@ describe(readAsk, () => {
         expect(
           isNotFound(failed) ? failed.data : "not a not-found"
         ).toBeUndefined();
-        expect(yield* Ref.get(calls)).toBe(0);
+        expect(yield* Ref.get(asked)).toStrictEqual(nothingAsked);
       })
   );
 });

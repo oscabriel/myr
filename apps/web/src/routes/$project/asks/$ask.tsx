@@ -1,26 +1,37 @@
-import { RegistryProvider, useAtomValue } from "@effect/atom-react";
-import { Client } from "@repo/protocol/contracts";
-import { Ask } from "@repo/protocol/domain/ask";
-import { createFileRoute, getRouteApi, notFound } from "@tanstack/react-router";
+import { useAtomMount, useAtomValue } from "@effect/atom-react";
+import type { Handle } from "@repo/protocol/ids";
+import {
+  createFileRoute,
+  getRouteApi,
+  useParams,
+} from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
-import { DateTime, Effect, Option, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/reactivity";
+import { Effect, Option, Schema } from "effect";
+import { AsyncResult } from "effect/reactivity";
 
+import { verdictAtom } from "../../../client/answer.ts";
 import { askAtom } from "../../../client/ask.ts";
+import { askStates, projectEventsAtom } from "../../../client/events.ts";
+import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
+import { watchAtom } from "../../../client/watch.ts";
+import { AskPageData, readAsk } from "../../../features/answer/reads.ts";
 import { AskView } from "../../../features/ask/ask-page.tsx";
 import {
   markdownAlternate,
   wantsMarkdown,
 } from "../../../features/ask/markdown.ts";
 import { NoSuchAsk } from "../../../features/ask/refused.tsx";
+import { whoAtom } from "../../../features/auth/who.ts";
 import { pageHead } from "../../../features/shared/head.ts";
-import { notFoundFor } from "../../../features/shared/refusals.ts";
+import { useProjectList } from "../../../features/shared/shell/context.ts";
+import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 import { AskPath, askMarkdownHandler } from "./{$ask}[.]md.ts";
 import type { AskParams, ClientFor } from "./{$ask}[.]md.ts";
 
-// The ask page: the brief, its fields and the lines that take it. The same
+// The ask page: where the ask stands, its brief, its check and its answers,
+// and the lines that take it; live while open. The same
 // URL answers `Accept: text/markdown` with the brief as Markdown (the GET
 // handler below), and its `.md` twin always does (`{$ask}[.]md.ts`).
 
@@ -62,35 +73,6 @@ export const askPageHeaders = ({
     }),
   });
 
-/** What the page's loader carries from the server, encoded: the ask, its brief, and when it was read. */
-const AskPageData = Schema.Struct({
-  ask: Ask,
-  brief: Schema.NonEmptyString,
-  now: Schema.DateTimeUtcFromString,
-});
-
-/** The ask for its page, or a not-found carrying the platform's refusal (a 404). */
-export const readAsk = (params: AskParams) =>
-  Effect.gen(function* () {
-    const path = yield* Schema.decodeEffect(AskPath)(params).pipe(
-      Effect.mapError(() => notFound())
-    );
-
-    const client = yield* Client;
-
-    const read = yield* client.showAsk(path).pipe(
-      Effect.catchTags({
-        UnknownAsk: notFoundFor,
-        UnknownProject: notFoundFor,
-      })
-    );
-
-    return yield* Schema.encodeEffect(AskPageData)({
-      ...read,
-      now: yield* DateTime.now,
-    });
-  });
-
 const askPage = createServerFn({ method: "GET" })
   .validator((params: AskParams) => params)
   .handler(({ data }) =>
@@ -99,68 +81,113 @@ const askPage = createServerFn({ method: "GET" })
 
 const root = getRouteApi("__root__");
 
-type AskRead = Pick<typeof AskPageData.Type, "ask" | "brief">;
-
-/** The page over the ask's atom, which starts from what the loader read and refetches when its keys change. */
+/**
+ * The page over its atoms, which start from what the loader read and read
+ * again as the project's events arrive: the ask, its latest verdict, and
+ * the events the fold reads.
+ */
 const FreshAsk = ({
-  atom,
-  now,
   platformUrl,
   read,
+  viewer,
 }: {
-  readonly atom: ReturnType<typeof askAtom>;
-  readonly now: DateTime.Utc;
   readonly platformUrl: string;
-  readonly read: AskRead;
+  readonly read: AskPageData;
+  readonly viewer: Handle | undefined;
 }) => {
+  const { project } = read.ask;
+
+  // Live: each event the project hears reads again what it changed.
+  useAtomMount(watchAtom(project));
+
   const { ask, brief } = Option.getOrElse(
-    AsyncResult.value(useAtomValue(atom)),
+    AsyncResult.value(useAtomValue(askAtom(project, read.ask.id))),
     () => read
   );
 
+  const { verdict } = Option.getOrElse(
+    AsyncResult.value(useAtomValue(verdictAtom(project, read.ask.id))),
+    () => read
+  );
+
+  // The replay as the browser reads it, once it has; until then the
+  // server's, which holds the same events about these asks.
+  const events = Option.getOrElse(
+    AsyncResult.value(useAtomValue(projectEventsAtom(project))),
+    () => read.events
+  );
+
+  const posture = useProjectList()?.find(
+    (listing) => listing.project === project
+  )?.posture;
+
   return (
-    <AskView ask={ask} brief={brief} now={now} platformUrl={platformUrl} />
+    <AskView
+      ask={ask}
+      brief={brief}
+      check={read.check}
+      now={read.now}
+      parent={read.parent}
+      platformUrl={platformUrl}
+      posture={posture}
+      states={askStates(events)}
+      verdict={verdict}
+      viewer={viewer}
+    />
   );
 };
 
 const AskPage = () => {
   const { platformUrl } = root.useLoaderData();
-
-  const { ask, brief, now } = Schema.decodeSync(AskPageData)(
-    Route.useLoaderData()
-  );
-
-  const atom = askAtom(ask.project, ask.id);
+  const read = Schema.decodeSync(AskPageData)(Route.useLoaderData());
+  const who = useAtomValue(whoAtom);
+  const { ask, brief, verdict } = read;
 
   return (
-    <RegistryProvider
-      initialValues={[
-        Atom.initialValue(atom, AsyncResult.success({ ask, brief })),
+    <SeededAtoms
+      id={`${ask.project}/${ask.id}`}
+      seeds={[
+        seedSuccess(askAtom(ask.project, ask.id), { ask, brief }),
+        seedSuccess(
+          verdictAtom(ask.project, ask.id),
+          verdict === undefined ? {} : { verdict }
+        ),
       ]}
-      key={`${ask.project}/${ask.id}`}
     >
       <FreshAsk
-        atom={atom}
-        now={now}
         platformUrl={platformUrl}
-        read={{ ask, brief }}
+        read={read}
+        viewer={
+          AsyncResult.isSuccess(who)
+            ? Option.getOrUndefined(who.value)
+            : undefined
+        }
       />
-    </RegistryProvider>
+    </SeededAtoms>
   );
+};
+
+const AskNotFound = ({ data }: { readonly data?: unknown }) => {
+  const { project } = useParams({ strict: false });
+
+  return <NoSuchAsk data={data} project={project} />;
 };
 
 export const Route = createFileRoute("/$project/asks/$ask")({
   // TanStack infers each option from the ones before it: the loader comes
   // first, so `head` reads its data.
   loader: ({ params }) => askPage({ data: params }),
-  head: ({ loaderData }) =>
-    pageHead({
-      title:
-        loaderData === undefined ? "No such ask" : loaderData.ask.brief.want,
-    }),
-  headers: askPageHeaders,
+  head: ({ loaderData, params }) =>
+    loaderData === undefined
+      ? pageHead({ title: "No such ask" })
+      : pageHead({
+          description: loaderData.ask.brief.want,
+          title: `${params.ask} · ${params.project}`,
+        }),
+  // An ask moves with each claim and landing: kept briefly, asked again.
+  headers: (context) => ({ ...branchPage, ...askPageHeaders(context) }),
   component: AskPage,
-  notFoundComponent: NoSuchAsk,
+  notFoundComponent: AskNotFound,
   server: {
     handlers: {
       GET: askPageHandler((request) => serverClient(env, request)),

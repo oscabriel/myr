@@ -10,8 +10,11 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
+import type { Verdict } from "@repo/protocol/domain/answer";
+import type { Ask } from "@repo/protocol/domain/ask";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { AreaName, AskId } from "@repo/protocol/ids";
+import type { StageName } from "@repo/protocol/domain/outcome";
+import { AreaName, AskId, CommitSha, DecisionId } from "@repo/protocol/ids";
 import {
   ChecksFailed,
   HeldBackFailed,
@@ -21,29 +24,38 @@ import {
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { Effect, Layer, Ref, Schema } from "effect";
+import { Effect, Layer, Ref, Schema, Stream } from "effect";
 import { RpcTest } from "effect/rpc";
 
 import {
   AnswerView,
+  durationText,
   HeldBackBits,
-  LaneTable,
 } from "../src/features/answer/answer-page.tsx";
+import { readAnswer } from "../src/features/answer/reads.ts";
+import { askStates } from "../src/features/shared/ask-progress.ts";
 import { Refusals } from "../src/features/shared/refusals.ts";
-import { readAnswer } from "../src/routes/$project/answers/$ask.tsx";
 import {
+  ask,
   askId,
+  brief,
+  claimedEvent,
+  decidedLanding,
+  family,
   inOrder,
+  judgedEvent,
   landedSha,
   landing,
   markupOf,
   now,
+  plainLanding,
   plainText,
   project,
   suite,
   textOf,
   verdictOf,
 } from "./ask-fixtures.ts";
+import { textIn } from "./markup.ts";
 
 const checksFailed = new ChecksFailed({
   lane: "unit",
@@ -66,14 +78,16 @@ const stagesOf = (markup: string) =>
     return stage === undefined || state === undefined ? [] : [[stage, state]];
   });
 
-/** Each lane row, as `[lane, result]`. */
+/** Each lane, in page order, as `[lane, result]`. */
 const lanesOf = (markup: string) =>
-  [...markup.matchAll(/<tr\b[^>]*>/gu)].flatMap(([tag]) => {
-    const lane = /data-lane="(?<value>[^"]+)"/u.exec(tag)?.groups?.value;
-    const result = /data-result="(?<value>[^"]+)"/u.exec(tag)?.groups?.value;
+  [...markup.matchAll(/<[a-z]+\b[^>]*data-lane="[^"]*"[^>]*>/gu)].flatMap(
+    ([tag]) => {
+      const lane = /data-lane="(?<value>[^"]+)"/u.exec(tag)?.groups?.value;
+      const result = /data-result="(?<value>[^"]+)"/u.exec(tag)?.groups?.value;
 
-    return lane === undefined || result === undefined ? [] : [[lane, result]];
-  });
+      return lane === undefined || result === undefined ? [] : [[lane, result]];
+    }
+  );
 
 /** Each link to a commit page, in page order, as `[href, text]`. */
 const commitLinksOf = (markup: string) =>
@@ -87,11 +101,89 @@ const commitLinksOf = (markup: string) =>
       : [[groups.href, plainText(groups.inner).trim()]]
   );
 
-describe(AnswerView, () => {
-  const page = <AnswerView now={now} verdict={refused} />;
+/** The hero, and the run after it. */
+const heroOf = (markup: string) =>
+  /<section aria-label="Outcome"[^>]*>(?<inner>.*?)<\/section>/su.exec(markup)
+    ?.groups?.inner ?? "";
+
+const runOf = (markup: string) =>
+  markup.slice(markup.indexOf('id="answer-gate"'), markup.indexOf("</main>"));
+
+/** The page's main pane, without the inspector. */
+const mainOf = (markup: string) =>
+  /<main\b[^>]*>(?<inner>.*)<\/main>/su.exec(markup)?.groups?.inner ?? "";
+
+/** The inspector. */
+const asideOf = (markup: string) =>
+  /<aside\b[^>]*>(?<inner>.*)<\/aside>/su.exec(markup)?.groups?.inner ?? "";
+
+const page = (
+  props: Partial<Parameters<typeof AnswerView>[0]> & {
+    readonly verdict: Verdict | undefined;
+  }
+) => <AnswerView ask={ask} now={now} {...props} />;
+
+const landedAt = (stage: StageName, heldBack: boolean) => ({
+  ...verdictOf(Outcome.cases.Landed.make({ sha: landedSha })),
+  heldBack: heldBack
+    ? verdictOf(Outcome.cases.Landed.make({ sha: landedSha })).heldBack
+    : [],
+  stage,
+});
+
+describe("the answer page", () => {
+  const refusedPage = page({ verdict: refused });
+
+  it("titles the page with the ask's want, and names the project, the ask and the answer in its trail", () => {
+    const markup = markupOf(refusedPage);
+
+    expect(markup).toMatch(
+      /<h1\b[^>]*>Parse ISO week dates like 2026-W41-3<\/h1>/u
+    );
+    expect(
+      inOrder(textOf(refusedPage), ["datekit", "Asks", askId, "Answer"])
+    ).toBeTruthy();
+    expect(markup).toContain('href="/datekit"');
+    expect(markup).toContain(`href="/datekit/asks/${askId}"`);
+  });
+
+  it("leads with the outcome: the first heading after the title is the hero, and a landing links its commit", () => {
+    const landed = landedAt("human", true);
+    const markup = markupOf(page({ landing: decidedLanding, verdict: landed }));
+    const afterTitle = markup.slice(markup.indexOf("</h1>"));
+
+    const hero =
+      /<section aria-label="Outcome"[^>]*>(?<inner>.*?)<\/section>/su.exec(
+        afterTitle
+      );
+
+    expect(hero).not.toBeNull();
+    expect(afterTitle.indexOf('<section aria-label="Outcome"')).toBeLessThan(
+      afterTitle.indexOf("<h2")
+    );
+    expect(plainText(hero?.groups?.inner ?? "")).toContain("Landed as 9b1c3e5");
+    expect(hero?.groups?.inner).toContain(
+      `href="/datekit/commit/${landedSha}"`
+    );
+  });
+
+  it("puts what was judged in the inspector, after the outcome and the gate", () => {
+    const markup = markupOf(refusedPage);
+    const strip = markup.indexOf('data-stage="human"');
+
+    expect(strip).toBeGreaterThan(markup.indexOf('aria-label="Outcome"'));
+    expect(asideOf(markup)).toContain("Patch id");
+    expect(asideOf(markup)).toContain("Merged tree");
+
+    expect(markup.indexOf("<aside")).toBeGreaterThan(strip);
+    // Below the shell's width, where the facts sit above the run, it comes last in main.
+    expect(mainOf(markup).lastIndexOf("Patch id")).toBeGreaterThan(
+      mainOf(markup).indexOf('data-stage="human"')
+    );
+  });
 
   it("shows the stages the answer passed, the one that refused it, and the ones it never reached", () => {
-    expect(stagesOf(markupOf(page))).toStrictEqual([
+    expect(stagesOf(mainOf(markupOf(refusedPage)))).toStrictEqual([
       ["parse", "passed"],
       ["shape", "passed"],
       ["merge", "passed"],
@@ -102,20 +194,121 @@ describe(AnswerView, () => {
     ]);
   });
 
-  it("shows each lane with its result", () => {
-    expect(lanesOf(markupOf(page))).toStrictEqual([
-      ["lint", "passed"],
-      ["unit", "failed"],
+  it("reads the decider and held-back stages as not needed for a landing that needed neither", () => {
+    const markup = markupOf(
+      page({ landing: plainLanding, verdict: landedAt("human", false) })
+    );
+
+    expect(stagesOf(mainOf(markup)).slice(5)).toStrictEqual([
+      ["heldBack", "skipped"],
+      ["human", "skipped"],
     ]);
     expect(
-      inOrder(textOf(page), ["lint", "passed", "unit", "failed"])
+      textOf(page({ landing: plainLanding, verdict: landedAt("human", false) }))
+    ).toContain("not needed");
+  });
+
+  it("reads them passed for a landing a decider finished and held-back checks judged", () => {
+    const markup = markupOf(
+      page({ landing: decidedLanding, verdict: landedAt("human", true) })
+    );
+
+    expect(stagesOf(mainOf(markup)).slice(5)).toStrictEqual([
+      ["heldBack", "passed"],
+      ["human", "passed"],
+    ]);
+  });
+
+  it("opens failed lanes first, each with the command that reads its log, and folds the passed ones into a line", () => {
+    const markup = markupOf(refusedPage);
+    const text = textOf(refusedPage);
+
+    expect(lanesOf(mainOf(markup))).toStrictEqual([
+      ["unit", "failed"],
+      ["lint", "passed"],
+    ]);
+    expect(text).toContain(
+      `${Brand.cli} evidence logs/datekit/parse-iso-week/unit --project datekit`
+    );
+    expect(text).toContain("1 lane passed in 1.2 s");
+    expect(
+      /<details\b[^>]*>.*data-lane="lint".*<\/details>/su.test(mainOf(markup))
     ).toBeTruthy();
+    expect(inOrder(text, ["unit", "bun test", "failed", "8.3 s"])).toBeTruthy();
+  });
+
+  it("keeps each passed lane's command and how long it ran inside the folded line", () => {
+    const folded =
+      /<details\b[^>]*>(?<inner>.*)<\/details>/su.exec(
+        mainOf(markupOf(refusedPage))
+      )?.groups?.inner ?? "";
+
+    expect(
+      inOrder(plainText(folded), ["lint", "bun run lint", "passed", "1.2 s"])
+    ).toBeTruthy();
+  });
+
+  it("says no lane has run yet while the answer is checking, and that none ran once it was refused before them", () => {
+    const checking = {
+      ...verdictOf(Outcome.cases.Checking.make({ stage: "cheap" })),
+      lanes: [],
+      stage: "cheap" as const,
+    };
+
+    const refusedEarly = { ...refused, lanes: [], stage: "shape" as const };
+
+    expect(textOf(page({ verdict: checking }))).toContain(
+      "No lane has run yet."
+    );
+    expect(textOf(page({ verdict: checking }))).not.toContain("No lane ran");
+    expect(textOf(page({ verdict: refusedEarly }))).toContain(
+      "No lane ran on this answer."
+    );
+  });
+
+  it("names the ask and the round right under the title, before the outcome", () => {
+    const states = askStates([
+      claimedEvent(1, "okafor"),
+      judgedEvent(2, refused.outcome),
+    ]);
+
+    const markup = mainOf(markupOf(page({ states, verdict: refused })));
+    const round = markup.indexOf("round 1 of 1");
+
+    expect(round).toBeGreaterThan(markup.indexOf("</h1>"));
+    expect(round).toBeLessThan(markup.indexOf('aria-label="Outcome"'));
+  });
+
+  it("gives no claim command for an ask that still waits on others to land", () => {
+    const blocked = { ...ask, blockedBy: [AskId.make("split-format")] };
+    const markup = mainOf(markupOf(page({ ask: blocked, verdict: undefined })));
+
+    expect(textIn(markup)).not.toContain(`${Brand.cli} claim`);
+    expect(textIn(markup)).toContain("waits for 1 ask to land first");
+    expect(markup).toContain(`href="/datekit/asks/${askId}"`);
+  });
+
+  it("names a lane's log only as the command that reads it", () => {
+    const passing = verdictOf(Outcome.cases.Checking.make({ stage: "checks" }));
+    const text = textOf(page({ verdict: passing }));
+
+    const mentions = [
+      ...text.matchAll(/logs\/datekit\/parse-iso-week\/unit/gu),
+    ];
+
+    expect(mentions.length).toBeGreaterThan(0);
+
+    for (const { index } of mentions) {
+      expect(text.slice(index - `${Brand.cli} evidence `.length, index)).toBe(
+        `${Brand.cli} evidence `
+      );
+    }
   });
 
   it("shows held-back checks only as an area's counts and its suite root", () => {
     const bits =
       /<ul aria-label="Held-back checks by area"[^>]*>(?<inner>.*?)<\/ul>/su.exec(
-        markupOf(page)
+        markupOf(refusedPage)
       )?.groups?.inner;
 
     expect(plainText(bits ?? "").trim()).toBe(`export 6/7 @ ${suite}`);
@@ -124,40 +317,66 @@ describe(AnswerView, () => {
   it("shows the refusals' explain lines in order, as git printed them", () => {
     expect(
       inOrder(
-        textOf(page),
+        textOf(refusedPage),
         explain([checksFailed, heldBackFailed]).map((line) => line.trim())
       )
     ).toBeTruthy();
   });
 
-  it("never shows where a lane's log is kept outside the refusal that names it", () => {
-    const passing = verdictOf(Outcome.cases.Checking.make({ stage: "checks" }));
+  it("names the answer it judged, its round, and when", () => {
+    const states = askStates([
+      claimedEvent(1, "okafor"),
+      judgedEvent(2, refused.outcome, CommitSha.make("e".repeat(40))),
+      judgedEvent(3, refused.outcome),
+    ]);
 
-    expect(textOf(<AnswerView now={now} verdict={passing} />)).not.toContain(
-      "logs/datekit"
+    const element = page({ states, verdict: refused });
+    const text = textOf(element);
+
+    for (const shown of [
+      "round 2 of 2",
+      "bbbbbbb",
+      "aaaaaaa",
+      "redThenGreen@0.0.0+5e1d",
+      "20 min ago",
+      "okafor's move",
+    ]) {
+      expect(text).toContain(shown);
+    }
+  });
+
+  it("reads a wait on a decision as waiting, in the hero", () => {
+    const waiting = verdictOf(
+      Outcome.cases.AwaitingDecision.make({
+        decision: DecisionId.make("dec-000001"),
+      })
     );
+
+    const text = textOf(page({ verdict: waiting }));
+
+    expect(text).toContain("Waiting on decision dec-000001");
   });
 
-  it("names the answer it judged and when", () => {
-    const text = textOf(page);
+  it("gives an ask nobody answered the command that claims it", () => {
+    const text = textOf(page({ verdict: undefined }));
 
-    expect(text).toContain("bbbbbbb");
-    expect(text).toContain("aaaaaaa");
-    expect(text).toContain("redThenGreen@0.0.0+5e1d");
-    expect(text).toContain("20 min ago");
+    expect(text).toContain("Nobody has answered this ask yet.");
+    expect(text).toContain(`${Brand.cli} claim ${askId} --project datekit`);
+    expect(markupOf(page({ verdict: undefined }))).not.toContain("data-stage");
   });
 
-  it("says plainly when no answer has been checked yet", () => {
-    const text = textOf(<AnswerView now={now} verdict={undefined} />);
+  it("names who holds a claimed ask with no answer pushed, and links back to the ask", () => {
+    const states = askStates([claimedEvent(1, "bram")]);
+    const element = page({ states, verdict: undefined });
+    const main = mainOf(markupOf(element));
 
-    expect(text).toContain("No answer to this ask has been checked yet");
-    expect(text).not.toContain("Parse");
+    expect(textIn(main)).toContain("Claimed by bram, no answer pushed yet.");
+    expect(main).toContain(`href="/datekit/asks/${askId}"`);
   });
 
   it("shows a landed answer's credit trailers in trailer order, its held-back trailer, and its commit", () => {
     const landed = verdictOf(Outcome.cases.Landed.make({ sha: landedSha }));
-    const element = <AnswerView landing={landing} now={now} verdict={landed} />;
-    const text = textOf(element);
+    const text = textOf(page({ landing, verdict: landed }));
 
     expect(text).toContain("Landed as 9b1c3e5");
     expect(
@@ -168,49 +387,61 @@ describe(AnswerView, () => {
     expect(text).toContain(`git show ${landedSha}`);
   });
 
-  it("links a landed answer's landing and its base to their commit pages, and keeps the git show command", () => {
+  it("links a landed answer's landing (from the hero and the landing) and its base to their commit pages", () => {
     const landed = verdictOf(Outcome.cases.Landed.make({ sha: landedSha }));
+    const markup = markupOf(page({ landing, verdict: landed }));
 
-    const markup = markupOf(
-      <AnswerView landing={landing} now={now} verdict={landed} />
-    );
-
-    expect(commitLinksOf(markup)).toStrictEqual([
+    expect(commitLinksOf(heroOf(markup))).toStrictEqual([
+      [`/${project}/commit/${landedSha}`, "9b1c3e5"],
+    ]);
+    expect(commitLinksOf(runOf(markup))).toStrictEqual([
       [`/${project}/commit/${landed.base}`, landed.base.slice(0, 7)],
       [`/${project}/commit/${landedSha}`, "The landing commit"],
     ]);
-    expect(markup).toContain(`git show ${landedSha}`);
   });
 
   it("links neither the head nor the merged tree: they live in the claim's fork", () => {
     const landed = verdictOf(Outcome.cases.Landed.make({ sha: landedSha }));
-
-    const markup = markupOf(
-      <AnswerView landing={landing} now={now} verdict={landed} />
-    );
+    const markup = markupOf(page({ landing, verdict: landed }));
 
     expect(markup).not.toContain(`/commit/${landed.head}`);
     expect(markup).not.toContain(`/commit/${landed.tree}`);
   });
 
   it("links the base and no landing when the answer has not landed", () => {
-    expect(commitLinksOf(markupOf(page))).toStrictEqual([
+    expect(commitLinksOf(heroOf(markupOf(refusedPage)))).toStrictEqual([]);
+    expect(commitLinksOf(runOf(markupOf(refusedPage)))).toStrictEqual([
       [`/${project}/commit/${refused.base}`, refused.base.slice(0, 7)],
     ]);
   });
-});
 
-describe(LaneTable, () => {
-  it("gives each lane's command and how long it ran", () => {
-    const { lanes } = refused;
-    const text = textOf(<LaneTable lanes={lanes} />);
+  it("stamps the landed mark only when the page is told the landing came while it was open", () => {
+    const landed = landedAt("human", false);
 
-    expect(inOrder(text, ["lint", "bun run lint", "1.2 s"])).toBeTruthy();
-    expect(inOrder(text, ["unit", "bun test", "8.3 s"])).toBeTruthy();
+    expect(
+      markupOf(page({ landing: plainLanding, stamp: true, verdict: landed }))
+    ).toContain("animate-stamp");
+    expect(
+      markupOf(page({ landing: plainLanding, verdict: landed }))
+    ).not.toContain("animate-stamp");
   });
 
-  it("says when no lane ran", () => {
-    expect(textOf(<LaneTable lanes={[]} />)).toContain("No lane ran");
+  it("draws a family member's family, the member marked", () => {
+    const child = family.child(1);
+
+    const markup = markupOf(
+      <AnswerView
+        ask={child}
+        now={now}
+        parent={family.parent}
+        verdict={refused}
+      />
+    );
+
+    expect(asideOf(markup)).toContain(`data-family="${family.parent.id}"`);
+    expect(asideOf(markup)).toMatch(
+      /aria-current="true"[^>]*title="retire-old-week-parse"|title="retire-old-week-parse"[^>]*aria-current="true"/u
+    );
   });
 });
 
@@ -227,11 +458,33 @@ describe(HeldBackBits, () => {
   });
 });
 
-/** What the stub platform was asked: verdicts and landings. */
+describe(durationText, () => {
+  it("says how long a lane ran in the unit a person reads", () => {
+    expect([640, 8312, 125_000].map(durationText)).toStrictEqual([
+      "640 ms",
+      "8.3 s",
+      "2 min 5 s",
+    ]);
+  });
+});
+
+/** What the stub platform was asked: verdicts, landings, asks and replays. */
 interface Asked {
+  readonly asks: number;
   readonly landings: number;
+  readonly replays: number;
   readonly verdicts: number;
 }
+
+/** Events in datekit: bram claimed the ask and pushed, and another ask was claimed too. */
+const replay = [
+  claimedEvent(1, "bram"),
+  claimedEvent(2, "okafor", AskId.make("format-week")),
+  judgedEvent(3, refused.outcome),
+];
+
+const count = (asked: Ref.Ref<Asked>, key: keyof Asked) =>
+  Ref.update(asked, (seen) => ({ ...seen, [key]: seen[key] + 1 }));
 
 /**
  * A platform whose datekit ask's latest answer ended in `outcome`, as the
@@ -241,7 +494,8 @@ interface Asked {
 const platformAt = (
   asked: Ref.Ref<Asked>,
   outcome: Outcome,
-  landingKnown = true
+  landingKnown = true,
+  shown: Ask = ask
 ) =>
   Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
     Layer.provide([
@@ -249,10 +503,7 @@ const platformAt = (
         unanswered,
         Contracts.toLayerHandler("verdict", (payload) =>
           Effect.gen(function* () {
-            yield* Ref.update(asked, (seen) => ({
-              ...seen,
-              verdicts: seen.verdicts + 1,
-            }));
+            yield* count(asked, "verdicts");
 
             if (payload.ask !== askId) {
               return yield* new UnknownAsk({ ask: payload.ask });
@@ -261,12 +512,28 @@ const platformAt = (
             return { verdict: verdictOf(outcome) };
           })
         ),
+        Contracts.toLayerHandler("showAsk", (payload) =>
+          Effect.gen(function* () {
+            yield* count(asked, "asks");
+
+            if (payload.ask !== shown.id && payload.ask !== family.parent.id) {
+              return yield* new UnknownAsk({ ask: payload.ask });
+            }
+
+            return {
+              ask: payload.ask === shown.id ? shown : family.parent,
+              brief,
+            };
+          })
+        ),
+        Contracts.toLayerHandler("watch", () =>
+          Stream.fromEffect(count(asked, "replays")).pipe(
+            Stream.flatMap(() => Stream.fromIterable(replay))
+          )
+        ),
         Contracts.toLayerHandler("landing", (payload) =>
           Effect.gen(function* () {
-            yield* Ref.update(asked, (seen) => ({
-              ...seen,
-              landings: seen.landings + 1,
-            }));
+            yield* count(asked, "landings");
 
             if (!landingKnown || payload.sha !== landedSha) {
               return yield* new UnknownCommit({ sha: payload.sha });
@@ -280,21 +547,64 @@ const platformAt = (
     ])
   );
 
-const nothingAsked: Asked = { landings: 0, verdicts: 0 };
+const nothingAsked: Asked = { asks: 0, landings: 0, replays: 0, verdicts: 0 };
 
 describe(readAnswer, () => {
-  it.effect("reads a landed answer's landing with its verdict", () =>
+  it.effect(
+    "reads a landed answer's landing with its verdict, its ask and the ask's events",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Ref.make(nothingAsked);
+        const landed = Outcome.cases.Landed.make({ sha: landedSha });
+
+        const read = yield* readAnswer({ ask: askId, project }).pipe(
+          Effect.provide(platformAt(asked, landed))
+        );
+
+        expect({
+          events: read.events.map(({ seq }) => seq),
+          landing: read.landing?.sha,
+          lastSeq: read.lastSeq,
+          outcome: read.verdict?.outcome._tag,
+          parent: read.parent,
+          want: read.askRead.brief.want,
+        }).toStrictEqual({
+          events: [1, 3],
+          landing: landedSha,
+          lastSeq: 3,
+          outcome: "Landed",
+          parent: undefined,
+          want: ask.brief.want,
+        });
+        expect(yield* Ref.get(asked)).toStrictEqual({
+          asks: 1,
+          landings: 1,
+          replays: 1,
+          verdicts: 1,
+        });
+      })
+  );
+
+  it.effect("reads a family member's parent, for the family", () =>
     Effect.gen(function* () {
       const asked = yield* Ref.make(nothingAsked);
-      const landed = Outcome.cases.Landed.make({ sha: landedSha });
 
       const read = yield* readAnswer({ ask: askId, project }).pipe(
-        Effect.provide(platformAt(asked, landed))
+        Effect.provide(
+          platformAt(asked, refused.outcome, true, {
+            ...family.child(0),
+            id: askId,
+          })
+        )
       );
 
-      expect(read.verdict?.outcome._tag).toBe("Landed");
-      expect(read.landing?.sha).toBe(landedSha);
-      expect(yield* Ref.get(asked)).toStrictEqual({ landings: 1, verdicts: 1 });
+      expect(read.parent?.id).toBe(family.parent.id);
+      expect(yield* Ref.get(asked)).toStrictEqual({
+        asks: 2,
+        landings: 0,
+        replays: 1,
+        verdicts: 1,
+      });
     })
   );
 
@@ -308,10 +618,9 @@ describe(readAnswer, () => {
 
       expect(read.verdict?.outcome._tag).toBe("Refused");
       expect(read.landing).toBeUndefined();
-      expect(yield* Ref.get(asked)).toStrictEqual({ landings: 0, verdicts: 1 });
+      expect((yield* Ref.get(asked)).landings).toBe(0);
     })
   );
-
   it.effect(
     "shows the verdict alone when the platform no longer finds its landing",
     () =>

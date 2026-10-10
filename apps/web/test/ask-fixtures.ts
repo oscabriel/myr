@@ -9,6 +9,7 @@ import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { Glob } from "@repo/protocol/domain/common";
+import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { Outcome } from "@repo/protocol/domain/outcome";
 import {
@@ -131,6 +132,106 @@ export const landing: LandingView = {
   parent: LandedSha.make(sha("a")),
   project,
   sha: landedSha,
+};
+
+/** The landing as a decider's finish made it: decided, and judged by held-back checks. */
+export const decidedLanding: LandingView = {
+  ...landing,
+  credits: [
+    ...landing.credits,
+    { handle: Handle.make("ines-v"), role: "Decided-by" },
+  ],
+};
+
+/** The landing as one that needed neither a decider nor held-back checks makes it. */
+export const plainLanding: LandingView = {
+  ask: askId,
+  assisted: [],
+  author: Handle.make("bram"),
+  credits: [
+    { handle: Handle.make("bram"), role: "Signed-off-by" },
+    { handle: Handle.make("ines-v"), role: "Asked-by" },
+  ],
+  landedAt: DateTime.makeUnsafe("2026-10-07T11:45:00Z"),
+  parent: LandedSha.make(sha("a")),
+  project,
+  sha: landedSha,
+};
+
+/** When the events below happened. */
+const eventAt = DateTime.makeUnsafe("2026-10-07T11:30:00Z");
+
+/** `claimant` claimed `on`, as event `seq`. */
+export const claimedEvent = (seq: number, claimant: string, on = askId) =>
+  ProjectEvent.cases.Claimed.make({
+    ask: on,
+    at: eventAt,
+    claimant: Handle.make(claimant),
+    seq,
+  });
+
+/** An answer at `head` to `on` was judged `outcome`, as event `seq`. */
+export const judgedEvent = (
+  seq: number,
+  outcome: Outcome,
+  head = CommitSha.make(sha("b")),
+  on = askId
+) =>
+  ProjectEvent.cases.Judged.make({ ask: on, at: eventAt, head, outcome, seq });
+
+/** An answer to `on` was pushed at `head`, as event `seq`. */
+export const pushedEvent = (
+  seq: number,
+  head = CommitSha.make(sha("b")),
+  on = askId
+) => ProjectEvent.cases.Pushed.make({ ask: on, at: eventAt, head, seq });
+
+/** `on` closed by a landing, as event `seq`. */
+export const closedEvent = (seq: number, on = askId) =>
+  ProjectEvent.cases.AskClosed.make({
+    ask: on,
+    at: eventAt,
+    landing: landedSha,
+    seq,
+  });
+
+const familyParent = AskId.make("retire-old-week");
+
+const familyChildren = ["format", "parse", "zones"].map((module) =>
+  AskId.make(`retire-old-week-${module}`)
+);
+
+const familyDelete = AskId.make("retire-old-week-delete");
+
+/** One member of the family below: blocked by `blockedBy`, its parent named. */
+const member = (id: AskId, blockedBy: readonly AskId[]): Ask => ({
+  ...ask,
+  blockedBy,
+  brief: { want: `Step ${id} of retiring oldWeek` },
+  id,
+  kind: KindName.make("migrate"),
+  parent: familyParent,
+});
+
+/** A migrate family in datekit: a parent, three children, and the delete child that waits on them. */
+export const family = {
+  /** The child at `index`, which waits on nothing. */
+  child: (index: number) =>
+    member(familyChildren[index] ?? AskId.make("retire-old-week-format"), []),
+  children: familyChildren,
+  deleteChild: {
+    ...member(familyDelete, familyChildren),
+    state: "waitingOnParent",
+  } satisfies Ask,
+  parent: {
+    ...ask,
+    blockedBy: [...familyChildren, familyDelete],
+    brief: {
+      want: "Replace every call to oldWeek with week, then delete oldWeek.",
+    },
+    id: familyParent,
+    kind: KindName.make("migrate"),
+  } satisfies Ask,
 };
 
 /** The entities React writes for text, and what each reads as. */

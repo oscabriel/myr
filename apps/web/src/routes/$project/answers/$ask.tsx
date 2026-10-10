@@ -1,96 +1,34 @@
 import { useAtomMount, useAtomValue } from "@effect/atom-react";
-import { Client } from "@repo/protocol/contracts";
-import { Verdict } from "@repo/protocol/domain/answer";
-import { LandingView } from "@repo/protocol/domain/landing";
-import { Outcome } from "@repo/protocol/domain/outcome";
-import { AskId, CommitSha, ProjectName } from "@repo/protocol/ids";
-import type { LandedSha } from "@repo/protocol/ids";
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import type { LandingView } from "@repo/protocol/domain/landing";
+import type { Handle, LandedSha } from "@repo/protocol/ids";
+import { createFileRoute, useParams } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
-import { DateTime, Effect, Option, Predicate, Schema } from "effect";
-import { AsyncResult } from "effect/reactivity";
+import { Effect, Option, Predicate, Schema } from "effect";
+import { AsyncResult, Atom } from "effect/reactivity";
+import { useMemo } from "react";
 
 import { landingAtom, verdictAtom } from "../../../client/answer.ts";
+import { askAtom } from "../../../client/ask.ts";
+import { askStates, projectEventsAtom } from "../../../client/events.ts";
 import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
 import { watchAtom } from "../../../client/watch.ts";
 import { AnswerView } from "../../../features/answer/answer-page.tsx";
+import {
+  AnswerPageData,
+  landedBy,
+  readAnswer,
+} from "../../../features/answer/reads.ts";
+import type { AnswerAddress } from "../../../features/answer/reads.ts";
 import { NoSuchAsk } from "../../../features/ask/refused.tsx";
-import { CODE, LINK } from "../../../features/shared/classes.ts";
+import { whoAtom } from "../../../features/auth/who.ts";
 import { pageHead } from "../../../features/shared/head.ts";
-import { PageShell } from "../../../features/shared/layout.tsx";
-import { answerPath } from "../../../features/shared/paths.ts";
-import { notFoundFor } from "../../../features/shared/refusals.ts";
+import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 
-// The answer page: the latest verdict on an answer to an ask, stage by
-// stage, or with `?head=<sha>` the verdict on an earlier answer. A landed
-// answer shows its landing's credit trailers.
-
-/** The page's address, not yet decoded: the path's names and `?head=`. */
-interface AnswerAddress {
-  readonly ask: string;
-  readonly head?: string | undefined;
-  readonly project: string;
-}
-
-/** The address, decoded: names the platform could hold, and a commit id. */
-const AnswerPath = Schema.Struct({
-  ask: AskId,
-  head: Schema.optionalKey(CommitSha),
-  project: ProjectName,
-});
-
-/** What the page's loader carries from the server, encoded: whose answer, its verdict and landing, and when it was read. */
-const AnswerPageData = Schema.Struct({
-  ...AnswerPath.fields,
-  landing: Schema.UndefinedOr(LandingView),
-  now: Schema.DateTimeUtcFromString,
-  verdict: Schema.UndefinedOr(Verdict),
-});
-
-type AnswerPageData = typeof AnswerPageData.Type;
-
-/** The landing a verdict's answer made, when it landed. */
-const landedBy = (verdict: Verdict | undefined): LandedSha | undefined =>
-  verdict !== undefined && Outcome.isAnyOf(["Landed"])(verdict.outcome)
-    ? verdict.outcome.sha
-    : undefined;
-
-/** The verdict for the page and, if its answer landed, the landing; or a not-found carrying the refusal (a 404). */
-export const readAnswer = ({ ask, head, project }: AnswerAddress) =>
-  Effect.gen(function* () {
-    const path = yield* Schema.decodeEffect(AnswerPath)(
-      head === undefined ? { ask, project } : { ask, head, project }
-    ).pipe(Effect.mapError(() => notFound()));
-
-    const client = yield* Client;
-
-    const { verdict } = yield* client.verdict(path).pipe(
-      Effect.catchTags({
-        UnknownAsk: notFoundFor,
-        UnknownProject: notFoundFor,
-      })
-    );
-
-    const sha = landedBy(verdict);
-
-    const landing =
-      sha === undefined
-        ? Option.none()
-        : yield* client.landing({ project: path.project, sha }).pipe(
-            Effect.map((found) => Option.some(found.landing)),
-            // The verdict names a landing the platform no longer finds: show the verdict alone.
-            Effect.catchTag("UnknownCommit", () => Effect.succeedNone)
-          );
-
-    return yield* Schema.encodeEffect(AnswerPageData)({
-      ...path,
-      landing: Option.getOrUndefined(landing),
-      now: yield* DateTime.now,
-      verdict,
-    });
-  });
+// The answer page: where the latest answer to an ask stands, stage by
+// stage, or with `?head=<sha>` an earlier answer. It updates live while
+// open, from the project's events.
 
 const answerPage = createServerFn({ method: "GET" })
   .validator((address: AnswerAddress) => address)
@@ -98,94 +36,116 @@ const answerPage = createServerFn({ method: "GET" })
     Effect.runPromise(readAnswer(data).pipe(Effect.provide(serverClient(env))))
   );
 
-/** The verdict with its landing's trailers, from the landing's atom (seeded when the loader read it). */
-const LandedAnswer = ({
-  now,
-  project,
-  seeded,
-  sha,
-  verdict,
-}: {
-  readonly now: DateTime.Utc;
-  readonly project: ProjectName;
-  readonly seeded: LandingView | undefined;
-  readonly sha: LandedSha;
-  readonly verdict: Verdict;
-}) => {
-  const fresh = Option.map(
-    AsyncResult.value(useAtomValue(landingAtom(project, sha))),
-    (found) => found.landing
+/** No landing to read: what the page reads while the answer has not landed. */
+const noLanding = Atom.make(Option.none<LandingView>());
+
+/**
+ * The landing at `sha`, from its atom (seeded when the loader read it), or
+ * as the loader read it. One hook whether or not the answer landed, so the
+ * page keeps its place in the tree when the answer lands while it is open
+ * (its outcome settles in rather than the page drawing anew).
+ */
+const useLanding = (
+  read: AnswerPageData,
+  sha: LandedSha | undefined
+): LandingView | undefined => {
+  const atom = useMemo(
+    () =>
+      sha === undefined
+        ? noLanding
+        : Atom.map(landingAtom(read.project, sha), (result) =>
+            Option.map(AsyncResult.value(result), (found) => found.landing)
+          ),
+    [read.project, sha]
   );
 
-  const landing = Option.getOrElse(fresh, () =>
-    seeded?.sha === sha ? seeded : undefined
-  );
-
-  return landing === undefined ? (
-    <AnswerView now={now} verdict={verdict} />
-  ) : (
-    <AnswerView landing={landing} now={now} verdict={verdict} />
+  return Option.getOrElse(useAtomValue(atom), () =>
+    sha !== undefined && read.landing?.sha === sha ? read.landing : undefined
   );
 };
 
-/** The page over the verdict's atom, which starts from what the loader read and refetches when its keys change. */
+/**
+ * The page over its atoms, which start from what the loader read and read
+ * again as the project's events arrive: the verdict, the ask, its landing,
+ * and the events the fold reads.
+ */
 const FreshAnswer = ({
-  atom,
   read,
+  viewer,
 }: {
-  readonly atom: ReturnType<typeof verdictAtom>;
   readonly read: AnswerPageData;
+  readonly viewer: Handle | undefined;
 }) => {
-  // Live: a push, a verdict or a landing on the ask makes the verdict fetch again.
+  // Live: each event the project hears reads again what it changed.
   useAtomMount(watchAtom(read.project));
 
   const { verdict } = Option.getOrElse(
-    AsyncResult.value(useAtomValue(atom)),
+    AsyncResult.value(
+      useAtomValue(verdictAtom(read.project, read.ask, read.head))
+    ),
     () => read
   );
 
-  const sha = landedBy(verdict);
+  const { ask } = Option.getOrElse(
+    AsyncResult.value(useAtomValue(askAtom(read.project, read.ask))),
+    () => ({ ask: read.askRead })
+  );
 
-  return verdict === undefined || sha === undefined ? (
-    <AnswerView now={read.now} verdict={verdict} />
-  ) : (
-    <LandedAnswer
+  // The replay as the browser reads it, once it has; until then the
+  // server's, which holds the same events about these asks.
+  const events = Option.getOrElse(
+    AsyncResult.value(useAtomValue(projectEventsAtom(read.project))),
+    () => read.events
+  );
+
+  const states = askStates(events);
+  const landed = states.get(read.ask)?.landed;
+
+  const landing = useLanding(read, landedBy(verdict));
+
+  return (
+    <AnswerView
+      ask={ask}
+      head={read.head}
+      landing={landing}
       now={read.now}
-      project={read.project}
-      seeded={read.landing}
-      sha={sha}
+      parent={read.parent}
+      // A landing the server's read already held never stamps.
+      stamp={landed !== undefined && landed.seq > read.lastSeq}
+      states={states}
       verdict={verdict}
+      viewer={viewer}
     />
   );
 };
 
 const AnswerPage = () => {
   const read = Schema.decodeSync(AnswerPageData)(Route.useLoaderData());
-  const { ask, head, landing, project, verdict } = read;
-  const atom = verdictAtom(project, ask, head);
+  const who = useAtomValue(whoAtom);
+  const { ask, askRead, brief, head, landing, project, verdict } = read;
 
   const seeds = [
-    seedSuccess(atom, verdict === undefined ? {} : { verdict }),
+    seedSuccess(
+      verdictAtom(project, ask, head),
+      verdict === undefined ? {} : { verdict }
+    ),
+    seedSuccess(askAtom(project, ask), { ask: askRead, brief }),
     ...(landing === undefined
       ? []
       : [seedSuccess(landingAtom(project, landing.sha), { landing })]),
   ];
 
   return (
-    <PageShell title={`Answer to ${ask}`}>
-      {head === undefined ? null : (
-        <p className="text-sm">
-          An earlier answer, at <code className={CODE}>{head.slice(0, 7)}</code>
-          .{" "}
-          <a className={LINK} href={answerPath(project, ask)}>
-            The latest answer
-          </a>
-        </p>
-      )}
-      <SeededAtoms id={`${project}/${ask}/${head ?? ""}`} seeds={seeds}>
-        <FreshAnswer atom={atom} read={read} />
-      </SeededAtoms>
-    </PageShell>
+    <SeededAtoms id={`${project}/${ask}/${head ?? ""}`} seeds={seeds}>
+      <FreshAnswer
+        read={read}
+        viewer={
+          AsyncResult.isSuccess(who)
+            ? Option.getOrUndefined(who.value)
+            : undefined
+        }
+      />
+    </SeededAtoms>
   );
 };
 
@@ -193,9 +153,11 @@ const AnswerPage = () => {
 const NOTHING =
   "Nothing is at this address: a project's and an ask's names are lowercase words joined by single dashes, and ?head= takes an answer's whole commit id, 40 hex digits.";
 
-const AnswerNotFound = ({ data }: { readonly data?: unknown }) => (
-  <NoSuchAsk data={data} nothing={NOTHING} />
-);
+const AnswerNotFound = ({ data }: { readonly data?: unknown }) => {
+  const { project } = useParams({ strict: false });
+
+  return <NoSuchAsk data={data} nothing={NOTHING} project={project} />;
+};
 
 export const Route = createFileRoute("/$project/answers/$ask")({
   // TanStack infers each option from the ones before it, so the search comes
@@ -204,7 +166,15 @@ export const Route = createFileRoute("/$project/answers/$ask")({
     Predicate.isString(head) ? { head } : {},
   loaderDeps: ({ search }) => ({ head: search.head }),
   loader: ({ deps, params }) => answerPage({ data: { ...params, ...deps } }),
-  head: ({ params }) => pageHead({ title: `Answer to ${params.ask}` }),
+  head: ({ loaderData, params }) =>
+    loaderData === undefined
+      ? pageHead({ title: "No such ask" })
+      : pageHead({
+          description: loaderData.askRead.brief.want,
+          title: `Answer to ${params.ask} · ${params.project}`,
+        }),
+  // An answer moves with each push and verdict: kept briefly, asked again.
+  headers: () => branchPage,
   component: AnswerPage,
   notFoundComponent: AnswerNotFound,
 });
