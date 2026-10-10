@@ -7,6 +7,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
+import { Glob } from "@repo/protocol/domain/common";
 import { AskId, Handle } from "@repo/protocol/ids";
 import { UnknownAsk } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
@@ -95,6 +96,30 @@ describe(AskView, () => {
       inOrder(text, ["Territory", "@datekit/parse", "packages/parse/**"])
     ).toBeTruthy();
     expect(markupOf(page())).toContain('href="/people/ines-v"');
+  });
+
+  // A paths territory (`territory.paths(...)`) has module `.`, which names
+  // nothing a reader knows: the field gives its paths alone.
+  it("gives a paths territory as its paths, with no module `.`", () => {
+    const text = textOf(
+      page({
+        ...ask,
+        territory: {
+          module: ".",
+          paths: [Glob.make("src/parse.ts"), Glob.make("test/parse.test.ts")],
+        },
+      })
+    );
+
+    const field = text.slice(
+      text.indexOf("Territory"),
+      text.indexOf("Check", text.indexOf("Territory"))
+    );
+
+    expect(
+      inOrder(field, ["The paths", "src/parse.ts", "test/parse.test.ts"])
+    ).toBeTruthy();
+    expect(field).not.toMatch(/\s\.\s|\s\.:/u);
   });
 
   it("gives the lines that clone the project, claim the ask and check an answer, with the CLI's own name", () => {

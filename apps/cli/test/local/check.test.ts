@@ -477,7 +477,7 @@ describe(`${Brand.cli} check`, () => {
           refusals: [
             new ChecksFailed({
               lane: "bad",
-              logRef: "local:bad",
+              logRef: ChecksFailed.localRef("bad"),
               next: "false",
             }),
           ],

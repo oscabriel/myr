@@ -1620,7 +1620,13 @@ const briefOf = (ask: Ask): string => {
     `# ${brief.want}`,
     "",
     `Ask \`${ask.id}\` in ${ask.project}, a \`${ask.kind}\` ask from ${ask.askedBy}.`,
-    ...section("Territory", [`The module \`${territory.module}\`: ${paths}.`]),
+    // A paths territory (module `.`) is no module a reader would know: it
+    // reads as its paths alone.
+    ...section("Territory", [
+      territory.module === "."
+        ? `The paths ${paths}.`
+        : `The module \`${territory.module}\`: ${paths}.`,
+    ]),
     ...section(
       "Current",
       Option.toArray(Option.fromUndefinedOr(brief.current))

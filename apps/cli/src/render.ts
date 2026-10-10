@@ -419,14 +419,18 @@ const evaluated = (policy: PublicPolicy) => {
   );
 };
 
-/** Why the config at the landed commit has not evaluated, and what makes it, in the people page's words. */
+/**
+ * Why the config at the landed commit has not evaluated, and the step that
+ * makes it, as a terminal's lines. The view sees only the success, which
+ * names no project, so the command names it as `<project>`.
+ */
 const pendingText = ({ at, reason }: PolicyPending) => {
   const notEvaluated = `The config at the landed commit ${short(at)} has not been evaluated`;
 
   return reason === "noConfig"
     ? [
-        `${notEvaluated}: the project has no ${Brand.configDir}/ folder, and the defaults need a test command that the platform could not find in its CI or package files.`,
-        `To make it evaluate, a decider lands a ${PROJECT_FILE} that names the test command (\`${Brand.cli} init --dry-run\` in a clone prints the one the CLI proposes); it is evaluated again at every landing.`,
+        `${notEvaluated}: there is no ${Brand.configDir}/ folder, and no test command in the project's CI or package files.`,
+        `Run \`${Brand.cli} init --project <project> --dry-run\` in the project's repo to see the ${PROJECT_FILE} it proposes, then have a decider land it.`,
       ]
     : [
         `${notEvaluated}: ${Brand.configDir}/ at ${short(at)} did not evaluate.`,
