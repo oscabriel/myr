@@ -14,9 +14,15 @@ import {
   BlobSha,
   CommitSha,
   Handle,
+  ProjectName,
   RepoPath,
 } from "@repo/protocol/ids";
-import { OutOfScope, UnknownAsk, UnknownPath } from "@repo/protocol/refusal";
+import {
+  OutOfScope,
+  UnknownAsk,
+  UnknownPath,
+  UnknownProject,
+} from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
@@ -343,6 +349,30 @@ describe(AskView, () => {
     expect(asideOf(markup)).toContain(`data-family="${parent.id}"`);
   });
 
+  it("says a family's parent waits for its family in the family's terms, never as a list of ids", () => {
+    const { children, deleteChild, parent } = family;
+    const states = askStates([closedEvent(1, children[0] ?? parent.id)]);
+    const markup = mainOf(markupOf(page(parent, { states })));
+
+    expect(plainText(markup)).toContain(
+      "Waits for 2 of 3 children and the delete step to land first; a claim waits until they do."
+    );
+    expect(plainText(markup)).not.toContain("Waits on");
+    expect(markup).toContain(`href="/datekit/asks/${deleteChild.id}"`);
+  });
+
+  it("says a family's parent whose children all landed waits only for the delete step", () => {
+    const { children, parent } = family;
+
+    const states = askStates(
+      children.map((child, index) => closedEvent(index + 1, child))
+    );
+
+    expect(plainText(mainOf(markupOf(page(parent, { states }))))).toContain(
+      "Waits for the delete step to land first"
+    );
+  });
+
   it("names the asks an ask outside a family waits on, each linking to its page", () => {
     const blocked = {
       ...ask,
@@ -427,6 +457,31 @@ describe(NoSuchAsk, () => {
     expect(markup).toContain('href="/datekit"');
     expect(markup).toContain('href="/"');
     expect(textOf(<NoSuchAsk project="datekit" />)).toContain("Open asks");
+  });
+
+  it("names the project and its asks in the trail, and no crumb for the ask that is not there", () => {
+    const refusal = new UnknownAsk({ ask: AskId.make("no-such-ask") });
+    const data = structuredClone(Schema.encodeSync(Refusals)([refusal]));
+
+    const trail = trailOf(
+      markupOf(<NoSuchAsk data={data} project="datekit" />)
+    );
+
+    expect(inOrder(plainText(trail), ["datekit", "Asks"])).toBeTruthy();
+    expect(trail).toContain('href="/datekit"');
+    expect(trail).not.toContain("no-such-ask");
+  });
+
+  it("links no project the platform says it does not have", () => {
+    const refusal = new UnknownProject({
+      project: ProjectName.make("nowhere"),
+    });
+
+    const data = structuredClone(Schema.encodeSync(Refusals)([refusal]));
+    const markup = markupOf(<NoSuchAsk data={data} project="nowhere" />);
+
+    expect(markup).not.toContain('href="/nowhere"');
+    expect(markup).toContain('href="/"');
   });
 
   it("says what its route gives it when a not-found carries no refusal", () => {

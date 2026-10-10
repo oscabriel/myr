@@ -201,10 +201,15 @@ export const StageStrip = ({
           data-state={state}
           key={name}
         >
-          <span className="text-label flex min-w-0 items-center gap-1.5">
-            <StateMarkIcon mark={marks[state].mark} size="sm" />
+          <span className="text-label flex min-w-0 items-start gap-1.5">
+            <StateMarkIcon
+              className="mt-px"
+              mark={marks[state].mark}
+              size="sm"
+            />
+            {/* Four cells a row on a phone: a long label wraps rather than losing its end. */}
             <span
-              className={`truncate ${
+              className={`min-w-0 break-words ${
                 state === "pending" || state === "skipped"
                   ? "text-muted-foreground"
                   : "text-foreground"

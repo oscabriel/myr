@@ -168,7 +168,7 @@ export const Route = createFileRoute("/$project/answers/$ask")({
   loader: ({ deps, params }) => answerPage({ data: { ...params, ...deps } }),
   head: ({ loaderData, params }) =>
     loaderData === undefined
-      ? pageHead({ title: `Answer to ${params.ask}` })
+      ? pageHead({ title: "No such ask" })
       : pageHead({
           description: loaderData.askRead.brief.want,
           title: `Answer to ${params.ask} · ${params.project}`,

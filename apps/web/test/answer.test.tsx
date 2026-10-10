@@ -237,6 +237,57 @@ describe("the answer page", () => {
     expect(inOrder(text, ["unit", "bun test", "failed", "8.3 s"])).toBeTruthy();
   });
 
+  it("keeps each passed lane's command and how long it ran inside the folded line", () => {
+    const folded =
+      /<details\b[^>]*>(?<inner>.*)<\/details>/su.exec(
+        mainOf(markupOf(refusedPage))
+      )?.groups?.inner ?? "";
+
+    expect(
+      inOrder(plainText(folded), ["lint", "bun run lint", "passed", "1.2 s"])
+    ).toBeTruthy();
+  });
+
+  it("says no lane has run yet while the answer is checking, and that none ran once it was refused before them", () => {
+    const checking = {
+      ...verdictOf(Outcome.cases.Checking.make({ stage: "cheap" })),
+      lanes: [],
+      stage: "cheap" as const,
+    };
+
+    const refusedEarly = { ...refused, lanes: [], stage: "shape" as const };
+
+    expect(textOf(page({ verdict: checking }))).toContain(
+      "No lane has run yet."
+    );
+    expect(textOf(page({ verdict: checking }))).not.toContain("No lane ran");
+    expect(textOf(page({ verdict: refusedEarly }))).toContain(
+      "No lane ran on this answer."
+    );
+  });
+
+  it("names the ask and the round right under the title, before the outcome", () => {
+    const states = askStates([
+      claimedEvent(1, "okafor"),
+      judgedEvent(2, refused.outcome),
+    ]);
+
+    const markup = mainOf(markupOf(page({ states, verdict: refused })));
+    const round = markup.indexOf("round 1 of 1");
+
+    expect(round).toBeGreaterThan(markup.indexOf("</h1>"));
+    expect(round).toBeLessThan(markup.indexOf('aria-label="Outcome"'));
+  });
+
+  it("gives no claim command for an ask that still waits on others to land", () => {
+    const blocked = { ...ask, blockedBy: [AskId.make("split-format")] };
+    const markup = mainOf(markupOf(page({ ask: blocked, verdict: undefined })));
+
+    expect(textIn(markup)).not.toContain(`${Brand.cli} claim`);
+    expect(textIn(markup)).toContain("waits for 1 ask to land first");
+    expect(markup).toContain(`href="/datekit/asks/${askId}"`);
+  });
+
   it("names a lane's log only as the command that reads it", () => {
     const passing = verdictOf(Outcome.cases.Checking.make({ stage: "checks" }));
     const text = textOf(page({ verdict: passing }));

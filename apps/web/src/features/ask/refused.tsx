@@ -8,22 +8,26 @@
  * (AGENTS.md principle 2).
  */
 import { ProjectName } from "@repo/protocol/ids";
+import { UnknownProject } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
 import { Option, Schema } from "effect";
 import type { Array } from "effect";
 
 import { EmptyState } from "../shared/empty.tsx";
-import { PageShell } from "../shared/layout.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { projectPath } from "../shared/paths.ts";
 import { RefusalView } from "../shared/refusal.tsx";
 import { Refusals } from "../shared/refusals.ts";
+import type { Crumb } from "../shared/shell/sections.ts";
+import { Workspace } from "../shared/shell/workspace.tsx";
 
 /** What a 404 says when the address could name no ask, so no refusal came back. */
 export const NAMES_ONLY =
   "Nothing is at this address: a project's and an ask's names are lowercase words joined by single dashes.";
 
 const LINK = "decoration-rule underline hover:decoration-current";
+
+const isUnknownProject = Schema.is(UnknownProject);
 
 /** Where to go from a page that names nothing: the project, then every open ask. */
 const Onward = ({ project }: { readonly project: ProjectName | undefined }) => (
@@ -50,16 +54,31 @@ export const NotFoundView = ({
   readonly project?: ProjectName | undefined;
   readonly refusals: Array.NonEmptyReadonlyArray<Refusal> | undefined;
   readonly title: string;
-}) => (
-  <PageShell title={title}>
-    {refusals === undefined ? (
-      <EmptyState title={nothing} />
-    ) : (
-      <RefusalView refusals={refusals} />
-    )}
-    <Onward project={project} />
-  </PageShell>
-);
+}) => {
+  // A project the platform says it lacks is no way onward.
+  const known = refusals?.some(isUnknownProject) === true ? undefined : project;
+
+  // The trail goes as far as what exists: the project and its asks.
+  const crumbs: readonly Crumb[] =
+    known === undefined
+      ? [{ label: "Asks", to: "/" }, { label: title }]
+      : [
+          { label: known, to: projectPath(known) },
+          { label: "Asks", to: projectPath(known) },
+          { label: title },
+        ];
+
+  return (
+    <Workspace crumbs={crumbs} title={title}>
+      {refusals === undefined ? (
+        <EmptyState title={nothing} />
+      ) : (
+        <RefusalView refusals={refusals} />
+      )}
+      <Onward project={known} />
+    </Workspace>
+  );
+};
 
 const decodeRefusals = Schema.decodeUnknownOption(Refusals);
 

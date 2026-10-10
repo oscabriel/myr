@@ -177,14 +177,23 @@ const passedLine = (lanes: readonly LaneResult[]) =>
 
 /** The lanes the platform ran on the merged tree: what failed, open and first; what passed, in one line. */
 export const Lanes = ({
+  checking = false,
   lanes,
   project,
 }: {
   readonly lanes: readonly LaneResult[];
   readonly project: Ask["project"];
+  /** The gate is still at work on the answer: its lanes may yet run. */
+  readonly checking?: boolean;
 }) => {
   if (lanes.length === 0) {
-    return <EmptyState title="No lane ran on this answer." />;
+    return (
+      <EmptyState
+        title={
+          checking ? "No lane has run yet." : "No lane ran on this answer."
+        }
+      />
+    );
   }
 
   const open = lanes.filter(({ result }) => result !== "passed");
@@ -277,12 +286,14 @@ export const InspectorOnly = ({
 const NoAnswerYet = ({
   ask,
   now,
-  progress,
+  states,
 }: {
   readonly ask: Ask;
   readonly now: DateTime.Utc;
-  readonly progress: AskProgress | undefined;
+  readonly states: ReadonlyMap<AskId, AskProgress>;
 }) => {
+  const progress = states.get(ask.id);
+
   const toAsk = (
     <AppLink
       className="decoration-rule underline hover:decoration-current"
@@ -311,6 +322,22 @@ const NoAnswerYet = ({
     );
   }
 
+  // What it waits on must land before anyone can claim it.
+  const waiting = ask.blockedBy.filter(
+    (blocker) => states.get(blocker)?.landed === undefined
+  ).length;
+
+  if (ask.state === "open" && waiting > 0) {
+    return (
+      <EmptyState
+        onward={toAsk}
+        title={`Nobody has answered this ask yet; it waits for ${waiting} ${
+          waiting === 1 ? "ask" : "asks"
+        } to land first.`}
+      />
+    );
+  }
+
   if (ask.state === "open") {
     return (
       <EmptyState
@@ -335,14 +362,14 @@ const NoAnswerYet = ({
 const Hero = ({
   ask,
   now,
-  progress,
   stamp,
+  states,
   verdict,
 }: {
   readonly ask: Ask;
   readonly now: DateTime.Utc;
-  readonly progress: AskProgress | undefined;
   readonly stamp: boolean;
+  readonly states: ReadonlyMap<AskId, AskProgress>;
   readonly verdict: Verdict | undefined;
 }) => {
   const tag = verdict?.outcome._tag ?? "none";
@@ -355,7 +382,7 @@ const Hero = ({
     setChanged(true);
   }
 
-  const claimant = progress?.claimant;
+  const claimant = states.get(ask.id)?.claimant;
 
   return (
     <section aria-label="Outcome" className="flex min-w-0 flex-col gap-3">
@@ -367,7 +394,7 @@ const Hero = ({
         key={tag}
       >
         {verdict === undefined ? (
-          <NoAnswerYet ask={ask} now={now} progress={progress} />
+          <NoAnswerYet ask={ask} now={now} states={states} />
         ) : (
           <OutcomeView
             outcome={verdict.outcome}
@@ -416,7 +443,11 @@ const Run = ({
     </Region>
 
     <Region id="answer-lanes" title="Lanes">
-      <Lanes lanes={verdict.lanes} project={verdict.project} />
+      <Lanes
+        checking={Outcome.isAnyOf(["Checking"])(verdict.outcome)}
+        lanes={verdict.lanes}
+        project={verdict.project}
+      />
     </Region>
 
     {verdict.heldBack.length === 0 ? null : (
@@ -639,15 +670,6 @@ export const AnswerView = ({
         />
       }
       factsHeading="This answer"
-      meta={
-        <AnswerMeta
-          ask={ask}
-          head={head}
-          now={now}
-          rounds={progress?.rounds ?? []}
-          verdict={verdict}
-        />
-      }
       state={
         <StatusLine
           compact
@@ -662,17 +684,30 @@ export const AnswerView = ({
         />
       }
       status={
-        <Hero
-          ask={ask}
-          now={now}
-          progress={progress}
-          stamp={
-            stamp &&
-            verdict !== undefined &&
-            Outcome.isAnyOf(["Landed"])(verdict.outcome)
-          }
-          verdict={verdict}
-        />
+        // The answer's head reads title, then which answer this is, then
+        // the outcome: a refusal drawn whole would bury a line after it.
+        <div className="flex min-w-0 flex-col gap-4">
+          <div className="text-ui text-muted-foreground">
+            <AnswerMeta
+              ask={ask}
+              head={head}
+              now={now}
+              rounds={progress?.rounds ?? []}
+              verdict={verdict}
+            />
+          </div>
+          <Hero
+            ask={ask}
+            now={now}
+            stamp={
+              stamp &&
+              verdict !== undefined &&
+              Outcome.isAnyOf(["Landed"])(verdict.outcome)
+            }
+            states={states}
+            verdict={verdict}
+          />
+        </div>
       }
       title={ask.brief.want}
     >

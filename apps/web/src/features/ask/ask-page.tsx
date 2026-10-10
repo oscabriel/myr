@@ -321,6 +321,55 @@ const WaitsOn = ({
   </p>
 );
 
+/**
+ * What a family's parent waits on, in the fan's terms: how many of its
+ * children have yet to land, then the delete step; never a list of ids
+ * (the fan draws each child).
+ */
+const FamilyWaits = ({
+  finale,
+  parent,
+  project,
+  states,
+}: {
+  readonly finale: AskId;
+  readonly parent: Ask;
+  readonly project: ProjectName;
+  readonly states: ReadonlyMap<AskId, AskProgress>;
+}) => {
+  const children = parent.blockedBy.filter((child) => child !== finale);
+
+  const left = children.filter(
+    (child) => states.get(child)?.landed === undefined
+  ).length;
+
+  const deleteStep = (
+    <AppLink className={LINK} to={askPath(project, finale)}>
+      the delete step
+    </AppLink>
+  );
+
+  return (
+    <p className="text-ui mt-2 flex items-start gap-2" data-state="waiting">
+      <Hourglass
+        aria-hidden="true"
+        className="text-waiting mt-0.5 size-4 shrink-0"
+        strokeWidth={1.75}
+      />
+      <span className="min-w-0">
+        Waits for{" "}
+        {left === 0 ? null : (
+          <>
+            {left} of {children.length}{" "}
+            {children.length === 1 ? "child" : "children"} and{" "}
+          </>
+        )}
+        {deleteStep} to land first; a claim waits until they do.
+      </span>
+    </p>
+  );
+};
+
 export interface AskViewProps {
   readonly ask: Ask;
   /** The brief as the platform renders it for an agent, in Markdown. */
@@ -593,7 +642,17 @@ export const AskView = ({
       status={
         <>
           <StatusLine subject={subject} />
-          {waitsOn ? <WaitsOn asks={remaining} project={ask.project} /> : null}
+          {waitsOn && family === ask && finale !== undefined ? (
+            <FamilyWaits
+              finale={finale}
+              parent={ask}
+              project={ask.project}
+              states={states}
+            />
+          ) : null}
+          {waitsOn && family !== ask ? (
+            <WaitsOn asks={remaining} project={ask.project} />
+          ) : null}
           {family === undefined ? null : (
             // Below the shell's width the family sits under the head, as a fan.
             <div className="shell:hidden mt-4">
