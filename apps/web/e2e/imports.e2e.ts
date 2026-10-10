@@ -9,7 +9,10 @@
  * awesome's relative links, changesets' deep tree and scoped tags, stb's
  * 730 KB header and a PNG, fuzzel's submodule, click's second log page and
  * anyhow's annotated tags. The first view of `tree`, `why` and
- * `commits?path=` on changesets and click is timed and printed.
+ * `commits?path=` on changesets and click is timed and printed. The thirty
+ * well-known imports after them each show their home with its README, the
+ * root folder, a file at line 5, the log, and why that file's lines are
+ * there.
  *
  * It runs only against `WEB_URL` (a dev stage's web origin) and is skipped
  * without it. `WEB_IMPORTS` narrows it to some projects (a comma list),
@@ -108,6 +111,47 @@ const imports: readonly Imported[] = [
   },
 ];
 
+/** One of the well-known imports: a file at its root of at least five lines, and its README's name. */
+interface Known {
+  readonly project: string;
+  readonly file: string;
+  readonly readme: string;
+}
+
+/** The thirty well-known imports, in the order the script imports them. */
+const known: readonly Known[] = [
+  { file: "package.json", project: "hono", readme: "README.md" },
+  { file: "package.json", project: "express", readme: "Readme.md" },
+  { file: "package.json", project: "fastify", readme: "README.md" },
+  { file: "package.json", project: "zustand", readme: "README.md" },
+  { file: "package.json", project: "immer", readme: "readme.md" },
+  { file: "package.json", project: "nanoid", readme: "README.md" },
+  { file: "package.json", project: "commander", readme: "Readme.md" },
+  { file: "package.json", project: "execa", readme: "readme.md" },
+  { file: "package.json", project: "chalk", readme: "readme.md" },
+  { file: "package.json", project: "mitt", readme: "README.md" },
+  { file: "package.json", project: "clsx", readme: "readme.md" },
+  { file: "Cargo.toml", project: "ripgrep", readme: "README.md" },
+  { file: "Cargo.toml", project: "serde", readme: "README.md" },
+  { file: "Cargo.toml", project: "axum", readme: "README.md" },
+  { file: "Cargo.toml", project: "fd", readme: "README.md" },
+  { file: "Cargo.toml", project: "hyperfine", readme: "README.md" },
+  { file: "go.mod", project: "bubbletea", readme: "README.md" },
+  { file: "go.mod", project: "fzf", readme: "README.md" },
+  { file: "go.mod", project: "cobra", readme: "README.md" },
+  { file: "go.mod", project: "gin", readme: "README.md" },
+  { file: "pyproject.toml", project: "requests", readme: "README.md" },
+  { file: "pyproject.toml", project: "flask", readme: "README.md" },
+  { file: "pyproject.toml", project: "httpx", readme: "README.md" },
+  { file: "pyproject.toml", project: "typer", readme: "README.md" },
+  { file: "pyproject.toml", project: "jinja", readme: "README.md" },
+  { file: "lua.c", project: "lua", readme: "README.md" },
+  { file: "Makefile.am", project: "jq", readme: "README.md" },
+  { file: "Makefile", project: "kilo", readme: "README.md" },
+  { file: "Gemfile", project: "sinatra", readme: "README.md" },
+  { file: "package.json", project: "nvm", readme: "README.md" },
+];
+
 /** What the check reads of its env: where the web lives, and which imports to visit. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
@@ -121,15 +165,20 @@ const settings = Effect.runSync(
   })
 );
 
-/** The imports this run visits: `WEB_IMPORTS`' names, or all eight. */
-const visited = Option.match(settings.only, {
-  onNone: () => imports,
-  onSome: (names) => {
-    const named = new Set(names.split(",").map((name) => name.trim()));
+/** Those of `all` this run visits: `WEB_IMPORTS`' names, or all of them. */
+const visitedOf = <A extends { readonly project: string }>(
+  all: readonly A[]
+): readonly A[] =>
+  Option.match(settings.only, {
+    onNone: () => all,
+    onSome: (names) => {
+      const named = new Set(names.split(",").map((name) => name.trim()));
 
-    return imports.filter(({ project }) => named.has(project));
-  },
-});
+      return all.filter(({ project }) => named.has(project));
+    },
+  });
+
+const visited = visitedOf(imports);
 
 /** Where screenshots go: `e2e/out/imports/<project>/<shot>.png`. */
 const out = decodeURIComponent(
@@ -407,6 +456,57 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
   }
 };
 
+/** The pages each well-known import shows. */
+const knownPages = ({ file, project, readme }: Known) => {
+  test(`${project}'s home renders its ${readme}`, ({ page: browser }) =>
+    Effect.runPromise(
+      visit(browser, project, `/${project}`, "home", {
+        selectors: ["[data-clone]", "[data-readme]"],
+        texts: [readme],
+      })
+    ));
+
+  test(`${project}'s root lists ${file}`, ({ page: browser }) =>
+    Effect.runPromise(
+      visit(browser, project, `/${project}/tree/main`, "tree", {
+        selectors: [`[data-entry="${file}"]`],
+      })
+    ));
+
+  test(`${project}'s ${file} opens at line 5`, ({ page: browser }) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        yield* visit(
+          browser,
+          project,
+          `/${project}/blob/main/${file}#L5`,
+          "blob",
+          {
+            selectors: ['[data-toolbar="file"]'],
+          }
+        );
+
+        expect(new URL(browser.url()).hash).toBe("#L5");
+      })
+    ));
+
+  test(`${project}'s log groups its commits by day`, ({ page: browser }) =>
+    Effect.runPromise(
+      visit(browser, project, `/${project}/commits/main`, "commits", {
+        selectors: [`a[href^="/${project}/commit/"]`, "[data-day]"],
+      })
+    ));
+
+  test(`${project}'s ${file} says why each line is there`, ({
+    page: browser,
+  }) =>
+    Effect.runPromise(
+      visit(browser, project, `/${project}/why/main/${file}`, "why", {
+        selectors: ["[data-range]"],
+      })
+    ));
+};
+
 /** What each repo was picked to exercise. */
 const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
   [
@@ -604,6 +704,12 @@ test.describe("the imported repos", () => {
           page: browser,
         }) => Effect.runPromise(specific(browser)));
       }
+    });
+  }
+
+  for (const imported of visitedOf(known)) {
+    test.describe(imported.project, () => {
+      knownPages(imported);
     });
   }
 });

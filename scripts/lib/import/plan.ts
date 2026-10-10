@@ -1,17 +1,22 @@
 /**
- * What `scripts/import-examples.ts` imports, and the commands its `--tags`
- * backfill runs: pure, so a test reads both without a network.
+ * What `scripts/import-examples.ts` imports, the pages it reads to warm
+ * each import, and the commands its `--tags` backfill runs: pure, so a test
+ * reads them without a network.
  *
- * Eight repos, each picked for a shape the code browser must render: a Rust crate with
- * a `master` default and 105 annotated tags first, then a TypeScript
- * library, a Go CLI, a Python package with a long merge history, a
- * Markdown list, a deep monorepo with 740 scoped tags, large single-file C
- * headers, and a repo off GitHub with a submodule.
+ * Thirty-eight repos. The first eight were each picked for a shape the
+ * code browser must render: a Rust crate with a `master` default and 105
+ * annotated tags first, then a TypeScript library, a Go CLI, a Python
+ * package with a long merge history, a Markdown list, a deep monorepo with
+ * 740 scoped tags, large single-file C headers, and a repo off GitHub with
+ * a submodule. The thirty after them are well-known projects in
+ * TypeScript, JavaScript, Rust, Go, Python, C, Ruby and shell, so a reader
+ * finds code they know; each is a copy, read-only here, under its own
+ * licence.
  */
 import { ProjectName } from "@repo/protocol/ids";
 import { Option, Redacted } from "effect";
 
-/** One repo to import: the project it becomes, where it is, its branch, and what it exercises. */
+/** One repo to import: the project it becomes, where it is, its branch, what it is, and its licence. */
 export interface ImportExample {
   readonly project: ProjectName;
   readonly url: string;
@@ -19,14 +24,23 @@ export interface ImportExample {
   readonly branch: string;
   /** What kind of repo it is, said for a person. */
   readonly kind: string;
+  /** Its licence, as an SPDX expression. */
+  readonly licence: string;
 }
 
 const example = (
   project: string,
   url: string,
   branch: string,
-  kind: string
-): ImportExample => ({ branch, kind, project: ProjectName.make(project), url });
+  kind: string,
+  licence: string
+): ImportExample => ({
+  branch,
+  kind,
+  licence,
+  project: ProjectName.make(project),
+  url,
+});
 
 /** The repos, in the order they import: anyhow first, the probe for `master` and tags. */
 export const examples: readonly ImportExample[] = [
@@ -34,44 +48,269 @@ export const examples: readonly ImportExample[] = [
     "anyhow",
     "https://github.com/dtolnay/anyhow",
     "master",
-    "Rust crate"
+    "Rust crate",
+    "MIT OR Apache-2.0"
   ),
   example(
     "ky",
     "https://github.com/sindresorhus/ky",
     "main",
-    "TypeScript library"
+    "TypeScript library",
+    "MIT"
   ),
-  example("gum", "https://github.com/charmbracelet/gum", "main", "Go CLI"),
+  example(
+    "gum",
+    "https://github.com/charmbracelet/gum",
+    "main",
+    "Go CLI",
+    "MIT"
+  ),
   example(
     "click",
     "https://github.com/pallets/click",
     "main",
-    "Python package"
+    "Python package",
+    "BSD-3-Clause"
   ),
   example(
     "awesome",
     "https://github.com/sindresorhus/awesome",
     "main",
-    "Markdown list"
+    "Markdown list",
+    "CC0-1.0"
   ),
   example(
     "changesets",
     "https://github.com/changesets/changesets",
     "main",
-    "TypeScript monorepo"
+    "TypeScript monorepo",
+    "MIT"
   ),
   example(
     "stb",
     "https://github.com/nothings/stb",
     "master",
-    "C single-file headers"
+    "C single-file headers",
+    "MIT OR Unlicense"
   ),
   example(
     "fuzzel",
     "https://codeberg.org/dnkl/fuzzel",
     "master",
-    "C on Codeberg"
+    "C on Codeberg",
+    "MIT"
+  ),
+  // Well known, so a reader meets code they have read before: permissive
+  // licences, each under 14 MB on GitHub, as the eight above import well.
+  example(
+    "hono",
+    "https://github.com/honojs/hono",
+    "main",
+    "TypeScript web framework",
+    "MIT"
+  ),
+  example(
+    "express",
+    "https://github.com/expressjs/express",
+    "master",
+    "JavaScript web framework",
+    "MIT"
+  ),
+  example(
+    "fastify",
+    "https://github.com/fastify/fastify",
+    "main",
+    "JavaScript web framework",
+    "MIT"
+  ),
+  example(
+    "zustand",
+    "https://github.com/pmndrs/zustand",
+    "main",
+    "TypeScript state library",
+    "MIT"
+  ),
+  example(
+    "immer",
+    "https://github.com/immerjs/immer",
+    "main",
+    "JavaScript immutable state",
+    "MIT"
+  ),
+  example(
+    "nanoid",
+    "https://github.com/ai/nanoid",
+    "main",
+    "JavaScript ID generator",
+    "MIT"
+  ),
+  example(
+    "commander",
+    "https://github.com/tj/commander.js",
+    "master",
+    "JavaScript CLI parser",
+    "MIT"
+  ),
+  example(
+    "execa",
+    "https://github.com/sindresorhus/execa",
+    "main",
+    "JavaScript process runner",
+    "MIT"
+  ),
+  example(
+    "chalk",
+    "https://github.com/chalk/chalk",
+    "main",
+    "JavaScript terminal colours",
+    "MIT"
+  ),
+  example(
+    "mitt",
+    "https://github.com/developit/mitt",
+    "main",
+    "TypeScript event emitter",
+    "MIT"
+  ),
+  example(
+    "clsx",
+    "https://github.com/lukeed/clsx",
+    "master",
+    "JavaScript class names",
+    "MIT"
+  ),
+  example(
+    "ripgrep",
+    "https://github.com/BurntSushi/ripgrep",
+    "master",
+    "Rust CLI",
+    "Unlicense OR MIT"
+  ),
+  example(
+    "serde",
+    "https://github.com/serde-rs/serde",
+    "master",
+    "Rust serialization",
+    "MIT OR Apache-2.0"
+  ),
+  example(
+    "axum",
+    "https://github.com/tokio-rs/axum",
+    "main",
+    "Rust web framework",
+    "MIT"
+  ),
+  example(
+    "fd",
+    "https://github.com/sharkdp/fd",
+    "master",
+    "Rust CLI",
+    "MIT OR Apache-2.0"
+  ),
+  example(
+    "hyperfine",
+    "https://github.com/sharkdp/hyperfine",
+    "master",
+    "Rust benchmarking CLI",
+    "MIT OR Apache-2.0"
+  ),
+  example(
+    "bubbletea",
+    "https://github.com/charmbracelet/bubbletea",
+    "main",
+    "Go TUI framework",
+    "MIT"
+  ),
+  example(
+    "fzf",
+    "https://github.com/junegunn/fzf",
+    "master",
+    "Go fuzzy finder",
+    "MIT"
+  ),
+  example(
+    "cobra",
+    "https://github.com/spf13/cobra",
+    "main",
+    "Go CLI library",
+    "Apache-2.0"
+  ),
+  example(
+    "gin",
+    "https://github.com/gin-gonic/gin",
+    "master",
+    "Go web framework",
+    "MIT"
+  ),
+  example(
+    "requests",
+    "https://github.com/psf/requests",
+    "main",
+    "Python HTTP library",
+    "Apache-2.0"
+  ),
+  example(
+    "flask",
+    "https://github.com/pallets/flask",
+    "main",
+    "Python web framework",
+    "BSD-3-Clause"
+  ),
+  example(
+    "httpx",
+    "https://github.com/encode/httpx",
+    "master",
+    "Python HTTP client",
+    "BSD-3-Clause"
+  ),
+  example(
+    "typer",
+    "https://github.com/fastapi/typer",
+    "master",
+    "Python CLI library",
+    "MIT"
+  ),
+  example(
+    "jinja",
+    "https://github.com/pallets/jinja",
+    "main",
+    "Python templates",
+    "BSD-3-Clause"
+  ),
+  example(
+    "lua",
+    "https://github.com/lua/lua",
+    "master",
+    "C language interpreter",
+    "MIT"
+  ),
+  example(
+    "jq",
+    "https://github.com/jqlang/jq",
+    "master",
+    "C JSON processor",
+    "MIT"
+  ),
+  example(
+    "kilo",
+    "https://github.com/antirez/kilo",
+    "master",
+    "C text editor",
+    "BSD-2-Clause"
+  ),
+  example(
+    "sinatra",
+    "https://github.com/sinatra/sinatra",
+    "main",
+    "Ruby web framework",
+    "MIT"
+  ),
+  example(
+    "nvm",
+    "https://github.com/nvm-sh/nvm",
+    "master",
+    "Shell version manager",
+    "MIT"
   ),
 ];
 
@@ -92,6 +331,28 @@ export const planImports = (
         onSome: (named) => named === project,
       }) && !listed.has(project)
   );
+
+/**
+ * The pages read once after an import, so its first reader does not pay
+ * for a cold read: its home, its root folder, its landings, and, when it
+ * has a README, the README and why each of its lines is there. Why and a
+ * file's history are kept by commit once read (ADR 0020).
+ */
+export const warmPaths = (
+  project: ProjectName,
+  readme: Option.Option<string>
+): readonly string[] => [
+  `/${project}`,
+  `/${project}/tree/main`,
+  `/${project}/commits/main`,
+  ...Option.match(readme, {
+    onNone: () => [],
+    onSome: (path) => [
+      `/${project}/blob/main/${path}`,
+      `/${project}/why/main/${path}`,
+    ],
+  }),
+];
 
 /** A git remote and the token that writes to it, kept apart so the URL can be shown. */
 export interface RedactedUrl {

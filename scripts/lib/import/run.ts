@@ -1,12 +1,14 @@
 /**
  * The import run: reads the flags, asks the platform what it lists, imports
  * the rest of the examples one at a time, prints each one's heads and tags,
- * records each new import on a stage in the ledger as kept, and with
- * `--tags` backfills the tags of an import that came without them.
+ * records each new import on a stage in the ledger as kept, warms each new
+ * import by reading its pages once through the web, with `--tags`
+ * backfills the tags of an import that came without them, and with
+ * `--warm` warms the examples the platform listed already.
  *
- * The platform and the backfill are services (`ImportTarget`,
- * `TagBackfill`), so a test runs the whole run over fakes; `live.ts` holds
- * the real ones.
+ * The platform, the backfill and the web are services (`ImportTarget`,
+ * `TagBackfill`, `Warmer`), so a test runs the whole run over fakes;
+ * `live.ts` holds the real ones.
  */
 import { ProjectName } from "@repo/protocol/ids";
 import { ProjectExists } from "@repo/protocol/refusal";
@@ -64,6 +66,10 @@ export interface ImportOptions {
   readonly dryRun: boolean;
   /** Backfill the tags of an import that has none. */
   readonly tags: boolean;
+  /** Warm the examples the platform lists already, as well as each new import. */
+  readonly warm: boolean;
+  /** The web's origin to warm through, when the stage's own can't be known. */
+  readonly web: Option.Option<string>;
 }
 
 /** The platform the imports go to, as the operator. */
@@ -104,6 +110,26 @@ export class TagBackfill extends Context.Service<
   }
 >()("scripts/TagBackfill") {}
 
+/** One page read to warm an import: where, whether it answered, and what it said. */
+export interface WarmRead {
+  readonly path: string;
+  readonly ok: boolean;
+  /** Its status and time, or why it failed; said for a person. */
+  readonly said: string;
+}
+
+/**
+ * Reads an import's pages once through the web, anonymously, so its first
+ * reader finds why and its history kept. A read that fails is reported in
+ * what it gives back, never as a failure: warming is a courtesy.
+ */
+export class Warmer extends Context.Service<
+  Warmer,
+  {
+    readonly warm: (project: ProjectName) => Effect.Effect<readonly WarmRead[]>;
+  }
+>()("scripts/Warmer") {}
+
 const isProjectExists = Schema.is(ProjectExists);
 
 /**
@@ -141,7 +167,7 @@ export const initUntilAnswered = <A extends { readonly landed?: string }, E>(
   });
 
 const USAGE =
-  "bun scripts/import-examples.ts --world node | --stage <dev-…> [--url <origin>] [--only <project>] [--tags] [--dry-run]";
+  "bun scripts/import-examples.ts --world node | --stage <dev-…> [--url <origin>] [--web <origin>] [--only <project>] [--tags] [--warm] [--dry-run]";
 
 /** The flags the command takes; any other is a typo, refused. */
 const FLAGS = new Set([
@@ -150,6 +176,8 @@ const FLAGS = new Set([
   "--stage",
   "--tags",
   "--url",
+  "--warm",
+  "--web",
   "--world",
 ]);
 
@@ -230,7 +258,16 @@ export const optionsOf = (
         ),
     });
 
-    return { dryRun: argv.includes("--dry-run"), only, tags, where };
+    return {
+      dryRun: argv.includes("--dry-run"),
+      only,
+      tags,
+      warm: argv.includes("--warm"),
+      web: Option.map(flagValue(argv, "--web"), (web) =>
+        web.replace(/\/+$/u, "")
+      ),
+      where,
+    };
   });
 
 /** The ledger's line for an import's repo, in the stage's public namespace. */
@@ -303,7 +340,23 @@ const backfillOne = (
     );
   });
 
-/** The run itself, over a target and a backfill. */
+/** One project warmed, and a line saying how it went. */
+const warmOne = (project: ProjectName) =>
+  Effect.gen(function* () {
+    const reads = yield* Warmer.use((warmer) => warmer.warm(project));
+    const failures = reads.filter(({ ok }) => !ok);
+
+    yield* Console.log(
+      Array.isReadonlyArrayNonEmpty(reads)
+        ? [
+            `  warmed ${project}: ${reads.length - failures.length} of ${reads.length} pages read`,
+            ...failures.map(({ path, said }) => `${path}: ${said}`),
+          ].join("; ")
+        : `  warm ${project}: no web to read through`
+    );
+  });
+
+/** The run itself, over a target, a backfill and a web. */
 const run = (options: ImportOptions) =>
   Effect.gen(function* () {
     const target = yield* ImportTarget;
@@ -359,6 +412,8 @@ const run = (options: ImportOptions) =>
           if (options.tags) {
             yield* backfillOne(example, tags, stage);
           }
+
+          yield* warmOne(example.project);
         }),
       { discard: true }
     );
@@ -392,6 +447,12 @@ const run = (options: ImportOptions) =>
       );
     }
 
+    if (options.warm) {
+      yield* Effect.forEach(skipped, ({ project }) => warmOne(project), {
+        discard: true,
+      });
+    }
+
     yield* Console.log(
       Option.isSome(stage)
         ? `imported ${plan.length} of ${plan.length}, each recorded in ${ledgerPath} as a kept import`
@@ -401,14 +462,14 @@ const run = (options: ImportOptions) =>
 
 /**
  * `bun scripts/import-examples.ts …`: reads the flags (refusing `demo`
- * before anything is built or called), then runs over the target and
- * backfill `layersOf` gives for them.
+ * before anything is built or called), then runs over the target, backfill
+ * and web `layersOf` gives for them.
  */
 export const importExamples = <E, R>(
   argv: readonly string[],
   layersOf: (
     options: ImportOptions
-  ) => Layer.Layer<ImportTarget | TagBackfill, E, R>
+  ) => Layer.Layer<ImportTarget | TagBackfill | Warmer, E, R>
 ): Effect.Effect<void, ImportExamplesFailed | E, R | FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const options = yield* optionsOf(argv);

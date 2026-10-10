@@ -22,6 +22,7 @@ import {
   Exit,
   Ref,
   Result,
+  Schema,
 } from "effect";
 import { TestClock } from "effect/testing";
 
@@ -31,6 +32,7 @@ import {
   planImports,
   shownCommand,
   tagBackfillCommands,
+  warmPaths,
 } from "../../../scripts/lib/import/plan.ts";
 import type { ImportExample } from "../../../scripts/lib/import/plan.ts";
 import {
@@ -39,6 +41,7 @@ import {
   ImportTarget,
   initUntilAnswered,
   TagBackfill,
+  Warmer,
 } from "../../../scripts/lib/import/run.ts";
 import { ProjectName } from "../../protocol/src/ids.ts";
 
@@ -48,19 +51,88 @@ const names = (planned: readonly ImportExample[]) =>
   planned.map(({ project: name }) => name);
 
 describe("the import plan", () => {
-  it("holds the eight repos of the preview, anyhow first, each master repo on its branch", () => {
+  it("holds the eight repos of the preview first, then thirty well-known ones, each on its branch with its licence", () => {
     expect(
-      examples.map(({ branch, project: name, url }) => [name, branch, url])
+      examples.map(({ branch, licence, project: name, url }) => [
+        name,
+        branch,
+        url,
+        licence,
+      ])
     ).toStrictEqual([
-      ["anyhow", "master", "https://github.com/dtolnay/anyhow"],
-      ["ky", "main", "https://github.com/sindresorhus/ky"],
-      ["gum", "main", "https://github.com/charmbracelet/gum"],
-      ["click", "main", "https://github.com/pallets/click"],
-      ["awesome", "main", "https://github.com/sindresorhus/awesome"],
-      ["changesets", "main", "https://github.com/changesets/changesets"],
-      ["stb", "master", "https://github.com/nothings/stb"],
-      ["fuzzel", "master", "https://codeberg.org/dnkl/fuzzel"],
+      [
+        "anyhow",
+        "master",
+        "https://github.com/dtolnay/anyhow",
+        "MIT OR Apache-2.0",
+      ],
+      ["ky", "main", "https://github.com/sindresorhus/ky", "MIT"],
+      ["gum", "main", "https://github.com/charmbracelet/gum", "MIT"],
+      ["click", "main", "https://github.com/pallets/click", "BSD-3-Clause"],
+      ["awesome", "main", "https://github.com/sindresorhus/awesome", "CC0-1.0"],
+      ["changesets", "main", "https://github.com/changesets/changesets", "MIT"],
+      ["stb", "master", "https://github.com/nothings/stb", "MIT OR Unlicense"],
+      ["fuzzel", "master", "https://codeberg.org/dnkl/fuzzel", "MIT"],
+      ["hono", "main", "https://github.com/honojs/hono", "MIT"],
+      ["express", "master", "https://github.com/expressjs/express", "MIT"],
+      ["fastify", "main", "https://github.com/fastify/fastify", "MIT"],
+      ["zustand", "main", "https://github.com/pmndrs/zustand", "MIT"],
+      ["immer", "main", "https://github.com/immerjs/immer", "MIT"],
+      ["nanoid", "main", "https://github.com/ai/nanoid", "MIT"],
+      ["commander", "master", "https://github.com/tj/commander.js", "MIT"],
+      ["execa", "main", "https://github.com/sindresorhus/execa", "MIT"],
+      ["chalk", "main", "https://github.com/chalk/chalk", "MIT"],
+      ["mitt", "main", "https://github.com/developit/mitt", "MIT"],
+      ["clsx", "master", "https://github.com/lukeed/clsx", "MIT"],
+      [
+        "ripgrep",
+        "master",
+        "https://github.com/BurntSushi/ripgrep",
+        "Unlicense OR MIT",
+      ],
+      [
+        "serde",
+        "master",
+        "https://github.com/serde-rs/serde",
+        "MIT OR Apache-2.0",
+      ],
+      ["axum", "main", "https://github.com/tokio-rs/axum", "MIT"],
+      ["fd", "master", "https://github.com/sharkdp/fd", "MIT OR Apache-2.0"],
+      [
+        "hyperfine",
+        "master",
+        "https://github.com/sharkdp/hyperfine",
+        "MIT OR Apache-2.0",
+      ],
+      [
+        "bubbletea",
+        "main",
+        "https://github.com/charmbracelet/bubbletea",
+        "MIT",
+      ],
+      ["fzf", "master", "https://github.com/junegunn/fzf", "MIT"],
+      ["cobra", "main", "https://github.com/spf13/cobra", "Apache-2.0"],
+      ["gin", "master", "https://github.com/gin-gonic/gin", "MIT"],
+      ["requests", "main", "https://github.com/psf/requests", "Apache-2.0"],
+      ["flask", "main", "https://github.com/pallets/flask", "BSD-3-Clause"],
+      ["httpx", "master", "https://github.com/encode/httpx", "BSD-3-Clause"],
+      ["typer", "master", "https://github.com/fastapi/typer", "MIT"],
+      ["jinja", "main", "https://github.com/pallets/jinja", "BSD-3-Clause"],
+      ["lua", "master", "https://github.com/lua/lua", "MIT"],
+      ["jq", "master", "https://github.com/jqlang/jq", "MIT"],
+      ["kilo", "master", "https://github.com/antirez/kilo", "BSD-2-Clause"],
+      ["sinatra", "main", "https://github.com/sinatra/sinatra", "MIT"],
+      ["nvm", "master", "https://github.com/nvm-sh/nvm", "MIT"],
     ]);
+  });
+
+  it("names each project once, as a name the platform takes", () => {
+    const all = names(examples);
+
+    expect(new Set(all).size).toBe(all.length);
+    expect(all.filter((name) => !Schema.is(ProjectName)(name))).toStrictEqual(
+      []
+    );
   });
 
   it("skips a project the platform lists already, and keeps only the one --only names", () => {
@@ -83,10 +155,30 @@ describe("the import plan", () => {
         planImports(examples, new Set(), Option.some(project("gum")))
       ),
     }).toStrictEqual({
-      all: ["anyhow", "gum", "click", "awesome", "changesets", "fuzzel"],
+      all: names(examples).filter((name) => name !== "ky" && name !== "stb"),
       listed: [],
       only: ["gum"],
     });
+  });
+});
+
+describe("the warm plan", () => {
+  it("reads a project's home, its tree, its landings, and its README and why the README is there", () => {
+    expect(warmPaths(project("ky"), Option.some("readme.md"))).toStrictEqual([
+      "/ky",
+      "/ky/tree/main",
+      "/ky/commits/main",
+      "/ky/blob/main/readme.md",
+      "/ky/why/main/readme.md",
+    ]);
+  });
+
+  it("reads no README when the project has none", () => {
+    expect(warmPaths(project("awesome"), Option.none())).toStrictEqual([
+      "/awesome",
+      "/awesome/tree/main",
+      "/awesome/commits/main",
+    ]);
   });
 });
 
@@ -182,11 +274,26 @@ const fakePlatform = (listed: readonly string[]) =>
         note(`tags ${example.project}`).pipe(Effect.as(105)),
     });
 
+    // Every read answers but fuzzel's why, which the web never answered.
+    const warmer = Warmer.of({
+      warm: (name) =>
+        note(`warm ${name}`).pipe(
+          Effect.as(
+            warmPaths(name, Option.some("README.md")).map((path) =>
+              name === "fuzzel" && path.includes("/why/")
+                ? { ok: false, path, said: "no answer" }
+                : { ok: true, path, said: "200" }
+            )
+          )
+        ),
+    });
+
     return {
       calls: Ref.get(calls),
       layer: Layer.mergeAll(
         Layer.succeed(ImportTarget, target),
-        Layer.succeed(TagBackfill, backfill)
+        Layer.succeed(TagBackfill, backfill),
+        Layer.succeed(Warmer, warmer)
       ),
     };
   });
@@ -194,7 +301,7 @@ const fakePlatform = (listed: readonly string[]) =>
 /** `importExamples(argv)` over `layer`, with the ledger in a temp folder: how it ended, and what it printed. */
 const ran = (
   argv: readonly string[],
-  layer: Layer.Layer<ImportTarget | TagBackfill>
+  layer: Layer.Layer<ImportTarget | TagBackfill | Warmer>
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -243,7 +350,8 @@ describe("bun scripts/import-examples.ts", () => {
 
           return Layer.mergeAll(
             Layer.effect(ImportTarget, Effect.die("a target was built")),
-            Layer.effect(TagBackfill, Effect.die("a backfill was built"))
+            Layer.effect(TagBackfill, Effect.die("a backfill was built")),
+            Layer.effect(Warmer, Effect.die("a warmer was built"))
           );
         }).pipe(Effect.result);
 
@@ -260,10 +368,15 @@ describe("bun scripts/import-examples.ts", () => {
   );
 
   it.live(
-    "imports each project the platform doesn't list, one at a time, with its counts, and records each in the ledger as a kept import",
+    "imports each project the platform doesn't list, one at a time, with its counts, warms it, and records each in the ledger as a kept import",
     () =>
       Effect.gen(function* () {
-        const platform = yield* fakePlatform(["ky", "stb", "click", "gum"]);
+        const fresh = ["anyhow", "awesome", "changesets", "fuzzel"];
+
+        const platform = yield* fakePlatform(
+          names(examples).filter((name) => !fresh.includes(name))
+        );
+
         const { ledger, printed, result } = yield* ran(onDev(), platform.layer);
 
         expect({
@@ -275,51 +388,74 @@ describe("bun scripts/import-examples.ts", () => {
             namespace,
             stage,
           })),
-          printed,
+          printed: printed.filter((line) => !line.startsWith("  skip ")),
           result: Result.isSuccess(result),
+          skipped: printed.filter((line) => line.startsWith("  skip ")).length,
         }).toStrictEqual({
           calls: [
             "listProjects",
-            "init anyhow master",
-            "ls-remote anyhow",
-            "init awesome main",
-            "ls-remote awesome",
-            "init changesets main",
-            "ls-remote changesets",
-            "init fuzzel master",
-            "ls-remote fuzzel",
+            ...fresh.flatMap((name) => [
+              `init ${name} ${name === "anyhow" || name === "fuzzel" ? "master" : "main"}`,
+              `ls-remote ${name}`,
+              `warm ${name}`,
+            ]),
           ],
-          ledger: ["anyhow", "awesome", "changesets", "fuzzel"].flatMap(
-            (name) => [
-              {
-                by: "import",
-                kind: "project",
-                name,
-                namespace: undefined,
-                stage: "dev-oscabriel",
-              },
-              {
-                by: "import",
-                kind: "repo",
-                name,
-                namespace: "projects-dev-oscabriel",
-                stage: "dev-oscabriel",
-              },
-            ]
-          ),
+          ledger: fresh.flatMap((name) => [
+            {
+              by: "import",
+              kind: "project",
+              name,
+              namespace: undefined,
+              stage: "dev-oscabriel",
+            },
+            {
+              by: "import",
+              kind: "repo",
+              name,
+              namespace: "projects-dev-oscabriel",
+              stage: "dev-oscabriel",
+            },
+          ]),
           printed: [
-            "import-examples on dev-oscabriel (https://platform.test): 4 to import, 4 listed already",
-            "  skip ky: listed already",
-            "  skip gum: listed already",
-            "  skip click: listed already",
-            "  skip stb: listed already",
+            "import-examples on dev-oscabriel (https://platform.test): 4 to import, 34 listed already",
             "imported anyhow (Rust crate, master): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  warmed anyhow: 5 of 5 pages read",
             "imported awesome (Markdown list, main): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  warmed awesome: 5 of 5 pages read",
             "imported changesets (TypeScript monorepo, main): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  warmed changesets: 5 of 5 pages read",
             "imported fuzzel (C on Codeberg, master): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  warmed fuzzel: 4 of 5 pages read; /fuzzel/why/main/README.md: no answer",
             "imported 4 of 4, each recorded in infra/created.jsonl as a kept import",
           ],
           result: true,
+          skipped: 34,
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "--warm warms every example the platform lists already, and imports nothing it lists",
+    () =>
+      Effect.gen(function* () {
+        const platform = yield* fakePlatform(["ky", "gum"]);
+
+        const { printed } = yield* ran(
+          onDev("--only", "ky", "--warm"),
+          platform.layer
+        );
+
+        expect({
+          calls: yield* platform.calls,
+          printed,
+        }).toStrictEqual({
+          calls: ["listProjects", "warm ky"],
+          printed: [
+            "import-examples on dev-oscabriel (https://platform.test): 0 to import, 1 listed already",
+            "  skip ky: listed already",
+            "  warmed ky: 5 of 5 pages read",
+            "imported 0 of 0, each recorded in infra/created.jsonl as a kept import",
+          ],
         });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
@@ -366,6 +502,7 @@ describe("bun scripts/import-examples.ts", () => {
             "init anyhow master",
             "ls-remote anyhow",
             "tags anyhow",
+            "warm anyhow",
           ],
           ledger: [
             ["project", "anyhow", undefined],
