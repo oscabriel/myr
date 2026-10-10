@@ -247,6 +247,68 @@ describe(watchAtom, () => {
       })
   );
 
+  // The rail lists every project with its open asks and last landing
+  // (`projectsAtom`, read under `keys.front()`): an event that changes
+  // them reads the list again, as one that leaves them alone does not.
+  it.effect(
+    "invalidates the project list on AskOpened, AskClosed and Landed, and not on Claimed",
+    () =>
+      Effect.gen(function* () {
+        const reactivity = yield* Reactivity.make;
+        const fired: string[] = [];
+
+        reactivity.registerUnsafe([keys.front()[0] ?? ""], () => {
+          fired.push("front");
+        });
+
+        const events = yield* Queue.unbounded<ProjectEvent>();
+
+        yield* tab(() => Stream.fromQueue(events), reactivity);
+
+        const each = [
+          ProjectEvent.cases.AskOpened.make({
+            ask: {
+              ask: parseIso,
+              blockedBy: [],
+              claimed: false,
+              kind: KindName.make("fix"),
+              territory: "src/parse.ts",
+              want: "parse reads the year",
+            },
+            at,
+            seq: 1,
+          }),
+          ProjectEvent.cases.Claimed.make({
+            ask: parseIso,
+            at,
+            claimant: Handle.make("alice"),
+            seq: 2,
+          }),
+          ProjectEvent.cases.Landed.make({ at, landing, seq: 3 }),
+          ProjectEvent.cases.AskClosed.make({
+            ask: parseIso,
+            at,
+            landing: sha,
+            seq: 4,
+          }),
+        ];
+
+        const heard: Record<string, readonly string[]> = {};
+
+        for (const event of each) {
+          yield* Queue.offer(events, event);
+          heard[event._tag] = yield* firedNow(fired);
+        }
+
+        expect(heard).toStrictEqual({
+          AskClosed: ["front"],
+          AskOpened: ["front"],
+          Claimed: [],
+          Landed: ["front"],
+        });
+      })
+  );
+
   it.effect(
     "polls every POLL_MS when the stream fails at connect, invalidating the project's keys",
     () =>

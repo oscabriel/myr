@@ -60,7 +60,8 @@ export const FileFacts = ({
       )}
       <AppLink
         className={`text-ui ${LINK}`}
-        to={commitsHref(project, rev, { path: file.path })}
+        search={{ path: file.path }}
+        to={commitsHref(project, rev)}
       >
         History of this file
       </AppLink>

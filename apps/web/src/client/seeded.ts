@@ -13,7 +13,9 @@
  * Everything under `SeededAtoms` reads and writes its own registry: put the
  * page's whole body under it, so its reads, its live view (`watchAtom`)
  * and its writes share one, and give each address its own `id`, so moving
- * to another address makes a new registry from that address's seeds.
+ * to another address makes a new registry from that address's seeds. The
+ * registries share one `Reactivity` (`sharedRuntime`, `surfaces.ts`), so a
+ * write on the page also refetches what the root reads (the rail's counts).
  *
  * ```tsx
  * const read = Route.useLoaderData();

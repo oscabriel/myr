@@ -17,10 +17,10 @@ import { pageHead } from "../../../../features/shared/head.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { ClientWhy } from "../../../../features/why/client-why.tsx";
 import { WhyFallback, WhyLines } from "../../../../features/why/why-view.tsx";
+import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { CodeRail } from "../../tree/-code-rail.tsx";
 import { FilesButton } from "../../tree/-files-button.tsx";
-import { codePageHeaders } from "../../tree/-headers.ts";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
 // Why each line of a file at a revision is there, read on the server: the
@@ -146,8 +146,7 @@ const WhyPage = () => {
 
 export const Route = createFileRoute("/$project/why/$rev/$")({
   staticData: { rail: CodeRail },
-  headers: ({ loaderData, params }) =>
-    codePageHeaders(params.rev, loaderData !== undefined),
+  headers: () => branchPage,
   loader: ({ params }) => whyPage({ data: params }),
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({ title: `Why ${_splat ?? project} at ${rev}` }),

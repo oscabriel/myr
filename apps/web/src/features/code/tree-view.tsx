@@ -182,11 +182,8 @@ export const TreeView = ({
           />
           <AppLink
             className="text-ui text-muted-foreground hover:text-foreground tablet:inline hidden shrink-0 no-underline"
-            to={commitsHref(
-              project,
-              rev,
-              listing.path === undefined ? {} : { path: listing.path }
-            )}
+            search={listing.path === undefined ? {} : { path: listing.path }}
+            to={commitsHref(project, rev)}
           >
             History
           </AppLink>

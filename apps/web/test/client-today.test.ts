@@ -62,13 +62,19 @@ describe("Today, through the web's atoms", seededWorld, () => {
     })
   );
 
+  // The page's atoms live in a registry of the page's own (`SeededAtoms`),
+  // the rail's in the root's: a decision taken on the page refetches both.
   it.live(
-    "closes a decision the decider declines, and Today refetches without it",
+    "closes a decision the decider declines, and Today refetches without it, on the page and in the rail",
     () =>
       Effect.gen(function* () {
         const registry = registryAs(DECIDER);
+        const rail = registryAs(DECIDER);
         const unmount = registry.mount(todayAtom);
+        const unmountRail = rail.mount(todayAtom);
         const before = yield* settled(registry, todayAtom);
+        // Read in the rail before the decision, so a refetch is what changes it.
+        yield* settled(rail, todayAtom);
 
         const proposal = Exit.isSuccess(before)
           ? before.value.decisions.find(({ subject }) =>
@@ -105,16 +111,29 @@ describe("Today, through the web's atoms", seededWorld, () => {
           taken === undefined ? undefined : DateTime.formatIso(taken.at)
         ).toBe("2026-10-07T09:21:00.000Z");
 
-        const after = yield* settled(registry, todayAtom);
+        /** Whether Today, in `where`, still holds the decision, and the budget it has used. */
+        const todayIn = (where: typeof registry) =>
+          Effect.map(settled(where, todayAtom), (today) =>
+            Exit.isSuccess(today)
+              ? {
+                  holds: today.value.decisions.some(
+                    ({ id }) => id === proposal.id
+                  ),
+                  used: today.value.budget.used,
+                }
+              : undefined
+          );
 
-        expect(
-          Exit.isSuccess(after)
-            ? after.value.decisions.map(({ id }) => id).includes(proposal.id)
-            : true
-        ).toBeFalsy();
-        expect(Exit.isSuccess(after) ? after.value.budget.used : 0).toBe(3);
+        expect({
+          page: yield* todayIn(registry),
+          rail: yield* todayIn(rail),
+        }).toStrictEqual({
+          page: { holds: false, used: 3 },
+          rail: { holds: false, used: 3 },
+        });
 
         unmount();
+        unmountRail();
       })
   );
 });
