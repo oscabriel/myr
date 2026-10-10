@@ -4,9 +4,9 @@
  * that project's `ProjectApi` (its Durable Object, through `Projects`) as
  * the caller `Authenticated` named; the cross-project reads (`listProjects`,
  * `frontPage`, `credits`) come from the front-page projection, each listed
- * project's posture read from its own ledger (`withStandingPosture`); `status` and
- * `today` without a project ask every project the projection lists and
- * merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
+ * project's posture read from its own ledger (`withStandingPosture`);
+ * `status` and `today` without a project ask every project the projection
+ * lists and merge what each says. `claim`, `proposeAsk` and `flagAsk` spend the
  * caller's rate limit first, so a call past it reaches no project; a
  * proposal with a draft, and `draftAsk`, spend the draft limit too.
  * `evidence` asks the project who may read a lane's log, which it reads

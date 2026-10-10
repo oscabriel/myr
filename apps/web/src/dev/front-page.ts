@@ -7,10 +7,11 @@
  * the anonymous viewer sees: takeable when no live claim holds it, nothing
  * it waits on is still on the page, and it is held for nobody; newest first.
  * A project is listed from its first event, `open` until a `PostureChanged`
- * ledger entry moves it, with when it last landed (the `projects`
- * table); `listProjects` reads each one's standing posture from its own
- * ledger (`withStandingPosture`), and keeps this one only as the fallback. A person's credits are each project's own count, joined
- * (`creditsFor`): the rule D1's `credits` table is fed by, read at the source.
+ * ledger entry moves it, with when it last landed (the `projects` table);
+ * `listProjects` reads each one's standing posture from its own ledger
+ * (`withStandingPosture`) and keeps this one only as the fallback. A
+ * person's credits are each project's own count, joined (`creditsFor`): the
+ * rule D1's `credits` table is fed by, read at the source.
  */
 import { FrontPage } from "@repo/project/front-page";
 import type { FrontPageFilter } from "@repo/project/front-page";

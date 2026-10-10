@@ -9,7 +9,8 @@
  * are one value, read at the source, with nothing written to keep them in
  * step.
  *
- * Cost: one ledger read per listed project per list, a few at once.
+ * Cost: one ledger read per listed project per list, at most 8 at once,
+ * each read whole for its one `posture` field.
  */
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Anonymous } from "@repo/protocol/principal";

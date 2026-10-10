@@ -11,9 +11,9 @@
  * front page's, and nothing else: no layer and no fork is listed; each
  * one's posture is the one its own ledger stands at, as `listProjects`
  * answers it (`withStandingPosture`), so `/` and the web's `/llms.txt`
- * stay one text. Every
- * value that reaches the HTML is escaped. Not a redirect: the web app is a
- * link, so the host stays discoverable at its own address.
+ * stay one text. Every value that reaches the HTML is escaped. Not a
+ * redirect: the web app is a link, so the host stays discoverable at its
+ * own address.
  */
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { frontLlms, MCP_PROTOCOL } from "@repo/agent-kit/host-doc";

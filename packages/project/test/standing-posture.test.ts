@@ -12,7 +12,7 @@ import type { Posture } from "@repo/protocol/posture";
 import { Principal } from "@repo/protocol/principal";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Array, DateTime, Duration, Effect, Layer, Ref } from "effect";
+import { Array, DateTime, Duration, Effect, Layer, Logger, Ref } from "effect";
 
 import type { ProjectApi } from "../src/project.ts";
 import { Projects } from "../src/projects.ts";
@@ -111,6 +111,27 @@ describe("a listing's standing posture", () => {
         { landedAt, openAsks: 2, posture: "open", project: burrow },
       ]);
     }).pipe(Effect.provide(platform))
+  );
+
+  it.effect(
+    "warns once for each project whose posture stays the projection's",
+    () =>
+      Effect.gen(function* () {
+        const warned: string[] = [];
+
+        const keeper = Logger.make(({ logLevel, message }) => {
+          warned.push(`${logLevel}: ${String(message)}`);
+        });
+
+        yield* withStandingPosture(listed).pipe(
+          Effect.provide(Logger.layer([keeper]))
+        );
+
+        expect(warned.toSorted()).toStrictEqual([
+          "Warn: broken's posture is the projection's: its ledger was not read",
+          "Warn: ghost's posture is the projection's: its ledger was not read",
+        ]);
+      }).pipe(Effect.provide(platform))
   );
 
   it.effect("lists nothing for an empty list, and asks no project", () =>

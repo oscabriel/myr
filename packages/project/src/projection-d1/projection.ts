@@ -9,9 +9,8 @@
  *   fallback for a list, which reads each project's standing posture from
  *   its own ledger (`withStandingPosture`), since a first config, a
  *   widening and a narrowing taking effect by the clock write no such
- *   entry. Its
- *   open asks are counted again from the front page whenever an ask opens
- *   or closes, and a landing stamps when it last landed.
+ *   entry. Its open asks are counted again from the front page whenever an
+ *   ask opens or closes, and a landing stamps when it last landed.
  * - A landing credits each person it names once per role, in its ask's
  *   area: the module of the ask's territory, read from the ask's front
  *   page row, which is still there when its `Landed` applies (its
