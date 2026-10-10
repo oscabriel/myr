@@ -9,15 +9,25 @@
  *
  * One world per isolate (`server.ts`): it is made and seeded when this
  * module loads, since `toWebHandler` builds at once, and kept for the
- * isolate's life. Nothing outside `src/dev/` imports this file, and the
- * production build carries none of it (`test/production-bundle.test.ts`).
+ * isolate's life. Under `vite dev` its seed ends at the minute it loads,
+ * and its clock runs on from there (`clock.ts`), so a page reads each
+ * deadline as the seed meant it on whatever day the server starts. Nothing
+ * outside `src/dev/` imports this file, and the production build carries
+ * none of it (`test/production-bundle.test.ts`).
  */
 import type { Backend } from "../server/rpc.ts";
 import { credentialFrom, withCredential } from "../server/session.ts";
 import { fixturesMode } from "./fixtures.ts";
 import { devServer } from "./server.ts";
 
-const served = devServer({ fixtures: fixturesMode });
+/**
+ * `vite dev` places the world at the present; vitest, whose `MODE` is
+ * `test`, keeps the calendar as written, so a test reads the same instants
+ * on every run.
+ */
+const time = import.meta.env.MODE === "test" ? "fixed" : "present";
+
+const served = devServer({ fixtures: fixturesMode, time });
 
 /** The development backend: every request answered by the dev world, as the platform is asked; the env unused. */
 export const backend: Backend = (request) =>

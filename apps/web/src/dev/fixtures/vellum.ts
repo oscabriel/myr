@@ -64,6 +64,7 @@ import {
 } from "@repo/protocol/refusal";
 import { Array, DateTime, Effect, Schema } from "effect";
 
+import { DevClock } from "../clock.ts";
 import {
   askFileOf,
   burrowPeople,
@@ -79,10 +80,10 @@ import type { Story } from "./story.ts";
 
 export const vellum = ProjectName.make("vellum");
 
-/** Where the world's clock stands once the fixtures are told. */
+/** The calendar's instant the world's clock stands at once the fixtures are told. */
 export const fixturesNow = instant("2026-10-07T10:00");
 
-/** When vellum's first commit was pushed, by its initializer. */
+/** When vellum's first commit was pushed, by its initializer, on the calendar. */
 export const vellumStart = instant("2026-08-24T09:00");
 
 const dir = Brand.configDir;
@@ -791,8 +792,11 @@ const ledger: Ledger = {
   project: vellum,
 };
 
-/** The env shape at `at`: four items, one write-only and set, none with a value or placeholder. */
-const envAt = (at: LandedSha): EnvSchemaView => ({
+/**
+ * The env shape at `at`: four items, one write-only and set at `setAt`,
+ * none with a value or placeholder.
+ */
+const envAt = (at: LandedSha, setAt: DateTime.Utc): EnvSchemaView => ({
   at,
   file: RepoPath.make(".env.schema"),
   imports: [],
@@ -807,7 +811,7 @@ const envAt = (at: LandedSha): EnvSchemaView => ({
       sensitive: true,
       tags: ["export", "errors"],
       type: 'string(startsWith="sntrys_")',
-      value: { setAt: instant("2026-10-06T16:30"), setBy: people.ines },
+      value: { setAt, setBy: people.ines },
     },
     {
       description: "Where error reports go; public.",
@@ -886,10 +890,15 @@ const childPage = (module: Module): Files =>
 
 // ------------------------------------------------------------- the story
 
-/** The record vellum's story writes, over its canonical repo standing at `base`. */
+/**
+ * The record vellum's story writes, over its canonical repo standing at
+ * `base`: each instant written on the calendar, placed in this world.
+ */
 export const tellVellum = (base: LandedSha) =>
   Effect.gen(function* () {
-    const t = instant;
+    const { place } = yield* DevClock;
+
+    const t = (text: string) => place(instant(text));
 
     const story = yield* storyOf({
       base,
@@ -1951,7 +1960,7 @@ export const tellVellum = (base: LandedSha) =>
     });
 
     const apart = {
-      env: envAt(story.head()),
+      env: envAt(story.head(), t("2026-10-06T16:30")),
       ledger,
       working: [people.ines, people.okonkwo],
     };
