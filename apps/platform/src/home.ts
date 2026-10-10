@@ -89,15 +89,6 @@ const section = (title: string, ...html: readonly string[]) =>
 const list = (items: readonly string[]) =>
   `<ul>\n${items.map(item).join("\n")}\n</ul>`;
 
-/** Wider than sign-in's column, for clone and install lines. */
-const STYLE = `<style>
-main{max-width:44rem}
-h2{font-size:1.1rem;margin:2rem 0 .5rem}
-pre{overflow-x:auto;padding:.5rem .75rem;background:rgba(127,127,127,.12)}
-code{font-family:ui-monospace,monospace;font-size:.9em}
-li{margin:.25rem 0}
-</style>`;
-
 const projectsSection = (origin: string, projects: readonly ProjectListing[]) =>
   section(
     "Projects",
@@ -123,7 +114,6 @@ const homeHtml = (input: {
   return page(
     "What this host serves",
     [
-      STYLE,
       `<h1>${escapeHtml(Brand.name)}</h1>`,
       `<p>A Git platform where everything a project ships is public. A project states each change it wants as an ask; you answer one with a commit, and the platform lands it only once its checks pass.</p>`,
       ...Option.toArray(
@@ -161,7 +151,9 @@ const homeHtml = (input: {
         `<p>A member can ask the platform's agent to draft a proposed ask (Workers AI, ${code(draftModel)}); a decider accepts it, and only people are credited.</p>`
       ),
       section("Health", `<p>${link(`${origin}/health`)}</p>`),
-    ].join("\n")
+    ].join("\n"),
+    // Wider than sign-in's column, for clone and install lines.
+    "document"
   );
 };
 

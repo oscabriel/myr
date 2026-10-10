@@ -8,9 +8,16 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { groups } from "@repo/protocol/refusal";
 import { Array as Arr, Effect, Option, Schema } from "effect";
 
-import { agentSetup, agentSetupMarkdown } from "../src/agent-setup.ts";
+import {
+  agentEndpoints,
+  agentLimits,
+  agentSetup,
+  agentSetupMarkdown,
+  synopsis,
+} from "../src/agent-setup.ts";
 import type { SetupChannel } from "../src/agent-setup.ts";
 import type { CommandDoc } from "../src/command-doc.ts";
 import { claudePlugin } from "../src/platform.ts";
@@ -173,5 +180,104 @@ describe("the Agents page's source", () => {
         expect(text).toContain(body);
       }
     }
+  });
+});
+
+describe("the Agents page's reference sections", () => {
+  it("gives every command one synopsis line, as typed, with its summary", () => {
+    const lines = synopsis(commands);
+
+    expect(lines.map(({ summary }) => summary)).toStrictEqual(
+      commands.map(({ summary }) => summary)
+    );
+
+    for (const [index, command] of commands.entries()) {
+      const line = lines[index]?.usage ?? "";
+
+      expect(
+        line.startsWith(`${Brand.cli} ${command.path.join(" ")}`)
+      ).toBeTruthy();
+
+      for (const name of command.positional) {
+        expect(line).toContain(`<${name}>`);
+      }
+    }
+
+    expect(synopsis([login])).toStrictEqual([
+      {
+        summary: login.summary,
+        usage: `${Brand.cli} login [--url] [--json]`,
+      },
+    ]);
+  });
+
+  it("names every endpoint an agent reads, on the host that serves it", () => {
+    const endpoints = agentEndpoints({ platformUrl, webUrl });
+
+    expect(endpoints.map(({ url }) => url)).toStrictEqual([
+      `${webUrl}/llms.txt`,
+      `${webUrl}/llms-full.txt`,
+      `${webUrl}/<project>/llms.txt`,
+      `${webUrl}/<project>/asks/<ask>.md`,
+      `${webUrl}/agents.md`,
+      `${webUrl}/.well-known/mcp.json`,
+      `${webUrl}/.well-known/agent-skills/index.json`,
+      `${platformUrl}/mcp`,
+      `${platformUrl}/<repo>.git`,
+    ]);
+
+    for (const { what } of endpoints) {
+      expect(what).not.toBe("");
+    }
+
+    expect(
+      endpoints.filter(({ readable }) => readable).map(({ url }) => url)
+    ).toStrictEqual([
+      `${webUrl}/llms.txt`,
+      `${webUrl}/llms-full.txt`,
+      `${webUrl}/agents.md`,
+      `${webUrl}/.well-known/mcp.json`,
+      `${webUrl}/.well-known/agent-skills/index.json`,
+    ]);
+  });
+
+  it("states the limits a policy sets by default, as a person says them", () => {
+    const values = agentLimits().map(({ value }) => value);
+
+    expect(values).toStrictEqual([
+      "3 by default",
+      "2 by default; 0 takes none",
+      "Warned after 2 hours, lapses after 1 day, by default",
+      "5 by default",
+      "2 weeks by default, then it takes its default",
+      "A set number a minute; past it, CapReached says when to try again",
+    ]);
+
+    for (const { limit } of agentLimits()) {
+      expect(limit).not.toBe("");
+    }
+  });
+
+  it("writes the reference sections into the Markdown, in the page's order", () => {
+    const text = agentSetupMarkdown({ commands, platformUrl, webUrl });
+    const at = (heading: string) => text.indexOf(`\n## ${heading}\n`);
+
+    const order = ["Synopsis", "Connect", "Endpoints", "Limits", "Refusals"];
+
+    for (const heading of order) {
+      expect(at(heading)).toBeGreaterThan(0);
+    }
+
+    expect(order.map(at)).toStrictEqual(
+      order.map(at).toSorted((a, b) => a - b)
+    );
+
+    for (const group of groups) {
+      for (const member of group.members) {
+        expect(text).toContain(`\`${member.identifier}\``);
+      }
+    }
+
+    expect(text).toContain(`${webUrl}/llms-full.txt`);
   });
 });

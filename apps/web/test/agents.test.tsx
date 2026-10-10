@@ -1,17 +1,24 @@
 /**
- * The Agents page: how each agent connects, drawn from `@repo/agent-kit`'s
- * `agentSetup`, so the page has no text of its own for a snippet
- * (principle 4); `/agents.md` is the same channels as Markdown.
+ * The For agents page: a reference in five sections (Synopsis, Connect,
+ * Endpoints, Limits, Refusals), every word of it from `@repo/agent-kit`,
+ * so the page has no text of its own for a snippet, a command or an
+ * endpoint (principle 4); `/agents.md` is the same reference as Markdown.
  */
 import { describe, expect, it } from "@effect/vitest";
-import { agentSetup, agentSetupMarkdown } from "@repo/agent-kit/agent-setup";
+import {
+  agentEndpoints,
+  agentLimits,
+  agentSetup,
+  agentSetupMarkdown,
+} from "@repo/agent-kit/agent-setup";
+import { Brand } from "@repo/brand";
+import { groups } from "@repo/protocol/refusal";
 import { Effect } from "effect";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 
 import { commands } from "../src/features/agents/catalog.ts";
-import { AgentSetupView } from "../src/features/agents/setup-page.tsx";
+import { AgentsView } from "../src/features/agents/setup-page.tsx";
 import { agentsMarkdownHandler } from "../src/routes/agents[.]md.ts";
+import { renderAt } from "./render.tsx";
 
 const platformUrl = "https://platform-test.example.workers.dev";
 
@@ -34,57 +41,203 @@ const decoded = (html: string) =>
     (entity) => ENTITIES.get(entity) ?? entity
   );
 
-const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
-
 /** What a reader sees: the markup without its tags, entities decoded. */
-const textOf = (element: ReactElement) =>
-  decoded(markupOf(element).replaceAll(/<[^>]+>/gu, ""));
+const textOf = (html: string) => decoded(html.replaceAll(/<[^>]+>/gu, ""));
 
-/** The text of every `<code>` on the page, in order. */
-const codeOf = (element: ReactElement) =>
-  [...markupOf(element).matchAll(/<code\b[^>]*>(?<body>.*?)<\/code>/gsu)].map(
-    ({ groups }) => decoded(groups?.body ?? "")
+/** The text of every `<code>` in `html`, in order. */
+const codeOf = (html: string) =>
+  [...html.matchAll(/<code\b[^>]*>(?<body>.*?)<\/code>/gsu)].map(
+    ({ groups: found }) => textOf(found?.body ?? "")
   );
 
-describe("the Agents page", () => {
-  const page = <AgentSetupView channels={channels} />;
+/** The page at `/agents`, inside a router. */
+const page = renderAt(
+  "/agents",
+  <AgentsView commands={commands} platformUrl={platformUrl} webUrl={webUrl} />
+);
 
-  it("shows every snippet agentSetup gives, and no code of its own", () => {
-    expect(codeOf(page)).toStrictEqual(
-      channels.flatMap(({ snippets }) => snippets.map(({ text }) => text))
-    );
-  });
+/** The section whose id is `id`: its markup, from its tag to its close. */
+const sectionOf = (html: string, id: string) => {
+  const start = html.indexOf(`<section aria-labelledby="${id}"`);
+  const end = html.indexOf("</section>", start);
 
-  it("heads each channel with its title and says when to use it", () => {
-    const text = textOf(page);
+  expect(start).toBeGreaterThanOrEqual(0);
 
-    for (const { snippets, title, useWhen } of channels) {
-      expect(text).toContain(title);
-      expect(text).toContain(useWhen);
+  return html.slice(start, end);
+};
 
-      for (const { label } of snippets) {
-        expect(text).toContain(label);
+const SECTIONS = [
+  ["synopsis", "Synopsis"],
+  ["connect", "Connect"],
+  ["endpoints", "Endpoints"],
+  ["limits", "Limits"],
+  ["refusals", "Refusals"],
+] as const;
+
+describe("the For agents page", () => {
+  it.effect("is titled For agents", () =>
+    Effect.gen(function* () {
+      expect(yield* page).toMatch(/<h1\b[^>]*>For agents<\/h1>/u);
+    })
+  );
+
+  it.effect(
+    "has its five sections in order, headed in the sans in sentence case",
+    () =>
+      Effect.gen(function* () {
+        const html = yield* page;
+
+        const headings = [
+          ...html.matchAll(
+            /<h2 (?<attributes>[^>]*)id="(?<id>[a-z]+)"[^>]*>(?<text>[^<]*)<\/h2>/gu
+          ),
+        ];
+
+        expect(
+          headings.map(({ groups: found }) => [found?.id, found?.text])
+        ).toStrictEqual(SECTIONS.map(([id, title]) => [id, title]));
+
+        for (const { groups: found } of headings) {
+          expect(found?.attributes).not.toContain("font-mono");
+          expect(found?.attributes).not.toContain("uppercase");
+        }
+
+        for (const { groups: found } of html.matchAll(
+          /<h(?<level>[1-4])\b[^>]*>(?<text>.*?)<\/h\k<level>>/gu
+        )) {
+          const words = textOf(found?.text ?? "");
+
+          expect(
+            words === words.toUpperCase() && /[A-Z]/u.test(words)
+          ).toBeFalsy();
+        }
+      })
+  );
+
+  it.effect("lists the five sections, as anchors, in its contents", () =>
+    Effect.gen(function* () {
+      const html = yield* page;
+      const inspector = html.slice(html.indexOf('data-facts="inspector"'));
+
+      const anchors = [
+        ...inspector.matchAll(/<a\b[^>]*href="#(?<id>[a-z]+)"/gu),
+      ].map(({ groups: found }) => found?.id);
+
+      expect(anchors).toStrictEqual(SECTIONS.map(([id]) => id));
+    })
+  );
+
+  it.effect("gives every command of the CLI a synopsis line, in mono", () =>
+    Effect.gen(function* () {
+      const synopsis = codeOf(sectionOf(yield* page, "synopsis"));
+
+      expect(synopsis).toHaveLength(commands.length);
+
+      for (const [index, command] of commands.entries()) {
+        expect(
+          synopsis[index]?.startsWith(`${Brand.cli} ${command.path.join(" ")}`)
+        ).toBeTruthy();
       }
-    }
-  });
+    })
+  );
 
-  it("gives every snippet a button that copies it", () => {
-    const buttons = markupOf(page).match(
-      /<button\b[^>]*>.*?Copy.*?<\/button>/gu
-    );
+  it.effect(
+    "shows every snippet agentSetup gives under Connect, and no code of its own",
+    () =>
+      Effect.gen(function* () {
+        const connect = sectionOf(yield* page, "connect");
 
-    expect(buttons).toHaveLength(
-      channels.reduce((count, { snippets }) => count + snippets.length, 0)
-    );
-  });
+        expect(codeOf(connect)).toStrictEqual(
+          channels.flatMap(({ snippets }) => snippets.map(({ text }) => text))
+        );
 
-  it("links the same channels as Markdown", () => {
-    expect(markupOf(page)).toMatch(/<a\b[^>]*href="\/agents\.md"[^>]*>/u);
-  });
+        const text = textOf(connect);
+
+        for (const { snippets, title, useWhen } of channels) {
+          expect(text).toContain(title);
+          expect(text).toContain(useWhen);
+
+          for (const { label } of snippets) {
+            expect(text).toContain(label);
+          }
+        }
+      })
+  );
+
+  it.effect("gives every snippet a button that copies it", () =>
+    Effect.gen(function* () {
+      const buttons = sectionOf(yield* page, "connect").match(
+        /<button\b[^>]*>.*?Copy.*?<\/button>/gu
+      );
+
+      expect(buttons).toHaveLength(
+        channels.reduce((count, { snippets }) => count + snippets.length, 0)
+      );
+    })
+  );
+
+  it.effect("names every endpoint and limit agent-kit gives", () =>
+    Effect.gen(function* () {
+      const html = yield* page;
+      const endpoints = sectionOf(html, "endpoints");
+
+      expect(codeOf(endpoints)).toStrictEqual(
+        agentEndpoints({ platformUrl, webUrl }).map(({ url }) => url)
+      );
+
+      for (const { readable, url, what } of agentEndpoints({
+        platformUrl,
+        webUrl,
+      })) {
+        expect(textOf(endpoints)).toContain(what);
+        expect(endpoints.includes(`href="${url}"`)).toBe(readable);
+      }
+
+      const limits = textOf(sectionOf(html, "limits"));
+
+      for (const { limit, value } of agentLimits()) {
+        expect(limits).toContain(limit);
+        expect(limits).toContain(value);
+      }
+    })
+  );
+
+  it.effect(
+    "names every refusal of the union, each linked to its row in /llms-full.txt",
+    () =>
+      Effect.gen(function* () {
+        const refusals = sectionOf(yield* page, "refusals");
+
+        const tags = groups.flatMap(({ members }) =>
+          members.map(({ identifier }) => identifier)
+        );
+
+        expect(codeOf(refusals)).toStrictEqual(tags);
+
+        for (const { members, name } of groups) {
+          expect(textOf(refusals)).toContain(name);
+
+          for (const { identifier } of members) {
+            expect(refusals).toMatch(
+              new RegExp(
+                `<a\\b[^>]*href="/llms-full\\.txt#:~:text=%60${identifier}%60[^"]*"[^>]*><code\\b[^>]*>${identifier}</code>`,
+                "u"
+              )
+            );
+          }
+        }
+      })
+  );
+
+  it.effect("links the same reference as Markdown", () =>
+    Effect.gen(function* () {
+      expect(yield* page).toMatch(/<a\b[^>]*href="\/agents\.md"[^>]*>/u);
+    })
+  );
 });
 
 describe("/agents.md", () => {
-  it.effect("answers the channels as Markdown for the web's own origin", () =>
+  it.effect("answers the reference as Markdown for the web's own origin", () =>
     Effect.gen(function* () {
       const response = yield* Effect.promise(() =>
         agentsMarkdownHandler(platformUrl)({
