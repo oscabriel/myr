@@ -420,13 +420,6 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   ) => Effect.Effect<{ readonly landing: LandingView }, UnknownCommit>;
   /** Where main has landed: none before the first push. */
   readonly head: () => Effect.Effect<{ readonly landed?: LandedSha }>;
-  /**
-   * The landings among `shas` (at most `MAX_LANDINGS`), in their order: a
-   * commit the platform did not land, imported history among them, has none.
-   */
-  readonly landings: (
-    shas: readonly CommitSha[]
-  ) => Effect.Effect<readonly LandingView[]>;
   /** Every claim's fork, with its ask, claimant and the claim's state. */
   readonly forks: () => Effect.Effect<readonly ForkRef[]>;
   /**

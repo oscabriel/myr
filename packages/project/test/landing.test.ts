@@ -199,6 +199,27 @@ describe("an answer on its way to main", () => {
     });
   });
 
+  it("names, in its refusal, the landing the merge found moved each path", () => {
+    const movedBy = [
+      { ask, author: bob, landing: main, path: changed },
+    ] as const;
+
+    const step = transition(
+      merging,
+      LandingCommand.MergeConflict({ conflicts: [changed], main, movedBy }),
+      now
+    );
+
+    expect(step.state).toStrictEqual(
+      Refused.make({
+        refusals: [
+          new StaleBase({ base, conflicts: [changed], main, movedBy }),
+        ],
+        request,
+      })
+    );
+  });
+
   it("lands the checked tree when its checks pass and nobody has to act", () => {
     const step = transition(checking, LandingCommand.Checked(clean), now);
 

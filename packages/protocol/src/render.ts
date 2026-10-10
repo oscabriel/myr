@@ -5,7 +5,7 @@ import type { Array } from "effect";
 import type { AnswerReceipt } from "./domain/answer.ts";
 import { Outcome } from "./domain/outcome.ts";
 import { ChecksFailed } from "./refusal.ts";
-import type { CapReached, Refusal } from "./refusal.ts";
+import type { CapReached, MovedBy, Refusal } from "./refusal.ts";
 
 const short = (sha: string) => sha.slice(0, 7);
 
@@ -42,6 +42,21 @@ const capReason = ({
   retryAfter === undefined
     ? held[limit](cap)
     : `you ${rated[limit].verb} ${counted(cap, rated[limit].noun)} in the last minute, the most the platform allows; try again in ${retryAfter}s`;
+
+/** A conflicting path, and the landing that last changed it when one is named. */
+const conflictIn = (path: string, movedBy: readonly MovedBy[]) => {
+  const mover = movedBy.find((moved) => moved.path === path);
+
+  if (mover === undefined) {
+    return path;
+  }
+
+  const { ask, author, landing } = mover;
+
+  return ask === undefined
+    ? `${path} (last changed by ${author} in ${short(landing)})`
+    : `${path} (last changed by ${author} in ${short(landing)}, for ${ask})`;
+};
 
 // A branch is what a person pushes; every other ref the platform writes.
 const BRANCH = "refs/heads/";
@@ -110,10 +125,10 @@ const reason = Match.typeTags<Refusal, string>()({
   RepoBusy: () => "the repo was busy with another push",
   SecretInOutput: ({ item, where }) =>
     `the write-only value ${item} appeared in the ${where}`,
-  StaleBase: ({ base, conflicts, main }) =>
+  StaleBase: ({ base, conflicts, main, movedBy = [] }) =>
     conflicts.length === 0
       ? `main moved to ${short(main)}, past your base ${short(base)}`
-      : `main moved to ${short(main)}, past your base ${short(base)}; conflicts in ${list(conflicts)}`,
+      : `main moved to ${short(main)}, past your base ${short(base)}; conflicts in ${list(conflicts.map((path) => conflictIn(path, movedBy)))}`,
   StaleLayer: ({ layer }) =>
     `the ${layer} layer moved since this answer was checked; it will be checked again`,
   TouchedJudge: ({ paths }) =>

@@ -7,6 +7,8 @@ import {
   CommitSha,
   DecisionId,
   EnvKey,
+  Handle,
+  LandedSha,
   ProjectName,
   ProposalId,
   RepoPath,
@@ -188,13 +190,33 @@ export class ReachedInternals extends Schema.TaggedError<ReachedInternals>()(
 
 // Merge
 
-/** Main moved past the answer's base; git's `fetch first` and `stale ref` land here too. */
+/**
+ * The landing on main that last changed a path an answer conflicts in: its
+ * commit, the person accountable for it, and the ask it answered or opened
+ * (none for a decider's own landing).
+ */
+export const MovedBy = Schema.Struct({
+  ask: Schema.optionalKey(AskId),
+  author: Handle,
+  landing: LandedSha,
+  path: RepoPath,
+});
+
+export type MovedBy = typeof MovedBy.Type;
+
+/**
+ * Main moved past the answer's base; git's `fetch first` and `stale ref`
+ * land here too. When the merge onto main conflicts, `conflicts` names the
+ * paths, and `movedBy` the landing that last changed each one the
+ * project's record holds, so the rebase knows whose change to keep.
+ */
 export class StaleBase extends Schema.TaggedError<StaleBase>()("StaleBase", {
   ...Retryable,
   ...nextIs("git pull --rebase"),
   base: CommitSha,
   conflicts: Schema.Array(RepoPath),
   main: CommitSha,
+  movedBy: Schema.optionalKey(Schema.NonEmptyArray(MovedBy)),
 }) {}
 
 /**

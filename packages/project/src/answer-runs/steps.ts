@@ -8,6 +8,7 @@
  * The inline adapter drives them in a loop (`drive`); the Answer Workflow
  * runs each as a durable step.
  */
+import type { RepoHost } from "@repo/artifacts/repo-host";
 import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import type { CheckLane, CheckRun } from "@repo/checks/check-runner";
 import { classifyFailure } from "@repo/gate/classify";
@@ -27,6 +28,8 @@ import {
   LandingState,
   pendingEffects,
 } from "../landing.ts";
+import { movedBy } from "./movers.ts";
+import type { LandingsOf } from "./movers.ts";
 
 /** A step's result: the command it reports, and what it saw beside it. */
 export interface Reported {
@@ -64,10 +67,14 @@ const attemptOf = (state: LandingState) =>
 const reported = (command: LandingCommand, report?: AnswerReport): Reported =>
   report === undefined ? { command } : { command, report };
 
-/** The answer's head merged onto `main`: the tree to check, or the paths that conflict. */
+/**
+ * The answer's head merged onto `main`: the tree to check, or the paths
+ * that conflict, with the landing that last moved each one (`movedBy`).
+ */
 const merge = (
   run: AnswerRun,
-  step: Extract<LandingEffect, { readonly _tag: "Merge" }>
+  step: Extract<LandingEffect, { readonly _tag: "Merge" }>,
+  landings: LandingsOf
 ) =>
   Lander.use((lander) =>
     lander.merge({
@@ -83,8 +90,21 @@ const merge = (
     ),
     Effect.catchTags({
       StaleBase: ({ conflicts }) =>
-        Effect.succeed(
-          reported(LandingCommand.MergeConflict({ conflicts, main: step.main }))
+        Effect.map(
+          movedBy(
+            { base: step.base, conflicts, main: step.main, repo: run.repo },
+            landings
+          ),
+          (moved) =>
+            reported(
+              Array.isReadonlyArrayNonEmpty(moved)
+                ? LandingCommand.MergeConflict({
+                    conflicts,
+                    main: step.main,
+                    movedBy: moved,
+                  })
+                : LandingCommand.MergeConflict({ conflicts, main: step.main })
+            )
         ),
       VerifierBlocked: () =>
         Effect.succeed(
@@ -260,19 +280,25 @@ const land = (
 /**
  * One step: the port call `effect` names, run for `run`, and the command
  * that reports it. `None` when the run's state no longer waits on that call
- * (a replay after the state moved on).
+ * (a replay after the state moved on). A merge that conflicts asks
+ * `landings` who moved each path.
  */
 export const runStep = (
   run: AnswerRun,
-  effect: LandingEffect
-): Effect.Effect<Option.Option<Reported>, never, CheckRunner | Lander> =>
+  effect: LandingEffect,
+  landings: LandingsOf
+): Effect.Effect<
+  Option.Option<Reported>,
+  never,
+  CheckRunner | Lander | RepoHost
+> =>
   LandingEffect.$match(effect, {
     Emit: () => Effect.succeedNone,
     Land: () =>
       LandingState.guards.Landing(run.state) && run.message !== undefined
         ? Effect.asSome(land(run, run.state, run.message))
         : Effect.succeedNone,
-    Merge: (merging) => Effect.asSome(merge(run, merging)),
+    Merge: (merging) => Effect.asSome(merge(run, merging, landings)),
     Record: () => Effect.succeedNone,
     Retry: () => Effect.succeedNone,
     RunChecks: () =>
@@ -299,10 +325,10 @@ export const runStep = (
 export const drive = (
   queue: AnswerQueue,
   requestId: RequestId
-): Effect.Effect<void, never, CheckRunner | Lander> => {
+): Effect.Effect<void, never, CheckRunner | Lander | RepoHost> => {
   const go = (
     steps: readonly LandingEffect[]
-  ): Effect.Effect<void, never, CheckRunner | Lander> =>
+  ): Effect.Effect<void, never, CheckRunner | Lander | RepoHost> =>
     Effect.gen(function* () {
       const effect = steps.find(isStep);
 
@@ -316,7 +342,7 @@ export const drive = (
         return;
       }
 
-      const step = yield* runStep(run.value, effect);
+      const step = yield* runStep(run.value, effect, queue.landings);
 
       if (Option.isNone(step)) {
         return;

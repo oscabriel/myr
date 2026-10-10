@@ -21,6 +21,7 @@ import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import {
   AskId,
+  Handle,
   LandedSha,
   LaneName,
   ProjectName,
@@ -433,7 +434,8 @@ describe("the core loop, through the platform's fetch handler with real git", ()
         });
 
         // 6. bob answered parse-month on the main he claimed at, in the
-        // line alice's answer changed: his run ends refused, StaleBase.
+        // line alice's answer changed: his run ends refused, StaleBase,
+        // naming alice's landing as the one that moved the file.
         const bobsWork = yield* bobGit.clone(bobs.remote);
 
         const stale = yield* bobGit.commit(bobsWork, "Read the month", {
@@ -481,6 +483,14 @@ describe("the core loop, through the platform's fetch handler with real git", ()
                     base: bobs.base,
                     conflicts: [RepoPath.make("src/parse.ts")],
                     main: landed,
+                    movedBy: [
+                      {
+                        ask: parseIso,
+                        author: Handle.make("alice"),
+                        landing: landed,
+                        path: RepoPath.make("src/parse.ts"),
+                      },
+                    ],
                   }),
                 ],
               }),

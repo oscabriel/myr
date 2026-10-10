@@ -285,7 +285,10 @@ const answered = (api: ProjectApi) =>
 
     const run = Option.getOrThrow(yield* api.answer(requestId));
     const merge = Option.getOrThrow(Array.findFirst(nextSteps(run), isStep));
-    const reported = Option.getOrThrow(yield* runStep(run, merge));
+
+    const reported = Option.getOrThrow(
+      yield* runStep(run, merge, api.landings)
+    );
 
     yield* api.advanceAnswer(requestId, reported.command, reported.report);
 

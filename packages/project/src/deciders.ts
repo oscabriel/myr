@@ -2075,6 +2075,8 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       /** The env every check job carries: the decider's change is unlanded code. */
       readonly env: UnlandedRunEnv;
       readonly lanes: readonly CheckLane[];
+      /** The project's record of landings, for a merge that conflicts. */
+      readonly landings: AnswerQueue["landings"];
       readonly message: string;
       readonly now: DateTime.Utc;
       /** The project's run block, which every check job carries. */
@@ -2101,7 +2103,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         state: step.state,
       };
 
-      const reported = yield* runStep(run, next);
+      const reported = yield* runStep(run, next, input.landings);
 
       if (Option.isNone(reported)) {
         return step.state;
@@ -2115,7 +2117,11 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
     });
 
   const landBody =
-    (caller: Person, input: Parameters<DeciderApi["land"]>[1]) =>
+    (
+      queue: AnswerQueue,
+      caller: Person,
+      input: Parameters<DeciderApi["land"]>[1]
+    ) =>
     (h: H, writes: W, now: DateTime.Utc) =>
       Effect.gen(function* () {
         const live = liveOf(h);
@@ -2224,6 +2230,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           carry(
             {
               env,
+              landings: queue.landings,
               lanes: Record.toEntries(policy.run.checks).map(
                 ([lane, command]) => CheckLane.make({ command, lane })
               ),
@@ -2417,7 +2424,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
       queue: AnswerQueue,
       caller: Person,
       input: Parameters<DeciderApi["land"]>[1]
-    ) => kernel.write(queue, landBody(caller, input)),
+    ) => kernel.write(queue, landBody(queue, caller, input)),
     proposeAsk: (
       queue: AnswerQueue,
       caller: Person,

@@ -66,7 +66,7 @@ Instead of landing an answer, the platform answers with refusals. Git prints the
 | `Weakened` | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet. |
 | `PrivatePathInPublicTree` | no | 65 | `__CLI__ check` | Take the held-back paths it names out of your answer. |
 | `ReachedInternals` | no | 65 | `__CLI__ check` | Import the other module only through its public files. |
-| `StaleBase` | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
+| `StaleBase` | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve. |
 | `StaleLayer` | yes | 75 | `__CLI__ status` | Nothing: the answer is checked again. |
 | `ChecksFailed` | no | 65 | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
 | `HeldBackFailed` | no | 65 | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
