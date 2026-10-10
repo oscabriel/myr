@@ -1,7 +1,8 @@
 /**
  * A project's landings list, rendered to HTML: each landing's subject says
  * what it is and links the ask it answers or the ask it opened; one that
- * did neither reads as what it is.
+ * did neither reads as what it is. Its credit is one line of roles, never
+ * the trailers again.
  */
 import { describe, expect, it } from "@effect/vitest";
 import type { LandingView } from "@repo/protocol/domain/landing";
@@ -63,5 +64,16 @@ describe("a project's landings list", () => {
     expect(
       hrefsOf(item).filter((href) => href.includes("/asks/"))
     ).toStrictEqual([]);
+  });
+});
+
+describe("a landing's credit in the list", () => {
+  it("is one line of roles in trailer order, each person linked, with no trailer lines", () => {
+    const item = itemOf(markup, landing.sha);
+    const credit = plainText(item);
+
+    expect(credit).toMatch(/Asked by ines-v[\s\S]*answered by okafor/u);
+    expect(credit).not.toContain("Asked-by:");
+    expect(hrefsOf(item)).toContain("/people/ines-v");
   });
 });

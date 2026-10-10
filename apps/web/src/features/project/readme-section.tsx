@@ -1,7 +1,8 @@
 /**
  * A README (or any Markdown file) under its own name, rendered on the
  * project's prose: a project's home shows its root README below its asks,
- * and a folder or a Markdown file shows its own.
+ * and a folder or a Markdown file shows its own. Its first sentence is the
+ * project's lede, under the project's name (`ledeOf`, `features/front/head.ts`).
  */
 import type { FileView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
