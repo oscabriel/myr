@@ -1,200 +1,101 @@
 /**
  * The pieces every page repeats, rendered to HTML with `react-dom/server`
- * (no DOM library): a refusal reads as `git push` printed it, credit
- * trailers read as the landing commit carries them, and an answer's outcome
- * and stages read the same on every page that shows one.
+ * (no DOM library): a state as its mark and its word, a posture as the
+ * platform labels it, a person by handle, a time as a distance, a command
+ * whole and copyable, and an empty list with the command that fills it.
+ * (Refusals and outcomes: `outcome.test.tsx`; credit: `credits.test.tsx`.)
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { Outcome } from "@repo/protocol/domain/outcome";
-import type { StageName } from "@repo/protocol/domain/outcome";
-import {
-  AskId,
-  DecisionId,
-  Handle,
-  LandedSha,
-  RepoPath,
-} from "@repo/protocol/ids";
-import { OutOfScope, Weakened } from "@repo/protocol/refusal";
-import { explain } from "@repo/protocol/render";
+import { Handle } from "@repo/protocol/ids";
 import { DateTime, Schema } from "effect";
-import type { ReactElement } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 
+import { Definition, Definitions } from "../src/features/ask/fields.tsx";
 import { CommandLine } from "../src/features/shared/command.tsx";
-import { CreditTrailers } from "../src/features/shared/credits.tsx";
+import { CopyAction } from "../src/features/shared/copy-action.tsx";
 import { EmptyState } from "../src/features/shared/empty.tsx";
 import { HandleLink } from "../src/features/shared/handle.tsx";
-import { OutcomeView, StageStrip } from "../src/features/shared/outcome.tsx";
+import {
+  STATE_MARK_NAMES,
+  STATE_MARKS,
+} from "../src/features/shared/marks.tsx";
 import { PostureBadge } from "../src/features/shared/posture.tsx";
-import { RefusalView } from "../src/features/shared/refusal.tsx";
+import {
+  FactsSkeleton,
+  RowSkeleton,
+} from "../src/features/shared/skeleton.tsx";
+import { StateBadge } from "../src/features/shared/state-badge.tsx";
 import { themeColors } from "../src/features/shared/theme.ts";
 import { When } from "../src/features/shared/time.tsx";
+import { markupOf, textOf } from "./markup.ts";
 
 import styles from "../src/styles.css?raw";
 
-/** The entities React writes for text, and what each reads as. */
-const ENTITIES: ReadonlyMap<string, string> = new Map([
-  ["&#x27;", "'"],
-  ["&amp;", "&"],
-  ["&gt;", ">"],
-  ["&lt;", "<"],
-  ["&quot;", '"'],
-]);
-
-const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
-
-/** What a reader sees: the markup without its tags, entities decoded. */
-const textOf = (element: ReactElement) =>
-  markupOf(element)
-    .replaceAll(/<[^>]+>/gu, "")
-    .replaceAll(
-      /&(?:#x27|amp|gt|lt|quot);/gu,
-      (entity) => ENTITIES.get(entity) ?? entity
-    );
-
-/** Where each of `parts` starts in `text`, each searched after the one before; -1 once one is missing. */
-const positionsInOrder = (text: string, parts: readonly string[]) => {
-  const positions: number[] = [];
-  let from = 0;
-
-  for (const part of parts) {
-    const at = from < 0 ? -1 : text.indexOf(part, from);
-
-    positions.push(at);
-    from = at < 0 ? -1 : at + part.length;
-  }
-
-  return positions;
-};
-
-/** Each `<li>` that names a stage, as `[stage, state]`. */
-const stagesOf = (element: ReactElement) =>
-  [...markupOf(element).matchAll(/<li\b[^>]*>/gu)].flatMap(([tag]) => {
-    const stage = /data-stage="(?<value>[^"]+)"/u.exec(tag)?.groups?.value;
-    const state = /data-state="(?<value>[^"]+)"/u.exec(tag)?.groups?.value;
-
-    return stage === undefined || state === undefined ? [] : [[stage, state]];
-  });
-
 const handle = Schema.decodeSync(Handle);
-
-const repoPath = Schema.decodeSync(RepoPath);
-
-const outOfScope = new OutOfScope({
-  paths: [repoPath("packages/format/src/format.ts"), repoPath("README.md")],
-});
-
-const weakened = new Weakened({
-  at: { line: 12, path: repoPath("packages/parse/test/parse.test.ts") },
-  weakening: { marker: ".skip(" },
-});
-
-const refusals = [outOfScope, weakened] as const;
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
-describe(RefusalView, () => {
-  it("shows every line explain gives, in order, each refusal's tag, and then its next command", () => {
-    const text = textOf(<RefusalView refusals={refusals} />);
+describe(StateBadge, () => {
+  const states = STATE_MARK_NAMES;
 
-    const expected = refusals.flatMap((refusal) => [
-      ...explain([refusal]).map((line) => line.trim()),
-      refusal.next,
-    ]);
+  it.each(states)(
+    "says %s in a word beside its mark, which the screen reader skips",
+    (state) => {
+      const element = <StateBadge mark={state} />;
+      const markup = markupOf(element);
 
-    expect(
-      positionsInOrder(text, expected).every((at) => at >= 0)
-    ).toBeTruthy();
-    expect(text).toContain("OutOfScope");
-    expect(text).toContain("Weakened");
+      expect(textOf(element).trim()).toBe(STATE_MARKS[state].word);
+      expect(STATE_MARKS[state].word.length).toBeGreaterThan(0);
+      expect(markup).toMatch(/<svg\b[^>]*aria-hidden="true"/u);
+      expect(markup).toContain(`data-mark="${state}"`);
+    }
+  );
 
-    for (const refusal of refusals) {
-      expect(refusal.next.startsWith(`${Brand.cli} `)).toBeTruthy();
+  it("is never a pill: no fill and no rounded edge", () => {
+    for (const state of states) {
+      const markup = markupOf(<StateBadge mark={state} />);
+
+      expect(markup).not.toMatch(/\brounded-(?:full|md|lg|xl)\b|\bbg-/u);
     }
   });
 
-  it("points at the path and line of a refusal that has one", () => {
-    const text = textOf(<RefusalView refusals={[weakened]} />);
-
-    expect(text).toContain("packages/parse/test/parse.test.ts:12");
+  it("gives refused to a refusal only, and waiting its own role", () => {
+    expect(STATE_MARKS.refused.tone).toBe("text-refused");
+    expect(STATE_MARKS.waiting.tone).toBe("text-waiting");
+    expect(STATE_MARKS.retry.tone).toBe("text-waiting");
+    expect(
+      states.filter((state) => STATE_MARKS[state].tone === "text-refused")
+    ).toStrictEqual(["refused"]);
   });
 
-  it("says whether retrying can help, without rewording the refusal", () => {
-    const markup = markupOf(<RefusalView refusals={refusals} />);
-
-    expect(markup).toContain('data-refusal="OutOfScope"');
-    expect(markup).toContain('data-retryable="false"');
+  it("can say a state in its own words", () => {
+    expect(textOf(<StateBadge mark="open" word="Open to take" />).trim()).toBe(
+      "Open to take"
+    );
   });
 });
 
-describe(CreditTrailers, () => {
-  const credits = [
-    { handle: handle("bram"), role: "Signed-off-by" },
-    { handle: handle("ines"), role: "Asked-by" },
-  ] as const;
+describe(CopyAction, () => {
+  it("holds its command as text and is named for what it copies", () => {
+    const command = `${Brand.cli} claim fix-week-start --project datekit`;
 
-  const assisted = [{ harness: "claude-code", verified: true }] as const;
-
-  it("lists credit in the order of the trailer roles, as the landing commit does", () => {
-    const text = textOf(
-      <CreditTrailers assisted={assisted} credits={credits} />
+    const markup = markupOf(
+      <CopyAction command={command} label="Copy claim command" />
     );
 
-    expect(
-      positionsInOrder(text, ["Asked-by: ines", "Signed-off-by: bram"]).every(
-        (at) => at >= 0
-      )
-    ).toBeTruthy();
+    expect(markup).toMatch(/^<button\b[^>]*aria-label="Copy claim command"/u);
+    expect(markup).toContain(`<code class="sr-only">${command}</code>`);
+    expect(markup).toContain('aria-live="polite"');
   });
+});
 
-  it("links each credited person to their page", () => {
-    const markup = markupOf(<CreditTrailers assisted={[]} credits={credits} />);
-
-    expect(markup).toContain('href="/people/ines"');
-    expect(markup).toContain('href="/people/bram"');
-  });
-
-  it("shows Assisted-by apart, in a list labelled as not credit", () => {
-    const text = textOf(
-      <CreditTrailers assisted={assisted} credits={credits} />
+describe("the skeletons", () => {
+  it("hold a row's place at its height, and a fact block's under its label", () => {
+    expect(markupOf(<RowSkeleton />)).toContain("h-16");
+    expect(markupOf(<RowSkeleton />)).not.toMatch(/animate-|shimmer/u);
+    expect(markupOf(<FactsSkeleton labels={["State", "Claim"]} />)).toContain(
+      "Claim"
     );
-
-    const label = text.indexOf("not credit");
-    const assistedAt = text.indexOf("Assisted-by: claude-code (verified)");
-
-    expect(label).toBeGreaterThan(text.indexOf("Signed-off-by: bram"));
-    expect(assistedAt).toBeGreaterThan(label);
-    expect(text.indexOf("Assisted-by")).toBe(assistedAt);
-  });
-
-  it("names an agent's model the way the trailer does", () => {
-    const text = textOf(
-      <CreditTrailers
-        assisted={[{ harness: "pi", model: "opus-4", verified: false }]}
-        credits={credits}
-      />
-    );
-
-    expect(text).toContain("Assisted-by: pi:opus-4 (claimed)");
-  });
-
-  it("shows a held-back trailer as its own Held-back line", () => {
-    const text = textOf(
-      <CreditTrailers
-        assisted={[]}
-        credits={credits}
-        heldBack="7/7 @ sha256:4f2a"
-      />
-    );
-
-    expect(text).toContain("Held-back: 7/7 @ sha256:4f2a");
-  });
-
-  it("leaves out the agents list when no agent helped", () => {
-    const text = textOf(<CreditTrailers assisted={[]} credits={credits} />);
-
-    expect(text).not.toContain("not credit");
   });
 });
 
@@ -219,116 +120,6 @@ describe(HandleLink, () => {
     expect(markupOf(<HandleLink handle={handle("ines-v")} />)).toMatch(
       /^<a\b[^>]*\bhref="\/people\/ines-v"[^>]*>ines-v<\/a>$/u
     );
-  });
-});
-
-describe(OutcomeView, () => {
-  const sha = Schema.decodeSync(LandedSha)(
-    "9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c"
-  );
-
-  const waiting = [
-    [Outcome.cases.Checking.make({ stage: "checks" }), "Checking", "checks"],
-    [
-      Outcome.cases.AwaitingDecision.make({
-        decision: Schema.decodeSync(DecisionId)("dec-000001"),
-      }),
-      "Waiting on decision",
-      "dec-000001",
-    ],
-    [
-      Outcome.cases.AwaitingFinish.make({ decider: handle("okonkwo") }),
-      "waiting for a decider's finish",
-      "okonkwo",
-    ],
-    [
-      Outcome.cases.WaitingOnParent.make({
-        ask: Schema.decodeSync(AskId)("split-format"),
-      }),
-      "waiting for",
-      "split-format",
-    ],
-  ] as const;
-
-  it.each(waiting)(
-    "reads %o as waiting, never as a refusal",
-    (outcome, wording, names) => {
-      const element = <OutcomeView outcome={outcome} />;
-
-      expect(markupOf(element)).toContain(`data-outcome="${outcome._tag}"`);
-      expect(markupOf(element)).toContain('data-state="waiting"');
-      expect(textOf(element)).toContain(wording);
-      expect(textOf(element)).toContain(names);
-    }
-  );
-
-  it("reads a landing as final, with its short sha", () => {
-    const element = (
-      <OutcomeView outcome={Outcome.cases.Landed.make({ sha })} />
-    );
-
-    expect(markupOf(element)).toContain('data-state="final"');
-    expect(textOf(element)).toContain("Landed as 9b1c3e5");
-  });
-
-  it("shows a refusal through RefusalView", () => {
-    const element = (
-      <OutcomeView outcome={Outcome.cases.Refused.make({ refusals })} />
-    );
-
-    expect(markupOf(element)).toContain('data-state="final"');
-    expect(markupOf(element)).toContain(
-      markupOf(<RefusalView refusals={refusals} />)
-    );
-  });
-});
-
-const strip = (stage: StageName, outcome: Outcome) =>
-  stagesOf(<StageStrip outcome={outcome} stage={stage} />);
-
-describe(StageStrip, () => {
-  it("marks the stages before the current one passed, and the rest pending", () => {
-    expect(
-      strip("checks", Outcome.cases.Checking.make({ stage: "checks" }))
-    ).toStrictEqual([
-      ["parse", "passed"],
-      ["shape", "passed"],
-      ["merge", "passed"],
-      ["cheap", "passed"],
-      ["checks", "current"],
-      ["heldBack", "pending"],
-      ["human", "pending"],
-    ]);
-  });
-
-  it("marks the stage that refused, and leaves the rest unreached", () => {
-    expect(
-      strip("shape", Outcome.cases.Refused.make({ refusals }))
-    ).toStrictEqual([
-      ["parse", "passed"],
-      ["shape", "refused"],
-      ["merge", "pending"],
-      ["cheap", "pending"],
-      ["checks", "pending"],
-      ["heldBack", "pending"],
-      ["human", "pending"],
-    ]);
-  });
-
-  it("marks a landed answer's later stages as not needed", () => {
-    const sha = Schema.decodeSync(LandedSha)(
-      "9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c"
-    );
-
-    expect(strip("checks", Outcome.cases.Landed.make({ sha }))).toStrictEqual([
-      ["parse", "passed"],
-      ["shape", "passed"],
-      ["merge", "passed"],
-      ["cheap", "passed"],
-      ["checks", "passed"],
-      ["heldBack", "skipped"],
-      ["human", "skipped"],
-    ]);
   });
 });
 
@@ -374,6 +165,37 @@ describe(EmptyState, () => {
 
     expect(text).toContain("No open asks");
     expect(text).toContain(command);
+    expect(
+      markupOf(<EmptyState command={command} title="No open asks" />)
+    ).toContain(markupOf(<CommandLine command={command} />));
+  });
+
+  it("gives a way onward when no command changes it", () => {
+    const text = textOf(
+      <EmptyState
+        onward={<a href="/datekit">Back to datekit</a>}
+        title="Nobody has answered this ask yet."
+      />
+    );
+
+    expect(text).toContain("Back to datekit");
+  });
+});
+
+describe(Definitions, () => {
+  it("reads each term before its value, in a list named for what it holds", () => {
+    const element = (
+      <Definitions label="Limits">
+        <Definition term="Claims at once">2</Definition>
+        <Definition term="Proposals a week">5</Definition>
+      </Definitions>
+    );
+
+    const markup = markupOf(element);
+
+    expect(markup).toMatch(/^<dl\b[^>]*aria-label="Limits"/u);
+    expect(markup.match(/<dt\b/gu)).toHaveLength(2);
+    expect(textOf(element)).toBe("Claims at once2Proposals a week5");
   });
 });
 

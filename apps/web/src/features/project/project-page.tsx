@@ -15,7 +15,7 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { DateTime } from "effect";
 
-import { EntriesTable, ReadmeSection } from "../code/tree-view.tsx";
+import { EntriesTable } from "../code/tree-view.tsx";
 import { SignedInProposeLink } from "../propose/propose-link.tsx";
 import { ID, SECTION } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
@@ -29,6 +29,7 @@ import { AskFields, AskStanding } from "./asks.tsx";
 import { LandingList } from "./landings.tsx";
 import { postureLabel } from "./posture-label.ts";
 import { ProjectNav } from "./project-nav.tsx";
+import { ReadmeSection } from "./readme-section.tsx";
 
 const AskRow = ({
   listing,

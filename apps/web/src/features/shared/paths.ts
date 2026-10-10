@@ -2,7 +2,12 @@
  * The site's addresses, in a module with no view of its own, so a route or
  * a view links to a page without carrying that page's view.
  */
-import type { AskId, Handle, ProjectName } from "@repo/protocol/ids";
+import type {
+  AskId,
+  DecisionId,
+  Handle,
+  ProjectName,
+} from "@repo/protocol/ids";
 
 /** A project's page. */
 export const projectPath = (project: ProjectName) => `/${project}`;
@@ -23,3 +28,7 @@ export const ledgerPath = (project: ProjectName) => `/${project}/ledger`;
 
 /** A project's env shape. */
 export const envPath = (project: ProjectName) => `/${project}/env`;
+
+/** A decision's page. */
+export const decisionPath = (project: ProjectName, decision: DecisionId) =>
+  `/${project}/decisions/${decision}`;

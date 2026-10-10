@@ -36,7 +36,7 @@ export interface AppLinkProps extends Omit<
   /** The path, built whole: `/datekit/ledger`. */
   readonly to: string;
   /** The address's search, each value a string. */
-  readonly search?: Readonly<Record<string, string>>;
+  readonly search?: Readonly<Record<string, string>> | undefined;
   /** The fragment, without its `#`. */
   readonly hash?: string;
   /** How the router decides the link leads to the page being read. */

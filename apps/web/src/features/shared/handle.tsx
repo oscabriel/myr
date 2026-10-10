@@ -4,13 +4,14 @@
  */
 import type { Handle } from "@repo/protocol/ids";
 
+import { AppLink } from "./link.tsx";
 import { personPath } from "./paths.ts";
 
 export const HandleLink = ({ handle }: { readonly handle: Handle }) => (
-  <a
+  <AppLink
     className="decoration-rule font-medium underline hover:decoration-current"
-    href={personPath(handle)}
+    to={personPath(handle)}
   >
     {handle}
-  </a>
+  </AppLink>
 );

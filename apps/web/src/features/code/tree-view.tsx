@@ -34,11 +34,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import { RepoMarkdown } from "../markdown/markdown.tsx";
 import { ProjectNav } from "../project/project-nav.tsx";
+import { ReadmeSection } from "../project/readme-section.tsx";
 import { LINK } from "../shared/classes.ts";
 import { PageShell } from "../shared/layout.tsx";
-import { ancestorsOf, blobHref, dirOf, treeHref } from "./paths.ts";
+import { ancestorsOf, blobHref, treeHref } from "./paths.ts";
 import { revLabel } from "./rev.ts";
 
 /** Each kind of entry: its mark and the word a screen reader says for it. */
@@ -157,37 +157,6 @@ export const CodeBreadcrumb = ({
     </Breadcrumb>
   );
 };
-
-/** A README (or any Markdown file), rendered, under its own name. */
-export const ReadmeSection = ({
-  file,
-  project,
-}: {
-  readonly file: FileView;
-  readonly project: ProjectName;
-}) => (
-  <section
-    aria-label={file.path}
-    className="border-rule flex min-w-0 flex-col gap-3 border-t pt-4"
-    data-readme={file.path}
-  >
-    <h2 className="text-muted-foreground font-mono text-xs font-medium">
-      {file.path.split("/").at(-1)}
-    </h2>
-    {file.text === undefined ? (
-      <p className="text-muted-foreground text-sm">
-        This file is too large to show here.
-      </p>
-    ) : (
-      <RepoMarkdown
-        at={file.at}
-        dir={dirOf(file.path)}
-        project={project}
-        source={file.text}
-      />
-    )}
-  </section>
-);
 
 /** A code page's frame: title, nav, and the file tree's column beside the content. */
 export const CodeLayout = ({

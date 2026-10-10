@@ -2,18 +2,21 @@
  * A project's posture, as the honest label the platform computes from its
  * visibility config. The posture literal rides as `data-posture`, so tests
  * and styles key on it; the words are the label, never rewritten here.
+ * It is a state badge: a lock in the sealed role when something is kept
+ * sealed, then the label.
  */
 import type { Posture } from "@repo/protocol/posture";
 
-import { Badge } from "../../components/ui/badge.tsx";
+import { POSTURE_MARKS } from "./mark-look.ts";
+import { StateBadge } from "./state-badge.tsx";
 
-/** Postures that keep something sealed read in the sealed role; the rest in ink. */
-const tone = {
-  open: "border-rule-strong text-foreground",
-  openCore: "border-sealed text-sealed",
-  openOnSchedule: "border-sealed text-sealed",
-  openWithSealedEvidence: "border-sealed text-sealed",
-  sourceAvailable: "border-rule text-muted-foreground",
+/** The label's colour: sealed when something is kept sealed, ink when nothing is, muted for a licence that is not open. */
+const wordTone = {
+  open: "text-foreground",
+  openCore: "text-sealed",
+  openOnSchedule: "text-sealed",
+  openWithSealedEvidence: "text-sealed",
+  sourceAvailable: "text-muted-foreground",
 } as const satisfies Record<Posture, string>;
 
 export const PostureBadge = ({
@@ -23,11 +26,10 @@ export const PostureBadge = ({
   readonly label: string;
   readonly posture: Posture;
 }) => (
-  <Badge
-    className={`h-auto bg-transparent py-0.5 text-left whitespace-normal ${tone[posture]}`}
-    data-posture={posture}
-    variant="outline"
-  >
-    {label}
-  </Badge>
+  <StateBadge
+    className="text-ui items-start [&>svg]:mt-0.5"
+    mark={POSTURE_MARKS[posture]}
+    word={<span data-posture={posture}>{label}</span>}
+    wordTone={wordTone[posture]}
+  />
 );

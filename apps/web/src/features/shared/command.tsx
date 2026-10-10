@@ -2,38 +2,36 @@
  * A shell line a reader runs next: a refusal's `next`, a clone URL, the
  * install line. The terminal is where work happens, so every page that
  * suggests an action shows its command, whole and copyable, never a form.
+ *
+ * A page marks its main commands `numbered`: while the single keys are on,
+ * each shows its number before the `$`, and that number key copies it
+ * ("Copy (1)" in the button's title).
  */
-import { Effect } from "effect";
 import { Check, Copy } from "lucide-react";
-import { useState } from "react";
 
 import { Button } from "../../components/ui/button.tsx";
+import { useCopy } from "./copy-action.tsx";
+import { useNumberedCommand } from "./keys.tsx";
 
-const copyFor = (command: string, shown: (copied: boolean) => void) =>
-  Effect.tryPromise(() => navigator.clipboard.writeText(command)).pipe(
-    Effect.andThen(
-      Effect.sync(() => {
-        shown(true);
-      })
-    ),
-    Effect.andThen(Effect.sleep("2 seconds")),
-    Effect.andThen(
-      Effect.sync(() => {
-        shown(false);
-      })
-    ),
-    Effect.ignore
-  );
-
-export const CommandLine = ({ command }: { readonly command: string }) => {
-  const [copied, setCopied] = useState(false);
-
-  const copy = () => {
-    Effect.runFork(copyFor(command, setCopied));
-  };
+const Line = ({
+  command,
+  number,
+}: {
+  readonly command: string;
+  readonly number: number | undefined;
+}) => {
+  const { copied, copy } = useCopy(command);
 
   return (
     <div className="border-rule bg-surface text-mono leading-terminal flex w-fit max-w-full min-w-0 items-start gap-2 border py-1 pr-1 pl-3 font-mono">
+      {number === undefined ? null : (
+        <span
+          aria-hidden="true"
+          className="text-muted-foreground font-sans tabular-nums select-none"
+        >
+          {number}
+        </span>
+      )}
       <span aria-hidden="true" className="text-muted-foreground select-none">
         $
       </span>
@@ -44,14 +42,33 @@ export const CommandLine = ({ command }: { readonly command: string }) => {
         className="shrink-0 font-sans"
         onClick={copy}
         size="sm"
+        title={number === undefined ? undefined : `Copy (${number})`}
         type="button"
         variant="ghost"
       >
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-        <span className="sr-only sm:not-sr-only">
+        <span className="sr-only sm:not-sr-only @max-xs:sr-only">
           {copied ? "Copied" : "Copy"}
         </span>
       </Button>
     </div>
   );
 };
+
+const NumberedLine = ({ command }: { readonly command: string }) => (
+  <Line command={command} number={useNumberedCommand(command)} />
+);
+
+export const CommandLine = ({
+  command,
+  numbered = false,
+}: {
+  readonly command: string;
+  /** One of the page's main commands, which a number key copies. */
+  readonly numbered?: boolean;
+}) =>
+  numbered ? (
+    <NumberedLine command={command} />
+  ) : (
+    <Line command={command} number={undefined} />
+  );

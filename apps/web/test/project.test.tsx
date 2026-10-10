@@ -31,6 +31,7 @@ import {
   ProjectPageData,
   readProjectPage,
 } from "../src/routes/$project/index.tsx";
+import { reachingTransport } from "./transport.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -458,24 +459,14 @@ describe(UnknownProjectView, () => {
   });
 });
 
-describe("the project, front page, people and code views", () => {
-  // Views only: props in, markup out. A view that fetched would tie its page
-  // to one transport (src/surfaces.ts); the atoms live in src/client/.
+describe("the project's views", () => {
   const sources: Readonly<Record<string, string>> = import.meta.glob(
-    "../src/features/{front,project,people,code}/**/*.{ts,tsx}",
+    "../src/features/project/**/*.{ts,tsx}",
     { eager: true, import: "default", query: "?raw" }
   );
 
-  const transport =
-    /from\s+["'](?:@repo\/protocol\/contracts|effect\/(?:rpc|http|reactivity)|#backend|[./]+\/(?:surfaces|client\/[^"']*|server\/[^"']*)(?:\.tsx?)?)["']/u;
-
   it("import no transport", () => {
     expect(Object.keys(sources).length).toBeGreaterThanOrEqual(3);
-
-    const reaching = Object.entries(sources).flatMap(([path, source]) =>
-      transport.test(source) ? [path] : []
-    );
-
-    expect(reaching).toStrictEqual([]);
+    expect(reachingTransport(sources)).toStrictEqual([]);
   });
 });

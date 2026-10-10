@@ -53,6 +53,7 @@ import { readCommitPage } from "../src/routes/$project/commit/$sha.tsx";
 import { readLogPage } from "../src/routes/$project/commits/$rev.tsx";
 import { readRefsPage } from "../src/routes/$project/refs.tsx";
 import { readTreePage } from "../src/routes/$project/tree/$rev/$.tsx";
+import { reachingTransport } from "./transport.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -1190,4 +1191,16 @@ describe("the code pages' reads", () => {
       ]);
     })
   );
+});
+
+describe("the code browser's views", () => {
+  const sources: Readonly<Record<string, string>> = import.meta.glob(
+    "../src/features/code/**/*.{ts,tsx}",
+    { eager: true, import: "default", query: "?raw" }
+  );
+
+  it("import no transport", () => {
+    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(3);
+    expect(reachingTransport(sources)).toStrictEqual([]);
+  });
 });

@@ -18,6 +18,7 @@ import type { ReactNode } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 
+import { ReadmeSection } from "../project/readme-section.tsx";
 import { LINK } from "../shared/classes.ts";
 import { CopyButton } from "./copy.tsx";
 import {
@@ -30,7 +31,7 @@ import {
   whyHref,
 } from "./paths.ts";
 import { revLabel } from "./rev.ts";
-import { CodeBreadcrumb, CodeLayout, ReadmeSection } from "./tree-view.tsx";
+import { CodeBreadcrumb, CodeLayout } from "./tree-view.tsx";
 
 /** How many lines the server sends; the browser's drawing shows them all. */
 export const FALLBACK_LINES = 2000;

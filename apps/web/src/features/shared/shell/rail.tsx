@@ -21,12 +21,9 @@ import {
   Bot,
   CalendarCheck,
   ChevronDown,
-  Eye,
   Folders,
   Keyboard,
   List,
-  LockKeyhole,
-  LockKeyholeOpen,
   Menu,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -37,6 +34,7 @@ import { Skeleton } from "../../../components/ui/skeleton.tsx";
 import { SessionSlot } from "../../auth/session-slot.tsx";
 import { postureLabel } from "../../project/posture-label.ts";
 import { AppLink } from "../link.tsx";
+import { POSTURE_MARKS } from "../mark-look.ts";
 import {
   useCurrentProject,
   useProjectList,
@@ -119,21 +117,9 @@ const SiteSections = () => (
   </ul>
 );
 
-/** A posture's mark: a lock in the sealed role when something is kept sealed. */
-const POSTURE_MARK = {
-  open: { icon: LockKeyholeOpen, tone: "text-muted-foreground" },
-  openCore: { icon: LockKeyhole, tone: "text-sealed" },
-  openOnSchedule: { icon: LockKeyhole, tone: "text-sealed" },
-  openWithSealedEvidence: { icon: LockKeyhole, tone: "text-sealed" },
-  sourceAvailable: { icon: Eye, tone: "text-muted-foreground" },
-} as const satisfies Record<
-  Posture,
-  { readonly icon: LucideIcon; readonly tone: string }
->;
-
 /** A project's posture at its row's end: the mark in its role, a short word muted, the full label as its title. */
 export const PostureMark = ({ posture }: { readonly posture: Posture }) => {
-  const { icon: Icon, tone } = POSTURE_MARK[posture];
+  const { icon: Icon, tone } = POSTURE_MARKS[posture];
 
   return (
     <span

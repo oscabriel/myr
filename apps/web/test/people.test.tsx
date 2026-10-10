@@ -11,6 +11,7 @@ import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { PersonView } from "../src/features/people/person-page.tsx";
+import { reachingTransport } from "./transport.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -84,5 +85,17 @@ describe(PersonView, () => {
     expect(textOf(<PersonView credits={[]} handle={handle} />)).toContain(
       "No credited landings yet"
     );
+  });
+});
+
+describe("the person's views", () => {
+  const sources: Readonly<Record<string, string>> = import.meta.glob(
+    "../src/features/people/**/*.{ts,tsx}",
+    { eager: true, import: "default", query: "?raw" }
+  );
+
+  it("import no transport", () => {
+    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(1);
+    expect(reachingTransport(sources)).toStrictEqual([]);
   });
 });

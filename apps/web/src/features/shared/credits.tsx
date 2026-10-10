@@ -5,10 +5,15 @@
  * landing was judged by held-back checks; then, apart and labelled, the
  * agents people worked through. `Assisted-by` is a disclosure, never credit
  * (GLOSSARY.md "Credit").
+ *
+ * `CompactCredit` is the same credit in one line for a row ("Asked by
+ * ines-v · answered by tamsin"): the roles in the same order, each person
+ * linked, and never an agent.
  */
 import { CreditRole } from "@repo/protocol/domain/credit";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { LockKeyhole } from "lucide-react";
+import { Fragment } from "react";
 
 import { HandleLink } from "./handle.tsx";
 
@@ -71,3 +76,60 @@ export const CreditTrailers = ({
     )}
   </div>
 );
+
+/** Each role as a row's line says it: the trailer, in words. */
+const roleWords = {
+  "Advised-by": "advised by",
+  "Asked-by": "asked by",
+  "Decided-by": "decided by",
+  "Finished-by": "finished by",
+  "Mentored-by": "mentored by",
+  "Released-by": "released by",
+  "Signed-off-by": "answered by",
+} as const satisfies Record<CreditRole, string>;
+
+/** A sentence's first word with its first letter raised. */
+const raised = (words: string) =>
+  `${words.slice(0, 1).toUpperCase()}${words.slice(1)}`;
+
+/** What comes before the `index`th of `count` people in a list of words. */
+const before = (index: number, count: number) => {
+  if (index === 0) {
+    return "";
+  }
+
+  return index === count - 1 ? " and " : ", ";
+};
+
+/** People in a list of words: "bram", "bram and tamsin", "bram, ines and tamsin". */
+const Joined = ({ people }: { readonly people: readonly Credit[] }) =>
+  people.map(({ handle }, index) => (
+    <Fragment key={handle}>
+      {before(index, people.length)}
+      <HandleLink handle={handle} />
+    </Fragment>
+  ));
+
+/** A landing's credit in one line: each role once, in trailer order, its people linked. */
+export const CompactCredit = ({
+  credits,
+}: {
+  readonly credits: readonly Credit[];
+}) => {
+  const roles = CreditRole.literals.flatMap((role) => {
+    const people = credits.filter((credit) => credit.role === role);
+
+    return people.length === 0 ? [] : [{ people, role }];
+  });
+
+  return roles.length === 0 ? null : (
+    <span className="min-w-0">
+      {roles.map(({ people, role }, index) => (
+        <Fragment key={role}>
+          {index === 0 ? raised(roleWords[role]) : ` · ${roleWords[role]}`}{" "}
+          <Joined people={people} />
+        </Fragment>
+      ))}
+    </span>
+  );
+};

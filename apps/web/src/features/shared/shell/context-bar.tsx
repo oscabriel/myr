@@ -5,12 +5,11 @@
  * state, or a list's count) and its one command to copy. From the shell's
  * width it stays at the top of main while main scrolls.
  */
-import { Effect } from "effect";
 import { Check, Copy } from "lucide-react";
-import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../../components/ui/button.tsx";
+import { useCopy } from "../copy-action.tsx";
 import { useNumberedCommand } from "../keys.tsx";
 import { AppLink } from "../link.tsx";
 import type { Crumb } from "./sections.ts";
@@ -62,37 +61,18 @@ export const Breadcrumb = ({
   </nav>
 );
 
-/** Copy `command`, then show it copied for two seconds. */
-const copyFor = (command: string, shown: (copied: boolean) => void) =>
-  Effect.tryPromise(() => navigator.clipboard.writeText(command)).pipe(
-    Effect.andThen(
-      Effect.sync(() => {
-        shown(true);
-      })
-    ),
-    Effect.andThen(Effect.sleep("2 seconds")),
-    Effect.andThen(
-      Effect.sync(() => {
-        shown(false);
-      })
-    ),
-    Effect.ignore
-  );
-
 /**
  * The page's one command, as a copy button: the command itself is the
  * button's text for a screen reader and a crawler, and its number (when the
  * single keys are on) is in its title.
  */
 export const CopyCommand = ({ command }: { readonly command: string }) => {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopy(command);
   const number = useNumberedCommand(command);
 
   return (
     <Button
-      onClick={() => {
-        Effect.runFork(copyFor(command, setCopied));
-      }}
+      onClick={copy}
       size="sm"
       title={
         number === undefined

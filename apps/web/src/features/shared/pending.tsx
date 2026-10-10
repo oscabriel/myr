@@ -16,11 +16,11 @@ import { useLocation } from "@tanstack/react-router";
 import { Unplug } from "lucide-react";
 
 import { Button } from "../../components/ui/button.tsx";
-import { Skeleton } from "../../components/ui/skeleton.tsx";
 import { PageShell } from "./layout.tsx";
 import { AppLink } from "./link.tsx";
 import { crumbsFor, projectOf } from "./shell/sections.ts";
 import { Workspace } from "./shell/workspace.tsx";
+import { RowSkeleton } from "./skeleton.tsx";
 
 const ROWS = ["first", "second", "third"] as const;
 
@@ -29,13 +29,7 @@ export const ReadingRows = () => (
   <div aria-busy="true" className="flex flex-col">
     <output className="sr-only">Reading from the platform</output>
     {ROWS.map((row) => (
-      <div
-        className="border-rule flex h-16 flex-col justify-center gap-2.5 border-t"
-        key={row}
-      >
-        <Skeleton className="h-3 w-full max-w-[28rem]" />
-        <Skeleton className="h-2.5 w-full max-w-[14rem]" />
-      </div>
+      <RowSkeleton key={row} />
     ))}
   </div>
 );

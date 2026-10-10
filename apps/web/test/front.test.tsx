@@ -18,6 +18,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { filterEntries, readFilter } from "../src/features/front/filter.ts";
 import type { FrontFilter } from "../src/features/front/filter.ts";
 import { FrontPageView } from "../src/features/front/front-page.tsx";
+import { reachingTransport } from "./transport.ts";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -227,5 +228,17 @@ describe(FrontPageView, () => {
 
     expect(text).toContain("No open asks");
     expect(text).toContain(`${Brand.cli} ask open`);
+  });
+});
+
+describe("the front page's views", () => {
+  const sources: Readonly<Record<string, string>> = import.meta.glob(
+    "../src/features/front/**/*.{ts,tsx}",
+    { eager: true, import: "default", query: "?raw" }
+  );
+
+  it("import no transport", () => {
+    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(1);
+    expect(reachingTransport(sources)).toStrictEqual([]);
   });
 });
