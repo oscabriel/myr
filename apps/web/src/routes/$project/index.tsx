@@ -35,6 +35,7 @@ import { useStamps } from "../../features/front/stamps.ts";
 import {
   ProjectView,
   heldBackOf,
+  homeListing,
 } from "../../features/project/project-page.tsx";
 import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
 import { askStates } from "../../features/shared/ask-progress.ts";
@@ -207,11 +208,7 @@ const LiveProject = ({
       heldBack={ledger === undefined ? undefined : heldBackOf(ledger)}
       landings={landings}
       lastLanded={latest?.landedAt}
-      listing={{
-        openAsks: asks?.length ?? 0,
-        posture: ledger?.posture ?? "open",
-        project,
-      }}
+      listing={homeListing({ asks, ledger, project })}
       now={data.now}
       parents={data.parents}
       platformUrl={platformUrl}

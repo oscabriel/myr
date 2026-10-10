@@ -43,6 +43,7 @@ import { recentShown } from "../src/features/project/landings.tsx";
 import {
   ProjectView,
   heldBackOf,
+  homeListing,
 } from "../src/features/project/project-page.tsx";
 import type { ProjectViewProps } from "../src/features/project/project-page.tsx";
 import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
@@ -600,11 +601,11 @@ const sentFrom = (
       heldBack={data.ledger === undefined ? undefined : heldBackOf(data.ledger)}
       landings={recentLandings(events)}
       lastLanded={latest?.landedAt}
-      listing={{
-        openAsks: data.asks?.length ?? 0,
-        posture: data.ledger?.posture ?? "open",
+      listing={homeListing({
+        asks: data.asks,
+        ledger: data.ledger,
         project: data.project,
-      }}
+      })}
       now={data.now}
       parents={data.parents}
       platformUrl={platformUrl}
@@ -688,6 +689,25 @@ describe("the project's home as the server sends it", () => {
         expect(yield* Ref.get(listed)).toBe(0);
         expect(head).toContain('data-posture="openWithSealedEvidence"');
         expect(textIn(head)).toContain("Open with sealed evidence");
+      }),
+    seededWorld
+  );
+
+  it.effect(
+    "says no posture while its own ledger is unread, never one it was not told",
+    () =>
+      Effect.gen(function* () {
+        const { ledger: _unread, ...data } = yield* readFrom(
+          "vellum",
+          devWorldWith({ fixtures: "on" })
+        );
+
+        const markup = yield* sentFrom(data);
+
+        expect({
+          badges: markup.match(/data-posture="/gu)?.length ?? 0,
+          open: textIn(inspectorOf(markup)).includes("Everything it ships"),
+        }).toStrictEqual({ badges: 0, open: false });
       }),
     seededWorld
   );

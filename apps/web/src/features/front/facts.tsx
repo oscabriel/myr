@@ -91,7 +91,8 @@ export const StartHere = ({ webUrl }: { readonly webUrl: string }) => (
   </FactBlock>
 );
 
-const plural = (count: number, one: string, many: string) =>
+/** A count and its noun: "1 open ask", "7 open asks". */
+export const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
 /** Every project the platform lists, its posture and its open asks; bars until the list arrives. */

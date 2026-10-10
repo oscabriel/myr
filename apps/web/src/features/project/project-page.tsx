@@ -17,12 +17,19 @@ import type { LandingView } from "@repo/protocol/domain/landing";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { Ledger } from "@repo/protocol/domain/visibility";
 import type { AreaName, AskId, Handle, ProjectName } from "@repo/protocol/ids";
+import type { Posture } from "@repo/protocol/posture";
 import { useRouter } from "@tanstack/react-router";
 import { Option, Predicate } from "effect";
 import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
-import { SelectedAskFacts, Onward, ForAgents, Step } from "../front/facts.tsx";
+import {
+  ForAgents,
+  Onward,
+  SelectedAskFacts,
+  Step,
+  plural,
+} from "../front/facts.tsx";
 import { finaleOf } from "../front/families.ts";
 import { ledeOf } from "../front/head.ts";
 import { ProposeLink } from "../propose/propose-link.tsx";
@@ -39,6 +46,7 @@ import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
 import { PostureBadge } from "../shared/posture.tsx";
 import { MetaCode, useRowSelection } from "../shared/row.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
+import { FactsSkeleton } from "../shared/skeleton.tsx";
 import { When } from "../shared/time.tsx";
 import { AskList, askListIds, openAsks, openToTake } from "./asks.tsx";
 import { LandingList, recentShown } from "./landings.tsx";
@@ -98,6 +106,36 @@ export const heldBackOf = (ledger: Ledger): readonly HeldBackArea[] => {
     }));
 };
 
+/**
+ * The project as its home knows it: its name, its open asks, when it last
+ * landed, and its posture once its own ledger has said it. Until then the
+ * page says no posture, never one it was not told.
+ */
+export type HomeListing = Omit<ProjectListing, "posture"> & {
+  readonly posture?: Posture | undefined;
+};
+
+/** The project for its home, from what was read: the posture only from its own ledger. */
+export const homeListing = ({
+  asks,
+  ledger,
+  project,
+}: {
+  readonly asks: readonly AskListing[] | undefined;
+  readonly ledger: Ledger | undefined;
+  readonly project: ProjectName;
+}): HomeListing => ({
+  openAsks: asks?.length ?? 0,
+  posture: ledger?.posture,
+  project,
+});
+
+/** A posture known, in the platform's words. */
+interface KnownPosture {
+  readonly label: string;
+  readonly posture: Posture;
+}
+
 export interface ProjectViewProps {
   /** The open asks; none while they are read, and none when they could not be. */
   readonly asks: readonly AskListing[] | undefined;
@@ -105,8 +143,8 @@ export interface ProjectViewProps {
   readonly unreachable?: boolean;
   /** The project's landings, newest first. */
   readonly landings: readonly LandingView[];
-  /** The project: its posture, when it last landed, its open asks. */
-  readonly listing: ProjectListing;
+  /** The project: its posture (once its ledger is read), when it last landed, its open asks. */
+  readonly listing: HomeListing;
   /** When it last landed, as its events say, over what the listing says. */
   readonly lastLanded?: DateTime.Utc | undefined;
   /** Its posture in the platform's words, from its own ledger. */
@@ -130,9 +168,6 @@ export interface ProjectViewProps {
   /** Whether someone is signed in, who may propose an ask. */
   readonly signedIn?: boolean;
 }
-
-const plural = (count: number, one: string, many: string) =>
-  `${count} ${count === 1 ? one : many}`;
 
 /** Who decides, one line per set of paths, at most three, then the policy. */
 const WhoDecides = ({
@@ -215,7 +250,7 @@ const RecentLandings = ({
 }: {
   readonly landedAt: DateTime.Utc | undefined;
   readonly landings: readonly LandingView[];
-  readonly listing: ProjectListing;
+  readonly listing: HomeListing;
   readonly now: DateTime.Utc;
   readonly platformUrl: string;
 }) => {
@@ -250,25 +285,29 @@ const RecentLandings = ({
 const HowItLands = ({
   deciders,
   heldBack,
-  label,
   landedAt,
   landings,
   listing,
   now,
   platformUrl,
+  posture,
 }: Pick<
   ProjectViewProps,
   "deciders" | "heldBack" | "landings" | "listing" | "now" | "platformUrl"
 > & {
-  readonly label: string;
+  readonly posture: KnownPosture | undefined;
   readonly landedAt: DateTime.Utc | undefined;
 }) => (
   <>
-    <PostureFacts
-      label={label}
-      posture={listing.posture}
-      project={listing.project}
-    />
+    {posture === undefined ? (
+      <FactsSkeleton labels={["Posture"]} />
+    ) : (
+      <PostureFacts
+        label={posture.label}
+        posture={posture.posture}
+        project={listing.project}
+      />
+    )}
     <GateFacts />
     <WhoDecides deciders={deciders} project={listing.project} />
     {heldBack === undefined ? null : <HeldBackFacts areas={heldBack} />}
@@ -287,23 +326,25 @@ const HowItLands = ({
 /** The project line: its posture, its open asks, when it last landed; then its README's first sentence. */
 const ProjectLine = ({
   count,
-  label,
   landedAt,
   lede,
-  listing,
   now,
+  posture,
 }: {
   readonly count: number;
-  readonly label: string;
+  readonly posture: KnownPosture | undefined;
   readonly landedAt: DateTime.Utc | undefined;
   readonly lede: string | undefined;
-  readonly listing: ProjectListing;
   readonly now: DateTime.Utc;
 }) => (
   <div className="flex flex-col gap-3">
     <p className="text-ui text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-      <PostureBadge label={label} posture={listing.posture} />
-      <span aria-hidden="true">·</span>
+      {posture === undefined ? null : (
+        <>
+          <PostureBadge label={posture.label} posture={posture.posture} />
+          <span aria-hidden="true">·</span>
+        </>
+      )}
       <span className="tabular-nums">
         {plural(count, "open ask", "open asks")}
       </span>
@@ -389,15 +430,15 @@ const AsksSection = ({
 
 /** Whichever facts the inspector shows: how a change lands here, or the selected ask's. */
 const PageFacts = ({
-  label,
   landedAt,
   picked,
+  posture,
   props,
   states,
 }: {
   readonly props: ProjectViewProps;
   readonly picked: AskListing | undefined;
-  readonly label: string;
+  readonly posture: KnownPosture | undefined;
   readonly landedAt: DateTime.Utc | undefined;
   readonly states: ReadonlyMap<AskId, AskProgress>;
 }) => {
@@ -408,12 +449,12 @@ const PageFacts = ({
       <HowItLands
         deciders={props.deciders}
         heldBack={props.heldBack}
-        label={label}
         landedAt={landedAt}
         landings={props.landings}
         listing={listing}
         now={props.now}
         platformUrl={platformUrl}
+        posture={posture}
       />
     );
   }
@@ -432,7 +473,7 @@ const PageFacts = ({
       full={selectedAsk?.id === picked.ask ? selectedAsk : undefined}
       listing={picked}
       platformUrl={platformUrl}
-      posture={{ label, posture: listing.posture }}
+      posture={posture}
       progress={states.get(picked.ask)}
       project={listing.project}
       takeable={openToTake(picked)}
@@ -459,7 +500,17 @@ const ProjectPanes = ({
   const { asks, code, listing } = props;
   const states = props.states ?? new Map<AskId, AskProgress>();
   const { project } = listing;
-  const label = props.postureLabel ?? postureLabel(listing.posture);
+
+  const posture = Option.getOrUndefined(
+    Option.map(
+      Option.fromUndefinedOr(listing.posture),
+      (known): KnownPosture => ({
+        label: props.postureLabel ?? postureLabel(known),
+        posture: known,
+      })
+    )
+  );
+
   const landedAt = props.lastLanded ?? listing.landedAt;
   const open = Option.map(Option.fromUndefinedOr(asks), openAsks);
   const text = code?.readme?.text;
@@ -473,9 +524,9 @@ const ProjectPanes = ({
       crumbs={[{ label: project, to: `/${project}` }, { label: "Asks" }]}
       facts={
         <PageFacts
-          label={label}
           landedAt={landedAt}
           picked={asks?.find(({ ask }) => ask === selected)}
+          posture={posture}
           props={props}
           states={states}
         />
@@ -489,18 +540,17 @@ const ProjectPanes = ({
         onNone: () => ({}),
         onSome: (factsKey) => ({ factsKey }),
       })}
-      factsSummary={label}
+      factsSummary={posture?.label ?? "Posture, gate, who decides, take part"}
       status={
         <ProjectLine
           count={Option.match(open, {
             onNone: () => listing.openAsks,
             onSome: (each) => each.length,
           })}
-          label={label}
           landedAt={landedAt}
           lede={Predicate.isString(text) ? ledeOf(text) : undefined}
-          listing={listing}
           now={props.now}
+          posture={posture}
         />
       }
       title={project}

@@ -36,15 +36,17 @@ import { projectPath } from "../shared/paths.ts";
 import { PostureBadge } from "../shared/posture.tsx";
 import { AskRow, RowGroup, useRowSelection } from "../shared/row.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
-import { ProjectsFacts, SelectedAskFacts, StartHere } from "./facts.tsx";
+import {
+  ProjectsFacts,
+  SelectedAskFacts,
+  StartHere,
+  plural,
+} from "./facts.tsx";
 import { arrange, finaleOf } from "./families.ts";
 import type { Arranged } from "./families.ts";
 import { countWith, filterEntries, frontPath } from "./filter.ts";
 import type { FrontFilter, FrontFilterInput } from "./filter.ts";
 import { EXPLAINER } from "./head.ts";
-
-const plural = (count: number, one: string, many: string) =>
-  `${count} ${count === 1 ? one : many}`;
 
 /** The list's count, as the context bar says it: "10 open asks, 8 open to take". */
 export const frontCount = (shown: readonly FrontPageEntry[]) =>
@@ -82,7 +84,7 @@ const byProject = (shown: readonly FrontPageEntry[]) => {
 };
 
 /** One option of a filter: its words and its count, the current one marked. */
-const Option = ({
+const FilterOption = ({
   count,
   current,
   label,
@@ -207,17 +209,17 @@ const Toolbar = ({
     <>
       <nav
         aria-label="Filter the asks"
-        className="flex min-w-0 flex-1 [scrollbar-width:none] items-center gap-6 overflow-x-auto overscroll-x-contain"
+        className="max-shell:pr-8 max-shell:[mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)] flex min-w-0 flex-1 [scrollbar-width:none] items-center gap-6 overflow-x-auto overscroll-x-contain"
       >
         <Segment label="Kind">
-          <Option
+          <FilterOption
             count={countWith(entries, filter, { kind: undefined })}
             current={filter.kind === undefined}
             label="All"
             search={{ ...filter, kind: undefined }}
           />
           {kindsOf(entries, filter).map((kind: KindName) => (
-            <Option
+            <FilterOption
               count={countWith(entries, filter, { kind })}
               current={filter.kind === kind}
               key={kind}
@@ -228,7 +230,7 @@ const Toolbar = ({
         </Segment>
         <span aria-hidden="true" className="bg-rule h-4 w-px shrink-0" />
         <Segment label="Who may take it">
-          <Option
+          <FilterOption
             count={countWith(entries, filter, {
               reserved: undefined,
               take: undefined,
@@ -237,7 +239,7 @@ const Toolbar = ({
             label="Any"
             search={{ ...filter, reserved: undefined, take: undefined }}
           />
-          <Option
+          <FilterOption
             count={countWith(entries, filter, {
               reserved: undefined,
               take: "open",
@@ -247,7 +249,7 @@ const Toolbar = ({
             search={{ ...filter, reserved: undefined, take: "open" }}
           />
           {held.map((reserved) => (
-            <Option
+            <FilterOption
               count={countWith(entries, filter, { reserved, take: undefined })}
               current={filter.reserved === reserved}
               key={reserved}
