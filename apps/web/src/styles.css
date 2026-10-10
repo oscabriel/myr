@@ -395,15 +395,15 @@
     --diffs-token-punctuation: var(--syntax-punctuation);
     --diffs-token-link: var(--syntax-link);
 
-    /* A diff's lines, in its own tints (Pierre mixes the line's from the
-       sign, as --diff-add-bg says). */
+    /* A diff's lines, in its own tints. Pierre mixes a changed line's
+       background (and its number's) from the sign colour, as --diff-add-bg
+       says, so the line backgrounds take no override of their own: Pierre
+       also draws a deletion's bar in dashes of that background and the
+       sign, and an override set to the sign would make the bar solid, so a
+       deletion would differ from an addition by colour alone. */
     --diffs-addition-color-override: var(--diff-add-sign);
-    --diffs-bg-addition-override: var(--diff-add-sign);
-    --diffs-bg-addition-number-override: var(--diff-add-sign);
     --diffs-bg-addition-emphasis-override: var(--diff-add-emphasis);
     --diffs-deletion-color-override: var(--diff-del-sign);
-    --diffs-bg-deletion-override: var(--diff-del-sign);
-    --diffs-bg-deletion-number-override: var(--diff-del-sign);
     --diffs-bg-deletion-emphasis-override: var(--diff-del-emphasis);
     --diffs-modified-color-override: var(--muted);
   }

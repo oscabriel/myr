@@ -315,6 +315,12 @@ describe("a README drawn in the page's own type", () => {
     expect(proseClasses().has("prose-h1:text-title")).toBeTruthy();
   });
 
+  it("sizes every element from the type scale, never an arbitrary size", () => {
+    expect(
+      [...proseClasses()].filter((name) => /(?:^|:)text-\[/u.test(name))
+    ).toStrictEqual([]);
+  });
+
   it("colours it from the tokens, so both schemes come from one set of classes", () => {
     const classes = proseClasses();
 

@@ -279,8 +279,8 @@ describe("Pierre's shadow roots", () => {
     const elsewhere = [
       "diffs-addition-color-override",
       "diffs-deletion-color-override",
-      "diffs-bg-addition-override",
-      "diffs-bg-deletion-override",
+      "diffs-bg-addition-emphasis-override",
+      "diffs-bg-deletion-emphasis-override",
     ].filter(
       (name) => !/^var\(--diff-(?:add|del)-/u.test(mapped.get(name) ?? "")
     );
@@ -296,6 +296,23 @@ describe("Pierre's shadow roots", () => {
       "diffs-bg-selection-number-override",
       "diffs-bg-selection-override",
     ]);
+  });
+
+  // Pierre reads --diffs-bg-deletion-override both as the colour it mixes a
+  // line from and, unmixed, as the light half of a deletion bar's dashes:
+  // set it, and the bar turns solid, telling a deletion from an addition by
+  // colour alone. Left unset, the line is mixed from the sign colour.
+  it("leave a changed line's background to Pierre's mix, so a deletion's bar keeps its dashes", () => {
+    const mapped = declarations(diffs);
+
+    expect(
+      [
+        "diffs-bg-addition-override",
+        "diffs-bg-addition-number-override",
+        "diffs-bg-deletion-override",
+        "diffs-bg-deletion-number-override",
+      ].filter((name) => mapped.has(name))
+    ).toStrictEqual([]);
   });
 
   it("mark a file tree's changes in the diff tints, and spend no state colour", () => {

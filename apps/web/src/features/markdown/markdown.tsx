@@ -113,10 +113,11 @@ const components: Components = { a: Anchor, img: Image };
  */
 const PROSE = [
   "prose prose-tokens text-body max-w-[70ch] min-w-0",
-  // Headings: the h1 at the title size, so the page's own headline leads.
+  // Headings on the scale: h1 and h2 at the title size, so the page's own
+  // headline leads, the h1 ruled beneath; h3 and h4 at the want's size.
   "prose-headings:font-semibold prose-headings:tracking-[-0.01em]",
   "prose-h1:text-title prose-h1:mb-3 prose-h1:border-b prose-h1:border-rule prose-h1:pb-2",
-  "prose-h2:text-[1.0625rem] prose-h2:mt-8 prose-h2:mb-3",
+  "prose-h2:text-title prose-h2:mt-8 prose-h2:mb-3",
   "prose-h3:text-want prose-h4:text-want",
   // Inline code: the mono face on a surface field, without backticks.
   "prose-code:before:content-none prose-code:after:content-none prose-code:font-normal",
