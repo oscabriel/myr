@@ -35,6 +35,33 @@ export const rowsOf = (view: WhyView): readonly WhyRow[] => {
   }));
 };
 
+/**
+ * The view's lines grouped by what brought them: consecutive ranges from
+ * one commit form one group, so a landing's lines read as one band.
+ */
+export const groupsOf = (view: WhyView): readonly WhyRow[] => {
+  const groups: WhyRow[] = [];
+
+  for (const row of rowsOf(view)) {
+    const last = groups.at(-1);
+
+    if (
+      last !== undefined &&
+      last.range.sha === row.range.sha &&
+      last.range.end + 1 === row.range.start
+    ) {
+      groups[groups.length - 1] = {
+        ...last,
+        range: { ...last.range, end: row.range.end },
+      };
+    } else {
+      groups.push(row);
+    }
+  }
+
+  return groups;
+};
+
 /** The row holding line `line`, numbered from 1. */
 export const rowAt = (rows: readonly WhyRow[], line: number) =>
   Option.fromUndefinedOr(
@@ -65,10 +92,6 @@ export const askOf = (landing: LandingView): Option.Option<LandingAsk> => {
     (ask): LandingAsk => ({ ask, kind: "opened" })
   );
 };
-
-/** A count of credit as a reader says it. */
-export const creditWords = (count: number) =>
-  `${count} ${count === 1 ? "credit" : "credits"}`;
 
 const isLanded = Outcome.isAnyOf(["Landed"]);
 

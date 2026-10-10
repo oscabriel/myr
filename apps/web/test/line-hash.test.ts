@@ -6,7 +6,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Option } from "effect";
 
-import { lineHash, parseLineHash } from "../src/features/code/line-hash.ts";
+import {
+  diffLinesHash,
+  lineHash,
+  parseDiffHash,
+  parseLineHash,
+} from "../src/features/code/line-hash.ts";
 
 describe("a line anchor", () => {
   it("names one line", () => {
@@ -49,5 +54,52 @@ describe("a line anchor", () => {
     expect(parseLineHash(lineHash({ end: 42, start: 3 }))).toStrictEqual(
       Option.some({ end: 42, start: 3 })
     );
+  });
+});
+
+describe("a file in a commit's diff, by its anchor", () => {
+  it("names the file, its path decoded", () => {
+    expect(parseDiffHash("#diff-src%2Fparse.ts")).toStrictEqual(
+      Option.some({ lines: Option.none(), path: "src/parse.ts" })
+    );
+  });
+
+  it("names lines on the new side, or the old with D", () => {
+    expect(parseDiffHash("diff-src%2Fparse.ts:L4-L7")).toStrictEqual(
+      Option.some({
+        lines: Option.some({
+          end: 7,
+          path: "src/parse.ts",
+          side: "additions",
+          start: 4,
+        }),
+        path: "src/parse.ts",
+      })
+    );
+    expect(
+      Option.flatMap(parseDiffHash("#diff-a.ts:D3"), ({ lines }) => lines)
+    ).toStrictEqual(
+      Option.some({ end: 3, path: "a.ts", side: "deletions", start: 3 })
+    );
+  });
+
+  it("is written back as it is read", () => {
+    const lines = {
+      end: 9,
+      path: "src/a b.ts",
+      side: "additions",
+      start: 2,
+    } as const;
+
+    expect(
+      Option.flatMap(
+        parseDiffHash(diffLinesHash(lines)),
+        (named) => named.lines
+      )
+    ).toStrictEqual(Option.some(lines));
+  });
+
+  it("names nothing for another anchor", () => {
+    expect(parseDiffHash("#L4")).toStrictEqual(Option.none());
   });
 });

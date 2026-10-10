@@ -1,127 +1,36 @@
 /**
- * One file of a project at a revision. The server sends its text as a
- * `<pre>` with one numbered, anchored line each (`#L42` scrolls there with
- * no script), capped at `FALLBACK_LINES`; the browser then draws it with
- * `@pierre/diffs` (`code`, from `client-code.tsx`), keeping the `#L10-L20`
- * selection in the address. A Markdown file is rendered (its source on
- * `?plain=1`), an image is shown from raw, and a binary file or one past
- * the read cap says its size and links its raw bytes.
+ * One file of a project at a revision, in Code mode (its Why mode is
+ * `why/why-view.tsx`, the same page). The file header stays under the
+ * context bar: the path once, the file in words, Code | Why, Raw,
+ * Permalink (`y`) and Copy. The code takes the pane's whole width and
+ * scrolls sideways inside itself, never wrapping: the server sends it as
+ * numbered, anchored plain text (`NumberedLines`), which the browser's
+ * highlighted drawing (`code`, from `client-code.tsx`) replaces in place.
  *
- * The toolbar: Raw (at the commit the page resolved, so it caches for
- * good), Why and History (at the page's revision), Permalink (the page at
- * that commit; `y` rewrites the address to it) and Copy.
+ * A Markdown file is rendered (its source on `?plain=1`), an image is shown
+ * from raw, and a binary file or one past the read cap says its size and
+ * links its bytes. The inspector holds "This file".
  */
-import type { FileView } from "@repo/protocol/domain/code";
+import type { CommitView, FileView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
-import { useEffect } from "react";
+import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
-import { buttonVariants } from "@/components/ui/button";
-
 import { ReadmeSection } from "../project/readme-section.tsx";
-import { LINK } from "../shared/classes.ts";
-import { CopyButton } from "./copy.tsx";
+import { AppLink } from "../shared/link.tsx";
+import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { FileFacts } from "./file-facts.tsx";
+import { FileHeader, PermalinkKey } from "./file-header.tsx";
+import { NumberedLines } from "./numbered-lines.tsx";
 import {
   blobHref,
-  commitsHref,
   isImage,
   isMarkdown,
   rawHref,
   sizeInWords,
-  whyHref,
 } from "./paths.ts";
-import { revLabel } from "./rev.ts";
-import { CodeBreadcrumb, CodeLayout } from "./tree-view.tsx";
 
-/** How many lines the server sends; the browser's drawing shows them all. */
-export const FALLBACK_LINES = 2000;
-
-const TOOL = buttonVariants({
-  className: "no-underline",
-  size: "sm",
-  variant: "ghost",
-});
-
-/** A text's lines, without the empty one after its last newline. */
-export const linesOf = (text: string): readonly string[] => {
-  const lines = text.split("\n");
-
-  return lines.at(-1) === "" ? lines.slice(0, -1) : lines;
-};
-
-/** The file as plain text: each line numbered and anchored `L<n>`. */
-export const NumberedLines = ({ text }: { readonly text: string }) => {
-  const lines = linesOf(text);
-  const shown = lines.slice(0, FALLBACK_LINES);
-
-  return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <pre className="border-rule bg-surface overflow-x-auto border py-2 font-mono text-[0.8125rem] leading-5">
-        <code className="grid grid-cols-[auto_1fr]">
-          {shown.map((line, index) => {
-            const number = index + 1;
-
-            // The anchor sits on the line's text: the row around it is
-            // `display: contents`, which draws no box to scroll to.
-            return (
-              <span className="contents" key={number}>
-                <a
-                  className="text-muted-foreground hover:text-foreground pr-4 pl-3 text-right no-underline select-none"
-                  href={`#L${number}`}
-                >
-                  {number}
-                </a>
-                <span className="pr-3 whitespace-pre" id={`L${number}`}>
-                  {line}
-                </span>
-              </span>
-            );
-          })}
-        </code>
-      </pre>
-      {lines.length > shown.length ? (
-        <p className="text-muted-foreground text-sm">
-          The first {FALLBACK_LINES.toLocaleString("en")} of{" "}
-          {lines.length.toLocaleString("en")} lines.
-        </p>
-      ) : null}
-    </div>
-  );
-};
-
-/** `y` rewrites the address to the page at its commit, keeping the line anchor. */
-const PermalinkKey = ({ href }: { readonly href: string }) => {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      const typing =
-        event.target instanceof HTMLElement &&
-        (event.target.isContentEditable ||
-          ["INPUT", "SELECT", "TEXTAREA"].includes(event.target.tagName));
-
-      if (
-        event.key === "y" &&
-        !typing &&
-        !event.metaKey &&
-        !event.ctrlKey &&
-        !event.altKey
-      ) {
-        globalThis.history.replaceState(
-          globalThis.history.state,
-          "",
-          `${href}${globalThis.location.search}${globalThis.location.hash}`
-        );
-      }
-    };
-
-    globalThis.addEventListener("keydown", onKey);
-
-    return () => {
-      globalThis.removeEventListener("keydown", onKey);
-    };
-  }, [href]);
-
-  return null;
-};
+const LINK = "decoration-rule underline hover:decoration-current";
 
 /** What the server shows of a file that has no text to number. */
 const Bytes = ({
@@ -133,12 +42,14 @@ const Bytes = ({
   readonly project: ProjectName;
   readonly words: string;
 }) => (
-  <p className="border-rule border border-dashed px-4 py-5 text-sm">
-    {words} ({sizeInWords(file.size)}).{" "}
-    <a className={LINK} href={rawHref(project, file.at, file.path)}>
-      View raw
-    </a>
-  </p>
+  <div className={`${GUTTER} ${MEASURE} pt-6`}>
+    <p className="border-rule text-ui border border-dashed px-4 py-5">
+      {words} ({sizeInWords(file.size)}).{" "}
+      <a className={LINK} href={rawHref(project, file.at, file.path)}>
+        View raw
+      </a>
+    </p>
+  </div>
 );
 
 /** The file's body: an image, Markdown, numbered text, or its size. */
@@ -157,11 +68,13 @@ const Body = ({
 }) => {
   if (isImage(file.path) && !plain) {
     return (
-      <img
-        alt={file.path}
-        className="border-rule max-w-full border"
-        src={rawHref(project, file.at, file.path)}
-      />
+      <div className={`${GUTTER} pt-6`}>
+        <img
+          alt={file.path}
+          className="border-rule max-w-full border"
+          src={rawHref(project, file.at, file.path)}
+        />
+      </div>
     );
   }
 
@@ -181,8 +94,9 @@ const Body = ({
 
   if (isMarkdown(file.path) && !plain) {
     return (
-      <>
-        <p className="text-sm">
+      <div className={`${GUTTER} ${MEASURE} flex flex-col gap-4 pt-6`}>
+        <p className="text-ui">
+          {/* A plain link: the router would write the 1 as a quoted string. */}
           <a
             className={LINK}
             href={`${blobHref(project, rev, file.path)}?plain=1`}
@@ -191,17 +105,17 @@ const Body = ({
           </a>
         </p>
         <ReadmeSection file={file} project={project} />
-      </>
+      </div>
     );
   }
 
   return (
     <>
       {isMarkdown(file.path) ? (
-        <p className="text-sm">
-          <a className={LINK} href={blobHref(project, rev, file.path)}>
+        <p className={`${GUTTER} text-ui pt-4`}>
+          <AppLink className={LINK} to={blobHref(project, rev, file.path)}>
             Show it rendered
-          </a>
+          </AppLink>
         </p>
       ) : null}
       {code ?? <NumberedLines text={file.text} />}
@@ -209,65 +123,61 @@ const Body = ({
   );
 };
 
+export interface BlobViewProps {
+  readonly file: FileView;
+  readonly project: ProjectName;
+  readonly rev: string;
+  /** The browser's drawing of the text, holding `NumberedLines` as its fallback. */
+  readonly code?: ReactNode;
+  /** `?plain=1`: a Markdown file's source, not its rendering. */
+  readonly plain?: boolean;
+  /** The commit that last changed the file. */
+  readonly last?: CommitView | undefined;
+  readonly now: DateTime.Utc;
+  /** The Files button, below the shell's width. */
+  readonly files?: ReactNode;
+}
+
 export const BlobView = ({
   code,
   file,
+  files,
+  last,
+  now,
   plain = false,
   project,
   rev,
-  sidebar,
-}: {
-  /**
-   * The browser's drawing of the text, holding `NumberedLines` as its
-   * fallback; the numbered lines alone when absent.
-   */
-  readonly code?: ReactNode;
-  readonly file: FileView;
-  /** `?plain=1`: a Markdown file's source, not its rendering. */
-  readonly plain?: boolean;
-  readonly project: ProjectName;
-  readonly rev: string;
-  /** The file tree, drawn in the browser. */
-  readonly sidebar?: ReactNode;
-}) => {
-  const permalink = blobHref(project, file.at, file.path);
-
-  return (
-    <CodeLayout
-      project={project}
-      sidebar={sidebar}
-      title={`${file.path} at ${revLabel(rev)}`}
-    >
-      <PermalinkKey href={permalink} />
-      <CodeBreadcrumb path={file.path} project={project} rev={rev} />
-      <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <span>{sizeInWords(file.size)}</span>
-        <nav
-          aria-label="File"
-          className="flex flex-wrap gap-1"
-          data-toolbar="file"
-        >
-          <a className={TOOL} href={rawHref(project, file.at, file.path)}>
-            Raw
-          </a>
-          <a className={TOOL} href={whyHref(project, rev, file.path)}>
-            Why
-          </a>
-          <a
-            className={TOOL}
-            href={commitsHref(project, rev, { path: file.path })}
-          >
-            History
-          </a>
-          <a className={TOOL} href={permalink} title="Permalink (y)">
-            Permalink
-          </a>
-        </nav>
-        {file.text === undefined ? null : (
-          <CopyButton label="Copy" text={file.text} />
-        )}
-      </div>
-      <Body code={code} file={file} plain={plain} project={project} rev={rev} />
-    </CodeLayout>
-  );
-};
+}: BlobViewProps) => (
+  <Workspace
+    crumbs={[
+      { label: project, to: `/${project}` },
+      { label: "Code", to: `/${project}/tree/main` },
+      { label: file.path.split("/").at(-1) ?? file.path, mono: true },
+    ]}
+    facts={
+      <FileFacts
+        file={file}
+        last={last}
+        now={now}
+        project={project}
+        rev={rev}
+      />
+    }
+    factsHeading="This file"
+    title={file.path.split("/").at(-1) ?? file.path}
+    toolbar={
+      <FileHeader
+        file={file}
+        files={files}
+        mode="code"
+        path={file.path}
+        project={project}
+        rev={rev}
+      />
+    }
+    variant="code"
+  >
+    <PermalinkKey href={blobHref(project, file.at, file.path)} />
+    <Body code={code} file={file} plain={plain} project={project} rev={rev} />
+  </Workspace>
+);

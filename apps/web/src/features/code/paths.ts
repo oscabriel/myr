@@ -38,7 +38,16 @@ export const whyHref = (project: ProjectName, rev: string, path: string) =>
 export const commitsHref = (
   project: ProjectName,
   rev: string,
-  { from, path }: { readonly from?: number; readonly path?: string } = {}
+  {
+    from,
+    path,
+    show,
+  }: {
+    readonly from?: number;
+    readonly path?: string;
+    /** Only the answers or the asks' openings; every commit when absent. */
+    readonly show?: "answers" | "openings";
+  } = {}
 ) => {
   const query = new URLSearchParams();
 
@@ -48,6 +57,10 @@ export const commitsHref = (
 
   if (from !== undefined && from > 0) {
     query.set("from", String(from));
+  }
+
+  if (show !== undefined) {
+    query.set("show", show);
   }
 
   const search = query.toString();

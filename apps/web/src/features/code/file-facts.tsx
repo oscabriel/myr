@@ -1,0 +1,82 @@
+/**
+ * The inspector's "This file": the path, the file in words (lines, size,
+ * language), the landing that last touched it (ask and answer first, the
+ * commit second), and where to take it: raw, a permalink, a copy, its
+ * history. A file's page and its why page show the same block.
+ */
+import type { CommitView, FileView } from "@repo/protocol/domain/code";
+import type { ProjectName } from "@repo/protocol/ids";
+import { Option } from "effect";
+import type { DateTime } from "effect";
+
+import { FactBlock } from "../shared/facts.tsx";
+import { AppLink } from "../shared/link.tsx";
+import { LandingWords } from "../why/band.tsx";
+import { CopyButton } from "./copy.tsx";
+import { fileWords } from "./file-header.tsx";
+import { blobHref, commitsHref, rawHref } from "./paths.ts";
+
+const LINK = "decoration-rule underline hover:decoration-current";
+
+export const FileFacts = ({
+  file,
+  last,
+  now,
+  project,
+  rev,
+}: {
+  readonly file: FileView;
+  /** The commit that last changed the file, with its landing; none when the read found none. */
+  readonly last?: CommitView | undefined;
+  readonly now: DateTime.Utc;
+  readonly project: ProjectName;
+  readonly rev: string;
+}) => (
+  <>
+    <FactBlock label="Path">
+      <p className="text-mono font-mono [overflow-wrap:anywhere]">
+        {file.path}
+      </p>
+      <p className="text-ui text-muted-foreground">
+        {fileWords(file).join(" · ")}
+      </p>
+    </FactBlock>
+    <FactBlock label="Last changed by">
+      {last === undefined ? (
+        <p className="text-ui text-muted-foreground">Not known.</p>
+      ) : (
+        <p className="text-ui [overflow-wrap:anywhere]" data-last={last.sha}>
+          <LandingWords
+            commit={Option.some(last)}
+            landing={Option.fromUndefinedOr(last.landing)}
+            now={now}
+            project={project}
+            sha={last.sha}
+          />
+        </p>
+      )}
+      <AppLink
+        className={`text-ui ${LINK}`}
+        to={commitsHref(project, rev, { path: file.path })}
+      >
+        History of this file
+      </AppLink>
+    </FactBlock>
+    <FactBlock label="Take it">
+      <nav
+        aria-label="Take the file"
+        className="text-ui flex flex-wrap items-center gap-x-4 gap-y-1"
+      >
+        <a className={LINK} href={rawHref(project, file.at, file.path)}>
+          Raw
+        </a>
+        <AppLink className={LINK} to={blobHref(project, file.at, file.path)}>
+          Permalink
+        </AppLink>
+        {file.text === undefined ? null : (
+          <CopyButton label="Copy the file" text={file.text} />
+        )}
+      </nav>
+    </FactBlock>
+  </>
+);

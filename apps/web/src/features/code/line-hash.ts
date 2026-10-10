@@ -35,3 +35,59 @@ export const parseLineHash = (hash: string): Option.Option<LineRange> => {
 /** The anchor for `range`: `#L<n>` for one line, `#L<a>-L<b>` for more. */
 export const lineHash = ({ end, start }: LineRange): string =>
   start === end ? `#L${start}` : `#L${start}-L${end}`;
+
+/** Lines on one side of one file's diff: the new side unless `deletions`. */
+export interface DiffLines extends LineRange {
+  readonly path: string;
+  readonly side: "additions" | "deletions";
+}
+
+const DIFF_ANCHOR =
+  /^#?diff-(?<path>[^:]+)(?::(?<lines>[DL]\d+(?:-[DL]\d+)?))?$/u;
+
+const decodePath = Option.liftThrowable(decodeURIComponent);
+
+/**
+ * The file a commit page's hash names (`#diff-src%2Fparse.ts`), and its
+ * lines when it names some (`…:L4-L7` on the new side, `…:D4` on the old).
+ */
+export const parseDiffHash = (
+  hash: string
+): Option.Option<{
+  readonly path: string;
+  readonly lines: Option.Option<DiffLines>;
+}> => {
+  const groups = DIFF_ANCHOR.exec(hash)?.groups;
+
+  return Option.flatMap(Option.fromUndefinedOr(groups?.path), (encoded) =>
+    Option.map(decodePath(encoded), (path) => ({
+      lines: Option.map(
+        Option.flatMap(Option.fromUndefinedOr(groups?.lines), (lines) =>
+          parseLineHash(lines.replaceAll("D", "L"))
+        ),
+        (range): DiffLines => ({
+          ...range,
+          path,
+          side:
+            groups?.lines?.startsWith("D") === true ? "deletions" : "additions",
+        })
+      ),
+      path,
+    }))
+  );
+};
+
+/** The hash naming `lines` of a file's diff, without the `#`. */
+export const diffLinesHash = ({
+  end,
+  path,
+  side,
+  start,
+}: DiffLines): string => {
+  const mark = side === "deletions" ? "D" : "L";
+
+  const lines =
+    start === end ? `${mark}${start}` : `${mark}${start}-${mark}${end}`;
+
+  return `diff-${encodeURIComponent(path)}:${lines}`;
+};

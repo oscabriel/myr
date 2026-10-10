@@ -14,14 +14,17 @@ import {
 } from "../../../features/code/address.ts";
 import { LOG_PAGE } from "../../../features/code/log-page.ts";
 import { LogView } from "../../../features/code/log-view.tsx";
+import type { LogShow } from "../../../features/code/log-view.tsx";
 import { CodeNotFound } from "../../../features/code/not-found.tsx";
 import { pageHead } from "../../../features/shared/head.ts";
 import { notFoundFor } from "../../../features/shared/refusals.ts";
 import { serverClient } from "../../../server/client.ts";
+import { codePageHeaders } from "../tree/-headers.ts";
 
-// The log from a revision, a page at a time (`?from=` is where the page
-// starts), only the commits that changed `?path=` when given; read on the
-// server, so the page arrives whole.
+// The landings: the log from a revision, a page at a time (`?from=` is
+// where the page starts), only the commits that changed `?path=` when
+// given, filtered to the answers or the asks' openings by `?show=`; read
+// on the server, so the page arrives whole.
 
 const LogPageData = Schema.Struct({
   commits: Schema.Array(CommitView),
@@ -32,6 +35,9 @@ const LogPageData = Schema.Struct({
   project: ProjectName,
   rev: Schema.String,
 });
+
+/** The kinds of commit a page may be filtered to. */
+const SHOWS: readonly LogShow[] = ["answers", "openings"];
 
 interface LogParams {
   readonly from?: number | undefined;
@@ -82,6 +88,7 @@ const logPage = createServerFn({ method: "GET" })
 
 const LogPage = () => {
   const read = Schema.decodeSync(LogPageData)(Route.useLoaderData());
+  const { show } = Route.useSearch();
 
   return (
     <LogView
@@ -92,6 +99,7 @@ const LogPage = () => {
       path={read.path}
       project={read.project}
       rev={read.rev}
+      show={show ?? "all"}
     />
   );
 };
@@ -100,14 +108,18 @@ export const Route = createFileRoute("/$project/commits/$rev")({
   validateSearch: (search: {
     readonly from?: unknown;
     readonly path?: unknown;
+    readonly show?: unknown;
   }) => ({
     from: Option.getOrUndefined(offsetOf(search.from)),
     path: Predicate.isString(search.path) ? search.path : undefined,
+    show: SHOWS.find((each) => each === search.show),
   }),
   loaderDeps: ({ search }) => ({ from: search.from, path: search.path }),
   loader: ({ deps, params }) => logPage({ data: { ...params, ...deps } }),
+  headers: ({ loaderData, params }) =>
+    codePageHeaders(params.rev, loaderData !== undefined),
   head: ({ params: { project, rev } }) =>
-    pageHead({ title: `${project}: commits on ${rev}` }),
+    pageHead({ title: `${project}: landings on ${rev}` }),
   component: LogPage,
   notFoundComponent: CodeNotFound,
 });

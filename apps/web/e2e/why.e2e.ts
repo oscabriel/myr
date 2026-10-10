@@ -69,8 +69,8 @@ test.describe("the deployed why page", () => {
 
         expect(response?.status()).toBe(200);
 
-        // A range's row, in the server's table or above the drawn lines,
-        // linking the ask its landing answered or opened.
+        // A group's band, among the server's lines or above the drawn
+        // ones, linking the ask its landing answered or opened.
         yield* Effect.promise(() =>
           expect(
             browser.locator(`[data-range] a[href^="/${project}/asks/"]`).first()

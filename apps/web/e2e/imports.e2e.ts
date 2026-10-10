@@ -326,8 +326,8 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
   test(`${project}'s log groups its commits by day`, ({ page: browser }) =>
     Effect.runPromise(
       visit(browser, project, `/${project}/commits/main`, "commits", {
-        selectors: [`a[href^="/${project}/commit/"]`],
-        texts: ["Commits on"],
+        selectors: [`a[href^="/${project}/commit/"]`, "[data-day]"],
+        texts: ["Landings"],
       })
     ));
 
@@ -338,7 +338,10 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
       Effect.gen(function* () {
         const href = yield* newestCommit(browser, project);
 
-        yield* visit(browser, project, href, "commit", { texts: ["changed"] });
+        yield* visit(browser, project, href, "commit", {
+          selectors: ["[data-diffs-header]"],
+          texts: ["changed"],
+        });
       })
     ));
 

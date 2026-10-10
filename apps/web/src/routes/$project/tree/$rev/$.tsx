@@ -1,11 +1,18 @@
+import { useAtomValue } from "@effect/atom-react";
+import type { CommitView } from "@repo/protocol/domain/code";
 import { FileView, TreeListing } from "@repo/protocol/domain/code";
 import { ProjectName } from "@repo/protocol/ids";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
-import { Effect, Option, Schema } from "effect";
+import { DateTime, Effect, Option, Schema } from "effect";
+import { AsyncResult } from "effect/reactivity";
 
-import { PathsTree } from "../-paths-tree.tsx";
+import { CodeRail } from "../-code-rail.tsx";
+import { FilesButton } from "../-files-button.tsx";
+import { codePageHeaders } from "../-headers.ts";
+import { softLanding } from "../-soft-landing.ts";
+import { lastChangesAtom } from "../../../../client/code.ts";
 import {
   projectOf,
   repoPathOf,
@@ -18,13 +25,15 @@ import { notFoundFor } from "../../../../features/shared/refusals.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { readFolderWithReadme } from "../../../../server/folder.ts";
 
-// A folder at a revision: its breadcrumb, its entries and its README, read
-// on the server, so the page arrives whole; the file tree beside it is the
-// browser's. An address naming no project, revision or folder is a 404
-// showing the platform's refusal.
+// A folder at a revision: its entries and its README, read on the server,
+// so the page arrives whole; the tree in the rail and what last changed
+// each entry are the browser's. A path missing at a revision that exists
+// lands on the nearest folder above it, the refusal as its notice; any
+// other address naming nothing is a 404 showing the platform's refusal.
 
 const TreePageData = Schema.Struct({
   listing: TreeListing,
+  now: Schema.DateTimeUtcFromString,
   project: ProjectName,
   readme: Schema.optionalKey(FileView),
   rev: Schema.String,
@@ -49,7 +58,7 @@ export const readTreePage = (params: TreeParams) =>
       rev,
     }).pipe(
       Effect.catchTags({
-        UnknownPath: notFoundFor,
+        UnknownPath: (refusal) => softLanding(refusal, project, rev),
         UnknownProject: notFoundFor,
         UnknownRevision: notFoundFor,
       })
@@ -57,6 +66,7 @@ export const readTreePage = (params: TreeParams) =>
 
     return yield* Schema.encodeEffect(TreePageData)({
       listing,
+      now: yield* DateTime.now,
       project,
       rev,
       ...Option.match(readme, {
@@ -74,35 +84,49 @@ const treePage = createServerFn({ method: "GET" })
     )
   );
 
+const NO_CHANGES: ReadonlyMap<string, CommitView> = new Map();
+
 const TreePage = () => {
-  const { listing, project, readme, rev } = Schema.decodeSync(TreePageData)(
-    Route.useLoaderData()
+  const { listing, now, project, readme, rev } = Schema.decodeSync(
+    TreePageData
+  )(Route.useLoaderData());
+
+  const last = useAtomValue(
+    lastChangesAtom({
+      at: listing.at,
+      paths: listing.entries.map(({ path }) => path),
+      project,
+    })
   );
 
   return (
     <TreeView
+      files={<FilesButton />}
+      last={AsyncResult.match(last, {
+        onFailure: () => NO_CHANGES,
+        onInitial: () => NO_CHANGES,
+        onSuccess: ({ value }) => value,
+      })}
       listing={listing}
+      now={now}
       project={project}
       readme={readme}
       rev={rev}
-      sidebar={
-        <PathsTree
-          at={listing.at}
-          current={listing.path}
-          project={project}
-          rev={rev}
-        />
-      }
     />
   );
 };
 
 export const Route = createFileRoute("/$project/tree/$rev/$")({
+  staticData: { rail: CodeRail },
   loader: ({ params }) => treePage({ data: params }),
+  headers: ({ loaderData, params }) =>
+    codePageHeaders(params.rev, loaderData !== undefined),
   head: ({ params: { _splat, project, rev } }) =>
     pageHead({
       title: `${_splat === undefined || _splat === "" ? project : _splat} at ${rev}`,
     }),
   component: TreePage,
-  notFoundComponent: CodeNotFound,
+  notFoundComponent: ({ data }) => (
+    <CodeNotFound data={data} files={<FilesButton />} />
+  ),
 });
