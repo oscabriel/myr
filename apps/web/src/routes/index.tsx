@@ -1,16 +1,22 @@
-import { Brand } from "@repo/brand";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useAtomValue } from "@effect/atom-react";
+import {
+  createFileRoute,
+  getRouteApi,
+  useRouter,
+} from "@tanstack/react-router";
 import { env } from "cloudflare:workers";
 import { useEffect } from "react";
 
+import { projectsAtom } from "../client/front.ts";
 import { useSignedIn } from "../features/auth/session-slot.tsx";
 import {
   markdownAlternateLink,
   markdownLink,
 } from "../features/front/markdown.ts";
+import { LandingView } from "../features/landing/landing-page.tsx";
+import { landingProjects } from "../features/landing/projects.ts";
 import { pageHead } from "../features/shared/head.ts";
-import { AppLink } from "../features/shared/link.tsx";
-import { ASKS_PATH, HOME_PATH } from "../features/shared/paths.ts";
+import { HOME_PATH } from "../features/shared/paths.ts";
 import { branchPage } from "../server/cache-headers.ts";
 import { serverClient } from "../server/client.ts";
 import { landingHandler } from "../server/front-page.ts";
@@ -19,11 +25,10 @@ import { landingHandler } from "../server/front-page.ts";
 // page for every reader, so the edge may keep it; its server GET sends a
 // reader who carries a session to `/home` before the page is drawn, and
 // gives an agent `llms.txt`. A signed-in reader who reaches it by a link
-// is moved on once the browser knows who they are.
+// is moved on once the browser knows who they are. Its projects are the
+// rail's read, in the browser, so every reader is sent the same page.
 
-/** What the platform is, in a sentence: the page's head and its lede. */
-const ABOUT =
-  "A git platform where a project says what it wants as asks, anyone may answer, and a change lands on main only by passing a typed gate.";
+const root = getRouteApi("__root__");
 
 /** Where the page's Markdown is. */
 const MARKDOWN = "/llms.txt";
@@ -35,10 +40,9 @@ export const landingHeaders = () => ({
   vary: "Accept",
 });
 
-/** The landing's head: the product's name, its sentence, and its Markdown. */
+/** The landing's head: its title and its Markdown; it unfurls with the site's own sentence. */
 export const landingHead = () => ({
   ...pageHead({
-    description: ABOUT,
     title: "A git platform with a typed gate",
   }),
   links: [markdownAlternateLink(MARKDOWN)],
@@ -47,26 +51,27 @@ export const landingHead = () => ({
 /** A signed-in reader who came by a link goes on to their home. */
 const useHomeOnceSignedIn = () => {
   const signedIn = useSignedIn();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   useEffect(() => {
     if (signedIn) {
-      void navigate({ replace: true, to: HOME_PATH });
+      void router.navigate({ replace: true, to: HOME_PATH });
     }
-  }, [navigate, signedIn]);
+  }, [router, signedIn]);
 };
 
 const Landing = () => {
   useHomeOnceSignedIn();
+  const { platformUrl } = root.useLoaderData();
+  const { origin } = useRouter();
+  const projects = landingProjects(useAtomValue(projectsAtom));
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-6 px-6 py-12">
-      <p className="text-want font-semibold">{Brand.name}</p>
-      <h1 className="text-headline font-semibold">{ABOUT}</h1>
-      <p>
-        <AppLink to={ASKS_PATH}>See the open asks</AppLink>
-      </p>
-    </main>
+    <LandingView
+      platformUrl={platformUrl}
+      projects={projects}
+      webUrl={origin}
+    />
   );
 };
 
