@@ -1,45 +1,33 @@
 /**
- * One folder of a project at a revision: where it sits (a breadcrumb of
- * its ancestors, each a link at the same revision), its entries (folders
- * first, as `readTree` orders them) and its README below. Props in, markup
- * out: the server renders all of it, and the browser adds the file tree
- * (`sidebar`, client-only, from `client-tree.tsx`) beside it.
+ * One folder of a project at a revision. The tree in the rail is the
+ * navigation; main lists the folder once, as rows: each entry's name (a
+ * folder first, as `readTree` orders them), what last changed it (the ask
+ * its landing answered, or the commit's subject) and how long ago, then
+ * the folder's README below on the page's prose.
+ *
+ * What last changed each entry arrives after the page (`last`): its
+ * column holds its place until then, so nothing moves.
  */
 import type {
   CodeEntry,
+  CommitView,
   FileView,
   TreeListing,
 } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
 import { Match, Option } from "effect";
+import type { DateTime } from "effect";
 import { File, FileSymlink, Folder, FolderGit2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { Fragment } from "react";
 import type { ReactNode } from "react";
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-import { ProjectNav } from "../project/project-nav.tsx";
 import { ReadmeSection } from "../project/readme-section.tsx";
-import { LINK } from "../shared/classes.ts";
-import { PageShell } from "../shared/layout.tsx";
-import { ancestorsOf, blobHref, treeHref } from "./paths.ts";
-import { revLabel } from "./rev.ts";
+import { AppLink } from "../shared/link.tsx";
+import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { When } from "../shared/time.tsx";
+import { askOf } from "../why/rows.ts";
+import { FileHeader } from "./file-header.tsx";
+import { blobHref, commitsHref, treeHref } from "./paths.ts";
 
 /** Each kind of entry: its mark and the word a screen reader says for it. */
 const kinds = Match.type<CodeEntry["type"]>().pipe(
@@ -61,7 +49,76 @@ const entryHref = (project: ProjectName, rev: string, entry: CodeEntry) =>
     Match.orElse(() => Option.some(blobHref(project, rev, entry.path)))
   );
 
-/** A folder's entries, one row each, each linking its page at `rev`. */
+/** What last changed an entry, in a few words: the ask its landing answered or opened, or the commit's subject. */
+const changeWords = (commit: CommitView) => {
+  const linked =
+    commit.landing === undefined
+      ? undefined
+      : Option.getOrUndefined(askOf(commit.landing));
+
+  if (linked === undefined) {
+    return commit.subject === "" ? "(no subject)" : commit.subject;
+  }
+
+  return linked.kind === "opened" ? `opened ${linked.ask}` : linked.ask;
+};
+
+const LINK =
+  "text-foreground no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring focus-visible:after:outline-solid";
+
+/** One entry, one 40 px row: its mark, its name, what last changed it, and when. */
+const EntryRow = ({
+  entry,
+  last,
+  now,
+  project,
+  rev,
+}: {
+  readonly entry: CodeEntry;
+  readonly last?: CommitView | undefined;
+  readonly now?: DateTime.Utc | undefined;
+  readonly project: ProjectName;
+  readonly rev: string;
+}) => {
+  const { icon: Icon, word } = kinds(entry.type);
+  const href = Option.getOrUndefined(entryHref(project, rev, entry));
+
+  return (
+    <li
+      className="group/row border-rule hover:bg-surface/50 relative isolate -mx-2 flex h-10 min-w-0 items-center gap-3 border-b px-2 transition-colors duration-[120ms]"
+      data-entry={entry.path}
+    >
+      <Icon
+        aria-hidden="true"
+        className="text-muted-foreground size-4 shrink-0"
+        strokeWidth={1.75}
+      />
+      <span className="sr-only">{word}:</span>
+      <span className="text-ui min-w-0 shrink-0 basis-[14rem] truncate font-medium">
+        {href === undefined ? (
+          entry.name
+        ) : (
+          <AppLink className={LINK} title={entry.name} to={href}>
+            {entry.name}
+          </AppLink>
+        )}
+      </span>
+      <span
+        className="text-ui text-muted-foreground tablet:block hidden min-w-0 flex-1 truncate"
+        data-last=""
+      >
+        {last === undefined ? null : changeWords(last)}
+      </span>
+      <span className="text-label text-muted-foreground ml-auto shrink-0 tabular-nums">
+        {last === undefined || now === undefined ? null : (
+          <When at={last.committer.at} now={now} />
+        )}
+      </span>
+    </li>
+  );
+};
+
+/** A folder's entries as rows, each linking its page at `rev` (a project's home lists its root so). */
 export const EntriesTable = ({
   entries,
   project,
@@ -71,153 +128,94 @@ export const EntriesTable = ({
   readonly project: ProjectName;
   readonly rev: string;
 }) => (
-  <Table className="font-mono text-[0.8125rem]">
-    <TableHeader>
-      <TableRow>
-        <TableHead className="font-sans">Name</TableHead>
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      {entries.map((entry) => {
-        const { icon: Icon, word } = kinds(entry.type);
-        const href = Option.getOrUndefined(entryHref(project, rev, entry));
-
-        return (
-          <TableRow data-entry={entry.path} key={entry.path}>
-            <TableCell className="flex min-w-0 items-center gap-2 whitespace-normal">
-              <Icon
-                aria-hidden="true"
-                className="text-muted-foreground size-4 shrink-0"
-              />
-              <span className="sr-only">{word}:</span>
-              {href === undefined ? (
-                <span className="[overflow-wrap:anywhere]">{entry.name}</span>
-              ) : (
-                <a className={`${LINK} [overflow-wrap:anywhere]`} href={href}>
-                  {entry.name}
-                </a>
-              )}
-            </TableCell>
-          </TableRow>
-        );
-      })}
-    </TableBody>
-  </Table>
+  <ul className="border-rule flex flex-col border-t" data-entries="">
+    {entries.map((entry) => (
+      <EntryRow entry={entry} key={entry.path} project={project} rev={rev} />
+    ))}
+  </ul>
 );
 
-/**
- * Where `path` sits in the project at `rev`: the project, then each folder
- * above it, each a link to its folder at `rev`, then `path`'s own name.
- */
-export const CodeBreadcrumb = ({
-  path,
-  project,
-  rev,
-}: {
-  readonly path?: string | undefined;
+export interface TreeViewProps {
+  readonly listing: TreeListing;
   readonly project: ProjectName;
   readonly rev: string;
-}) => {
-  const here = path === undefined || path === "" ? undefined : path;
-  const name = here?.split("/").at(-1);
-
-  return (
-    <Breadcrumb>
-      <BreadcrumbList className="font-mono text-[0.8125rem]">
-        <BreadcrumbItem>
-          {here === undefined ? (
-            <BreadcrumbPage>{project}</BreadcrumbPage>
-          ) : (
-            <BreadcrumbLink href={treeHref(project, rev)}>
-              {project}
-            </BreadcrumbLink>
-          )}
-        </BreadcrumbItem>
-        {here === undefined
-          ? null
-          : ancestorsOf(here).map((folder) => (
-              <Fragment key={folder}>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href={treeHref(project, rev, folder)}>
-                    {folder.split("/").at(-1)}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-              </Fragment>
-            ))}
-        {name === undefined ? null : (
-          <>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </>
-        )}
-      </BreadcrumbList>
-    </Breadcrumb>
-  );
-};
-
-/** A code page's frame: title, nav, and the file tree's column beside the content. */
-export const CodeLayout = ({
-  children,
-  project,
-  sidebar,
-  title,
-}: {
-  readonly children: ReactNode;
-  readonly project: ProjectName;
-  readonly sidebar?: ReactNode;
-  readonly title: string;
-}) => (
-  <PageShell title={title}>
-    <ProjectNav current="code" project={project} />
-    <div className="grid min-w-0 gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-      {sidebar === undefined ? null : (
-        <aside
-          aria-label="Files"
-          className="max-h-[40dvh] min-w-0 overflow-hidden lg:sticky lg:top-4 lg:max-h-[calc(100dvh-2rem)] lg:self-start"
-        >
-          {sidebar}
-        </aside>
-      )}
-      <div
-        className={`flex min-w-0 flex-col gap-4 ${sidebar === undefined ? "lg:col-span-2" : ""}`}
-      >
-        {children}
-      </div>
-    </div>
-  </PageShell>
-);
+  /** The folder's README, read; absent when it has none. */
+  readonly readme?: FileView | undefined;
+  /** What last changed each entry, by path, once read. */
+  readonly last?: ReadonlyMap<string, CommitView>;
+  readonly now: DateTime.Utc;
+  /** The Files button, below the shell's width. */
+  readonly files?: ReactNode;
+  /** A notice above the folder (the refusal a missing path landed here with). */
+  readonly notice?: ReactNode;
+}
 
 export const TreeView = ({
+  files,
+  last,
   listing,
+  notice,
+  now,
   project,
   readme,
   rev,
-  sidebar,
-}: {
-  readonly listing: TreeListing;
-  readonly project: ProjectName;
-  /** The folder's README, read; absent when it has none or it is not read yet. */
-  readonly readme?: FileView | undefined;
-  readonly rev: string;
-  /** The file tree, drawn in the browser. */
-  readonly sidebar?: ReactNode;
-}) => (
-  <CodeLayout
-    project={project}
-    sidebar={sidebar}
-    title={
-      listing.path === undefined
-        ? `${project} at ${revLabel(rev)}`
-        : `${listing.path} at ${revLabel(rev)}`
-    }
-  >
-    <CodeBreadcrumb path={listing.path} project={project} rev={rev} />
-    <EntriesTable entries={listing.entries} project={project} rev={rev} />
-    {readme === undefined ? null : (
-      <ReadmeSection file={readme} project={project} />
-    )}
-  </CodeLayout>
-);
+}: TreeViewProps) => {
+  const name = listing.path?.split("/").at(-1) ?? project;
+
+  return (
+    <Workspace
+      crumbs={[
+        { label: project, to: `/${project}` },
+        listing.path === undefined
+          ? { label: "Code" }
+          : { label: "Code", to: `/${project}/tree/main` },
+        ...(listing.path === undefined ? [] : [{ label: name, mono: true }]),
+      ]}
+      title={name}
+      toolbar={
+        <>
+          <FileHeader
+            files={files}
+            path={listing.path}
+            project={project}
+            rev={rev}
+          />
+          <AppLink
+            className="text-ui text-muted-foreground hover:text-foreground tablet:inline hidden shrink-0 no-underline"
+            to={commitsHref(
+              project,
+              rev,
+              listing.path === undefined ? {} : { path: listing.path }
+            )}
+          >
+            History
+          </AppLink>
+        </>
+      }
+      variant="code"
+    >
+      <div className={`${GUTTER} ${MEASURE} flex flex-col gap-8`}>
+        {notice}
+        <ul
+          aria-label={`${name}'s entries`}
+          className="border-rule flex flex-col border-t"
+          data-entries=""
+        >
+          {listing.entries.map((entry) => (
+            <EntryRow
+              entry={entry}
+              key={entry.path}
+              last={last?.get(entry.path)}
+              now={now}
+              project={project}
+              rev={rev}
+            />
+          ))}
+        </ul>
+        {readme === undefined ? null : (
+          <ReadmeSection file={readme} project={project} />
+        )}
+      </div>
+    </Workspace>
+  );
+};

@@ -5,9 +5,10 @@
  * load. Its lines live in a shadow root, where a native `#L` fragment
  * cannot reach, so the drawing scrolls to the anchored line itself.
  *
- * It is Pierre's `File`, not its virtualized `CodeView`, which draws
- * nothing until it mounts; a file is capped at 1 MiB, and past
- * `HIGHLIGHT_LIMIT` characters it is drawn without highlighting.
+ * It is Pierre's `File`, not its virtualized `CodeView`: a file is capped
+ * at 1 MiB, it flows in the page's own scroll under the file header (so it
+ * draws no header of its own), and past the shared limits (`pierre.ts`) it is
+ * drawn without highlighting. Highlighting runs in the worker pool.
  *
  * The library and Shiki's grammars are megabytes, so only the browser
  * loads this module (`client-code.tsx`); the Worker never bundles it.
@@ -20,11 +21,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { lineHash, parseLineHash } from "./line-hash.ts";
 import type { LineRange } from "./line-hash.ts";
 import { diffsOptions, registerCodeTheme } from "./pierre.ts";
+import { CodePool } from "./pool.tsx";
 
 registerCodeTheme();
-
-/** Past this many characters a file is drawn without highlighting. */
-const HIGHLIGHT_LIMIT = 300_000;
 
 export interface FileCodeProps {
   readonly path: string;
@@ -55,13 +54,11 @@ const reveal = (pending: Pending) => {
       ? null
       : node?.shadowRoot?.querySelector(`[data-line="${line}"]`);
 
-  if (row !== null && row !== undefined) {
-    // The page scrolls, not the drawing, and only up or down:
-    // `scrollIntoView` would also slide a wide line sideways under the
-    // line numbers.
-    globalThis.scrollBy({
-      top: row.getBoundingClientRect().top - globalThis.innerHeight / 2,
-    });
+  if (row instanceof HTMLElement) {
+    // Whichever scrolls the code (main from the shell's width, the page
+    // below it) brings the line to its middle, and only up or down: the
+    // code's own sideways scroll stays where it is.
+    row.scrollIntoView({ block: "center", inline: "nearest" });
     pending.line = undefined;
   }
 };
@@ -119,16 +116,18 @@ export const FileCode = ({ path, sha, text }: FileCodeProps) => {
         pending.current.node = node;
         reveal(pending.current);
       },
+      disableFileHeader: true,
       overflow: "scroll",
-      tokenizeMaxLength: HIGHLIGHT_LIMIT,
     }),
     []
   );
 
   return (
-    <div className="border-rule min-w-0 border" data-code="pierre">
-      <File file={file} options={options} selectedLines={selected} />
-    </div>
+    <CodePool>
+      <div className="min-w-0" data-code="pierre">
+        <File file={file} options={options} selectedLines={selected} />
+      </div>
+    </CodePool>
   );
 };
 

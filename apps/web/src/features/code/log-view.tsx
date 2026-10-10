@@ -1,22 +1,27 @@
 /**
- * The log from a revision along first parents, newest first, grouped by
- * the day each commit was committed (UTC), a page at a time. A landing
- * reads as the platform recorded it (`CommitView.landing`, never a
- * trailer): its ask, its author, its credit and its verdict. A commit with
- * no landing came in with the history the project adopted, and says so.
+ * The landings: the log from a revision along first parents, newest first,
+ * a page at a time, under a sticky header per day (UTC). One row per
+ * commit: its subject, then what it did (the ask it answered or opened),
+ * its credit in one line, and "held back" with its lock when sealed checks
+ * judged it; at the right its short id over its age. A commit the platform
+ * did not land came in with the history the project adopted, and says so.
+ *
+ * The toolbar filters the page: every commit, the answers, or the asks'
+ * openings. A landing reads as the platform recorded it
+ * (`CommitView.landing`), never from a trailer.
  */
 import type { CommitView } from "@repo/protocol/domain/code";
-import { Outcome } from "@repo/protocol/domain/outcome";
 import type { ProjectName, RepoPath } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
+import { LockKeyhole } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { ProjectNav } from "../project/project-nav.tsx";
-import { ID, LINK } from "../shared/classes.ts";
-import { CreditTrailers } from "../shared/credits.tsx";
+import { CompactCredit } from "../shared/credits.tsx";
 import { EmptyState } from "../shared/empty.tsx";
-import { HandleLink } from "../shared/handle.tsx";
-import { PageShell } from "../shared/layout.tsx";
+import { AppLink } from "../shared/link.tsx";
 import { askPath } from "../shared/paths.ts";
+import { MetaCode, MetaLine, Row, RowGroup } from "../shared/row.tsx";
+import { Workspace } from "../shared/shell/workspace.tsx";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
 import { LOG_PAGE } from "./log-page.ts";
@@ -24,9 +29,10 @@ import { Pager } from "./pager.tsx";
 import { blobHref, commitHref, commitsHref, shortSha } from "./paths.ts";
 import { revLabel } from "./rev.ts";
 
-const isLanded = Outcome.isAnyOf(["Landed"]);
+/** Which commits the page shows: all of them, the answers, or the asks' openings. */
+export type LogShow = "all" | "answers" | "openings";
 
-/** A day as its heading says it: "October 6, 2026". */
+/** A day as its header says it: "October 6, 2026". */
 const dayWords = new Intl.DateTimeFormat("en", {
   dateStyle: "long",
   timeZone: "UTC",
@@ -50,7 +56,34 @@ export const byDay = (commits: readonly CommitView[]) => {
   return days;
 };
 
-const Row = ({
+/** What a commit did: the ask it answered or opened, when it is a landing that did. */
+const linkedOf = (commit: CommitView) =>
+  commit.landing === undefined
+    ? undefined
+    : Option.getOrUndefined(askOf(commit.landing));
+
+/** Whether `commit` belongs on the page `show` asks for. */
+export const shows = (show: LogShow, commit: CommitView) => {
+  if (show === "all") {
+    return true;
+  }
+
+  const linked = linkedOf(commit);
+
+  return show === "openings"
+    ? linked?.kind === "opened"
+    : linked?.kind === "answers";
+};
+
+const LINK = "decoration-rule underline hover:decoration-current";
+
+/** A part of a row's second line that holds links: above the row's own link, so it can be pressed. */
+const Raised = ({ children }: { readonly children: ReactNode }) => (
+  <span className="relative z-[1]">{children}</span>
+);
+
+/** One commit's row. */
+const CommitRow = ({
   commit,
   now,
   project,
@@ -60,77 +93,61 @@ const Row = ({
   readonly project: ProjectName;
 }) => {
   const { landing } = commit;
-
-  const linked =
-    landing === undefined ? undefined : Option.getOrUndefined(askOf(landing));
+  const linked = linkedOf(commit);
 
   return (
-    <li
-      className="border-rule flex flex-col gap-2 border-t py-3"
-      data-commit={commit.sha}
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <a
-          className={`${LINK} font-medium [overflow-wrap:anywhere]`}
-          href={commitHref(project, commit.sha)}
-        >
-          {commit.subject === "" ? "(no subject)" : commit.subject}
-        </a>
-        <p className="text-muted-foreground flex items-baseline gap-2 text-sm">
-          <a className={`${ID} ${LINK}`} href={commitHref(project, commit.sha)}>
-            {shortSha(commit.sha)}
-          </a>
-          <span aria-hidden="true">·</span>
-          <When at={commit.committer.at} now={now} />
-        </p>
-      </div>
-      {landing === undefined ? (
-        <p className="text-muted-foreground text-sm">
-          {commit.author.name}, before adoption
-        </p>
-      ) : (
-        <div className="flex flex-col gap-2 text-sm">
-          <p className="flex flex-wrap gap-x-4 gap-y-1">
-            {linked === undefined ? null : (
-              <span>
-                <span className="text-muted-foreground text-xs font-medium">
-                  {linked.kind === "opened" ? "Opened" : "Ask"}
-                </span>{" "}
-                <a
-                  className={`${ID} ${LINK}`}
-                  href={askPath(project, linked.ask)}
+    <Row
+      action={
+        <span className="flex w-20 flex-col items-end leading-5">
+          <MetaCode>{shortSha(commit.sha)}</MetaCode>
+          <span className="text-label text-muted-foreground tabular-nums">
+            <When at={commit.committer.at} now={now} />
+          </span>
+        </span>
+      }
+      data={{ "data-commit": commit.sha }}
+      href={commitHref(project, commit.sha)}
+      id={commit.sha}
+      meta={
+        landing === undefined ? (
+          <MetaLine parts={[commit.author.name, "before adoption"]} />
+        ) : (
+          <MetaLine
+            parts={[
+              linked === undefined ? undefined : (
+                <Raised key="ask">
+                  {linked.kind === "opened" ? "Opened " : null}
+                  <AppLink
+                    className={`text-mono font-mono ${LINK}`}
+                    to={askPath(project, linked.ask)}
+                  >
+                    {linked.ask}
+                  </AppLink>
+                </Raised>
+              ),
+              <Raised key="credit">
+                <CompactCredit credits={landing.credits} />
+              </Raised>,
+              landing.heldBackTrailer === undefined ? undefined : (
+                <span
+                  className="text-sealed inline-flex items-center gap-1"
+                  key="held"
+                  title={landing.heldBackTrailer}
                 >
-                  {linked.ask}
-                </a>
-              </span>
-            )}
-            <span>
-              <span className="text-muted-foreground text-xs font-medium">
-                Author
-              </span>{" "}
-              <HandleLink handle={landing.author} />
-            </span>
-            {landing.verdict === undefined ? null : (
-              <span data-outcome={landing.verdict.outcome._tag}>
-                <span className="text-muted-foreground text-xs font-medium">
-                  Verdict
-                </span>{" "}
-                {isLanded(landing.verdict.outcome)
-                  ? "checked and landed"
-                  : landing.verdict.outcome._tag}
-              </span>
-            )}
-          </p>
-          <CreditTrailers
-            assisted={landing.assisted}
-            credits={landing.credits}
-            {...(landing.heldBackTrailer === undefined
-              ? {}
-              : { heldBack: landing.heldBackTrailer })}
+                  <LockKeyhole
+                    aria-hidden="true"
+                    className="size-3.5"
+                    strokeWidth={1.75}
+                  />
+                  held back
+                </span>
+              ),
+            ]}
           />
-        </div>
-      )}
-    </li>
+        )
+      }
+      title={commit.subject === "" ? "(no subject)" : commit.subject}
+    />
   );
 };
 
@@ -144,15 +161,41 @@ const Row = ({
 const newerPage = (from: number, path: RepoPath | undefined) =>
   path === undefined ? { from: Math.max(0, from - LOG_PAGE) } : { path };
 
-export const LogView = ({
-  commits,
-  from,
-  next,
-  now,
-  path,
-  project,
-  rev,
-}: {
+const FILTERS = [
+  { label: "All", show: "all" },
+  { label: "Answers", show: "answers" },
+  { label: "Ask openings", show: "openings" },
+] as const satisfies readonly {
+  readonly label: string;
+  readonly show: LogShow;
+}[];
+
+const FILTER =
+  "text-ui text-muted-foreground hover:text-foreground aria-[current]:text-foreground flex h-10 items-center border-b-2 border-transparent px-1 no-underline aria-[current]:border-current aria-[current]:font-semibold";
+
+/** The page's title: the landings at the revision, or one path's history. */
+const titleOf = (path: RepoPath | undefined, rev: string) => {
+  if (path !== undefined) {
+    return `History of ${path}`;
+  }
+
+  return rev === "main" ? "Landings" : `Landings on ${revLabel(rev)}`;
+};
+
+/** The page's search with `show`: none for every commit. */
+const searchFor = (query: string, show: LogShow) => {
+  const search: Record<string, string> = Object.fromEntries(
+    new URLSearchParams(query)
+  );
+
+  if (show !== "all") {
+    search.show = show;
+  }
+
+  return search;
+};
+
+export interface LogViewProps {
   readonly commits: readonly CommitView[];
   /** Where this page starts. */
   readonly from: number;
@@ -163,53 +206,83 @@ export const LogView = ({
   readonly path?: RepoPath | undefined;
   readonly project: ProjectName;
   readonly rev: string;
-}) => {
+  /** Which commits of the page to show. */
+  readonly show?: LogShow;
+}
+
+export const LogView = ({
+  commits,
+  from,
+  next,
+  now,
+  path,
+  project,
+  rev,
+  show = "all",
+}: LogViewProps) => {
   const filter = path === undefined ? {} : { path };
+  const shown = commits.filter((commit) => shows(show, commit));
+  const base = commitsHref(project, rev, filter);
+  const [to, query = ""] = base.split("?");
 
   return (
-    <PageShell
-      title={
-        path === undefined
-          ? `Commits on ${revLabel(rev)}`
-          : `History of ${path} on ${revLabel(rev)}`
+    <Workspace
+      title={titleOf(path, rev)}
+      toolbar={
+        <nav aria-label="Show" className="flex h-full items-center gap-4">
+          {FILTERS.map(({ label, show: each }) => (
+            <AppLink
+              aria-current={show === each ? "page" : undefined}
+              className={FILTER}
+              key={each}
+              search={searchFor(query, each)}
+              to={to ?? base}
+            >
+              {label}
+            </AppLink>
+          ))}
+        </nav>
       }
+      variant="list"
     >
-      <ProjectNav current="landings" project={project} />
       {path === undefined ? null : (
-        <p className="text-sm">
-          <a className={LINK} href={blobHref(project, rev, path)}>
+        <p className="text-ui">
+          <AppLink className={LINK} to={blobHref(project, rev, path)}>
             Back to {path}
-          </a>
+          </AppLink>
         </p>
       )}
-      {commits.length === 0 ? (
-        <EmptyState title="No commits on this page." />
+      {shown.length === 0 ? (
+        <EmptyState
+          title={
+            commits.length === 0
+              ? "No commits on this page."
+              : "None of this page's commits are of this kind."
+          }
+        />
       ) : (
-        byDay(commits).map(({ commits: ofDay, day }) => (
-          <section
-            aria-label={day}
-            className="flex flex-col gap-1"
-            data-day={day}
-            key={day}
-          >
-            <h2 className="text-muted-foreground text-sm font-medium">
-              Commits on{" "}
-              {dayWords.format(
-                DateTime.toDateUtc(ofDay[0]?.committer.at ?? now)
-              )}
-            </h2>
-            <ol className="border-rule flex flex-col border-b">
-              {ofDay.map((commit) => (
-                <Row
-                  commit={commit}
-                  key={commit.sha}
-                  now={now}
-                  project={project}
-                />
-              ))}
-            </ol>
-          </section>
-        ))
+        <div className="flex flex-col">
+          {byDay(shown).map(({ commits: ofDay, day }) => (
+            <div data-day={day} key={day}>
+              <RowGroup
+                counts={`${ofDay.length} ${ofDay.length === 1 ? "commit" : "commits"}`}
+                label={day}
+                name={dayWords.format(
+                  DateTime.toDateUtc(ofDay[0]?.committer.at ?? now)
+                )}
+              >
+                {ofDay.map((commit) => (
+                  <CommitRow
+                    commit={commit}
+                    key={commit.sha}
+                    now={now}
+                    project={project}
+                  />
+                ))}
+              </RowGroup>
+            </div>
+          ))}
+        </div>
       )}
       <Pager
         newer={
@@ -223,6 +296,6 @@ export const LogView = ({
             : commitsHref(project, rev, { ...filter, from: next })
         }
       />
-    </PageShell>
+    </Workspace>
   );
 };

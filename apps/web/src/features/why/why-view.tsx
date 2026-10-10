@@ -1,151 +1,158 @@
 /**
- * Why each line of a file is there (ADR 0019). The server sends a table
- * of ranges (lines a–b → the landing or the commit that brought them)
- * beside the file's numbered lines; the browser then draws the file with
- * one row above each range (`code`, from `client-why.tsx`), where clicking
- * a line number opens that line's landing. A file the walk cannot read as
- * text (binary, or past 1 MiB) has no ranges, and the page says so.
+ * A file in Why mode (ADR 0019): the same page as its Code mode, the code
+ * with a band above each group of lines one commit brought, saying who
+ * put them there, ask and answer first and the commit second, with why,
+ * one step back. The server sends the bands among numbered plain lines;
+ * the browser draws the file highlighted with the same bands as Pierre's
+ * annotations (`code`, from `client-why.tsx`), where pressing a line
+ * number opens that line's landing whole.
+ *
+ * A file the walk cannot read as text (binary, or past 1 MiB) has no
+ * groups, and the page says so.
  */
-import type { WhyView } from "@repo/protocol/domain/code";
+import type { CommitView, FileView, WhyView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
+import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
-import { buttonVariants } from "@/components/ui/button";
+import { FileFacts } from "../code/file-facts.tsx";
+import { FileHeader, PermalinkKey } from "../code/file-header.tsx";
+import { NumberedLines } from "../code/numbered-lines.tsx";
+import { blobHref, commitHref, shortSha, whyHref } from "../code/paths.ts";
+import { AppLink } from "../shared/link.tsx";
+import { GUTTER, MEASURE, Workspace } from "../shared/shell/workspace.tsx";
+import { WhyBand } from "./range-summary.tsx";
+import { groupsOf } from "./rows.ts";
 
-import { NumberedLines } from "../code/blob-view.tsx";
-import { blobHref, commitHref, commitsHref, shortSha } from "../code/paths.ts";
-import { revLabel } from "../code/rev.ts";
-import { CodeBreadcrumb, CodeLayout } from "../code/tree-view.tsx";
-import { LINK } from "../shared/classes.ts";
-import { RangeLinks, RangeSummary } from "./range-summary.tsx";
-import { linesWords, rowsOf } from "./rows.ts";
+const LINK = "decoration-rule underline hover:decoration-current";
 
-const TOOL = buttonVariants({
-  className: "no-underline",
-  size: "sm",
-  variant: "ghost",
-});
-
-/** The ranges as a table: lines a–b, then who and why. */
-export const WhyTable = ({
-  project,
-  view,
-}: {
-  readonly project: ProjectName;
-  readonly view: WhyView;
-}) => (
-  <table className="w-full border-collapse text-sm" data-why="ranges">
-    <thead className="sr-only">
-      <tr>
-        <th scope="col">Lines</th>
-        <th scope="col">Brought by</th>
-      </tr>
-    </thead>
-    <tbody>
-      {rowsOf(view).map((row) => (
-        <tr
-          className="border-rule border-t align-top"
-          data-range={`${row.range.start}-${row.range.end}`}
-          key={row.range.start}
-        >
-          <td className="py-2 pr-4 whitespace-nowrap">
-            <a className={LINK} href={`#L${row.range.start}`}>
-              {linesWords(row.range)}
-            </a>
-          </td>
-          <td className="flex flex-col gap-1 py-2">
-            <RangeSummary project={project} row={row} />
-            <RangeLinks
-              line={row.range.start}
-              project={project}
-              row={row}
-              view={view}
-            />
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-);
-
-/** The page's fallback: the table of ranges beside the numbered lines. */
+/** The page's fallback: the numbered lines, each group's band above its first line. */
 export const WhyFallback = ({
+  now,
   project,
   text,
   view,
 }: {
+  readonly now: DateTime.Utc;
   readonly project: ProjectName;
   readonly text: string;
   readonly view: WhyView;
 }) => (
-  <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-    <WhyTable project={project} view={view} />
-    <NumberedLines text={text} />
+  <div data-why="ranges">
+    <NumberedLines
+      bands={
+        new Map(
+          groupsOf(view).map((row) => [
+            row.range.start,
+            <WhyBand
+              key={row.range.start}
+              now={now}
+              project={project}
+              row={row}
+              view={view}
+            />,
+          ])
+        )
+      }
+      text={text}
+    />
   </div>
 );
 
+export interface WhyLinesProps {
+  readonly project: ProjectName;
+  readonly rev: string;
+  readonly view: WhyView;
+  readonly now: DateTime.Utc;
+  /** The file at `view.at`: its words, its bytes; absent when it could not be read. */
+  readonly file?: FileView | undefined;
+  /** The file's text at `view.at`; absent for a binary or too large file. */
+  readonly text?: string;
+  /** The browser's drawing, holding `WhyFallback` as its fallback. */
+  readonly code?: ReactNode;
+  /** The commit that last changed the file. */
+  readonly last?: CommitView | undefined;
+  /** The Files button, below the shell's width. */
+  readonly files?: ReactNode;
+}
+
 export const WhyLines = ({
   code,
+  file,
+  files,
+  last,
+  now,
   project,
   rev,
   text,
   view,
-}: {
-  /** The browser's drawing, holding `WhyFallback` as its fallback. */
-  readonly code?: ReactNode;
-  readonly project: ProjectName;
-  readonly rev: string;
-  /** The file's text at `view.at`; absent for a binary or too large file. */
-  readonly text?: string;
-  readonly view: WhyView;
-}) => (
-  <CodeLayout project={project} title={`Why ${view.path} at ${revLabel(rev)}`}>
-    <CodeBreadcrumb path={view.path} project={project} rev={rev} />
-    <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-      <span>
-        Why each line is there, at{" "}
-        <a
-          className={`font-mono text-[0.8125rem] ${LINK}`}
-          href={commitHref(project, view.at)}
-        >
-          {shortSha(view.at)}
-        </a>
-      </span>
-      <nav aria-label="File" className="flex flex-wrap gap-1">
-        <a className={TOOL} href={blobHref(project, rev, view.path)}>
-          File
-        </a>
-        <a
-          className={TOOL}
-          href={commitsHref(project, rev, { path: view.path })}
-        >
-          History
-        </a>
-      </nav>
-    </div>
-    {view.stoppedAt === undefined ? null : (
-      <p className="text-muted-foreground text-sm">
-        The walk stopped after 200 commits: lines older than{" "}
-        <a
-          className={`font-mono text-[0.8125rem] ${LINK}`}
-          href={commitHref(project, view.stoppedAt)}
-        >
-          {shortSha(view.stoppedAt)}
-        </a>{" "}
-        point at it.
-      </p>
-    )}
-    {view.ranges.length === 0 || text === undefined ? (
-      <p className="border-rule border border-dashed px-4 py-5 text-sm">
-        {text === ""
-          ? "This file is empty."
-          : "This file is binary or too large to say why each line is there."}{" "}
-        <a className={LINK} href={blobHref(project, view.at, view.path)}>
-          View the file
-        </a>
-      </p>
-    ) : (
-      (code ?? <WhyFallback project={project} text={text} view={view} />)
-    )}
-  </CodeLayout>
-);
+}: WhyLinesProps) => {
+  const name = view.path.split("/").at(-1) ?? view.path;
+
+  return (
+    <Workspace
+      crumbs={[
+        { label: project, to: `/${project}` },
+        { label: "Code", to: `/${project}/tree/main` },
+        { label: name, mono: true },
+      ]}
+      facts={
+        file === undefined ? undefined : (
+          <FileFacts
+            file={file}
+            last={last}
+            now={now}
+            project={project}
+            rev={rev}
+          />
+        )
+      }
+      factsHeading="This file"
+      title={name}
+      toolbar={
+        <FileHeader
+          files={files}
+          mode="why"
+          path={view.path}
+          project={project}
+          rev={rev}
+          {...(file === undefined ? {} : { file })}
+        />
+      }
+      variant="code"
+    >
+      <PermalinkKey href={whyHref(project, view.at, view.path)} />
+      {view.stoppedAt === undefined ? null : (
+        <p className={`${GUTTER} ${MEASURE} text-ui text-muted-foreground`}>
+          The walk stopped after 200 commits: lines older than{" "}
+          <AppLink
+            className={`text-mono font-mono ${LINK}`}
+            to={commitHref(project, view.stoppedAt)}
+          >
+            {shortSha(view.stoppedAt)}
+          </AppLink>{" "}
+          point at it.
+        </p>
+      )}
+      {view.ranges.length === 0 || text === undefined ? (
+        <div className={`${GUTTER} ${MEASURE}`}>
+          <p className="border-rule text-ui border border-dashed px-4 py-5">
+            {text === ""
+              ? "This file is empty."
+              : "This file is binary or too large to say why each line is there."}{" "}
+            <AppLink
+              className={LINK}
+              to={blobHref(project, view.at, view.path)}
+            >
+              View the file
+            </AppLink>
+          </p>
+        </div>
+      ) : (
+        (code ?? (
+          <WhyFallback now={now} project={project} text={text} view={view} />
+        ))
+      )}
+    </Workspace>
+  );
+};

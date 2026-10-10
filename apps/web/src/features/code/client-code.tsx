@@ -1,7 +1,7 @@
 /**
  * A file and a commit's diff, drawn in the browser only. `@pierre/diffs`
  * and Shiki's grammars are megabytes, and the drawing needs the DOM, so the
- * server renders `fallback` (numbered lines, or the changed files by name)
+ * server renders `fallback` (numbered lines, or the plain-text diff)
  * and the browser loads the drawing after hydration. `import.meta.env.SSR`
  * is `true` in the Worker's build, so the dynamic imports below are dead
  * code there and the Worker bundles none of it (`bytes:check`), as

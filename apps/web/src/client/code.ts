@@ -8,8 +8,9 @@
  * root folder and README (`projectCodeAtom`), which its loader also read.
  */
 import type { Contract } from "@repo/protocol/contracts";
-import type { ProjectName } from "@repo/protocol/ids";
-import { Effect } from "effect";
+import type { CommitView } from "@repo/protocol/domain/code";
+import type { ProjectName, RepoPath } from "@repo/protocol/ids";
+import { Array, Effect, Option } from "effect";
 import { Atom } from "effect/reactivity";
 import type { Rpc } from "effect/rpc";
 
@@ -81,4 +82,53 @@ export const projectCodeAtom = Atom.family((project: ProjectName) =>
       )
     )
   )
+);
+
+/** At most this many of a folder's entries have what last changed them read. */
+export const LAST_CHANGES_CAP = 30;
+
+/**
+ * What last changed each of a folder's entries at a commit, by path: one
+ * `log` of one commit per entry (the platform keeps a path's history once
+ * walked), three at a time, read after the page and only in the browser.
+ * An entry whose read fails is left out; a folder of more than
+ * `LAST_CHANGES_CAP` entries reads none, to spare the platform the walks.
+ */
+export const lastChangesAtom = Atom.family(
+  (key: {
+    readonly at: string;
+    readonly paths: readonly RepoPath[];
+    readonly project: ProjectName;
+  }) =>
+    Atom.withServerValueInitial(
+      ContractsClient.runtime.atom(
+        Effect.gen(function* () {
+          const client = yield* ContractsClient;
+
+          if (key.paths.length > LAST_CHANGES_CAP) {
+            return new Map<string, CommitView>();
+          }
+
+          const found = yield* Effect.forEach(
+            key.paths,
+            (path) =>
+              client("log", {
+                at: key.at,
+                limit: 1,
+                path,
+                project: key.project,
+              }).pipe(
+                Effect.map(({ commits }) => Option.fromUndefinedOr(commits[0])),
+                Effect.orElseSucceed(() => Option.none<CommitView>()),
+                Effect.map((commit) =>
+                  Option.map(commit, (last) => [path, last] as const)
+                )
+              ),
+            { concurrency: 3 }
+          );
+
+          return new Map<string, CommitView>(Array.getSomes(found));
+        })
+      )
+    )
 );

@@ -1,10 +1,10 @@
 /**
- * The "why" page, rendered to HTML with `react-dom/server` from a
+ * The file in Why mode, rendered to HTML with `react-dom/server` from a
  * `WhyView` decoded with the protocol's own schema: the server's fallback
- * is a table of ranges (lines a–b → the landing or the commit that brought
- * them) beside the numbered lines, each landing linking its ask, its
- * answer, its commit and its people; the browser's drawing is Pierre's
- * (`<diffs-container>`), loaded only there.
+ * is the numbered lines with a band above each group of lines one commit
+ * brought, ask and answer first and the commit second, each linked; the
+ * browser's drawing is Pierre's (`<diffs-container>`), loaded only there,
+ * with the same bands as its annotations.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -13,7 +13,7 @@ import { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { LandedSha, ProjectName } from "@repo/protocol/ids";
 import { asTester, unanswered } from "@repo/protocol/testing";
-import { Duration, Effect, Layer, Ref, Schema } from "effect";
+import { DateTime, Duration, Effect, Layer, Ref, Schema } from "effect";
 import { RpcTest } from "effect/rpc";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -39,12 +39,6 @@ const hrefsOf = (markup: string) =>
   [...markup.matchAll(/href="(?<href>[^"]*)"/gu)].map((match) =>
     (match.groups?.href ?? "").replaceAll("&amp;", "&")
   );
-
-/** The markup of the table row marked `data-range` with `value`. */
-const rowOf = (markup: string, value: string) =>
-  new RegExp(`<tr\\b[^>]*data-range="${value}"[^>]*>[\\s\\S]*?</tr>`, "u").exec(
-    markup
-  )?.[0] ?? "";
 
 const datekit = ProjectName.make("datekit");
 
@@ -128,42 +122,71 @@ const view = Schema.decodeSync(WhyView)({
 const TEXT =
   "export const iso = 1;\nexport const week = 2;\nexport const day = 3;\nexport const old = 4;\n";
 
-const page = <WhyLines project={datekit} rev="main" text={TEXT} view={view} />;
+const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
+
+const page = (
+  <WhyLines now={now} project={datekit} rev="main" text={TEXT} view={view} />
+);
+
+/** The band of the group marked `data-range` with `value`, up to the next band or line. */
+const bandOf = (markup: string, value: string) => {
+  const start = markup.indexOf(`data-range="${value}"`);
+  const rest = markup.slice(start + 1);
+
+  const ends = [rest.indexOf("data-range="), rest.indexOf(' id="L')].filter(
+    (at) => at !== -1
+  );
+
+  return start === -1 ? "" : markup.slice(start, start + 1 + Math.min(...ends));
+};
 
 describe("the why page's fallback", () => {
-  it("names the landing that brought lines 1–3, linking its ask, its answer, its commit and its people", () => {
-    const row = rowOf(markupOf(page), "1-3");
+  it("names who brought lines 1–3, ask and answer first and the commit second, each linked", () => {
+    const band = bandOf(markupOf(page), "1-3");
+    const text = textOf(band);
 
-    expect(textOf(row)).toContain("lines 1–3");
-    expect(textOf(row)).toContain("Answer parse-iso-week");
-    expect(textOf(row)).toContain("2 credits");
-    expect(textOf(row)).toContain("checked and landed");
-    expect(hrefsOf(row)).toStrictEqual(
+    expect(text).toContain("lines 1–3");
+    expect(text).toContain("parse-iso-week");
+    expect(text).toContain("answered by bram");
+    expect(
+      [text.indexOf("parse-iso-week"), text.indexOf("answered by bram")].every(
+        (at) => at > -1 && at < text.indexOf(LANDED.slice(0, 7))
+      )
+    ).toBeTruthy();
+    expect(hrefsOf(band)).toStrictEqual(
       expect.arrayContaining([
         "/datekit/asks/parse-iso-week",
         "/datekit/answers/parse-iso-week",
         `/datekit/commit/${LANDED}`,
-        "/people/bram",
       ])
     );
   });
 
-  it("says an imported commit's lines came before adoption", () => {
-    const row = rowOf(markupOf(page), "4-4");
+  it("counts no credit and colours nothing by age", () => {
+    const markup = markupOf(page);
 
-    expect(textOf(row)).toContain("line 4");
-    expect(textOf(row)).toContain("Add the formatter");
-    expect(textOf(row)).toContain("Ada");
-    expect(textOf(row)).toContain("before adoption");
-    expect(hrefsOf(row)).toContain(`/datekit/commit/${IMPORTED}`);
+    expect(textOf(markup)).not.toMatch(/\bcredits?\b/u);
+    expect(bandOf(markup, "1-3")).not.toMatch(
+      /text-(?:landed|waiting|refused|checking)/u
+    );
   });
 
-  it("links the file as it was before each commit, and a proposal about each range's first line", () => {
+  it("says an imported commit's lines came before adoption", () => {
+    const band = bandOf(markupOf(page), "4-4");
+
+    expect(textOf(band)).toContain("line 4");
+    expect(textOf(band)).toContain("Add the formatter");
+    expect(textOf(band)).toContain("Ada");
+    expect(textOf(band)).toContain("before adoption");
+    expect(hrefsOf(band)).toContain(`/datekit/commit/${IMPORTED}`);
+  });
+
+  it("offers why, one step back, and a proposal about each group's first line", () => {
     const markup = markupOf(page);
     const hrefs = hrefsOf(markup);
 
     expect(hrefs).toContain(`/datekit/why/${IMPORTED}/src/format.ts`);
-    expect(textOf(markup)).toContain("Prior to this landing");
+    expect(textOf(markup)).toContain("why, one step back");
     expect(textOf(markup)).toContain("Propose an ask about this line");
 
     const proposal = hrefs
@@ -178,11 +201,45 @@ describe("the why page's fallback", () => {
     ]);
   });
 
-  it("numbers every line beside the table, and leaves the drawing to the browser", () => {
+  it("puts each group's band above its first line, among the numbered lines, and leaves the drawing to the browser", () => {
     const markup = markupOf(page);
 
     expect(markup).toContain('id="L4"');
+    expect(markup).toContain('data-why="ranges"');
+    expect(markup.indexOf('data-range="4-4"')).toBeLessThan(
+      markup.indexOf('id="L4"')
+    );
+    expect(markup.indexOf('data-range="4-4"')).toBeGreaterThan(
+      markup.indexOf('id="L3"')
+    );
     expect(markup).not.toContain("<diffs-container");
+  });
+
+  it("groups consecutive lines one commit brought into one band", () => {
+    const split = Schema.decodeSync(WhyView)({
+      ...Schema.encodeSync(WhyView)(view),
+      ranges: [
+        { end: 2, sha: LANDED, start: 1 },
+        { end: 3, sha: LANDED, start: 3 },
+        { end: 4, sha: IMPORTED, start: 4 },
+      ],
+    });
+
+    const markup = markupOf(
+      <WhyLines
+        now={now}
+        project={datekit}
+        rev="main"
+        text={TEXT}
+        view={split}
+      />
+    );
+
+    expect(
+      [...markup.matchAll(/data-range="(?<range>[^"]+)"/gu)].map(
+        (match) => match.groups?.range
+      )
+    ).toStrictEqual(["1-3", "4-4"]);
   });
 
   it("says why a file without ranges has none", () => {
@@ -195,8 +252,25 @@ describe("the why page's fallback", () => {
     });
 
     expect(
-      textOf(markupOf(<WhyLines project={datekit} rev="main" view={binary} />))
+      textOf(
+        markupOf(
+          <WhyLines now={now} project={datekit} rev="main" view={binary} />
+        )
+      )
     ).toContain("binary or too large");
+  });
+
+  it("is the same page as the file, in Why mode", () => {
+    const toggle =
+      /<nav\b[^>]*aria-label="Mode"[\s\S]*?<\/nav>/u.exec(
+        markupOf(page)
+      )?.[0] ?? "";
+
+    expect(hrefsOf(toggle)).toStrictEqual([
+      "/datekit/blob/main/src/format.ts",
+      "/datekit/why/main/src/format.ts",
+    ]);
+    expect(toggle).toMatch(/aria-current="page"[^>]*>Why</u);
   });
 });
 
@@ -243,57 +317,32 @@ const opening = Schema.decodeSync(WhyView)({
 });
 
 const opened = (
-  <WhyLines project={datekit} rev="main" text={TEXT} view={opening} />
+  <WhyLines now={now} project={datekit} rev="main" text={TEXT} view={opening} />
 );
 
-describe("the why page's row for an ask's opening", () => {
-  it('links the ask it opened and reads "Open ask", with no answer link', () => {
-    const row = rowOf(markupOf(opened), "2-3");
+describe("the why page's band for an ask's opening", () => {
+  it('links the ask it opened and reads "opened", with no answer link', () => {
+    const band = bandOf(markupOf(opened), "2-3");
 
-    expect(textOf(row)).toContain("Open ask format-ordinal");
-    expect(textOf(row)).toContain("ines-v");
-    expect(textOf(row)).toContain("1 credit");
-    expect(hrefsOf(row)).toContain("/datekit/asks/format-ordinal");
+    expect(textOf(band)).toContain("opened format-ordinal");
+    expect(textOf(band)).toContain("by ines-v");
+    expect(hrefsOf(band)).toContain("/datekit/asks/format-ordinal");
     expect(
-      hrefsOf(row).filter((href) => href.includes("/answers/"))
-    ).toStrictEqual([]);
-  });
-
-  it('says "Open ask" once when the commit\'s subject already says it, still linking the ask', () => {
-    const said = Schema.decodeSync(WhyView)({
-      ...Schema.encodeSync(WhyView)(opening),
-      commits: Schema.encodeSync(WhyView)(opening).commits.map((commit) =>
-        commit.sha === OPENED
-          ? { ...commit, subject: "Open ask format-ordinal" }
-          : commit
-      ),
-    });
-
-    const row = rowOf(
-      markupOf(
-        <WhyLines project={datekit} rev="main" text={TEXT} view={said} />
-      ),
-      "2-3"
-    );
-
-    expect(textOf(row).split("Open ask format-ordinal")).toHaveLength(2);
-    expect(hrefsOf(row)).toContain("/datekit/asks/format-ordinal");
-    expect(
-      hrefsOf(row).filter((href) => href.includes("/answers/"))
+      hrefsOf(band).filter((href) => href.includes("/answers/"))
     ).toStrictEqual([]);
   });
 
   it("keeps an answering landing's ask and answer links, and an adopted commit's words", () => {
     const markup = markupOf(opened);
 
-    expect(hrefsOf(rowOf(markup, "1-1"))).toStrictEqual(
+    expect(hrefsOf(bandOf(markup, "1-1"))).toStrictEqual(
       expect.arrayContaining([
         "/datekit/asks/parse-iso-week",
         "/datekit/answers/parse-iso-week",
       ])
     );
-    expect(textOf(rowOf(markup, "1-1"))).not.toContain("Open ask");
-    expect(textOf(rowOf(markup, "4-4"))).toContain("before adoption");
+    expect(textOf(bandOf(markup, "1-1"))).not.toContain("opened");
+    expect(textOf(bandOf(markup, "4-4"))).toContain("before adoption");
   });
 });
 
@@ -328,7 +377,7 @@ describe("a line's landing, in the line dialog", () => {
 describe("the why page's drawing", () => {
   it("draws the file with @pierre/diffs", () => {
     expect(
-      markupOf(<WhyCode project={datekit} text={TEXT} view={view} />)
+      markupOf(<WhyCode now={now} project={datekit} text={TEXT} view={view} />)
     ).toContain("<diffs-container");
   });
 });
@@ -362,6 +411,7 @@ const whyPlatform = (asked: Ref.Ref<Asked>, mainAt: string) => {
       Layer.mergeAll(
         unanswered,
         Contracts.toLayerHandler("why", () => during(Effect.succeed(view))),
+        Contracts.toLayerHandler("log", () => Effect.succeed({ commits: [] })),
         Contracts.toLayerHandler("readFile", (payload) =>
           during(
             Effect.gen(function* () {

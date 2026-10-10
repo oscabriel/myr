@@ -1,8 +1,8 @@
 /**
  * The project's file tree, drawn in the browser only (`repo-tree.tsx`,
- * `@pierre/trees`). The server renders `fallback` (nothing, or the commit's
- * list of changed files), and the browser loads the tree after hydration;
- * the Worker bundles none of it, as `client-code.tsx` explains.
+ * `@pierre/trees`), in the rail's slot or the Files sheet. The server
+ * renders `fallback` (nothing), and the browser loads the tree after
+ * hydration; the Worker bundles none of it, as `client-code.tsx` explains.
  */
 import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
