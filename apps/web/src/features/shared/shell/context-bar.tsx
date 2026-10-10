@@ -27,12 +27,17 @@ export const Breadcrumb = ({
         const face = mono ? "text-mono font-mono" : "";
 
         return (
+          // On a phone the top bar's Back link names the page above, so
+          // the trail keeps only the page itself, whole rather than cut.
           <li
-            className="flex min-w-0 items-center gap-1.5"
+            className={`${last ? "flex" : "tablet:flex hidden"} min-w-0 items-center gap-1.5`}
             key={`${index}:${label}`}
           >
             {index === 0 ? null : (
-              <span aria-hidden="true" className="text-muted-foreground">
+              <span
+                aria-hidden="true"
+                className={`text-muted-foreground ${last ? "tablet:inline hidden" : ""}`}
+              >
                 /
               </span>
             )}

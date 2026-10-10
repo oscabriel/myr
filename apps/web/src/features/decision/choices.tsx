@@ -169,6 +169,7 @@ export const DecisionRecord = ({
       <p
         className="text-ui pl-6 [overflow-wrap:anywhere] whitespace-pre-line"
         data-note=""
+        data-said=""
       >
         {decided.note}
       </p>
@@ -176,13 +177,13 @@ export const DecisionRecord = ({
   </section>
 );
 
-/**
- * Choices kept in sight while their decision is: on a phone, a bar above
- * the bottom bar; from a tablet's width, where they sit.
- */
+// Choices kept in sight while their decision is: on a phone, a bar fixed
+// above the bottom bar (a bar that only stuck would stay below the screen
+// while its decision starts low on the page), with main keeping room for
+// it at its foot (`styles.css`); from a tablet's width, where they sit.
 export const stuckAboveBar = (node: ReactNode) => (
   <div
-    className="border-rule bg-background tablet:static tablet:border-t-0 tablet:p-0 tablet:mx-0 sticky bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[6] -mx-4 border-t px-4 py-2"
+    className="border-rule bg-background tablet:static tablet:border-t-0 tablet:p-0 fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[6] border-t px-4 py-2"
     data-choices-bar=""
   >
     {node}

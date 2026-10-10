@@ -13,6 +13,7 @@
  * Either can be numbered: while the single keys are on, its number copies
  * it, and shows in its title ("Copy claim command (1)").
  */
+import { Brand } from "@repo/brand";
 import { Effect, Option } from "effect";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
@@ -107,6 +108,20 @@ export const CopyAction = ({ numbered = false, ...props }: CopyProps) =>
   ) : (
     <ActionButton {...props} number={undefined} />
   );
+
+/** An open ask's claim command, as a row's copy button. */
+export const ClaimAction = ({
+  ask,
+  project,
+}: {
+  readonly ask: string;
+  readonly project: string;
+}) => (
+  <CopyAction
+    command={`${Brand.cli} claim ${ask} --project ${project}`}
+    label="Copy claim command"
+  />
+);
 
 /** A command shown whole and small (a status line's next step); pressing it copies it. */
 export const CommandChip = ({ command }: { readonly command: string }) => {

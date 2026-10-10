@@ -2,7 +2,7 @@
  * A project's files as a tree, drawn by `@pierre/trees`, in the UI's own
  * face: compact rows, plain grey icons, single-child folders flattened
  * into one row, the folders above the visible rows kept at the top as the
- * reader scrolls, and a filter. The current path is open, selected and in
+ * reader scrolls, and a filter above it. The current path is open, selected and in
  * view; when it changes (the reader moved to another file and the tree
  * stayed mounted), the tree follows.
  *
@@ -25,6 +25,8 @@ import type {
 } from "@pierre/trees";
 import { FileTree as FileTreeView, useFileTree } from "@pierre/trees/react";
 import { useEffect, useMemo } from "react";
+
+import { Input } from "@/components/ui/input";
 
 import type { Counts } from "./diff-model.ts";
 import { ancestorsOf } from "./paths.ts";
@@ -89,7 +91,9 @@ export const treeOptionsFor = (
     initialExpansion: open ? "open" : "closed",
     initialSelectedPaths: current === undefined ? [] : [current],
     preparedInput,
-    search: true,
+    // The filter is a field above the tree (`filterTree`): a field inside
+    // the tree's role would not be one of its rows to a screen reader.
+    search: false,
     stickyFolders: true,
     // The selected row's fill is faint on paper: its name in ink at 600
     // says it too.
@@ -123,6 +127,11 @@ export const followChoices = (
       onOpen(path);
     }
   });
+
+/** Narrow `tree` to the paths that match `text`; an empty filter shows every path. */
+export const filterTree = (tree: Pick<FileTree, "setSearch">, text: string) => {
+  tree.setSearch(text.trim() === "" ? null : text);
+};
 
 /** Whether a tree item is a folder, which opens. */
 const isFolder = (item: FileTreeItemHandle): item is FileTreeDirectoryHandle =>
@@ -176,7 +185,22 @@ export const RepoTree = (props: RepoTreeProps) => {
   }, [model, current]);
 
   // The tree scrolls inside itself, so it takes the height its box gives.
-  return <FileTreeView className="block h-full min-h-0" model={model} />;
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 px-3 pb-1.5">
+        <Input
+          aria-label="Filter files"
+          data-keys-off=""
+          onChange={(event) => {
+            filterTree(model, event.currentTarget.value);
+          }}
+          placeholder="Filter files"
+          type="search"
+        />
+      </div>
+      <FileTreeView className="block min-h-0 flex-1" model={model} />
+    </div>
+  );
 };
 
 // `React.lazy` takes a module's default export.

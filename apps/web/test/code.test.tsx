@@ -44,6 +44,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { BlobView } from "../src/features/code/blob-view.tsx";
 import { CommitView } from "../src/features/code/commit-view.tsx";
+import { FileFacts } from "../src/features/code/file-facts.tsx";
 import { LOG_PAGE } from "../src/features/code/log-page.ts";
 import { LogView } from "../src/features/code/log-view.tsx";
 import { CodeNotFound } from "../src/features/code/not-found.tsx";
@@ -398,6 +399,27 @@ describe(TreeView, () => {
 
   it("leaves the file tree to the browser", () => {
     expect(markupOf(page)).not.toContain("<file-tree-container");
+  });
+});
+
+/** Where a file's facts link their permalink, on the page of `mode`. */
+const permalink = (mode: "code" | "why") =>
+  /href="(?<href>[^"]*)"[^>]*>Permalink</u.exec(
+    markupOf(
+      <FileFacts
+        file={readme}
+        mode={mode}
+        now={now}
+        project={datekit}
+        rev="main"
+      />
+    )
+  )?.groups?.href;
+
+describe("a file's facts", () => {
+  it("link a permalink to the page they sit on: the code, or why", () => {
+    expect(permalink("code")).toBe(`/datekit/blob/${AT}/README.md`);
+    expect(permalink("why")).toBe(`/datekit/why/${AT}/README.md`);
   });
 });
 

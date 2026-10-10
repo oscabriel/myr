@@ -22,6 +22,8 @@ export interface DraftedFileProps {
 
 const options: FileOptions<undefined, undefined> = {
   ...diffsOptions,
+  // The page names the file in its own heading above the code.
+  disableFileHeader: true,
   overflow: "scroll",
 };
 

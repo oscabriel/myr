@@ -52,7 +52,11 @@ const FactRow = ({
   readonly label: string;
 }) => (
   <div className="contents">
-    <dt className="text-label text-muted-foreground pt-0.5">{label}</dt>
+    {/* Sentence case, as every label on the page: the platform names some
+        evidence in lower case ("answer"); the text stays the platform's. */}
+    <dt className="text-label text-muted-foreground pt-0.5 first-letter:uppercase">
+      {label}
+    </dt>
     <dd className="text-ui mb-1.5 min-w-0 [overflow-wrap:anywhere] @lg:mb-0">
       {children}
     </dd>

@@ -76,7 +76,9 @@ const wantsMarkdown = (request: Request) => {
 
 const code = (text: string) => `<code>${escapeHtml(text)}</code>`;
 
-const pre = (text: string) => `<pre><code>${escapeHtml(text)}</code></pre>`;
+// Tab reaches a command that scrolls sideways on a phone, to scroll it.
+const pre = (text: string) =>
+  `<pre tabindex="0"><code>${escapeHtml(text)}</code></pre>`;
 
 const link = (url: string, text = url) =>
   `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`;

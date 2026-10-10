@@ -407,9 +407,12 @@ describe("a project's ledger", () => {
         "write-only: names, and who set each value and when",
       ])
     ).toBeTruthy();
-    expect(facts).toMatch(
-      /<code\b[^>]*select-all[^>]*>[^<]*ledger --project datekit/u
-    );
+    // The command is the text of the one code element a tap selects whole.
+    expect(
+      plainText(
+        /<code\b[^>]*select-all[^>]*>.*?<\/code>/u.exec(facts)?.[0] ?? ""
+      )
+    ).toContain("ledger --project datekit");
   });
 
   it("shows a project without layers as Open, with nothing held back", () => {

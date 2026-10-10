@@ -170,7 +170,10 @@ const VouchList = ({
           >
             <HandleLink handle={handle} />
             {note === undefined ? null : (
-              <span className="text-muted-foreground">{` — ${note}`}</span>
+              <span
+                className="text-muted-foreground"
+                data-said=""
+              >{` — ${note}`}</span>
             )}
           </li>
         ))}

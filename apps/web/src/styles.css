@@ -134,14 +134,17 @@
   --skeleton: oklch(0.8 0.008 255);
 
   /* Code: ink carries keywords, names and calls; strings lean teal and
-     constants olive, both too grey to be mistaken for a state. */
+     constants olive, both too grey to be mistaken for a state. Each keeps
+     4.5:1 on a changed word's tint as well as on the paper. */
   --syntax-keyword: var(--foreground);
   --syntax-function: var(--foreground);
   --syntax-parameter: var(--foreground);
-  --syntax-string: oklch(0.46 0.035 200);
-  --syntax-constant: oklch(0.47 0.035 110);
-  --syntax-comment: var(--muted);
-  --syntax-punctuation: var(--muted);
+  --syntax-string: oklch(0.42 0.035 200);
+  --syntax-constant: oklch(0.42 0.035 110);
+  /* A step darker than muted: a changed word's tint sits under these, and
+     they keep 4.5:1 on it too. */
+  --syntax-comment: oklch(0.42 0.012 258);
+  --syntax-punctuation: oklch(0.42 0.012 258);
   --syntax-link: var(--syntax-string);
 
   /* A diff's lines. The sign colour draws the + and -, the bars and a
@@ -202,6 +205,8 @@
 
     --syntax-string: oklch(0.8 0.035 200);
     --syntax-constant: oklch(0.82 0.035 110);
+    --syntax-comment: var(--muted);
+    --syntax-punctuation: var(--muted);
 
     --diff-add-sign: oklch(0.74 0.08 195);
     --diff-add-bg: color-mix(
@@ -363,6 +368,15 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     caret-color: var(--checking);
+  }
+
+  /* On a phone a decision's choices are a bar fixed above the bottom bar
+     (decision/choices.tsx): main keeps room for it at its foot, so the
+     page's last lines scroll clear of it. */
+  @media (width < 40rem) {
+    main:has([data-choices-bar]) {
+      padding-bottom: 10rem;
+    }
   }
 
   ::selection {

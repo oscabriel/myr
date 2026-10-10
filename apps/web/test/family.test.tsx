@@ -7,6 +7,7 @@
  * here from hand-made events.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
@@ -196,8 +197,35 @@ describe(FamilyStrip, () => {
 
       expect(textIn(folded)).toContain("Show 6 children");
       expect(folded).toMatch(/<button\b[^>]*aria-expanded="false"/u);
-      expect(tagsWith(folded, "data-family-child")).toHaveLength(0);
+      // Folded, the rows are out of sight and out of the reading order:
+      // the list that holds them is hidden.
+      expect(folded).toMatch(
+        /<ul\b[^>]*hidden=""[^>]*>(?:(?!<\/ul>).)*data-family-child/su
+      );
+      expect(folded).not.toMatch(
+        /<ul\b(?![^>]*hidden="")[^>]*>(?:(?!<\/ul>).)*data-family-child/su
+      );
     })
+  );
+
+  it.effect(
+    "holds each open child's claim command as text, folded or not",
+    () =>
+      Effect.gen(function* () {
+        for (const expanded of [false, true]) {
+          const markup = yield* strip({ expanded });
+
+          for (const open of ["burrow-notify", "burrow-search"]) {
+            expect(markup).toContain(
+              `<code class="sr-only">${Brand.cli} claim ${id(open)} --project burrow</code>`
+            );
+          }
+
+          // A child someone holds, or that landed, has none.
+          expect(markup).not.toContain(`claim ${id("burrow-catalog")} `);
+          expect(markup).not.toContain(`claim ${id("burrow-auth")} `);
+        }
+      })
   );
 
   it.effect(

@@ -501,6 +501,7 @@ export const ProposalView = ({
       }
       state={<StatusLine compact subject={{ kind: "proposal", proposal }} />}
       status={<ProposalStatus proposal={proposal} />}
+      said
       title={proposal.want}
     >
       {Option.isSome(decision) && open ? (

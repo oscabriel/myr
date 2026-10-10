@@ -16,6 +16,15 @@ import {
   treesOptions,
 } from "../src/features/code/pierre.ts";
 
+/** A drawn code box, wider than its pane when it `scrolls`. */
+const box = (scrolls: boolean) => ({
+  clientHeight: 400,
+  clientWidth: 600,
+  scrollHeight: 400,
+  scrollWidth: scrolls ? 900 : 600,
+  tabIndex: -1,
+});
+
 describe("the options every drawing of code shares", () => {
   it("name the token theme for both schemes, so the page's scheme decides", () => {
     expect(diffsOptions.theme).toStrictEqual({
@@ -31,6 +40,18 @@ describe("the options every drawing of code shares", () => {
     expect(diffsOptions.tokenizeMaxLength).toBe(DEFAULT_TOKENIZE_MAX_LENGTH);
     expect(diffsOptions.tokenizeMaxLineLength).toBe(1000);
     expect(diffsOptions.maxLineDiffLength).toBe(1000);
+  });
+
+  it("let the keyboard reach code that scrolls, with its focus in sight", () => {
+    const wide = box(true);
+    const narrow = box(false);
+
+    diffsOptions.onPostRender({
+      shadowRoot: { querySelectorAll: () => [wide, narrow] },
+    });
+
+    expect([wide.tabIndex, narrow.tabIndex]).toStrictEqual([0, -1]);
+    expect(diffsOptions.unsafeCSS).toContain("code:focus-visible");
   });
 
   it("draw a file tree compact, with plain icons", () => {

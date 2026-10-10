@@ -153,7 +153,9 @@ export const Refusals = () => (
           className="border-rule shell:grid shell:grid-cols-[12rem_minmax(0,1fr)] shell:gap-4 flex min-w-0 flex-col gap-1 border-b py-2.5"
           key={name}
         >
-          <dt className="text-ui font-medium">{name}</dt>
+          <dt className="text-ui font-medium" data-term="">
+            {name}
+          </dt>
           <dd className="flex min-w-0 flex-wrap gap-x-3 gap-y-1">
             {members.map(({ identifier }) => (
               <a

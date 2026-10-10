@@ -171,7 +171,8 @@ describe(StatusLine, () => {
           ask: AskId.make("drop-legacy-fetch-burrow-kit"),
         }),
         "Passed, waiting for drop-legacy-fetch-burrow-kit to land first",
-        "the family's move",
+        // The ask it waits on may be no family's: the move is that ask's.
+        "that ask's move",
       ],
     ] as const;
 

@@ -709,6 +709,7 @@ export const AnswerView = ({
           />
         </div>
       }
+      said
       title={ask.brief.want}
     >
       {verdict === undefined ? null : (

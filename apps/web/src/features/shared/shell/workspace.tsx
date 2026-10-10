@@ -32,6 +32,8 @@ export interface WorkspaceProps {
   readonly crumbs?: readonly Crumb[];
   /** The page head's title: the headline, or a title when it runs long. */
   readonly title: ReactNode;
+  /** The title is someone's own words (a want), shown as they wrote it. */
+  readonly said?: boolean | undefined;
   /** A status line under the title. */
   readonly status?: ReactNode;
   /** A 14 px muted line under the status: kind, asker, age. */
@@ -69,11 +71,13 @@ const LONG_TITLE = 80;
 
 const PageHead = ({
   meta,
+  said = false,
   status,
   title,
-}: Pick<WorkspaceProps, "meta" | "status" | "title">) => (
+}: Pick<WorkspaceProps, "meta" | "said" | "status" | "title">) => (
   <div className="flex flex-col gap-4 pt-6 pb-6">
     <h1
+      data-said={said ? "" : undefined}
       className={`text-balance break-words ${
         Predicate.isString(title) && title.length > LONG_TITLE
           ? "text-title"
@@ -204,6 +208,7 @@ const WorkspaceView = ({
   factsSummary,
   meta,
   primaryCommand,
+  said,
   state,
   status,
   title,
@@ -244,7 +249,7 @@ const WorkspaceView = ({
             state={state}
           />
           <div className={`${GUTTER} ${code ? "" : MEASURE}`}>
-            <PageHead meta={meta} status={status} title={title} />
+            <PageHead meta={meta} said={said} status={status} title={title} />
           </div>
           {hasFacts && !code ? (
             <CommandSlotProvider slot="facts">

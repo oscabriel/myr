@@ -156,6 +156,21 @@ describe(CommandLine, () => {
     expect(textOf(element)).toContain(command);
     expect(markupOf(element)).toMatch(/<button\b[^>]*>.*Copy.*<\/button>/u);
   });
+
+  it("keeps each word whole on its line, so a narrow column breaks between words", () => {
+    const command = `${Brand.cli} claim lint-heading-levels --project vellum`;
+    const markup = markupOf(<CommandLine command={command} />);
+
+    const words = [
+      ...markup.matchAll(
+        /<span class="inline-block[^"]*">(?<word>[^<]*)<\/span>/gu
+      ),
+    ].map(([, word]) => word);
+
+    expect(words).toStrictEqual(command.split(" "));
+    // The words keep the command's own spaces between them.
+    expect(textOf(<CommandLine command={command} />)).toContain(command);
+  });
 });
 
 describe(EmptyState, () => {

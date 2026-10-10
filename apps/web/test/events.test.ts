@@ -198,7 +198,7 @@ describe(whoseMove, () => {
       Checking: "platform",
       Landed: "none",
       Refused: "answerer",
-      WaitingOnParent: "family",
+      WaitingOnParent: "parent",
     } satisfies Record<Outcome["_tag"], Move>);
   });
 

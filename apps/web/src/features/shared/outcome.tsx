@@ -214,6 +214,7 @@ export const StageStrip = ({
                   ? "text-muted-foreground"
                   : "text-foreground"
               }`}
+              data-term=""
             >
               {stageNames(name).label}
             </span>

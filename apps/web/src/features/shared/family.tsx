@@ -24,6 +24,7 @@ import { useId, useState } from "react";
 
 import { familyMarks, markOf } from "./ask-progress.ts";
 import type { AskProgress, Mark } from "./ask-progress.ts";
+import { ClaimAction } from "./copy-action.tsx";
 import { AppLink } from "./link.tsx";
 import { StateMarkIcon } from "./marks.tsx";
 import type { StateMark } from "./marks.tsx";
@@ -240,47 +241,50 @@ export const FamilyStrip = ({
           </span>
         </button>
       </div>
-      {open ? (
-        <ul
-          className="border-rule mt-1 ml-[0.4375rem] flex flex-col border-l pl-3"
-          id={rowsId}
-        >
-          {family.children.map(({ ask, mark }) => (
-            <li
-              className="flex h-8 min-w-0 items-center gap-2"
-              data-family-child={ask}
-              key={ask}
+      {/* Folded, the rows stay in the page, hidden: each open child's
+          claim command is text an agent reading the page still finds. */}
+      <ul
+        className="border-rule mt-1 ml-[0.4375rem] flex flex-col border-l pl-3"
+        hidden={!open}
+        id={rowsId}
+      >
+        {family.children.map(({ ask, mark }) => (
+          <li
+            className="flex h-8 min-w-0 items-center gap-2"
+            data-family-child={ask}
+            key={ask}
+          >
+            <StateMarkIcon
+              mark={markFor(mark)}
+              size="sm"
+              // A folded row is out of sight: its stamp would play unseen.
+              stamp={open && stamps.has(ask)}
+            />
+            <AppLink
+              className="text-ui decoration-rule relative z-10 min-w-0 truncate no-underline hover:underline"
+              title={wants?.get(ask) ?? ask}
+              to={askPath(project, ask)}
             >
-              <StateMarkIcon
-                mark={markFor(mark)}
-                size="sm"
-                stamp={stamps.has(ask)}
-              />
-              <AppLink
-                className="text-ui decoration-rule relative z-10 min-w-0 truncate no-underline hover:underline"
-                title={wants?.get(ask) ?? ask}
-                to={askPath(project, ask)}
-              >
-                {wants?.get(ask) ?? (
-                  <span className="text-mono font-mono">
-                    {family.nameOf(ask)}
-                  </span>
-                )}
-              </AppLink>
-              {wants?.has(ask) === true ? (
-                <span className="text-mono text-muted-foreground tablet:inline hidden shrink-0 font-mono">
+              {wants?.get(ask) ?? (
+                <span className="text-mono font-mono">
                   {family.nameOf(ask)}
                 </span>
-              ) : null}
-              <span className="text-label text-muted-foreground ml-auto shrink-0">
-                {words[mark]}
+              )}
+            </AppLink>
+            {wants?.has(ask) === true ? (
+              <span className="text-mono text-muted-foreground tablet:inline hidden shrink-0 font-mono">
+                {family.nameOf(ask)}
               </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div hidden id={rowsId} />
-      )}
+            ) : null}
+            <span className="text-label text-muted-foreground ml-auto shrink-0">
+              {words[mark]}
+            </span>
+            {mark === "open" ? (
+              <ClaimAction ask={ask} project={project} />
+            ) : null}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

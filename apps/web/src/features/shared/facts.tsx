@@ -285,7 +285,7 @@ export const GateFacts = (
   if (props.outcome === undefined) {
     return (
       <FactBlock label="Gate">
-        <p className="text-ui">
+        <p className="text-ui" data-term="">
           {StageName.literals
             .map((stage) => stageNames(stage).label)
             .join(" · ")}
@@ -305,7 +305,9 @@ export const GateFacts = (
           <dl className="mt-2 flex flex-col gap-1.5">
             {StageName.literals.map((stage) => (
               <div className="flex flex-col" key={stage}>
-                <dt className="text-label">{stageNames(stage).label}</dt>
+                <dt className="text-label" data-term="">
+                  {stageNames(stage).label}
+                </dt>
                 <dd className="text-label text-muted-foreground font-normal">
                   {runs(stage)}
                 </dd>
@@ -339,6 +341,7 @@ export const GateFacts = (
                   ? "text-muted-foreground"
                   : ""
               }
+              data-term=""
             >
               {stageNames(name).label}
             </span>
@@ -666,7 +669,13 @@ export const ProvenanceFacts = ({
               <span className="min-w-0 flex-1 truncate">
                 {shown ?? <CodeValue value={value} />}
               </span>
-              <CopyAction command={value} label={`Copy ${label}`} />
+              {shown === undefined ? (
+                <CopyAction command={value} label={`Copy ${label}`} />
+              ) : (
+                // A time reads as words, its exact instant in its own
+                // title: nothing here to paste into a terminal.
+                <span aria-hidden="true" className="size-8 shrink-0" />
+              )}
             </dd>
           </div>
         ))}

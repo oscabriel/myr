@@ -355,6 +355,18 @@ describe("the platform's own pages", () => {
       })
     );
 
+    it.effect("lets the keyboard reach a block that scrolls sideways", () =>
+      Effect.gen(function* () {
+        const html = yield* page.html;
+
+        // A command wider than a phone scrolls in its box: Tab reaches the
+        // box, so a keyboard can scroll it.
+        expect(html.match(/<pre\b[^>]*>/gu) ?? []).toStrictEqual(
+          (html.match(/<pre\b[^>]*>/gu) ?? []).map(() => '<pre tabindex="0">')
+        );
+      })
+    );
+
     it.effect("reads at 16 px, inputs too", () =>
       Effect.gen(function* () {
         const rules = rulesOf(styleOf(yield* page.html));

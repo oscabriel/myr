@@ -99,6 +99,7 @@ export const WhyLines = ({
       facts={
         file === undefined ? undefined : (
           <FileFacts
+            mode="why"
             file={file}
             last={last}
             now={now}

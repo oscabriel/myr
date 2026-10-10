@@ -22,6 +22,7 @@ import { DiffCode } from "../src/features/code/diff-view.tsx";
 import {
   followChoices,
   RepoTree,
+  filterTree,
   treeOptionsFor,
 } from "../src/features/code/repo-tree.tsx";
 
@@ -112,6 +113,22 @@ describe("the file tree", () => {
     tree.getItem("src/")?.select();
 
     expect(opened).toStrictEqual([]);
+  });
+
+  it("keeps its filter outside the tree, which holds only rows", () => {
+    const { tree } = treeAt("src/parse.ts");
+
+    // A field inside a tree's role is not one of its rows to a screen
+    // reader: the filter sits above the tree and narrows it from there.
+    expect(treeOptionsFor({ paths: PATHS }).search).toBeFalsy();
+
+    filterTree(tree, "week");
+
+    expect(tree.getSearchValue()).toBe("week");
+
+    filterTree(tree, "");
+
+    expect(tree.isSearchOpen()).toBeFalsy();
   });
 
   it("opens the folders above the page's file, and selects it", () => {

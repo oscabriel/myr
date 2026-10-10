@@ -416,6 +416,7 @@ export const CommitView = ({
             <p
               className="text-body max-w-[70ch] [overflow-wrap:anywhere] whitespace-pre-wrap"
               data-body=""
+              data-said=""
             >
               {body}
             </p>

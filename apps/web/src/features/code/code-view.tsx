@@ -113,6 +113,7 @@ export const FileCode = ({ path, sha, text }: FileCodeProps) => {
         );
       },
       onPostRender: (node: HTMLElement) => {
+        diffsOptions.onPostRender(node);
         pending.current.node = node;
         reveal(pending.current);
       },

@@ -43,16 +43,25 @@ const SECTIONS = [
   { id: "refusals", title: "Refusals" },
 ] as const;
 
-/** JSON or text to paste: whole, wrapping, with a button that copies it. */
+/**
+ * JSON or text to paste: whole, with a button that copies it. It keeps its
+ * own lines and indentation and scrolls sideways where the screen is
+ * narrower than a line, as code does everywhere on the web, rather than
+ * wrapping a value under its key; the keyboard reaches it to scroll.
+ */
 const SnippetBlock = ({ snippet }: { readonly snippet: SetupSnippet }) => {
   const { copied, copy } = useCopy(snippet.text);
 
   return (
     <div className="border-rule bg-surface flex max-w-full min-w-0 items-start gap-2 border py-1 pr-1 pl-3">
-      <pre className="text-mono leading-terminal min-w-0 flex-1 overflow-x-auto py-0.5 font-mono whitespace-pre-wrap">
-        <code className="[overflow-wrap:anywhere] select-all">
-          {snippet.text}
-        </code>
+      <pre
+        aria-label={snippet.label}
+        className="text-mono leading-terminal min-w-0 flex-1 overflow-x-auto py-0.5 font-mono whitespace-pre"
+        // A box that scrolls is a stop for Tab, so a keyboard can scroll it.
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrolling region must take focus to be scrolled without a pointer (WCAG 2.1.1)
+        tabIndex={0}
+      >
+        <code className="select-all">{snippet.text}</code>
       </pre>
       <Button
         className="shrink-0"

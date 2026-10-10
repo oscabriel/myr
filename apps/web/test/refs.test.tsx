@@ -155,7 +155,12 @@ describe(RefsView, () => {
     const facts = inspectorOf(markupOf(page));
 
     expect(plainText(facts)).toContain(`git clone ${platformUrl}/datekit.git`);
-    expect(facts).toMatch(/<code\b[^>]*select-all[^>]*>git clone /u);
+    // The command is the text of the one code element a tap selects whole.
+    expect(
+      plainText(
+        /<code\b[^>]*select-all[^>]*>.*?<\/code>/u.exec(facts)?.[0] ?? ""
+      )
+    ).toMatch(/^ ?git clone /u);
     expect(plainText(facts)).toContain("claim fork");
   });
 

@@ -159,7 +159,8 @@ const moveWords = (
       decider === undefined ? "a decider's move" : `${decider}'s move`,
     ]),
     Match.when("platform", () => ["the platform's move"]),
-    Match.when("family", () => ["the family's move"]),
+    // The ask it waits on may be a family's or a lone one: its move.
+    Match.when("parent", () => ["that ask's move"]),
     Match.when("none", () => []),
     Match.exhaustive
   );
@@ -222,7 +223,13 @@ const answerReading = ({
       after: after(),
       lead: "Checking",
       mark: "checking",
-      rest: <> at the {stageNames(at).words} stage</>,
+      rest: (
+        <>
+          {" at the "}
+          <span data-term="">{stageNames(at).words}</span>
+          {" stage"}
+        </>
+      ),
       tone: "checking",
     }),
     Landed: ({ sha }): Reading => ({
@@ -249,7 +256,15 @@ const answerReading = ({
       next: refusals[0].next,
       rest: (
         <>
-          {stage === undefined ? ": " : ` at ${stageNames(stage).label}: `}
+          {stage === undefined ? (
+            ": "
+          ) : (
+            <>
+              {" at "}
+              <span data-term="">{stageNames(stage).label}</span>
+              {": "}
+            </>
+          )}
           <Code>{headline(refusals)}</Code>
         </>
       ),

@@ -250,7 +250,7 @@ export const DiffCode = ({
       lineHoverHighlight: "both",
       overflow: "scroll",
       stickyHeaders: true,
-      unsafeCSS: HEADER_CSS,
+      unsafeCSS: `${diffsOptions.unsafeCSS}\n${HEADER_CSS}`,
     }),
     [split]
   );

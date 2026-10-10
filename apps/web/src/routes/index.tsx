@@ -16,7 +16,7 @@ import { AsyncResult } from "effect/reactivity";
 import { useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 
-import { askAtom } from "../client/ask.ts";
+import { selectedAskAtom } from "../client/ask.ts";
 import { projectEventsAtom } from "../client/events.ts";
 import { frontPageAtom, projectsAtom } from "../client/front.ts";
 import {
@@ -80,17 +80,21 @@ const everyAsk = frontPageAtom({});
 
 const root = getRouteApi("__root__");
 
-/** The selected ask in full, read in the browser once it is selected. */
+/**
+ * The selected ask in full, read in the browser once it is selected. It
+ * wraps the page whether or not a row is selected, so selecting one never
+ * remounts the list (and loses the row the keys rest on).
+ */
 const WithFull = ({
-  ask,
   children,
-  project,
+  pick,
 }: {
-  readonly ask: AskId;
-  readonly project: ProjectName;
+  readonly pick:
+    | { readonly ask: AskId; readonly project: ProjectName }
+    | undefined;
   readonly children: (full: Ask | undefined) => ReactNode;
 }) => {
-  const read = useAtomValue(askAtom(project, ask));
+  const read = useAtomValue(selectedAskAtom(pick));
 
   return children(AsyncResult.isSuccess(read) ? read.value.ask : undefined);
 };
@@ -159,12 +163,10 @@ const LiveFront = ({
     />
   );
 
-  return hydrated && Option.isSome(picked) ? (
-    <WithFull ask={picked.value.ask} project={picked.value.project}>
+  return (
+    <WithFull pick={hydrated ? Option.getOrUndefined(picked) : undefined}>
       {view}
     </WithFull>
-  ) : (
-    view()
   );
 };
 

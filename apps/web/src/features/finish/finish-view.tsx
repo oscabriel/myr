@@ -138,7 +138,9 @@ const FinishLines = ({
 /** What the ask wants, in one paragraph, and the way to it. */
 const WantFacts = ({ ask }: { readonly ask: Ask }) => (
   <FactBlock label="The ask wants">
-    <p className="text-want font-normal">{ask.brief.want}</p>
+    <p className="text-want font-normal" data-said="">
+      {ask.brief.want}
+    </p>
     <AppLink className={`text-ui ${LINK}`} to={askPath(ask.project, ask.id)}>
       The ask <code className="text-mono font-mono">{ask.id}</code>
     </AppLink>
@@ -528,7 +530,9 @@ const PhoneFinish = ({
   >) => (
   <div className={`tablet:hidden flex flex-col gap-6 ${GUTTER}`}>
     {ask === undefined ? null : (
-      <p className="text-want max-w-[70ch]">{ask.brief.want}</p>
+      <p className="text-want max-w-[70ch]" data-said="">
+        {ask.brief.want}
+      </p>
     )}
     {verdict === undefined ? null : (
       <div data-outcome={verdict.outcome._tag}>

@@ -59,7 +59,7 @@ export interface Family {
 }
 
 /** Who acts next on an ask. */
-export type Move = "answerer" | "decider" | "family" | "none" | "platform";
+export type Move = "answerer" | "decider" | "none" | "parent" | "platform";
 
 /** The highest event number among `events`; 0 when there are none. */
 export const lastSeq = (events: readonly ProjectEvent[]): number => {
@@ -176,7 +176,7 @@ export const whoseMove = (latest?: Outcome, claimant?: Handle): Move => {
     Checking: (): Move => "platform",
     Landed: (): Move => "none",
     Refused: (): Move => "answerer",
-    WaitingOnParent: (): Move => "family",
+    WaitingOnParent: (): Move => "parent",
   });
 };
 

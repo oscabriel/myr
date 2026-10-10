@@ -19,7 +19,6 @@
  * press. `j` and `k` reach each row's link (`data-list-key`). Every
  * `data-*` a list carries sits on the row's `<li>`.
  */
-import { Brand } from "@repo/brand";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -27,7 +26,7 @@ import type { MouseEvent, ReactNode } from "react";
 import { Fragment } from "react";
 
 import type { AskProgress } from "./ask-progress.ts";
-import { CopyAction } from "./copy-action.tsx";
+import { ClaimAction } from "./copy-action.tsx";
 import { useListKeys } from "./keys.tsx";
 import { AppLink } from "./link.tsx";
 import { STATE_MARKS, StateMarkIcon } from "./marks.tsx";
@@ -199,6 +198,8 @@ export const Row = ({
       aria-current={selected ? "true" : undefined}
       className={onSelect === undefined ? LINK : `${LINK} ${SELECTS}`}
       data-list-key={id}
+      // The thing in its own words: a want, a subject, a commit's line.
+      data-said=""
       search={search}
       title={title}
       to={href}
@@ -305,13 +306,15 @@ export const RowGroup = ({
 }) => (
   <section aria-label={label} className="flex min-w-0 flex-col">
     <div
-      className={`border-rule bg-background sticky z-[5] -mx-2 flex h-8 min-w-0 items-center gap-3 border-b px-2 ${STICK[under]}`}
+      // On a phone a long posture wraps under the name rather than losing
+      // its last word; from a tablet the header is one 32 px line.
+      className={`border-rule bg-background tablet:h-8 tablet:flex-nowrap tablet:py-0 sticky z-[5] -mx-2 flex min-h-8 min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 border-b px-2 py-1 ${STICK[under]}`}
     >
       <h2 className="text-ui shrink-0 font-semibold [&_a]:no-underline [&_a:hover]:underline">
         {name}
       </h2>
       {facts === undefined ? null : (
-        <div className="text-ui text-muted-foreground flex min-w-0 items-center truncate">
+        <div className="text-ui text-muted-foreground tablet:truncate flex min-w-0 items-center">
           {facts}
         </div>
       )}
@@ -333,7 +336,12 @@ export const RowList = ({
   readonly children: ReactNode;
   readonly label: string;
 }) => (
-  <ul aria-label={label} className="border-rule flex flex-col border-t">
+  // The top hairline runs as wide as the rows' own (each row reaches 8 px
+  // past the list on either side, for its fill).
+  <ul
+    aria-label={label}
+    className="border-rule -mx-2 flex flex-col border-t px-2"
+  >
     {children}
   </ul>
 );
@@ -443,10 +451,7 @@ export const AskRow = ({
     <Row
       action={
         open && takeable !== false ? (
-          <CopyAction
-            command={`${Brand.cli} claim ${listing.ask} --project ${project}`}
-            label="Copy claim command"
-          />
+          <ClaimAction ask={listing.ask} project={project} />
         ) : undefined
       }
       data={{

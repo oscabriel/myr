@@ -19,7 +19,8 @@
  * text, so a minified bundle or a lockfile cannot stall the page.
  *
  * No React and no DOM here: the module loads in Node for its test, and in
- * the browser only through the views that draw.
+ * the browser only through the views that draw. A drawing hands its code
+ * boxes over once drawn, so code too wide for its pane is a stop for Tab.
  */
 import {
   DEFAULT_TOKENIZE_MAX_LENGTH,
@@ -29,14 +30,54 @@ import {
 /** The token theme's registered name. */
 export const CODE_THEME = "repo-tokens";
 
+/** A drawn file's code box: whether it scrolls, and whether Tab reaches it. */
+interface CodeBox {
+  readonly clientHeight: number;
+  readonly clientWidth: number;
+  readonly scrollHeight: number;
+  readonly scrollWidth: number;
+  tabIndex: number;
+}
+
+/** A drawing as Pierre hands it over once drawn: its code boxes, in its shadow root. */
+interface Drawn {
+  readonly shadowRoot: {
+    readonly querySelectorAll: (selectors: "code") => Iterable<CodeBox>;
+  } | null;
+}
+
+/**
+ * Code that scrolls (a long line, a phone's width) is a stop for Tab, so a
+ * keyboard can scroll it; code that fits is not, so a page of short files
+ * adds no stops.
+ */
+const reachScrolledCode = (node: Drawn) => {
+  for (const code of node.shadowRoot?.querySelectorAll("code") ?? []) {
+    code.tabIndex =
+      code.scrollWidth > code.clientWidth ||
+      code.scrollHeight > code.clientHeight
+        ? 0
+        : -1;
+  }
+};
+
+/**
+ * The focus ring inside a drawing's shadow root, which the page's own
+ * stylesheet does not reach: the page's ink, as everywhere else.
+ */
+export const FOCUS_CSS =
+  "code:focus-visible { outline: 2px solid var(--foreground); outline-offset: -2px; }";
+
 /** Spread first into a drawing's own options. */
 export const diffsOptions = {
   maxLineDiffLength: 1000,
+  onPostRender: reachScrolledCode,
   preferredHighlighter: "shiki-js",
   theme: { dark: CODE_THEME, light: CODE_THEME },
   themeType: "system",
   tokenizeMaxLength: DEFAULT_TOKENIZE_MAX_LENGTH,
   tokenizeMaxLineLength: 1000,
+  unsafeCSS: FOCUS_CSS,
 } as const;
 
 /** The file tree's look: compact rows, plain icons (`styles.css` greys them). */

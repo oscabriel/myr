@@ -269,7 +269,7 @@ const held = <A,>(set: Set<A>, item: A) => {
 const lastOf = <A,>(set: ReadonlySet<A>): A | undefined => [...set].at(-1);
 
 /** Whether `event` was pressed inside something that takes typing. */
-const inField = (event: KeyboardEvent) => {
+export const inField = (event: KeyboardEvent) => {
   const [target] = event.composedPath();
 
   return (

@@ -240,7 +240,9 @@ const Brief = ({ ask }: { readonly ask: Ask }) => {
 
   return parts.length === 0 ? null : (
     <Region id="ask-brief" title="Brief">
-      <div className="text-body flex max-w-[70ch] flex-col gap-5">{parts}</div>
+      <div className="text-body flex max-w-[70ch] flex-col gap-5" data-said="">
+        {parts}
+      </div>
     </Region>
   );
 };
@@ -668,6 +670,7 @@ export const AskView = ({
           )}
         </>
       }
+      said
       title={ask.brief.want}
       {...(takeable ? { primaryCommand: claimCommand(ask) } : {})}
     >

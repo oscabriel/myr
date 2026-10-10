@@ -14,18 +14,21 @@ import { AppLink } from "../shared/link.tsx";
 import { LandingWords } from "../why/band.tsx";
 import { CopyButton } from "./copy.tsx";
 import { fileWords } from "./file-header.tsx";
-import { blobHref, commitsHref, rawHref } from "./paths.ts";
+import { blobHref, commitsHref, rawHref, whyHref } from "./paths.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
 export const FileFacts = ({
   file,
   last,
+  mode = "code",
   now,
   project,
   rev,
 }: {
   readonly file: FileView;
+  /** Which page shows the block: its permalink keeps the reader there. */
+  readonly mode?: "code" | "why";
   /** The commit that last changed the file, with its landing; none when the read found none. */
   readonly last?: CommitView | undefined;
   readonly now: DateTime.Utc;
@@ -70,7 +73,14 @@ export const FileFacts = ({
         <a className={LINK} href={rawHref(project, file.at, file.path)}>
           Raw
         </a>
-        <AppLink className={LINK} to={blobHref(project, file.at, file.path)}>
+        <AppLink
+          className={LINK}
+          to={(mode === "why" ? whyHref : blobHref)(
+            project,
+            file.at,
+            file.path
+          )}
+        >
           Permalink
         </AppLink>
         {file.text === undefined ? null : (

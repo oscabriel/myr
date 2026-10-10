@@ -13,6 +13,25 @@ import { Button } from "../../components/ui/button.tsx";
 import { useCopy } from "./copy-action.tsx";
 import { useNumberedCommand } from "./keys.tsx";
 
+// The command's words, each kept whole on its line: a narrow column breaks
+// the line between words, never after a word's own hyphen
+// (`lint-heading-levels`, `--project`); a word longer than the line (a URL)
+// still breaks, anywhere. The text is the command's, space for space.
+const wordsOf = (command: string) =>
+  command.split(/(?<space>\s+)/u).map((part, index) =>
+    part.trim() === "" ? (
+      part
+    ) : (
+      <span
+        className="inline-block max-w-full [overflow-wrap:anywhere]"
+        // The parts never move: their place in the command is their key.
+        key={index}
+      >
+        {part}
+      </span>
+    )
+  );
+
 const Line = ({
   command,
   number,
@@ -35,8 +54,8 @@ const Line = ({
       <span aria-hidden="true" className="text-muted-foreground select-none">
         $
       </span>
-      <code className="min-w-0 flex-1 py-0.5 [overflow-wrap:anywhere] break-words whitespace-pre-wrap select-all">
-        {command}
+      <code className="min-w-0 flex-1 py-0.5 whitespace-pre-wrap select-all">
+        {wordsOf(command)}
       </code>
       <Button
         className="shrink-0 font-sans"

@@ -118,7 +118,9 @@ const DecisionFacts = ({
 /** The ask a decision concerns: its want and its page. */
 const AskFacts = ({ ask }: { readonly ask: Ask }) => (
   <FactBlock label="The ask">
-    <p className="text-ui">{ask.brief.want}</p>
+    <p className="text-ui" data-said="">
+      {ask.brief.want}
+    </p>
     <AppLink className={`text-ui ${LINK}`} to={askPath(ask.project, ask.id)}>
       <code className="text-mono font-mono">{ask.id}</code>
     </AppLink>
@@ -128,7 +130,9 @@ const AskFacts = ({ ask }: { readonly ask: Ask }) => (
 /** The proposal a decision would open: its want, who proposed it, its page. */
 const ProposalFacts = ({ proposal }: { readonly proposal: Proposal }) => (
   <FactBlock label="The proposal">
-    <p className="text-ui">{proposal.want}</p>
+    <p className="text-ui" data-said="">
+      {proposal.want}
+    </p>
     <p className="text-ui text-muted-foreground">
       Proposed by <HandleLink handle={proposal.proposer} />
     </p>

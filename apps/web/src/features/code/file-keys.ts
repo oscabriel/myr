@@ -8,20 +8,7 @@
  */
 import { useEffect, useRef } from "react";
 
-import { intentOf, useKeys } from "../shared/keys.tsx";
-
-/** Whether `event` was pressed inside something that takes typing. */
-const typing = (event: KeyboardEvent) => {
-  const [target] = event.composedPath();
-
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      target.closest(
-        "input, textarea, select, [role=combobox], [role=searchbox], [role=textbox], [data-keys-off]"
-      ) !== null)
-  );
-};
+import { inField, intentOf, useKeys } from "../shared/keys.tsx";
 
 /** The file `step` away from `current` in `paths`; the first or last when the page shows none of them. */
 export const stepFrom = (
@@ -62,7 +49,7 @@ export const useCodeFileKeys = (
         {
           altKey: event.altKey,
           ctrlKey: event.ctrlKey,
-          inField: typing(event),
+          inField: inField(event),
           key: event.key,
           metaKey: event.metaKey,
         },

@@ -195,7 +195,9 @@ export const SelectedAskFacts = ({
     <>
       <FactBlock label="State">
         {full === undefined ? (
-          <p className="text-want font-medium">{listing.want}</p>
+          <p className="text-want font-medium" data-said="">
+            {listing.want}
+          </p>
         ) : (
           <StatusLine
             command={false}
