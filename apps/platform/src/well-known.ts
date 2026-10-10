@@ -10,9 +10,16 @@
  * they work on either host.
  *
  * Projects come from the front page (`listProjects` reads the same), each
- * read at its landed SHA: the mirror ref the platform moves after each of
- * its own landings, or `main` for a project whose only landing
- * is its initializer's first push, which writes no mirror.
+ * read at its landed SHA as its own record says it (`ProjectApi.head`: its
+ * last landing, or its initializer's first push); for a project whose
+ * record names none, at its repo's refs: the mirror ref the platform moves
+ * after each of its own landings, or `main`.
+ *
+ * What a landed commit holds never changes, so each project's skill (or
+ * that it has none) is kept by its landed SHA, in the isolate's code cache
+ * and in the code store (`<repo>/skill/v<SKILL_VERSION>/<sha>`): a request
+ * costs one record read per project, and a file read only for a project
+ * whose main moved.
  */
 import { describedIn } from "@repo/agent-kit/generated-file";
 import {
@@ -22,11 +29,23 @@ import {
 } from "@repo/agent-kit/project-skill";
 import { wellKnownSkills } from "@repo/agent-kit/well-known";
 import { RefName, RepoHost, Revision } from "@repo/artifacts/repo-host";
+import { CodeStore } from "@repo/project/code-store";
+import { CodeCache } from "@repo/project/code/cache";
 import { FrontPage } from "@repo/project/front-page";
 import { landedRef } from "@repo/project/lander";
+import { Projects } from "@repo/project/projects";
 import { ProjectName, RepoName, RepoPath } from "@repo/protocol/ids";
+import type { CommitSha } from "@repo/protocol/ids";
 import type { Layer } from "effect";
-import { Array as Arr, Context, Effect, Option, Order, Schema } from "effect";
+import {
+  Array as Arr,
+  Cause,
+  Context,
+  Effect,
+  Option,
+  Order,
+  Schema,
+} from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 /** Where the index and the skills are served. */
@@ -59,37 +78,115 @@ const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const textOf = (bytes: Uint8Array) =>
   Option.liftThrowable(() => utf8.decode(bytes))();
 
+/** The kept skill's version, in its key: it moves when what is kept changes. */
+const SKILL_VERSION = 1;
+
+/** A project's skill at a landed commit as the store keeps it: its text, or none. */
+const KeptSkill = Schema.fromJsonString(
+  Schema.Struct({ content: Schema.optionalKey(Schema.String) })
+);
+
+const decodeKept = Schema.decodeOption(KeptSkill);
+
+const encodeKept = Schema.encodeEffect(KeptSkill);
+
+/**
+ * Where `project`'s main landed: as its record says, or, for a project whose
+ * record names none (or that the platform never made), at its repo's refs.
+ */
+const landedOf = (
+  project: ProjectName
+): Effect.Effect<Option.Option<CommitSha>, never, Projects | RepoHost> =>
+  Effect.gen(function* () {
+    const projects = yield* Projects;
+
+    const recorded = yield* Effect.suspend(() => projects.get(project)).pipe(
+      Effect.flatMap((api) => api.head()),
+      Effect.map(({ landed }) => Option.fromUndefinedOr(landed)),
+      Effect.catchCause((cause) =>
+        Cause.hasInterruptsOnly(cause) ? Effect.interrupt : Effect.succeedNone
+      )
+    );
+
+    if (Option.isSome(recorded)) {
+      return Option.some<CommitSha>(recorded.value);
+    }
+
+    const host = yield* RepoHost;
+    const refs = yield* host.refs(RepoName.make(project));
+
+    return Option.orElse(Option.fromUndefinedOr(refs.get(landedRef)), () =>
+      Option.fromUndefinedOr(refs.get(mainRef))
+    );
+  }).pipe(Effect.catchTag("RepoNotFound", () => Effect.succeedNone));
+
+/** `project`'s skill file at `landed`, read from its repo: none when it has none. */
+const skillAt = (project: ProjectName, landed: CommitSha) =>
+  Effect.gen(function* () {
+    const host = yield* RepoHost;
+    const [path] = contributeSkillPaths(project);
+
+    const bytes = yield* host.readFile(
+      RepoName.make(project),
+      Revision.Commit({ sha: landed }),
+      RepoPath.make(path)
+    );
+
+    return Option.flatMap(bytes, textOf);
+  }).pipe(Effect.catchTag("RepoNotFound", () => Effect.succeedNone));
+
+/**
+ * `project`'s skill at `landed`: the isolate's cache first, then the code
+ * store, then its repo, whose answer is kept in both. A store that fails is
+ * a miss.
+ */
+const keptSkillAt = (project: ProjectName, landed: CommitSha) =>
+  Effect.gen(function* () {
+    const cache = yield* CodeCache;
+    const store = yield* CodeStore;
+    const key = `${RepoName.make(project)}/skill/v${SKILL_VERSION}/${landed}`;
+
+    return yield* cache.through(
+      key,
+      Effect.gen(function* () {
+        const kept = Option.flatMap(yield* store.get(key), decodeKept);
+
+        if (Option.isSome(kept)) {
+          return Option.fromUndefinedOr(kept.value.content);
+        }
+
+        const read = yield* skillAt(project, landed);
+
+        yield* encodeKept(
+          Option.match(read, {
+            onNone: () => ({}),
+            onSome: (content) => ({ content }),
+          })
+        ).pipe(
+          Effect.flatMap((text) => store.put(key, text)),
+          Effect.catch((error) =>
+            Effect.logWarning(`${project}'s skill was not kept`, error)
+          )
+        );
+
+        return read;
+      })
+    );
+  });
+
 /**
  * A project's contribute skill as it landed: none for a project never
  * made, one with no landing, or one whose landed tree has no such file.
  */
 const landedSkill = (
   project: ProjectName
-): Effect.Effect<Option.Option<string>, never, RepoHost> =>
-  Effect.gen(function* () {
-    const host = yield* RepoHost;
-    const repo = RepoName.make(project);
-    const refs = yield* host.refs(repo);
-
-    const landed = Option.orElse(
-      Option.fromUndefinedOr(refs.get(landedRef)),
-      () => Option.fromUndefinedOr(refs.get(mainRef))
-    );
-
-    if (Option.isNone(landed)) {
-      return Option.none();
-    }
-
-    const [path] = contributeSkillPaths(project);
-
-    const bytes = yield* host.readFile(
-      repo,
-      Revision.Commit({ sha: landed.value }),
-      RepoPath.make(path)
-    );
-
-    return Option.flatMap(bytes, textOf);
-  }).pipe(Effect.catchTag("RepoNotFound", () => Effect.succeedNone));
+): Effect.Effect<Option.Option<string>, never, Projects | RepoHost> =>
+  Effect.flatMap(landedOf(project), (landed) =>
+    Option.match(landed, {
+      onNone: () => Effect.succeedNone,
+      onSome: (sha) => keptSkillAt(project, sha),
+    })
+  );
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
@@ -155,7 +252,7 @@ const skillFile = (project: ProjectName) =>
  */
 export const agentSkills = (
   request: Request
-): Effect.Effect<Response, never, FrontPage | RepoHost> => {
+): Effect.Effect<Response, never, FrontPage | Projects | RepoHost> => {
   const { pathname } = new URL(request.url);
 
   if (pathname === INDEX) {
@@ -189,17 +286,22 @@ const readOnly = HttpServerResponse.empty({
 /**
  * `/.well-known/agent-skills/*` on the platform's router, for anyone: GET
  * and HEAD (the router serves HEAD as GET, without the body) through
- * `agentSkills`, with the front page and the repos taken once when the
- * router is built.
+ * `agentSkills`, with the front page, the projects, the repos and the
+ * code reads' cache and store taken once when the router is built (the
+ * last two are `Context.Reference`s: without them every request reads
+ * every file).
  */
 export const agentSkillRoutes: Layer.Layer<
   never,
   never,
-  HttpRouter.HttpRouter | FrontPage | RepoHost
+  HttpRouter.HttpRouter | FrontPage | Projects | RepoHost
 > = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const services = Context.make(FrontPage, yield* FrontPage).pipe(
-      Context.add(RepoHost, yield* RepoHost)
+      Context.add(Projects, yield* Projects),
+      Context.add(RepoHost, yield* RepoHost),
+      Context.add(CodeCache, yield* CodeCache),
+      Context.add(CodeStore, yield* CodeStore)
     );
 
     yield* router.add("*", `${ROOT}/*`, (request) =>

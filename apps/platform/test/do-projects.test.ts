@@ -196,6 +196,7 @@ const everyMethod = (api: ProjectApi) =>
       "showProposal",
       api.showProposal(anyone, ProposalId.make("prop-000001"))
     ),
+    standing: settled("standing", api.standing()),
     status: settled("status", api.status(bob)),
     submitAnswer: settled(
       "submitAnswer",

@@ -96,6 +96,7 @@ import {
   appended,
   declaredBy,
   ledgerFor,
+  nextMove,
   nextSeq,
   postureCaughtUp,
   sealedInEffect,
@@ -1165,6 +1166,16 @@ const live = Effect.gen(function* () {
     readableLayers,
     recordRead,
     settle,
+    standing: (snapshot) => {
+      const now = nowOf();
+      const visibility = visibilityIn(snapshot);
+
+      return {
+        posture: standing({ decisions: snapshot.decisions, now, visibility })
+          .posture,
+        until: nextMove({ decisions: snapshot.decisions, now, visibility }),
+      };
+    },
   };
 
   return port;

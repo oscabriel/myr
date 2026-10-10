@@ -139,6 +139,7 @@ export const ProjectCalls = byMethod({
   setEnv: callOf(MethodSchemas.setEnv),
   showAsk: callOf(MethodSchemas.showAsk),
   showProposal: callOf(MethodSchemas.showProposal),
+  standing: callOf(MethodSchemas.standing),
   status: callOf(MethodSchemas.status),
   submitAnswer: callOf(MethodSchemas.submitAnswer),
   today: callOf(MethodSchemas.today),

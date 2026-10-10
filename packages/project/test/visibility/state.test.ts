@@ -22,7 +22,7 @@ import { Anonymous } from "@repo/protocol/principal";
 import { NotDecider } from "@repo/protocol/refusal";
 import { advanceTo, at } from "@repo/testkit/clock";
 import { areaRoots, suiteRoot } from "@repo/visibility/commitment";
-import { Array, Effect, Option, Order } from "effect";
+import { Array, DateTime, Effect, Option, Order } from "effect";
 
 import { drive } from "../../src/answer-runs/steps.ts";
 import { ProjectStore } from "../../src/project-store.ts";
@@ -205,6 +205,39 @@ describe("a landing that adds the visibility config", () => {
             ],
           ],
         });
+      }).pipe(Effect.provide(visibilityWorld()))
+  );
+
+  it.effect(
+    "stands, for a list, at the ledger's posture until the instant an accepted narrowing takes effect",
+    () =>
+      Effect.gen(function* () {
+        const { api } = yield* sealedByInes;
+        const [opened] = yield* postureDecisions(api);
+        const decision = Option.getOrThrow(Option.fromUndefinedOr(opened));
+
+        /** What a list keeps, beside the posture the ledger shows. */
+        const both = Effect.gen(function* () {
+          const { posture, until } = yield* api.standing();
+          const ledger = yield* api.ledger(anyone);
+
+          return [posture, ledger.posture, until] as const;
+        });
+
+        const waiting = yield* both;
+
+        yield* advanceTo("2026-10-08T12:00:00Z");
+        yield* api.decide(okonkwo, { choice: "accept", decision: decision.id });
+
+        const accepted = yield* both;
+
+        yield* advanceTo("2026-10-14T12:00:00Z");
+
+        expect([waiting, accepted, yield* both]).toStrictEqual([
+          ["open", "open", undefined],
+          ["open", "open", DateTime.makeUnsafe("2026-10-14T12:00:00Z")],
+          ["openWithSealedEvidence", "openWithSealedEvidence", undefined],
+        ]);
       }).pipe(Effect.provide(visibilityWorld()))
   );
 

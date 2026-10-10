@@ -17,10 +17,18 @@
  * 7. `web-front-page`: the web's `GET /` answers 200 with HTML;
  * 8. `web-llms-txt`: the web's `GET /llms.txt` answers 200 with Markdown,
  *    which it builds from the platform's project list, so only a web that
- *    reaches the platform through its service binding passes.
+ *    reaches the platform through its service binding passes;
+ * 9. `web-project-llms-txt`: a seeded example's `llms.txt` on the web
+ *    answers 200 with Markdown;
+ * 10. `web-ask-md`: one of the seeded example's asks as Markdown answers 200;
+ * 11. `web-agent-skills`: the web's `/.well-known/agent-skills/index.json`
+ *    answers 200 with JSON.
  *
- * The web's two run when smoke knows where the web lives: bootstrap's
- * workers.dev record, or `--web-url`.
+ * The web's probes run when smoke knows where the web lives: bootstrap's
+ * workers.dev record, or `--web-url`. The agent surfaces among them
+ * (`agentProbes`, 8 to 11) are what an agent reads first, so each is timed
+ * against `AGENT_BUDGET_MS`: one over it is a warning line, never a failure,
+ * since a cold isolate's first answer is slower than the rest.
  *
  * A probe the platform answers with its own failure (a server error, or an
  * RPC defect) asks again for up to `settling`, as a fresh deploy gives
@@ -62,7 +70,43 @@ export const platformProbes = [
 ] as const;
 
 /** The web's probes, run after the platform's when smoke has the web's origin. */
-export const webProbes = ["web-front-page", "web-llms-txt"] as const;
+export const webProbes = [
+  "web-front-page",
+  "web-llms-txt",
+  "web-project-llms-txt",
+  "web-ask-md",
+  "web-agent-skills",
+] as const;
+
+/** How long an agent surface may take to answer before smoke warns: 500 ms. */
+export const AGENT_BUDGET_MS = 500;
+
+/** An example every seeded stage holds, and one of its asks. */
+const SEEDED = { ask: "format-ordinal", project: "datekit" } as const;
+
+/** The agent surfaces on the web smoke reads, each by its path and the media type it answers with. */
+export const agentProbes = [
+  { contentType: "text/markdown", path: "/llms.txt", probe: "web-llms-txt" },
+  {
+    contentType: "text/markdown",
+    path: `/${SEEDED.project}/llms.txt`,
+    probe: "web-project-llms-txt",
+  },
+  {
+    contentType: "text/markdown",
+    path: `/${SEEDED.project}/asks/${SEEDED.ask}.md`,
+    probe: "web-ask-md",
+  },
+  {
+    contentType: "application/json",
+    path: "/.well-known/agent-skills/index.json",
+    probe: "web-agent-skills",
+  },
+] as const satisfies readonly {
+  readonly contentType: string;
+  readonly path: string;
+  readonly probe: (typeof webProbes)[number];
+}[];
 
 /** Every probe, in the order smoke runs them. */
 export const probes = [...platformProbes, ...webProbes] as const;
@@ -105,14 +149,19 @@ export class SmokeFailed extends Schema.TaggedError<SmokeFailed>()(
   }
 }
 
-/** A passing run: the stage `/health` named, and how long each probe took. */
+/**
+ * A passing run: the stage `/health` named, how long each probe took
+ * (against its budget, when it has one), and a line for each probe over it.
+ */
 export interface SmokeReport {
   readonly origin: string;
   readonly stage: string;
   readonly probes: readonly {
     readonly probe: Probe;
     readonly elapsedMs: number;
+    readonly budgetMs?: number;
   }[];
+  readonly warnings: readonly string[];
 }
 
 /**
@@ -391,16 +440,27 @@ const webFrontPage = (web: string) => {
   );
 };
 
+/** An agent surface on the web: 200, with the media type it answers with. */
+const agentSurface = (
+  web: string,
+  { contentType, path }: (typeof agentProbes)[number]
+) => {
+  const label = `GET ${path} on the web`;
+
+  return send(label, HttpClientRequest.get(`${web}${path}`)).pipe(
+    Effect.flatMap(statusIs(label, 200, notServingYet)),
+    Effect.flatMap(typeIs(label, contentType, contentType))
+  );
+};
+
 /**
  * The web's `/llms.txt`: Markdown that opens with its title. The web answers
  * 503 when the platform does not, so a 200 is the service binding working.
  */
-const webLlmsTxt = (web: string) => {
+const webLlmsTxt = (web: string, probe: (typeof agentProbes)[number]) => {
   const label = "GET /llms.txt on the web";
 
-  return send(label, HttpClientRequest.get(`${web}/llms.txt`)).pipe(
-    Effect.flatMap(statusIs(label, 200, notServingYet)),
-    Effect.flatMap(typeIs(label, "text/markdown", "Markdown")),
+  return agentSurface(web, probe).pipe(
     Effect.flatMap(({ text }) =>
       text.startsWith("# ")
         ? Effect.void
@@ -461,6 +521,8 @@ export const smoke = (
       settling
     );
 
+    const { web } = options;
+
     const rest = yield* Effect.forEach(
       [
         ["oauth-metadata", oauthMetadata(origin)],
@@ -468,11 +530,19 @@ export const smoke = (
         ["anonymous-unknown-project", anonymousUnknownProject(origin)],
         ["missing-repo-404", missingRepo(origin)],
         ["platform-root", platformRoot(origin)],
-        ...(options.web === undefined
+        ...(web === undefined
           ? []
           : ([
-              ["web-front-page", webFrontPage(options.web)],
-              ["web-llms-txt", webLlmsTxt(options.web)],
+              ["web-front-page", webFrontPage(web)],
+              ...agentProbes.map(
+                (agent) =>
+                  [
+                    agent.probe,
+                    agent.probe === "web-llms-txt"
+                      ? webLlmsTxt(web, agent)
+                      : Effect.asVoid(agentSurface(web, agent)),
+                  ] as const
+              ),
             ] as const)),
       ] as const,
       ([probe, run]) => timed(probe, run, settling)
@@ -495,10 +565,25 @@ export const smoke = (
       return yield* new SmokeFailed({ failures, origin });
     }
 
+    const budgeted = new Set<Probe>(agentProbes.map(({ probe }) => probe));
+
+    const timings = runs.map(({ elapsedMs, probe }) =>
+      budgeted.has(probe)
+        ? { budgetMs: AGENT_BUDGET_MS, elapsedMs, probe }
+        : { elapsedMs, probe }
+    );
+
     return {
       origin,
-      probes: runs.map(({ elapsedMs, probe }) => ({ elapsedMs, probe })),
+      probes: timings,
       stage: first.outcome.success,
+      warnings: timings.flatMap(({ budgetMs, elapsedMs, probe }) =>
+        budgetMs !== undefined && elapsedMs > budgetMs
+          ? [
+              `${probe} answered in ${elapsedMs} ms, over its ${budgetMs} ms budget`,
+            ]
+          : []
+      ),
     };
   });
 
@@ -580,8 +665,18 @@ export const main = (argv: readonly string[]) =>
 
     yield* Effect.forEach(
       report.probes,
-      ({ elapsedMs, probe }) =>
-        Console.log(`smoke ${stage}: ${probe} passed in ${elapsedMs} ms`),
+      ({ budgetMs, elapsedMs, probe }) =>
+        Console.log(
+          `smoke ${stage}: ${probe} passed in ${elapsedMs} ms${
+            budgetMs === undefined ? "" : ` (budget ${budgetMs} ms)`
+          }`
+        ),
+      { discard: true }
+    );
+
+    yield* Effect.forEach(
+      report.warnings,
+      (line) => Console.warn(`smoke ${stage}: warning: ${line}`),
       { discard: true }
     );
   }).pipe(Effect.provide(FetchHttpClient.layer));

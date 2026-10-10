@@ -8,6 +8,7 @@ import {
   HttpServerResponse,
 } from "effect/http";
 
+import { AGENT_BUDGET_MS, agentProbes } from "../../../infra/smoke.ts";
 import { NoStage, UnknownStage } from "../../../infra/stages.ts";
 import {
   main,
@@ -19,11 +20,12 @@ import {
   webProbes,
 } from "../../../scripts/smoke.ts";
 
-/** What the fake platform answers one request with. */
+/** What the fake platform answers one request with, after `delayMs` when given. */
 interface Reply {
   readonly status: number;
   readonly body?: string;
   readonly contentType?: string;
+  readonly delayMs?: number;
 }
 
 /** A request as the fake platform sees it. */
@@ -140,6 +142,10 @@ const fakePlatform = (answer: (seen: Seen) => Reply) =>
         method: request.method,
         path: url.pathname,
       });
+
+      if (reply.delayMs !== undefined) {
+        yield* Effect.sleep(`${reply.delayMs} millis`);
+      }
 
       return reply.body === undefined
         ? HttpServerResponse.empty({ status: reply.status })
@@ -304,9 +310,10 @@ describe("smoke against a live stage", () => {
 });
 
 /**
- * The web as smoke expects to find it: its front page renders, and
- * its `/llms.txt` answers with the Markdown it builds from the platform's
- * project list, which only a web that reaches the platform can.
+ * The web as smoke expects to find it: its front page renders, its
+ * `/llms.txt` answers with the Markdown it builds from the platform's
+ * project list, which only a web that reaches the platform can, and so do
+ * a seeded example's `llms.txt` and ask, and the agent skills' index.
  */
 const healthyWeb = ({ method, path }: Seen): Reply => {
   if (method === "GET" && path === "/") {
@@ -321,6 +328,25 @@ const healthyWeb = ({ method, path }: Seen): Reply => {
     return {
       body: "# Platform\n\n> A Git platform.\n",
       contentType: "text/markdown; charset=utf-8",
+      status: 200,
+    };
+  }
+
+  if (
+    method === "GET" &&
+    (path === "/datekit/llms.txt" || path === "/datekit/asks/format-ordinal.md")
+  ) {
+    return {
+      body: "# datekit\n",
+      contentType: "text/markdown; charset=utf-8",
+      status: 200,
+    };
+  }
+
+  if (method === "GET" && path === "/.well-known/agent-skills/index.json") {
+    return {
+      body: '{"skills":[]}',
+      contentType: "application/json",
       status: 200,
     };
   }
@@ -340,7 +366,79 @@ describe("smoke against a stage's web", () => {
         expect(report.probes.map(({ probe }) => probe)).toStrictEqual([
           ...probes,
         ]);
-        expect(webProbes).toStrictEqual(["web-front-page", "web-llms-txt"]);
+        expect(webProbes).toStrictEqual([
+          "web-front-page",
+          "web-llms-txt",
+          "web-project-llms-txt",
+          "web-ask-md",
+          "web-agent-skills",
+        ]);
+        expect(report.warnings).toStrictEqual([]);
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+  );
+
+  it("probes each agent surface by its path and content type, against a 500 ms budget", () => {
+    expect({ agentProbes, budget: AGENT_BUDGET_MS }).toStrictEqual({
+      agentProbes: [
+        {
+          contentType: "text/markdown",
+          path: "/llms.txt",
+          probe: "web-llms-txt",
+        },
+        {
+          contentType: "text/markdown",
+          path: "/datekit/llms.txt",
+          probe: "web-project-llms-txt",
+        },
+        {
+          contentType: "text/markdown",
+          path: "/datekit/asks/format-ordinal.md",
+          probe: "web-ask-md",
+        },
+        {
+          contentType: "application/json",
+          path: "/.well-known/agent-skills/index.json",
+          probe: "web-agent-skills",
+        },
+      ],
+      budget: 500,
+    });
+  });
+
+  it.live(
+    "warns, and still passes, when an agent surface answers past its budget",
+    () =>
+      Effect.gen(function* () {
+        const origin = yield* fakePlatform(healthy);
+
+        const web = yield* fakePlatform((seen) =>
+          seen.path === "/.well-known/agent-skills/index.json"
+            ? { ...healthyWeb(seen), delayMs: AGENT_BUDGET_MS + 100 }
+            : healthyWeb(seen)
+        );
+
+        const report = yield* smoke(origin, { web });
+
+        expect({
+          budgets: report.probes.flatMap(({ budgetMs, probe }) =>
+            budgetMs === undefined ? [] : [[probe, budgetMs]]
+          ),
+          probes: report.probes.map(({ probe }) => probe),
+          warnings: report.warnings.map((line) =>
+            line.replace(/\d+ ms,/u, "N ms,")
+          ),
+        }).toStrictEqual({
+          budgets: [
+            ["web-llms-txt", 500],
+            ["web-project-llms-txt", 500],
+            ["web-ask-md", 500],
+            ["web-agent-skills", 500],
+          ],
+          probes: [...probes],
+          warnings: [
+            "web-agent-skills answered in N ms, over its 500 ms budget",
+          ],
+        });
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
@@ -352,11 +450,12 @@ describe("smoke against a stage's web", () => {
     () =>
       Effect.gen(function* () {
         const origin = yield* fakePlatform(healthy);
-        const asked = { front: 0, llms: 0 };
+        const asked = new Map<string, number>();
 
         const web = yield* fakePlatform((seen) => {
-          const count =
-            seen.path === "/" ? (asked.front += 1) : (asked.llms += 1);
+          const count = (asked.get(seen.path) ?? 0) + 1;
+
+          asked.set(seen.path, count);
 
           return count <= 2 ? { status: 404 } : healthyWeb(seen);
         });
@@ -364,10 +463,21 @@ describe("smoke against a stage's web", () => {
         const report = yield* smoke(origin, { settling: "10 seconds", web });
 
         expect({
-          asked,
+          asked: Object.fromEntries(asked),
           probes: report.probes.map(({ probe }) => probe),
-        }).toStrictEqual({ asked: { front: 3, llms: 3 }, probes: [...probes] });
-      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
+        }).toStrictEqual({
+          asked: {
+            "/": 3,
+            "/.well-known/agent-skills/index.json": 3,
+            "/datekit/asks/format-ordinal.md": 3,
+            "/datekit/llms.txt": 3,
+            "/llms.txt": 3,
+          },
+          probes: [...probes],
+        });
+      }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer)),
+    // Five paths, each asked three times a second apart.
+    30_000
   );
 
   it.live(
@@ -400,6 +510,16 @@ describe("smoke against a stage's web", () => {
           {
             probe: "web-llms-txt",
             reason: "GET /llms.txt on the web answered 503, not 200",
+          },
+          {
+            probe: "web-project-llms-txt",
+            reason:
+              "GET /datekit/llms.txt on the web answered application/json, not text/markdown",
+          },
+          {
+            probe: "web-ask-md",
+            reason:
+              "GET /datekit/asks/format-ordinal.md on the web answered application/json, not text/markdown",
           },
         ]);
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
@@ -527,7 +647,8 @@ describe("the smoke command", () => {
   it.live("probes the web at --web-url, and only there, beside --url", () =>
     Effect.gen(function* () {
       const origin = yield* fakePlatform(healthy);
-      // A web that answers, wrongly: JSON where a page and Markdown belong.
+      // A web that answers, wrongly: JSON where a page and Markdown belong
+      // (only the agent skills' index is JSON).
       const web = yield* fakePlatform(() => ({ body: "{}", status: 200 }));
 
       yield* main(["--stage", "dev-oscabriel", "--url", origin]);
@@ -540,7 +661,9 @@ describe("the smoke command", () => {
         Schema.is(SmokeFailed)(failed)
           ? failed.failures.map(({ probe }) => probe)
           : []
-      ).toStrictEqual([...webProbes]);
+      ).toStrictEqual(
+        webProbes.filter((probe) => probe !== "web-agent-skills")
+      );
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 

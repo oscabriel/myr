@@ -24,6 +24,7 @@ import {
   clearedCookie,
   clientMetadataHandler,
   credentialFrom,
+  HANDLE_COOKIE,
   pkce,
   SESSION_COOKIE,
   sessionCookie,
@@ -358,7 +359,10 @@ describe("the production backend", () => {
           200,
           "as anyone",
         ]);
-        expect(expiriesOf(response)).toStrictEqual([[SESSION_COOKIE, true]]);
+        expect(expiriesOf(response)).toStrictEqual([
+          [SESSION_COOKIE, true],
+          [HANDLE_COOKIE, true],
+        ]);
       })
   );
 
@@ -399,18 +403,43 @@ const signIn = (path: string) =>
     return { location, response, state };
   });
 
-/** Signs in, then comes back to the callback with `code` and the state sign-in sent, to a platform that answers `/token` with `answer`. */
+/** The protocol client a server route calls the platform with, through the production backend in process. */
+const clientOver = (env: Env) => (request: Request) =>
+  serverClientOver(backend)(env, request);
+
+/** A callback whose platform must not be reached. */
+const unreachableCallback = callbackHandler(
+  unreachable,
+  clientOver(unreachable)
+);
+
+/**
+ * Signs in, then comes back to the callback with `code` and the state sign-in
+ * sent, to a platform that answers `/token` with `answer` and `/rpc` (the
+ * callback's `status`) with `status`.
+ */
 const signInAndBack = (
   path: string,
   code: string,
-  answer: () => Response = () => Response.json(TOKEN_ANSWER)
+  answer: () => Response = () => Response.json(TOKEN_ANSWER),
+  status: (request: Request) => Response = statusReply(STATUS_OF_INES)
 ) =>
   Effect.gen(function* () {
     const { location, state } = yield* signIn(path);
-    const platform = recorder(answer);
+
+    const platform = recorder((request) =>
+      new URL(request.url).pathname.startsWith("/rpc")
+        ? status(request)
+        : answer()
+    );
+
+    const env = envWith(platform.fetch);
 
     const response = yield* Effect.promise(() =>
-      callbackHandler(envWith(platform.fetch))({
+      callbackHandler(
+        env,
+        clientOver(env)
+      )({
         request: get(
           `/auth/callback?code=${code}&state=${location.searchParams.get("state") ?? ""}`,
           { cookie: state?.pair ?? "" }
@@ -488,7 +517,18 @@ describe("the callback", () => {
         const [exchange, ...more] = seen;
         const form = new URLSearchParams(exchange?.body);
 
-        expect(more).toStrictEqual([]);
+        // Then once, with the new token, `status`: the handle it names is
+        // kept beside the session, so no page asks the platform again.
+        expect(
+          more.map(({ authorization, body, cookie, url }) => [
+            new URL(url).pathname.replace(/\/$/u, ""),
+            authorization,
+            cookie,
+            body.includes('"tag":"status"'),
+          ])
+        ).toStrictEqual([
+          ["/rpc", `Bearer ${TOKEN_ANSWER.access_token}`, null, true],
+        ]);
         expect([
           exchange?.method,
           exchange?.url,
@@ -564,7 +604,7 @@ describe("the callback", () => {
         const { state } = yield* signIn("/auth/signin");
 
         const response = yield* Effect.promise(() =>
-          callbackHandler(unreachable)({
+          unreachableCallback({
             request: get("/auth/callback?code=c0de&state=forged", {
               cookie: state?.pair ?? "",
             }),
@@ -581,7 +621,7 @@ describe("the callback", () => {
   it.effect("answers 400 when the browser holds no sign-in in progress", () =>
     Effect.gen(function* () {
       const response = yield* Effect.promise(() =>
-        callbackHandler(unreachable)({
+        unreachableCallback({
           request: get("/auth/callback?code=c0de&state=anything"),
         })
       );
@@ -642,7 +682,7 @@ describe("the callback", () => {
 });
 
 describe("sign-out", () => {
-  it("goes home and expires the session cookie, by POST or by a plain link", () => {
+  it("goes home and expires the session and handle cookies, by POST or by a plain link", () => {
     const answers = ["POST", "GET"].map((method) => {
       const response = signOutHandler({
         request: new Request(`${WEB_URL}/auth/signout`, {
@@ -659,8 +699,22 @@ describe("sign-out", () => {
     });
 
     expect(answers).toStrictEqual([
-      [302, "/", [[SESSION_COOKIE, true]]],
-      [302, "/", [[SESSION_COOKIE, true]]],
+      [
+        302,
+        "/",
+        [
+          [SESSION_COOKIE, true],
+          [HANDLE_COOKIE, true],
+        ],
+      ],
+      [
+        302,
+        "/",
+        [
+          [SESSION_COOKIE, true],
+          [HANDLE_COOKIE, true],
+        ],
+      ],
     ]);
   });
 });
@@ -714,11 +768,29 @@ describe("whoami", () => {
         ]);
         expect(response.headers.get("cache-control")).toBe("no-store");
         expect(yield* textOf(response)).toBe('{"handle":"ines-v"}');
+
+        // A session from before the handle was kept: asked once, then kept.
+        const kept = cookiesOf(response).filter(
+          ({ name }) => name === HANDLE_COOKIE
+        );
+
+        expect(
+          kept.map(({ attributes }) => lockedDown(attributes))
+        ).toStrictEqual([true]);
+
+        const again = yield* whoami(unreachable, {
+          cookie: [
+            `${SESSION_COOKIE}=tok123`,
+            ...kept.map(({ pair }) => pair),
+          ].join("; "),
+        });
+
+        expect(yield* textOf(again)).toBe('{"handle":"ines-v"}');
       })
   );
 
   it.effect(
-    "answers {} and expires the cookie when the platform no longer knows the session",
+    "answers {} and expires both cookies when the platform no longer knows the session",
     () =>
       Effect.gen(function* () {
         const platform = recorder((request) =>
@@ -732,8 +804,110 @@ describe("whoami", () => {
         });
 
         expect(yield* textOf(response)).toBe("{}");
-        expect(expiriesOf(response)).toStrictEqual([[SESSION_COOKIE, true]]);
+        expect(expiriesOf(response)).toStrictEqual([
+          [SESSION_COOKIE, true],
+          [HANDLE_COOKIE, true],
+        ]);
       })
+  );
+});
+
+/** The `Cookie` header a browser sends back after `response`: each cookie it set and did not expire. */
+const sentBack = (response: Response) =>
+  cookiesOf(response)
+    .filter(({ attributes }) => !attributes.includes("max-age=0"))
+    .map(({ pair }) => pair)
+    .join("; ");
+
+describe("the handle kept beside the session", () => {
+  it.effect(
+    "after a sign-in, answers whoami with no call to the platform",
+    () =>
+      Effect.gen(function* () {
+        const { response } = yield* signInAndBack("/auth/signin", "c0de");
+        const who = yield* whoami(unreachable, { cookie: sentBack(response) });
+
+        expect(yield* textOf(who)).toBe('{"handle":"ines-v"}');
+        expect(who.headers.getSetCookie()).toStrictEqual([]);
+      })
+  );
+
+  it.effect(
+    "is a __Host- cookie the page's JavaScript never reads, living as long as the session",
+    () =>
+      Effect.gen(function* () {
+        const { response } = yield* signInAndBack("/auth/signin", "c0de");
+        const cookies = cookiesOf(response);
+        const session = cookies.find(({ name }) => name === SESSION_COOKIE);
+        const handle = cookies.find(({ name }) => name === HANDLE_COOKIE);
+
+        expect({
+          host: HANDLE_COOKIE.startsWith("__Host-"),
+          lives: maxAgeOf(handle?.attributes ?? []),
+          lockedDown: lockedDown(handle?.attributes),
+          token: handle?.value.includes("tok-from-platform"),
+        }).toStrictEqual({
+          host: true,
+          lives: maxAgeOf(session?.attributes ?? []),
+          lockedDown: true,
+          token: false,
+        });
+      })
+  );
+
+  it.effect(
+    "is not kept when the platform names no one at sign-in, and the session still starts",
+    () =>
+      Effect.gen(function* () {
+        const { response } = yield* signInAndBack(
+          "/auth/signin",
+          "c0de",
+          () => Response.json(TOKEN_ANSWER),
+          () => new Response("down", { status: 503 })
+        );
+
+        expect(
+          cookiesOf(response)
+            .map(({ name }) => name)
+            .filter((name) => name !== "__Host-sign-in")
+        ).toStrictEqual([SESSION_COOKIE]);
+      })
+  );
+
+  it.effect("is not believed for another session: the platform is asked", () =>
+    Effect.gen(function* () {
+      const { response } = yield* signInAndBack("/auth/signin", "c0de");
+
+      const handle = cookiesOf(response).find(
+        ({ name }) => name === HANDLE_COOKIE
+      );
+
+      const platform = recorder(statusReply(STATUS_OF_INES));
+
+      const who = yield* whoami(envWith(platform.fetch), {
+        cookie: `${SESSION_COOKIE}=another-token; ${handle?.pair ?? ""}`,
+      });
+
+      expect(yield* textOf(who)).toBe('{"handle":"ines-v"}');
+      expect(
+        (yield* platform.seen).map(({ authorization }) => authorization)
+      ).toStrictEqual(["Bearer another-token"]);
+    })
+  );
+
+  it.effect("is expired, unread, once no session is left", () =>
+    Effect.gen(function* () {
+      const { response } = yield* signInAndBack("/auth/signin", "c0de");
+
+      const handle = cookiesOf(response).find(
+        ({ name }) => name === HANDLE_COOKIE
+      );
+
+      const who = yield* whoami(unreachable, { cookie: handle?.pair ?? "" });
+
+      expect(yield* textOf(who)).toBe("{}");
+      expect(expiriesOf(who)).toStrictEqual([[HANDLE_COOKIE, true]]);
+    })
   );
 });
 

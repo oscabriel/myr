@@ -166,6 +166,34 @@ export const standing = (input: {
 };
 
 /**
+ * The next instant the posture in effect moves by the clock alone: an
+ * accepted narrowing whose notice still runs at `now`. None when only an
+ * event can move it: no narrowing waits, one waits on its decision (a
+ * `Decided` event settles it), or one took effect already. A later landing
+ * or decision may move it sooner; this is only when time does.
+ */
+export const nextMove = (input: {
+  readonly decisions: readonly Decision[];
+  readonly now: DateTime.Utc;
+  readonly visibility: Option.Option<VisibilityPolicy>;
+}): Option.Option<DateTime.Utc> => {
+  const declared = declaredBy(input.visibility);
+
+  const noticeDays = Option.match(input.visibility, {
+    onNone: () => 0,
+    onSome: ({ notice }) => notice.narrowingDays,
+  });
+
+  return Arr.last(
+    input.decisions.flatMap((decision) => Option.toArray(askedOf(decision)))
+  ).pipe(
+    Option.filter(({ subject }) => subject.to === declared.posture),
+    Option.flatMap(({ decision }) => takesEffect(decision, noticeDays)),
+    Option.filter((at) => DateTime.isGreaterThan(at, input.now))
+  );
+};
+
+/**
  * Whether the config's held-back checks judge answers yet: not while a
  * narrowing from Open waits on its decision (nothing was sealed before).
  */

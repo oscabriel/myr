@@ -10,15 +10,27 @@ import { describe, expect, it } from "@effect/vitest";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { Brand } from "@repo/brand";
-import { CommitSha, RepoPath } from "@repo/protocol/ids";
+import { CommitDiff } from "@repo/protocol/domain/code";
+import { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
 import {
   UnknownCommit,
   UnknownPath,
   UnknownRevision,
 } from "@repo/protocol/refusal";
-import { DateTime, Effect, Exit, Fiber, Layer, Option, Ref } from "effect";
+import {
+  DateTime,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Option,
+  Ref,
+  Schema,
+} from "effect";
 import { TestClock } from "effect/testing";
 
+import { CodeStore } from "../src/code-store.ts";
+import { CodeStoreMemory } from "../src/code-store/memory.ts";
 import {
   commitOf,
   fileOf,
@@ -28,17 +40,20 @@ import {
   treeOf,
 } from "../src/code.ts";
 import { CodeCache, CodeCacheLive } from "../src/code/cache.ts";
+import { commitKey, DIFF_TEXT } from "../src/code/commit.ts";
 import { filesUnder } from "../src/code/paths.ts";
 import { compareTags } from "../src/code/refs.ts";
 import { READS_AT_ONCE } from "../src/code/tree.ts";
 import {
   big,
+  Content,
   datekit,
   fork,
   longHistory,
   project,
   overlappingTrees,
   wide,
+  writer,
 } from "./code-fixtures.ts";
 
 const revision = (name: string) => Option.some(name);
@@ -543,6 +558,215 @@ describe("a commit", () => {
         Exit.fail(new UnknownCommit({ sha: missing }))
       );
     }).pipe(Effect.provide(RepoHostMemory))
+  );
+});
+
+/** 150 KiB of text: fourteen of them run past a diff's 2 MiB of text. */
+const sizable = (name: string) => `${name.padEnd(1023, "y")}\n`.repeat(150);
+
+/**
+ * One commit modifying twenty files, `f00.txt` to `f19.txt`, each from a
+ * line to 150 KiB but `f14.txt`, which stays small: thirteen fit the text
+ * budget, `f13.txt` runs past it, and every file after it is a path only.
+ */
+const twentyFiles = Effect.gen(function* () {
+  const git = yield* writer;
+  const name = RepoName.make("twentykit");
+
+  const paths = Array.from(
+    { length: 20 },
+    (_, at) => `f${String(at).padStart(2, "0")}.txt`
+  );
+
+  const before = yield* git.commit(
+    "Small",
+    paths.map((at) => [at, Content.Text({ text: `${at}\n` })] as const),
+    [],
+    1
+  );
+
+  const after = yield* git.commit(
+    "Large",
+    paths.map(
+      (at) =>
+        [
+          at,
+          Content.Text({
+            text: at === "f14.txt" ? "small\n" : sizable(at),
+          }),
+        ] as const
+    ),
+    [before],
+    2
+  );
+
+  yield* git.push(name, [["refs/heads/main", after]]);
+
+  return {
+    after,
+    code: {
+      forks: Effect.succeed([]),
+      head: Effect.succeedNone,
+      landings: () => Effect.succeed([]),
+      project,
+      repo: name,
+    },
+    paths,
+  };
+});
+
+describe("a commit's texts, read live", () => {
+  it.live(
+    "are read several at a time, and cut at the budget in path order as one after another would",
+    () =>
+      Effect.gen(function* () {
+        const reading = yield* Ref.make(false);
+        const peak = yield* Ref.make(0);
+
+        const { diff, paths } = yield* Effect.gen(function* () {
+          const made = yield* twentyFiles;
+
+          yield* Ref.set(reading, true);
+
+          return {
+            diff: yield* commitOf(made.code, made.after),
+            paths: made.paths,
+          };
+        }).pipe(Effect.provide(overlappingTrees(reading, peak, "blob")));
+
+        const most = yield* Ref.get(peak);
+
+        // Thirteen files' texts fit the budget, and a fourteenth does not.
+        expect([
+          13 * sizable("f00.txt").length <= DIFF_TEXT,
+          14 * sizable("f00.txt").length > DIFF_TEXT,
+        ]).toStrictEqual([true, true]);
+        expect({
+          files: diff.files.map(({ newText, oldText, path: at, status }) => [
+            at,
+            status,
+            oldText,
+            newText,
+          ]),
+          truncated: diff.truncated,
+        }).toStrictEqual({
+          files: paths.map((at, index) =>
+            index < 13
+              ? [at, "modified", `${at}\n`, sizable(at)]
+              : [at, "modified", undefined, undefined]
+          ),
+          truncated: true,
+        });
+        // Several at once, never past the fan-out of 8.
+        expect([most > 1, most <= 8]).toStrictEqual([true, true]);
+      }),
+    long
+  );
+});
+
+/** The memory store, with each blob `readBlob` is asked for counted in `reads`. */
+const blobsCountedBy = (reads: Ref.Ref<number>) =>
+  Layer.effect(
+    RepoHost,
+    Effect.gen(function* () {
+      const host = yield* RepoHost;
+
+      return RepoHost.of({
+        ...host,
+        readBlob: (name, blob) =>
+          Ref.update(reads, (count) => count + 1).pipe(
+            Effect.andThen(host.readBlob(name, blob))
+          ),
+      });
+    })
+  ).pipe(Layer.provide(RepoHostMemory));
+
+/** What the store keeps under a key, as a diff, if it holds one that decodes. */
+const keptUnder = (key: string) =>
+  Effect.map(
+    Effect.flatMap(Effect.service(CodeStore), (store) => store.get(key)),
+    Option.flatMap(
+      Schema.decodeUnknownOption(Schema.fromJsonString(CommitDiff))
+    )
+  );
+
+describe("a commit kept by its id", () => {
+  it.effect(
+    "is kept without its landing, read again with no blob read, and its landing still asked for",
+    () =>
+      Effect.gen(function* () {
+        const blobs = yield* Ref.make(0);
+        const asked = yield* Ref.make<readonly (readonly CommitSha[])[]>([]);
+
+        yield* Effect.gen(function* () {
+          const { c4, code } = yield* datekit;
+
+          const counted = {
+            ...code,
+            landings: (shas: readonly CommitSha[]) =>
+              Ref.update(asked, (all) => [...all, shas]).pipe(
+                Effect.andThen(code.landings(shas))
+              ),
+          };
+
+          const first = yield* commitOf(counted, c4);
+          const read = yield* Ref.get(blobs);
+
+          expect([first.commit.landing?.sha, read > 0]).toStrictEqual([
+            c4,
+            true,
+          ]);
+
+          const kept = yield* keptUnder(commitKey(code.repo, c4));
+
+          // Kept with no landing: the rest is the diff as it was answered.
+          expect(
+            Option.map(kept, (decoded) => ({
+              kept: decoded.commit.landing,
+              restored: {
+                ...decoded,
+                commit: { ...decoded.commit, landing: first.commit.landing },
+              },
+            }))
+          ).toStrictEqual(Option.some({ kept: undefined, restored: first }));
+
+          const second = yield* commitOf(counted, c4);
+
+          expect({
+            asked: yield* Ref.get(asked),
+            blobs: yield* Ref.get(blobs),
+            second,
+          }).toStrictEqual({ asked: [[c4], [c4]], blobs: read, second: first });
+        }).pipe(
+          Effect.provide(Layer.merge(blobsCountedBy(blobs), CodeStoreMemory))
+        );
+      })
+  );
+
+  it.effect("is computed again when what is kept no longer decodes", () =>
+    Effect.gen(function* () {
+      const blobs = yield* Ref.make(0);
+
+      yield* Effect.gen(function* () {
+        const { c2, code } = yield* datekit;
+        const store = yield* CodeStore;
+        const key = commitKey(code.repo, c2);
+
+        const fresh = yield* commitOf(code, c2).pipe(
+          Effect.provideService(CodeStore, CodeStore.defaultValue())
+        );
+
+        const read = yield* Ref.get(blobs);
+
+        yield* store.put(key, '{"files":"no longer a diff"}');
+
+        expect(yield* commitOf(code, c2)).toStrictEqual(fresh);
+        expect(yield* Ref.get(blobs)).toBe(2 * read);
+        expect(yield* keptUnder(key)).toStrictEqual(Option.some(fresh));
+      }).pipe(
+        Effect.provide(Layer.merge(blobsCountedBy(blobs), CodeStoreMemory))
+      );
+    })
   );
 });
 
