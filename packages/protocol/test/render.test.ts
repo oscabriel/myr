@@ -19,6 +19,7 @@ import {
   ChecksFailed,
   DirectPush,
   DraftInProgress,
+  NotDecider,
   OutOfScope,
   PrivatePathInPublicTree,
   ProposalClosed,
@@ -116,12 +117,12 @@ describe(explain, () => {
       starts: "Weakened: adds .skip( without a reason",
     },
     {
-      ends: "; it waits for a decider because it raises this territory's escapes",
+      ends: "; a decider declined it, so take the marker out",
       refusal: new Weakened({
         at: { line: 3, path },
         weakening: { marker: "oxlint-disable", reason: "generated code" },
       }),
-      starts: 'Weakened: adds oxlint-disable, with the reason "generated code"',
+      starts: 'Weakened: adds oxlint-disable with the reason "generated code"',
     },
     {
       ends: "; import it through that module's public exports instead",
@@ -188,6 +189,25 @@ describe(explain, () => {
       `  next: ${Brand.cli} check`,
       "  retryable: no",
     ]);
+  });
+
+  // A reasoned marker opens a decision instead of a refusal, so a refused one
+  // was declined by a decider: no reason given now changes that.
+  it("says a decider declined a reasoned marker, and to take it out", () => {
+    const lines = explain([
+      new Weakened({
+        at: { line: 3, path },
+        weakening: { marker: ".skip(", reason: "flaky" },
+      }),
+    ]);
+
+    expect(lines).toStrictEqual([
+      'Weakened: adds .skip( with the reason "flaky"; a decider declined it, so take the marker out',
+      "  at: src/a.ts:3",
+      `  next: ${Brand.cli} check`,
+      "  retryable: no",
+    ]);
+    expect(lines.join("\n")).not.toContain("waits for a decider");
   });
 
   it("leaves a raised ratchet's reason as it was", () => {
@@ -378,6 +398,31 @@ describe(explain, () => {
       "  next: bun test",
       "  retryable: no",
     ]);
+  });
+
+  // The lane's command reproduces the failure in a clone of the fork; the log
+  // is read through `evidence`, which lets in the answer's claimant and the
+  // project's deciders alone.
+  it("says the checks failed on the answer, how to see it, and where the log is kept", () => {
+    const logRef = "datekit/push-2222222/unit#1";
+
+    expect(
+      explain([new ChecksFailed({ lane: "unit", logRef, next: "bun test" })])
+    ).toStrictEqual([
+      `ChecksFailed: the unit checks failed on the answer; run next in a clone of the fork to see the failure; the log is kept as ${logRef}, for the answer's claimant and the project's deciders to read with ${Brand.cli} evidence`,
+      "  next: bun test",
+      "  retryable: no",
+    ]);
+  });
+
+  // `today` across every project raises it too, so it names no project.
+  it("tells a caller they are not a decider without naming a project", () => {
+    const [line] = explain([new NotDecider({})]);
+
+    expect(line).toBe(
+      "NotDecider: you are not a decider here: only the deciders a project's config names may do this"
+    );
+    expect(line).not.toContain("this project's");
   });
 
   // Below the floor no acknowledgement helps, so the next step is another value.

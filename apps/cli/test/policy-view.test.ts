@@ -136,13 +136,26 @@ describe("policy's text view", () => {
     }
   });
 
-  it("says a project with no config folder has not been evaluated, why, and what makes it evaluate", () => {
+  // The view sees only the success, which names no project: the next step
+  // names it as a placeholder, in the terminal's own short lines.
+  it("says a project with no config folder has not been evaluated, why, and the command that makes it evaluate", () => {
     const lines = linesOf(textOf(noConfig));
 
     expect(lines).toStrictEqual([
-      `The config at the landed commit ${sha.slice(0, 7)} has not been evaluated: the project has no ${Brand.configDir}/ folder, and the defaults need a test command that the platform could not find in its CI or package files.`,
-      `To make it evaluate, a decider lands a ${Brand.configDir}/project.ts that names the test command (\`${Brand.cli} init --dry-run\` in a clone prints the one the CLI proposes); it is evaluated again at every landing.`,
+      `The config at the landed commit ${sha.slice(0, 7)} has not been evaluated: there is no ${Brand.configDir}/ folder, and no test command in the project's CI or package files.`,
+      `Run \`${Brand.cli} init --project <project> --dry-run\` in the project's repo to see the ${Brand.configDir}/project.ts it proposes, then have a decider land it.`,
     ]);
+  });
+
+  it("names init with --project in the Markdown form too, without the page's clone sentence", () => {
+    const view = Option.getOrThrow(views.projectPolicy(noConfig));
+
+    for (const form of [view.markdown, view.text ?? ""]) {
+      expect(form).toContain(
+        `\`${Brand.cli} init --project <project> --dry-run\``
+      );
+      expect(form.toLowerCase()).not.toContain("in a clone");
+    }
   });
 
   it("says a config folder that did not evaluate has not been evaluated, and to land a fix", () => {

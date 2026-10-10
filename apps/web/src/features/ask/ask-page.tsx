@@ -222,8 +222,15 @@ export const AskView = ({
           </span>
         </Field>
         <Field label="Territory">
-          <Code>{ask.territory.module}</Code>
-          <span className="text-muted-foreground">: </span>
+          {/* A paths territory (module `.`) reads as its paths alone. */}
+          {ask.territory.module === "." ? (
+            <span className="text-muted-foreground">The paths </span>
+          ) : (
+            <>
+              <Code>{ask.territory.module}</Code>
+              <span className="text-muted-foreground">: </span>
+            </>
+          )}
           {ask.territory.paths.map((path, index) => (
             <span key={path}>
               {index === 0 ? null : ", "}

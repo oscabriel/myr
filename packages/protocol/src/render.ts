@@ -59,7 +59,7 @@ const reason = Match.typeTags<Refusal, string>()({
   ChecksFailed: ({ lane, logRef }) =>
     logRef === ChecksFailed.withheld
       ? `the ${lane} checks failed; their log was withheld`
-      : `the ${lane} checks failed; the log is at ${logRef}`,
+      : `the ${lane} checks failed on the answer; run next in a clone of the fork to see the failure; the log is kept as ${logRef}, for the answer's claimant and the project's deciders to read with ${Brand.cli} evidence`,
   ClaimLapsed: ({ ask }) => `your claim on ${ask} lapsed`,
   DecisionClosed: ({ decision }) =>
     `${decision} was already decided, or expired to its default`,
@@ -81,7 +81,9 @@ const reason = Match.typeTags<Refusal, string>()({
     `a layer's files would enter a public tree: ${list(paths)}`,
   NoAsk: () => "this push names no open ask",
   NotClaimed: ({ ask }) => `you hold no claim on ${ask}`,
-  NotDecider: () => "only one of this project's deciders may do this",
+  // `today` across every project raises it too, so it names no project.
+  NotDecider: () =>
+    "you are not a decider here: only the deciders a project's config names may do this",
   NotRedFirst: () =>
     "the ask's check must fail on main twice in the same way, by an assertion",
   NotSensitive: ({ key }) =>
@@ -131,9 +133,11 @@ const reason = Match.typeTags<Refusal, string>()({
       return `raises the ${weakening.ratchet} ratchet in ${weakening.territory} from ${weakening.before} to ${weakening.after}`;
     }
 
+    // A reasoned marker opens a decision, not a refusal: a refusal that
+    // carries a reason is a waiver a decider declined.
     return weakening.reason === undefined
       ? `adds ${weakening.marker} without a reason; remove it, or give a reason after " -- " for a decider to weigh`
-      : `adds ${weakening.marker}, with the reason "${weakening.reason}"; it waits for a decider because it raises this territory's escapes`;
+      : `adds ${weakening.marker} with the reason "${weakening.reason}"; a decider declined it, so take the marker out`;
   },
 });
 
