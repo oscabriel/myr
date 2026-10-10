@@ -1,5 +1,5 @@
 /**
- * Code the server sends highlighted (ADR 0026): a blob page's file and a
+ * Code the server sends highlighted (ADR 0027): a blob page's file and a
  * commit page's first files, drawn by `@pierre/diffs/ssr` into a
  * declarative shadow root, in a fixed set of languages and within the
  * server's own limit; anything else is sent as plain text, as before.

@@ -14,7 +14,7 @@
  * under a size ceiling, and the hashed assets it serves are kept by
  * browsers for good (`public/_headers`). The Worker bundles the grammars
  * it highlights in and no others, none on its entry, and no theme
- * collection or WebAssembly (ADR 0026).
+ * collection or WebAssembly (ADR 0027).
  *
  * Modules are read from the build's source maps (each map's `sources`),
  * strings from every other file it wrote. The Cloudflare plugin rewrites
@@ -72,7 +72,7 @@ const GRAMMAR = /node_modules\/@shikijs\/langs\/dist\/(?<name>[\w-]+)\.mjs$/u;
 
 /**
  * The grammars the Worker highlights in (`features/code/prerender-server.ts`,
- * ADR 0026), by Shiki's module names: HTML brings JavaScript and CSS with it.
+ * ADR 0027), by Shiki's module names: HTML brings JavaScript and CSS with it.
  */
 const SERVER_GRAMMARS = [
   "css",

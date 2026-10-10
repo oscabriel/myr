@@ -7,7 +7,7 @@
  * figures with two before and one after, a sign in the first of two
  * leading columns, unchanged runs as 32 px "N unmodified lines" bars. So
  * the highlighting arrives in place and nothing moves. The first files the
- * server highlights (`prerenderedPaths`, ADR 0026) are its drawing instead
+ * server highlights (`prerenderedPaths`, ADR 0027) are its drawing instead
  * of plain lines, under the same header.
  *
  * Each file is a disclosure whose summary is its header: folded, only the

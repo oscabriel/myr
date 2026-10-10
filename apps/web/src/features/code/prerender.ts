@@ -47,7 +47,7 @@ export type ServerLanguage = (typeof SERVER_LANGUAGES)[number];
 
 /**
  * The most lines the server highlights for one page. Measured in the dev
- * world's workerd (ADR 0026), warm: 2,400 lines of TypeScript took about
+ * world's workerd (ADR 0027), warm: 2,400 lines of TypeScript took about
  * 315 ms, 600 about 85 ms and 400 about 57 ms, so a page spends at most
  * some 60 ms highlighting, and a longer file is sent plain.
  */

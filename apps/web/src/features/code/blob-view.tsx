@@ -5,7 +5,7 @@
  * Permalink (`y`) and Copy. The code takes the pane's whole width and
  * scrolls sideways inside itself, never wrapping: the server sends it
  * highlighted where it highlights its language and size (`ServerCode`,
- * ADR 0026), else as numbered, anchored plain text (`NumberedLines`), and
+ * ADR 0027), else as numbered, anchored plain text (`NumberedLines`), and
  * the browser's drawing (`code`, from `client-code.tsx`) replaces it in
  * place.
  *

@@ -4,7 +4,7 @@ status: accepted
 
 # The web reads a project's code through public contracts the platform serves
 
-> **Superseded in part (2026-10-10).** Code is no longer drawn in the browser only. ADR 0026 records that the web Worker highlights a blob page's file and a commit page's first files on the server, in a fixed set of languages and within its own limit, and that the browser's drawing takes their place once it can draw the same code at once. The tree is still drawn in the browser only. The record below is kept as it was decided.
+> **Superseded in part (2026-10-10).** Code is no longer drawn in the browser only. ADR 0027 records that the web Worker highlights a blob page's file and a commit page's first files on the server, in a fixed set of languages and within its own limit, and that the browser's drawing takes their place once it can draw the same code at once. The tree is still drawn in the browser only. The record below is kept as it was decided.
 
 The web's code browser (tree, file, raw bytes, log, commit, refs, and why each line is there) reads only through public, read-only contracts on `/rpc`. The platform Worker serves them over its existing `RepoHost` on the public Artifacts namespace. The logic lives in one host-free module, `@repo/project/code`, which the platform's handlers and the web's offline dev world both call. No payload names a repo. Each names a project, and the module reads that project's canonical repo only, never a fork or a layer. A revision is `main` (the project's landed SHA, from its record and never from a ref), a full commit SHA in the canonical repo, or a tag name matched exactly against the port's tag list, never joined into a ref path. Every answer names the commit it resolved, so any page becomes a permalink.
 
