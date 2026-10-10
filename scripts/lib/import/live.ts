@@ -1,10 +1,11 @@
 /**
- * The import run's real target and backfill: a platform over `/rpc` as the
- * operator, git's `ls-remote` anonymously through the gateway, and the tag
+ * The import run's real target, backfill and web: a platform over `/rpc` as
+ * the operator, git's `ls-remote` anonymously through the gateway, the tag
  * backfill through `@repo/artifacts`' REST adapter with the ops
- * credentials, as `infra/teardown.ts` reaches Artifacts. No token is ever
- * printed: the operator's goes only into the `Authorization` header of
- * `/rpc` calls, and the backfill's write token only into git's env.
+ * credentials, as `infra/teardown.ts` reaches Artifacts, and the warm
+ * reads through the stage's web, anonymously. No token is ever printed:
+ * the operator's goes only into the `Authorization` header of `/rpc`
+ * calls, and the backfill's write token only into git's env.
  */
 import { Fetch, FetchFailed } from "@repo/artifacts/fetch";
 import { RepoHost, RepoName } from "@repo/artifacts/repo-host";
@@ -20,6 +21,7 @@ import {
   Effect,
   FileSystem,
   Layer,
+  Option,
   Redacted,
   Schema,
   Stream,
@@ -34,17 +36,20 @@ import {
   recordedSubdomain,
   resources,
   subdomainFile,
+  webOrigin,
 } from "../../../infra/stages.ts";
 import type { Stage } from "../../../infra/stages.ts";
 import { servedWorld, worldOperator } from "../seed.ts";
-import { shownCommand, tagBackfillCommands } from "./plan.ts";
+import { shownCommand, tagBackfillCommands, warmPaths } from "./plan.ts";
 import type { Command } from "./plan.ts";
 import {
   ImportExamplesFailed,
   ImportTarget,
   initUntilAnswered,
   TagBackfill,
+  Warmer,
 } from "./run.ts";
+import type { WarmRead } from "./run.ts";
 
 const failed = (reason: string) => new ImportExamplesFailed({ reason });
 
@@ -200,6 +205,66 @@ export const platformTarget = (input: {
     })
   ).pipe(Layer.provide(clientAt(input.origin, input.token)));
 
+/** How long one warm read may take: a cold why on a long history takes seconds. */
+const WARM_READ_TIMEOUT = Duration.seconds(90);
+
+/** `duration` in seconds, to a tenth. */
+const secondsOf = (duration: Duration.Duration) =>
+  `${(Duration.toMillis(duration) / 1000).toFixed(1)} s`;
+
+/**
+ * The web at `web`, read anonymously, page by page, each body read to its
+ * end so the server finishes what it draws; the README's path asked of the
+ * platform at `origin` (`readTree`, a public read).
+ */
+export const webWarmer = (input: {
+  readonly origin: string;
+  readonly token: Redacted.Redacted;
+  readonly web: string;
+}): Layer.Layer<Warmer> =>
+  Layer.effect(
+    Warmer,
+    Effect.gen(function* () {
+      const client = yield* Client;
+      const http = yield* HttpClient.HttpClient;
+
+      const read = (path: string): Effect.Effect<WarmRead> =>
+        http.get(`${input.web}${path}`).pipe(
+          Effect.flatMap((response) =>
+            Effect.as(response.text, response.status)
+          ),
+          Effect.timed,
+          Effect.timeout(WARM_READ_TIMEOUT),
+          Effect.map(([took, status]) => ({
+            ok: status === 200,
+            path,
+            said: `${status} in ${secondsOf(took)}`,
+          })),
+          Effect.orElseSucceed(() => ({ ok: false, path, said: "no answer" }))
+        );
+
+      return Warmer.of({
+        warm: (project) =>
+          client.readTree({ project }).pipe(
+            Effect.map(({ readme }) => Option.fromUndefinedOr(readme?.path)),
+            Effect.orElseSucceed(() => Option.none<string>()),
+            Effect.flatMap((readme) =>
+              Effect.forEach(warmPaths(project, readme), read)
+            )
+          ),
+      });
+    })
+  ).pipe(
+    Layer.provide(clientAt(input.origin, input.token)),
+    Layer.provide(FetchHttpClient.layer)
+  );
+
+/** No web to warm through: the Node world serves the platform alone. */
+export const noWarmer = Layer.succeed(
+  Warmer,
+  Warmer.of({ warm: () => Effect.succeed([]) })
+);
+
 /**
  * A deployed dev stage at `url`, or at the workers.dev origin bootstrap
  * recorded, as the operator: `OPERATOR_TOKEN` from the env
@@ -207,9 +272,10 @@ export const platformTarget = (input: {
  */
 export const stageTarget = (
   stage: Stage,
-  url: string | undefined
+  url: string | undefined,
+  web: string | undefined
 ): Layer.Layer<
-  ImportTarget,
+  ImportTarget | Warmer,
   ImportExamplesFailed,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
 > =>
@@ -223,21 +289,37 @@ export const stageTarget = (
         )
       );
 
+      const subdomain = yield* recordedSubdomain.pipe(
+        Effect.orElseSucceed(() => Option.none<string>())
+      );
+
       const origin =
         url ??
-        platformOrigin(
-          stage,
-          yield* recordedSubdomain.pipe(
-            Effect.flatMap(Effect.fromOption),
-            Effect.mapError(() =>
-              failed(
-                `no --url, and ${subdomainFile} doesn't record the account's workers.dev subdomain`
-              )
-            )
-          )
+        Option.map(subdomain, (sub) => platformOrigin(stage, sub)).pipe(
+          Option.getOrUndefined
         );
 
-      return platformTarget({ label: `${stage} (${origin})`, origin, token });
+      if (origin === undefined) {
+        return yield* failed(
+          `no --url, and ${subdomainFile} doesn't record the account's workers.dev subdomain`
+        );
+      }
+
+      // With --url and no --web, the stage's web can't be known: no warming.
+      const webAt =
+        web ??
+        (url === undefined
+          ? Option.getOrUndefined(
+              Option.map(subdomain, (sub) => webOrigin(stage, sub))
+            )
+          : undefined);
+
+      return Layer.mergeAll(
+        platformTarget({ label: `${stage} (${origin})`, origin, token }),
+        webAt === undefined
+          ? noWarmer
+          : webWarmer({ origin, token, web: webAt })
+      );
     })
   );
 
@@ -248,18 +330,21 @@ const worldToken = Redacted.make(
 
 /** The Node world, served for as long as the layer lasts, with the operator's session. */
 export const worldTarget: Layer.Layer<
-  ImportTarget,
+  ImportTarget | Warmer,
   ImportExamplesFailed,
   ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
 > = Layer.unwrap(
   servedWorld(new Map([[worldOperator, worldToken]])).pipe(
     Effect.mapError(({ reason }) => failed(reason)),
     Effect.map((origin) =>
-      platformTarget({
-        label: `the Node world (${origin})`,
-        origin,
-        token: worldToken,
-      })
+      Layer.mergeAll(
+        platformTarget({
+          label: `the Node world (${origin})`,
+          origin,
+          token: worldToken,
+        }),
+        noWarmer
+      )
     )
   )
 );

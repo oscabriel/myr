@@ -1,10 +1,14 @@
 /**
  * `bun run import-examples`: imports the open-source repos the code browser
- * is previewed on (anyhow first, then ky, gum, click, awesome,
- * changesets, stb and fuzzel), one at a time, as the operator, onto a dev
- * stage or the Node world; never `demo`.
+ * is previewed on (the eight that test its shapes, anyhow first, then
+ * thirty well-known projects), one at a time, as the operator, onto a dev
+ * stage or the Node world; never `demo`. Each new import is warmed: its
+ * pages read once through the stage's web, so its first reader finds why
+ * and its history kept; `--warm` warms the ones listed already too.
  *
  *   bun scripts/import-examples.ts --world node [--only anyhow]
+ *   bunx varlock run --path apps/platform/ -- \
+ *     bun scripts/import-examples.ts --stage dev-<user> --warm
  *   bunx varlock run --path apps/platform/ -- \
  *     bun scripts/import-examples.ts --stage dev-<user> [--only <p>] [--dry-run]
  *   bunx varlock run --path apps/platform/ -- bunx varlock run --path infra/ -- \
@@ -23,7 +27,7 @@
  * core is `lib/import/`.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import { Effect, Layer, Stdio } from "effect";
+import { Effect, Layer, Option, Stdio } from "effect";
 
 import { worldTarget, restBackfill, stageTarget } from "./lib/import/live.ts";
 import {
@@ -48,7 +52,7 @@ const layersOf = (options: ImportOptions) =>
   ImportWhere.match(options.where, {
     Stage: ({ stage, url }) =>
       Layer.mergeAll(
-        stageTarget(stage, url),
+        stageTarget(stage, url, Option.getOrUndefined(options.web)),
         options.tags ? restBackfill(stage) : noBackfill
       ),
     World: () => Layer.mergeAll(worldTarget, noBackfill),
