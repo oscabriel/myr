@@ -2,8 +2,8 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
-import type { Plugin } from "vite";
+import { defineConfig, loadEnv } from "vite";
+import type { Plugin, ServerOptions } from "vite";
 
 import {
   MANIFEST_PATH,
@@ -37,15 +37,33 @@ const webAppManifest = (): Plugin => ({
 // The Cloudflare framework guide's order: the Worker runs TanStack Start's
 // SSR environment, and Start comes before React. `vite build` picks the
 // stage from `CLOUDFLARE_ENV` (infra/deploy.ts sets it).
-export default defineConfig({
-  plugins: [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
-    tailwindcss(),
-    tanstackStart(),
-    viteReact(),
-    webAppManifest(),
-  ],
-  // shadcn's components import through `@/` (components.json), which
-  // tsconfig.json's `paths` maps to `src/`.
-  resolve: { tsconfigPaths: true },
+export default defineConfig(({ mode }) => {
+  // This machine's Caddy name for the dev server, from the gitignored
+  // `apps/web/.env`; without one, the dev server answers on localhost alone.
+  const caddyDevHost = loadEnv(mode, process.cwd(), "").CADDY_DEV_HOST;
+
+  const server: ServerOptions = {
+    host: "127.0.0.1",
+    port: 3032,
+    strictPort: true,
+  };
+
+  if (caddyDevHost !== undefined && caddyDevHost !== "") {
+    server.allowedHosts = ["localhost", "127.0.0.1", caddyDevHost];
+    server.hmr = { clientPort: 443, host: caddyDevHost, protocol: "wss" };
+  }
+
+  return {
+    plugins: [
+      cloudflare({ viteEnvironment: { name: "ssr" } }),
+      tailwindcss(),
+      tanstackStart(),
+      viteReact(),
+      webAppManifest(),
+    ],
+    // shadcn's components import through `@/` (components.json), which
+    // tsconfig.json's `paths` maps to `src/`.
+    resolve: { tsconfigPaths: true },
+    server,
+  };
 });

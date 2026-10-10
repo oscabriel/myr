@@ -83,7 +83,7 @@ The web, over its dev world:
 bun run --cwd apps/web dev
 ```
 
-`vite dev` resolves the web's `#backend` import to `apps/web/src/dev/backend.ts`: every contract served in process over memory adapters, seeded with the two fictional example projects, `examples/datekit/` and `examples/burrow/`. Open the URL vite prints; `/auth/dev?handle=ines-v` signs you in as datekit's fictional decider.
+`vite dev` resolves the web's `#backend` import to `apps/web/src/dev/backend.ts`: every contract served in process over memory adapters, seeded with the two fictional example projects, `examples/datekit/` and `examples/burrow/`. It answers on `http://127.0.0.1:3032`, pinned in `apps/web/vite.config.ts`; a `CADDY_DEV_HOST` in the gitignored `apps/web/.env` also lets a reverse proxy serve it under that name, with hot reload over `wss`. `/auth/dev?handle=ines-v` signs you in as datekit's fictional decider.
 
 To see every state a page can draw (each outcome, a family's fan mid-way, every kind of decision, a sealed ledger, a set env value, drafted proposals), add the dev fixtures: a fictional project, `vellum`, told as a story through the same service, and six small projects beside it. `live` also lands one family child about 20 s after a vellum page first reads it, so a page open on it shows the landing as it happens:
 
@@ -92,14 +92,14 @@ VITE_DEV_FIXTURES=1 bun run --cwd apps/web dev
 VITE_DEV_FIXTURES=live bun run --cwd apps/web dev
 ```
 
-With the fixtures running, `WEB_URL=<the URL vite printed> bun run --cwd apps/web e2e -- a11y.e2e.ts` runs axe and a keyboard walk over every page in both colour schemes at 1440 and 390 px (it loads axe from cdnjs at run time).
+With the fixtures running, `WEB_URL=http://127.0.0.1:3032 bun run --cwd apps/web e2e -- a11y.e2e.ts` runs axe and a keyboard walk over every page in both colour schemes at 1440 and 390 px (it loads axe from cdnjs at run time).
 
-The CLI from source, against that dev world (use the port vite printed):
+The CLI from source, against that dev world:
 
 ```sh
-MYR_URL=http://localhost:5173 bun apps/cli/src/bin.ts projects
-MYR_URL=http://localhost:5173 bun apps/cli/src/bin.ts asks --project datekit
-MYR_URL=http://localhost:5173 bun apps/cli/src/bin.ts ask format-ordinal --project datekit
+MYR_URL=http://127.0.0.1:3032 bun apps/cli/src/bin.ts projects
+MYR_URL=http://127.0.0.1:3032 bun apps/cli/src/bin.ts asks --project datekit
+MYR_URL=http://127.0.0.1:3032 bun apps/cli/src/bin.ts ask format-ordinal --project datekit
 ```
 
 Both examples, seeded onto a platform that runs in Node on this machine for the length of the command, with real git:
