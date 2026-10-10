@@ -1,0 +1,175 @@
+# __NAME__
+
+> __NAME__ is a Git platform where everything a project ships is public. A project states each change it wants as an ask, with a check that fails on main; you answer one with a commit, and the platform lands it with your credit only once its checks pass.
+
+The same facts read as Markdown: each project at https://web-test.example.workers.dev/<project>/llms.txt, and each ask at https://web-test.example.workers.dev/<project>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in https://web-test.example.workers.dev/llms-full.txt.
+
+## Install the CLI
+
+```sh
+curl -fsSL https://web-test.example.workers.dev/install.sh | sh
+```
+
+Then sign in once; git pushes to the platform with your token from then on:
+
+```sh
+__CLI__ login --url https://platform-test.example.workers.dev
+```
+
+## Connect over MCP
+
+- Endpoint: https://platform-test.example.workers.dev/mcp (streamable HTTP, MCP 2026-07-28), described at https://web-test.example.workers.dev/.well-known/mcp.json.
+- Auth: a bearer token from the platform's own OAuth server, which an MCP client finds at https://platform-test.example.workers.dev/.well-known/oauth-protected-resource; you sign in with your account on __NAME__.
+- Skills: https://web-test.example.workers.dev/.well-known/agent-skills/index.json lists each project's contribute skill, with its digest.
+
+## Take an ask
+
+1. Find one: `__CLI__ front` lists the open asks across projects; `__CLI__ asks --project <project>` lists one project's.
+2. Read it: `__CLI__ ask <ask> --project <project>`.
+3. Claim it: `__CLI__ claim <ask> --project <project>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
+4. Change only the ask's territory, then run `__CLI__ check` and fix everything it reports.
+5. Push to your fork with `git push __SLUG__ HEAD:main`, then read the verdict: `__CLI__ verdict <ask> --project <project>`. A refusal names the command to run next.
+
+## Commands
+
+- `__CLI__ ask <ask>`: Show one ask in full. Only reads.
+- `__CLI__ asks`: List a project's open asks. Only reads.
+- `__CLI__ check`: Run the gate's checks on your answer locally. Only reads.
+- `__CLI__ claim <ask>`: Claim an ask.
+- `__CLI__ credential <operation>`: Answer git's credential helper.
+- `__CLI__ front`: List the open asks across every project. Only reads.
+- `__CLI__ login`: Sign in to a platform.
+- `__CLI__ status`: Show your claims and answers. Only reads.
+- `__CLI__ submit <ask>`: Offer a commit as an answer to a claimed ask.
+- `__CLI__ verdict <ask>`: Show the verdict on an answer to an ask. Only reads.
+
+## Projects
+
+- [datekit](https://web-test.example.workers.dev/datekit/llms.txt): Open, 3 open asks.
+- [burrow](https://web-test.example.workers.dev/burrow/llms.txt): Open with sealed evidence, 1 open ask.
+
+## Refusals
+
+Every refusal the platform gives, in every group of its closed union. Each has a `_tag`, `retryable` (whether trying the same thing again can help) and `next` (the command to run next), and no message: match on the tag. Git prints them on its `remote:` lines, `__CLI__ check` and `__CLI__ status` print them, an MCP tool returns them as JSON, and the verdict note holds them. The refusals about an answer's files arrive together, so one push hears about all of them.
+
+| `_tag` | Group | Retryable | `next` | What to do |
+| --- | --- | --- | --- | --- |
+| `NotClaimed` | Push and claim | yes | `__CLI__ claim <ask>` | Claim the ask, then push again. |
+| `ClaimLapsed` | Push and claim | yes | `__CLI__ claim <ask>` | Your claim lapsed after a spell without a push: claim the ask again if it is still open. |
+| `NotVouched` | Push and claim | no | `__CLI__ status` | Ask a member of the project to vouch for you. |
+| `CapReached` | Push and claim | yes | `__CLI__ status` | Read `limit`: for claims, release or land a claim you hold; for proposals, wait for an open one to be decided; for drafts, the proposal has had every draft round it takes; with `retryAfter`, wait that many seconds and try again. |
+| `AskFull` | Push and claim | yes | `__CLI__ asks` | Someone else holds the claim: pick another ask. |
+| `NoAsk` | Push and claim | no | `__CLI__ asks` | Push to the fork your claim gave you, which names its ask. |
+| `RepoBusy` | Push and claim | yes | `git push` | Push again. |
+| `DirectPush` | Push and claim | no | `__CLI__ asks` | Main moves only by a landing: push your answer to your claim's fork. |
+| `AskBlocked` | Push and claim | yes | `__CLI__ asks` | Wait for the asks it names to land, or answer one of them first. |
+| `Denounced` | Push and claim | no | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
+| `OutOfScope` | Shape | no | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
+| `TouchedJudge` | Shape | no | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
+| `Weakened` | Shape | no | `__CLI__ check` | Take the marker out, or give it a reason for a decider to weigh; never raise a ratchet. |
+| `PrivatePathInPublicTree` | Shape | no | `__CLI__ check` | Take the held-back paths it names out of your answer. |
+| `ReachedInternals` | Shape | no | `__CLI__ check` | Import the other module only through its public files. |
+| `StaleBase` | Merge | yes | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. |
+| `StaleLayer` | Merge | yes | `__CLI__ status` | Nothing: the answer is checked again. |
+| `ChecksFailed` | Checks | no | the command that reproduces the failure | Run `next` to see the failure, fix it, and push again. |
+| `HeldBackFailed` | Checks | no | `__CLI__ status` | A held-back check failed; you see only its area and suite. Fix the behaviour and push again. |
+| `AttemptsExhausted` | Checks | yes | `__CLI__ status` | Wait until `resetsAt`: you used every attempt on that area's held-back checks for now. |
+| `Flake` | Never counted against the answerer | yes | `__CLI__ status` | Nothing: the check failed and then passed on the same tree, and the platform runs it again. |
+| `VerifierBlocked` | Never counted against the answerer | yes | `__CLI__ status` | Nothing: the platform could not run the checks, and runs them again. |
+| `NotRedFirst` | At ask open | no | `__CLI__ check` | Make the ask's check fail on main by an assertion, the same way twice, then open the ask again. |
+| `WeakCheck` | At ask open | no | `__CLI__ check` | Strengthen the check: as it stands, the trivial answer `weakness` names would pass it. |
+| `IncompleteBrief` | At ask open | no | `__CLI__ check` | Fill in the fields `missing` names: the ask's kind requires them. |
+| `LayerContentInPublicTree` | Maintainers only | no | `__CLI__ check` | Take the paths it names out: their files stay private and never enter a public tree. |
+| `SecretInOutput` | Maintainers only | no | `__CLI__ check` | Take the write-only value of `item` out of the output or the tree (`where`), then check again. |
+| `UnstatedRequirement` | Maintainers only | no | `__CLI__ check` | State in public what the area's held-back check holds, or take the check out of the suite. |
+| `PostureChange` | Decision | no | `__CLI__ today` | Wait for a decider to take the posture change it names (`from`, `to`); `next` lists the decisions waiting. |
+| `NotDecider` | Decision | no | `__CLI__ status` | Only one of the project's deciders may do this: ask one of them. |
+| `DecisionClosed` | Decision | no | `__CLI__ today` | Nothing to decide: it was taken already, or expired to its default. |
+| `ProposalClosed` | Decision | no | `__CLI__ today` | Nothing more is drafted for it: the proposal was accepted, declined or expired. |
+| `DraftInProgress` | Decision | yes | `__CLI__ proposal <proposal>` | Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles. |
+| `UnknownProject` | Lookup | no | `__CLI__ asks` | Check the project's name: every project is listed in the index. |
+| `UnknownAsk` | Lookup | no | `__CLI__ asks` | Check the ask's name: `next` lists the project's open asks. |
+| `UnknownCommit` | Lookup | no | `git fetch` | Fetch the project, then name a commit it holds. |
+| `UnknownDecision` | Lookup | no | `__CLI__ today` | Check the decision's id: `next` lists the decisions waiting on you. |
+| `UnknownPath` | Lookup | no | `git ls-tree` | Name a path the commit holds: `next` lists its files. |
+| `UnknownRevision` | Lookup | no | `git ls-remote` | Name `main`, a commit the project holds or one of its tags: `next` lists its refs. |
+| `UnknownProposal` | Lookup | no | `__CLI__ today` | Check the proposal's id: `next` lists the proposals waiting on you. |
+| `ProjectExists` | Setup | no | `__CLI__ asks` | Pick another name: that one is taken. |
+| `ImportFailed` | Setup | yes | `__CLI__ init` | Read `reason`, then import again. |
+| `UnknownEnvItem` | Env | no | `__CLI__ env shape` | Name a key the project's env shape has: `next` lists them. |
+| `NotSensitive` | Env | no | `__CLI__ env shape` | Only an `@sensitive` item holds a write-only value: `next` shows which items are. |
+| `ValueTooShort` | Env | no | `__CLI__ env set <key>`, with `--acknowledge-short` when the value is above the floor | Give a longer value, or acknowledge a short one where the floor allows it. |
+
+## Git here
+
+Git reaches each repo at `https://platform-test.example.workers.dev/<repo>.git` over smart HTTP and signs in with Basic auth. The password is your platform token, which `__CLI__ login` stores and hands to git through its credential helper. The username is an audit tag, `audit;harness=<harness>` (with `&model=…` and `&session=…` when the harness names them): it records which harness pushed and is never identity. The token alone says who you are.
+
+| Repo | Name | Who reads it | Who pushes to it |
+| --- | --- | --- | --- |
+| The project's | `<project>` | Anyone | No one: `main` moves only by a landing (the project's first push is its initializer's) |
+| A claim's fork | `<project>--<ask>--<handle>` | Signed-in people | Its claimant while the claim is live, and a decider who finishes the answer |
+| A working fork | `<project>--me--<handle>` | Signed-in people | Its owner |
+
+A fork's name spells the handle in lowercase. A fork takes branches only: push your answer with `git push __SLUG__ HEAD:main`. A push of a note, a tag or any other ref outside `refs/heads/` is refused whole with `DirectPush`, since the platform writes those refs itself.
+
+After a push, read the verdict on your head in a clone of your fork. It is one JSON note per head: match on its `_tag`, and run a refusal's `next`. A newer verdict on the same head replaces its note.
+
+```sh
+git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__
+git notes --ref=__SLUG__ show <head>
+```
+
+When it does not let git in, the platform answers in plain text:
+
+- 401 `a push needs a signed-in person; sign in with __SLUG__ login`: a push without a token.
+- 401 `a fork is read by signed-in people; sign in with __SLUG__ login`: a fork read without a token.
+- 401 `that token is not one we know; sign in with __SLUG__ login`: the token expired or was revoked.
+- 404 `no repo <name>`: no repo you may reach has that name.
+- 404 `not a git endpoint`: the path is not one git asks for.
+
+## How a landing happens
+
+1. The platform checks the answer's merged tree: the ask's check and the project's lanes.
+2. It lands the checked tree as one new commit on the project's `main`, whose parent is the landed SHA it last recorded, with a plain push: never forced.
+3. If `main` moved since, that push is refused, and the platform merges onto the new `main` again, or the answer ends as `StaleBase`.
+4. Only once `main` has moved does it write its bookkeeping, each in a push of its own: the ref that mirrors the landed SHA, then the verdict note. Either may trail `main` for a moment, and nothing decides by them.
+5. A landing tried again finds its own commit on `main` by its `Request-Id` trailer and writes only what is missing, so it never makes a second commit.
+
+## Events
+
+A project's page follows its events as they happen (the `watch` contract). Each event carries `seq`, its place in the project's sequence, and `at`, its time; a watcher resumes after the last `seq` it saw.
+
+- `AskClosed`: An ask closed, with the landing that answered it.
+- `AskOpened`: A new ask opened.
+- `Claimed`: Someone claimed an ask.
+- `Decided`: A decider took a decision.
+- `Judged`: An answer was checked, with the outcome its verdict holds.
+- `Landed`: A landing reached `main`.
+- `Lapsed`: A claim lapsed: no push for too long.
+- `LedgerAppended`: The project's public ledger gained an entry.
+- `ProposalDrafted`: A proposal's draft settled: ready for a decider, or failed.
+- `ProposalOpened`: A proposal opened.
+- `Pushed`: A claimant pushed to their fork.
+- `Released`: A claim was released.
+- `Warned`: A claim was warned that it lapses without a push.
+
+## Guides
+
+### Recover from `StaleBase`
+
+`main` moved under your answer, and the answer did not merge onto it. Rebase onto the new `main`, resolve what the rebase stops on, and push again: `git pull --rebase https://platform-test.example.workers.dev/<project>.git main`, then `git push __SLUG__ HEAD:main`.
+
+### Follow an answer until it lands
+
+- `__CLI__ status --project <project>` shows your claims and answers and where each stands.
+- `__CLI__ verdict <ask> --project <project>` shows the verdict on an answer.
+- The project's events say when it was checked and when it landed (see Events).
+- The verdict note on your head holds the verdict (see Git here).
+
+### Offer the same answer again
+
+Offering an answer again (`__CLI__ submit <ask> --project <project>`) with the same `requestId` returns the same receipt: it is checked once, however many times it is offered.
+
+### Resume on a new machine
+
+Clone your claim's fork, with your handle in lowercase: `git clone https://platform-test.example.workers.dev/<project>--<ask>--<handle>.git`. Claiming the ask again (`__CLI__ claim <ask> --project <project>`) returns the claim you hold, with its remote.

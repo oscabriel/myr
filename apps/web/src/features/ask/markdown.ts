@@ -4,12 +4,15 @@
  * same URL with `.md`. The request decides; no user-agent list does.
  *
  * The brief is the platform's: `showAsk` renders it once, and the web only
- * serves it. A refusal is set the way `git push` printed it, from
+ * serves it, under the banner that names the web's indexes when the route
+ * hands in where they are. A refusal is set the way `git push` printed it, from
  * `@repo/protocol/render` (AGENTS.md principle 3), then its next command.
  * Pure: a `Request` or an `Exit` in, a string or a `Response` out.
  */
+import { indexBanner } from "@repo/agent-kit/host-doc";
 import { Brand } from "@repo/brand";
 import type { Visibility } from "@repo/protocol/annotations";
+import type { ProjectName } from "@repo/protocol/ids";
 import { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { Array, Cause, Exit, Option, Schema } from "effect";
@@ -150,14 +153,27 @@ const UNANSWERED = [
   "",
 ].join("\n");
 
+/** Where the web's indexes are, for the banner over an ask's brief. */
+export interface AskIndex {
+  readonly project: ProjectName;
+  readonly webUrl: string;
+}
+
+/** The brief as served: under the banner when `index` is given, else as it came. */
+const briefWithBanner = (brief: string, index: AskIndex | undefined) =>
+  index === undefined ? brief : `${indexBanner(index)}\n\n${brief}`;
+
 /**
  * How reading an ask ended, as the Markdown response: the brief (200,
- * cacheable as its contract's visibility allows); a refusal (404, its
- * Markdown); or no answer from the platform (502). Only a brief is cached.
+ * cacheable as its contract's visibility allows), opened by the banner
+ * naming `index`'s `llms.txt` files when one is given; a refusal (404, its
+ * Markdown, no banner); or no answer from the platform (502). Only a brief
+ * is cached.
  */
 export const askMarkdownResponse = <E>(
   result: Exit.Exit<{ readonly brief: string }, E>,
-  visibility: ContractVisibility
+  visibility: ContractVisibility,
+  index?: AskIndex
 ): Response =>
   Exit.match(result, {
     onFailure: (cause) =>
@@ -166,7 +182,8 @@ export const askMarkdownResponse = <E>(
         onSome: (refusal) =>
           markdown(refusalsMarkdown([refusal]), 404, "no-store"),
       }),
-    onSuccess: ({ brief }) => markdown(brief, 200, cacheFor(visibility)),
+    onSuccess: ({ brief }) =>
+      markdown(briefWithBanner(brief, index), 200, cacheFor(visibility)),
   });
 
 /**

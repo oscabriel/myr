@@ -15,6 +15,7 @@ import { asTester, unanswered } from "@repo/protocol/testing";
 import { Effect, Exit, Layer, Ref } from "effect";
 import { RpcTest } from "effect/rpc";
 
+import { indexBanner } from "../src/features/agents/llms.ts";
 import {
   askMarkdownResponse,
   refusalsMarkdown,
@@ -296,6 +297,41 @@ describe(askMarkdownResponse, () => {
           brief,
         ]);
       })
+  );
+});
+
+describe("an ask's Markdown with the index named", () => {
+  const index = { project, webUrl: WEB };
+
+  it.effect(
+    "opens with the banner naming its project's llms.txt, then the brief unchanged",
+    () =>
+      Effect.gen(function* () {
+        const seen = yield* read(
+          askMarkdownResponse(Exit.succeed({ brief }), "public", index)
+        );
+
+        expect(seen.status).toBe(200);
+        expect(seen.body).toBe(`${indexBanner(index)}\n\n${brief}`);
+        expect(seen.body.split("\n")[0]).toContain(
+          `${WEB}/${project}/llms.txt`
+        );
+      })
+  );
+
+  it.effect("keeps a refusal's Markdown as it is, with no banner", () =>
+    Effect.gen(function* () {
+      const refusal = new UnknownAsk({ ask: AskId.make("no-such-ask") });
+
+      const seen = yield* read(
+        askMarkdownResponse(Exit.fail(refusal), "public", index)
+      );
+
+      expect([seen.status, seen.body]).toStrictEqual([
+        404,
+        refusalsMarkdown([refusal]),
+      ]);
+    })
   );
 });
 

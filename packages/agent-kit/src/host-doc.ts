@@ -6,7 +6,10 @@
  * which projects exist: the web serves it at `/llms.txt`, and the platform
  * at `/` for an agent, with no web app's pages named when it knows of none.
  * `projectLlms` is the web's `/<project>/llms.txt`, with the project's open
- * asks, and `mcpCard` its `/.well-known/mcp.json`.
+ * asks, and `mcpCard` its `/.well-known/mcp.json`. With a web app,
+ * `frontLlms` names `/llms-full.txt` (`full-llms.ts`), and `indexBanner`
+ * opens every other Markdown answer the web serves, so a reader that lands
+ * on one finds the rest.
  *
  * Pure: the hosts hand in what the platform lists and the CLI's commands
  * as this package's one list holds them, so no command is written here
@@ -82,7 +85,7 @@ const usage = (
 };
 
 /** `words` as typed, with `flags`, when the catalog has the command. */
-const typed = (
+export const typed = (
   commands: Commands,
   words: string,
   known: Known,
@@ -93,7 +96,7 @@ const typed = (
   );
 
 /** The sentence `make` writes around a typed command, or nothing without it. */
-const withCommand = (
+export const withCommand = (
   command: Option.Option<string>,
   make: (typedCommand: string) => string
 ) => Option.toArray(Option.map(command, make));
@@ -212,7 +215,7 @@ export const frontLlms = (input: {
     ...Option.match(webUrl, {
       onNone: () => [],
       onSome: (web) => [
-        `The same facts read as Markdown: each project at ${web}/<project>/llms.txt, and each ask at ${web}/<project>/asks/<ask>.md.`,
+        `The same facts read as Markdown: each project at ${web}/<project>/llms.txt, and each ask at ${web}/<project>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in ${web}/llms-full.txt.`,
         "",
       ],
     }),
@@ -276,6 +279,20 @@ const sentence = (text: string) => `${text.replace(/[.\s]+$/u, "")}.`;
 const askLine = (webUrl: string, project: string, listing: AskListing) =>
   `- [${listing.ask}](${projectPage(webUrl, project)}/asks/${listing.ask}.md): ${[sentence(listing.want), ...askNotes(listing)].join(" ")}`;
 
+/**
+ * The line that opens a Markdown answer the web serves: where the index is,
+ * where the full text is, and, for a project's answer, the project's own
+ * index. One blockquote, so a reader that lands on any page finds the rest.
+ */
+export const indexBanner = (input: {
+  readonly webUrl: string;
+  readonly project?: ProjectName;
+}) => {
+  const { project, webUrl } = input;
+
+  return `> For agents: the index is ${webUrl}/llms.txt, and everything beyond it (refusals, git, landings, events, guides) is ${webUrl}/llms-full.txt${project === undefined ? "" : `; this project's index is ${projectPage(webUrl, project)}/llms.txt`}.`;
+};
+
 /** `/<project>/llms.txt`: the project, its posture, how to clone it, its open asks and how to take one. */
 export const projectLlms = (input: {
   readonly listing: ProjectListing;
@@ -288,6 +305,8 @@ export const projectLlms = (input: {
   const { project } = listing;
 
   return page([
+    indexBanner({ project, webUrl }),
+    "",
     `# ${project}`,
     "",
     `> A project on ${Brand.name}. Posture: ${postureWords[listing.posture]}. ${counted(asks.length, "open ask")}.`,

@@ -12,7 +12,7 @@ import { ProjectName } from "@repo/protocol/ids";
 import { Effect } from "effect";
 
 import type { CommandDoc } from "../src/command-doc.ts";
-import { frontLlms } from "../src/host-doc.ts";
+import { frontLlms, indexBanner, projectLlms } from "../src/host-doc.ts";
 import { expectGolden } from "./golden.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
@@ -130,5 +130,61 @@ describe("the host's Markdown", () => {
         lines.filter((line) => line.startsWith(`- \`${Brand.cli} `))
       ).toHaveLength(commands.length);
     });
+  });
+
+  it("with a web app, names /llms-full.txt in its opening sentence", () => {
+    const lines = linesOf(
+      frontLlms({ commands, platformUrl, projects, webUrl })
+    );
+
+    expect(lines[4]).toContain(`${webUrl}/llms-full.txt`);
+  });
+
+  it("without a web app, names no /llms-full.txt", () => {
+    expect(frontLlms({ commands, platformUrl, projects })).not.toContain(
+      "llms-full.txt"
+    );
+  });
+});
+
+describe("the index banner", () => {
+  it("is one blockquote naming the index and the full text", () => {
+    const banner = indexBanner({ webUrl });
+
+    expect(banner.split("\n")).toHaveLength(1);
+    expect(banner.startsWith("> ")).toBeTruthy();
+    expect(banner).toContain(`${webUrl}/llms.txt`);
+    expect(banner).toContain(`${webUrl}/llms-full.txt`);
+  });
+
+  it("names a project's own index when it has one", () => {
+    expect(
+      indexBanner({ project: ProjectName.make("datekit"), webUrl })
+    ).toContain(`${webUrl}/datekit/llms.txt`);
+  });
+
+  it("opens a project's llms.txt, then its heading", () => {
+    const lines = linesOf(
+      projectLlms({
+        asks: [],
+        commands,
+        listing: projects[0] ?? {
+          openAsks: 0,
+          posture: "open",
+          project: ProjectName.make("datekit"),
+        },
+        platformUrl,
+        webUrl,
+      })
+    );
+
+    expect(lines.slice(0, 3)).toStrictEqual([
+      indexBanner({ project: ProjectName.make("datekit"), webUrl }),
+      "",
+      "# datekit",
+    ]);
+    expect(lines[0]).toContain(`${webUrl}/llms.txt`);
+    expect(lines[0]).toContain(`${webUrl}/llms-full.txt`);
+    expect(lines[0]).toContain(`${webUrl}/datekit/llms.txt`);
   });
 });

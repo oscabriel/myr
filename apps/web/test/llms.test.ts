@@ -8,18 +8,25 @@
 import { describe, expect, it } from "@effect/vitest";
 import type { CommandDoc } from "@repo/agent-kit/command-doc";
 import { Brand } from "@repo/brand";
+import { claimForkName, workingForkName } from "@repo/project/repo-names";
+import { Client, Contracts } from "@repo/protocol/contracts";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
-import { AskId, KindName, ProjectName } from "@repo/protocol/ids";
-import { Option } from "effect";
+import { AskId, Handle, KindName, ProjectName } from "@repo/protocol/ids";
+import { asTester, unanswered } from "@repo/protocol/testing";
+import { Effect, Layer, Option } from "effect";
+import { RpcTest } from "effect/rpc";
 
 import { commands as catalog } from "../src/features/agents/catalog.ts";
 import {
   frontLlms,
+  fullLlms,
+  indexBanner,
   mcpCard,
   missingProjectLlms,
   projectLlms,
 } from "../src/features/agents/llms.ts";
+import { llmsFullHandler } from "../src/routes/llms-full[.]txt.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
 
@@ -231,8 +238,10 @@ describe(projectLlms, () => {
 
   const lines = linesOf(text);
 
-  it("opens with the project, its posture and how many asks are open", () => {
-    expect(lines.slice(0, 3)).toStrictEqual([
+  it("opens with the banner, then the project, its posture and how many asks are open", () => {
+    expect(lines.slice(0, 5)).toStrictEqual([
+      indexBanner({ project: datekit, webUrl }),
+      "",
       "# datekit",
       "",
       `> A project on ${Brand.name}. Posture: Open with sealed evidence. 3 open asks.`,
@@ -321,6 +330,95 @@ describe("the command catalog", () => {
         ({ path }) => !text.includes(`- \`${cli} ${path.join(" ")}`)
       )
     ).toStrictEqual([]);
+  });
+});
+
+/** A platform that lists `listed` as its projects, and answers nothing else. */
+const listing = (listed: readonly ProjectListing[]) => () =>
+  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+    Layer.provide([
+      Layer.mergeAll(
+        unanswered,
+        Contracts.toLayerHandler("listProjects", () =>
+          Effect.succeed({ projects: listed })
+        )
+      ),
+      asTester,
+    ])
+  );
+
+/** A platform that cannot be reached: every call dies on the way. */
+const unreachable = () =>
+  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
+    Layer.provide([unanswered, asTester])
+  );
+
+const getFull = () => new Request(`${webUrl}/llms-full.txt`);
+
+const read = (response: Response) =>
+  Effect.map(
+    Effect.promise(() => response.text()),
+    (body) => ({
+      body,
+      contentType: response.headers.get("content-type"),
+      status: response.status,
+    })
+  );
+
+describe("/llms-full.txt", () => {
+  it.effect("is fullLlms over the projects the platform lists", () =>
+    Effect.gen(function* () {
+      const response = yield* Effect.promise(() =>
+        llmsFullHandler(listing(projects), platformUrl)({ request: getFull() })
+      );
+
+      expect(yield* read(response)).toStrictEqual({
+        body: fullLlms({ commands: catalog, platformUrl, projects, webUrl }),
+        contentType: "text/markdown; charset=utf-8",
+        status: 200,
+      });
+    })
+  );
+
+  it.effect("is unavailable when the platform does not answer", () =>
+    Effect.gen(function* () {
+      const response = yield* Effect.promise(() =>
+        llmsFullHandler(unreachable, platformUrl)({ request: getFull() })
+      );
+
+      const seen = yield* read(response);
+
+      expect(seen.status).toBe(503);
+      expect(seen.body).toContain("# Unavailable");
+    })
+  );
+
+  describe("its fork names", () => {
+    const text = fullLlms({ commands: catalog, platformUrl, projects, webUrl });
+    const parseIso = AskId.make("parse-iso");
+    const ada = Handle.make("Ada");
+
+    /** A name pattern the doc states, with its placeholders filled in. */
+    const filled = (pattern: string) =>
+      pattern
+        .replaceAll("<project>", datekit)
+        .replaceAll("<ask>", parseIso)
+        .replaceAll("<handle>", ada.toLowerCase());
+
+    /** The patterns in the doc's code spans that name a fork. */
+    const patterns = [...text.matchAll(/`(?<name><project>--[^`]+)`/gu)].map(
+      (match) => match.groups?.name ?? ""
+    );
+
+    it("spell a claim's fork as the platform names it", () => {
+      expect(patterns.map(filled)).toContain(
+        claimForkName(datekit, parseIso, ada)
+      );
+    });
+
+    it("spell a working fork as the platform names it", () => {
+      expect(patterns.map(filled)).toContain(workingForkName(datekit, ada));
+    });
   });
 });
 
