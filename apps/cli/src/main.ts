@@ -23,6 +23,7 @@ import {
   transportMessage,
 } from "./remote.ts";
 import { commands, mcp, UnknownCommand } from "./surfaces.ts";
+import { cliVersion } from "./version.ts";
 
 /**
  * The three commands that start any contribution, first in `--help`, so a
@@ -42,11 +43,6 @@ export const root = Command.make(Brand.cli).pipe(
   Command.withDescription(banner),
   Command.withSubcommands(tree)
 );
-
-/**
- * The CLI's version until the release build stamps its own.
- */
-const version = "0.0.0";
 
 /** The exit code of a usage error, as for a command line effect/cli can't parse. */
 const USAGE = 2;
@@ -176,7 +172,7 @@ export const program = (argv: readonly string[]) =>
     const exit = yield* Effect.exit(
       Command.runWith(root.pipe(Command.provideEffectDiscard(stdout.open)), {
         renderErrors: false,
-        version,
+        version: cliVersion,
       })(argv).pipe(
         Effect.provideService(
           CliConfig.CliConfig,

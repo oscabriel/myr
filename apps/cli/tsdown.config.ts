@@ -4,10 +4,24 @@
  * sdk a config folder imports) and `./protocol` (the types its data has).
  * Workspace packages are inlined, so the published package names none of
  * them; `effect` and `@effect/platform-bun`, the package's own
- * dependencies, stay imports.
+ * dependencies, stay imports. Each entry is stamped with the version
+ * `build.ts` is given (`npm`).
  */
 import { defineConfig } from "tsdown";
 import type { UserConfig } from "tsdown";
+
+/** What a build no release stamped says it is (the release's `UNRELEASED`). */
+export const UNSTAMPED = "0.0.0";
+
+/**
+ * What each bundler replaces so `cliVersion` (`src/version.ts`) reads
+ * `version`: the expression it reads, onto the version as a string literal.
+ * `build.ts` hands it to tsdown here (`npm`) and to every `bun build
+ * --compile` (`compileArgs`).
+ */
+export const versionDefine = (version: string) => ({
+  "import.meta.env.CLI_BUILD_VERSION": JSON.stringify(version),
+});
 
 /** The library entries, by the name each is published under. */
 export const library = {
@@ -48,9 +62,21 @@ export const declarations = (
     entry,
   }) satisfies UserConfig;
 
-export default defineConfig([
-  { ...shared, dts: false, entry: { bin: "src/bin.ts" } },
-  { ...shared, dts: false, entry: library },
-  // The pi extension, which the publish manifest's `"pi"` key names.
-  { ...shared, dts: false, entry: { pi: "src/pi.ts" } },
-]);
+/**
+ * The npm build stamped with `version` (`src/version.ts`): one define for
+ * all three entries, so they agree. `build.ts` builds them in order; only
+ * the first cleans `dist/`, so a build one at a time keeps the others' files.
+ */
+export const npm = (version: string) => {
+  const stamped = { ...shared, define: versionDefine(version), dts: false };
+
+  return [
+    { ...stamped, entry: { bin: "src/bin.ts" } },
+    { ...stamped, clean: false, entry: library },
+    // The pi extension, which the publish manifest's `"pi"` key names.
+    { ...stamped, clean: false, entry: { pi: "src/pi.ts" } },
+  ] satisfies UserConfig[];
+};
+
+/** `tsdown` run here by hand builds what no release stamped. */
+export default defineConfig(npm(UNSTAMPED));

@@ -3,7 +3,8 @@
  * plan `scripts/lib/release.ts` makes:
  *
  * - `tsdown`: the CLI's `bun run build` in `apps/cli`, with both targets
- *   (`dist/`, and `dist/bin/<target>/` per target);
+ *   (`dist/`, and `dist/bin/<target>/` per target), stamped with the
+ *   release's version (what `--version` prints);
  * - `manifest`: the npm package, staged in `apps/cli/release/npm/`: the
  *   build's `dist/*.js` and `*.d.ts`, the generated `package.json`, its
  *   README and the repo's licence;
@@ -615,7 +616,15 @@ export const runStep = (step: ReleaseStep, layout: Layout, release: Release) =>
       run(
         "tsdown",
         "bun",
-        ["run", "build", "--", "--targets", targets.join(",")],
+        [
+          "run",
+          "build",
+          "--",
+          "--targets",
+          targets.join(","),
+          "--version",
+          release.version,
+        ],
         layout.cli
       )
     ),

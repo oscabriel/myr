@@ -42,6 +42,7 @@ import { Output } from "./output.ts";
 import { refusalsIn, views } from "./render.ts";
 import { repoContext } from "./repo-context.ts";
 import { today } from "./tui/command.ts";
+import { cliVersion } from "./version.ts";
 
 /** The folder the CLI stands in: the process's own, unless a test says otherwise. */
 export const WorkingDirectory = Context.Reference<string>(
@@ -315,7 +316,7 @@ const server = (made: Skill) =>
           McpProtocol.v2025_03_26,
           McpProtocol.v2024_11_05,
         ],
-        version: "0.0.0",
+        version: cliVersion,
       })
     )
   );

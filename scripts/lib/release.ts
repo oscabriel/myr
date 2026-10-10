@@ -390,8 +390,10 @@ const served = (version: string) =>
   );
 
 /**
- * What the CLI reports itself as until a build stamps it (`main.ts`
- * says `0.0.0`), and so what a build that neither uploads nor publishes is.
+ * What a build that neither uploads nor publishes is stamped with. The
+ * build stamps the release's version into the CLI (`apps/cli/build.ts`'s
+ * `--version`, which the `tsdown` step passes), and a run no build stamped
+ * reports this too (`apps/cli/src/version.ts`).
  */
 const UNRELEASED = "0.0.0";
 

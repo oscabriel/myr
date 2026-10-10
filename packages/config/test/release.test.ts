@@ -11,11 +11,14 @@ import {
   Crypto,
   Effect,
   FileSystem,
+  Layer,
   Option,
   Order,
   Path,
+  Ref,
   Result,
   Schema,
+  Sink,
   Stream,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
@@ -42,6 +45,7 @@ import {
   VersionNeeded,
   VersionReleased,
 } from "../../../scripts/lib/release.ts";
+import { layoutOf, runStep } from "../../../scripts/lib/release/steps.ts";
 import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
@@ -427,6 +431,69 @@ const second = {
   [`${Brand.slug}-darwin-arm64`]: { bytes: 62_800_000, sha256: digest("d") },
   [`${Brand.slug}-linux-x64`]: { bytes: 81_900_000, sha256: digest("e") },
 };
+
+/**
+ * A spawner that runs nothing and exits 0: each command it was asked for,
+ * as `<folder>$ <command> <args>`, its folder relative to the repo root.
+ */
+const recordingSpawner = Effect.gen(function* () {
+  const path = yield* Path.Path;
+  const root = yield* repoRoot;
+  const lines = yield* Ref.make<readonly string[]>([]);
+
+  const spawner = ChildProcessSpawner.make((command) =>
+    Effect.gen(function* () {
+      if (!ChildProcess.isStandardCommand(command)) {
+        return yield* Effect.die("the release pipes no commands");
+      }
+
+      yield* Ref.update(lines, (all) => [
+        ...all,
+        `${path.relative(root, command.options.cwd ?? root)}$ ${[command.command, ...command.args].join(" ")}`,
+      ]);
+
+      return ChildProcessSpawner.makeHandle({
+        all: Stream.empty,
+        exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+        getInputFd: () => Sink.drain,
+        getOutputFd: () => Stream.empty,
+        isRunning: Effect.succeed(false),
+        kill: () => Effect.void,
+        pid: ChildProcessSpawner.ProcessId(1),
+        stderr: Stream.empty,
+        stdin: Sink.drain,
+        stdout: Stream.empty,
+        unref: Effect.succeed(Effect.void),
+      });
+    })
+  );
+
+  return {
+    layer: Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner),
+    spawned: Ref.get(lines),
+  };
+});
+
+describe("a release's build step", () => {
+  it.effect(
+    "builds the CLI stamped with the release's version, for both targets",
+    () =>
+      Effect.gen(function* () {
+        const { layer, spawned } = yield* recordingSpawner;
+        const layout = yield* layoutOf(yield* repoRoot);
+
+        yield* runStep("tsdown", layout, {
+          origin: "https://platform.example",
+          stage: Option.none(),
+          version: "0.2.0-demo.1",
+        }).pipe(Effect.provide(layer));
+
+        expect(yield* spawned).toStrictEqual([
+          "apps/cli$ bun run build -- --targets bun-linux-x64,bun-darwin-arm64 --version 0.2.0-demo.1",
+        ]);
+      }).pipe(Effect.provide(NodeServices.layer))
+  );
+});
 
 describe("the release manifest", () => {
   it.effect(
