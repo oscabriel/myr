@@ -15,6 +15,7 @@ import type { FileView, TreeListing } from "@repo/protocol/domain/code";
 import type { Glob } from "@repo/protocol/domain/common";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import type { LandingView } from "@repo/protocol/domain/landing";
+import { StageName } from "@repo/protocol/domain/outcome";
 import type { ImportSource } from "@repo/protocol/domain/policy";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { Ledger } from "@repo/protocol/domain/visibility";
@@ -39,21 +40,17 @@ import type { AskProgress } from "../shared/ask-progress.ts";
 import { LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
-import {
-  FactBlock,
-  GateFacts,
-  HeldBackFacts,
-  PostureFacts,
-} from "../shared/facts.tsx";
+import { FactBlock, GateFacts, HeldBackFacts } from "../shared/facts.tsx";
+import { AppLink } from "../shared/link.tsx";
+import { ledgerPath } from "../shared/paths.ts";
 import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
 import { PostureBadge } from "../shared/posture.tsx";
-import { MetaCode, useRowSelection } from "../shared/row.tsx";
+import { MetaCode, MetaLine, useRowSelection } from "../shared/row.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
-import { FactsSkeleton } from "../shared/skeleton.tsx";
 import { When } from "../shared/time.tsx";
 import { AskList, askListIds, openAsks, openToTake } from "./asks.tsx";
 import { LandingList, recentShown } from "./landings.tsx";
-import { postureLabel } from "./posture-label.ts";
+import { postureLabel, postureWord } from "./posture-label.ts";
 import { ProjectNav } from "./project-nav.tsx";
 import { ReadmeSection } from "./readme-section.tsx";
 
@@ -72,6 +69,8 @@ export interface Deciders {
 /** One area a layer holds checks in, and how many. */
 export interface HeldBackArea {
   readonly area: AreaName;
+  /** How many sealed checks it holds. */
+  readonly checks: number;
   readonly detail: string;
 }
 
@@ -105,6 +104,7 @@ export const heldBackOf = (ledger: Ledger): readonly HeldBackArea[] => {
     .toSorted(([a], [b]) => a.localeCompare(b))
     .map(([area, count]) => ({
       area,
+      checks: count,
       detail: `${count} sealed ${count === 1 ? "check" : "checks"}`,
     }));
 };
@@ -310,7 +310,7 @@ const RecentLandings = ({
   return <FactBlock label="Recent landings">{shown}</FactBlock>;
 };
 
-/** How a change lands here: the facts with nothing selected. */
+/** How a change lands here: the facts with nothing selected; the posture is the head's to say. */
 const HowItLands = ({
   deciders,
   heldBack,
@@ -320,7 +320,6 @@ const HowItLands = ({
   listing,
   now,
   platformUrl,
-  posture,
 }: Pick<
   ProjectViewProps,
   | "deciders"
@@ -331,19 +330,9 @@ const HowItLands = ({
   | "now"
   | "platformUrl"
 > & {
-  readonly posture: KnownPosture | undefined;
   readonly landedAt: DateTime.Utc | undefined;
 }) => (
   <>
-    {posture === undefined ? (
-      <FactsSkeleton labels={["Posture"]} />
-    ) : (
-      <PostureFacts
-        label={posture.label}
-        posture={posture.posture}
-        project={listing.project}
-      />
-    )}
     <GateFacts />
     <WhoDecides deciders={deciders} project={listing.project} />
     {heldBack === undefined ? null : <HeldBackFacts areas={heldBack} />}
@@ -360,49 +349,96 @@ const HowItLands = ({
   </>
 );
 
-/** The project line: its posture, its open asks, when it last landed; then its README's first sentence. */
+/** A count and its noun, with its plural: "1 path", "3 paths". */
+const counted = (count: number, noun: string) =>
+  `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+/**
+ * How a change lands here, in one sentence built only from typed facts:
+ * the gate, the paths deciders are set for, what is held back (the ledger
+ * linked from it), and when it last landed. The one place the project's
+ * own pages state it; the inspector carries the same as facts.
+ */
+const RuleSentence = ({
+  deciders,
+  heldBack,
+  landedAt,
+  now,
+  project,
+}: {
+  readonly deciders: readonly Deciders[] | undefined;
+  readonly heldBack: readonly HeldBackArea[] | undefined;
+  readonly landedAt: DateTime.Utc | undefined;
+  readonly now: DateTime.Utc;
+  readonly project: ProjectName;
+}) => {
+  const checks = (heldBack ?? []).reduce((sum, area) => sum + area.checks, 0);
+
+  const sealed =
+    heldBack === undefined ? undefined : (
+      <AppLink className={LINK} key="ledger" to={ledgerPath(project)}>
+        {heldBack.length === 0
+          ? "nothing held back"
+          : `${counted(checks, "sealed check")} in ${counted(heldBack.length, "area")}`}
+      </AppLink>
+    );
+
+  const parts = [
+    `Gate: ${counted(StageName.literals.length, "stage")}`,
+    deciders === undefined || deciders.length === 0
+      ? undefined
+      : `deciders set for ${counted(deciders.length, "path")}`,
+    sealed,
+    landedAt === undefined ? (
+      "nothing landed yet"
+    ) : (
+      <span key="landed">
+        last landed <When at={landedAt} now={now} />
+      </span>
+    ),
+  ];
+
+  return (
+    <p className="text-ui text-muted-foreground max-w-[70ch]" data-rule="">
+      <MetaLine parts={parts} />
+    </p>
+  );
+};
+
+/** The project line: its posture and its open asks; its README's first sentence; then its one rule sentence. */
 const ProjectLine = ({
   count,
-  landedAt,
   lede,
-  now,
   posture,
+  rule,
 }: {
   readonly count: number;
   readonly posture: KnownPosture | undefined;
-  readonly landedAt: DateTime.Utc | undefined;
   readonly lede: string | undefined;
-  readonly now: DateTime.Utc;
+  readonly rule: ReactNode;
 }) => (
   <div className="flex flex-col gap-3">
     <p className="text-ui text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-      {/* Each part keeps its dot after it, so a line never opens on one; on
-          a phone the posture has a line of its own. */}
+      {/* The posture in the short form the rail says, the platform's own
+          label its title; its dot after it, so a line never opens on one. */}
       {posture === undefined ? null : (
-        <span className="max-tablet:basis-full flex items-center gap-x-2">
-          <PostureBadge label={posture.label} posture={posture.posture} />
-          <span aria-hidden="true" className="max-tablet:hidden">
-            ·
-          </span>
+        <span className="flex items-center gap-x-2">
+          <PostureBadge
+            label={postureWord(posture.posture)}
+            posture={posture.posture}
+            title={posture.label}
+          />
+          <span aria-hidden="true">·</span>
         </span>
       )}
-      <span className="inline-flex gap-x-2 tabular-nums">
+      <span className="tabular-nums">
         {plural(count, "open ask", "open asks")}
-        <span aria-hidden="true">·</span>
-      </span>
-      <span>
-        {landedAt === undefined ? (
-          "nothing landed yet"
-        ) : (
-          <>
-            last landed <When at={landedAt} now={now} />
-          </>
-        )}
       </span>
     </p>
     {lede === undefined ? null : (
       <p className="text-want max-w-[70ch]">{lede}</p>
     )}
+    {rule}
   </div>
 );
 
@@ -499,7 +535,6 @@ const PageFacts = ({
         listing={listing}
         now={props.now}
         platformUrl={platformUrl}
-        posture={posture}
       />
     );
   }
@@ -585,17 +620,28 @@ const ProjectPanes = ({
         onNone: () => ({}),
         onSome: (factsKey) => ({ factsKey }),
       })}
-      factsSummary={posture?.label ?? "Posture, gate, who decides, take part"}
+      factsSummary={
+        posture === undefined
+          ? "Gate, who decides, take part"
+          : postureWord(posture.posture)
+      }
       status={
         <ProjectLine
           count={Option.match(open, {
             onNone: () => listing.openAsks,
             onSome: (each) => each.length,
           })}
-          landedAt={landedAt}
           lede={Predicate.isString(text) ? ledeOf(text) : undefined}
-          now={props.now}
           posture={posture}
+          rule={
+            <RuleSentence
+              deciders={props.deciders}
+              heldBack={props.heldBack}
+              landedAt={landedAt}
+              now={props.now}
+              project={project}
+            />
+          }
         />
       }
       title={project}

@@ -17,3 +17,18 @@ const labels = {
 } as const satisfies Record<Posture, string>;
 
 export const postureLabel = (posture: Posture): string => labels[posture];
+
+/**
+ * A posture in its short form: the one the rail and a project's head both
+ * say, so a project reads the same in both places (the platform's full
+ * label is its title).
+ */
+const words = {
+  open: "Open",
+  openCore: "Open core",
+  openOnSchedule: "Open on schedule",
+  openWithSealedEvidence: "Sealed evidence",
+  sourceAvailable: "Source available",
+} as const satisfies Record<Posture, string>;
+
+export const postureWord = (posture: Posture): string => words[posture];

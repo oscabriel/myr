@@ -4,7 +4,6 @@
  * the bottom bar, the section row and the context bar all read them here,
  * so one address names one place everywhere.
  */
-import type { Posture } from "@repo/protocol/posture";
 import { Result } from "effect";
 
 /** Which of a project's pages is being read. */
@@ -223,12 +222,3 @@ export const crumbsFor = (pathname: string): readonly Crumb[] => {
       ]
     : projectCrumbs(first, tab, false);
 };
-
-/** A posture in one short word for the rail, beside its mark; the full label is its title. */
-export const POSTURE_WORD = {
-  open: "Open",
-  openCore: "Core",
-  openOnSchedule: "Scheduled",
-  openWithSealedEvidence: "Sealed",
-  sourceAvailable: "Source",
-} as const satisfies Record<Posture, string>;
