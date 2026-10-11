@@ -127,6 +127,11 @@ describe("the host's Markdown", () => {
       );
     });
 
+    it("spells a project as its full name, never <project>", () => {
+      expect(text).not.toContain("<project>");
+      expect(text).toContain("--project <owner>/<name>");
+    });
+
     it("names no page only a web app serves", () => {
       expect(text).not.toContain("llms.txt");
       expect(text).not.toContain("mcp.json");

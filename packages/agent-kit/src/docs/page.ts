@@ -43,7 +43,7 @@ export const written = (
   ]),
 });
 
-/** A command as typed, in a code span: `<cli> claim <ask> --project <project>`. */
+/** A command as typed, in a code span: `<cli> claim <ask> --project <owner>/<name>`. */
 export const cli = (words: string) => code(`${Brand.cli} ${words}`);
 
 /** A block of shell commands. */

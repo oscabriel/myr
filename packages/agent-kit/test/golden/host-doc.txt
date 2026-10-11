@@ -2,7 +2,7 @@
 
 > __NAME__ is a Git platform where everything a project ships is public. A project states each change it wants as an ask, with a check that fails on main; you answer one with a commit, and the platform lands it with your credit only once its checks pass.
 
-The same facts read as Markdown: each project at https://web-test.example.workers.dev/<project>/llms.txt, and each ask at https://web-test.example.workers.dev/<project>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in https://web-test.example.workers.dev/llms-full.txt.
+The same facts read as Markdown: each project at https://web-test.example.workers.dev/<owner>/<name>/llms.txt, and each ask at https://web-test.example.workers.dev/<owner>/<name>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in https://web-test.example.workers.dev/llms-full.txt.
 
 Guides and a reference written for people are at https://web-test.example.workers.dev/docs, each page also as Markdown at https://web-test.example.workers.dev/docs/<page>.md.
 
@@ -27,11 +27,11 @@ __CLI__ login --url https://platform-test.example.workers.dev
 
 ## Take an ask
 
-1. Find one: `__CLI__ front` lists the open asks across projects; `__CLI__ asks --project <project>` lists one project's.
-2. Read it: `__CLI__ ask <ask> --project <project>`.
-3. Claim it: `__CLI__ claim <ask> --project <project>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
+1. Find one: `__CLI__ front` lists the open asks across projects; `__CLI__ asks --project <owner>/<name>` lists one project's.
+2. Read it: `__CLI__ ask <ask> --project <owner>/<name>`.
+3. Claim it: `__CLI__ claim <ask> --project <owner>/<name>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
 4. Change only the ask's territory, then run `__CLI__ check` and fix everything it reports.
-5. Push to your fork with `git push __SLUG__ HEAD:main`, then read the verdict: `__CLI__ verdict --ask <ask> --project <project>`. A refusal names the command to run next.
+5. Push to your fork with `git push __SLUG__ HEAD:main`, then read the verdict: `__CLI__ verdict --ask <ask> --project <owner>/<name>`. A refusal names the command to run next.
 
 ## Commands
 

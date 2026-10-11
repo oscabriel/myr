@@ -87,7 +87,7 @@ const platformBody = (input: PlatformInput) =>
     "",
     ...loopSteps(),
     "",
-    `A project's own \`<project>-contribute\` skill and the block in its AGENTS.md give its territories, its run block and its ask kinds.`,
+    `A project's own \`<key>-contribute\` skill (its key is its name with each \`/\` as \`__\`: \`oscabriel__foo-contribute\`) and the block in its AGENTS.md give its territories, its run block and its ask kinds.`,
     "",
     "## Output",
     "",

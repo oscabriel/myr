@@ -160,7 +160,7 @@ describe("the Agents page's source", () => {
     const { text } = snippet("Text for any agent", "");
 
     expect(text).toContain(`${webUrl}/llms.txt`);
-    expect(text).toContain(`${webUrl}/<project>/asks/<ask>.md`);
+    expect(text).toContain(`${webUrl}/<owner>/<name>/asks/<ask>.md`);
   });
 
   it("adds the skills from the web's index", () => {
@@ -217,8 +217,8 @@ describe("the Agents page's reference sections", () => {
     expect(endpoints.map(({ url }) => url)).toStrictEqual([
       `${webUrl}/llms.txt`,
       `${webUrl}/llms-full.txt`,
-      `${webUrl}/<project>/llms.txt`,
-      `${webUrl}/<project>/asks/<ask>.md`,
+      `${webUrl}/<owner>/<name>/llms.txt`,
+      `${webUrl}/<owner>/<name>/asks/<ask>.md`,
       `${webUrl}/agents.md`,
       `${webUrl}/.well-known/mcp.json`,
       `${webUrl}/.well-known/agent-skills/index.json`,
