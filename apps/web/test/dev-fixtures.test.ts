@@ -6,6 +6,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
+import type { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
@@ -737,7 +738,7 @@ const timesIn = (options: DevWorldOptions) =>
   inWorld(options, (as) =>
     Effect.gen(function* () {
       const ines = yield* as(signedIn("ines-v"));
-      const { decisions } = yield* ines.today({});
+      const { decisions, overflow } = yield* ines.today({});
 
       const proposedAt = (handle: string, want: string) =>
         Effect.flatMap(as(signedIn(handle)), (client) =>
@@ -753,15 +754,24 @@ const timesIn = (options: DevWorldOptions) =>
 
       const second = yield* proposedAt("sefa", "datekit reads RFC 2822 dates.");
 
-      return { decisions, first, second };
+      return { decisions, first, overflow, second };
     })
   );
+
+/** A decision, keyed as the platform counts it: its id within its project. */
+const keyOf = ({ id, project }: Decision) => `${project}/${id}`;
 
 /**
  * A fixed world stands at the calendar's `end` once seeded; a world at
  * the present has every instant moved by one whole number of minutes, so
  * `end` is the minute it was built in, and its clock runs on from there,
  * with every decision still to come.
+ *
+ * Today lists as many decisions as the day's budget allows, and the budget
+ * counts a UTC day: which of the story's taken decisions fall on the
+ * present day moves with the time of day the world is built at. So the
+ * two worlds are held to the same open count, listed and overflowing
+ * together, and the decisions both list are held to the one shift.
  */
 const placedAtThePresent = (fixtures: FixtureMode, end: DateTime.Utc) =>
   Effect.gen(function* () {
@@ -773,27 +783,39 @@ const placedAtThePresent = (fixtures: FixtureMode, end: DateTime.Utc) =>
     const present = yield* timesIn({ fixtures, time: "present" });
     const after = yield* DateTime.now;
 
+    const fixedByKey = new Map(
+      fixed.decisions.map((decision) => [keyOf(decision), decision])
+    );
+
+    const shared = present.decisions.filter((decision) =>
+      fixedByKey.has(keyOf(decision))
+    );
+
+    const [first] = shared;
+
+    expect(first).toBeDefined();
+
     const shift = millisFrom(
-      fixed.decisions[0]?.openedAt ?? end,
-      present.decisions[0]?.openedAt ?? end
+      (first === undefined ? undefined : fixedByKey.get(keyOf(first)))
+        ?.openedAt ?? end,
+      first?.openedAt ?? end
     );
 
     const unshifted = (at: DateTime.Utc) =>
       DateTime.subtractDuration(at, Duration.millis(shift));
 
-    expect(present.decisions.length).toBeGreaterThan(0);
     expect(
-      present.decisions.map(({ expiresAt, id, openedAt }) => [
-        id,
-        unshifted(openedAt),
-        unshifted(expiresAt),
+      shared.map((decision) => [
+        keyOf(decision),
+        unshifted(decision.openedAt),
+        unshifted(decision.expiresAt),
       ])
     ).toStrictEqual(
-      fixed.decisions.map(({ expiresAt, id, openedAt }) => [
-        id,
-        openedAt,
-        expiresAt,
-      ])
+      shared.map((decision) => {
+        const was = fixedByKey.get(keyOf(decision));
+
+        return [keyOf(decision), was?.openedAt, was?.expiresAt];
+      })
     );
     expect(shift % Duration.toMillis(Duration.minutes(1))).toBe(0);
 
@@ -808,7 +830,9 @@ const placedAtThePresent = (fixtures: FixtureMode, end: DateTime.Utc) =>
       present.decisions.every(
         ({ expiresAt }) => millisFrom(present.second, expiresAt) > 0
       ),
-    ]).toStrictEqual([true, true, true, true, true, true]);
+      present.decisions.length + present.overflow ===
+        fixed.decisions.length + fixed.overflow,
+    ]).toStrictEqual([true, true, true, true, true, true, true]);
   });
 
 describe("the dev world's time", seededWorlds, () => {
