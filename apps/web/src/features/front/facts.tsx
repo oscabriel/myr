@@ -17,7 +17,6 @@ import type { AskId, ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
 import { ArrowRight } from "lucide-react";
 
-import { postureLabel } from "../project/posture-label.ts";
 import type { AskProgress } from "../shared/ask-progress.ts";
 import { CommandLine } from "../shared/command.tsx";
 import {
@@ -28,7 +27,6 @@ import {
 } from "../shared/facts.tsx";
 import { AppLink } from "../shared/link.tsx";
 import { askPath, projectPath } from "../shared/paths.ts";
-import { PostureBadge } from "../shared/posture.tsx";
 import { MetaCode } from "../shared/row.tsx";
 import { FactsSkeleton } from "../shared/skeleton.tsx";
 import { StatusLine } from "../shared/status-line.tsx";
@@ -93,7 +91,10 @@ export const StartHere = ({ webUrl }: { readonly webUrl: string }) => (
 export const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/** Every project the platform lists, its posture and its open asks; bars until the list arrives. */
+/**
+ * Every project the platform lists, by its open asks; bars until the list
+ * arrives. Each project's posture is its group header's to say, once.
+ */
 export const ProjectsFacts = ({
   projects,
 }: {
@@ -106,25 +107,19 @@ export const ProjectsFacts = ({
       <ul className="flex flex-col">
         {projects.map((listing) => (
           <li
-            className="flex min-h-11 min-w-0 flex-col justify-center gap-0.5 py-1"
+            className="flex min-h-8 min-w-0 items-baseline justify-between gap-3 py-1"
             data-project={listing.project}
             key={listing.project}
           >
-            <span className="flex min-w-0 items-baseline justify-between gap-3">
-              <AppLink
-                className="text-ui decoration-rule truncate font-semibold no-underline hover:underline"
-                to={projectPath(listing.project)}
-              >
-                {listing.project}
-              </AppLink>
-              <span className="text-label text-muted-foreground shrink-0 tabular-nums">
-                {plural(listing.openAsks, "open ask", "open asks")}
-              </span>
+            <AppLink
+              className="text-ui decoration-rule truncate font-semibold no-underline hover:underline"
+              to={projectPath(listing.project)}
+            >
+              {listing.project}
+            </AppLink>
+            <span className="text-label text-muted-foreground shrink-0 tabular-nums">
+              {plural(listing.openAsks, "open ask", "open asks")}
             </span>
-            <PostureBadge
-              label={postureLabel(listing.posture)}
-              posture={listing.posture}
-            />
           </li>
         ))}
       </ul>

@@ -396,6 +396,21 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
+    "lists the projects in the inspector by their counts, leaving the posture to the group headers",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front({});
+        const inspector = markup.slice(markup.indexOf('data-facts="inspector"'));
+        const block =
+          /<section aria-label="Projects"[\s\S]*?<\/section>/u.exec(inspector)?.[0] ??
+          "";
+
+        expect(textIn(block)).toContain("open ask");
+        expect(block).not.toContain("data-posture=");
+      })
+  );
+
+  it.effect(
     "draws its rows when the list of projects has not arrived, with no posture yet",
     () =>
       Effect.gen(function* () {
@@ -490,7 +505,7 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "with nothing selected, says where to start and lists every project with its posture",
+    "with nothing selected, says where to start and lists every project with its open asks",
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
@@ -505,12 +520,8 @@ describe(FrontPageView, () => {
           ].filter((words) => !text.includes(words))
         ).toStrictEqual([]);
         expect(facts).toContain('href="/llms.txt"');
-        expect(facts).toMatch(
-          /href="\/burrow"[\s\S]*?1 open ask\b[\s\S]*?Open with sealed evidence/u
-        );
-        expect(facts).toMatch(
-          /href="\/datekit"[\s\S]*?2 open asks[\s\S]*?>Open</u
-        );
+        expect(facts).toMatch(/href="\/burrow"[\s\S]*?1 open ask\b/u);
+        expect(facts).toMatch(/href="\/datekit"[\s\S]*?2 open asks/u);
       })
   );
 

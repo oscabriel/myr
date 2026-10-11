@@ -659,13 +659,19 @@ export const ProvenanceFacts = ({
           strokeWidth={1.75}
         />
       </button>
-      <dl className={`${open ? "flex" : "shell:flex hidden"} flex-col`}>
+      <dl
+        className={`${open ? "flex" : "shell:flex hidden"} flex-col gap-1.5`}
+      >
         {entries.map(({ label, shown, value }) => (
-          <div className="flex min-h-8 min-w-0 items-center gap-3" key={label}>
-            <dt className="text-label text-muted-foreground w-24 shrink-0">
-              {label}
-            </dt>
-            <dd className="text-ui flex min-w-0 flex-1 items-center gap-3">
+          // A label over its value, as every block is: never a key and
+          // value grid.
+          <div
+            className="flex min-w-0 flex-col"
+            data-provenance={label}
+            key={label}
+          >
+            <dt className="text-label text-muted-foreground">{label}</dt>
+            <dd className="text-ui flex min-h-8 min-w-0 items-center gap-3">
               <span className="min-w-0 flex-1 truncate">
                 {shown ?? <CodeValue value={value} />}
               </span>
