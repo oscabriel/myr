@@ -1,26 +1,22 @@
-import { useAtom, useAtomMount, useAtomValue } from "@effect/atom-react";
+import { useAtomMount, useAtomValue } from "@effect/atom-react";
 import type { Ask } from "@repo/protocol/domain/ask";
-import { AskId, ownerOf } from "@repo/protocol/ids";
+import { AskId } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
 import {
   createFileRoute,
   getRouteApi,
   useHydrated,
-  useLocation,
-  useNavigate,
-  useRouter,
 } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { env } from "cloudflare:workers";
 import { Effect, Option, Predicate, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { selectedAskAtom } from "../../../client/ask.ts";
 import { projectCodeAtom } from "../../../client/code.ts";
 import { projectEventsAtom, recentLandings } from "../../../client/events.ts";
-import { importAtom, importMade } from "../../../client/import.ts";
 import {
   asksAtom,
   projectLedgerAtom,
@@ -29,8 +25,7 @@ import {
 import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
 import type { Seed } from "../../../client/seeded.ts";
 import { watchAtom } from "../../../client/watch.ts";
-import { hereOf, useSignedIn } from "../../../features/auth/session-slot.tsx";
-import { whoAtom } from "../../../features/auth/who.ts";
+import { useSignedIn } from "../../../features/auth/session-slot.tsx";
 import { ledeOf } from "../../../features/front/head.ts";
 import {
   markdownAlternateLink,
@@ -38,12 +33,16 @@ import {
 } from "../../../features/front/markdown.ts";
 import { useStamps } from "../../../features/front/stamps.ts";
 import {
+  ImportOffer,
+  offerFor,
+} from "../../../features/import/import-offer.tsx";
+import { useImporter } from "../../../features/import/use-importer.tsx";
+import {
   ProjectView,
   heldBackOf,
   homeListing,
 } from "../../../features/project/project-page.tsx";
 import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
-import { ProposalFailure } from "../../../features/proposal/failure.tsx";
 import { askStates } from "../../../features/shared/ask-progress.ts";
 import { pageHead } from "../../../features/shared/head.ts";
 import { reloadOnEnter } from "../../../features/shared/shell/selection.ts";
@@ -295,59 +294,24 @@ const ProjectPage = () => {
   );
 };
 
+/** The import offer for `project`, wired. */
+const Offer = ({ project }: { readonly project: ProjectName }) => {
+  const importer = useImporter(project);
+
+  return <ImportOffer importer={importer} project={project} />;
+};
+
 /**
- * No project at this address. At a source namespace's (`/github.com/
- * pallets/click`) the page offers the import: who is signed in is read in
- * the browser, the import is sent only when Import is pressed, and an
- * import made goes to the project; a refusal shows under the form.
+ * No project at this address: at a source namespace's
+ * (`/github.com/pallets/click`) the import offer, else the not-found.
  */
 const Unknown = () => {
   const { project } = Route.useParams();
-  const navigate = useNavigate();
-  const router = useRouter();
-  const here = useLocation({ select: hereOf });
-  const who = useAtomValue(whoAtom);
-  const [imported, send] = useAtom(importAtom);
-  // Set once this form sends: a project the atom still holds from an
-  // earlier visit never moves the page.
-  const [sent, setSent] = useState(false);
-  const made = sent ? Option.getOrUndefined(importMade(imported)) : undefined;
 
-  useEffect(() => {
-    if (made === project) {
-      // The loader read this address as no project: it reads it again.
-      void router.invalidate();
-    } else if (made !== undefined) {
-      void navigate({
-        params: { owner: ownerOf(made), project: made },
-        to: "/$owner/$project",
-      });
-    }
-  }, [made, navigate, project, router]);
-
-  return (
-    <UnknownProjectView
-      importer={{
-        busy: imported.waiting,
-        checking: !AsyncResult.isSuccess(who),
-        children: AsyncResult.isFailure(imported) ? (
-          <div aria-live="polite">
-            <ProposalFailure
-              cause={imported.cause}
-              doing="import it"
-              here={here}
-            />
-          </div>
-        ) : null,
-        handle: AsyncResult.isSuccess(who) ? who.value : Option.none(),
-        onImport: (payload) => {
-          setSent(true);
-          send(payload);
-        },
-      }}
-      name={project}
-    />
-  );
+  return Option.match(offerFor(project), {
+    onNone: () => <UnknownProjectView name={project} />,
+    onSome: (offered) => <Offer project={offered} />,
+  });
 };
 
 export const Route = createFileRoute("/$owner/$project/")({

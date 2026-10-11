@@ -9,11 +9,11 @@ import type { InitProject } from "@repo/protocol/contracts";
 import { ImportSource } from "@repo/protocol/domain/policy";
 import {
   Owner,
-  ProjectName,
+  projectNameOf,
   ShortName,
   sourceNamespaceOf,
 } from "@repo/protocol/ids";
-import type { Handle, SourceNamespace } from "@repo/protocol/ids";
+import type { Handle, ProjectName, SourceNamespace } from "@repo/protocol/ids";
 import { Array, Option, Schema } from "effect";
 
 /** What `initProject` takes, from its one schema. */
@@ -32,8 +32,6 @@ const decodeShortName = Schema.decodeUnknownOption(ShortName);
 
 const decodeOwner = Schema.decodeUnknownOption(Owner);
 
-const decodeProject = Schema.decodeUnknownOption(ProjectName);
-
 const decodeSource = Schema.decodeUnknownOption(ImportSource);
 
 /** The name a URL ends in, without `.git` and lowercased; none when it is no name. */
@@ -50,6 +48,11 @@ export const prefillFrom = (url: string): Prefill => ({
   owner: sourceNamespaceOf(url.trim()),
 });
 
+/** A source namespace as an owner: every one is (a host is never a reserved word). */
+export const ownerOfNamespace = (
+  namespace: SourceNamespace
+): Option.Option<Owner> => decodeOwner(namespace);
+
 /** A handle as an owner, lowercased; none for one no owner can spell. */
 export const ownerOfHandle = (handle: Handle): Option.Option<Owner> =>
   decodeOwner(handle.toLowerCase());
@@ -64,9 +67,7 @@ export const ownerChoices = (
   url: string
 ): readonly Owner[] =>
   Array.dedupe([
-    ...Option.toArray(
-      Option.flatMap(prefillFrom(url).owner, (owner) => decodeOwner(owner))
-    ),
+    ...Option.toArray(Option.flatMap(prefillFrom(url).owner, ownerOfNamespace)),
     ...Option.toArray(Option.flatMap(handle, ownerOfHandle)),
   ]);
 
@@ -77,28 +78,34 @@ export const ownerChoices = (
 export const sourceUrlOf = (project: ProjectName) => `https://${project}`;
 
 /**
- * The form's fields as `initProject`'s payload: the URL and the branch
- * trimmed, the branch only when named. None when the contract would refuse
+ * The source the form names, as `initProject` takes it: the URL and the
+ * branch trimmed, the branch only when named. None for a URL the contract
+ * would refuse (no public HTTPS URL).
+ */
+export const importSourceOf = (form: {
+  readonly url: string;
+  readonly branch: string;
+}): Option.Option<ImportSource> => {
+  const branch = form.branch.trim();
+  const url = form.url.trim();
+
+  return decodeSource(branch === "" ? { url } : { branch, url });
+};
+
+/**
+ * The form's fields as `initProject`'s payload: its source, and the
+ * project the owner and the name make. None when the contract would refuse
  * the name or the URL before the platform ever read it.
  */
 export const importPayload = (form: {
   readonly url: string;
   readonly branch: string;
-  readonly owner: string;
+  readonly owner: Owner;
   readonly name: string;
-}): Option.Option<ImportPayload> => {
-  const branch = form.branch.trim();
-  const url = form.url.trim();
-
-  return Option.flatMap(
-    decodeSource(branch === "" ? { url } : { branch, url }),
-    (source) =>
-      Option.map(
-        decodeProject(`${form.owner}/${form.name.trim()}`),
-        (project) => ({
-          import: source,
-          project,
-        })
-      )
+}): Option.Option<ImportPayload> =>
+  Option.flatMap(importSourceOf(form), (source) =>
+    Option.map(decodeShortName(form.name.trim()), (short) => ({
+      import: source,
+      project: projectNameOf(form.owner, short),
+    }))
   );
-};

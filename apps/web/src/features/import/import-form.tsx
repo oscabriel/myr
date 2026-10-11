@@ -13,7 +13,12 @@
  * anything.
  */
 import { Brand } from "@repo/brand";
-import type { Handle, ShortName, SourceNamespace } from "@repo/protocol/ids";
+import type {
+  Handle,
+  Owner,
+  ShortName,
+  SourceNamespace,
+} from "@repo/protocol/ids";
 import { Option } from "effect";
 import { LogIn } from "lucide-react";
 import { useId, useState } from "react";
@@ -25,14 +30,20 @@ import { Spinner } from "../../components/ui/spinner.tsx";
 import { signInHref } from "../auth/session-slot.tsx";
 import { CommandLine } from "../shared/command.tsx";
 import { ClientOwnerSelect } from "./client-owner.tsx";
-import { importPayload, ownerChoices, prefillFrom } from "./prefill.ts";
+import {
+  importPayload,
+  importSourceOf,
+  ownerChoices,
+  ownerOfNamespace,
+  prefillFrom,
+} from "./prefill.ts";
 import type { ImportPayload } from "./prefill.ts";
 
 /** What the form starts with: a URL, and the owner and name it gives. */
 export interface ImportPrefill {
   readonly url: string;
-  readonly owner?: SourceNamespace;
-  readonly name?: ShortName;
+  readonly owner?: SourceNamespace | undefined;
+  readonly name?: ShortName | undefined;
 }
 
 /** Who is importing, and what became of the last press. */
@@ -46,7 +57,7 @@ export interface Importer {
   /** Sends the payload; the route goes to the project once it is made. */
   readonly onImport?: ((payload: ImportPayload) => void) | undefined;
   /** What the last import came back with, when it was refused. */
-  readonly children?: ReactNode | undefined;
+  readonly refusal?: ReactNode | undefined;
 }
 
 export interface ImportFormProps extends Importer {
@@ -84,28 +95,27 @@ const IMPORT_WORDS = {
   ready: "Import",
 } as const;
 
-/** Whether `url` is one the contract takes: a public HTTPS URL. */
-const isHttps = (url: string) => /^https:\/\/\S+$/u.test(url.trim());
-
 type FormState = keyof typeof IMPORT_WORDS;
 
 /** Where the form stands: importing, waiting on a field, or ready. */
 const formState = ({
+  branch,
   busy,
   owner,
   payload,
   url,
 }: {
   readonly busy: boolean;
-  readonly owner: string | undefined;
+  readonly owner: Owner | undefined;
   readonly payload: Option.Option<ImportPayload>;
   readonly url: string;
+  readonly branch: string;
 }): FormState => {
   if (busy) {
     return "busy";
   }
 
-  if (!isHttps(url)) {
+  if (Option.isNone(importSourceOf({ branch, url }))) {
     return "noUrl";
   }
 
@@ -192,7 +202,7 @@ const FixedOwner = ({
 );
 
 /** What the hint under Owner says, by what may be chosen. */
-const ownerHint = (fixed: boolean, choices: readonly string[]) => {
+const ownerHint = (fixed: boolean, choices: readonly Owner[]) => {
   if (fixed) {
     return "The address names it: the project keeps its source's account.";
   }
@@ -223,14 +233,14 @@ const NameHint = ({
 
 const Form = ({
   busy = false,
-  children,
   fixedOwner,
   handle,
   onImport,
   prefill,
+  refusal,
 }: Pick<
   ImportFormProps,
-  "busy" | "children" | "fixedOwner" | "handle" | "onImport" | "prefill"
+  "busy" | "fixedOwner" | "handle" | "onImport" | "prefill" | "refusal"
 >) => {
   const id = useId();
   const [url, setUrl] = useState(prefill?.url ?? "");
@@ -239,7 +249,9 @@ const Form = ({
   const [typed, setTyped] = useState<string | undefined>(prefill?.name);
 
   const choices =
-    fixedOwner === undefined ? ownerChoices(handle, url) : [fixedOwner];
+    fixedOwner === undefined
+      ? ownerChoices(handle, url)
+      : Option.toArray(ownerOfNamespace(fixedOwner));
 
   const owner = choices.find((choice) => choice === chosen) ?? choices[0];
 
@@ -251,7 +263,7 @@ const Form = ({
       ? Option.none()
       : importPayload({ branch, name, owner, url });
 
-  const state = formState({ busy, owner, payload, url });
+  const state = formState({ branch, busy, owner, payload, url });
 
   return (
     <form
@@ -282,15 +294,17 @@ const Form = ({
             setUrl(event.target.value);
           }}
           placeholder="https://github.com/pallets/click"
-          readOnly={busy}
+          // At a source namespace's address the URL is the address's own.
+          readOnly={busy || fixedOwner !== undefined}
           required
           spellCheck={false}
           type="url"
           value={url}
         />
         <p className={HINT} id={`${id}-url-hint`}>
-          Any public repo over HTTPS: GitHub, GitLab, Codeberg, Bitbucket or
-          another host.
+          {fixedOwner === undefined
+            ? "Any public repo over HTTPS: GitHub, GitLab, Codeberg, Bitbucket or another host."
+            : "Rebuilt from this page's address."}
         </p>
       </div>
 
@@ -327,7 +341,7 @@ const Form = ({
             describedBy={`${id}-owner-hint`}
             labelledBy={`${id}-owner`}
             onChange={setChosen}
-            value={owner ?? ""}
+            value={owner}
           />
         ) : (
           <FixedOwner hintId={`${id}-owner-hint`} owner={fixedOwner} />
@@ -361,7 +375,7 @@ const Form = ({
         </p>
       </div>
 
-      {children}
+      {refusal}
 
       <div className="flex flex-col gap-2">
         <Button
@@ -392,12 +406,12 @@ const Form = ({
 export const ImportForm = ({
   busy,
   checking = false,
-  children,
   fixedOwner,
   handle,
   here,
   onImport,
   prefill,
+  refusal,
 }: ImportFormProps): ReactNode => {
   if (checking) {
     return (
@@ -414,9 +428,8 @@ export const ImportForm = ({
       handle={handle}
       onImport={onImport}
       prefill={prefill}
-    >
-      {children}
-    </Form>
+      refusal={refusal}
+    />
   ) : (
     <SignInToImport fixedOwner={fixedOwner} here={here} prefill={prefill} />
   );

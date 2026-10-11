@@ -7,19 +7,23 @@
  * the page links to sign-in, coming back to it. A refusal reads as the
  * platform gave it. The page is about its reader, so no cache keeps it.
  */
+import { RegistryContext } from "@effect/atom-react";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { InitProject } from "@repo/protocol/contracts";
-import { Handle, ProjectName } from "@repo/protocol/ids";
+import { Contracts, InitProject } from "@repo/protocol/contracts";
+import { Handle, Owner, ProjectName } from "@repo/protocol/ids";
 import {
   ImportFailed,
   NotYourNamespace,
   ProjectExists,
 } from "@repo/protocol/refusal";
-import { Cause, Option, Schema } from "effect";
-import { AsyncResult } from "effect/reactivity";
+import { asPerson, unanswered } from "@repo/protocol/testing";
+import { Cause, Effect, Exit, Layer, Option, Schema } from "effect";
+import { Atom, AsyncResult, AtomRegistry, Reactivity } from "effect/reactivity";
+import { RpcTest } from "effect/rpc";
 
-import { importMade } from "../src/client/import.ts";
+import { importAtom, importMade } from "../src/client/import.ts";
+import type { Importer } from "../src/features/import/import-form.tsx";
 import { ImportView } from "../src/features/import/import-page.tsx";
 import {
   importPayload,
@@ -27,9 +31,16 @@ import {
   prefillFrom,
   sourceUrlOf,
 } from "../src/features/import/prefill.ts";
+import type { ImportPayload } from "../src/features/import/prefill.ts";
+import {
+  afterImport,
+  useImporter,
+} from "../src/features/import/use-importer.tsx";
 import { ProposalFailure } from "../src/features/proposal/failure.tsx";
 import { importHeaders, importSearch, Route } from "../src/routes/import.tsx";
+import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { markupOf, textIn } from "./markup.ts";
+import { renderAt, routerAt } from "./render.tsx";
 
 const CLICK = "https://github.com/pallets/click";
 
@@ -175,7 +186,7 @@ describe(importPayload, () => {
     const payload = importPayload({
       branch: " stable ",
       name: "click",
-      owner: "github.com/pallets",
+      owner: Owner.make("github.com/pallets"),
       url: ` ${CLICK} `,
     });
 
@@ -193,7 +204,7 @@ describe(importPayload, () => {
       importPayload({
         branch: "",
         name: "click",
-        owner: "oscabriel",
+        owner: Owner.make("oscabriel"),
         url: CLICK,
       })
     ).toStrictEqual(
@@ -206,7 +217,7 @@ describe(importPayload, () => {
       importPayload({
         branch: "",
         name: "Bad Name",
-        owner: "oscabriel",
+        owner: Owner.make("oscabriel"),
         url: CLICK,
       })
     ).toStrictEqual(Option.none());
@@ -214,7 +225,7 @@ describe(importPayload, () => {
       importPayload({
         branch: "",
         name: "click",
-        owner: "oscabriel",
+        owner: Owner.make("oscabriel"),
         url: "http://github.com/pallets/click",
       })
     ).toStrictEqual(Option.none());
@@ -284,16 +295,200 @@ describe("a refused import", () => {
     ],
   ])("reads as the platform's %s, under the form", (tag, refusal) => {
     const markup = markupOf(
-      <ImportView handle={oscabriel} here="/import" url={CLICK}>
-        <ProposalFailure
-          cause={Cause.fail(refusal)}
-          doing="import it"
-          here="/import"
-        />
-      </ImportView>
+      <ImportView
+        handle={oscabriel}
+        here="/import"
+        refusal={
+          <ProposalFailure
+            cause={Cause.fail(refusal)}
+            doing="import it"
+            here="/import"
+          />
+        }
+        url={CLICK}
+      />
     );
 
     expect(markup).toContain(`data-refusal="${tag}"`);
     expect(markup).toContain("<form");
+  });
+});
+
+/**
+ * The page as its route draws it, the hook's importer over `registry`,
+ * handing each render's importer to `seen`, as the press would reach it.
+ * A server's render always reads who is signed in as not yet known (the
+ * page's first paint, `whoAtom`), so this one says, as the browser would
+ * once it knows, that oscabriel is.
+ */
+const Page = ({
+  seen,
+}: {
+  readonly seen?: ((importer: Importer) => void) | undefined;
+}) => {
+  const importer = useImporter();
+
+  seen?.(importer);
+
+  return (
+    <ImportView
+      {...importer}
+      checking={false}
+      handle={oscabriel}
+      here="/import"
+      url={CLICK}
+    />
+  );
+};
+
+const PageOver = ({
+  registry,
+  seen,
+}: {
+  readonly registry: AtomRegistry.AtomRegistry;
+  readonly seen?: (importer: Importer) => void;
+}) => (
+  <RegistryContext.Provider value={registry}>
+    <Page seen={seen} />
+  </RegistryContext.Provider>
+);
+
+/**
+ * A browser signed in as oscabriel, over a platform whose `initProject`
+ * answers with `answer`, every payload it is sent kept in `sent`.
+ */
+const browserWith = (
+  sent: ImportPayload[],
+  answer: (
+    payload: ImportPayload
+  ) => Effect.Effect<
+    typeof InitProject.successSchema.Type,
+    typeof InitProject.errorSchema.Type
+  >
+) =>
+  AtomRegistry.make({
+    initialValues: [
+      Atom.initialValue(
+        ContractsClient.runtime.layer,
+        Layer.effect(
+          ContractsClient,
+          RpcTest.makeClient(webContracts, { flatten: true })
+        ).pipe(
+          Layer.provide([
+            Layer.mergeAll(
+              unanswered,
+              Contracts.toLayerHandler("initProject", (payload) => {
+                sent.push(payload);
+
+                return answer(payload);
+              })
+            ),
+            asPerson(Handle.make("oscabriel")),
+          ]),
+          Layer.provideMerge(Reactivity.layer)
+        )
+      ),
+    ],
+  });
+
+/** The form's fields as the page drew them: what pressing Import sends. */
+const fieldsIn = (markup: string) => {
+  const value = (name: string) =>
+    /value="(?<value>[^"]*)"/u
+      .exec(inputNamed(markup, name))
+      ?.groups?.value?.replaceAll("&amp;", "&") ?? "";
+
+  return {
+    branch: value("branch"),
+    name: value("name"),
+    owner: Owner.make(value("owner")),
+    url: value("url"),
+  };
+};
+
+/** Presses Import on the page drawn over `registry`, and waits for the answer. */
+const pressImport = (registry: AtomRegistry.AtomRegistry) =>
+  Effect.gen(function* () {
+    const importers: Importer[] = [];
+
+    const markup = yield* renderAt(
+      `/import?url=${encodeURIComponent(CLICK)}`,
+      <PageOver
+        registry={registry}
+        seen={(importer) => {
+          importers.push(importer);
+        }}
+      />
+    );
+
+    const payload = yield* Effect.fromOption(importPayload(fieldsIn(markup)));
+
+    // A page in the browser keeps the atom mounted while it waits; a
+    // server's render keeps nothing.
+    registry.mount(importAtom);
+    importers.at(-1)?.onImport?.(payload);
+
+    return yield* Effect.exit(
+      AtomRegistry.getResult(registry, importAtom, { suspendOnWaiting: true })
+    );
+  });
+
+describe("pressing Import", () => {
+  it.live(
+    "sends initProject the project and the import, then goes to the project's address",
+    () =>
+      Effect.gen(function* () {
+        const sent: ImportPayload[] = [];
+
+        const registry = browserWith(sent, ({ project }) =>
+          Effect.succeed(made(project))
+        );
+
+        const answered = yield* pressImport(registry);
+
+        const to = yield* Effect.fromOption(
+          Exit.match(answered, {
+            onFailure: () => Option.none(),
+            onSuccess: ({ project }) => afterImport(project),
+          })
+        );
+
+        const router = routerAt("/import");
+
+        yield* Effect.tryPromise(() => router.load());
+
+        expect(sent).toStrictEqual([
+          { import: { url: CLICK }, project: "github.com/pallets/click" },
+        ]);
+        // Where the hook's `navigate` goes: a router with no window to
+        // move only builds the location, as `navigate` does first.
+        expect(router.buildLocation(to).publicHref).toBe(
+          "/github.com/pallets/click"
+        );
+      })
+  );
+
+  it.live("draws a refusal as the platform gave it, under the form", () =>
+    Effect.gen(function* () {
+      const registry = browserWith([], ({ project }) =>
+        Effect.fail(NotYourNamespace.of(project, Handle.make("oscabriel")))
+      );
+
+      yield* pressImport(registry);
+
+      const markup = yield* renderAt(
+        "/import",
+        <PageOver registry={registry} />
+      );
+
+      expect(markup).toContain('data-refusal="NotYourNamespace"');
+      expect(markup).toContain("<form");
+    })
+  );
+
+  it("stays where it is when the import made the project this address names", () => {
+    const click = ProjectName.make("github.com/pallets/click");
+
+    expect(afterImport(click, click)).toStrictEqual(Option.none());
   });
 });

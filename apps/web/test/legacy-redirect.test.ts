@@ -48,6 +48,35 @@ describe("an old or miscased project address", () => {
     );
   });
 
+  it("is a 301 from a name with a trailing .git to the name, the rest and the query kept", () => {
+    expect(movedTo("/github.com/pallets/click.git")).toStrictEqual(
+      Option.some([301, "/github.com/pallets/click"])
+    );
+    expect(movedTo("/oscabriel/datekit.git")).toStrictEqual(
+      Option.some([301, "/oscabriel/datekit"])
+    );
+    expect(
+      movedTo("/github.com/pallets/click.git/tree/main?x=1")
+    ).toStrictEqual(
+      Option.some([301, "/github.com/pallets/click/tree/main?x=1"])
+    );
+    expect(movedTo("/GitHub.com/Pallets/Click.GIT")).toStrictEqual(
+      Option.some([301, "/github.com/pallets/click"])
+    );
+  });
+
+  it("answers only a read with the .git 301", () => {
+    expect(
+      canonicalAddress(request("/github.com/pallets/click.git", "POST"))
+    ).toStrictEqual(Option.none());
+    expect(
+      Option.map(
+        canonicalAddress(request("/oscabriel/datekit.git", "HEAD")),
+        (response) => response.status
+      )
+    ).toStrictEqual(Option.some(301));
+  });
+
   it("is kept by the edge, as a page that reads as nobody", () => {
     const answered = Option.getOrThrow(
       canonicalAddress(request("/datekit/tree/main?x=1"))

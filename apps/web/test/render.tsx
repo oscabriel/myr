@@ -75,17 +75,28 @@ const routesFor = (view: ReactNode, options: RenderOptions) => {
   ]);
 };
 
+/**
+ * The app's router at `url`, in memory, drawing `view` whatever the
+ * address: what a test navigates as a page would, and reads where it went.
+ */
+export const routerAt = (
+  url: string,
+  view: ReactNode = null,
+  options: RenderOptions = {}
+) =>
+  createRouter({
+    history: createMemoryHistory({ initialEntries: [url] }),
+    rewrite: addressRewrite,
+    routeTree: routesFor(view, options),
+  });
+
 /** `view`'s static markup inside a router whose location is `url`. */
 export const renderAt = (
   url: string,
   view: ReactNode,
   options: RenderOptions = {}
 ): Effect.Effect<string, Cause.UnknownError> => {
-  const router = createRouter({
-    history: createMemoryHistory({ initialEntries: [url] }),
-    rewrite: addressRewrite,
-    routeTree: routesFor(view, options),
-  });
+  const router = routerAt(url, view, options);
 
   return Effect.tryPromise(() => router.load()).pipe(
     Effect.map(() => renderToStaticMarkup(<RouterProvider router={router} />))

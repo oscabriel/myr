@@ -12,19 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select.tsx";
-
-export interface OwnerSelectProps {
-  /** The owners to choose from, the default first. */
-  readonly choices: readonly string[];
-  readonly labelledBy: string;
-  readonly describedBy: string;
-  readonly onChange: (value: string) => void;
-  readonly value: string;
-}
-
-/** The trigger's look, shared with the server's stand-in for it. */
-export const TRIGGER =
-  "tablet:text-ui tablet:h-9 h-11 w-full max-w-sm text-base";
+import { TRIGGER } from "./client-owner.tsx";
+import type { OwnerSelectProps } from "./client-owner.tsx";
 
 export const OwnerSelect = ({
   choices,
@@ -37,8 +26,11 @@ export const OwnerSelect = ({
     items={choices.map((choice) => ({ label: choice, value: choice }))}
     name="owner"
     onValueChange={(chosen) => {
-      if (chosen !== null) {
-        onChange(chosen);
+      // The select hands back one of its items' values: find it, an owner.
+      const owner = choices.find((choice) => choice === chosen);
+
+      if (owner !== undefined) {
+        onChange(owner);
       }
     }}
     value={value}
