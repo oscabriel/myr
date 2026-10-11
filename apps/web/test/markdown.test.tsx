@@ -61,7 +61,7 @@ describe("what a README cannot carry", () => {
   it("keeps an image but not its event handler", () => {
     const markup = rendered("<img src=x onerror=alert(1)>");
 
-    expect(markup).toContain(`src="/p/raw/${sha}/x"`);
+    expect(markup).toContain(`src="/oscabriel/p/raw/${sha}/x"`);
     expect(markup).not.toContain("onerror");
     expect(markup).not.toContain("alert");
   });
@@ -109,16 +109,16 @@ describe("links and images in docs/README.md", () => {
   it("loads a relative image raw from the README's folder, at the SHA", () => {
     const markup = readme("![logo](./img/logo.png)");
 
-    expect(markup).toContain(`src="/p/raw/${sha}/docs/img/logo.png"`);
+    expect(markup).toContain(`src="/oscabriel/p/raw/${sha}/docs/img/logo.png"`);
     expect(markup).toContain('loading="lazy"');
     expect(markup).toContain('decoding="async"');
     expect(markup).toContain('referrerPolicy="no-referrer"');
   });
 
   it.each([
-    ["[a](../../x)", `/p/blob/${sha}/x`],
-    ["[b](/LICENSE)", `/p/blob/${sha}/LICENSE`],
-    ["[g](guide.md#install)", `/p/blob/${sha}/docs/guide.md#install`],
+    ["[a](../../x)", `/oscabriel/p/blob/${sha}/x`],
+    ["[b](/LICENSE)", `/oscabriel/p/blob/${sha}/LICENSE`],
+    ["[g](guide.md#install)", `/oscabriel/p/blob/${sha}/docs/guide.md#install`],
   ])("opens %s inside the project", (source, href) => {
     expect(anchorsOf(readme(source))).toStrictEqual([`<a href="${href}">`]);
   });
@@ -134,7 +134,7 @@ describe("links and images in docs/README.md", () => {
     );
 
     expect(anchorsOf(markup)).toStrictEqual([
-      `<a href="/p/blob/${sha}/x?raw=1#L3">`,
+      `<a href="/oscabriel/p/blob/${sha}/x?raw=1#L3">`,
     ]);
   });
 
@@ -146,12 +146,12 @@ describe("links and images in docs/README.md", () => {
         project={project}
         source="[a](../../x?raw=1#L3)"
       />,
-      `/p/blob/${sha}/x?raw=1#L3`
+      `/oscabriel/p/blob/${sha}/x?raw=1#L3`
     );
 
     const [anchor] = anchorsOf(markup);
 
-    expect(anchor).toContain(`href="/p/blob/${sha}/x?raw=1#L3"`);
+    expect(anchor).toContain(`href="/oscabriel/p/blob/${sha}/x?raw=1#L3"`);
     expect(anchor).toContain('aria-current="page"');
   });
 
@@ -168,7 +168,7 @@ describe("links and images in docs/README.md", () => {
             at={sha}
             dir=""
             project={project}
-            source="[r](src/routes/$project/index.tsx) [s](bin/$.sh) [o](src/{-$x}.ts#L2)"
+            source="[r](src/routes/$owner/$project/index.tsx) [s](bin/$.sh) [o](src/{-$x}.ts#L2)"
           />
         );
 
@@ -179,9 +179,9 @@ describe("links and images in docs/README.md", () => {
             )
           )
         ).toStrictEqual([
-          `/p/blob/${sha}/src/routes/$project/index.tsx`,
-          `/p/blob/${sha}/bin/$.sh`,
-          `/p/blob/${sha}/src/{-$x}.ts#L2`,
+          `/oscabriel/p/blob/${sha}/src/routes/$owner/$project/index.tsx`,
+          `/oscabriel/p/blob/${sha}/bin/$.sh`,
+          `/oscabriel/p/blob/${sha}/src/{-$x}.ts#L2`,
         ]);
       })
   );
@@ -206,7 +206,7 @@ describe("links and images in docs/README.md", () => {
       '<p align="center"><img src="media/logo.svg" width="200" alt="logo"></p>'
     );
 
-    expect(markup).toContain(`src="/p/raw/${sha}/media/logo.svg"`);
+    expect(markup).toContain(`src="/oscabriel/p/raw/${sha}/media/logo.svg"`);
     expect(markup).toContain('align="center"');
   });
 
@@ -216,9 +216,9 @@ describe("links and images in docs/README.md", () => {
     );
 
     expect(markup).toContain(
-      `srcSet="/p/raw/${sha}/media/dark.svg 1x, /p/raw/${sha}/media/dark@2x.svg 2x"`
+      `srcSet="/oscabriel/p/raw/${sha}/media/dark.svg 1x, /oscabriel/p/raw/${sha}/media/dark@2x.svg 2x"`
     );
-    expect(markup).toContain(`src="/p/raw/${sha}/media/logo.svg"`);
+    expect(markup).toContain(`src="/oscabriel/p/raw/${sha}/media/logo.svg"`);
   });
 });
 

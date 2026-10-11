@@ -5,19 +5,19 @@ import { env } from "cloudflare:workers";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { useCallback, useMemo, useState } from "react";
 
-import { commitOf, projectOf } from "../../../features/code/address.ts";
-import { ClientDiffs } from "../../../features/code/client-code.tsx";
-import { CommitView } from "../../../features/code/commit-view.tsx";
-import { drawnFiles } from "../../../features/code/diff-model.ts";
-import { PANE_SCROLLER } from "../../../features/code/diff-pane.tsx";
-import { SPLIT_QUERY, useMedia } from "../../../features/code/media.ts";
-import { CodeNotFound } from "../../../features/code/not-found.tsx";
-import { PlainDiff } from "../../../features/code/plain-diff.tsx";
-import { prerenderedPaths } from "../../../features/code/prerender.ts";
-import { pageHead } from "../../../features/shared/head.ts";
-import { notFoundFor } from "../../../features/shared/refusals.ts";
-import { branchPage } from "../../../server/cache-headers.ts";
-import { serverClient } from "../../../server/client.ts";
+import { commitOf, projectOf } from "../../../../features/code/address.ts";
+import { ClientDiffs } from "../../../../features/code/client-code.tsx";
+import { CommitView } from "../../../../features/code/commit-view.tsx";
+import { drawnFiles } from "../../../../features/code/diff-model.ts";
+import { PANE_SCROLLER } from "../../../../features/code/diff-pane.tsx";
+import { SPLIT_QUERY, useMedia } from "../../../../features/code/media.ts";
+import { CodeNotFound } from "../../../../features/code/not-found.tsx";
+import { PlainDiff } from "../../../../features/code/plain-diff.tsx";
+import { prerenderedPaths } from "../../../../features/code/prerender.ts";
+import { pageHead } from "../../../../features/shared/head.ts";
+import { notFoundFor } from "../../../../features/shared/refusals.ts";
+import { branchPage } from "../../../../server/cache-headers.ts";
+import { serverClient } from "../../../../server/client.ts";
 import { CommitRail } from "../tree/-code-rail.tsx";
 import { CommitPageData } from "../tree/-commit-files.ts";
 import { FilesButton } from "../tree/-files-button.tsx";
@@ -192,7 +192,7 @@ const CommitPage = () => {
   );
 };
 
-export const Route = createFileRoute("/$project/commit/$sha")({
+export const Route = createFileRoute("/$owner/$project/commit/$sha")({
   staticData: { rail: CommitRail },
   // The router writes back what this returns, dropping only `undefined`,
   // so a unified diff's address carries no `style`.
@@ -218,7 +218,7 @@ export const Route = createFileRoute("/$project/commit/$sha")({
 
             if (Option.isSome(decoded) && !decoded.value.diff.truncated) {
               const { drawDiffAhead } = yield* Effect.promise(
-                () => import("../../../features/code/prerender.ts")
+                () => import("../../../../features/code/prerender.ts")
               );
 
               yield* Effect.promise(() =>

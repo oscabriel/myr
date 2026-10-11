@@ -13,14 +13,14 @@ import { env } from "cloudflare:workers";
 import { Effect, Option, Schema, Struct } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 
-import { ledgerAtom } from "../../client/ledger.ts";
-import { policyAtom } from "../../client/policy.ts";
-import { watchAtom } from "../../client/watch.ts";
-import { PeopleView } from "../../features/project-people/people-view.tsx";
-import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageHead } from "../../features/shared/head.ts";
-import { branchPage } from "../../server/cache-headers.ts";
-import { serverClient } from "../../server/client.ts";
+import { ledgerAtom } from "../../../client/ledger.ts";
+import { policyAtom } from "../../../client/policy.ts";
+import { watchAtom } from "../../../client/watch.ts";
+import { PeopleView } from "../../../features/project-people/people-view.tsx";
+import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
+import { pageHead } from "../../../features/shared/head.ts";
+import { branchPage } from "../../../server/cache-headers.ts";
+import { serverClient } from "../../../server/client.ts";
 
 // A project's policy (its section reads "Policy" at the address it has
 // always had): who decides what, who is vouched for, its limits, and its
@@ -125,7 +125,7 @@ const Unknown = () => {
   return <UnknownProjectView name={project} />;
 };
 
-export const Route = createFileRoute("/$project/people")({
+export const Route = createFileRoute("/$owner/$project/people")({
   loader: ({ params }) => peoplePage({ data: params.project }),
   // The policy moves with the next landing: kept briefly, read again behind.
   headers: () => branchPage,

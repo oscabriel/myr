@@ -254,7 +254,7 @@ const props = (more: Partial<ProjectViewProps> = {}): ProjectViewProps => ({
 });
 
 const page = (more: Partial<ProjectViewProps> = {}) =>
-  renderAt("/datekit", <ProjectView {...props(more)} />);
+  renderAt("/oscabriel/datekit", <ProjectView {...props(more)} />);
 
 describe(ProjectView, () => {
   it.effect(
@@ -264,12 +264,12 @@ describe(ProjectView, () => {
         const row = rowOf(yield* page(), "fix-week-start");
 
         expect(row).toMatch(
-          /<a\b[^>]*href="\/datekit\/asks\/fix-week-start"[^>]*>A week starts on the locale&#x27;s first day, not always on Sunday\.<\/a>/u
+          /<a\b[^>]*href="\/oscabriel\/datekit\/asks\/fix-week-start"[^>]*>A week starts on the locale&#x27;s first day, not always on Sunday\.<\/a>/u
         );
         expect(textIn(row)).toContain("bug · core · fix-week-start");
         expect(textIn(row)).toContain("Open to take");
         expect(textIn(row)).toContain(
-          `${Brand.cli} claim fix-week-start --project datekit`
+          `${Brand.cli} claim fix-week-start --project oscabriel/datekit`
         );
       })
   );
@@ -385,8 +385,8 @@ describe(ProjectView, () => {
         expect(text).toMatch(/src\/\*\*\s*·\s*ines-v, okonkwo/u);
         expect(
           missingFrom(facts, [
-            'href="/datekit/people"',
-            'href="/datekit/llms.txt"',
+            'href="/oscabriel/datekit/people"',
+            'href="/oscabriel/datekit/llms.txt"',
           ])
         ).toStrictEqual([]);
       })
@@ -432,8 +432,8 @@ describe(ProjectView, () => {
         const text = textIn(facts);
 
         const steps = [
-          `git clone ${platformUrl}/datekit.git`,
-          `${Brand.cli} asks --project datekit`,
+          `git clone ${platformUrl}/oscabriel/datekit.git`,
+          `${Brand.cli} asks --project oscabriel/datekit`,
           `${Brand.cli} claim <ask>`,
           `${Brand.cli} check`,
         ].map((command) => text.indexOf(command));
@@ -458,7 +458,7 @@ describe(ProjectView, () => {
         const markup = yield* page({ code: { readme, root } });
         const main = mainOf(markup);
 
-        expect(main).not.toContain('href="/datekit/tree/main/src"');
+        expect(main).not.toContain('href="/oscabriel/datekit/tree/main/src"');
         expect(main).not.toContain("data-clone");
         expect(main).toContain('data-readme="README.md"');
         expect(textIn(main)).toContain("Dates, kept.");
@@ -487,7 +487,9 @@ describe(ProjectView, () => {
         expect(text).toContain(`${Brand.cli} ask open`);
         expect(text).toContain("Nothing has landed");
         // The project exists, so `init` would refuse it: its first push lands main.
-        expect(text).toContain(`git push ${platformUrl}/datekit.git HEAD:main`);
+        expect(text).toContain(
+          `git push ${platformUrl}/oscabriel/datekit.git HEAD:main`
+        );
         expect(text).not.toContain(`${Brand.cli} init`);
       })
   );
@@ -681,7 +683,7 @@ describe("the project's home as the server sends it", () => {
         const main = mainOf(markup);
 
         expect(main).toMatch(
-          /<a\b[^>]*href="\/datekit\/asks\/add-months-clamp"[^>]*>[^<]+<\/a>/u
+          /<a\b[^>]*href="\/oscabriel\/datekit\/asks\/add-months-clamp"[^>]*>[^<]+<\/a>/u
         );
         expect(
           missingFrom(main, [
@@ -691,7 +693,7 @@ describe("the project's home as the server sends it", () => {
         ).toStrictEqual([]);
         expect(
           foundIn(main, [
-            'href="/datekit/tree/main/src"',
+            'href="/oscabriel/datekit/tree/main/src"',
             "data-clone",
             "Reading from the platform",
           ])
@@ -732,7 +734,7 @@ describe("the project's home as the server sends it", () => {
         const listed = yield* Ref.make(0);
 
         const data = yield* readFrom(
-          "vellum",
+          "oscabriel/vellum",
           devWorldWith({ fixtures: "on" }, listed)
         );
 
@@ -750,7 +752,7 @@ describe("the project's home as the server sends it", () => {
     () =>
       Effect.gen(function* () {
         const { ledger: _unread, ...data } = yield* readFrom(
-          "vellum",
+          "oscabriel/vellum",
           devWorldWith({ fixtures: "on" })
         );
 
@@ -813,7 +815,7 @@ describe("a family child landing while the page is open", () => {
         });
 
         const [data, later] = yield* Effect.gen(function* () {
-          const first = yield* readProjectPage("vellum").pipe(
+          const first = yield* readProjectPage("oscabriel/vellum").pipe(
             Effect.flatMap(decodePage)
           );
 
@@ -874,12 +876,12 @@ describe(UnknownProjectView, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/no-such-project",
-          <UnknownProjectView name="no-such-project" />
+          "/oscabriel/no-such-project",
+          <UnknownProjectView name="oscabriel/no-such-project" />
         );
 
         expect(markup).toContain('data-refusal="UnknownProject"');
-        expect(markup).toContain("no-such-project");
+        expect(markup).toContain("oscabriel/no-such-project");
         expect(markup).toMatch(/<a\b[^>]*href="\/asks"[^>]*>Open asks<\/a>/u);
       })
   );

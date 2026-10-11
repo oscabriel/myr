@@ -54,15 +54,15 @@ import { Refusals } from "../src/features/shared/refusals.ts";
 import {
   readBlobPage,
   Route as BlobRoute,
-} from "../src/routes/$project/blob/$rev/$.tsx";
-import { readCommitPage } from "../src/routes/$project/commit/$sha.tsx";
-import { readLogPage } from "../src/routes/$project/commits/$rev.tsx";
-import { readRefsPage } from "../src/routes/$project/refs.tsx";
+} from "../src/routes/$owner/$project/blob/$rev/$.tsx";
+import { readCommitPage } from "../src/routes/$owner/$project/commit/$sha.tsx";
+import { readLogPage } from "../src/routes/$owner/$project/commits/$rev.tsx";
+import { readRefsPage } from "../src/routes/$owner/$project/refs.tsx";
 import {
   readTreePage,
   Route as TreeRoute,
-} from "../src/routes/$project/tree/$rev/$.tsx";
-import { Route as WhyRoute } from "../src/routes/$project/why/$rev/$.tsx";
+} from "../src/routes/$owner/$project/tree/$rev/$.tsx";
+import { Route as WhyRoute } from "../src/routes/$owner/$project/why/$rev/$.tsx";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
@@ -341,8 +341,8 @@ describe(TreeView, () => {
     expect(markup.indexOf('data-entry="src"')).toBeLessThan(
       markup.indexOf('data-entry="README.md"')
     );
-    expect(hrefsOf(markup)).toContain("/datekit/tree/main/src");
-    expect(hrefsOf(markup)).toContain("/datekit/blob/main/README.md");
+    expect(hrefsOf(markup)).toContain("/oscabriel/datekit/tree/main/src");
+    expect(hrefsOf(markup)).toContain("/oscabriel/datekit/blob/main/README.md");
   });
 
   it("lists the folder once", () => {
@@ -379,9 +379,9 @@ describe(TreeView, () => {
     const crumbs = hrefsOf(navOf(markup, 'aria-label="Path"'));
 
     expect(crumbs).toStrictEqual([
-      `/datekit/tree/${TAG_SEGMENT}`,
-      `/datekit/tree/${TAG_SEGMENT}/src`,
-      `/datekit/tree/${TAG_SEGMENT}/src/format`,
+      `/oscabriel/datekit/tree/${TAG_SEGMENT}`,
+      `/oscabriel/datekit/tree/${TAG_SEGMENT}/src`,
+      `/oscabriel/datekit/tree/${TAG_SEGMENT}/src/format`,
     ]);
     expect(
       textOf(
@@ -409,14 +409,14 @@ describe(TreeView, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          `/datekit/commits/${TAG_SEGMENT}?path=src%2Fformat%2Flocale`,
+          `/oscabriel/datekit/commits/${TAG_SEGMENT}?path=src%2Fformat%2Flocale`,
           <TreeView listing={nested} now={now} project={datekit} rev={TAG} />
         );
 
         const history = anchorOf(markup, "History");
 
         expect(history).toContain(
-          `href="/datekit/commits/${TAG_SEGMENT}?path=src%2Fformat%2Flocale"`
+          `href="/oscabriel/datekit/commits/${TAG_SEGMENT}?path=src%2Fformat%2Flocale"`
         );
         expect(history).toContain('aria-current="page"');
       })
@@ -439,8 +439,8 @@ const permalink = (mode: "code" | "why") =>
 
 describe("a file's facts", () => {
   it("link a permalink to the page they sit on: the code, or why", () => {
-    expect(permalink("code")).toBe(`/datekit/blob/${AT}/README.md`);
-    expect(permalink("why")).toBe(`/datekit/why/${AT}/README.md`);
+    expect(permalink("code")).toBe(`/oscabriel/datekit/blob/${AT}/README.md`);
+    expect(permalink("why")).toBe(`/oscabriel/datekit/why/${AT}/README.md`);
   });
 
   // The history's `?path=` is the address's search, not part of its path:
@@ -451,14 +451,14 @@ describe("a file's facts", () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/datekit/commits/main?path=README.md",
+          "/oscabriel/datekit/commits/main?path=README.md",
           <FileFacts file={readme} now={now} project={datekit} rev="main" />
         );
 
         const history = anchorOf(markup, "History of this file");
 
         expect(history).toContain(
-          'href="/datekit/commits/main?path=README.md"'
+          'href="/oscabriel/datekit/commits/main?path=README.md"'
         );
         expect(history).toContain('aria-current="page"');
       })
@@ -530,9 +530,9 @@ describe(BlobView, () => {
     expect(countIn(main, 'title="src/format/parse.ts"')).toBe(1);
     expect(countIn(main, 'aria-label="Path"')).toBe(1);
     expect(hrefsOf(navOf(main, 'aria-label="Path"'))).toStrictEqual([
-      "/datekit/tree/main",
-      "/datekit/tree/main/src",
-      "/datekit/tree/main/src/format",
+      "/oscabriel/datekit/tree/main",
+      "/oscabriel/datekit/tree/main/src",
+      "/oscabriel/datekit/tree/main/src/format",
     ]);
   });
 
@@ -540,8 +540,8 @@ describe(BlobView, () => {
     const toggle = navOf(markupOf(page), 'aria-label="Mode"');
 
     expect(hrefsOf(toggle)).toStrictEqual([
-      "/datekit/blob/main/src/format/parse.ts",
-      "/datekit/why/main/src/format/parse.ts",
+      "/oscabriel/datekit/blob/main/src/format/parse.ts",
+      "/oscabriel/datekit/why/main/src/format/parse.ts",
     ]);
     expect(toggle).toMatch(/aria-current="page"[^>]*>Code</u);
     expect(toggle).not.toMatch(/aria-current="page"[^>]*>Why</u);
@@ -552,11 +552,11 @@ describe(BlobView, () => {
     const toolbar = navOf(markup, 'data-toolbar="file"');
 
     expect(hrefsOf(toolbar)).toStrictEqual([
-      `/datekit/raw/${AT}/src/format/parse.ts`,
-      `/datekit/blob/${AT}/src/format/parse.ts`,
+      `/oscabriel/datekit/raw/${AT}/src/format/parse.ts`,
+      `/oscabriel/datekit/blob/${AT}/src/format/parse.ts`,
     ]);
     expect(hrefsOf(inspectorOf(markup))).toContain(
-      "/datekit/commits/main?path=src%2Fformat%2Fparse.ts"
+      "/oscabriel/datekit/commits/main?path=src%2Fformat%2Fparse.ts"
     );
   });
 
@@ -572,9 +572,9 @@ describe(BlobView, () => {
     expect(text).toContain("answered by bram");
     expect(hrefsOf(facts)).toStrictEqual(
       expect.arrayContaining([
-        "/datekit/asks/parse-iso-week",
-        "/datekit/answers/parse-iso-week",
-        `/datekit/commit/${LANDED}`,
+        "/oscabriel/datekit/asks/parse-iso-week",
+        "/oscabriel/datekit/answers/parse-iso-week",
+        `/oscabriel/datekit/commit/${LANDED}`,
       ])
     );
   });
@@ -596,7 +596,7 @@ describe(BlobView, () => {
     expect(markupOf(element)).not.toContain("<pre");
     expect(textOf(element)).toContain("2.0 KiB");
     expect(hrefsOf(markupOf(element))).toContain(
-      `/datekit/raw/${AT}/assets/fixture.bin`
+      `/oscabriel/datekit/raw/${AT}/assets/fixture.bin`
     );
   });
 
@@ -618,7 +618,7 @@ describe(BlobView, () => {
     expect(textOf(element)).toContain("too large to show");
     expect(textOf(element)).toContain("3.0 MiB");
     expect(hrefsOf(markupOf(element))).toContain(
-      `/datekit/raw/${AT}/data/zones.json`
+      `/oscabriel/datekit/raw/${AT}/data/zones.json`
     );
   });
 
@@ -635,7 +635,10 @@ describe(BlobView, () => {
     expect(
       markupOf(<BlobView file={logo} now={now} project={datekit} rev="main" />)
     ).toMatch(
-      new RegExp(`<img\\b[^>]*src="/datekit/raw/${AT}/docs/logo.png"`, "u")
+      new RegExp(
+        `<img\\b[^>]*src="/oscabriel/datekit/raw/${AT}/docs/logo.png"`,
+        "u"
+      )
     );
   });
 
@@ -661,7 +664,7 @@ describe(BlobView, () => {
     expect(rendered).toContain('data-readme="docs/guide.md"');
     expect(rendered).not.toContain('id="L1"');
     expect(hrefsOf(rendered)).toContain(
-      "/datekit/blob/main/docs/guide.md?plain=1"
+      "/oscabriel/datekit/blob/main/docs/guide.md?plain=1"
     );
     expect(plain).toContain('id="L3"');
     expect(plain).not.toContain("data-readme=");
@@ -705,8 +708,8 @@ describe(LogView, () => {
 
     expect(hrefsOf(row)).toStrictEqual(
       expect.arrayContaining([
-        "/datekit/asks/parse-iso-week",
-        `/datekit/commit/${LANDED}`,
+        "/oscabriel/datekit/asks/parse-iso-week",
+        `/oscabriel/datekit/commit/${LANDED}`,
         "/people/ines-v",
       ])
     );
@@ -797,7 +800,7 @@ describe(LogView, () => {
       LANDED
     );
 
-    expect(hrefsOf(row)).toContain("/datekit/asks/parse-iso-week");
+    expect(hrefsOf(row)).toContain("/oscabriel/datekit/asks/parse-iso-week");
     expect(row).toContain("Opened");
   });
 
@@ -819,9 +822,9 @@ describe(LogView, () => {
     const filters = navOf(markupOf(page), 'aria-label="Show"');
 
     expect(hrefsOf(filters)).toStrictEqual([
-      "/datekit/commits/main",
-      "/datekit/commits/main?show=answers",
-      "/datekit/commits/main?show=openings",
+      "/oscabriel/datekit/commits/main",
+      "/oscabriel/datekit/commits/main?show=answers",
+      "/oscabriel/datekit/commits/main?show=openings",
     ]);
     expect(filters).toMatch(/aria-current="page"[^>]*>All</u);
   });
@@ -830,7 +833,7 @@ describe(LogView, () => {
     const row = slice(markupOf(page), "data-commit", IMPORTED);
 
     expect(row).toContain("before adoption");
-    expect(hrefsOf(row)).toContain(`/datekit/commit/${IMPORTED}`);
+    expect(hrefsOf(row)).toContain(`/oscabriel/datekit/commit/${IMPORTED}`);
     expect(slice(markupOf(page), "data-commit", LANDED)).not.toContain(
       "before adoption"
     );
@@ -839,7 +842,9 @@ describe(LogView, () => {
   it("links the older page from where this one ends, and no newer page from the first", () => {
     const pager = navOf(markupOf(page), 'data-slot="pagination"');
 
-    expect(hrefsOf(pager)).toStrictEqual(["/datekit/commits/main?from=30"]);
+    expect(hrefsOf(pager)).toStrictEqual([
+      "/oscabriel/datekit/commits/main?from=30",
+    ]);
   });
 
   it("keeps the path on both pages of a path's history", () => {
@@ -859,8 +864,8 @@ describe(LogView, () => {
     );
 
     expect(hrefsOf(pager)).toStrictEqual([
-      "/datekit/commits/main?path=src%2Fparse.ts",
-      "/datekit/commits/main?path=src%2Fparse.ts&from=60",
+      "/oscabriel/datekit/commits/main?path=src%2Fparse.ts",
+      "/oscabriel/datekit/commits/main?path=src%2Fparse.ts&from=60",
     ]);
   });
 
@@ -881,8 +886,8 @@ describe(LogView, () => {
     );
 
     expect(hrefsOf(pager)).toStrictEqual([
-      "/datekit/commits/main?show=answers",
-      "/datekit/commits/main?from=60&show=answers",
+      "/oscabriel/datekit/commits/main?show=answers",
+      "/oscabriel/datekit/commits/main?from=60&show=answers",
     ]);
   });
 
@@ -906,8 +911,8 @@ describe(LogView, () => {
     );
 
     expect(hrefsOf(pager)).toStrictEqual([
-      "/datekit/commits/main?path=src%2Fparse.ts",
-      "/datekit/commits/main?path=src%2Fparse.ts&from=430",
+      "/oscabriel/datekit/commits/main?path=src%2Fparse.ts",
+      "/oscabriel/datekit/commits/main?path=src%2Fparse.ts&from=430",
     ]);
   });
 });
@@ -984,8 +989,10 @@ describe(CommitView, () => {
 
     expect(text).toContain(`Landed as ${LANDED.slice(0, 7)}`);
     expect(text).toContain("answered parse-iso-week");
-    expect(hrefsOf(markup)).toContain("/datekit/asks/parse-iso-week");
-    expect(hrefsOf(markup)).toContain("/datekit/answers/parse-iso-week");
+    expect(hrefsOf(markup)).toContain("/oscabriel/datekit/asks/parse-iso-week");
+    expect(hrefsOf(markup)).toContain(
+      "/oscabriel/datekit/answers/parse-iso-week"
+    );
     expect(markup).toContain('data-outcome="Landed"');
   });
 
@@ -1015,15 +1022,19 @@ describe(CommitView, () => {
       />
     );
 
-    expect(hrefsOf(markup)).toContain("/datekit/asks/parse-iso-week");
-    expect(hrefsOf(markup)).not.toContain("/datekit/answers/parse-iso-week");
+    expect(hrefsOf(markup)).toContain("/oscabriel/datekit/asks/parse-iso-week");
+    expect(hrefsOf(markup)).not.toContain(
+      "/oscabriel/datekit/answers/parse-iso-week"
+    );
     expect(markup).toContain("opened");
   });
 
   it("puts git's own facts on one line: author, committer and parent, linked", () => {
     const text = textOf(page);
 
-    expect(hrefsOf(markupOf(page))).toContain(`/datekit/commit/${IMPORTED}`);
+    expect(hrefsOf(markupOf(page))).toContain(
+      `/oscabriel/datekit/commit/${IMPORTED}`
+    );
     expect(text).toContain("authored by Bram");
     expect(text).toContain("committed by the platform");
     expect(text).toContain(`parent ${IMPORTED.slice(0, 7)}`);
@@ -1294,13 +1305,13 @@ describe("the code pages' reads", () => {
         const { calls, refused } = yield* refusedBy(
           readTreePage({
             _splat: "src/format/locale",
-            project: "datekit",
+            project: "oscabriel/datekit",
             rev: TAG_SEGMENT,
           })
         );
 
         expect(calls).toStrictEqual([
-          { at: TAG, path: "src/format/locale", project: "datekit" },
+          { at: TAG, path: "src/format/locale", project: "oscabriel/datekit" },
         ]);
         expect(refused).toStrictEqual(
           Option.some(explain([new UnknownRevision({ rev: TAG })]))
@@ -1314,14 +1325,18 @@ describe("the code pages' reads", () => {
       Effect.gen(function* () {
         const cases: readonly (readonly [Effect.Effect<Refused>, Refusal])[] = [
           [
-            refusedBy(readRefsPage("no-such-project")),
+            refusedBy(readRefsPage("oscabriel/no-such-project")),
             new UnknownProject({
               project: ProjectName.make("oscabriel/no-such-project"),
             }),
           ],
           [
             refusedBy(
-              readTreePage({ _splat: "nope", project: "datekit", rev: "main" })
+              readTreePage({
+                _splat: "nope",
+                project: "oscabriel/datekit",
+                rev: "main",
+              })
             ),
             noPath(RepoPath.make("nope")),
           ],
@@ -1329,18 +1344,20 @@ describe("the code pages' reads", () => {
             refusedBy(
               readBlobPage({
                 _splat: "nope.ts",
-                project: "datekit",
+                project: "oscabriel/datekit",
                 rev: "main",
               })
             ),
             noPath(RepoPath.make("nope.ts")),
           ],
           [
-            refusedBy(readLogPage({ project: "datekit", rev: "v9" })),
+            refusedBy(readLogPage({ project: "oscabriel/datekit", rev: "v9" })),
             new UnknownRevision({ rev: "v9" }),
           ],
           [
-            refusedBy(readCommitPage({ project: "datekit", sha: OLDER })),
+            refusedBy(
+              readCommitPage({ project: "oscabriel/datekit", sha: OLDER })
+            ),
             new UnknownCommit({ sha: CommitSha.make(OLDER) }),
           ],
         ];
@@ -1359,10 +1376,16 @@ describe("the code pages' reads", () => {
       Effect.gen(function* () {
         const reads: readonly Effect.Effect<Refused>[] = [
           refusedBy(readRefsPage("Not_A-Project")),
-          refusedBy(readTreePage({ project: "datekit", rev: "%E0%A4%A" })),
-          refusedBy(readBlobPage({ project: "datekit", rev: "main" })),
-          refusedBy(readLogPage({ project: "datekit", rev: "%" })),
-          refusedBy(readCommitPage({ project: "datekit", sha: "abc1234" })),
+          refusedBy(
+            readTreePage({ project: "oscabriel/datekit", rev: "%E0%A4%A" })
+          ),
+          refusedBy(
+            readBlobPage({ project: "oscabriel/datekit", rev: "main" })
+          ),
+          refusedBy(readLogPage({ project: "oscabriel/datekit", rev: "%" })),
+          refusedBy(
+            readCommitPage({ project: "oscabriel/datekit", sha: "abc1234" })
+          ),
         ];
 
         for (const read of reads) {
@@ -1381,7 +1404,7 @@ describe("the code pages' reads", () => {
       const read = yield* readLogPage({
         from: 30,
         path: "src/parse.ts",
-        project: "datekit",
+        project: "oscabriel/datekit",
         rev: "main",
       }).pipe(Effect.provide(platformOf(calls)));
 
@@ -1391,7 +1414,7 @@ describe("the code pages' reads", () => {
           from: 30,
           limit: LOG_PAGE,
           path: "src/parse.ts",
-          project: "datekit",
+          project: "oscabriel/datekit",
         },
       ]);
       expect([read.from, read.next, read.path]).toStrictEqual([
@@ -1540,12 +1563,12 @@ describe("a code page's caching", () => {
   // "2 minutes ago", reckoned from when it was read. Kept for good, such a
   // page would never show the landing, and its times would never move.
   const routes: Readonly<Record<string, string>> = import.meta.glob(
-    "../src/routes/$project/{tree,blob,why}/$rev/$.tsx",
+    "../src/routes/$owner/$project/{tree,blob,why}/$rev/$.tsx",
     { eager: true, import: "default", query: "?raw" }
   );
 
   const logs: Readonly<Record<string, string>> = import.meta.glob(
-    "../src/routes/$project/{commits/$rev,commit/$sha}.tsx",
+    "../src/routes/$owner/$project/{commits/$rev,commit/$sha}.tsx",
     { eager: true, import: "default", query: "?raw" }
   );
 

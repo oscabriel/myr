@@ -8,23 +8,23 @@ import { Effect, Option, Predicate, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useMemo } from "react";
 
-import { landingAtom, verdictAtom } from "../../../client/answer.ts";
-import { askAtom } from "../../../client/ask.ts";
-import { askStates, projectEventsAtom } from "../../../client/events.ts";
-import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
-import { watchAtom } from "../../../client/watch.ts";
-import { AnswerView } from "../../../features/answer/answer-page.tsx";
+import { landingAtom, verdictAtom } from "../../../../client/answer.ts";
+import { askAtom } from "../../../../client/ask.ts";
+import { askStates, projectEventsAtom } from "../../../../client/events.ts";
+import { SeededAtoms, seedSuccess } from "../../../../client/seeded.ts";
+import { watchAtom } from "../../../../client/watch.ts";
+import { AnswerView } from "../../../../features/answer/answer-page.tsx";
 import {
   AnswerPageData,
   landedBy,
   readAnswer,
-} from "../../../features/answer/reads.ts";
-import type { AnswerAddress } from "../../../features/answer/reads.ts";
-import { NoSuchAsk } from "../../../features/ask/refused.tsx";
-import { whoAtom } from "../../../features/auth/who.ts";
-import { pageHead } from "../../../features/shared/head.ts";
-import { branchPage } from "../../../server/cache-headers.ts";
-import { serverClient } from "../../../server/client.ts";
+} from "../../../../features/answer/reads.ts";
+import type { AnswerAddress } from "../../../../features/answer/reads.ts";
+import { NoSuchAsk } from "../../../../features/ask/refused.tsx";
+import { whoAtom } from "../../../../features/auth/who.ts";
+import { pageHead } from "../../../../features/shared/head.ts";
+import { branchPage } from "../../../../server/cache-headers.ts";
+import { serverClient } from "../../../../server/client.ts";
 
 // The answer page: where the latest answer to an ask stands, stage by
 // stage, or with `?head=<sha>` an earlier answer. It updates live while
@@ -159,7 +159,7 @@ const AnswerNotFound = ({ data }: { readonly data?: unknown }) => {
   return <NoSuchAsk data={data} nothing={NOTHING} project={project} />;
 };
 
-export const Route = createFileRoute("/$project/answers/$ask")({
+export const Route = createFileRoute("/$owner/$project/answers/$ask")({
   // TanStack infers each option from the ones before it, so the search comes
   // before the loader that reads it.
   validateSearch: ({ head }: { readonly head?: unknown }) =>

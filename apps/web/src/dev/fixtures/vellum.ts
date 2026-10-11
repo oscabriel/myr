@@ -49,6 +49,7 @@ import {
   EnvKey,
   KindName,
   LaneName,
+  keyOf,
   LayerName,
   ProjectName,
   ProposalId,
@@ -99,8 +100,8 @@ const people = {
   wren: visitors.regular,
 } as const;
 
-/** vellum's initializer, who decides everything not named for someone else. */
-export const vellumInitializer = people.ines;
+/** vellum's initializer: the operator, in whose namespace it is made. */
+export { operator as vellumInitializer } from "../examples.ts";
 
 const MODULES = [
   "cli",
@@ -783,7 +784,7 @@ const ledger: Ledger = {
       readers: [people.ines, people.okonkwo, people.lin],
       reason:
         "Held-back checks for the export and the parser, written by the maintainers so an answer cannot be fitted to them.",
-      repo: RepoName.make("vellum--maintainers"),
+      repo: RepoName.make(`${keyOf(vellum)}--maintainers`),
       writers: "deciders",
     },
   ],

@@ -215,13 +215,13 @@ describe("the dev seed", seededWorlds, () => {
       const listed = new Set(projects.map(({ project }) => project));
 
       for (const fixture of [
-        "vellum",
-        "amberlog",
-        "cinderbox",
-        "fernwick",
-        "mossgate",
-        "quillon",
-        "tidepool",
+        "oscabriel/vellum",
+        "okafor/amberlog",
+        "lin-h/cinderbox",
+        "okonkwo/fernwick",
+        "lin-h/mossgate",
+        "okafor/quillon",
+        "okonkwo/tidepool",
       ]) {
         expect(listed.has(ProjectName.make(fixture))).toBeFalsy();
       }
@@ -257,8 +257,8 @@ describe("the dev seed", seededWorlds, () => {
         expect(
           projects.map(({ landedAt: at, project }) => [project, at])
         ).toStrictEqual([
-          ["burrow", opening.landedAt],
-          ["datekit", landedAt[0]],
+          ["oscabriel/burrow", opening.landedAt],
+          ["oscabriel/datekit", landedAt[0]],
         ]);
         expect(opening.opened).toBeDefined();
         expect(landedAt).toHaveLength(1);
@@ -344,8 +344,8 @@ describe("the dev world's raw files", seededWorlds, () => {
     () =>
       Effect.gen(function* () {
         const [manifest, climbed] = yield* fetched([
-          "/datekit/raw/main/package.json",
-          "/datekit/raw/main/..%2F..%2Fpackage.json",
+          "/oscabriel/datekit/raw/main/package.json",
+          "/oscabriel/datekit/raw/main/..%2F..%2Fpackage.json",
         ]);
 
         expect(manifest).toMatchObject({

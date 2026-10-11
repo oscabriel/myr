@@ -85,13 +85,13 @@ describe(RefsView, () => {
     expect(plainText(main)).toContain("moves only by a landing");
     expect(main).toContain(LANDED.slice(0, 7));
     expect(main).toContain(`title="${LANDED}"`);
-    expect(hrefsOf(main)).toContain(`/datekit/commit/${LANDED}`);
+    expect(hrefsOf(main)).toContain(`/oscabriel/datekit/commit/${LANDED}`);
   });
 
   it("offers main's files from its row", () => {
     const main = elementWith(mainOf(markupOf(page)), 'data-ref="main"');
 
-    expect(hrefsOf(main)).toContain("/datekit/tree/main");
+    expect(hrefsOf(main)).toContain("/oscabriel/datekit/tree/main");
     expect(plainText(main)).toContain("Browse files");
   });
 
@@ -116,8 +116,8 @@ describe(RefsView, () => {
       markup.indexOf('data-tag="v1.0.0"')
     );
     expect(hrefsOf(newest).slice(0, 2)).toStrictEqual([
-      "/datekit/tree/v1.1.0",
-      `/datekit/commit/${IMPORTED}`,
+      "/oscabriel/datekit/tree/v1.1.0",
+      `/oscabriel/datekit/commit/${IMPORTED}`,
     ]);
   });
 
@@ -132,7 +132,7 @@ describe(RefsView, () => {
       /<p\b[^>]*font-mono[^>]*><a\b[^>]*>datekit--parse-iso--ines-v</u
     );
     expect(hrefsOf(fork)).toStrictEqual([
-      "/datekit/answers/parse-iso",
+      "/oscabriel/datekit/answers/parse-iso",
       "/people/ines-v",
     ]);
     expect(plainText(fork)).toContain("Claimed");
@@ -154,7 +154,9 @@ describe(RefsView, () => {
   it("puts the clone command and what a claim fork is in its facts", () => {
     const facts = inspectorOf(markupOf(page));
 
-    expect(plainText(facts)).toContain(`git clone ${platformUrl}/datekit.git`);
+    expect(plainText(facts)).toContain(
+      `git clone ${platformUrl}/oscabriel/datekit.git`
+    );
     // The command is the text of the one code element a tap selects whole.
     expect(
       plainText(
@@ -192,10 +194,12 @@ describe(RefsView, () => {
 
   it.effect("sits under the project's crumbs: datekit, then Refs", () =>
     Effect.gen(function* () {
-      const markup = yield* renderAt("/datekit/refs", page);
+      const markup = yield* renderAt("/oscabriel/datekit/refs", page);
       const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
 
-      expect(crumbs).toMatch(/<a\b[^>]*href="\/datekit"[^>]*>datekit<\/a>/u);
+      expect(crumbs).toMatch(
+        /<a\b[^>]*href="\/oscabriel\/datekit"[^>]*>oscabriel\/datekit<\/a>/u
+      );
       expect(plainText(crumbs)).toContain("Refs");
     })
   );
@@ -220,7 +224,7 @@ describe("a monorepo's refs page", () => {
     ],
   });
 
-  const CORE = "/datekit/refs?package=%40datekit%2Fcore";
+  const CORE = "/oscabriel/datekit/refs?package=%40datekit%2Fcore";
 
   it("lists each package above the tags, with its newest tag, linked to its tree, and its count", () => {
     const markup = mainOf(markupOf(viewOf(monorepo)));
@@ -230,13 +234,13 @@ describe("a monorepo's refs page", () => {
     expect(textOf(viewOf(monorepo))).toContain("Packages");
     expect(hrefsOf(core)).toStrictEqual([
       CORE,
-      `/datekit/tree/${TAG_SEGMENT.replace("1.0.0", "2.0.0")}`,
+      `/oscabriel/datekit/tree/${TAG_SEGMENT.replace("1.0.0", "2.0.0")}`,
     ]);
     expect(plainText(core)).toContain("2 tags");
     // The last package's slice runs on to the page's end: its first two links.
     expect(hrefsOf(fmt).slice(0, 2)).toStrictEqual([
-      "/datekit/refs?package=fmt",
-      "/datekit/tree/fmt%400.1.0",
+      "/oscabriel/datekit/refs?package=fmt",
+      "/oscabriel/datekit/tree/fmt%400.1.0",
     ]);
     expect(fmt).toContain("1 tag<");
   });
@@ -260,7 +264,7 @@ describe("a monorepo's refs page", () => {
       )
     ).toStrictEqual(["@datekit/core@2.0.0", "@datekit/core@1.0.0"]);
     expect(markup).not.toContain("data-package=");
-    expect(hrefsOf(markup)).toContain("/datekit/refs");
+    expect(hrefsOf(markup)).toContain("/oscabriel/datekit/refs");
     expect(textOf(element)).toContain("All tags");
   });
 
@@ -290,7 +294,7 @@ describe("a monorepo's refs page", () => {
 
     expect(markupOf(element)).not.toContain("data-tag=");
     expect(textOf(element)).toContain("No tags for @datekit/none.");
-    expect(hrefsOf(markupOf(element))).toContain("/datekit/refs");
+    expect(hrefsOf(markupOf(element))).toContain("/oscabriel/datekit/refs");
   });
 
   it("links each package so the router reads its name back, even one that reads as a number", () => {

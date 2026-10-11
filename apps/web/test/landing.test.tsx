@@ -31,8 +31,12 @@ const WEB = "https://web.example.workers.dev";
 
 const listed = LandingProjects.cases.Listed.make({
   projects: Schema.decodeSync(Schema.Array(ProjectListing))([
-    { openAsks: 2, posture: "openWithSealedEvidence", project: "datekit" },
-    { openAsks: 6, posture: "open", project: "burrow" },
+    {
+      openAsks: 2,
+      posture: "openWithSealedEvidence",
+      project: "oscabriel/datekit",
+    },
+    { openAsks: 6, posture: "open", project: "oscabriel/burrow" },
   ]),
 });
 
@@ -110,18 +114,22 @@ describe(LandingView, () => {
         const markup = yield* pageWith(listed);
 
         expect(hrefsOf(markup)).toStrictEqual(
-          expect.arrayContaining(["/datekit", "/burrow", "/asks"])
+          expect.arrayContaining([
+            "/oscabriel/datekit",
+            "/oscabriel/burrow",
+            "/asks",
+          ])
         );
         expect(markup).toMatch(
-          /data-project="datekit"[\s\S]*?data-posture="openWithSealedEvidence"/u
+          /data-project="oscabriel\/datekit"[\s\S]*?data-posture="openWithSealedEvidence"/u
         );
         expect(markup).toMatch(
-          /data-project="burrow"[\s\S]*?data-posture="open"/u
+          /data-project="oscabriel\/burrow"[\s\S]*?data-posture="open"/u
         );
         // The posture badge, with its mark, not the word alone.
         expect(
           markup
-            .slice(markup.indexOf('data-project="datekit"'))
+            .slice(markup.indexOf('data-project="oscabriel/datekit"'))
             .split("</li>")[0]
         ).toContain("<svg");
       })
@@ -198,7 +206,7 @@ describe("the landing's projects, read on the server", () => {
     Array.from({ length: PROJECTS_SHOWN + 2 }, (_, at) => ({
       openAsks: 1,
       posture: "open",
-      project: `project-${at}`,
+      project: `oscabriel/project-${at}`,
     }))
   );
 

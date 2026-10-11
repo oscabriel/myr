@@ -77,7 +77,7 @@ describe(
 
           const read = registry.get(familyEventsAtom(key));
 
-          expect(key).toBe("burrow datekit");
+          expect(key).toBe("oscabriel/burrow oscabriel/datekit");
           expect([...read.keys()]).toStrictEqual([burrow, datekit]);
           expect(read.get(datekit)?.length).toBeGreaterThan(0);
         })

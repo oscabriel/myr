@@ -9,6 +9,7 @@ import {
   ownerOf,
   ProjectKey,
   ProjectName,
+  projectAddressOf,
   projectNameOf,
   reservedProjectNames,
   ShortName,
@@ -201,4 +202,39 @@ describe("the legacy table", () => {
     expect(keys).toContain("burrow");
     expect(keys).toHaveLength(40);
   });
+});
+
+const addressOf = (path: string) =>
+  Option.map(
+    projectAddressOf(path.split("/").filter((segment) => segment !== "")),
+    ({ legacy, rest, spelled }) => ({ legacy, rest: rest.join("/"), spelled })
+  );
+
+// What a path's first segments name, the one reader the web's redirects and
+// its shell both use: a legacy key is one segment, a source path three, any
+// other name two.
+describe("a project's address", () => {
+  it.each([
+    ["/oscabriel/datekit/tree/main", "oscabriel/datekit", "tree/main", false],
+    ["/github.com/pallets/click", "github.com/pallets/click", "", false],
+    [
+      "/GitHub.com/Pallets/click/asks/x",
+      "GitHub.com/Pallets/click",
+      "asks/x",
+      false,
+    ],
+    ["/datekit/ledger", "datekit", "ledger", true],
+    ["/Click", "Click", "", true],
+  ])("reads %j as its name and its page", (path, spelled, rest, legacy) => {
+    expect(addressOf(path)).toStrictEqual(
+      Option.some({ legacy, rest, spelled })
+    );
+  });
+
+  it.each(["/", "/oscabriel", "/github.com/pallets"])(
+    "reads nothing in %j, too short for a name",
+    (path) => {
+      expect(addressOf(path)).toStrictEqual(Option.none());
+    }
+  );
 });

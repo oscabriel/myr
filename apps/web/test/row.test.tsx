@@ -49,7 +49,7 @@ describe(AskRow, () => {
       );
 
       expect(anchors(markup)).toContainEqual([
-        "/burrow/asks/fix-week-start",
+        "/oscabriel/burrow/asks/fix-week-start",
         "A week starts on the locale's first day, not always on Sunday.",
       ]);
       expect(
@@ -89,7 +89,7 @@ describe(AskRow, () => {
           <AskRow listing={listing("@burrow/auth")} project={burrow} takeable />
         );
 
-        const command = `${Brand.cli} claim fix-week-start --project burrow`;
+        const command = `${Brand.cli} claim fix-week-start --project oscabriel/burrow`;
 
         expect(markup).toMatch(
           new RegExp(
@@ -112,7 +112,7 @@ describe(AskRow, () => {
 
         expect(row).toMatch(/^<li\b/u);
         expect(attributeOf(row ?? "", "data-ask")).toBe("fix-week-start");
-        expect(attributeOf(row ?? "", "data-project")).toBe("burrow");
+        expect(attributeOf(row ?? "", "data-project")).toBe("oscabriel/burrow");
         expect(attributeOf(row ?? "", "data-takeable")).toBe("true");
       })
   );
@@ -189,7 +189,7 @@ describe(Row, () => {
       Effect.gen(function* () {
         const markup = yield* rowsAt(
           <Row
-            href="/datekit/asks/a"
+            href="/oscabriel/datekit/asks/a"
             id="a"
             state={{ mark: "landed", word: "Landed" }}
             title="Format ordinals"
@@ -206,7 +206,12 @@ describe(Row, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* rowsAt(
-          <Row href="/datekit/asks/a" id="a" selected title="Format ordinals" />
+          <Row
+            href="/oscabriel/datekit/asks/a"
+            id="a"
+            selected
+            title="Format ordinals"
+          />
         );
 
         expect(markup).toContain('data-selected="true"');
@@ -219,12 +224,16 @@ describe(Row, () => {
     () =>
       Effect.gen(function* () {
         const plain = yield* rowsAt(
-          <Row href="/datekit/asks/a" id="a" title="Format ordinals" />
+          <Row
+            href="/oscabriel/datekit/asks/a"
+            id="a"
+            title="Format ordinals"
+          />
         );
 
         const selecting = yield* rowsAt(
           <Row
-            href="/datekit/asks/a"
+            href="/oscabriel/datekit/asks/a"
             id="a"
             onSelect={() => {}}
             title="Format ordinals"
@@ -247,7 +256,7 @@ describe(Row, () => {
           <Row
             action={<button type="button">Copy</button>}
             data={{ "data-ask": "a" }}
-            href="/datekit/asks/a"
+            href="/oscabriel/datekit/asks/a"
             id="a"
             title="Format ordinals"
           />
@@ -267,9 +276,13 @@ describe(Row, () => {
         "/",
         <RowGroup
           counts="7 open · 6 to take"
-          name={<a href="/datekit">datekit</a>}
+          name={<a href="/oscabriel/datekit">datekit</a>}
         >
-          <Row href="/datekit/asks/a" id="a" title="Format ordinals" />
+          <Row
+            href="/oscabriel/datekit/asks/a"
+            id="a"
+            title="Format ordinals"
+          />
         </RowGroup>
       );
 

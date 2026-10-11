@@ -55,7 +55,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
         budget: { finishes: 0, total: 5, used: 2 },
         decider: "ines-v",
         newcomers: ["bram"],
-        projects: ["datekit"],
+        projects: ["oscabriel/datekit"],
         subjects: ["OpenProposal", "OpenProposal", "StrayPush"],
         unattended: ["diff-in-days-dst"],
       });

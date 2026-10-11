@@ -6,6 +6,7 @@ import {
   RouteError,
 } from "./features/shared/pending.tsx";
 import { routeTree } from "./routeTree.gen.ts";
+import { addressRewrite } from "./server/addresses.ts";
 
 /**
  * TanStack Start's router, over the route tree the Vite plugin generates.
@@ -22,6 +23,8 @@ import { routeTree } from "./routeTree.gen.ts";
  *   `NotFoundPage`, both inside the shell, never the router's own.
  * - Each new page's main pane (and its inspector) starts at its top; going
  *   back returns each to where it was.
+ * - A project at its source path (`/github.com/pallets/click`) is read by
+ *   the same pages as `/oscabriel/datekit` (`addressRewrite`).
  */
 export const getRouter = () =>
   createRouter({
@@ -33,6 +36,7 @@ export const getRouter = () =>
     defaultPreloadDelay: 50,
     defaultPreloadStaleTime: 30_000,
     defaultStaleTime: 10_000,
+    rewrite: addressRewrite,
     routeTree,
     scrollRestoration: true,
     scrollToTopSelectors: ["#main", "#facts"],

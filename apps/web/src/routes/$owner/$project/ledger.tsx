@@ -12,13 +12,13 @@ import { env } from "cloudflare:workers";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 
-import { ledgerAtom } from "../../client/ledger.ts";
-import { watchAtom } from "../../client/watch.ts";
-import { LedgerView } from "../../features/ledger/ledger-page.tsx";
-import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageHead } from "../../features/shared/head.ts";
-import { branchPage } from "../../server/cache-headers.ts";
-import { serverClient } from "../../server/client.ts";
+import { ledgerAtom } from "../../../client/ledger.ts";
+import { watchAtom } from "../../../client/watch.ts";
+import { LedgerView } from "../../../features/ledger/ledger-page.tsx";
+import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
+import { pageHead } from "../../../features/shared/head.ts";
+import { branchPage } from "../../../server/cache-headers.ts";
+import { serverClient } from "../../../server/client.ts";
 
 // A project's ledger, as anyone may read it. The loader reads it on the
 // server, so the page arrives whole and an address naming no project is a
@@ -99,7 +99,7 @@ const Unknown = () => {
   return <UnknownProjectView name={project} />;
 };
 
-export const Route = createFileRoute("/$project/ledger")({
+export const Route = createFileRoute("/$owner/$project/ledger")({
   loader: ({ params }) => ledgerPage({ data: params.project }),
   // A ledger moves with the project's next entry: kept briefly, read again behind.
   headers: () => branchPage,

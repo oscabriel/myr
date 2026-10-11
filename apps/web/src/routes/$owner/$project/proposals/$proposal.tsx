@@ -15,18 +15,18 @@ import {
   draftAtom,
   projectTodayAtom,
   proposalAtom,
-} from "../../../client/proposal.ts";
-import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
-import { watchAtom } from "../../../client/watch.ts";
-import { NotFoundView } from "../../../features/ask/refused.tsx";
-import { hereOf } from "../../../features/auth/session-slot.tsx";
-import { whoAtom } from "../../../features/auth/who.ts";
-import { ProposalFailure } from "../../../features/proposal/failure.tsx";
-import { ProposalView } from "../../../features/proposal/proposal-view.tsx";
-import { pageHead } from "../../../features/shared/head.ts";
-import { notFoundFor, Refusals } from "../../../features/shared/refusals.ts";
-import { personalPage } from "../../../server/cache-headers.ts";
-import { serverClient } from "../../../server/client.ts";
+} from "../../../../client/proposal.ts";
+import { SeededAtoms, seedSuccess } from "../../../../client/seeded.ts";
+import { watchAtom } from "../../../../client/watch.ts";
+import { NotFoundView } from "../../../../features/ask/refused.tsx";
+import { hereOf } from "../../../../features/auth/session-slot.tsx";
+import { whoAtom } from "../../../../features/auth/who.ts";
+import { ProposalFailure } from "../../../../features/proposal/failure.tsx";
+import { ProposalView } from "../../../../features/proposal/proposal-view.tsx";
+import { pageHead } from "../../../../features/shared/head.ts";
+import { notFoundFor, Refusals } from "../../../../features/shared/refusals.ts";
+import { personalPage } from "../../../../server/cache-headers.ts";
+import { serverClient } from "../../../../server/client.ts";
 
 // `/$project/proposals/$proposal`: one proposal and the platform's draft of
 // its ask. The loader reads `showProposal` on the server, so the page
@@ -180,7 +180,7 @@ const Unknown = ({ data }: { readonly data?: unknown }) => (
   />
 );
 
-export const Route = createFileRoute("/$project/proposals/$proposal")({
+export const Route = createFileRoute("/$owner/$project/proposals/$proposal")({
   loader: ({ params }) => proposalPage({ data: params }),
   // Who may draft it again and the decision on it are the reader's own.
   headers: () => personalPage,

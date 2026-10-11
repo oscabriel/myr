@@ -133,7 +133,7 @@ describe(proposalPayload, () => {
 
     expect(payload).toStrictEqual({
       draft: true,
-      project: "datekit",
+      project: "oscabriel/datekit",
       want: "formatISO keeps the offset.",
     });
     expect(isPayload(payload)).toBeTruthy();
@@ -148,7 +148,7 @@ describe(proposalPayload, () => {
     });
 
     expect(payload).toStrictEqual({
-      project: "datekit",
+      project: "oscabriel/datekit",
       territory: "src",
       want: "formatISO keeps the offset.",
     });
@@ -237,7 +237,7 @@ describe("the sign-in link", () => {
 
     const there = new URL(back ?? "/", "https://web.test");
 
-    expect(there.pathname).toBe("/datekit/proposals/new");
+    expect(there.pathname).toBe("/oscabriel/datekit/proposals/new");
     expect(Object.fromEntries(there.searchParams)).toStrictEqual({
       about: "src/format.ts",
       at,
@@ -248,7 +248,7 @@ describe("the sign-in link", () => {
 
 describe("a refused send on the propose form", () => {
   it("with no session, asks to sign in and come back to the form as it was", () => {
-    const here = `/datekit/proposals/new?about=src%2Fformat.ts&at=${at}&line=12`;
+    const here = `/oscabriel/datekit/proposals/new?about=src%2Fformat.ts&at=${at}&line=12`;
 
     const markup = markupOf(
       <ProposalFailure
@@ -259,7 +259,7 @@ describe("a refused send on the propose form", () => {
     );
 
     expect(markup).toContain(
-      `href="/auth/signin?return=%2Fdatekit%2Fproposals%2Fnew%3Fabout%3Dsrc%252Fformat.ts%26at%3D${at}%26line%3D12"`
+      `href="/auth/signin?return=%2Foscabriel%2Fdatekit%2Fproposals%2Fnew%3Fabout%3Dsrc%252Fformat.ts%26at%3D${at}%26line%3D12"`
     );
     expect(plainText(markup)).not.toContain("Today is a decider's page");
   });

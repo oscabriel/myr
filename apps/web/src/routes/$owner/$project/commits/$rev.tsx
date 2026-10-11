@@ -11,15 +11,15 @@ import {
   projectOf,
   repoPathOf,
   revisionOf,
-} from "../../../features/code/address.ts";
-import { LOG_PAGE } from "../../../features/code/log-page.ts";
-import { LogView } from "../../../features/code/log-view.tsx";
-import type { LogShow } from "../../../features/code/log-view.tsx";
-import { CodeNotFound } from "../../../features/code/not-found.tsx";
-import { pageHead } from "../../../features/shared/head.ts";
-import { notFoundFor } from "../../../features/shared/refusals.ts";
-import { branchPage } from "../../../server/cache-headers.ts";
-import { serverClient } from "../../../server/client.ts";
+} from "../../../../features/code/address.ts";
+import { LOG_PAGE } from "../../../../features/code/log-page.ts";
+import { LogView } from "../../../../features/code/log-view.tsx";
+import type { LogShow } from "../../../../features/code/log-view.tsx";
+import { CodeNotFound } from "../../../../features/code/not-found.tsx";
+import { pageHead } from "../../../../features/shared/head.ts";
+import { notFoundFor } from "../../../../features/shared/refusals.ts";
+import { branchPage } from "../../../../server/cache-headers.ts";
+import { serverClient } from "../../../../server/client.ts";
 
 // The landings: the log from a revision, a page at a time (`?from=` is
 // where the page starts), only the commits that changed `?path=` when
@@ -104,7 +104,7 @@ const LogPage = () => {
   );
 };
 
-export const Route = createFileRoute("/$project/commits/$rev")({
+export const Route = createFileRoute("/$owner/$project/commits/$rev")({
   validateSearch: (search: {
     readonly from?: unknown;
     readonly path?: unknown;

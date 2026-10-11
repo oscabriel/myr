@@ -35,6 +35,7 @@ import {
   CheckVersion,
   CommitSha,
   LandedSha,
+  keyOf,
   LaneName,
   PatchId,
   RepoName,
@@ -155,7 +156,7 @@ export const storyOf = (input: {
   Effect.gen(function* () {
     const host = yield* RepoHost;
     const { project } = input;
-    const repo = RepoName.make(project);
+    const repo = RepoName.make(keyOf(project));
     const main = RefName.make("refs/heads/main");
 
     let head = input.base;
@@ -796,7 +797,7 @@ export const storyOf = (input: {
             base: each.base,
             checkCommand: `${Brand.cli} check`,
             claimant: each.claimant,
-            fork: RepoName.make(`${project}--${ask}--${each.claimant}`),
+            fork: RepoName.make(`${keyOf(project)}--${ask}--${each.claimant}`),
             lapsesAt: DateTime.add(each.lastPush ?? each.at, input.lapseAfter),
             openedAt: each.at,
             project,
@@ -819,7 +820,7 @@ export const storyOf = (input: {
           ...apart.working.map((handle): ForkRef => ({
             handle,
             kind: "working",
-            repo: RepoName.make(`${project}--me--${handle}`),
+            repo: RepoName.make(`${keyOf(project)}--me--${handle}`),
           })),
         ];
 

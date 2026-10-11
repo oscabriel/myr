@@ -221,13 +221,15 @@ describe(TerritoryFacts, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/datekit",
+          "/oscabriel/datekit",
           <TerritoryFacts ask={ask} />
         );
 
-        expect(markup).toContain('href="/datekit/tree/main/packages/parse"');
         expect(markup).toContain(
-          'href="/datekit/blob/main/test/parse-week.test.ts"'
+          'href="/oscabriel/datekit/tree/main/packages/parse"'
+        );
+        expect(markup).toContain(
+          'href="/oscabriel/datekit/blob/main/test/parse-week.test.ts"'
         );
         expect(markup).toContain("red first");
       })
@@ -238,7 +240,7 @@ describe(TerritoryFacts, () => {
     () =>
       Effect.gen(function* () {
         const paths = yield* renderAt(
-          "/datekit",
+          "/oscabriel/datekit",
           <TerritoryFacts
             ask={{
               ...ask,
@@ -248,7 +250,7 @@ describe(TerritoryFacts, () => {
         );
 
         const whole = yield* renderAt(
-          "/datekit",
+          "/oscabriel/datekit",
           <TerritoryFacts
             ask={{
               ...ask,
@@ -259,7 +261,7 @@ describe(TerritoryFacts, () => {
 
         expect(textIn(paths)).toContain("src/parse.ts");
         expect(textIn(paths)).not.toContain("The whole project");
-        expect(whole).toContain('href="/datekit/tree/main"');
+        expect(whole).toContain('href="/oscabriel/datekit/tree/main"');
       })
   );
 });

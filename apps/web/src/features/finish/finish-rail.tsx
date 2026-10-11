@@ -39,13 +39,13 @@ const Placeholder = () => (
 
 export const FinishRail = () => {
   const data: unknown = useMatch({
-    from: "/$project/decisions/$decision",
+    from: "/$owner/$project/decisions/$decision",
     select: (match) => match.loaderData,
     shouldThrow: false,
   });
 
   const project = useMatch({
-    from: "/$project/decisions/$decision",
+    from: "/$owner/$project/decisions/$decision",
     select: (match) => match.params.project,
     shouldThrow: false,
   });

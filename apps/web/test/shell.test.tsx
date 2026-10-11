@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { ProjectName } from "@repo/protocol/ids";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -14,12 +15,14 @@ import {
   createRouter,
   Outlet,
   RouterProvider,
+  useParams,
 } from "@tanstack/react-router";
 import { Effect } from "effect";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import { PageShell } from "../src/features/shared/layout.tsx";
 import { AppLink } from "../src/features/shared/link.tsx";
+import { projectPath } from "../src/features/shared/paths.ts";
 import { RouteError } from "../src/features/shared/pending.tsx";
 import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
 import { RailSlot } from "../src/features/shared/shell/rail-slot.tsx";
@@ -60,7 +63,10 @@ const textOf = (markup: string) =>
 const ledgerPage = (facts: boolean) => (
   <AppShell>
     <Workspace
-      crumbs={[{ label: "datekit", to: "/datekit" }, { label: "Ledger" }]}
+      crumbs={[
+        { label: "oscabriel/datekit", to: "/oscabriel/datekit" },
+        { label: "Ledger" },
+      ]}
       title="Ledger"
       {...(facts
         ? { facts: <p>Posture: open</p>, factsHeading: "This ledger" }
@@ -83,7 +89,11 @@ describe("the shell", () => {
     "names the site's sections in the rail, each a word, and the project's under it with the page being read current",
     () =>
       Effect.gen(function* () {
-        const markup = yield* renderAt("/datekit/ledger", ledgerPage(true));
+        const markup = yield* renderAt(
+          "/oscabriel/datekit/ledger",
+          ledgerPage(true)
+        );
+
         const rail = elementOf(markup, "nav", 'aria-label="Site"');
         const links = linksOf(rail);
 
@@ -110,18 +120,27 @@ describe("the shell", () => {
           links
             .filter(
               ({ href }) =>
-                href?.startsWith("/datekit/") === true || href === "/datekit"
+                href?.startsWith("/oscabriel/datekit/") === true ||
+                href === "/oscabriel/datekit"
             )
             .map(({ href, text, current }) => ({ current, href, text }))
-            .filter(({ text }) => text !== "datekit")
+            .filter(({ text }) => text !== "oscabriel/datekit")
         ).toStrictEqual([
-          { current: false, href: "/datekit", text: "Asks" },
-          { current: false, href: "/datekit/tree/main", text: "Code" },
-          { current: false, href: "/datekit/commits/main", text: "Landings" },
-          { current: false, href: "/datekit/refs", text: "Refs" },
-          { current: false, href: "/datekit/people", text: "Policy" },
-          { current: true, href: "/datekit/ledger", text: "Ledger" },
-          { current: false, href: "/datekit/env", text: "Env shape" },
+          { current: false, href: "/oscabriel/datekit", text: "Asks" },
+          {
+            current: false,
+            href: "/oscabriel/datekit/tree/main",
+            text: "Code",
+          },
+          {
+            current: false,
+            href: "/oscabriel/datekit/commits/main",
+            text: "Landings",
+          },
+          { current: false, href: "/oscabriel/datekit/refs", text: "Refs" },
+          { current: false, href: "/oscabriel/datekit/people", text: "Policy" },
+          { current: true, href: "/oscabriel/datekit/ledger", text: "Ledger" },
+          { current: false, href: "/oscabriel/datekit/env", text: "Env shape" },
         ]);
       })
   );
@@ -131,13 +150,15 @@ describe("the shell", () => {
     () =>
       Effect.gen(function* () {
         const rail = elementOf(
-          yield* renderAt("/datekit/ledger", ledgerPage(false)),
+          yield* renderAt("/oscabriel/datekit/ledger", ledgerPage(false)),
           "nav",
           'aria-label="Site"'
         );
 
         expect(textOf(rail)).toContain("Projects");
-        expect(linksOf(rail).map(({ text }) => text)).toContain("datekit");
+        expect(linksOf(rail).map(({ text }) => text)).toContain(
+          "oscabriel/datekit"
+        );
       })
   );
 
@@ -155,7 +176,7 @@ describe("the shell", () => {
 
         const ledger = linksOf(
           elementOf(
-            yield* renderAt("/datekit/ledger", ledgerPage(false)),
+            yield* renderAt("/oscabriel/datekit/ledger", ledgerPage(false)),
             "nav",
             'aria-label="Site"'
           )
@@ -168,7 +189,7 @@ describe("the shell", () => {
           {
             active: true,
             current: true,
-            href: "/datekit/ledger",
+            href: "/oscabriel/datekit/ledger",
             text: "Ledger",
           },
         ]);
@@ -207,7 +228,7 @@ describe("the shell", () => {
       );
 
       expect(linksOf(rail).map(({ href }) => href)).not.toContain(
-        "/datekit/ledger"
+        "/oscabriel/datekit/ledger"
       );
     })
   );
@@ -216,14 +237,23 @@ describe("the shell", () => {
     "gives the page one main region, its context bar naming the project and the page",
     () =>
       Effect.gen(function* () {
-        const markup = yield* renderAt("/datekit/ledger", ledgerPage(true));
+        const markup = yield* renderAt(
+          "/oscabriel/datekit/ledger",
+          ledgerPage(true)
+        );
+
         const main = elementOf(markup, "main", 'id="main"');
         const crumbs = elementOf(main, "nav", 'aria-label="Breadcrumb"');
 
         expect(main).toContain("<p>Entries</p>");
-        expect(textOf(crumbs)).toBe("datekit / Ledger");
+        expect(textOf(crumbs)).toBe("oscabriel/datekit / Ledger");
         expect(linksOf(crumbs)).toStrictEqual([
-          { active: false, current: false, href: "/datekit", text: "datekit" },
+          {
+            active: false,
+            current: false,
+            href: "/oscabriel/datekit",
+            text: "oscabriel/datekit",
+          },
         ]);
         expect(main).toMatch(/<h1\b[^>]*>Ledger<\/h1>/u);
       })
@@ -234,7 +264,7 @@ describe("the shell", () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/datekit/env",
+          "/oscabriel/datekit/env",
           <AppShell>
             <PageShell title="Env shape of datekit">
               <p>Items</p>
@@ -244,7 +274,7 @@ describe("the shell", () => {
 
         expect(
           textOf(elementOf(markup, "nav", 'aria-label="Breadcrumb"'))
-        ).toBe("datekit / Env shape");
+        ).toBe("oscabriel/datekit / Env shape");
       })
   );
 
@@ -252,8 +282,15 @@ describe("the shell", () => {
     "gives the facts an inspector named Facts when the page has some, and none when it has none",
     () =>
       Effect.gen(function* () {
-        const withFacts = yield* renderAt("/datekit/ledger", ledgerPage(true));
-        const without = yield* renderAt("/datekit/ledger", ledgerPage(false));
+        const withFacts = yield* renderAt(
+          "/oscabriel/datekit/ledger",
+          ledgerPage(true)
+        );
+
+        const without = yield* renderAt(
+          "/oscabriel/datekit/ledger",
+          ledgerPage(false)
+        );
 
         expect(elementOf(withFacts, "aside", 'aria-label="Facts"')).toContain(
           "Posture: open"
@@ -270,7 +307,7 @@ describe("the shell", () => {
     () =>
       Effect.gen(function* () {
         const bar = elementOf(
-          yield* renderAt("/datekit/ledger", ledgerPage(false)),
+          yield* renderAt("/oscabriel/datekit/ledger", ledgerPage(false)),
           "nav",
           'aria-label="Sections"'
         );
@@ -299,16 +336,57 @@ describe("the shell", () => {
     "keeps the rail's slot for a page that fills it, and none for a page that does not",
     () =>
       Effect.gen(function* () {
-        const code = yield* renderAt("/datekit/tree/main", ledgerPage(false), {
-          rail: Tree,
-        });
+        const code = yield* renderAt(
+          "/oscabriel/datekit/tree/main",
+          ledgerPage(false),
+          {
+            rail: Tree,
+          }
+        );
 
-        const ledger = yield* renderAt("/datekit/ledger", ledgerPage(false));
+        const ledger = yield* renderAt(
+          "/oscabriel/datekit/ledger",
+          ledgerPage(false)
+        );
 
         expect(elementOf(code, "nav", 'aria-label="Site"')).toContain(
           "<p>src/add.ts</p>"
         );
         expect(ledger).not.toContain("src/add.ts");
+      })
+  );
+});
+
+/** The project route's params as the page reads them, and a link to the same page. */
+const ProjectParamsView = () => {
+  const { owner, project } = useParams({ strict: false });
+
+  return (
+    <p data-owner={owner} data-project={project}>
+      <AppLink
+        to={`${projectPath(ProjectName.make("github.com/pallets/click"))}/tree/main`}
+      >
+        tree
+      </AppLink>
+    </p>
+  );
+};
+
+describe("a project at its source path", () => {
+  it.effect(
+    "reaches the project's pages with its owner in one param, and links back to the same address",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/github.com/pallets/click/tree/main",
+          <ProjectParamsView />
+        );
+
+        expect(markup).toContain('data-owner="github.com/pallets"');
+        expect(markup).toContain('data-project="github.com/pallets/click"');
+        expect(linksOf(markup).map(({ href }) => href)).toStrictEqual([
+          "/github.com/pallets/click/tree/main",
+        ]);
       })
   );
 });
@@ -320,7 +398,7 @@ describe("the shell's controls", () => {
   it.effect("set every button in the rail at the UI size", () =>
     Effect.gen(function* () {
       const rail = elementOf(
-        yield* renderAt("/datekit/tree/main", ledgerPage(false), {
+        yield* renderAt("/oscabriel/datekit/tree/main", ledgerPage(false), {
           rail: Tree,
         }),
         "nav",
@@ -346,12 +424,14 @@ describe(AppLink, () => {
   it.effect("leads to a path holding $ or braces as written", () =>
     Effect.gen(function* () {
       const markup = yield* renderAt(
-        "/datekit/ledger",
+        "/oscabriel/datekit/ledger",
         <p>
-          <AppLink to="/datekit/blob/main/src/routes/$project/$.tsx">
+          <AppLink to="/oscabriel/datekit/blob/main/src/routes/$owner/$project/$.tsx">
             route
           </AppLink>
-          <AppLink to="/datekit/blob/main/src/{-$x}.ts">optional</AppLink>
+          <AppLink to="/oscabriel/datekit/blob/main/src/{-$x}.ts">
+            optional
+          </AppLink>
         </p>
       );
 
@@ -359,8 +439,8 @@ describe(AppLink, () => {
 
       expect(hrefs.map((href) => decodeURIComponent(href ?? ""))).toStrictEqual(
         [
-          "/datekit/blob/main/src/routes/$project/$.tsx",
-          "/datekit/blob/main/src/{-$x}.ts",
+          "/oscabriel/datekit/blob/main/src/routes/$owner/$project/$.tsx",
+          "/oscabriel/datekit/blob/main/src/{-$x}.ts",
         ]
       );
     })
@@ -369,12 +449,12 @@ describe(AppLink, () => {
   it("draws the same address with no router around it", () => {
     expect(
       renderToStaticMarkup(
-        <AppLink to="/datekit/blob/main/src/routes/$project/$.tsx">
+        <AppLink to="/oscabriel/datekit/blob/main/src/routes/$owner/$project/$.tsx">
           route
         </AppLink>
       )
     ).toMatch(
-      /href="\/datekit\/blob\/main\/src\/routes\/(?:\$|%24)project\/(?:\$|%24)\.tsx"/u
+      /href="\/oscabriel\/datekit\/blob\/main\/src\/routes\/(?:\$|%24)owner\/(?:\$|%24)project\/(?:\$|%24)\.tsx"/u
     );
   });
 });
@@ -429,12 +509,14 @@ describe("a page whose read fails", () => {
       const failing = createRoute({
         getParentRoute: () => root,
         loader: () => Promise.reject(new Error("fetch failed")),
-        path: "$project",
+        path: "$owner/$project",
       });
 
       const router = createRouter({
         defaultErrorComponent: RouteError,
-        history: createMemoryHistory({ initialEntries: ["/datekit"] }),
+        history: createMemoryHistory({
+          initialEntries: ["/oscabriel/datekit"],
+        }),
         routeTree: root.addChildren([failing]),
       });
 

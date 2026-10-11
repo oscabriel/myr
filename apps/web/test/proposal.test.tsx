@@ -28,7 +28,7 @@ import {
   DRAFT_ATTEMPTS,
   ProposalView,
 } from "../src/features/proposal/proposal-view.tsx";
-import { readProposal } from "../src/routes/$project/proposals/$proposal.tsx";
+import { readProposal } from "../src/routes/$owner/$project/proposals/$proposal.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { markupOf, plainText } from "./ask-fixtures.ts";
 
@@ -177,7 +177,7 @@ describe(ProposalView, () => {
       "fails twice the same way in lane unit: expected '+02:00', got 'Z'"
     );
     expect(text).toContain(`drafted by ${model}, attempt 2 of 3`);
-    expect(markup).toContain('href="/datekit/decisions/dec-000003"');
+    expect(markup).toContain('href="/oscabriel/datekit/decisions/dec-000003"');
   });
 
   it("once ready, draws nothing in the checking role", () => {
@@ -262,7 +262,7 @@ describe(ProposalView, () => {
 });
 
 describe("a failed call on the proposal page", () => {
-  const here = "/datekit/proposals/prop-000007";
+  const here = "/oscabriel/datekit/proposals/prop-000007";
 
   it("with no session, asks to sign in and come back to the page", () => {
     const markup = markupOf(
@@ -274,7 +274,7 @@ describe("a failed call on the proposal page", () => {
     );
 
     expect(markup).toContain(
-      'href="/auth/signin?return=%2Fdatekit%2Fproposals%2Fprop-000007"'
+      'href="/auth/signin?return=%2Foscabriel%2Fdatekit%2Fproposals%2Fprop-000007"'
     );
     expect(plainText(markup)).toContain("Sign in");
     expect(plainText(markup)).not.toContain("Today is a decider's page");

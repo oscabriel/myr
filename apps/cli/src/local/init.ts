@@ -102,7 +102,7 @@ const flags = {
   ),
   project: Flag.String("project").pipe(
     Flag.withDescription(
-      "The project's name; by default this repo's folder, or the imported repo's name."
+      "The project's name, <owner>/<name>; a bare name is yours (<your handle>/<name>). By default this repo's folder, or an import's source path."
     ),
     Flag.optional
   ),

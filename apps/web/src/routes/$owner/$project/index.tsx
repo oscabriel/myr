@@ -14,41 +14,42 @@ import { AsyncResult } from "effect/reactivity";
 import { useMemo } from "react";
 import type { ReactNode } from "react";
 
-import { selectedAskAtom } from "../../client/ask.ts";
-import { projectCodeAtom } from "../../client/code.ts";
-import { projectEventsAtom, recentLandings } from "../../client/events.ts";
+import { selectedAskAtom } from "../../../client/ask.ts";
+import { projectCodeAtom } from "../../../client/code.ts";
+import { projectEventsAtom, recentLandings } from "../../../client/events.ts";
 import {
   asksAtom,
   projectLedgerAtom,
   projectPolicyAtom,
-} from "../../client/project.ts";
-import { SeededAtoms, seedSuccess } from "../../client/seeded.ts";
-import type { Seed } from "../../client/seeded.ts";
-import { watchAtom } from "../../client/watch.ts";
-import { useSignedIn } from "../../features/auth/session-slot.tsx";
-import { ledeOf } from "../../features/front/head.ts";
+} from "../../../client/project.ts";
+import { SeededAtoms, seedSuccess } from "../../../client/seeded.ts";
+import type { Seed } from "../../../client/seeded.ts";
+import { watchAtom } from "../../../client/watch.ts";
+import { useSignedIn } from "../../../features/auth/session-slot.tsx";
+import { ledeOf } from "../../../features/front/head.ts";
 import {
   markdownAlternateLink,
   markdownLink,
-} from "../../features/front/markdown.ts";
-import { useStamps } from "../../features/front/stamps.ts";
+} from "../../../features/front/markdown.ts";
+import { useStamps } from "../../../features/front/stamps.ts";
 import {
   ProjectView,
   heldBackOf,
   homeListing,
-} from "../../features/project/project-page.tsx";
-import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { askStates } from "../../features/shared/ask-progress.ts";
-import { pageHead } from "../../features/shared/head.ts";
-import { reloadOnEnter } from "../../features/shared/shell/selection.ts";
-import { branchPage } from "../../server/cache-headers.ts";
-import { serverClient } from "../../server/client.ts";
+} from "../../../features/project/project-page.tsx";
+import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
+import { askStates } from "../../../features/shared/ask-progress.ts";
+import { pageHead } from "../../../features/shared/head.ts";
+import { reloadOnEnter } from "../../../features/shared/shell/selection.ts";
+import { withProjectName } from "../../../server/addresses.ts";
+import { branchPage } from "../../../server/cache-headers.ts";
+import { serverClient } from "../../../server/client.ts";
 import {
   ProjectPageData,
   decodeName,
   projectPageHandler,
   readProjectPage,
-} from "../../server/project-page.ts";
+} from "../../../server/project-page.ts";
 
 // A project's home, which is its list of asks. The loader reads, on the
 // server and at once, the project's asks, its own ledger (its posture), its
@@ -294,7 +295,7 @@ const Unknown = () => {
   return <UnknownProjectView name={project} />;
 };
 
-export const Route = createFileRoute("/$project/")({
+export const Route = createFileRoute("/$owner/$project/")({
   // TanStack infers each option from the ones before it.
   validateSearch: ({ ask }: { readonly ask?: unknown }) =>
     Predicate.isString(ask) ? { ask } : {},
@@ -306,9 +307,11 @@ export const Route = createFileRoute("/$project/")({
   notFoundComponent: Unknown,
   server: {
     handlers: {
-      GET: projectPageHandler(
-        (request) => serverClient(env, request),
-        env.PUBLIC_PLATFORM_URL
+      GET: withProjectName(
+        projectPageHandler(
+          (request) => serverClient(env, request),
+          env.PUBLIC_PLATFORM_URL
+        )
       ),
     },
   },

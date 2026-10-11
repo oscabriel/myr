@@ -145,7 +145,7 @@ describe(AskView, () => {
     const trail = trailOf(markupOf(page()));
 
     expect(inOrder(plainText(trail), ["datekit", "Asks", askId])).toBeTruthy();
-    expect(trail).toContain('href="/datekit"');
+    expect(trail).toContain('href="/oscabriel/datekit"');
   });
 
   it("says an open ask is open to take, who it is held for, and gives its kind, asker and age", () => {
@@ -177,15 +177,15 @@ describe(AskView, () => {
       ])
     ).toBeTruthy();
     expect(markupOf(page())).toContain(
-      'href="/datekit/blob/main/test/parse-week.test.ts"'
+      'href="/oscabriel/datekit/blob/main/test/parse-week.test.ts"'
     );
   });
 
   it("gives the lines that clone the project, claim the ask and check an answer, with the CLI's own name", () => {
     expect(
       inOrder(textOf(page()), [
-        `git clone ${platformUrl}/datekit.git`,
-        `${Brand.cli} claim ${askId} --project datekit`,
+        `git clone ${platformUrl}/oscabriel/datekit.git`,
+        `${Brand.cli} claim ${askId} --project oscabriel/datekit`,
         `${Brand.cli} check`,
       ])
     ).toBeTruthy();
@@ -243,7 +243,7 @@ describe(AskView, () => {
     expect(textOf(page({ ...ask, state: "closed" }, { states }))).toContain(
       "Landed as 9b1c3e5"
     );
-    expect(markup).toContain(`href="/datekit/commit/${landedSha}"`);
+    expect(markup).toContain(`href="/oscabriel/datekit/commit/${landedSha}"`);
   });
 
   it("gives a round the word its landing or verdict has since said, not the one it was judged with", () => {
@@ -280,7 +280,7 @@ describe(AskView, () => {
 
     const rows = [
       ...main.matchAll(
-        /href="\/datekit\/answers\/parse-iso-week\?head=(?<head>[0-9a-f]+)"/gu
+        /href="\/oscabriel\/datekit\/answers\/parse-iso-week\?head=(?<head>[0-9a-f]+)"/gu
       ),
     ].map(({ groups }) => groups?.head);
 
@@ -315,7 +315,7 @@ describe(AskView, () => {
 
     expect(markup).not.toContain('data-code="plain"');
     expect(markup).toContain(
-      'href="/datekit/blob/main/test/parse-week.test.ts"'
+      'href="/oscabriel/datekit/blob/main/test/parse-week.test.ts"'
     );
   });
 
@@ -358,7 +358,9 @@ describe(AskView, () => {
       "Waits for 2 of 3 children and the delete step to land first; a claim waits until they do."
     );
     expect(plainText(markup)).not.toContain("Waits on");
-    expect(markup).toContain(`href="/datekit/asks/${deleteChild.id}"`);
+    expect(markup).toContain(
+      `href="/oscabriel/datekit/asks/${deleteChild.id}"`
+    );
   });
 
   it("says a family's parent whose children all landed waits only for the delete step", () => {
@@ -390,8 +392,8 @@ describe(AskView, () => {
         "to land first",
       ])
     ).toBeTruthy();
-    expect(markup).toContain('href="/datekit/asks/split-format"');
-    expect(markup).toContain('href="/datekit/asks/split-parse"');
+    expect(markup).toContain('href="/oscabriel/datekit/asks/split-format"');
+    expect(markup).toContain('href="/oscabriel/datekit/asks/split-parse"');
   });
 
   it("names nothing it waits on when nothing blocks it, or what blocked it landed", () => {
@@ -416,8 +418,8 @@ describe(AskView, () => {
   it("links to the ask's Markdown and to the verdict on its latest answer", () => {
     const markup = markupOf(page());
 
-    expect(markup).toContain(`href="/datekit/asks/${askId}.md"`);
-    expect(markup).toContain(`href="/datekit/answers/${askId}"`);
+    expect(markup).toContain(`href="/oscabriel/datekit/asks/${askId}.md"`);
+    expect(markup).toContain(`href="/oscabriel/datekit/answers/${askId}"`);
   });
 
   it("shows the brief exactly as an agent reads it", () => {
@@ -454,7 +456,7 @@ describe(NoSuchAsk, () => {
   it("offers the way onward: the project, and the open asks", () => {
     const markup = markupOf(<NoSuchAsk project="datekit" />);
 
-    expect(markup).toContain('href="/datekit"');
+    expect(markup).toContain('href="/oscabriel/datekit"');
     expect(markup).toContain('href="/asks"');
     expect(textOf(<NoSuchAsk project="datekit" />)).toContain("Open asks");
   });
@@ -468,7 +470,7 @@ describe(NoSuchAsk, () => {
     );
 
     expect(inOrder(plainText(trail), ["datekit", "Asks"])).toBeTruthy();
-    expect(trail).toContain('href="/datekit"');
+    expect(trail).toContain('href="/oscabriel/datekit"');
     expect(trail).not.toContain("no-such-ask");
   });
 

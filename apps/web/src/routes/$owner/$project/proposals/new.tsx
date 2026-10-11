@@ -1,5 +1,5 @@
 import { useAtom, useAtomValue } from "@effect/atom-react";
-import { CommitSha, ProjectName, RepoPath } from "@repo/protocol/ids";
+import { CommitSha, ownerOf, ProjectName, RepoPath } from "@repo/protocol/ids";
 import {
   createFileRoute,
   useLocation,
@@ -13,14 +13,14 @@ import {
   modulesAtom,
   proposalMade,
   proposeAtom,
-} from "../../../client/propose.ts";
-import { hereOf } from "../../../features/auth/session-slot.tsx";
-import { whoAtom } from "../../../features/auth/who.ts";
-import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
-import { ProposalFailure } from "../../../features/proposal/failure.tsx";
-import { ProposeView } from "../../../features/propose/propose-view.tsx";
-import type { About } from "../../../features/propose/propose-view.tsx";
-import { pageHead } from "../../../features/shared/head.ts";
+} from "../../../../client/propose.ts";
+import { hereOf } from "../../../../features/auth/session-slot.tsx";
+import { whoAtom } from "../../../../features/auth/who.ts";
+import { UnknownProjectView } from "../../../../features/project/unknown-project.tsx";
+import { ProposalFailure } from "../../../../features/proposal/failure.tsx";
+import { ProposeView } from "../../../../features/propose/propose-view.tsx";
+import type { About } from "../../../../features/propose/propose-view.tsx";
+import { pageHead } from "../../../../features/shared/head.ts";
 
 // `/$project/proposals/new`: the propose form. Who is signed in and the
 // project's top folders are read in the browser (the server paints the
@@ -77,8 +77,8 @@ const Propose = ({ project }: { readonly project: ProjectName }) => {
   useEffect(() => {
     if (made !== undefined) {
       void navigate({
-        params: { project, proposal: made },
-        to: "/$project/proposals/$proposal",
+        params: { owner: ownerOf(project), project, proposal: made },
+        to: "/$owner/$project/proposals/$proposal",
       });
     }
   }, [made, navigate, project]);
@@ -118,7 +118,7 @@ const Page = () => {
   });
 };
 
-export const Route = createFileRoute("/$project/proposals/new")({
+export const Route = createFileRoute("/$owner/$project/proposals/new")({
   component: Page,
   validateSearch: (search: {
     readonly about?: unknown;

@@ -20,7 +20,7 @@ import { RpcTest } from "effect/rpc";
 
 import { EnvView, NothingLanded } from "../src/features/env/env-page.tsx";
 import { ProjectView } from "../src/features/project/project-page.tsx";
-import { readEnv } from "../src/routes/$project/env.tsx";
+import { readEnv } from "../src/routes/$owner/$project/env.tsx";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
 import { elementWith, inspectorOf, mainOf } from "./records.ts";
@@ -199,7 +199,7 @@ describe("a project's env shape", () => {
       ])
     ).toBeTruthy();
     expect(facts).toContain(
-      'href="/datekit/commit/9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c"'
+      'href="/oscabriel/datekit/commit/9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c"'
     );
   });
 
@@ -214,7 +214,7 @@ describe("a project's env shape", () => {
     // The placeholder unlanded code sees is not a value, but reads like one.
     expect(markup).not.toContain("placeholder-sentry-auth-token");
     expect(plainText(inspectorOf(markup))).toContain(
-      `${Brand.cli} env set <KEY> --project datekit --yes`
+      `${Brand.cli} env set <KEY> --project oscabriel/datekit --yes`
     );
   });
 
@@ -290,10 +290,12 @@ describe("a project's env shape", () => {
 
   it.effect("sits under the project's crumbs: datekit, then Env shape", () =>
     Effect.gen(function* () {
-      const markup = yield* renderAt("/datekit/env", page);
+      const markup = yield* renderAt("/oscabriel/datekit/env", page);
       const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
 
-      expect(crumbs).toMatch(/<a\b[^>]*href="\/datekit"[^>]*>datekit<\/a>/u);
+      expect(crumbs).toMatch(
+        /<a\b[^>]*href="\/oscabriel\/datekit"[^>]*>oscabriel\/datekit<\/a>/u
+      );
       expect(plainText(crumbs)).toContain("Env shape");
     })
   );
@@ -305,8 +307,10 @@ describe("a project with nothing landed", () => {
     const text = textOf(view);
 
     expect(markupOf(view)).toMatch(/<h1\b[^>]*>Env shape<\/h1>/u);
-    expect(text).toContain("Nothing has landed in datekit yet");
-    expect(text).toContain(`${Brand.cli} env shape --project datekit`);
+    expect(text).toContain("Nothing has landed in oscabriel/datekit yet");
+    expect(text).toContain(
+      `${Brand.cli} env shape --project oscabriel/datekit`
+    );
     expect(text).not.toContain("UnknownProject");
   });
 });
@@ -331,7 +335,7 @@ describe("the env shape's way in", () => {
     );
 
     expect(markup).toMatch(
-      /<a\b[^>]*href="\/datekit\/env"[^>]*>Env shape<\/a>/u
+      /<a\b[^>]*href="\/oscabriel\/datekit\/env"[^>]*>Env shape<\/a>/u
     );
   });
 });
@@ -401,7 +405,7 @@ describe(readEnv, () => {
           Effect.provide(platformWhere(asked, { known: true, landed: true }))
         );
 
-        expect(read.project).toBe("datekit");
+        expect(read.project).toBe("oscabriel/datekit");
         expect(read.schema?.items.map(({ key }) => key)).toStrictEqual([
           "APP_ENV",
           "SENTRY_DSN",
@@ -422,7 +426,7 @@ describe(readEnv, () => {
           Effect.provide(platformWhere(asked, { known: true, landed: false }))
         );
 
-        expect(read.project).toBe("datekit");
+        expect(read.project).toBe("oscabriel/datekit");
         expect(read.schema).toBeUndefined();
         expect(yield* Ref.get(asked)).toStrictEqual({ asks: 1, schemas: 1 });
       })
@@ -433,7 +437,7 @@ describe(readEnv, () => {
       const asked = yield* Ref.make(nothingAsked);
 
       const failed = yield* Effect.flip(
-        readEnv("no-such-project").pipe(
+        readEnv("oscabriel/no-such-project").pipe(
           Effect.provide(platformWhere(asked, { known: true, landed: true }))
         )
       );

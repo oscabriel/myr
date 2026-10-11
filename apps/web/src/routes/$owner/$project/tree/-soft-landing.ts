@@ -15,9 +15,9 @@ import type { UnknownPath } from "@repo/protocol/refusal";
 import { notFound } from "@tanstack/react-router";
 import { DateTime, Effect, Option, Schema } from "effect";
 
-import { ancestorsOf } from "../../../features/code/paths.ts";
-import { SoftLanding } from "../../../features/code/soft-landing.ts";
-import { notFoundFor } from "../../../features/shared/refusals.ts";
+import { ancestorsOf } from "../../../../features/code/paths.ts";
+import { SoftLanding } from "../../../../features/code/soft-landing.ts";
+import { notFoundFor } from "../../../../features/shared/refusals.ts";
 
 /** Each folder above `path`, nearest first, then the root (none). */
 const above = (path: string): readonly Option.Option<RepoPath>[] => [

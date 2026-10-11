@@ -11,14 +11,17 @@ import {
   projectOf,
   repoPathOf,
   revisionOf,
-} from "../../../../features/code/address.ts";
-import { CodeNotFound } from "../../../../features/code/not-found.tsx";
-import { pageHead } from "../../../../features/shared/head.ts";
-import { notFoundFor } from "../../../../features/shared/refusals.ts";
-import { ClientWhy } from "../../../../features/why/client-why.tsx";
-import { WhyFallback, WhyLines } from "../../../../features/why/why-view.tsx";
-import { branchPage } from "../../../../server/cache-headers.ts";
-import { serverClient } from "../../../../server/client.ts";
+} from "../../../../../features/code/address.ts";
+import { CodeNotFound } from "../../../../../features/code/not-found.tsx";
+import { pageHead } from "../../../../../features/shared/head.ts";
+import { notFoundFor } from "../../../../../features/shared/refusals.ts";
+import { ClientWhy } from "../../../../../features/why/client-why.tsx";
+import {
+  WhyFallback,
+  WhyLines,
+} from "../../../../../features/why/why-view.tsx";
+import { branchPage } from "../../../../../server/cache-headers.ts";
+import { serverClient } from "../../../../../server/client.ts";
 import { CodeRail } from "../../tree/-code-rail.tsx";
 import { FilesButton } from "../../tree/-files-button.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
@@ -144,7 +147,7 @@ const WhyPage = () => {
   );
 };
 
-export const Route = createFileRoute("/$project/why/$rev/$")({
+export const Route = createFileRoute("/$owner/$project/why/$rev/$")({
   staticData: { rail: CodeRail },
   headers: () => branchPage,
   loader: ({ params }) => whyPage({ data: params }),

@@ -25,13 +25,19 @@ import { Projects } from "@repo/project/projects";
 import type { HarnessAudit } from "@repo/protocol/audit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
-import { AskId, Handle, RepoName, RequestId } from "@repo/protocol/ids";
+import { AskId, Handle, keyOf, RepoName, RequestId } from "@repo/protocol/ids";
 import type { CommitSha, ProjectName, ProposalId } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
 import { Array, DateTime, Effect, Option } from "effect";
 
 import { DevClock, devMinute } from "./clock.ts";
-import { burrow, burrowPeople, datekit, datekitPeople } from "./examples.ts";
+import {
+  burrow,
+  burrowPeople,
+  datekit,
+  datekitPeople,
+  operator,
+} from "./examples.ts";
 import type { Opening } from "./examples.ts";
 import { filesAt, overlay, personIdentity, scratch, textOf } from "./git.ts";
 import type { Files } from "./git.ts";
@@ -47,6 +53,7 @@ export const visitors = {
 
 /** Everyone in the seed: the people a dev token may sign in as. */
 export const devPeople: readonly Handle[] = [
+  operator,
   datekitPeople.decider,
   datekitPeople.zones,
   datekitPeople.contributor,
@@ -140,7 +147,7 @@ export const startedAt = (
     yield* api.initProject(as(initializer), {});
     yield* clock.set(DateTime.add(when, { minutes: 1 }));
 
-    const first = yield* pushed(RepoName.make(project), {
+    const first = yield* pushed(RepoName.make(keyOf(project)), {
       author: initializer,
       files,
       message: "First commit",
@@ -257,7 +264,7 @@ const DECLINED = [
 /** datekit: four asks opened, one answered and landed, one claimed, decisions waiting. */
 const seedDatekit = Effect.gen(function* () {
   const { contributor, decider } = datekitPeople;
-  const api = yield* started(datekit.project, decider, datekit.files, 0);
+  const api = yield* started(datekit.project, operator, datekit.files, 0);
 
   yield* opened(api, decider, datekit.asks, 2);
 
@@ -312,7 +319,7 @@ const seedDatekit = Effect.gen(function* () {
 
 /** burrow: the migrate ask opened as its family, six children and a delete child waiting on them. */
 const seedBurrow = Effect.flatMap(
-  started(burrow.project, burrowPeople.decider, burrow.files, 15),
+  started(burrow.project, operator, burrow.files, 15),
   (api) => opened(api, burrowPeople.decider, burrow.asks, 17)
 );
 
@@ -330,7 +337,7 @@ export const seedEnd = devMinute(STRAY_MINUTE);
 const strayPush = (api: ProjectApi) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
-    const repo = RepoName.make(datekit.project);
+    const repo = RepoName.make(keyOf(datekit.project));
 
     yield* at(STRAY_MINUTE);
 

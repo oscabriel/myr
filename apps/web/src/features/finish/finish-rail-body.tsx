@@ -24,7 +24,7 @@ const decode = Schema.decodeUnknownOption(DecisionPageData);
 /** The finish on the page, its files in order; none for any other page. */
 export const useFinish = () => {
   const data: unknown = useMatch({
-    from: "/$project/decisions/$decision",
+    from: "/$owner/$project/decisions/$decision",
     select: (match) => match.loaderData,
     shouldThrow: false,
   });

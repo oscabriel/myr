@@ -23,19 +23,19 @@ import { Option, Schema } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { useMemo } from "react";
 
-import { pathsAtom, refsAtom } from "../../../client/code.ts";
-import { ClientTree } from "../../../features/code/client-tree.tsx";
-import { drawnFiles, treeOrder } from "../../../features/code/diff-model.ts";
-import { useCodeFileKeys } from "../../../features/code/file-keys.ts";
-import { parseDiffHash } from "../../../features/code/line-hash.ts";
-import { SHELL_QUERY, useMedia } from "../../../features/code/media.ts";
+import { pathsAtom, refsAtom } from "../../../../client/code.ts";
+import { ClientTree } from "../../../../features/code/client-tree.tsx";
+import { drawnFiles, treeOrder } from "../../../../features/code/diff-model.ts";
+import { useCodeFileKeys } from "../../../../features/code/file-keys.ts";
+import { parseDiffHash } from "../../../../features/code/line-hash.ts";
+import { SHELL_QUERY, useMedia } from "../../../../features/code/media.ts";
 import {
   blobHref,
   diffAnchor,
   treeHref,
   whyHref,
-} from "../../../features/code/paths.ts";
-import { RefSwitcher } from "../../../features/code/ref-switcher.tsx";
+} from "../../../../features/code/paths.ts";
+import { RefSwitcher } from "../../../../features/code/ref-switcher.tsx";
 import { CommitPageData } from "./-commit-files.ts";
 
 const isProject = Schema.is(ProjectName);
@@ -47,7 +47,7 @@ const NONE: readonly ChangedFile[] = [];
 /** The files the commit on the page changed; none while its data is not there. */
 const useCommitFiles = (): readonly ChangedFile[] => {
   const data: unknown = useMatch({
-    from: "/$project/commit/$sha",
+    from: "/$owner/$project/commit/$sha",
     select: (match) => match.loaderData,
     shouldThrow: false,
   });

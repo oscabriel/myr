@@ -11,19 +11,19 @@ import { AsyncResult } from "effect/reactivity";
 import { CodeRail } from "../-code-rail.tsx";
 import { FilesButton } from "../-files-button.tsx";
 import { softLanding } from "../-soft-landing.ts";
-import { lastChangesAtom } from "../../../../client/code.ts";
+import { lastChangesAtom } from "../../../../../client/code.ts";
 import {
   projectOf,
   repoPathOf,
   revisionOf,
-} from "../../../../features/code/address.ts";
-import { CodeNotFound } from "../../../../features/code/not-found.tsx";
-import { TreeView } from "../../../../features/code/tree-view.tsx";
-import { pageHead } from "../../../../features/shared/head.ts";
-import { notFoundFor } from "../../../../features/shared/refusals.ts";
-import { branchPage } from "../../../../server/cache-headers.ts";
-import { serverClient } from "../../../../server/client.ts";
-import { readFolderWithReadme } from "../../../../server/folder.ts";
+} from "../../../../../features/code/address.ts";
+import { CodeNotFound } from "../../../../../features/code/not-found.tsx";
+import { TreeView } from "../../../../../features/code/tree-view.tsx";
+import { pageHead } from "../../../../../features/shared/head.ts";
+import { notFoundFor } from "../../../../../features/shared/refusals.ts";
+import { branchPage } from "../../../../../server/cache-headers.ts";
+import { serverClient } from "../../../../../server/client.ts";
+import { readFolderWithReadme } from "../../../../../server/folder.ts";
 
 // A folder at a revision: its entries and its README, read on the server,
 // so the page arrives whole; the tree in the rail and what last changed
@@ -116,7 +116,7 @@ const TreePage = () => {
   );
 };
 
-export const Route = createFileRoute("/$project/tree/$rev/$")({
+export const Route = createFileRoute("/$owner/$project/tree/$rev/$")({
   staticData: { rail: CodeRail },
   loader: ({ params }) => treePage({ data: params }),
   headers: () => branchPage,

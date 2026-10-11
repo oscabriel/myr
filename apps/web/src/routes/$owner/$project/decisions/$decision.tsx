@@ -15,38 +15,41 @@ import { AsyncResult } from "effect/reactivity";
 import { useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { decideAtom } from "../../../client/decide.ts";
-import { projectEventsAtom } from "../../../client/events.ts";
-import { watchAtom } from "../../../client/watch.ts";
-import { hereOf } from "../../../features/auth/session-slot.tsx";
-import { useCodeFileKeys } from "../../../features/code/file-keys.ts";
-import { parseDiffHash } from "../../../features/code/line-hash.ts";
-import { SPLIT_QUERY, useMedia } from "../../../features/code/media.ts";
-import { diffAnchor } from "../../../features/code/paths.ts";
-import type { DecideInput } from "../../../features/decision/decision-card.tsx";
-import { DecisionView } from "../../../features/decision/decision-page.tsx";
+import { decideAtom } from "../../../../client/decide.ts";
+import { projectEventsAtom } from "../../../../client/events.ts";
+import { watchAtom } from "../../../../client/watch.ts";
+import { hereOf } from "../../../../features/auth/session-slot.tsx";
+import { useCodeFileKeys } from "../../../../features/code/file-keys.ts";
+import { parseDiffHash } from "../../../../features/code/line-hash.ts";
+import { SPLIT_QUERY, useMedia } from "../../../../features/code/media.ts";
+import { diffAnchor } from "../../../../features/code/paths.ts";
+import type { DecideInput } from "../../../../features/decision/decision-card.tsx";
+import { DecisionView } from "../../../../features/decision/decision-page.tsx";
 import {
   DecisionPageData,
   DecisionRead,
   newerThan,
   readDecision,
-} from "../../../features/decision/read.ts";
-import type { FoundDecision } from "../../../features/decision/read.ts";
-import { patchFiles } from "../../../features/finish/files.ts";
-import { FinishFilesButton } from "../../../features/finish/finish-files-button.tsx";
-import { FinishRail } from "../../../features/finish/finish-rail.tsx";
-import { FinishView } from "../../../features/finish/finish-view.tsx";
+} from "../../../../features/decision/read.ts";
+import type { FoundDecision } from "../../../../features/decision/read.ts";
+import { patchFiles } from "../../../../features/finish/files.ts";
+import { FinishFilesButton } from "../../../../features/finish/finish-files-button.tsx";
+import { FinishRail } from "../../../../features/finish/finish-rail.tsx";
+import { FinishView } from "../../../../features/finish/finish-view.tsx";
 import {
   isFinishDecision,
   patchOf,
   waiverPatchOf,
-} from "../../../features/finish/patch.ts";
-import type { FinishDecision } from "../../../features/finish/patch.ts";
-import { marksKey, useReadMarks } from "../../../features/finish/read-marks.ts";
-import { ProposalFailure } from "../../../features/proposal/failure.tsx";
-import { pageHead } from "../../../features/shared/head.ts";
-import { personalPage } from "../../../server/cache-headers.ts";
-import { serverClient } from "../../../server/client.ts";
+} from "../../../../features/finish/patch.ts";
+import type { FinishDecision } from "../../../../features/finish/patch.ts";
+import {
+  marksKey,
+  useReadMarks,
+} from "../../../../features/finish/read-marks.ts";
+import { ProposalFailure } from "../../../../features/proposal/failure.tsx";
+import { pageHead } from "../../../../features/shared/head.ts";
+import { personalPage } from "../../../../server/cache-headers.ts";
+import { serverClient } from "../../../../server/client.ts";
 
 // `/$project/decisions/$decision`: one decision from the reader's Today in
 // that project, read on the server with their own session; for a finish,
@@ -311,7 +314,7 @@ const DecisionPage = () => {
   );
 };
 
-export const Route = createFileRoute("/$project/decisions/$decision")({
+export const Route = createFileRoute("/$owner/$project/decisions/$decision")({
   staticData: { rail: FinishRail },
   loader: ({ params }) => decisionPage({ data: params }),
   headers: () => personalPage,

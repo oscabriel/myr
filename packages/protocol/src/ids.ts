@@ -534,6 +534,45 @@ export const addressOfRepo = (repo: RepoName): Option.Option<string> => {
   );
 };
 
+/** A path read as a project's address: its name as spelled, and the segments after it. */
+export interface ProjectAddress {
+  /** The name's segments as the path spelled them, joined: `OscaBriel/datekit`, `datekit`. */
+  readonly spelled: string;
+  /** Whether the name is a key a project kept from before owners, one segment. */
+  readonly legacy: boolean;
+  /** The segments after the name: a page's (`tree`, `main`, `src`). */
+  readonly rest: readonly string[];
+}
+
+/**
+ * A path's segments (decoded) read as a project's address: one segment when
+ * the first is a key a project kept from before owners (`datekit`), three
+ * when it is a source host (`github.com/pallets/click`), else two
+ * (`oscabriel/datekit`). None when fewer remain. It spells nothing: the
+ * name's own decode lowercases it and checks it.
+ */
+export const projectAddressOf = (
+  segments: readonly string[]
+): Option.Option<ProjectAddress> => {
+  const first = segments[0]?.toLowerCase();
+
+  if (first === undefined) {
+    return Option.none();
+  }
+
+  const legacy = legacyNameByKey[first] !== undefined;
+  const owned = isSourceHost(first) ? 3 : 2;
+  const length = legacy ? 1 : owned;
+
+  return segments.length < length
+    ? Option.none()
+    : Option.some({
+        legacy,
+        rest: segments.slice(length),
+        spelled: segments.slice(0, length).join("/"),
+      });
+};
+
 /**
  * The source namespace an import's URL names, when its host is one the
  * platform knows: `https://github.com/Pallets/click.git` is

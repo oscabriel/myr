@@ -12,7 +12,7 @@
 import { ClientOnly } from "@tanstack/react-router";
 import { lazy, Suspense } from "react";
 
-import { RailSlot } from "../../../features/shared/shell/rail-slot.tsx";
+import { RailSlot } from "../../../../features/shared/shell/rail-slot.tsx";
 
 const Body = import.meta.env.SSR
   ? undefined

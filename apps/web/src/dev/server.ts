@@ -71,30 +71,39 @@ const seededWorld = (options: DevWorldOptions) => {
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
-/** `/<project>/raw/<rev>/<path…>`: a project's raw files, as the platform serves them. */
+/**
+ * `/<project>/raw/<rev>/<path…>`: a project's raw files, as the platform
+ * serves them, at each spelling of a name: `oscabriel/datekit`,
+ * `github.com/pallets/click`, and a key from before owners, `datekit`.
+ */
 const raw = Layer.unwrap(
   Effect.gen(function* () {
     const services = Context.make(RepoHost, yield* RepoHost).pipe(
       Context.add(Projects, yield* Projects)
     );
 
-    return HttpRouter.add(
-      "GET",
-      "/:project/raw/*",
-      Effect.gen(function* () {
-        const params = yield* HttpRouter.params;
-        const request = yield* HttpServerRequest.HttpServerRequest;
+    const answer = Effect.gen(function* () {
+      const params = yield* HttpRouter.params;
+      const request = yield* HttpServerRequest.HttpServerRequest;
 
-        return yield* Option.match(decodeProject(params.project), {
-          onNone: () =>
-            Effect.succeed(HttpServerResponse.empty({ status: 404 })),
-          onSome: (project) =>
-            rawFor(project, request.url).pipe(
-              Effect.provide(services),
-              Effect.map(HttpServerResponse.fromWeb)
-            ),
-        });
-      })
+      const spelled = [params.host, params.owner, params.project]
+        .filter((segment) => segment !== undefined)
+        .join("/");
+
+      return yield* Option.match(decodeProject(spelled), {
+        onNone: () => Effect.succeed(HttpServerResponse.empty({ status: 404 })),
+        onSome: (project) =>
+          rawFor(project, request.url).pipe(
+            Effect.provide(services),
+            Effect.map(HttpServerResponse.fromWeb)
+          ),
+      });
+    });
+
+    return Layer.mergeAll(
+      HttpRouter.add("GET", "/:project/raw/*", answer),
+      HttpRouter.add("GET", "/:owner/:project/raw/*", answer),
+      HttpRouter.add("GET", "/:host/:owner/:project/raw/*", answer)
     );
   })
 );

@@ -138,6 +138,14 @@ export const askFileOf = (stated: StatedAsk): AskFile => {
 
 // ------------------------------------------------------------- datekit
 
+/**
+ * The operator, who makes the dev world's examples in their namespace as
+ * the stages' were made, so `oscabriel/datekit` is theirs and the legacy
+ * address `/datekit` leads to it. They decide nothing: each project's
+ * config folder names its deciders.
+ */
+export const operator = Handle.make("oscabriel");
+
 export const datekitPeople = {
   contributor: Handle.make("bram"),
   decider: Handle.make("ines-v"),

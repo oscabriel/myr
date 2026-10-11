@@ -252,11 +252,14 @@ describe(TodayView, () => {
 
     expect(links).toStrictEqual([
       [
-        "datekit/dec-000002",
+        "oscabriel/datekit/dec-000002",
         "main moved without a landing, from aaaaaaa to bbbbbbb",
       ],
-      ["datekit/dec-000003", "Vouch for lin-h, so they may claim asks"],
-      ["burrow/dec-000001", "Open the ask proposed in prop-000004"],
+      [
+        "oscabriel/datekit/dec-000003",
+        "Vouch for lin-h, so they may claim asks",
+      ],
+      ["oscabriel/burrow/dec-000001", "Open the ask proposed in prop-000004"],
     ]);
   });
 
@@ -435,10 +438,10 @@ describe(orderDecisions, () => {
     expect(
       orderDecisions(merged).map(({ id, project }) => `${project}/${id}`)
     ).toStrictEqual([
-      "datekit/dec-000002",
-      "datekit/dec-000003",
-      "burrow/dec-000001",
-      "burrow/dec-000002",
+      "oscabriel/datekit/dec-000002",
+      "oscabriel/datekit/dec-000003",
+      "oscabriel/burrow/dec-000001",
+      "oscabriel/burrow/dec-000002",
     ]);
   });
 });

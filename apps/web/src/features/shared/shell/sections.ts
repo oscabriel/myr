@@ -4,8 +4,9 @@
  * the bottom bar, the section row and the context bar all read them here,
  * so one address names one place everywhere.
  */
+import { projectAddressOf } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
-import { Result } from "effect";
+import { Option, Result } from "effect";
 
 /** Which of a project's pages is being read. */
 export type ProjectTab =
@@ -55,7 +56,7 @@ const SECTION_OF = {
   why: "code",
 } as const satisfies Record<string, ProjectTab>;
 
-/** The site's own first segments: every other one names a project. */
+/** The site's own first segments: every other one starts a project's address. */
 const SITE = new Set(["agents", "asks", "docs", "home", "people", "today"]);
 
 /** `segment` decoded, or as it came when it does not decode. */
@@ -72,24 +73,39 @@ const segmentsOf = (pathname: string) =>
     .filter((segment) => segment !== "")
     .map(decoded);
 
-/** The project an address is in, by its first segment; none on the site's own pages. */
-export const projectOf = (pathname: string): string | undefined => {
-  const [first] = segmentsOf(pathname);
+/**
+ * The project an address is in, as the address spells it, and the
+ * segments of its page after the name; none on the site's own pages. The
+ * name is read by the protocol's one reader of addresses, so
+ * `/oscabriel/datekit/ledger` and `/github.com/pallets/click/tree/main` (or
+ * the router's own `/github.com%2Fpallets/click/…`) each find theirs.
+ */
+const addressOf = (pathname: string) => {
+  const segments = segmentsOf(pathname);
+  const [first] = segments;
 
-  return first === undefined || SITE.has(first) ? undefined : first;
+  return first === undefined || SITE.has(first)
+    ? undefined
+    : Option.getOrUndefined(projectAddressOf(segments));
 };
+
+/** The project an address is in; none on the site's own pages. */
+export const projectOf = (pathname: string): string | undefined =>
+  addressOf(pathname)?.spelled;
 
 /** The project section an address sits in; none for a page under none (a decision, a proposal). */
 export const sectionOf = (pathname: string): ProjectTab | undefined => {
-  const [first, second] = segmentsOf(pathname);
+  const address = addressOf(pathname);
 
-  if (first === undefined || SITE.has(first)) {
+  if (address === undefined) {
     return undefined;
   }
 
-  return second === undefined
+  const [page] = address.rest;
+
+  return page === undefined
     ? "overview"
-    : Object.entries(SECTION_OF).find(([segment]) => segment === second)?.[1];
+    : Object.entries(SECTION_OF).find(([segment]) => segment === page)?.[1];
 };
 
 /** One step of the trail to a page: its word, its page (none for the page itself), and whether it is an id. */
@@ -194,7 +210,7 @@ const SUBJECT_CRUMBS = {
  * link but the last. A page that knows better gives `Workspace` its own.
  */
 export const crumbsFor = (pathname: string): readonly Crumb[] => {
-  const [first, second, third, ...rest] = segmentsOf(pathname);
+  const [first, second] = segmentsOf(pathname);
 
   if (first === undefined) {
     return [{ label: "Asks" }];
@@ -206,22 +222,31 @@ export const crumbsFor = (pathname: string): readonly Crumb[] => {
     return site[1](second);
   }
 
+  const address = addressOf(pathname);
+
+  if (address === undefined) {
+    return [{ label: first }];
+  }
+
+  const project = address.spelled;
+  const [page, third, ...rest] = address.rest;
+
   const subject = Object.entries(SUBJECT_CRUMBS).find(
-    ([name]) => name === second
+    ([name]) => name === page
   );
 
   if (subject !== undefined && third !== undefined) {
-    return subject[1](first, third, rest.join("/"));
+    return subject[1](project, third, rest.join("/"));
   }
 
   const tab = sectionOf(pathname);
 
   return tab === undefined
     ? [
-        { label: first, to: `/${first}` },
-        { label: rest.at(-1) ?? third ?? second ?? first },
+        { label: project, to: `/${project}` },
+        { label: rest.at(-1) ?? third ?? page ?? project },
       ]
-    : projectCrumbs(first, tab, false);
+    : projectCrumbs(project, tab, false);
 };
 
 /** A posture in one short word for the rail, beside its mark; the full label is its title. */

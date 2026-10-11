@@ -21,7 +21,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { LandingDetails } from "../src/features/why/range-summary.tsx";
 import { WhyCode } from "../src/features/why/why-code.tsx";
 import { WhyLines } from "../src/features/why/why-view.tsx";
-import { readWhyPage } from "../src/routes/$project/why/$rev/$.tsx";
+import { readWhyPage } from "../src/routes/$owner/$project/why/$rev/$.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
@@ -155,9 +155,9 @@ describe("the why page's fallback", () => {
     ).toBeTruthy();
     expect(hrefsOf(band)).toStrictEqual(
       expect.arrayContaining([
-        "/datekit/asks/parse-iso-week",
-        "/datekit/answers/parse-iso-week",
-        `/datekit/commit/${LANDED}`,
+        "/oscabriel/datekit/asks/parse-iso-week",
+        "/oscabriel/datekit/answers/parse-iso-week",
+        `/oscabriel/datekit/commit/${LANDED}`,
       ])
     );
   });
@@ -178,19 +178,19 @@ describe("the why page's fallback", () => {
     expect(textOf(band)).toContain("Add the formatter");
     expect(textOf(band)).toContain("Ada");
     expect(textOf(band)).toContain("before adoption");
-    expect(hrefsOf(band)).toContain(`/datekit/commit/${IMPORTED}`);
+    expect(hrefsOf(band)).toContain(`/oscabriel/datekit/commit/${IMPORTED}`);
   });
 
   it("offers why, one step back, and a proposal about each group's first line", () => {
     const markup = markupOf(page);
     const hrefs = hrefsOf(markup);
 
-    expect(hrefs).toContain(`/datekit/why/${IMPORTED}/src/format.ts`);
+    expect(hrefs).toContain(`/oscabriel/datekit/why/${IMPORTED}/src/format.ts`);
     expect(textOf(markup)).toContain("why, one step back");
     expect(textOf(markup)).toContain("Propose an ask about this line");
 
     const proposal = hrefs
-      .filter((href) => href.startsWith("/datekit/proposals/new?"))
+      .filter((href) => href.startsWith("/oscabriel/datekit/proposals/new?"))
       .map((href) =>
         Object.fromEntries(new URL(href, "https://x").searchParams)
       );
@@ -267,8 +267,8 @@ describe("the why page's fallback", () => {
       )?.[0] ?? "";
 
     expect(hrefsOf(toggle)).toStrictEqual([
-      "/datekit/blob/main/src/format.ts",
-      "/datekit/why/main/src/format.ts",
+      "/oscabriel/datekit/blob/main/src/format.ts",
+      "/oscabriel/datekit/why/main/src/format.ts",
     ]);
     expect(toggle).toMatch(/aria-current="page"[^>]*>Why</u);
   });
@@ -326,7 +326,7 @@ describe("the why page's band for an ask's opening", () => {
 
     expect(textOf(band)).toContain("opened format-ordinal");
     expect(textOf(band)).toContain("by ines-v");
-    expect(hrefsOf(band)).toContain("/datekit/asks/format-ordinal");
+    expect(hrefsOf(band)).toContain("/oscabriel/datekit/asks/format-ordinal");
     expect(
       hrefsOf(band).filter((href) => href.includes("/answers/"))
     ).toStrictEqual([]);
@@ -337,8 +337,8 @@ describe("the why page's band for an ask's opening", () => {
 
     expect(hrefsOf(bandOf(markup, "1-1"))).toStrictEqual(
       expect.arrayContaining([
-        "/datekit/asks/parse-iso-week",
-        "/datekit/answers/parse-iso-week",
+        "/oscabriel/datekit/asks/parse-iso-week",
+        "/oscabriel/datekit/answers/parse-iso-week",
       ])
     );
     expect(textOf(bandOf(markup, "1-1"))).not.toContain("opened");
@@ -359,7 +359,7 @@ describe("a line's landing, in the line dialog", () => {
     );
 
     expect(textOf(markup)).toContain("Opened ask format-ordinal");
-    expect(hrefsOf(markup)).toContain("/datekit/asks/format-ordinal");
+    expect(hrefsOf(markup)).toContain("/oscabriel/datekit/asks/format-ordinal");
     expect(
       hrefsOf(markup).filter((href) => href.includes("/answers/"))
     ).toStrictEqual([]);
@@ -370,7 +370,9 @@ describe("a line's landing, in the line dialog", () => {
 
     expect(textOf(markup)).toContain("Ask parse-iso-week");
     expect(textOf(markup)).not.toContain("Opened ask");
-    expect(hrefsOf(markup)).toContain("/datekit/answers/parse-iso-week");
+    expect(hrefsOf(markup)).toContain(
+      "/oscabriel/datekit/answers/parse-iso-week"
+    );
   });
 });
 

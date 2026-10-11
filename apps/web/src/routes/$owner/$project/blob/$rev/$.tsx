@@ -10,16 +10,16 @@ import {
   projectOf,
   repoPathOf,
   revisionOf,
-} from "../../../../features/code/address.ts";
-import { BlobView } from "../../../../features/code/blob-view.tsx";
-import { ClientFile } from "../../../../features/code/client-code.tsx";
-import { CodeNotFound } from "../../../../features/code/not-found.tsx";
-import { showsCode } from "../../../../features/code/paths.ts";
-import { FileFallback } from "../../../../features/code/server-code.tsx";
-import { pageHead } from "../../../../features/shared/head.ts";
-import { notFoundFor } from "../../../../features/shared/refusals.ts";
-import { branchPage } from "../../../../server/cache-headers.ts";
-import { serverClient } from "../../../../server/client.ts";
+} from "../../../../../features/code/address.ts";
+import { BlobView } from "../../../../../features/code/blob-view.tsx";
+import { ClientFile } from "../../../../../features/code/client-code.tsx";
+import { CodeNotFound } from "../../../../../features/code/not-found.tsx";
+import { showsCode } from "../../../../../features/code/paths.ts";
+import { FileFallback } from "../../../../../features/code/server-code.tsx";
+import { pageHead } from "../../../../../features/shared/head.ts";
+import { notFoundFor } from "../../../../../features/shared/refusals.ts";
+import { branchPage } from "../../../../../server/cache-headers.ts";
+import { serverClient } from "../../../../../server/client.ts";
 import { CodeRail } from "../../tree/-code-rail.tsx";
 import { FilesButton } from "../../tree/-files-button.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
@@ -127,7 +127,7 @@ const BlobPage = () => {
   );
 };
 
-export const Route = createFileRoute("/$project/blob/$rev/$")({
+export const Route = createFileRoute("/$owner/$project/blob/$rev/$")({
   staticData: { rail: CodeRail },
   // The router writes back what this returns, dropping only `undefined`,
   // so a rendered file's address carries no `plain`.
@@ -152,7 +152,7 @@ export const Route = createFileRoute("/$project/blob/$rev/$")({
 
           if (showsCode(data.file, plain)) {
             const { drawFileAhead } = yield* Effect.promise(
-              () => import("../../../../features/code/prerender.ts")
+              () => import("../../../../../features/code/prerender.ts")
             );
 
             yield* Effect.promise(() => drawFileAhead(data.file));
@@ -168,7 +168,7 @@ export const Route = createFileRoute("/$project/blob/$rev/$")({
     if (preload && !import.meta.env.SSR) {
       Effect.runFork(
         Effect.tryPromise(() =>
-          Promise.all([page, import("../../../../features/code/warm.ts")])
+          Promise.all([page, import("../../../../../features/code/warm.ts")])
         ).pipe(
           Effect.flatMap(([data, { warmFile }]) =>
             Effect.tryPromise(() => warmFile(data.file))

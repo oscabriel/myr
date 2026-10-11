@@ -86,7 +86,7 @@ const claim = (fields: Partial<typeof ClaimView.Encoded> = {}) =>
   Schema.decodeSync(ClaimView)({
     ask: "fix-week-start",
     base: "a".repeat(40),
-    checkCommand: `${Brand.cli} check fix-week-start --project datekit`,
+    checkCommand: `${Brand.cli} check fix-week-start --project oscabriel/datekit`,
     claimant: "bram",
     fork: "datekit--fix-week-start--bram",
     lapsesAt: "2026-10-08T12:00:00.000Z",
@@ -176,13 +176,15 @@ describe(HomeView, () => {
         );
         expect(commandsOf(markup)).toStrictEqual(
           expect.arrayContaining([
-            `${Brand.cli} check fix-week-start --project datekit`,
+            `${Brand.cli} check fix-week-start --project oscabriel/datekit`,
             `${Brand.cli} claim parse-iso-week`,
           ])
         );
         // A refusal a new push can mend turns back, in its own mark.
         expect(markup).toContain("lucide-rotate-ccw");
-        expect(markup).toContain('href="/datekit/answers/parse-iso-week"');
+        expect(markup).toContain(
+          'href="/oscabriel/datekit/answers/parse-iso-week"'
+        );
       })
   );
 
@@ -249,7 +251,7 @@ describe(HomeView, () => {
 
         expect(textIn(markup)).toContain("You hold no claim.");
         expect(commandsOf(markup)).toContain(
-          `${Brand.cli} claim split-format --project burrow`
+          `${Brand.cli} claim split-format --project oscabriel/burrow`
         );
       })
   );
@@ -334,8 +336,8 @@ describe(pairWork, () => {
     expect(
       work.map(({ answer, claim: held }) => [held.project, answer])
     ).toStrictEqual([
-      ["datekit", datekitAnswer],
-      ["burrow", undefined],
+      ["oscabriel/datekit", datekitAnswer],
+      ["oscabriel/burrow", undefined],
     ]);
   });
 });
@@ -351,7 +353,9 @@ describe("home, read on the server with the reader's session", () => {
           "Your work",
           "Asks you may take",
         ]);
-        expect(markup).toMatch(/data-claim="[^"]+"[^>]*data-project="vellum"/u);
+        expect(markup).toMatch(
+          /data-claim="[^"]+"[^>]*data-project="oscabriel\/vellum"/u
+        );
         expect(markup).toContain('href="/people/bram"');
         expect(markup).toContain('href="/asks"');
       }).pipe(Effect.provide(fixturesClient("bram")), Effect.scoped),
@@ -369,7 +373,7 @@ describe("home, read on the server with the reader's session", () => {
           "Decisions waiting",
           "Asks you may take",
         ]);
-        expect(markup).toMatch(/href="\/[a-z-]+\/decisions\/[^"]+"/u);
+        expect(markup).toMatch(/href="\/[a-z-]+\/[a-z-]+\/decisions\/[^"]+"/u);
         expect(markup).toContain('href="/today"');
       }).pipe(Effect.provide(fixturesClient("ines-v")), Effect.scoped),
     60_000

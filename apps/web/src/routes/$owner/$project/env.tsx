@@ -12,14 +12,14 @@ import { env } from "cloudflare:workers";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 
-import { envSchemaAtom } from "../../client/env.ts";
-import { watchAtom } from "../../client/watch.ts";
-import { EnvView, NothingLanded } from "../../features/env/env-page.tsx";
-import { UnknownProjectView } from "../../features/project/unknown-project.tsx";
-import { pageHead } from "../../features/shared/head.ts";
-import { useProjectList } from "../../features/shared/shell/context.ts";
-import { branchPage } from "../../server/cache-headers.ts";
-import { serverClient } from "../../server/client.ts";
+import { envSchemaAtom } from "../../../client/env.ts";
+import { watchAtom } from "../../../client/watch.ts";
+import { EnvView, NothingLanded } from "../../../features/env/env-page.tsx";
+import { UnknownProjectView } from "../../../features/project/unknown-project.tsx";
+import { pageHead } from "../../../features/shared/head.ts";
+import { useProjectList } from "../../../features/shared/shell/context.ts";
+import { branchPage } from "../../../server/cache-headers.ts";
+import { serverClient } from "../../../server/client.ts";
 
 // A project's env shape, as anyone may read it: never a value, and no form
 // (a value is set from a terminal only). The loader reads it on the server,
@@ -129,7 +129,7 @@ const Unknown = () => {
   return <UnknownProjectView name={project} />;
 };
 
-export const Route = createFileRoute("/$project/env")({
+export const Route = createFileRoute("/$owner/$project/env")({
   loader: ({ params }) => envPage({ data: params.project }),
   // The env shape moves with the next landing or value set: kept briefly, read again behind.
   headers: () => branchPage,

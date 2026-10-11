@@ -207,12 +207,15 @@ describe("the dev world's fixtures", seededWorlds, () => {
 
           expect(projects.length).toBeGreaterThan(8);
           expect(
-            ["burrow", "datekit", "vellum"].filter(
-              (name) => !names.has(ProjectName.make(name))
-            )
+            [
+              "oscabriel/burrow",
+              "oscabriel/datekit",
+              "oscabriel/vellum",
+            ].filter((name) => !names.has(ProjectName.make(name)))
           ).toStrictEqual([]);
           expect(
-            projects.find(({ project }) => project === "mossgate")?.openAsks
+            projects.find(({ project }) => project === "lin-h/mossgate")
+              ?.openAsks
           ).toBe(0);
         })
       )
