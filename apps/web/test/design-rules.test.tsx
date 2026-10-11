@@ -7,6 +7,11 @@
 import { describe, expect, it } from "@effect/vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import {
+  STATE_MARK_NAMES,
+  STATE_MARKS,
+} from "../src/features/shared/marks.tsx";
+import { wordTone } from "../src/features/shared/row.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
 
 import design from "../../../DESIGN.md?raw";
@@ -20,21 +25,21 @@ const spacing = (name: string) =>
 const inspectorClasses = (code: boolean) => {
   const markup = renderToStaticMarkup(
     <Workspace
-      code={code}
       crumbs={[{ label: "Ledger" }]}
       facts={<p>Posture: open</p>}
       factsHeading="This ledger"
       title="Ledger"
+      variant={code ? "code" : "document"}
     >
       <p>Entries</p>
     </Workspace>
   );
 
-  return (
-    /<aside\b[^>]*data-facts="inspector"[^>]*>/u
-      .exec(markup)?.[0]
-      .match(/class="(?<classes>[^"]*)"/u)
-      ?.groups?.classes.split(" ") ?? []
+  const aside =
+    /<aside\b[^>]*data-facts="inspector"[^>]*>/u.exec(markup)?.[0] ?? "";
+
+  return (/class="(?<classes>[^"]*)"/u.exec(aside)?.groups?.classes ?? "").split(
+    " "
   );
 };
 
@@ -50,5 +55,21 @@ describe("DESIGN.md's named values", () => {
     expect(inspectorClasses(true)).toStrictEqual(
       expect.arrayContaining([`codefacts:w-[${wide}]`])
     );
+  });
+
+  it("sets a row's state word in ink but for Refused and Landed, as the Mark Carries Rule says", () => {
+    const coloured = STATE_MARK_NAMES.filter(
+      (mark) => wordTone(mark) !== "text-foreground"
+    );
+
+    expect(design).toContain(
+      "the state word is ink at 500, except Refused (red) and Landed (green)"
+    );
+    expect(coloured).toStrictEqual(["landed", "refused", "retry"]);
+    expect(coloured.map(wordTone)).toStrictEqual([
+      STATE_MARKS.landed.tone,
+      STATE_MARKS.refused.tone,
+      STATE_MARKS.refused.tone,
+    ]);
   });
 });

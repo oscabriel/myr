@@ -305,6 +305,7 @@ const rowIds = (groups: readonly Group[]) =>
 const ProjectGroup = ({
   group,
   listing,
+  now,
   onSelect,
   parents,
   selected,
@@ -312,6 +313,7 @@ const ProjectGroup = ({
 }: {
   readonly group: Group;
   readonly listing: ProjectListing | undefined;
+  readonly now: DateTime.Utc;
   readonly parents: readonly Ask[];
   readonly selected: string | undefined;
   readonly onSelect: (id: string) => void;
@@ -324,6 +326,7 @@ const ProjectGroup = ({
     <AskRow
       key={listingOf.ask}
       listing={listingOf}
+      now={now}
       onSelect={onSelect}
       progress={states.get(listingOf.ask)}
       project={project}
@@ -443,6 +446,7 @@ export const FrontPageView = ({
   entries,
   events,
   filter,
+  now,
   parents,
   platformUrl,
   projects,
@@ -538,6 +542,7 @@ export const FrontPageView = ({
               listing={projects?.find(
                 ({ project }) => project === group.project
               )}
+              now={now}
               onSelect={select}
               parents={parents}
               selected={selected}

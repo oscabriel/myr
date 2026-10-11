@@ -9,11 +9,12 @@ import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { AskListing } from "@repo/protocol/domain/ask";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { CommitSha, ProjectName } from "@repo/protocol/ids";
+import { CommitSha, Handle, ProjectName } from "@repo/protocol/ids";
 import { StaleBase } from "@repo/protocol/refusal";
-import { Effect, Schema } from "effect";
+import { DateTime, Effect, Schema } from "effect";
 import type { ReactElement } from "react";
 
+import { STATE_MARKS } from "../src/features/shared/marks.tsx";
 import { AskRow, Row, RowGroup } from "../src/features/shared/row.tsx";
 import { attributeOf, tagsWith, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
@@ -178,6 +179,141 @@ describe(AskRow, () => {
           expect(classes).toContain("text-refused");
           expect(classes).not.toContain("text-waiting");
         }
+      })
+  );
+});
+
+describe("an ask row's standing, word and time", () => {
+  const now = DateTime.makeUnsafe("2026-10-11T12:00:00Z");
+  const held = { ...listing("@burrow/auth"), reserve: "newcomers" } as const;
+
+  /** The classes on each element whose text is `word`, in `markup`. */
+  const wordClasses = (markup: string, word: string) =>
+    [
+      ...markup.matchAll(
+        new RegExp(`<span class="(?<classes>[^"]*)">${word}<`, "gu")
+      ),
+    ].map((match) => match.groups?.classes ?? "");
+
+  it.effect(
+    "reads an ask held for newcomers as held for them, whether or not the viewer may take it",
+    () =>
+      Effect.gen(function* () {
+        const refused = textIn(
+          yield* rowsAt(
+            <AskRow listing={held} project={burrow} takeable={false} />
+          )
+        );
+        const unknown = textIn(
+          yield* rowsAt(<AskRow listing={held} project={burrow} />)
+        );
+
+        expect(refused).toContain("Held for newcomers");
+        expect(refused).not.toContain("Not open to you");
+        expect(unknown).toContain("Held for newcomers");
+      })
+  );
+
+  it.effect(
+    "sets a waiting word in ink, its colour on the mark alone, and keeps Landed green",
+    () =>
+      Effect.gen(function* () {
+        const waiting = yield* rowsAt(
+          <AskRow
+            listing={{ ...listing("@burrow/auth"), blockedBy: [held.ask] }}
+            project={burrow}
+          />
+        );
+        const landed = yield* rowsAt(
+          <Row
+            href="/burrow/asks/a"
+            id="a"
+            state={{ mark: "landed", word: "Landed" }}
+            title="Format ordinals"
+          />
+        );
+
+        expect(wordClasses(waiting, "Waiting").length).toBeGreaterThan(0);
+        expect(wordClasses(waiting, "Waiting").join(" ")).not.toContain(
+          STATE_MARKS.waiting.tone
+        );
+        expect(waiting).toMatch(/<svg\b[^>]*text-waiting/u);
+        expect(wordClasses(landed, "Landed").join(" ")).toContain(
+          "text-landed"
+        );
+      })
+  );
+
+  it.effect(
+    "fills the time slot with the last push, and names the round in line 2",
+    () =>
+      Effect.gen(function* () {
+        const at = DateTime.subtract(now, { hours: 3 });
+        const head = CommitSha.make("c".repeat(40));
+        const markup = yield* rowsAt(
+          <AskRow
+            listing={listing("@burrow/auth")}
+            now={now}
+            progress={{
+              claimant: Handle.make("bram"),
+              lastPush: { at, head },
+              lastSeq: 4,
+              rounds: [
+                { at, head, outcome: Outcome.cases.Checking.make({ stage: "checks" }), seq: 3 },
+                { at, head, outcome: Outcome.cases.Checking.make({ stage: "checks" }), seq: 4 },
+              ],
+            }}
+            project={burrow}
+          />
+        );
+
+        expect(markup).toMatch(
+          new RegExp(`<time dateTime="${DateTime.formatIso(at)}"[^>]*>3 h ago</time>`, "u")
+        );
+        expect(textIn(markup)).toContain("round 2");
+      })
+  );
+
+  it.effect("fills the time slot with the ask's opening when nothing was pushed", () =>
+    Effect.gen(function* () {
+      const opened = DateTime.subtract(now, { days: 2 });
+      const markup = yield* rowsAt(
+        <AskRow
+          listing={listing("@burrow/auth")}
+          now={now}
+          progress={{ lastSeq: 1, opened, rounds: [] }}
+          project={burrow}
+          takeable
+        />
+      );
+
+      expect(textIn(markup)).toContain("2 d ago");
+    })
+  );
+
+  it.effect(
+    "gives a selected row the pressed surface under the pointer, and lets the want take two lines on a phone",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* rowsAt(
+          <Row
+            data={{ "data-ask": "a" }}
+            href="/burrow/asks/a"
+            id="a"
+            selected
+            title="Format ordinals"
+          />
+        );
+        const [row] = tagsWith(markup, "data-ask");
+        const want = /<p class="(?<classes>[^"]*)"><a\b/u.exec(markup)?.groups
+          ?.classes;
+
+        expect(attributeOf(row ?? "", "class")?.split(" ")).toStrictEqual(
+          expect.arrayContaining(["bg-surface", "hover:bg-surface-2"])
+        );
+        expect(want?.split(" ")).toStrictEqual(
+          expect.arrayContaining(["line-clamp-2", "tablet:line-clamp-1"])
+        );
       })
   );
 });

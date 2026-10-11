@@ -10,8 +10,10 @@
  *   text its `title`; it is the link, never the id.
  * - Line 2 is metadata, parted by ` · `; a value that means nothing (the
  *   whole repo's territory, ".") is left out (`MetaLine`).
- * - The state's mark sits in its own column and its word at the right, in
- *   its role; the mark is hidden from screen readers, the word is not.
+ * - The state's mark sits in its own column, in its role's colour, and its
+ *   word at the right in ink (Refused and Landed keep theirs: DESIGN.md's
+ *   Mark Carries Rule); the mark is hidden from screen readers, the word
+ *   is not.
  * - A row with a command has one copy action, the command as text inside it.
  *
  * From the shell's width a click anywhere off the link selects the row
@@ -23,6 +25,7 @@ import type { AskListing } from "@repo/protocol/domain/ask";
 import type { ClaimState } from "@repo/protocol/domain/claim";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { ProjectName } from "@repo/protocol/ids";
+import type { DateTime } from "effect";
 import type { MouseEvent, ReactNode } from "react";
 import { Fragment } from "react";
 
@@ -35,6 +38,7 @@ import type { StateMark } from "./marks.tsx";
 import { askPath } from "./paths.ts";
 import { useSelection } from "./shell/selection.ts";
 import type { SelectionParam } from "./shell/selection.ts";
+import { When } from "./time.tsx";
 
 /** A row's state: its mark, its word, and when (a `When`, or words). */
 export interface RowState {
@@ -81,16 +85,18 @@ export interface RowProps {
 const SHELL_WIDTH = "(min-width: 70rem)";
 
 /**
- * The word's colour: the state's role; ink for open and claimed, which have
- * none. A refusal that can be retried keeps its ochre mark, but its word is
- * a refusal's, as the status line says it.
+ * The word's colour (DESIGN.md's Mark Carries Rule): ink, its role's colour
+ * left to the mark, so a list of waiting asks is not an ochre stripe; a
+ * refusal keeps red and a landing green. A refusal that can be retried
+ * keeps its ochre mark, but its word is a refusal's, as the status line
+ * says it.
  */
-const wordTone = (mark: StateMark) => {
-  if (mark === "open" || mark === "claimed") {
-    return "text-foreground";
+export const wordTone = (mark: StateMark) => {
+  if (mark === "refused" || mark === "retry") {
+    return STATE_MARKS.refused.tone;
   }
 
-  return mark === "retry" ? "text-refused" : STATE_MARKS[mark].tone;
+  return mark === "landed" ? STATE_MARKS.landed.tone : "text-foreground";
 };
 
 /** Whether a press on `target` was meant for a link or a control in the row. */
@@ -217,7 +223,7 @@ export const Row = ({
   // `isolate` keeps the row's raised controls (its copy button, a fan's
   // nodes) inside the row, so a sticky header passes over them.
   const rowClass = `group/row border-rule relative isolate -mx-2 border-b px-2 transition-colors duration-[120ms] ${
-    selected ? "bg-surface" : "hover:bg-surface/50"
+    selected ? "bg-surface hover:bg-surface-2" : "hover:bg-surface/50"
   }`;
 
   return (
@@ -248,7 +254,13 @@ export const Row = ({
             {mark}
           </span>
           <div className="flex min-w-0 flex-1 flex-col">
-            <p className={`text-want truncate ${weight} ${face}`}>{link}</p>
+            {/* Below a tablet the want, the one line that says what done
+                means, may take two lines. */}
+            <p
+              className={`text-want tablet:line-clamp-1 line-clamp-2 break-words ${weight} ${face}`}
+            >
+              {link}
+            </p>
             {meta === undefined && state === undefined ? null : (
               <p className="text-ui text-muted-foreground truncate leading-5">
                 {state === undefined ? null : (
@@ -384,6 +396,12 @@ export const CLAIM_STATES = {
   warned: { mark: "waiting", word: "Warned, no push lately" },
 } as const satisfies Record<ClaimState, RowState>;
 
+/** Who an ask is held for, as its state word. */
+const reserveWords = {
+  newcomers: "Held for newcomers",
+  people: "Held for people",
+} as const;
+
 /** Where an open ask stands for its reader, as a row's state. */
 const askState = (
   listing: AskListing,
@@ -406,28 +424,23 @@ const askState = (
     return { mark: "waiting", word: "Waiting" };
   }
 
-  if (takeable === false) {
-    return { mark: "notYet", word: "Not open to you" };
+  // An ask held for someone says so wherever it is listed and whoever
+  // reads it, before whether this reader may take it.
+  if (listing.reserve !== undefined) {
+    return { mark: "open", word: reserveWords[listing.reserve] };
   }
 
-  if (takeable === undefined && listing.reserve !== undefined) {
-    return {
-      mark: "open",
-      word:
-        listing.reserve === "newcomers"
-          ? "Held for newcomers"
-          : "Held for people",
-    };
-  }
-
-  return { mark: "open", word: "Open to take" };
+  return takeable === false
+    ? { mark: "notYet", word: "Not open to you" }
+    : { mark: "open", word: "Open to take" };
 };
 
-/** Who an ask is held for, in a row's metadata. */
-const reserveWords = {
-  newcomers: "held for newcomers",
-  people: "held for people, not agents",
-} as const;
+/**
+ * The time an ask row shows: its last push, else its last round, else its
+ * opening, so a list scans by recency.
+ */
+const askTime = (progress: AskProgress | undefined) =>
+  progress?.lastPush?.at ?? progress?.rounds.at(-1)?.at ?? progress?.opened;
 
 /**
  * An open ask as a row: its want, its kind, territory and id, where it
@@ -436,6 +449,7 @@ const reserveWords = {
  */
 export const AskRow = ({
   listing,
+  now,
   onSelect,
   progress,
   project,
@@ -456,9 +470,17 @@ export const AskRow = ({
   readonly showProject?: boolean;
   /** A family's fan, when the ask is a parent. */
   readonly strip?: ReactNode;
+  /** The page's now, which the row's time is told against. */
+  readonly now?: DateTime.Utc | undefined;
 }) => {
-  const state = askState(listing, takeable, progress);
+  const at = askTime(progress);
+  const standing = askState(listing, takeable, progress);
+  const state =
+    at === undefined || now === undefined
+      ? standing
+      : { ...standing, time: <When at={at} now={now} /> };
   const claimant = progress?.claimant;
+  const rounds = progress?.rounds.length ?? 0;
   const open = state.mark === "open";
 
   return (
@@ -483,9 +505,7 @@ export const AskRow = ({
             territoryPart(listing.territory),
             <MetaCode key="id">{listing.ask}</MetaCode>,
             claimant === undefined ? undefined : `claimed by ${claimant}`,
-            listing.reserve === undefined || takeable === undefined
-              ? undefined
-              : reserveWords[listing.reserve],
+            rounds === 0 ? undefined : `round ${rounds}`,
           ]}
         />
       }

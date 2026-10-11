@@ -407,16 +407,15 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "marks an ask the viewer may not take with the reason, and no command",
+    "says an ask held for newcomers is held for them whoever reads it, with no command for a viewer who may not take it",
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
         const row = rowOf(markup, "explain-iso-week");
 
         expect(row).toContain('data-takeable="false"');
-        expect(textIn(row)).toMatch(
-          /Not open to you[\s\S]*held for newcomers/u
-        );
+        expect(textIn(row)).toContain("Held for newcomers");
+        expect(textIn(row)).not.toContain("Not open to you");
         expect(row).not.toContain("Open to take");
         expect(row).not.toContain(`${Brand.cli} claim explain-iso-week`);
         expect(rowOf(markup, "fix-week-start")).toContain("Open to take");

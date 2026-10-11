@@ -495,7 +495,7 @@ shadcn 4.21.2, style `base-lyra` on Base UI, in `src/components/ui/` (generated,
 
 Each rule below is decided in this document (ADR 0039) and not yet in the code; the build issues are cut from this list, and an item leaves it when its file changes.
 
-- The row's state word in ink at 500 except Refused and Landed (`wordTone`), the time slot filled on every ask row, "round n" and "mentored by" in line 2, the two-line want below `tablet`, the pressed surface on a selected row under the pointer, and held-for-newcomers read before takeable (`askState`): `apps/web/src/features/shared/row.tsx`. Decided, not yet drawn.
+- "mentored by" in an ask row's line 2: the row reads an `AskListing`, which carries no mentor, so it waits on the listing gaining one (a contract change in `packages/protocol`): `apps/web/src/features/shared/row.tsx`. Decided, not yet drawn.
 - The head meta line's `files · +n −m` on answer and commit subjects: `apps/web/src/features/shared/status-line.tsx` and the answer and commit heads. Decided, not yet drawn.
 - Provenance in the one block shape, the Rounds block removed from the inspector, the front page's Projects block as counts only, and the held-back roots shortened: `apps/web/src/features/shared/facts.tsx`. Decided, not yet drawn.
 - The Rounds region, the waiting sentence and the Landing region's sentence-first order with "The landing commit" as its onward link: `apps/web/src/features/answer/answer-page.tsx`; "Credit" at Title weight there: `apps/web/src/features/shared/credits.tsx`. Decided, not yet drawn.

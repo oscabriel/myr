@@ -409,6 +409,7 @@ const ProjectLine = ({
 /** The asks' place on the page, as far as they have been read. */
 const AsksSection = ({
   asks,
+  now,
   onSelect,
   parents,
   project,
@@ -419,6 +420,7 @@ const AsksSection = ({
   unreachable,
 }: {
   readonly asks: readonly AskListing[] | undefined;
+  readonly now: DateTime.Utc;
   readonly unreachable: boolean;
   readonly project: ProjectName;
   readonly parents: readonly Ask[];
@@ -443,6 +445,7 @@ const AsksSection = ({
     list = (
       <AskList
         asks={asks}
+        now={now}
         onSelect={onSelect}
         parents={parents}
         project={project}
@@ -601,6 +604,7 @@ const ProjectPanes = ({
       <ProjectNav current="overview" project={project} />
       <AsksSection
         asks={asks}
+        now={props.now}
         onSelect={select}
         parents={props.parents ?? []}
         project={project}

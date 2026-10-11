@@ -6,6 +6,7 @@
  */
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
+import type { DateTime } from "effect";
 import type { ReactNode } from "react";
 
 import { arrange } from "../front/families.ts";
@@ -38,6 +39,7 @@ export const openAsks = (listings: readonly AskListing[]) => {
 /** The project's asks, families as fans with their children listed. */
 export const AskList = ({
   asks,
+  now,
   onSelect,
   parents,
   project,
@@ -46,6 +48,7 @@ export const AskList = ({
   states,
 }: {
   readonly asks: readonly AskListing[];
+  readonly now: DateTime.Utc;
   readonly project: ProjectName;
   /** Each family's parent in full, which counts its children. */
   readonly parents: readonly Ask[];
@@ -58,6 +61,7 @@ export const AskList = ({
     <AskRow
       key={listing.ask}
       listing={listing}
+      now={now}
       onSelect={onSelect}
       progress={states.get(listing.ask)}
       project={project}
