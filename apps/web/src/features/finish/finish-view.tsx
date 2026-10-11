@@ -16,7 +16,7 @@
  *
  * What the page reads from the decision's evidence: `patch`, the answer's
  * unified diff, and `fork`, the name of the answer's fork
- * (`<project>--<ask>--<handle>`), where a finish fetches the head and pushes
+ * (`<key>--<ask>--<handle>`), where a finish fetches the head and pushes
  * its commits. Without a patch the page shows the lines and no diff;
  * without a fork it names the fork by the claim fork's pattern and leaves
  * the answerer's handle for the decider to fill in. The web never calls

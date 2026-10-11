@@ -327,7 +327,7 @@ const today = viewOf(TodayOf.successSchema, (page) =>
       ? []
       : [
           prose(
-            `Take one with \`${Brand.cli} decide --project <project> --decision <decision> --choice <choice> --yes\`.`
+            `Take one with \`${Brand.cli} decide --project <owner>/<name> --decision <decision> --choice <choice> --yes\`.`
           ),
         ])
   )
@@ -427,7 +427,7 @@ const evaluated = (policy: PublicPolicy) => {
 /**
  * Why the config at the landed commit has not evaluated, and the step that
  * makes it, as a terminal's lines. The view sees only the success, which
- * names no project, so the command names it as `<project>`.
+ * names no project, so the command names it as `<owner>/<name>`.
  */
 const pendingText = ({ at, reason }: PolicyPending) => {
   const notEvaluated = `The config at the landed commit ${short(at)} has not been evaluated`;
@@ -435,7 +435,7 @@ const pendingText = ({ at, reason }: PolicyPending) => {
   return reason === "noConfig"
     ? [
         `${notEvaluated}: there is no ${Brand.configDir}/ folder, and no test command in the project's CI or package files.`,
-        `Run \`${Brand.cli} init --project <project> --dry-run\` in the project's repo to see the ${PROJECT_FILE} it proposes, then have a decider land it.`,
+        `Run \`${Brand.cli} init --project <owner>/<name> --dry-run\` in the project's repo to see the ${PROJECT_FILE} it proposes, then have a decider land it.`,
       ]
     : [
         `${notEvaluated}: ${Brand.configDir}/ at ${short(at)} did not evaluate.`,

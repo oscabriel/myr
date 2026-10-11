@@ -80,7 +80,7 @@ export const StartHere = ({ webUrl }: { readonly webUrl: string }) => (
     <Step command={installCommand(webUrl)} label="Install the command line" />
     <Step command={`${Brand.cli} front`} label="List every open ask" />
     <Step
-      command={`${Brand.cli} claim <ask> --project <project>`}
+      command={`${Brand.cli} claim <ask> --project <owner>/<name>`}
       label="Claim one you may take"
     />
     <ForAgents href="/llms.txt" />

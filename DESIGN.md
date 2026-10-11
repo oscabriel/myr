@@ -480,7 +480,7 @@ The platform's own label, never rewritten, through the state badge: a lock mark 
 ### Owners and imports
 
 - **Names:** a project is named in full wherever a page names it, `<owner>/<name>` (`oscabriel/datekit`, `github.com/pallets/click`), in mono like any id; the owner is never dropped to save room. A field or fact that holds the namespace is labelled "Owner".
-- **Words:** "Import a repo" is the page at `/import` and every link to it; "Imported from" heads an import's source fact; "Not imported yet" heads the offer at a source path nobody has imported. A refused import draws its refusal as any refusal does: `NotYourNamespace`'s headline reads "`<owner>` is not yours to make projects in: you are `<handle>`", rendered, never reworded. The banned words below stay banned here, and so do the words the glossary avoids for an import: mirror, fork (of the source) and sync.
+- **Words:** "Import a repo" is the page at `/import` and every link to it; "Imported from" heads an import's source fact; "Not imported yet" heads the offer at the address of a source namespace's project nobody has imported. A refused import draws its refusal as any refusal does: `NotYourNamespace`'s headline reads "`<owner>` is not yours to make projects in: you are `<handle>`", rendered, never reworded. The banned words below stay banned here, and so do the words the glossary avoids for an import: mirror, fork (of the source) and sync.
 
 ### The landing
 

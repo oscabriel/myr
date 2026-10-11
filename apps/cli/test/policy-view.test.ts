@@ -143,7 +143,7 @@ describe("policy's text view", () => {
 
     expect(lines).toStrictEqual([
       `The config at the landed commit ${sha.slice(0, 7)} has not been evaluated: there is no ${Brand.configDir}/ folder, and no test command in the project's CI or package files.`,
-      `Run \`${Brand.cli} init --project <project> --dry-run\` in the project's repo to see the ${Brand.configDir}/project.ts it proposes, then have a decider land it.`,
+      `Run \`${Brand.cli} init --project <owner>/<name> --dry-run\` in the project's repo to see the ${Brand.configDir}/project.ts it proposes, then have a decider land it.`,
     ]);
   });
 
@@ -152,7 +152,7 @@ describe("policy's text view", () => {
 
     for (const form of [view.markdown, view.text ?? ""]) {
       expect(form).toContain(
-        `\`${Brand.cli} init --project <project> --dry-run\``
+        `\`${Brand.cli} init --project <owner>/<name> --dry-run\``
       );
       expect(form.toLowerCase()).not.toContain("in a clone");
     }

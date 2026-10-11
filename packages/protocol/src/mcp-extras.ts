@@ -118,7 +118,7 @@ const projectList = McpServer.resource({
         "",
         projectsTable(projects),
         "",
-        `A project's open asks: the prompt \`contribute\` with its name, or \`${Brand.cli} asks --project <project>\`.`,
+        `A project's open asks: the prompt \`contribute\` with its name, or \`${Brand.cli} asks --project <owner>/<name>\`.`,
         "",
       ].join("\n")
     );

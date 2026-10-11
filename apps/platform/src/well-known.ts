@@ -2,8 +2,9 @@
  * The projects' contribute skills where agents look for skills:
  * `/.well-known/agent-skills/index.json`, in the Agent Skills discovery shape
  * (`wellKnownSkills`), lists every project whose landed tree holds
- * `.agents/skills/<project>-contribute/SKILL.md`, with the SHA-256 of the
- * file's bytes, and `/.well-known/agent-skills/<project>-contribute/SKILL.md`
+ * `.agents/skills/<key>-contribute/SKILL.md` (the project's key), with the
+ * SHA-256 of the file's bytes, and
+ * `/.well-known/agent-skills/<key>-contribute/SKILL.md`
  * serves that file as it landed. Nothing is generated here: the platform serves
  * what landed (a follow-up landing lands the regenerated skill). The web host
  * forwards these paths unchanged, and the index's URLs are path-absolute, so

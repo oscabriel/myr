@@ -127,7 +127,7 @@ describe("the host's Markdown", () => {
       );
     });
 
-    it("spells a project as its full name, never <project>", () => {
+    it("spells a project as <owner>/<name>, never <project>", () => {
       expect(text).not.toContain("<project>");
       expect(text).toContain("--project <owner>/<name>");
     });

@@ -128,7 +128,7 @@ describe("the docs", () => {
     ).toStrictEqual(docEntries);
   });
 
-  it("spell a project as its full name, <owner>/<name>, never <project>", () => {
+  it("spell a project as <owner>/<name>, never <project>", () => {
     expect(
       pages.flatMap(({ markdown, slug }) =>
         markdown.includes("<project>") ? [slug] : []

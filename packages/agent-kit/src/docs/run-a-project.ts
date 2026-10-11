@@ -24,7 +24,7 @@ export const runAProject: DocSource = {
     "",
     "## Import a repo",
     "",
-    `To bring a public repo over HTTPS: ${cli("init --import <url>")}, with ${code("--branch")} when its default branch is not the one you want. A repo from ${sourceHosts.map((host) => code(host)).join(", ")} is named at its source path, so ${code("https://github.com/pallets/click")} becomes ${code("github.com/pallets/click")}; a repo from any other host is named under your handle, after the URL's last segment. ${code("--project")} names it otherwise, a bare word again under your handle. On the web, [Import a repo](/import) does the same, and the address of a source path nobody has imported yet, such as ${code("/github.com/pallets/click")}, offers the import. You are an import's first decider, as of any project.`,
+    `To bring a public repo over HTTPS: ${cli("init --import <url>")}, with ${code("--branch")} when its default branch is not the one you want. A repo from ${sourceHosts.map((host) => code(host)).join(", ")} is named after its source namespace, ${code("<host>/<account>/<name>")}, so ${code("https://github.com/pallets/click")} becomes ${code("github.com/pallets/click")}; a repo from any other host is named under your handle, after the URL's last segment. ${code("--project")} names it otherwise, a bare word again under your handle. On the web, [Import a repo](/import) does the same, and the web address of such a name nobody has imported yet, such as ${code("/github.com/pallets/click")}, offers the import. You are an import's first decider, as of any project.`,
     "",
     "## The config folder",
     "",

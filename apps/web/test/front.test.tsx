@@ -526,7 +526,7 @@ describe(FrontPageView, () => {
           [
             "Start here",
             `curl -fsSL ${webUrl}/install.sh | sh`,
-            `${Brand.cli} claim <ask> --project <project>`,
+            `${Brand.cli} claim <ask> --project <owner>/<name>`,
           ].filter((words) => !text.includes(words))
         ).toStrictEqual([]);
         expect(facts).toContain('href="/llms.txt"');
