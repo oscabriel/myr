@@ -9,7 +9,6 @@ import {
   askMarkdownResponse,
   noAskAt,
 } from "../../../../features/ask/markdown.ts";
-import { withProjectName } from "../../../../server/addresses.ts";
 import { serverClient } from "../../../../server/client.ts";
 
 // An ask as Markdown, always: `/<project>/asks/<ask>.md` (a literal `.` is
@@ -69,9 +68,7 @@ export const askMarkdownHandler =
 export const Route = createFileRoute("/$owner/$project/asks/{$ask}.md")({
   server: {
     handlers: {
-      GET: withProjectName(
-        askMarkdownHandler((request) => serverClient(env, request))
-      ),
+      GET: askMarkdownHandler((request) => serverClient(env, request)),
     },
   },
 });

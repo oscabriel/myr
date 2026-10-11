@@ -46,7 +46,6 @@ import { UnknownProjectView } from "../../../features/project/unknown-project.ts
 import { askStates } from "../../../features/shared/ask-progress.ts";
 import { pageHead } from "../../../features/shared/head.ts";
 import { reloadOnEnter } from "../../../features/shared/shell/selection.ts";
-import { withProjectName } from "../../../server/addresses.ts";
 import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 import {
@@ -326,11 +325,9 @@ export const Route = createFileRoute("/$owner/$project/")({
   notFoundComponent: Unknown,
   server: {
     handlers: {
-      GET: withProjectName(
-        projectPageHandler(
-          (request) => serverClient(env, request),
-          env.PUBLIC_PLATFORM_URL
-        )
+      GET: projectPageHandler(
+        (request) => serverClient(env, request),
+        env.PUBLIC_PLATFORM_URL
       ),
     },
   },
