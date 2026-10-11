@@ -341,9 +341,7 @@ const RoundsRegion = ({
  * What a waiting answer's contributor needs, from its rounds: there is
  * nothing to run, and what another push would start.
  */
-const waitingSentence = (
-  round: { readonly number: number; readonly of: number } | undefined
-) =>
+const waitingSentence = (round: ReturnType<typeof roundOf>) =>
   round === undefined
     ? "Nothing for you to run."
     : `Nothing for you to run. Pushing again starts round ${round.of + 1}; this verdict stays as round ${round.number}.`;
@@ -488,7 +486,7 @@ const Run = ({
   readonly landing: LandingView | undefined;
   readonly now: DateTime.Utc;
   /** Which round the verdict is, of how many. */
-  readonly round: { readonly number: number; readonly of: number } | undefined;
+  readonly round: ReturnType<typeof roundOf>;
   readonly verdict: Verdict;
 }) => (
   <>

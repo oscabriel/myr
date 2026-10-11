@@ -349,10 +349,6 @@ const HowItLands = ({
   </>
 );
 
-/** A count and its noun, with its plural: "1 path", "3 paths". */
-const counted = (count: number, noun: string) =>
-  `${count} ${noun}${count === 1 ? "" : "s"}`;
-
 /**
  * How a change lands here, in one sentence built only from typed facts:
  * the gate, the paths deciders are set for, what is held back (the ledger
@@ -379,15 +375,15 @@ const RuleSentence = ({
       <AppLink className={LINK} key="ledger" to={ledgerPath(project)}>
         {heldBack.length === 0
           ? "nothing held back"
-          : `${counted(checks, "sealed check")} in ${counted(heldBack.length, "area")}`}
+          : `${plural(checks, "sealed check", "sealed checks")} in ${plural(heldBack.length, "area", "areas")}`}
       </AppLink>
     );
 
   const parts = [
-    `Gate: ${counted(StageName.literals.length, "stage")}`,
+    `Gate: ${plural(StageName.literals.length, "stage", "stages")}`,
     deciders === undefined || deciders.length === 0
       ? undefined
-      : `deciders set for ${counted(deciders.length, "path")}`,
+      : `deciders set for ${plural(deciders.length, "path", "paths")}`,
     sealed,
     landedAt === undefined ? (
       "nothing landed yet"
