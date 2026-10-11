@@ -477,6 +477,11 @@ The platform's own label, never rewritten, through the state badge: a lock mark 
 - **Keys:** `?` opens the keys dialog with the switch "Single-key shortcuts: On / Off" (kept in this browser, on by default); each key in the dialog is a `kbd`: label type, a hairline border, the 2 px radius, 4 px of side padding, on the paper; `j`/`k` move through a list's rows (and from 1120 px select them), Enter opens; `J`/`K` move between files on code, commit and finish pages; `1`–`9` copy the page's numbered commands, the inspector's first; Escape closes a sheet or clears the selection. No key acts in a field, a combobox or the tree's filter. Every key has a pointer twin.
 - **Selection:** in the address (`?ask=`, `?decision=`), replaced in history, so a selected row and its facts render on the server and can be shared.
 
+### Owners and imports
+
+- **Names:** a project is named in full wherever a page names it, `<owner>/<name>` (`oscabriel/datekit`, `github.com/pallets/click`), in mono like any id; the owner is never dropped to save room. A field or fact that holds the namespace is labelled "Owner".
+- **Words:** "Import a repo" is the page at `/import` and every link to it; "Imported from" heads an import's source fact; "Not imported yet" heads the offer at the address of a source namespace's project nobody has imported. A refused import draws its refusal as any refusal does: `NotYourNamespace`'s headline reads "`<owner>` is not yours to make projects in: you are `<handle>`", rendered, never reworded. The banned words below stay banned here, and so do the words the glossary avoids for an import: mirror, fork (of the source) and sync.
+
 ### The landing
 
 - **Where:** `/`, the one page outside the shell (its route's `staticData: { shell: "bare" }`); the front page is `/asks`. A reader who carries a session is sent to `/home` before it is drawn.

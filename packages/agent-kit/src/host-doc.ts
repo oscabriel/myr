@@ -5,7 +5,7 @@
  * how to connect over MCP, how to find and take an ask, every command, and
  * which projects exist: the web serves it at `/llms.txt`, and the platform
  * at `/` for an agent, with no web app's pages named when it knows of none.
- * `projectLlms` is the web's `/<project>/llms.txt`, with the project's open
+ * `projectLlms` is the web's `/<owner>/<name>/llms.txt`, with the project's open
  * asks, and `mcpCard` its `/.well-known/mcp.json`. With a web app,
  * `frontLlms` names `/llms-full.txt` (`full-llms.ts`), and `indexBanner`
  * sits under the title of every other Markdown answer the web serves, so a reader that lands
@@ -69,9 +69,7 @@ const usage = (
   flags: readonly ("ask" | "project")[] = []
 ) => {
   const valueOf = (name: string) =>
-    name === "project" && known.project !== undefined
-      ? known.project
-      : `<${name}>`;
+    name === "project" ? (known.project ?? "<owner>/<name>") : `<${name}>`;
 
   return [
     Brand.cli,
@@ -216,7 +214,7 @@ export const frontLlms = (input: {
     ...Option.match(webUrl, {
       onNone: () => [],
       onSome: (web) => [
-        `The same facts read as Markdown: each project at ${web}/<project>/llms.txt, and each ask at ${web}/<project>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in ${web}/llms-full.txt.`,
+        `The same facts read as Markdown: each project at ${web}/<owner>/<name>/llms.txt, and each ask at ${web}/<owner>/<name>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in ${web}/llms-full.txt.`,
         "",
         `Guides and a reference written for people are at ${web}/docs, each page also as Markdown at ${web}/docs/<page>.md.`,
         "",
@@ -307,7 +305,7 @@ export const underTitle = (text: string, banner: string) => {
     : `${banner}\n\n${text}`;
 };
 
-/** `/<project>/llms.txt`: the project, its posture, how to clone it, its open asks and how to take one. */
+/** `/<owner>/<name>/llms.txt`: the project, its posture, how to clone it, its open asks and how to take one. */
 export const projectLlms = (input: {
   readonly listing: ProjectListing;
   readonly asks: readonly AskListing[];
@@ -340,7 +338,7 @@ export const projectLlms = (input: {
 };
 
 /**
- * `/<project>/llms.txt` for a project the platform does not list. A name
+ * `/<owner>/<name>/llms.txt` for a project the platform does not list. A name
  * that could not be a project's is not repeated back.
  */
 export const missingProjectLlms = (input: {

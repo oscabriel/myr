@@ -203,13 +203,17 @@ describe(fullLlms, () => {
   it("names the repos a person meets by their patterns", () => {
     const git = section("Git here");
 
-    expect(git).toContainEqual(expect.stringContaining("`<project>`"));
+    expect(git).toContainEqual(expect.stringContaining("`<owner>/<name>`"));
     expect(git).toContainEqual(
-      expect.stringContaining("`<project>--<ask>--<handle>`")
+      expect.stringContaining("`<owner>/<name>--<ask>--<handle>`")
     );
     expect(git).toContainEqual(
-      expect.stringContaining("`<project>--me--<handle>`")
+      expect.stringContaining("`<owner>/<name>--me--<handle>`")
     );
+  });
+
+  it("spells a project as <owner>/<name>, never <project>", () => {
+    expect(text).not.toContain("<project>");
   });
 
   it("reads the verdict note with plain git", () => {
@@ -227,7 +231,7 @@ describe(fullLlms, () => {
         `\`a push needs a signed-in person; sign in with ${Brand.cli} login\``
       )
     );
-    expect(git).toContainEqual(expect.stringContaining("`no repo <name>`"));
+    expect(git).toContainEqual(expect.stringContaining("`no repo <repo>`"));
   });
 
   it("names only commands the catalog has in its guides", () => {

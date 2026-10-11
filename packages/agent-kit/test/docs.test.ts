@@ -128,6 +128,22 @@ describe("the docs", () => {
     ).toStrictEqual(docEntries);
   });
 
+  it("spell a project as <owner>/<name>, never <project>", () => {
+    expect(
+      pages.flatMap(({ markdown, slug }) =>
+        markdown.includes("<project>") ? [slug] : []
+      )
+    ).toStrictEqual([]);
+  });
+
+  it("say how a new project is named, and that /import brings a repo over", () => {
+    const markdown = markdownOf("run-a-project");
+
+    expect(markdown).toContain(`${Brand.cli} init --project <owner>/<name>`);
+    expect(markdown).toContain("](/import)");
+    expect(markdown).toContain("github.com/pallets/click");
+  });
+
   it("find a page by its slug, and none by another", () => {
     expect(
       Option.map(docPage(input, "events"), ({ title }) => title)

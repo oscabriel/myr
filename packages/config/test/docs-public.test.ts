@@ -61,9 +61,12 @@ const TERMS = [
   "Family",
   "Landed SHA",
   "Outcome",
+  "Owner",
   "Patch id",
   "Policy",
+  "Project name",
   "Proposal",
+  "Source namespace",
   "Today",
   "Working fork",
 ] as const;

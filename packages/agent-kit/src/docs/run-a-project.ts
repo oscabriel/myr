@@ -4,6 +4,7 @@
  * decisions, finish an answer, land your own change and vouch.
  */
 import { Brand } from "@repo/brand";
+import { sourceHosts } from "@repo/protocol/ids";
 
 import { code } from "../text.ts";
 import type { DocSource } from "./page.ts";
@@ -15,7 +16,15 @@ export const runAProject: DocSource = {
   body: () => [
     "## Make a project",
     "",
-    `In a repo of your own, ${cli("init --project <project>")} makes it a project: it finds the repo's checks (its test and lint commands, and its CI), writes the config folder, ${code(`${dir}/`)}, and pushes. To bring a public repo over HTTPS instead: ${cli("init --project <project> --import <url>")}, with ${code("--branch")} when its default branch is not the one you want. You are the project's first decider.`,
+    `In a repo of your own, ${cli("init --project <owner>/<name>")} makes it a project: it finds the repo's checks (its test and lint commands, and its CI), writes the config folder, ${code(`${dir}/`)}, and pushes. You are the project's first decider.`,
+    "",
+    "## How a project is named",
+    "",
+    `A project's name is its owner, then a short name: ${code("<owner>/<name>")}, as in ${code("oscabriel/datekit")}. The name is the project's address everywhere: ${code("--project")} takes it, the web shows the project at ${code("/<owner>/<name>")}, and git clones it from ${code("<platform>/<owner>/<name>.git")}. You make projects under your own handle; a bare word, as in ${cli("init --project datekit")}, is taken as yours, under the handle ${cli("login")} kept. Owning a namespace is the right to make projects in it and nothing more: who decides stays with the config folder.`,
+    "",
+    "## Import a repo",
+    "",
+    `To bring a public repo over HTTPS: ${cli("init --import <url>")}, with ${code("--branch")} when its default branch is not the one you want. A repo from ${sourceHosts.map((host) => code(host)).join(", ")} is named after its source namespace, ${code("<host>/<account>/<name>")}, so ${code("https://github.com/pallets/click")} becomes ${code("github.com/pallets/click")}; a repo from any other host is named under your handle, after the URL's last segment. ${code("--project")} names it otherwise, a bare word again under your handle. On the web, [Import a repo](/import) does the same, and the web address of such a name nobody has imported yet, such as ${code("/github.com/pallets/click")}, offers the import. You are an import's first decider, as of any project.`,
     "",
     "## The config folder",
     "",
@@ -39,7 +48,7 @@ export const runAProject: DocSource = {
     "});",
     "```",
     "",
-    `The project's Policy page shows what the folder evaluated to at the landed commit, and ${cli("policy --project <project>")} prints the same.`,
+    `The project's Policy page shows what the folder evaluated to at the landed commit, and ${cli("policy --project <owner>/<name>")} prints the same.`,
     "",
     "## Open an ask",
     "",
@@ -56,31 +65,31 @@ export const runAProject: DocSource = {
     "});",
     "```",
     "",
-    `${cli("ask open <ask> --project <project>")} lands the ask, but only once its check fails on \`main\` twice the same way, by an assertion: a check that cannot fail, or fails by not loading, opens nothing. ${cli("schema ask open")} prints what it takes.`,
+    `${cli("ask open <ask> --project <owner>/<name>")} lands the ask, but only once its check fails on \`main\` twice the same way, by an assertion: a check that cannot fail, or fails by not loading, opens nothing. ${cli("schema ask open")} prints what it takes.`,
     "",
     "## Proposals and drafts",
     "",
-    `Anyone not denounced may propose an ask: ${cli('propose --project <project> --want "<what should be true>"')}. A proposal expires unless a decider accepts it. With ${code("--draft")}, the platform's agent drafts the ask file and its failing check, runs them red first, and puts the draft to a decider with its evidence; ${cli("proposal <proposal> --project <project>")} follows it, and ${cli("ask draft <proposal> --project <project>")} asks for another round. Nothing lands until a decider accepts, and the landing discloses the agent in \`Assisted-by\`.`,
+    `Anyone not denounced may propose an ask: ${cli('propose --project <owner>/<name> --want "<what should be true>"')}. A proposal expires unless a decider accepts it. With ${code("--draft")}, the platform's agent drafts the ask file and its failing check, runs them red first, and puts the draft to a decider with its evidence; ${cli("proposal <proposal> --project <owner>/<name>")} follows it, and ${cli("ask draft <proposal> --project <owner>/<name>")} asks for another round. Nothing lands until a decider accepts, and the landing discloses the agent in \`Assisted-by\`.`,
     "",
     "## Today",
     "",
-    `A decider's day is a short list of decisions, each with its evidence and a safe default taken if nobody decides before it expires, held to the project's budget. Read it on the web at [Today](/today), or with ${cli("today")}, and take one with ${cli("decide --project <project> --decision <decision> --choice accept")} (or \`decline\`, \`adopt\`, \`revert\`).`,
+    `A decider's day is a short list of decisions, each with its evidence and a safe default taken if nobody decides before it expires, held to the project's budget. Read it on the web at [Today](/today), or with ${cli("today")}, and take one with ${cli("decide --project <owner>/<name> --decision <decision> --choice accept")} (or \`decline\`, \`adopt\`, \`revert\`).`,
     "",
     "## Finish an answer, or land your own change",
     "",
-    `When an ask's kind requires a finish, a passing answer waits for a decider's own commits on top: ${cli("finish <ask> --project <project> --base <base> --head <head>")}. They are checked again, and the landing credits you with \`Finished-by\`.`,
+    `When an ask's kind requires a finish, a passing answer waits for a decider's own commits on top: ${cli("finish <ask> --project <owner>/<name> --base <base> --head <head>")}. They are checked again, and the landing credits you with \`Finished-by\`.`,
     "",
     `A decider's own change goes through the same gate. Make your working fork, push to it, and land it:`,
     "",
     ...shell(
-      `${Brand.cli} fork --project <project>`,
+      `${Brand.cli} fork --project <owner>/<name>`,
       `git push <fork remote> HEAD:main`,
-      `${Brand.cli} land --project <project> --base <base> --head <head>`
+      `${Brand.cli} land --project <owner>/<name> --base <base> --head <head>`
     ),
     "",
     "## Vouch",
     "",
-    `${cli("vouch --project <project> --handle <handle> --verdict vouch")} admits a person to claim, by landing a line in the vouch file; \`--verdict denounce\` bars them from proposing.`,
+    `${cli("vouch --project <owner>/<name> --handle <handle> --verdict vouch")} admits a person to claim, by landing a line in the vouch file; \`--verdict denounce\` bars them from proposing.`,
     "",
   ],
   slug: "run-a-project",

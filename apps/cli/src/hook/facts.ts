@@ -99,7 +99,7 @@ const claimFor = (
 
 /**
  * The session's facts for a harness running in `cwd`. The repo's remote
- * names the project, and a claim's fork (`<project>--<ask>--<handle>`)
+ * names the project, and a claim's fork (`<owner>/<name>--<ask>--<handle>`)
  * the ask; `status` gives the caller's live claim and its check
  * command; `showAsk` gives the want and the territory; git gives the files
  * at the claim's base for the judge closure.

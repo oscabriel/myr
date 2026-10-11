@@ -66,7 +66,7 @@ export const contributeBody = (project: ProjectName, policy: Policy) =>
   ]);
 
 /**
- * `.agents/skills/<project>-contribute/SKILL.md` and its `.claude/skills/`
+ * `.agents/skills/<key>-contribute/SKILL.md` and its `.claude/skills/`
  * copy, the same bytes, with frontmatter naming the landing it came from.
  */
 export const projectSkill = (input: {

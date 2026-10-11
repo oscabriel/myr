@@ -88,6 +88,6 @@ export const repoKind = (name: RepoName): RepoKind => {
   return Option.getOrElse(kind, () => RepoKind.Unknown());
 };
 
-/** A person's working fork: `<project>--me--<handle in lowercase>`. */
+/** A person's working fork: `<key>--me--<handle in lowercase>`. */
 export const workingForkName = (project: ProjectName, handle: Handle) =>
   RepoName.make(`${keyOf(project)}--${WORKING}--${handle.toLowerCase()}`);

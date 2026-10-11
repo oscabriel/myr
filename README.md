@@ -30,9 +30,9 @@ $ git push
 remote: OutOfScope: changes paths outside the ask's territory: README.md; put those files back, or flag the ask if the want needs them
 remote:   next: myr check
 remote:   retryable: no
-To https://<platform>/datekit--parse-iso--alice.git
+To https://<platform>/dora/datekit--parse-iso--alice.git
  ! [remote rejected] HEAD -> main (OutOfScope)
-error: failed to push some refs to 'https://<platform>/datekit--parse-iso--alice.git'
+error: failed to push some refs to 'https://<platform>/dora/datekit--parse-iso--alice.git'
 ```
 
 The core loop, in six lines:
@@ -99,8 +99,8 @@ The CLI from source, against that dev world:
 
 ```sh
 MYR_URL=http://127.0.0.1:3032 bun apps/cli/src/bin.ts projects
-MYR_URL=http://127.0.0.1:3032 bun apps/cli/src/bin.ts asks --project datekit
-MYR_URL=http://127.0.0.1:3032 bun apps/cli/src/bin.ts ask format-ordinal --project datekit
+MYR_URL=http://127.0.0.1:3032 bun apps/cli/src/bin.ts asks --project oscabriel/datekit
+MYR_URL=http://127.0.0.1:3032 bun apps/cli/src/bin.ts ask format-ordinal --project oscabriel/datekit
 ```
 
 Both examples, seeded onto a platform that runs in Node on this machine for the length of the command, with real git:
@@ -335,10 +335,10 @@ Bindings are declared per stage in each app's `wrangler.jsonc`, and the platform
 
 ### The core loop, step by step
 
-1. **Init or import.** `myr init` finds the project's own commands (its run block), proposes a config folder, and makes the project, empty or imported once from a public HTTPS repo. For an empty project, the initializer's first push is the only direct push `main` ever takes; after it, `main` moves only by a landing.
+1. **Init or import.** `myr init` finds the project's own commands (its run block), proposes a config folder, and makes the project, empty or imported once from a public HTTPS repo (from the CLI, or from the web's `/import`). A project is named `<owner>/<name>` (the rule is in the Run a project guide, `packages/agent-kit/src/docs/run-a-project.ts`), and a project made before owners keeps its old address as a redirect ([ADR 0032](docs/adr/0032-a-project-is-named-by-its-owner-and-the-forty-keep-their-keys.md), [ADR 0033](docs/adr/0033-a-repo-is-imported-from-the-web-and-its-host-path-offers-the-import.md)). For an empty project, the initializer's first push is the only direct push `main` ever takes; after it, `main` moves only by a landing.
 2. **Rules at the landed SHA.** After every landing the Lander bundles the config folder, and the platform evaluates it once, with frozen time and randomness, into a typed policy. Rules come only from the platform's own last landing.
 3. **Open an ask.** A decider sends the ask and its check; the check runs on `main` twice and must fail the same way by an assertion; the platform lands the ask with `Asked-by`.
-4. **Claim.** `myr claim` makes the claimant's fork (`<project>--<ask>--<handle>`). Pushes keep the claim alive; a quiet claim is warned, then lapses.
+4. **Claim.** `myr claim` makes the claimant's fork (`<owner>/<name>--<ask>--<handle>`). Pushes keep the claim alive; a quiet claim is warned, then lapses.
 5. **Push through the gateway.** Custody admits the pusher before git sees the pack; after the fork takes it, the shape stage reads the diff (territory, judge closure, weakening markers, reached internals, layer paths) and every refusal comes back at once in `remote:` lines.
 6. **Check.** The `Answer` Workflow has the Lander merge onto `main`, then the Checker runs the cheap lanes, the ask's check and the project's checks on the exact merged tree, then the held-back checks.
 7. **Land.** One landing at a time per project: the Lander commits the checked tree (author the answerer, committer the platform, a trailer for each person the platform recorded in a role) and pushes `main`. A moved `main` means a re-merge and a re-check, or `StaleBase`.

@@ -20,7 +20,7 @@ Find an ask with `__CLI__ asks`, then, in the project's repo:
 4. Push your answer to your fork: `git push __SLUG__ HEAD:main`. The push itself can be refused; follow the answer with `__CLI__ status`.
 5. Read the verdict on your head: `git fetch __SLUG__ refs/notes/__SLUG__:refs/notes/__SLUG__`, then `git notes --ref=__SLUG__ show HEAD`. It is JSON: match on its `_tag`, and run a refusal's `next`.
 
-A project's own `<project>-contribute` skill and the block in its AGENTS.md give its territories, its run block and its ask kinds.
+A project's own `<key>-contribute` skill (its key: the name with each `/` as `__`, as in `oscabriel__foo-contribute`, or for a project made before owners its old one-word key, as in `datekit-contribute`) and the block in its AGENTS.md give its territories, its run block and its ask kinds.
 
 ## Output
 

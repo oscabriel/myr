@@ -33,7 +33,7 @@ const guides = (commands: Commands, platformUrl: string) => [
   "",
   "### Recover from `StaleBase`",
   "",
-  `\`main\` moved under your answer, and the answer did not merge onto it. Rebase onto the new \`main\`, resolve what the rebase stops on, and push again: ${code(`git pull --rebase ${platformUrl}/<project>.git main`)}, then ${pushAnswer()}.`,
+  `\`main\` moved under your answer, and the answer did not merge onto it. Rebase onto the new \`main\`, resolve what the rebase stops on, and push again: ${code(`git pull --rebase ${platformUrl}/<owner>/<name>.git main`)}, then ${pushAnswer()}.`,
   "",
   `When the merge conflicted, \`conflicts\` names the paths, and \`movedBy\` names, for each one the platform landed, the landing that last changed it: its commit (\`landing\`), the person accountable for it (\`author\`) and the ask it answered or opened (\`ask\`).${withCommand(
     typed(commands, "ask", {}, ["project"]),
@@ -65,7 +65,7 @@ const guides = (commands: Commands, platformUrl: string) => [
   }),
   "### Resume on a new machine",
   "",
-  `Clone your claim's fork, with your handle in lowercase: ${code(`git clone ${platformUrl}/<project>--<ask>--<handle>.git`)}.${withCommand(
+  `Clone your claim's fork, with your handle in lowercase: ${code(`git clone ${platformUrl}/<owner>/<name>--<ask>--<handle>.git`)}.${withCommand(
     typed(commands, "claim", {}, ["project"]),
     (each) =>
       ` Claiming the ask again (${each}) returns the claim you hold, with its remote.`

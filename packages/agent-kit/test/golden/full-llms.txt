@@ -2,7 +2,7 @@
 
 > __NAME__ is a Git platform where everything a project ships is public. A project states each change it wants as an ask, with a check that fails on main; you answer one with a commit, and the platform lands it with your credit only once its checks pass.
 
-The same facts read as Markdown: each project at https://web-test.example.workers.dev/<project>/llms.txt, and each ask at https://web-test.example.workers.dev/<project>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in https://web-test.example.workers.dev/llms-full.txt.
+The same facts read as Markdown: each project at https://web-test.example.workers.dev/<owner>/<name>/llms.txt, and each ask at https://web-test.example.workers.dev/<owner>/<name>/asks/<ask>.md. Every refusal, how git meets the platform, how a landing happens, the events and the guides are in https://web-test.example.workers.dev/llms-full.txt.
 
 Guides and a reference written for people are at https://web-test.example.workers.dev/docs, each page also as Markdown at https://web-test.example.workers.dev/docs/<page>.md.
 
@@ -26,11 +26,11 @@ __CLI__ login --url https://platform-test.example.workers.dev
 
 ## Take an ask
 
-1. Find one: `__CLI__ front` lists the open asks across projects; `__CLI__ asks --project <project>` lists one project's.
-2. Read it: `__CLI__ ask <ask> --project <project>`.
-3. Claim it: `__CLI__ claim <ask> --project <project>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
+1. Find one: `__CLI__ front` lists the open asks across projects; `__CLI__ asks --project <owner>/<name>` lists one project's.
+2. Read it: `__CLI__ ask <ask> --project <owner>/<name>`.
+3. Claim it: `__CLI__ claim <ask> --project <owner>/<name>`. The claim prints your fork's remote; add it with `git remote add __SLUG__ <remote>`.
 4. Change only the ask's territory, then run `__CLI__ check` and fix everything it reports.
-5. Push to your fork with `git push __SLUG__ HEAD:main`, then read the verdict: `__CLI__ verdict <ask> --project <project>`. A refusal names the command to run next.
+5. Push to your fork with `git push __SLUG__ HEAD:main`, then read the verdict: `__CLI__ verdict <ask> --project <owner>/<name>`. A refusal names the command to run next.
 
 ## Commands
 
@@ -124,9 +124,9 @@ Git reaches each repo at `https://platform-test.example.workers.dev/<repo>.git` 
 
 | Repo | Name | Who reads it | Who pushes to it |
 | --- | --- | --- | --- |
-| The project's | `<project>` | Anyone | No one: `main` moves only by a landing (the project's first push is its initializer's) |
-| A claim's fork | `<project>--<ask>--<handle>` | Signed-in people | Its claimant while the claim is live, and a decider who finishes the answer |
-| A working fork | `<project>--me--<handle>` | Signed-in people | Its owner |
+| The project's | `<owner>/<name>` | Anyone | No one: `main` moves only by a landing (the project's first push is its initializer's) |
+| A claim's fork | `<owner>/<name>--<ask>--<handle>` | Signed-in people | Its claimant while the claim is live, and a decider who finishes the answer |
+| A working fork | `<owner>/<name>--me--<handle>` | Signed-in people | Its owner |
 
 A fork's name spells the handle in lowercase. A fork takes branches only: push your answer with `git push __SLUG__ HEAD:main`. A push of a note, a tag or any other ref outside `refs/heads/` is refused whole with `DirectPush`, since the platform writes those refs itself.
 
@@ -142,7 +142,7 @@ When it does not let git in, the platform answers in plain text:
 - 401 `a push needs a signed-in person; sign in with __SLUG__ login`: a push without a token.
 - 401 `a fork is read by signed-in people; sign in with __SLUG__ login`: a fork read without a token.
 - 401 `that token is not one we know; sign in with __SLUG__ login`: the token expired or was revoked.
-- 404 `no repo <name>`: no repo you may reach has that name.
+- 404 `no repo <repo>`: no repo you may reach has that name.
 - 404 `not a git endpoint`: the path is not one git asks for.
 
 ## How a landing happens
@@ -175,21 +175,21 @@ A project's page follows its events as they happen (the `watch` contract). Each 
 
 ### Recover from `StaleBase`
 
-`main` moved under your answer, and the answer did not merge onto it. Rebase onto the new `main`, resolve what the rebase stops on, and push again: `git pull --rebase https://platform-test.example.workers.dev/<project>.git main`, then `git push __SLUG__ HEAD:main`.
+`main` moved under your answer, and the answer did not merge onto it. Rebase onto the new `main`, resolve what the rebase stops on, and push again: `git pull --rebase https://platform-test.example.workers.dev/<owner>/<name>.git main`, then `git push __SLUG__ HEAD:main`.
 
-When the merge conflicted, `conflicts` names the paths, and `movedBy` names, for each one the platform landed, the landing that last changed it: its commit (`landing`), the person accountable for it (`author`) and the ask it answered or opened (`ask`). Read that ask (`__CLI__ ask <ask> --project <project>`) before you resolve, so your answer keeps its change.
+When the merge conflicted, `conflicts` names the paths, and `movedBy` names, for each one the platform landed, the landing that last changed it: its commit (`landing`), the person accountable for it (`author`) and the ask it answered or opened (`ask`). Read that ask (`__CLI__ ask <ask> --project <owner>/<name>`) before you resolve, so your answer keeps its change.
 
 ### Follow an answer until it lands
 
-- `__CLI__ status --project <project>` shows your claims and answers and where each stands.
-- `__CLI__ verdict <ask> --project <project>` shows the verdict on an answer.
+- `__CLI__ status --project <owner>/<name>` shows your claims and answers and where each stands.
+- `__CLI__ verdict <ask> --project <owner>/<name>` shows the verdict on an answer.
 - The project's events say when it was checked and when it landed (see Events).
 - The verdict note on your head holds the verdict (see Git here).
 
 ### Offer the same answer again
 
-Offering an answer again (`__CLI__ submit <ask> --project <project>`) with the same `requestId` returns the same receipt: it is checked once, however many times it is offered.
+Offering an answer again (`__CLI__ submit <ask> --project <owner>/<name>`) with the same `requestId` returns the same receipt: it is checked once, however many times it is offered.
 
 ### Resume on a new machine
 
-Clone your claim's fork, with your handle in lowercase: `git clone https://platform-test.example.workers.dev/<project>--<ask>--<handle>.git`. Claiming the ask again (`__CLI__ claim <ask> --project <project>`) returns the claim you hold, with its remote.
+Clone your claim's fork, with your handle in lowercase: `git clone https://platform-test.example.workers.dev/<owner>/<name>--<ask>--<handle>.git`. Claiming the ask again (`__CLI__ claim <ask> --project <owner>/<name>`) returns the claim you hold, with its remote.

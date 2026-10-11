@@ -175,19 +175,19 @@ describe(frontLlms, () => {
 
   it("finds and takes an ask with the commands the catalog has", () => {
     expect(lines).toContain(
-      `1. Find one: \`${cli} front\` lists the open asks across projects; \`${cli} asks --project <project>\` lists one project's.`
+      `1. Find one: \`${cli} front\` lists the open asks across projects; \`${cli} asks --project <owner>/<name>\` lists one project's.`
     );
     expect(lines).toContain(
-      `2. Read it: \`${cli} ask <ask> --project <project>\`.`
+      `2. Read it: \`${cli} ask <ask> --project <owner>/<name>\`.`
     );
     expect(lines).toContain(
-      `3. Claim it: \`${cli} claim <ask> --project <project>\`. The claim prints your fork's remote; add it with \`git remote add ${Brand.slug} <remote>\`.`
+      `3. Claim it: \`${cli} claim <ask> --project <owner>/<name>\`. The claim prints your fork's remote; add it with \`git remote add ${Brand.slug} <remote>\`.`
     );
     expect(lines).toContain(
       `4. Change only the ask's territory, then run \`${cli} check\` and fix everything it reports.`
     );
     expect(lines).toContain(
-      `5. Push to your fork with \`git push ${Brand.slug} HEAD:main\`, then read the verdict: \`${cli} verdict --ask <ask> --project <project>\`. A refusal names the command to run next.`
+      `5. Push to your fork with \`git push ${Brand.slug} HEAD:main\`, then read the verdict: \`${cli} verdict --ask <ask> --project <owner>/<name>\`. A refusal names the command to run next.`
     );
   });
 
@@ -410,14 +410,14 @@ describe("/llms-full.txt", () => {
     /** A name pattern the doc states, with its placeholders filled in. */
     const filled = (pattern: string) =>
       pattern
-        .replaceAll("<project>", datekit)
+        .replaceAll("<owner>/<name>", datekit)
         .replaceAll("<ask>", parseIso)
         .replaceAll("<handle>", ada.toLowerCase());
 
     /** The patterns in the doc's code spans that name a fork. */
-    const patterns = [...text.matchAll(/`(?<name><project>--[^`]+)`/gu)].map(
-      (match) => match.groups?.name ?? ""
-    );
+    const patterns = [
+      ...text.matchAll(/`(?<name><owner>\/<name>--[^`]+)`/gu),
+    ].map((match) => match.groups?.name ?? "");
 
     it("spell a claim's fork as the gateway addresses it", () => {
       expect(patterns.map(filled)).toContain(

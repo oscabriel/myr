@@ -125,7 +125,7 @@ const anyAgent = ({ webUrl }: SetupInput): SetupChannel => ({
     {
       label: "Paste into the agent's prompt",
       language: "text",
-      text: `Use ${webUrl}/llms.txt as the source of truth for ${Brand.name}: it says how to take an ask and lists every command and project. Each ask reads as Markdown at ${webUrl}/<project>/asks/<ask>.md.`,
+      text: `Use ${webUrl}/llms.txt as the source of truth for ${Brand.name}: it says how to take an ask and lists every command and project. Each ask reads as Markdown at ${webUrl}/<owner>/<name>/asks/<ask>.md.`,
     },
   ],
   title: "Text for any agent",
@@ -207,12 +207,12 @@ export const agentEndpoints = ({
   },
   {
     readable: false,
-    url: `${webUrl}/<project>/llms.txt`,
+    url: `${webUrl}/<owner>/<name>/llms.txt`,
     what: "One project: its posture, how to clone it and its open asks.",
   },
   {
     readable: false,
-    url: `${webUrl}/<project>/asks/<ask>.md`,
+    url: `${webUrl}/<owner>/<name>/asks/<ask>.md`,
     what: "One ask's brief as Markdown.",
   },
   {

@@ -1,6 +1,6 @@
 /**
  * The platform's generator for a project's own agent files:
- * the contribute skill (`.agents/skills/<project>-contribute/SKILL.md`
+ * the contribute skill (`.agents/skills/<key>-contribute/SKILL.md`
  * and its `.claude/skills/` copy) and the block in the project's AGENTS.md,
  * from `@repo/agent-kit`, which `@repo/project` may not import.
  *

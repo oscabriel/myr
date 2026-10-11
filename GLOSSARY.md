@@ -25,11 +25,11 @@ One person's exclusive, expiring right to answer an ask, made of a fork and a sc
 _Avoid_: lease, lock, assignment
 
 **Claim fork**:
-The fork a claim is made of, named `<project>--<ask>--<handle>`, to which the claimant pushes answers.
+The fork a claim is made of, at `<owner>/<name>--<ask>--<handle>`, to which the claimant pushes answers.
 _Avoid_: branch, feature branch
 
 **Working fork**:
-A person's own fork of a project, named `<project>--me--<handle>`, that holds a decider's own changes before they land and a proposer's sealed answers.
+A person's own fork of a project, at `<owner>/<name>--me--<handle>`, that holds a decider's own changes before they land and a proposer's sealed answers.
 _Avoid_: personal fork, scratch repo
 
 **Check**:
@@ -85,7 +85,7 @@ The commit the platform itself last landed on main; the only commit a project's 
 _Avoid_: HEAD, tip of main
 
 **Import**:
-A project adopted from a public repo: a read-only copy, not run by its maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from; by default the project is named at its source namespace.
+A project adopted from a public repo: a read-only copy, not run by its maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from; by default the project is named after its source namespace (the Run a project guide has the whole rule). It is made from the CLI's `init --import` or the web's `/import`.
 _Avoid_: mirror, fork (of the source), sync
 
 **Outcome**:
@@ -212,7 +212,7 @@ The namespace a project is named in: a person's handle, or a source namespace. O
 _Avoid_: org, account, maintainer, admin
 
 **Source namespace**:
-An owner that is the host and account a repo was imported from, such as `github.com/pallets`, so an import's address says where it came from.
+An owner that is the host and the account on that host a repo was imported from, such as `github.com/pallets`, so an import's address, `<host>/<account>/<name>`, says where it came from. Here, and only here, account means the host's account, never one on this platform.
 _Avoid_: upstream, origin, mirror
 
 **Config folder**:

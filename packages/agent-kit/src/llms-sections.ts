@@ -59,19 +59,19 @@ export const gitHere = (platformUrl: string) => [
     [
       [
         "The project's",
-        code("<project>"),
+        code("<owner>/<name>"),
         "Anyone",
         "No one: `main` moves only by a landing (the project's first push is its initializer's)",
       ],
       [
         "A claim's fork",
-        code("<project>--<ask>--<handle>"),
+        code("<owner>/<name>--<ask>--<handle>"),
         "Signed-in people",
         "Its claimant while the claim is live, and a decider who finishes the answer",
       ],
       [
         "A working fork",
-        code("<project>--me--<handle>"),
+        code("<owner>/<name>--me--<handle>"),
         "Signed-in people",
         "Its owner",
       ],
@@ -92,7 +92,7 @@ export const gitHere = (platformUrl: string) => [
   `- 401 ${code(signIn("a push needs a signed-in person"))}: a push without a token.`,
   `- 401 ${code(signIn("a fork is read by signed-in people"))}: a fork read without a token.`,
   `- 401 ${code(signIn("that token is not one we know"))}: the token expired or was revoked.`,
-  `- 404 ${code("no repo <name>")}: no repo you may reach has that name.`,
+  `- 404 ${code("no repo <repo>")}: no repo you may reach has that name.`,
   `- 404 ${code("not a git endpoint")}: the path is not one git asks for.`,
   "",
 ];

@@ -9,7 +9,7 @@ import { ProjectKey, ProjectName, sourceNamespaceOf } from "@repo/protocol/ids";
 import { Option } from "effect";
 
 /**
- * One imported project: its name here, at its source path
+ * One imported project: its name here, after its source namespace
  * (`github.com/pallets/click`), the key it was imported under (`click`),
  * its source, its licence, and what it is.
  */
