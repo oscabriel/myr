@@ -30,7 +30,16 @@ import {
 import { UnknownRevision } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { DateTime, Duration, Effect, Layer, Ref, Schema, Stream } from "effect";
+import {
+  DateTime,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Ref,
+  Schema,
+  Stream,
+} from "effect";
 import { FetchHttpClient } from "effect/http";
 import { RpcClient, RpcSerialization, RpcTest } from "effect/rpc";
 
@@ -39,6 +48,7 @@ import type { DevWorldOptions } from "../src/dev/server.ts";
 import { devServer } from "../src/dev/server.ts";
 import { ledeOf } from "../src/features/front/head.ts";
 import { stampStep } from "../src/features/front/stamps.ts";
+import { ImportOffer, offerFor } from "../src/features/import/import-offer.tsx";
 import { recentShown } from "../src/features/project/landings.tsx";
 import { postureWord } from "../src/features/project/posture-label.ts";
 import {
@@ -670,6 +680,10 @@ const nothingLanded = Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
 
 const decodePage = Schema.decodeEffect(ProjectPageData);
 
+/** An input's opening tag, by its `name`. */
+const inputNamed = (markup: string, name: string) =>
+  new RegExp(`<input[^>]*name="${name}"[^>]*>`, "u").exec(markup)?.[0] ?? "";
+
 /** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
 const seededWorld = { timeout: 30_000 };
 
@@ -922,6 +936,21 @@ describe(UnknownProjectView, () => {
       })
   );
 
+  it.effect(
+    "keeps the one-sentence not-found, and no offer, for a person's address",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/oscabriel/no-such",
+          <UnknownProjectView name="oscabriel/no-such" />
+        );
+
+        expect(markup).toContain('data-refusal="UnknownProject"');
+        expect(markup).not.toContain("<form");
+        expect(offerFor("oscabriel/no-such")).toStrictEqual(Option.none());
+      })
+  );
+
   it("says in a sentence that an address naming no possible project names none", () => {
     const markup = markupOf(<UnknownProjectView name="Not_A_Project" />);
 
@@ -930,6 +959,68 @@ describe(UnknownProjectView, () => {
       "No such project"
     );
   });
+});
+
+describe(ImportOffer, () => {
+  const click = ProjectName.make("github.com/pallets/click");
+
+  const offered = (handle: Option.Option<Handle>) =>
+    renderAt(
+      "/github.com/pallets/click",
+      <ImportOffer importer={{ handle }} project={click} />
+    );
+
+  it("is what a source namespace's address offers, and no other", () => {
+    expect(offerFor("github.com/pallets/click")).toStrictEqual(
+      Option.some(click)
+    );
+    expect(offerFor("oscabriel/no-such")).toStrictEqual(Option.none());
+    expect(offerFor("Not_A_Project")).toStrictEqual(Option.none());
+  });
+
+  it.effect(
+    "draws the form prefilled from the address, the owner fixed and no refusal",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* offered(Option.some(Handle.make("oscabriel")));
+
+        expect(inputNamed(markup, "url")).toContain(
+          'value="https://github.com/pallets/click"'
+        );
+        expect(inputNamed(markup, "owner")).toMatch(
+          /type="hidden"[^>]*value="github\.com\/pallets"|value="github\.com\/pallets"[^>]*type="hidden"/u
+        );
+        expect(inputNamed(markup, "name")).toContain('value="click"');
+        expect(markup).not.toContain('data-slot="select-trigger"');
+        expect(markup).not.toContain("data-refusal");
+      })
+  );
+
+  it.effect(
+    "keeps the URL the address rebuilds read-only, and the branch and the name editable",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* offered(Option.some(Handle.make("oscabriel")));
+
+        expect(inputNamed(markup, "url")).toContain('readOnly=""');
+        expect(inputNamed(markup, "branch")).not.toContain("readOnly");
+        expect(inputNamed(markup, "name")).not.toContain("readOnly");
+      })
+  );
+
+  it.effect(
+    "signed out, says what would be imported, with the sign-in link back to the address",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* offered(Option.none());
+
+        expect(markup).not.toContain("<form");
+        expect(markup).toContain(
+          `href="/auth/signin?return=${encodeURIComponent("/github.com/pallets/click")}"`
+        );
+        expect(textIn(markup)).toContain("https://github.com/pallets/click");
+      })
+  );
 });
 
 describe("the project's views", () => {

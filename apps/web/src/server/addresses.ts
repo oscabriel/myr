@@ -11,8 +11,8 @@
  *   (`oscabriel/datekit`), the name every read takes, and splits it again
  *   when the router prints a link.
  * - `canonicalAddress` answers, before any page, a key a project kept from
- *   before owners (`/datekit/…`) and a name spelled in another case
- *   (`/OscaBriel/datekit/…`) with a 301 to the name's address, the rest of
+ *   before owners (`/datekit/…`), a name spelled in another case
+ *   (`/OscaBriel/datekit/…`) and one ending in `.git` with a 301 to the name's address, the rest of
  *   the path and the query kept.
  */
 import {
@@ -123,10 +123,19 @@ const movedTo = (location: string) =>
   });
 
 /**
+ * A name as spelled without a trailing `.git` on its last segment: an
+ * address copied from a clone URL (`/github.com/pallets/click.git`) names
+ * the project.
+ */
+const withoutGit = (spelled: string) => spelled.replace(/\.git$/iu, "");
+
+/**
  * The 301 a request needs to reach its project's address, if any: a key a
  * project kept from before owners (`/datekit/tree/main?x=1` to
  * `/oscabriel/datekit/tree/main?x=1`) and a name in another case
- * (`/OscaBriel/datekit` to `/oscabriel/datekit`). None for the web's own
+ * (`/OscaBriel/datekit` to `/oscabriel/datekit`), and a name with a
+ * trailing `.git` (`/github.com/pallets/click.git` to
+ * `/github.com/pallets/click`). None for the web's own
  * pages and files, for an address already canonical, and for a name no
  * project could have, which its page says is unknown.
  */
@@ -144,7 +153,7 @@ export const canonicalAddress = (request: Request): Option.Option<Response> => {
   }
 
   return Option.flatMap(projectAddressOf(segments), (address) =>
-    Option.flatMap(decodeName(address.spelled), (name) =>
+    Option.flatMap(decodeName(withoutGit(address.spelled)), (name) =>
       name === address.spelled
         ? Option.none()
         : Option.some(

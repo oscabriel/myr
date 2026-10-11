@@ -33,6 +33,11 @@ import {
 } from "../../../features/front/markdown.ts";
 import { useStamps } from "../../../features/front/stamps.ts";
 import {
+  ImportOffer,
+  offerFor,
+} from "../../../features/import/import-offer.tsx";
+import { useImporter } from "../../../features/import/use-importer.tsx";
+import {
   ProjectView,
   heldBackOf,
   homeListing,
@@ -289,10 +294,24 @@ const ProjectPage = () => {
   );
 };
 
+/** The import offer for `project`, wired. */
+const Offer = ({ project }: { readonly project: ProjectName }) => {
+  const importer = useImporter(project);
+
+  return <ImportOffer importer={importer} project={project} />;
+};
+
+/**
+ * No project at this address: at a source namespace's
+ * (`/github.com/pallets/click`) the import offer, else the not-found.
+ */
 const Unknown = () => {
   const { project } = Route.useParams();
 
-  return <UnknownProjectView name={project} />;
+  return Option.match(offerFor(project), {
+    onNone: () => <UnknownProjectView name={project} />,
+    onSome: (offered) => <Offer project={offered} />,
+  });
 };
 
 export const Route = createFileRoute("/$owner/$project/")({

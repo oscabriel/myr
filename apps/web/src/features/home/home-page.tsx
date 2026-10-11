@@ -31,6 +31,7 @@ import {
   ASKS_PATH,
   askPath,
   HOME_PATH,
+  IMPORT_PATH,
   personPath,
 } from "../shared/paths.ts";
 import { UnreachableNotice } from "../shared/pending.tsx";
@@ -336,12 +337,16 @@ const AsksBlock = ({ asks }: { readonly asks: Takeable }) => (
   </RowGroup>
 );
 
-/** Who is signed in, and the way to their record. */
+/** Who is signed in, the way to their record, and the way to import a repo. */
 const Record = ({ handle }: { readonly handle: Handle }) => (
   <>
     Signed in as <HandleLink handle={handle} />.{" "}
     <AppLink className={LINK} to={personPath(handle)}>
       Your record
+    </AppLink>
+    {" · "}
+    <AppLink className={LINK} to={IMPORT_PATH}>
+      Import a repo
     </AppLink>
   </>
 );

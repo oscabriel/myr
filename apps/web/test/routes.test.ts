@@ -39,13 +39,6 @@ const segments = [
   .filter((segment) => !notSegments.has(segment) && !segment.startsWith("$"))
   .toSorted();
 
-/**
- * Words reserved before the web serves a page at them: `import` is the
- * import page's address, reserved before the page lands, so no owner takes
- * it in the meantime.
- */
-const RESERVED_BEFORE_THEIR_PAGE = ["import"];
-
 describe("the web's own paths", () => {
   it("are found: every page and file the web serves at its top", () => {
     expect(segments).toStrictEqual([
@@ -60,6 +53,7 @@ describe("the web's own paths", () => {
       "favicon.ico",
       "home",
       "icons",
+      "import",
       "install.sh",
       "llms-full.txt",
       "llms.txt",
@@ -79,12 +73,7 @@ describe("the web's own paths", () => {
 
   it("are the protocol's reserved names, where an owner could spell one", () => {
     expect(
-      [
-        ...segments.filter((segment) =>
-          /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(segment)
-        ),
-        ...RESERVED_BEFORE_THEIR_PAGE,
-      ].toSorted()
+      segments.filter((segment) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(segment))
     ).toStrictEqual([...reservedProjectNames]);
   });
 });
