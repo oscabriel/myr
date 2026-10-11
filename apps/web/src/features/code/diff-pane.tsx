@@ -75,12 +75,20 @@ const useStuck = () => {
   return { pane, stuck };
 };
 
-export const DiffPane = ({ children }: { readonly children: ReactNode }) => {
+export const DiffPane = ({
+  children,
+  id,
+}: {
+  readonly children: ReactNode;
+  /** Its anchor, for a link to the diff from the page's head. */
+  readonly id?: string;
+}) => {
   const { pane, stuck } = useStuck();
 
   return (
     <div
       className={PANE}
+      id={id}
       data-diff-pane=""
       data-files=""
       data-stuck={stuck}
