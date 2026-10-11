@@ -25,7 +25,6 @@ import { NoSuchAsk } from "../../../../features/ask/refused.tsx";
 import { whoAtom } from "../../../../features/auth/who.ts";
 import { pageHead } from "../../../../features/shared/head.ts";
 import { useProjectList } from "../../../../features/shared/shell/context.ts";
-import { withProjectName } from "../../../../server/addresses.ts";
 import { branchPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 import { AskPath, askMarkdownHandler } from "./{$ask}[.]md.ts";
@@ -191,9 +190,7 @@ export const Route = createFileRoute("/$owner/$project/asks/$ask")({
   notFoundComponent: AskNotFound,
   server: {
     handlers: {
-      GET: withProjectName(
-        askPageHandler((request) => serverClient(env, request))
-      ),
+      GET: askPageHandler((request) => serverClient(env, request)),
     },
   },
 });

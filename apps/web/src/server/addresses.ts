@@ -69,7 +69,11 @@ export const addressRewrite: LocationRewrite = {
   },
 };
 
-/** What the `$owner/$project` route reads from its two segments. */
+/**
+ * What the `$owner/$project` route reads from its two segments. Start runs
+ * `parse` for a server handler too, so a handler reads the full name as
+ * `project` (`test/server-params.test.ts`).
+ */
 interface ProjectParams {
   readonly owner: string;
   readonly project: string;
@@ -93,22 +97,6 @@ export const projectParams = {
       : { owner: project.slice(0, slash), project: project.slice(slash + 1) };
   },
 };
-
-/**
- * A project route's server handler, handed the project's full name as
- * `project`. Start hands a server handler the path's own segments (`owner`
- * and the short name), never the route's parsed params, so each server
- * handler under `$owner/$project` is wired through this.
- */
-export const withProjectName =
-  <Input extends { readonly params: object }, Out>(
-    handler: (input: Input) => Out
-  ) =>
-  (input: Input & { readonly params: ProjectParams }): Out =>
-    handler({
-      ...input,
-      params: { ...input.params, ...projectParams.parse(input.params) },
-    });
 
 const decodeName = Schema.decodeOption(ProjectName);
 
