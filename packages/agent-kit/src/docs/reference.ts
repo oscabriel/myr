@@ -18,7 +18,8 @@ import type { CommandDoc } from "../command-doc.ts";
 import { events, gitHere, landing, refusals } from "../llms-sections.ts";
 import { exitCodeSection } from "../refusals.ts";
 import { code, table } from "../text.ts";
-import { IMPORTED_NOTE, importedProjects } from "./imported.ts";
+import { IMPORTED_NOTE } from "./imported-note.ts";
+import { importedProjects } from "./imported.ts";
 import type { DocSource } from "./page.ts";
 import { withoutHeading } from "./page.ts";
 

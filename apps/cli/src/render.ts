@@ -3,7 +3,7 @@
  * script), and plain text for a person where a table reads better padded.
  * A contract without a view here prints its encoded JSON in a fenced block.
  */
-import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported";
+import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported-note";
 import { Brand } from "@repo/brand";
 import type { View } from "@repo/protocol/cli";
 import {

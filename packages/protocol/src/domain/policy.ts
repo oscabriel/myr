@@ -124,7 +124,8 @@ export type PublicPolicy = typeof PublicPolicy.Type;
  * Where an imported project came from: the public repo's https address,
  * and the branch its `main` was adopted from when the import named one.
  * The same shape `initProject` takes, kept on the project's record and
- * shown on its page (ADR 0031).
+ * shown on its page (ADR 0031). It lives beside the policy, whose read
+ * names it: a module of its own would cost the root's preloaded bytes.
  */
 export const ImportSource = Schema.Struct({
   branch: Schema.optionalKey(Schema.NonEmptyString),

@@ -8,7 +8,7 @@
  * the events, the policy and the code on the server and keeps them live in
  * the browser, and hands them here.
  */
-import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported";
+import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported-note";
 import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import type { FileView, TreeListing } from "@repo/protocol/domain/code";
@@ -218,7 +218,6 @@ const ImportedFrom = ({ source }: { readonly source: ImportSource }) => (
     <p className="text-ui">
       <a
         className={`${LINK} [overflow-wrap:anywhere]`}
-        data-imported-from={source.url}
         href={source.url}
         rel="noreferrer"
       >
