@@ -18,7 +18,8 @@ import {
 import type { ProjectName } from "@repo/protocol/ids";
 import { Data, Option, Schema } from "effect";
 
-import { forkName } from "./claim.ts";
+/** A claim's fork, as `@repo/protocol/ids` spells it. */
+export { claimForkName } from "@repo/protocol/ids";
 
 /** What a repo is, read from its name alone. */
 export type RepoKind =
@@ -86,13 +87,6 @@ export const repoKind = (name: RepoName): RepoKind => {
 
   return Option.getOrElse(kind, () => RepoKind.Unknown());
 };
-
-/** A claim's fork: `<project>--<ask>--<handle in lowercase>`. */
-export const claimForkName: (
-  project: ProjectName,
-  ask: AskId,
-  handle: Handle
-) => RepoName = forkName;
 
 /** A person's working fork: `<project>--me--<handle in lowercase>`. */
 export const workingForkName = (project: ProjectName, handle: Handle) =>

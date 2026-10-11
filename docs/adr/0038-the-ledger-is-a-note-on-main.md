@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # The ledger is a note on main

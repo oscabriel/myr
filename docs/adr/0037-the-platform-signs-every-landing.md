@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # The platform signs every landing

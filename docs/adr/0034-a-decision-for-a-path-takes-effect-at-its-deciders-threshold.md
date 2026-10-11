@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # A decision for a path takes effect at its deciders' threshold

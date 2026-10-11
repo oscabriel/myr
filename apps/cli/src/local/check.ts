@@ -32,15 +32,15 @@ import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import type { Policy } from "@repo/protocol/domain/policy";
+import type { RepoName } from "@repo/protocol/ids";
 import {
   AskId,
   CommitSha,
   Handle,
   LandedSha,
   ProjectName,
-  RepoName,
   addressOfRepo,
-  keyOf,
+  claimForkName,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import {
@@ -669,9 +669,7 @@ export const check = Command.make(
       }
 
       // The claim's fork, named as the platform names it: by the project's key.
-      const fork = RepoName.make(
-        `${keyOf(project)}--${askId}--${handle.toLowerCase()}`
-      );
+      const fork = claimForkName(project, askId, handle);
 
       const facts = yield* localFacts({
         ask,

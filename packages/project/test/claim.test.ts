@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { ClaimView } from "@repo/protocol/domain/claim";
 import {
   AskId,
+  claimForkName,
   CommitSha,
   Handle,
   LandedSha,
@@ -24,7 +25,6 @@ import {
   ClaimCommand,
   ClaimEffect,
   ClaimState,
-  forkName,
   toView,
   transition,
 } from "../src/claim.ts";
@@ -120,7 +120,9 @@ describe("claiming an ask", () => {
   });
 
   it("names the fork after the project, the ask and the handle in lowercase", () => {
-    expect(forkName(project, ask, bob)).toBe("alice__datekit--parse-iso--bob");
+    expect(claimForkName(project, ask, bob)).toBe(
+      "alice__datekit--parse-iso--bob"
+    );
   });
 
   it("refuses a second person with AskFull, and forks nothing", () => {

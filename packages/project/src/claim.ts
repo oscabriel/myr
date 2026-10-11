@@ -8,6 +8,7 @@ import { ClaimView } from "@repo/protocol/domain/claim";
 import type { Policy } from "@repo/protocol/domain/policy";
 import {
   AskId,
+  claimForkName,
   CommitSha,
   Handle,
   keyOf,
@@ -128,10 +129,6 @@ export interface ClaimStep {
   readonly state: ClaimState;
 }
 
-/** A claim's fork: `<key>--<ask>--<handle in lowercase>`, by the project's key. */
-export const forkName = (project: ProjectName, ask: AskId, handle: Handle) =>
-  RepoName.make(`${keyOf(project)}--${ask}--${handle.toLowerCase()}`);
-
 /** What `transition` returns: a step, or the refusal that changes nothing. */
 export type ClaimResult = Result.Result<ClaimStep, ClaimRefusal>;
 
@@ -210,7 +207,7 @@ const grant = (
     ask,
     base: made.base,
     claimant,
-    fork: forkName(made.project, ask, claimant),
+    fork: claimForkName(made.project, ask, claimant),
     lastPushAt: Option.none(),
     openedAt: now,
     ...deadlines(now, policy),

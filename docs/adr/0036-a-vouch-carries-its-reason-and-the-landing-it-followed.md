@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # A vouch carries its reason and the landing it followed
