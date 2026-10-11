@@ -129,7 +129,9 @@ const Line = ({
       >
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
         <span
-          className={bleed ? "sr-only" : "sr-only sm:not-sr-only @max-xs:sr-only"}
+          className={
+            bleed ? "sr-only" : "sr-only sm:not-sr-only @max-xs:sr-only"
+          }
         >
           {copied ? "Copied" : "Copy"}
         </span>

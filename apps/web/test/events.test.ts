@@ -169,7 +169,11 @@ describe(askStates, () => {
       }),
     ]);
 
-    expect(states.get(ask)).toStrictEqual({ lastSeq: 4, opened: at, rounds: [] });
+    expect(states.get(ask)).toStrictEqual({
+      lastSeq: 4,
+      opened: at,
+      rounds: [],
+    });
   });
 });
 

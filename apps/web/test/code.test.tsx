@@ -1031,6 +1031,7 @@ describe(CommitView, () => {
 
   it("ends its head's meta line with the files and lines it changed, linking the diff", () => {
     const markup = markupOf(page);
+
     const meta =
       /<div class="text-ui text-muted-foreground">[\s\S]*?<\/div>/u.exec(
         markup

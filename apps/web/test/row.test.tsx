@@ -183,17 +183,17 @@ describe(AskRow, () => {
   );
 });
 
+/** The classes on each element whose text is `word`, in `markup`. */
+const wordClasses = (markup: string, word: string) =>
+  [
+    ...markup.matchAll(
+      new RegExp(`<span class="(?<classes>[^"]*)">${word}<`, "gu")
+    ),
+  ].map((match) => match.groups?.classes ?? "");
+
 describe("an ask row's standing, word and time", () => {
   const now = DateTime.makeUnsafe("2026-10-11T12:00:00Z");
   const held = { ...listing("@burrow/auth"), reserve: "newcomers" } as const;
-
-  /** The classes on each element whose text is `word`, in `markup`. */
-  const wordClasses = (markup: string, word: string) =>
-    [
-      ...markup.matchAll(
-        new RegExp(`<span class="(?<classes>[^"]*)">${word}<`, "gu")
-      ),
-    ].map((match) => match.groups?.classes ?? "");
 
   it.effect(
     "reads an ask held for newcomers as held for them, whether or not the viewer may take it",
@@ -204,6 +204,7 @@ describe("an ask row's standing, word and time", () => {
             <AskRow listing={held} project={burrow} takeable={false} />
           )
         );
+
         const unknown = textIn(
           yield* rowsAt(<AskRow listing={held} project={burrow} />)
         );
@@ -224,6 +225,7 @@ describe("an ask row's standing, word and time", () => {
             project={burrow}
           />
         );
+
         const landed = yield* rowsAt(
           <Row
             href="/burrow/asks/a"
@@ -250,6 +252,7 @@ describe("an ask row's standing, word and time", () => {
       Effect.gen(function* () {
         const at = DateTime.subtract(now, { hours: 3 });
         const head = CommitSha.make("c".repeat(40));
+
         const markup = yield* rowsAt(
           <AskRow
             listing={listing("@burrow/auth")}
@@ -259,8 +262,18 @@ describe("an ask row's standing, word and time", () => {
               lastPush: { at, head },
               lastSeq: 4,
               rounds: [
-                { at, head, outcome: Outcome.cases.Checking.make({ stage: "checks" }), seq: 3 },
-                { at, head, outcome: Outcome.cases.Checking.make({ stage: "checks" }), seq: 4 },
+                {
+                  at,
+                  head,
+                  outcome: Outcome.cases.Checking.make({ stage: "checks" }),
+                  seq: 3,
+                },
+                {
+                  at,
+                  head,
+                  outcome: Outcome.cases.Checking.make({ stage: "checks" }),
+                  seq: 4,
+                },
               ],
             }}
             project={burrow}
@@ -268,27 +281,33 @@ describe("an ask row's standing, word and time", () => {
         );
 
         expect(markup).toMatch(
-          new RegExp(`<time dateTime="${DateTime.formatIso(at)}"[^>]*>3 h ago</time>`, "u")
+          new RegExp(
+            `<time dateTime="${DateTime.formatIso(at)}"[^>]*>3 h ago</time>`,
+            "u"
+          )
         );
         expect(textIn(markup)).toContain("round 2");
       })
   );
 
-  it.effect("fills the time slot with the ask's opening when nothing was pushed", () =>
-    Effect.gen(function* () {
-      const opened = DateTime.subtract(now, { days: 2 });
-      const markup = yield* rowsAt(
-        <AskRow
-          listing={listing("@burrow/auth")}
-          now={now}
-          progress={{ lastSeq: 1, opened, rounds: [] }}
-          project={burrow}
-          takeable
-        />
-      );
+  it.effect(
+    "fills the time slot with the ask's opening when nothing was pushed",
+    () =>
+      Effect.gen(function* () {
+        const opened = DateTime.subtract(now, { days: 2 });
 
-      expect(textIn(markup)).toContain("2 d ago");
-    })
+        const markup = yield* rowsAt(
+          <AskRow
+            listing={listing("@burrow/auth")}
+            now={now}
+            progress={{ lastSeq: 1, opened, rounds: [] }}
+            project={burrow}
+            takeable
+          />
+        );
+
+        expect(textIn(markup)).toContain("2 d ago");
+      })
   );
 
   it.effect(
@@ -304,7 +323,9 @@ describe("an ask row's standing, word and time", () => {
             title="Format ordinals"
           />
         );
+
         const [row] = tagsWith(markup, "data-ask");
+
         const want = /<p class="(?<classes>[^"]*)"><a\b/u.exec(markup)?.groups
           ?.classes;
 

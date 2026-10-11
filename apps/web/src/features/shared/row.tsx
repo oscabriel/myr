@@ -475,10 +475,12 @@ export const AskRow = ({
 }) => {
   const at = askTime(progress);
   const standing = askState(listing, takeable, progress);
+
   const state =
     at === undefined || now === undefined
       ? standing
       : { ...standing, time: <When at={at} now={now} /> };
+
   const claimant = progress?.claimant;
   const rounds = progress?.rounds.length ?? 0;
   const open = state.mark === "open";

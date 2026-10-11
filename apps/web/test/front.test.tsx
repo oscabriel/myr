@@ -400,10 +400,15 @@ describe(FrontPageView, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
-        const inspector = markup.slice(markup.indexOf('data-facts="inspector"'));
+
+        const inspector = markup.slice(
+          markup.indexOf('data-facts="inspector"')
+        );
+
         const block =
-          /<section aria-label="Projects"[\s\S]*?<\/section>/u.exec(inspector)?.[0] ??
-          "";
+          /<section aria-label="Projects"[\s\S]*?<\/section>/u.exec(
+            inspector
+          )?.[0] ?? "";
 
         expect(textIn(block)).toContain("open ask");
         expect(block).not.toContain("data-posture=");
@@ -429,8 +434,9 @@ describe(FrontPageView, () => {
         const row = rowOf(markup, "explain-iso-week");
 
         expect(row).toContain('data-takeable="false"');
-        expect(textIn(row)).toContain("Held for newcomers");
-        expect(textIn(row)).not.toContain("Not open to you");
+        expect(textIn(row)).toMatch(
+          /^(?!.*Not open to you).*Held for newcomers/su
+        );
         expect(row).not.toContain("Open to take");
         expect(row).not.toContain(`${Brand.cli} claim explain-iso-week`);
         expect(rowOf(markup, "fix-week-start")).toContain("Open to take");

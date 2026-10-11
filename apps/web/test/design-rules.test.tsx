@@ -7,14 +7,13 @@
 import { describe, expect, it } from "@effect/vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
+import design from "../../../DESIGN.md?raw";
 import {
   STATE_MARK_NAMES,
   STATE_MARKS,
 } from "../src/features/shared/marks.tsx";
 import { wordTone } from "../src/features/shared/row.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
-
-import design from "../../../DESIGN.md?raw";
 
 /** A `spacing` token's value in DESIGN.md's frontmatter. */
 const spacing = (name: string) =>
@@ -38,9 +37,9 @@ const inspectorClasses = (code: boolean) => {
   const aside =
     /<aside\b[^>]*data-facts="inspector"[^>]*>/u.exec(markup)?.[0] ?? "";
 
-  return (/class="(?<classes>[^"]*)"/u.exec(aside)?.groups?.classes ?? "").split(
-    " "
-  );
+  return (
+    /class="(?<classes>[^"]*)"/u.exec(aside)?.groups?.classes ?? ""
+  ).split(" ");
 };
 
 describe("DESIGN.md's named values", () => {

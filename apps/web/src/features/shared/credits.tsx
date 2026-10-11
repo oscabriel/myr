@@ -35,15 +35,18 @@ export const CreditTrailers = ({
   assisted,
   credits,
   heldBack,
+  label = "fact",
 }: {
   readonly assisted: readonly AgentTrailer[];
   readonly credits: readonly Credit[];
   readonly heldBack?: string;
+  /** "Credit" as a fact's label, or at Title weight, a region's own head (the Landed page). */
+  readonly label?: "fact" | "title";
 }) => (
   <div className="flex flex-col gap-4">
     {credits.length === 0 ? null : (
       <section className="flex flex-col gap-1.5">
-        <h3 className={LABEL}>Credit</h3>
+        <h3 className={label === "title" ? "text-title" : LABEL}>Credit</h3>
         <ul className={LINES}>
           {inTrailerOrder(credits).map(({ handle, role }) => (
             <li className="[overflow-wrap:anywhere]" key={`${role}:${handle}`}>
@@ -113,8 +116,11 @@ const Joined = ({ people }: { readonly people: readonly Credit[] }) =>
 /** A landing's credit in one line: each role once, in trailer order, its people linked. */
 export const CompactCredit = ({
   credits,
+  within = false,
 }: {
   readonly credits: readonly Credit[];
+  /** Inside a sentence, after a ` · `: its first word stays lower case. */
+  readonly within?: boolean;
 }) => {
   const roles = CreditRole.literals.flatMap((role) => {
     const people = credits.filter((credit) => credit.role === role);
@@ -126,7 +132,9 @@ export const CompactCredit = ({
     <span className="min-w-0">
       {roles.map(({ people, role }, index) => (
         <Fragment key={role}>
-          {index === 0 ? raised(roleWords[role]) : ` · ${roleWords[role]}`}{" "}
+          {index === 0 && !within
+            ? raised(roleWords[role])
+            : `${index === 0 ? "" : " · "}${roleWords[role]}`}{" "}
           <Joined people={people} />
         </Fragment>
       ))}

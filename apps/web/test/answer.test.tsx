@@ -305,13 +305,87 @@ describe("the answer page", () => {
     }
   });
 
-  it("shows held-back checks only as an area's counts and its suite root", () => {
+  it("shows held-back checks only as an area's counts and its suite root, shortened, the whole root in its title", () => {
     const bits =
       /<ul aria-label="Held-back checks by area"[^>]*>(?<inner>.*?)<\/ul>/su.exec(
         markupOf(refusedPage)
       )?.groups?.inner;
 
-    expect(plainText(bits ?? "").trim()).toBe(`export 6/7 @ ${suite}`);
+    expect(plainText(bits ?? "").trim()).toBe("export 6/7 @ sha256:4f2a4f…");
+    expect(bits).toContain(`title="${suite}"`);
+  });
+
+  it("reads an answer's rounds first in main, newest first, the one on the page selected, and leaves them out of the inspector", () => {
+    const states = askStates([
+      claimedEvent(1, "okafor"),
+      judgedEvent(2, refused.outcome, CommitSha.make("e".repeat(40))),
+      judgedEvent(3, refused.outcome),
+    ]);
+
+    const markup = markupOf(page({ states, verdict: refused }));
+    const main = mainOf(markup);
+    const rounds = main.slice(main.indexOf('id="answer-rounds"'));
+
+    expect(main.indexOf('id="answer-rounds"')).toBeGreaterThan(-1);
+    expect(main.indexOf('id="answer-rounds"')).toBeLessThan(
+      main.indexOf('id="answer-gate"')
+    );
+    expect(
+      inOrder(textIn(rounds), ["Round 2 of 2", "Round 1 of 2"])
+    ).toBeTruthy();
+    expect(rounds).toMatch(/data-selected="true"[^>]*>[\s\S]*?Round 2 of 2/u);
+    expect(textIn(asideOf(markup))).not.toContain("Rounds");
+  });
+
+  it("draws no rounds region for an answer's only round", () => {
+    const states = askStates([
+      claimedEvent(1, "okafor"),
+      judgedEvent(2, refused.outcome),
+    ]);
+
+    expect(mainOf(markupOf(page({ states, verdict: refused })))).not.toContain(
+      'id="answer-rounds"'
+    );
+  });
+
+  it("tells a waiting answer's contributor there is nothing to run, and what a push would start", () => {
+    const waiting = verdictOf(
+      Outcome.cases.AwaitingDecision.make({
+        decision: DecisionId.make("dec-000001"),
+      })
+    );
+
+    const states = askStates([
+      claimedEvent(1, "okafor"),
+      judgedEvent(2, refused.outcome, CommitSha.make("e".repeat(40))),
+      judgedEvent(3, waiting.outcome),
+    ]);
+
+    expect(
+      textIn(mainOf(markupOf(page({ states, verdict: waiting }))))
+    ).toContain(
+      "Nothing for you to run. Pushing again starts round 3; this verdict stays as round 2."
+    );
+    expect(textIn(mainOf(markupOf(refusedPage)))).not.toContain(
+      "Nothing for you to run."
+    );
+  });
+
+  it("tells a landing as a sentence, then credits the people at title weight, then links the landing commit", () => {
+    const landed = verdictOf(Outcome.cases.Landed.make({ sha: landedSha }));
+    const markup = markupOf(page({ landing, verdict: landed }));
+    const region = markup.slice(markup.indexOf('id="answer-landing"'));
+
+    expect(
+      inOrder(textIn(region), [
+        "Landed as 9b1c3e5",
+        "asked by ines-v",
+        "Credit",
+        "Asked-by: ines-v",
+        "The landing commit",
+      ])
+    ).toBeTruthy();
+    expect(region).toMatch(/<h3 class="[^"]*text-title[^"]*">Credit<\/h3>/u);
   });
 
   it("shows the refusals' explain lines in order, as git printed them", () => {
@@ -396,6 +470,7 @@ describe("the answer page", () => {
     ]);
     expect(commitLinksOf(runOf(markup))).toStrictEqual([
       [`/${project}/commit/${landed.base}`, landed.base.slice(0, 7)],
+      [`/${project}/commit/${landedSha}`, "9b1c3e5"],
       [`/${project}/commit/${landedSha}`, "The landing commit"],
     ]);
   });
@@ -453,7 +528,7 @@ describe(HeldBackBits, () => {
     ];
 
     expect(textOf(<HeldBackBits results={results} />).trim()).toBe(
-      `export 6/7 @ ${suite} parse 3/3 @ ${suite}`
+      "export 6/7 @ sha256:4f2a4f… parse 3/3 @ sha256:4f2a4f…"
     );
   });
 });

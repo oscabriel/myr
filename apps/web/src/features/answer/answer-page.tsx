@@ -30,24 +30,25 @@ import type {
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import type { AskId, CommitSha, Handle } from "@repo/protocol/ids";
+import type { AskId, CommitSha, Handle, ProjectName } from "@repo/protocol/ids";
 import { ChecksFailed } from "@repo/protocol/refusal";
 import type { DateTime } from "effect";
-import { ChevronDown, LockKeyhole } from "lucide-react";
+import { ArrowRight, ChevronDown, LockKeyhole } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { Region } from "../ask/fields.tsx";
 import { commitHref, shortSha } from "../code/paths.ts";
-import type { AskProgress } from "../shared/ask-progress.ts";
+import type { AskProgress, Round } from "../shared/ask-progress.ts";
 import { CommandLine } from "../shared/command.tsx";
-import { CreditTrailers } from "../shared/credits.tsx";
+import { CompactCredit, CreditTrailers } from "../shared/credits.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import {
   ClaimFacts,
+  CodeValue,
   FamilyFacts,
   ProvenanceFacts,
-  RoundsFacts,
+  shortValue,
   StateFacts,
   TerritoryFacts,
   verdictProvenance,
@@ -57,10 +58,10 @@ import { StateMarkIcon } from "../shared/marks.tsx";
 import type { StateMark } from "../shared/marks.tsx";
 import { OutcomeView, StageStrip } from "../shared/outcome.tsx";
 import { answerPath, askPath } from "../shared/paths.ts";
-import { MetaCode, MetaLine } from "../shared/row.tsx";
+import { MetaCode, MetaLine, Row, RowList } from "../shared/row.tsx";
 import type { Crumb } from "../shared/shell/sections.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
-import { StatusLine } from "../shared/status-line.tsx";
+import { readStatus, StatusLine } from "../shared/status-line.tsx";
 import type { StatusSubject } from "../shared/status-line.tsx";
 import { distanceInWords, When } from "../shared/time.tsx";
 import {
@@ -257,7 +258,8 @@ export const HeldBackBits = ({
           strokeWidth={1.75}
         />
         <span className="min-w-0">
-          {area} {passed}/{total} @ {suite}
+          {area} {passed}/{total} @{" "}
+          <span title={suite}>{shortValue(suite)}</span>
         </span>
       </li>
     ))}
@@ -281,6 +283,70 @@ export const InspectorOnly = ({
     {children}
   </div>
 );
+
+/**
+ * Every push the gate checked, newest first, the one the page reads
+ * selected: first in main, once there is more than one, so a verdict is
+ * read against its round.
+ */
+const RoundsRegion = ({
+  ask,
+  current,
+  now,
+  project,
+  rounds,
+}: {
+  readonly ask: AskId;
+  readonly project: ProjectName;
+  readonly rounds: readonly Round[];
+  /** The head the page shows. */
+  readonly current: CommitSha | undefined;
+  readonly now: DateTime.Utc;
+}) => {
+  // The page reads the last round at its head.
+  const read =
+    current === undefined
+      ? 0
+      : rounds.findLastIndex(({ head }) => head === current) + 1;
+
+  return (
+    <Region id="answer-rounds" title="Rounds">
+      <RowList label="Rounds">
+        {rounds
+          .map((round, index) => ({ number: index + 1, round }))
+          .toReversed()
+          .map(({ number, round: { at, head, outcome } }) => {
+            const { lead, mark } = readStatus({ kind: "answer", outcome });
+
+            return (
+              <Row
+                href={answerPath(project, ask)}
+                id={`${head}:${number}`}
+                key={`${head}:${number}`}
+                meta={<CodeValue value={head} />}
+                search={{ head }}
+                selected={number === read}
+                size="one-line"
+                state={{ mark, time: <When at={at} now={now} />, word: lead }}
+                title={`Round ${number} of ${rounds.length}`}
+              />
+            );
+          })}
+      </RowList>
+    </Region>
+  );
+};
+
+/**
+ * What a waiting answer's contributor needs, from its rounds: there is
+ * nothing to run, and what another push would start.
+ */
+const waitingSentence = (
+  round: { readonly number: number; readonly of: number } | undefined
+) =>
+  round === undefined
+    ? "Nothing for you to run."
+    : `Nothing for you to run. Pushing again starts round ${round.of + 1}; this verdict stays as round ${round.number}.`;
 
 /** What the hero says before any answer was judged: who holds the ask, or how to take it. */
 const NoAnswerYet = ({
@@ -415,11 +481,14 @@ const Run = ({
   holds,
   landing,
   now,
+  round,
   verdict,
 }: {
   readonly holds: ReturnType<typeof holdsOf>;
   readonly landing: LandingView | undefined;
   readonly now: DateTime.Utc;
+  /** Which round the verdict is, of how many. */
+  readonly round: { readonly number: number; readonly of: number } | undefined;
   readonly verdict: Verdict;
 }) => (
   <>
@@ -429,6 +498,15 @@ const Run = ({
         outcome={verdict.outcome}
         stage={verdict.stage}
       />
+      {Outcome.isAnyOf([
+        "AwaitingDecision",
+        "AwaitingFinish",
+        "WaitingOnParent",
+      ])(verdict.outcome) ? (
+        <p className="text-body max-w-[70ch]" data-waiting="">
+          {waitingSentence(round)}
+        </p>
+      ) : null}
       <p className="text-ui text-muted-foreground">
         Checked on the tree it would land as: <Sha sha={verdict.head} /> merged
         onto main at{" "}
@@ -462,25 +540,67 @@ const Run = ({
 
     {landing === undefined ? null : (
       <Region id="answer-landing" title="Landing">
-        <CreditTrailers
-          assisted={landing.assisted}
-          credits={landing.credits}
-          {...(landing.heldBackTrailer === undefined
-            ? {}
-            : { heldBack: landing.heldBackTrailer })}
-        />
-        <AppLink
-          className="text-ui decoration-rule self-start font-medium underline hover:decoration-current"
-          to={commitHref(landing.project, landing.sha)}
-        >
-          The landing commit
-        </AppLink>
+        {/* The landing told as a sentence before it is shown as a hash:
+            the page's job is to credit the people. */}
+        <p className="text-title flex min-w-0 flex-wrap items-baseline gap-x-2 font-normal">
+          <span className="flex items-center gap-2 font-semibold">
+            <StateMarkIcon mark="landed" />
+            <span className="text-landed">Landed</span>
+          </span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">
+            {/* The space is the sentence's; the gap only draws it. */}
+            {" as "}
+            <AppLink
+              className="decoration-rule underline hover:decoration-current"
+              to={commitHref(landing.project, landing.sha)}
+            >
+              <code
+                className="font-mono text-[length:inherit]"
+                title={landing.sha}
+              >
+                {shortSha(landing.sha)}
+              </code>
+            </AppLink>
+            {landing.credits.length === 0 ? null : (
+              <>
+                {" · "}
+                <CompactCredit credits={landing.credits} within />
+              </>
+            )}
+            {" · "}
+            <span className="text-muted-foreground">
+              <When at={landing.landedAt} now={now} />
+            </span>
+          </span>
+        </p>
+        {/* More room above Credit's head than under it. */}
+        <div className="mt-3">
+          <CreditTrailers
+            assisted={landing.assisted}
+            credits={landing.credits}
+            label="title"
+            {...(landing.heldBackTrailer === undefined
+              ? {}
+              : { heldBack: landing.heldBackTrailer })}
+          />
+        </div>
         <div className="flex min-w-0 flex-col gap-1.5">
           <span className="text-label text-muted-foreground">
             In a clone of {landing.project}
           </span>
           <CommandLine command={`git show ${landing.sha}`} />
         </div>
+        <AppLink
+          className="text-ui flex items-center gap-1.5 self-start font-medium no-underline hover:underline"
+          to={commitHref(landing.project, landing.sha)}
+        >
+          The landing commit
+          <ArrowRight
+            aria-hidden="true"
+            className="size-4"
+            strokeWidth={1.75}
+          />
+        </AppLink>
       </Region>
     )}
 
@@ -514,7 +634,7 @@ export interface AnswerViewProps {
 
 const NONE: ReadonlyMap<AskId, AskProgress> = new Map();
 
-/** The answer's facts: its state, rounds, claim, family, territory and check, then what was judged. */
+/** The answer's facts: its state, claim, family, territory and check, then what was judged. */
 const AnswerFacts = ({
   ask,
   now,
@@ -547,13 +667,6 @@ const AnswerFacts = ({
           <StateFacts subject={subject} />
         </InspectorOnly>
       )}
-      <RoundsFacts
-        ask={ask.id}
-        now={now}
-        project={ask.project}
-        rounds={roundsAsTheyStand(progress, verdict)}
-        {...(verdict === undefined ? {} : { current: verdict.head })}
-      />
       {landed ? null : (
         <ClaimFacts
           now={now}
@@ -642,6 +755,7 @@ export const AnswerView = ({
   viewer,
 }: AnswerViewProps) => {
   const progress = states.get(ask.id);
+  const rounds = roundsAsTheyStand(progress, verdict);
 
   const subject: StatusSubject | undefined =
     verdict === undefined
@@ -712,11 +826,21 @@ export const AnswerView = ({
       said
       title={ask.brief.want}
     >
+      {rounds.length > 1 ? (
+        <RoundsRegion
+          ask={ask.id}
+          current={verdict?.head}
+          now={now}
+          project={ask.project}
+          rounds={rounds}
+        />
+      ) : null}
       {verdict === undefined ? null : (
         <Run
           holds={holdsOf(verdict, landing, progress?.rounds ?? [])}
           landing={landing}
           now={now}
+          round={roundOf(progress?.rounds ?? [], verdict.head)}
           verdict={verdict}
         />
       )}

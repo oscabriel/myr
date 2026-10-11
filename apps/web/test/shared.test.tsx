@@ -197,11 +197,13 @@ describe(CommandLine, () => {
 
   it("takes the bleed form in the inspector: pane-wide, ruled above and below, hanging 2ch, an icon-only Copy", () => {
     const command = `${Brand.cli} claim lint-heading-levels --project vellum`;
+
     const markup = markupOf(
       <InspectorCommands>
         <CommandLine command={command} />
       </InspectorCommands>
     );
+
     const box = /<div\b[^>]*data-form="bleed"[^>]*>/u.exec(markup)?.[0] ?? "";
 
     expect(box).toMatch(/\bborder-y\b/u);
