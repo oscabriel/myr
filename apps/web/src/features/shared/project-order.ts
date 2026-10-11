@@ -7,6 +7,9 @@
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Array as Arr, Order } from "effect";
 
+/** How many projects the rail and the landing name; the rest are a step away. */
+export const PROJECTS_SHOWN = 8;
+
 /** The most open asks first, then by name. */
 const leading = Order.combine(
   Order.mapInput(

@@ -160,7 +160,7 @@ export const ProjectsSheetBody = ({
   </>
 );
 
-/** The phone's More:Docs, For agents, the project's sections, the keys, the session. */
+/** The phone's More: Docs, For agents, the project's sections, the keys, the session. */
 const More = () => {
   const project = useCurrentProject();
   const listed = useProjectList();

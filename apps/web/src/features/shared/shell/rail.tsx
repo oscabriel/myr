@@ -39,7 +39,7 @@ import { postureLabel, postureWord } from "../../project/posture-label.ts";
 import { AppLink } from "../link.tsx";
 import { POSTURE_MARKS } from "../mark-look.ts";
 import { ASKS_PATH, docsPath, HOME_PATH } from "../paths.ts";
-import { leadingProjects } from "../project-order.ts";
+import { leadingProjects, PROJECTS_SHOWN } from "../project-order.ts";
 import {
   useCurrentProject,
   useProjectList,
@@ -58,9 +58,6 @@ export const RAIL_ROW = `${RAIL_BASE} [&[aria-current]]:bg-surface`;
 
 /** A row's mark: 16 px at the marks' stroke, muted until the row is current. */
 const MARK = "text-muted-foreground size-4 shrink-0";
-
-/** At most this many projects in the rail; more open the switcher. */
-const SHOWN = 8;
 
 const SITE = [
   { icon: House, label: "Home", to: HOME_PATH },
@@ -235,7 +232,7 @@ const Projects = () => {
     listed?.find((listing) => listing.project === project);
 
   const others = (listed ?? []).filter(({ project }) => project !== current);
-  const room = SHOWN - (current === undefined ? 0 : 1);
+  const room = PROJECTS_SHOWN - (current === undefined ? 0 : 1);
   const leading = leadingProjects(others, room);
 
   return (

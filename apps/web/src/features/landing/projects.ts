@@ -6,10 +6,7 @@
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Schema } from "effect";
 
-import { leadingProjects } from "../shared/project-order.ts";
-
-/** The projects the page names; the rest are a step away, at `/asks`. */
-export const PROJECTS_SHOWN = 8;
+import { leadingProjects, PROJECTS_SHOWN } from "../shared/project-order.ts";
 
 /** The projects block: the ones that lead, or that the list did not come. */
 export const LandingProjects = Schema.TaggedUnion({
