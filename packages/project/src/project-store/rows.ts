@@ -2,8 +2,8 @@ import { Ask } from "@repo/protocol/domain/ask";
 import { AgentTrailer } from "@repo/protocol/domain/credit";
 import { Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
-import { ImportSource } from "@repo/protocol/domain/import";
 import { LandingView } from "@repo/protocol/domain/landing";
+import { ImportSource } from "@repo/protocol/domain/policy";
 import { Proposal } from "@repo/protocol/domain/proposal";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import {

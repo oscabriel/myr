@@ -37,9 +37,8 @@ import { Choice, Decision, Today } from "./domain/decision.ts";
 import { EnvSchemaView } from "./domain/env.ts";
 import { ProjectEvent } from "./domain/event.ts";
 import { FrontPageEntry, ProjectListing } from "./domain/front-page.ts";
-import { ImportSource } from "./domain/import.ts";
 import { LandingView } from "./domain/landing.ts";
-import { PolicyPending, PublicPolicy } from "./domain/policy.ts";
+import { ImportSource, PolicyPending, PublicPolicy } from "./domain/policy.ts";
 import { DraftNote, Proposal } from "./domain/proposal.ts";
 import { CreditSummary } from "./domain/record.ts";
 import { Ledger } from "./domain/visibility.ts";
@@ -577,7 +576,7 @@ export class PolicyOf extends Rpc.make("projectPolicy", {
 })
   .annotate(
     Description,
-    "Show a project's evaluated config folder at its landed commit: who decides which paths, its vouches, caps, budget and claim timing; and, for an imported project, where it came from."
+    "Show a project's evaluated config folder at its landed commit: who decides which paths, its vouches, caps, budget and claim timing; for an import, its source."
   )
   .annotate(Audience, "public")
   .annotate(Visibility, "public")

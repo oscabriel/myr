@@ -25,9 +25,12 @@ import type { Contract } from "@repo/protocol/contracts";
 import { LandReceipt } from "@repo/protocol/domain/answer";
 import type { AnswerReceipt } from "@repo/protocol/domain/answer";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
-import type { ImportSource } from "@repo/protocol/domain/import";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import type { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
+import type {
+  ImportSource,
+  PolicyPending,
+  PublicPolicy,
+} from "@repo/protocol/domain/policy";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { Refusal } from "@repo/protocol/refusal";
 import { receiptLine } from "@repo/protocol/render";

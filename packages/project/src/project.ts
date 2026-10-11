@@ -111,12 +111,11 @@ import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import { ProjectEvent } from "@repo/protocol/domain/event";
-import type { ImportSource } from "@repo/protocol/domain/import";
 import type { AskKind } from "@repo/protocol/domain/kind";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
-import type { PublicPolicy } from "@repo/protocol/domain/policy";
+import type { ImportSource, PublicPolicy } from "@repo/protocol/domain/policy";
 import { Policy } from "@repo/protocol/domain/policy";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
