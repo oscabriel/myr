@@ -8,13 +8,13 @@ import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { ProjectEvent } from "@repo/protocol/domain/event";
-import { LandedSha, RepoName } from "@repo/protocol/ids";
+import { Handle, LandedSha, RepoName } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { ProjectExists } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
 import { gitClient } from "@repo/testkit/git-client";
 import { aProject } from "@repo/testkit/scenarios";
-import { DateTime, Effect, Exit, Option, Ref } from "effect";
+import { DateTime, Effect, Exit, Option, Ref, Struct } from "effect";
 
 import { ProjectStore } from "../src/project-store.ts";
 import { projectService } from "../src/project.ts";
@@ -28,7 +28,23 @@ const repo = RepoName.make(project);
 
 const alice = Person.make({ handle: scenario.initializer });
 
+const bob = Person.make({ handle: Handle.make("bob") });
+
 const mainRef = RefName.make("refs/heads/main");
+
+/**
+ * The project's row as an import written before sources were kept left it
+ * (ADR 0031): the same row without `importedFrom`.
+ */
+const forgetSource = ProjectStore.use((store) =>
+  Effect.flatMap(store.load(), ({ project: row }) =>
+    Option.match(row, {
+      onNone: () => Effect.void,
+      onSome: (kept) =>
+        store.commit({ project: Struct.omit(kept, ["importedFrom"]) }),
+    })
+  )
+);
 
 const masterRef = RefName.make("refs/heads/master");
 
@@ -179,7 +195,79 @@ describe("importing a public repo", () => {
       }).pipe(Effect.provide(worldOf(scenario, "memory")))
   );
 
-  it.effect("still answers ProjectExists for a project that exists", () =>
+  it.effect(
+    "keeps where it came from on its row, and projectPolicy names it",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-08T12:00:00Z");
+
+        const { url } = yield* upstreamOnMaster;
+        const api = yield* projectService(project);
+
+        yield* api.initProject(alice, { import: { branch: "master", url } });
+
+        const snapshot = yield* ProjectStore.use((store) => store.load());
+
+        expect(
+          Option.map(snapshot.project, (row) => row.importedFrom)
+        ).toStrictEqual(Option.some({ branch: "master", url }));
+        expect((yield* api.policy()).importedFrom).toStrictEqual({
+          branch: "master",
+          url,
+        });
+      }).pipe(Effect.provide(worldOf(scenario, "memory")))
+  );
+
+  it.effect(
+    "answers a repeat with the same source as the first call did, and ProjectExists for another source",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-08T12:00:00Z");
+
+        const { tip, url } = yield* upstreamOnMaster;
+        const api = yield* projectService(project);
+
+        const made = yield* api.initProject(alice, { import: { url } });
+        const again = yield* api.initProject(alice, { import: { url } });
+
+        expect(again).toStrictEqual(made);
+        expect(made.landed).toStrictEqual(LandedSha.make(tip));
+        expect(
+          yield* Effect.flip(
+            api.initProject(alice, {
+              import: { url: "https://example.com/other.git" },
+            })
+          )
+        ).toStrictEqual(new ProjectExists({ project }));
+      }).pipe(Effect.provide(worldOf(scenario, "memory")))
+  );
+
+  it.effect(
+    "sets the source on a repeat by the initializer for an import adopted before sources were kept, hearing no second landing",
+    () =>
+      Effect.gen(function* () {
+        yield* advanceTo("2026-10-08T12:00:00Z");
+
+        const { tip, url } = yield* upstreamOnMaster;
+        const api = yield* projectService(project);
+
+        yield* api.initProject(alice, { import: { url } });
+        yield* forgetSource;
+
+        const retried = yield* api.initProject(alice, { import: { url } });
+        const snapshot = yield* ProjectStore.use((store) => store.load());
+
+        expect(retried.landed).toStrictEqual(LandedSha.make(tip));
+        expect(
+          Option.map(snapshot.project, (row) => row.importedFrom)
+        ).toStrictEqual(Option.some({ url }));
+        expect(
+          (yield* api.events(0, 10)).map(({ event }) => event._tag)
+        ).toStrictEqual(["Landed"]);
+      }).pipe(Effect.provide(worldOf(scenario, "memory")))
+  );
+
+  it.effect("refuses a source from anyone but the initializer", () =>
     Effect.gen(function* () {
       yield* advanceTo("2026-10-08T12:00:00Z");
 
@@ -187,6 +275,32 @@ describe("importing a public repo", () => {
       const api = yield* projectService(project);
 
       yield* api.initProject(alice, { import: { url } });
+      yield* forgetSource;
+
+      expect(
+        yield* Effect.flip(api.initProject(bob, { import: { url } }))
+      ).toStrictEqual(new ProjectExists({ project }));
+    }).pipe(Effect.provide(worldOf(scenario, "memory")))
+  );
+
+  it.effect("refuses a source for a project that started empty", () =>
+    Effect.gen(function* () {
+      yield* advanceTo("2026-10-08T12:00:00Z");
+
+      const { url } = yield* upstreamOnMaster;
+      const api = yield* projectService(project);
+      const client = yield* gitClient(memoryFs());
+
+      const first = yield* client.commit("Start", [["README.md", "# start\n"]]);
+
+      yield* api.initProject(alice, {});
+      yield* (yield* RepoHost)
+        .push(repo, client.source, [
+          { from: Option.none(), ref: mainRef, to: first },
+        ])
+        .pipe(Effect.orDie);
+      yield* advanceTo("2026-10-08T12:01:00Z");
+      yield* api.recordFirstPush(alice, first);
 
       expect(
         yield* Effect.flip(api.initProject(alice, { import: { url } }))

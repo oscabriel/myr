@@ -8,12 +8,14 @@
  * the events, the policy and the code on the server and keeps them live in
  * the browser, and hands them here.
  */
+import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported-note";
 import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
 import type { FileView, TreeListing } from "@repo/protocol/domain/code";
 import type { Glob } from "@repo/protocol/domain/common";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import type { LandingView } from "@repo/protocol/domain/landing";
+import type { ImportSource } from "@repo/protocol/domain/policy";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
 import type { Ledger } from "@repo/protocol/domain/visibility";
 import type { AreaName, AskId, Handle, ProjectName } from "@repo/protocol/ids";
@@ -34,6 +36,7 @@ import { finaleOf, stillWaiting } from "../front/families.ts";
 import { ledeOf } from "../front/head.ts";
 import { ProposeLink } from "../propose/propose-link.tsx";
 import type { AskProgress } from "../shared/ask-progress.ts";
+import { LINK } from "../shared/classes.ts";
 import { CommandLine } from "../shared/command.tsx";
 import { EmptyState } from "../shared/empty.tsx";
 import {
@@ -153,6 +156,8 @@ export interface ProjectViewProps {
   readonly heldBack?: readonly HeldBackArea[] | undefined;
   /** Who decides for which paths; none while the policy is read or when it has none. */
   readonly deciders?: readonly Deciders[] | undefined;
+  /** Where it was imported from; none for a project that started empty, or while the policy is read. */
+  readonly importedFrom?: ImportSource | undefined;
   readonly now: DateTime.Utc;
   readonly platformUrl: string;
   /** The root folder at main and its README, once read. */
@@ -206,6 +211,30 @@ const WhoDecides = ({
     </FactBlock>
   );
 };
+
+/** Where an imported project came from: its source, the branch adopted, and what a copy is. */
+const ImportedFrom = ({ source }: { readonly source: ImportSource }) => (
+  <FactBlock label="Imported from">
+    <p className="text-ui">
+      <a
+        className={`${LINK} [overflow-wrap:anywhere]`}
+        href={source.url}
+        rel="noreferrer"
+      >
+        {source.url}
+      </a>
+      {source.branch === undefined ? null : (
+        <>
+          {" "}
+          · branch <MetaCode>{source.branch}</MetaCode>
+        </>
+      )}
+    </p>
+    <p className="text-ui text-muted-foreground">
+      This project is {IMPORTED_NOTE}.
+    </p>
+  </FactBlock>
+);
 
 /** The four commands that take part, in the order a newcomer runs them. */
 const TakePart = ({
@@ -285,6 +314,7 @@ const RecentLandings = ({
 const HowItLands = ({
   deciders,
   heldBack,
+  importedFrom,
   landedAt,
   landings,
   listing,
@@ -293,7 +323,13 @@ const HowItLands = ({
   posture,
 }: Pick<
   ProjectViewProps,
-  "deciders" | "heldBack" | "landings" | "listing" | "now" | "platformUrl"
+  | "deciders"
+  | "heldBack"
+  | "importedFrom"
+  | "landings"
+  | "listing"
+  | "now"
+  | "platformUrl"
 > & {
   readonly posture: KnownPosture | undefined;
   readonly landedAt: DateTime.Utc | undefined;
@@ -311,6 +347,7 @@ const HowItLands = ({
     <GateFacts />
     <WhoDecides deciders={deciders} project={listing.project} />
     {heldBack === undefined ? null : <HeldBackFacts areas={heldBack} />}
+    {importedFrom === undefined ? null : <ImportedFrom source={importedFrom} />}
     <TakePart platformUrl={platformUrl} project={listing.project} />
     <RecentLandings
       landedAt={landedAt}
@@ -453,6 +490,7 @@ const PageFacts = ({
       <HowItLands
         deciders={props.deciders}
         heldBack={props.heldBack}
+        importedFrom={props.importedFrom}
         landedAt={landedAt}
         landings={props.landings}
         listing={listing}

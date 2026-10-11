@@ -38,7 +38,7 @@ import { EnvSchemaView } from "./domain/env.ts";
 import { ProjectEvent } from "./domain/event.ts";
 import { FrontPageEntry, ProjectListing } from "./domain/front-page.ts";
 import { LandingView } from "./domain/landing.ts";
-import { PolicyPending, PublicPolicy } from "./domain/policy.ts";
+import { ImportSource, PolicyPending, PublicPolicy } from "./domain/policy.ts";
 import { DraftNote, Proposal } from "./domain/proposal.ts";
 import { CreditSummary } from "./domain/record.ts";
 import { Ledger } from "./domain/visibility.ts";
@@ -562,6 +562,8 @@ export class PolicyOf extends Rpc.make("projectPolicy", {
   error: UnknownProject,
   payload: { project: ProjectName },
   success: Schema.Struct({
+    /** Where the project was imported from; absent for one that started empty. */
+    importedFrom: Schema.optionalKey(ImportSource),
     /** Absent while the config folder at the landed commit has not evaluated. */
     policy: Schema.optionalKey(PublicPolicy),
     /**
@@ -574,7 +576,7 @@ export class PolicyOf extends Rpc.make("projectPolicy", {
 })
   .annotate(
     Description,
-    "Show a project's evaluated config folder at its landed commit: who decides which paths, its vouches, caps, budget and claim timing."
+    "Show a project's evaluated config folder at its landed commit: who decides which paths, its vouches, caps, budget and claim timing; for an import, its source."
   )
   .annotate(Audience, "public")
   .annotate(Visibility, "public")
@@ -613,12 +615,7 @@ export class InitProject extends Rpc.make("initProject", {
   error: Schema.Union([ProjectExists, ImportFailed]),
   payload: {
     /** A public repo to import, instead of starting empty. */
-    import: Schema.optionalKey(
-      Schema.Struct({
-        branch: Schema.optionalKey(Schema.NonEmptyString),
-        url: Schema.String.check(Schema.isPattern(/^https:\/\/\S+$/u)),
-      })
-    ),
+    import: Schema.optionalKey(ImportSource),
     project: ProjectName,
   },
   success: Schema.Struct({

@@ -548,6 +548,113 @@ describe("bun scripts/import-examples.ts", () => {
         ).toStrictEqual(["ls-remote anyhow", "tags anyhow"]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
+
+  it.live(
+    "--sources asks initProject again for each import the ledger records, listed or not, and never for a listed project it doesn't",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+
+        const dir = yield* fs.makeTempDirectoryScoped({ prefix: "importing-" });
+
+        const ledgerFile = path.join(dir, "created.jsonl");
+
+        // An earlier run imported anyhow and gum; the platform lists anyhow
+        // and ky (someone else's project), and gum not yet.
+        const platform = yield* fakePlatform(["anyhow", "ky"]);
+
+        yield* fs.writeFileString(
+          ledgerFile,
+          ["anyhow", "gum"]
+            .map(
+              (name) =>
+                `${JSON.stringify({ at: "2026-10-08T20:00:00.000Z", by: "import", kind: "project", name, stage: "dev-oscabriel" })}\n`
+            )
+            .join("")
+        );
+
+        const printed: string[] = [];
+
+        yield* importExamples(
+          onDev("--only", "gum", "--sources"),
+          () => platform.layer
+        ).pipe(
+          Effect.provideService(LedgerFile, ledgerFile),
+          Effect.provideService(Console.Console, {
+            ...console,
+            log: (...args: readonly unknown[]) => {
+              printed.push(args.map(String).join(" "));
+            },
+          })
+        );
+
+        yield* importExamples(onDev("--sources"), () => platform.layer).pipe(
+          Effect.provideService(LedgerFile, ledgerFile),
+          Effect.provideService(Console.Console, {
+            ...console,
+            log: () => {},
+          })
+        );
+
+        expect(
+          (yield* platform.calls).filter((call) => /gum|anyhow|ky/u.test(call))
+        ).toStrictEqual([
+          "init gum main",
+          "init anyhow master",
+          "init gum main",
+        ]);
+        expect(printed).toStrictEqual([
+          "import-examples on dev-oscabriel (https://platform.test): 0 to import, 1 listed already",
+          "  skip gum: imported already, as the ledger records",
+          "  gum: source kept: https://github.com/charmbracelet/gum (main)",
+          "imported 0 of 0, each recorded in infra/created.jsonl as a kept import",
+        ]);
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "--sources --dry-run prints each source it would keep, and keeps none",
+    () =>
+      Effect.gen(function* () {
+        const platform = yield* fakePlatform(["anyhow"]);
+
+        const { ledger, printed } = yield* ran(
+          onDev("--only", "anyhow", "--sources", "--dry-run"),
+          platform.layer
+        );
+
+        expect({
+          calls: yield* platform.calls,
+          ledger,
+          printed: printed.filter((line) => line.includes("source")),
+        }).toStrictEqual({
+          calls: ["listProjects"],
+          ledger: [],
+          printed: [],
+        });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+
+  it.live(
+    "--sources in the Node world goes over every example listed, with no ledger",
+    () =>
+      Effect.gen(function* () {
+        const platform = yield* fakePlatform(["anyhow", "ky"]);
+
+        const { printed } = yield* ran(
+          ["--world", "node", "--sources", "--dry-run"],
+          platform.layer
+        );
+
+        expect(printed.filter((line) => line.includes("source"))).toStrictEqual(
+          [
+            "  would keep the source of anyhow: https://github.com/dtolnay/anyhow (master)",
+            "  would keep the source of ky: https://github.com/sindresorhus/ky (main)",
+          ]
+        );
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
 });
 
 /** A call the platform never answered, as an edge timeout leaves it. */

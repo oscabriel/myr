@@ -188,11 +188,13 @@ const LiveProject = ({
     (read) => read
   );
 
-  const deciders = valueOr(
+  const policyRead = valueOr(
     useAtomValue(projectPolicyAtom(project)),
     data.policy,
     (read) => read
-  )?.policy?.deciders;
+  );
+
+  const deciders = policyRead?.policy?.deciders;
 
   const reads = useMemo(
     () => new Map(events === undefined ? [] : [[project, events]]),
@@ -210,6 +212,7 @@ const LiveProject = ({
       code={code}
       deciders={deciders}
       heldBack={ledger === undefined ? undefined : heldBackOf(ledger)}
+      importedFrom={policyRead?.importedFrom}
       landings={landings}
       lastLanded={latest?.landedAt}
       listing={homeListing({ asks, ledger, project })}

@@ -18,6 +18,7 @@ import type { CommandDoc } from "../command-doc.ts";
 import { events, gitHere, landing, refusals } from "../llms-sections.ts";
 import { exitCodeSection } from "../refusals.ts";
 import { code, table } from "../text.ts";
+import { IMPORTED_NOTE } from "./imported-note.ts";
 import { importedProjects } from "./imported.ts";
 import type { DocSource } from "./page.ts";
 import { withoutHeading } from "./page.ts";
@@ -92,7 +93,7 @@ export const mcpPage: DocSource = {
 
 export const importedPage: DocSource = {
   body: () => [
-    "These projects are copies of public repos, imported so you can read code you know on the platform. Each is read-only here and is not run by its maintainers; its history, with its authors, came with it, and why each line is there reads as before adoption. Each stays under its own licence.",
+    `These projects were imported so you can read code you know on the platform. Each is ${IMPORTED_NOTE}; its history, with its authors, came with it, and why each line is there reads as before adoption. Each stays under its own licence.`,
     "",
     ...table(
       ["Project", "Source", "Licence", "What it is"],

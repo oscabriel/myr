@@ -66,6 +66,8 @@ export interface ImportOptions {
   readonly dryRun: boolean;
   /** Backfill the tags of an import that has none. */
   readonly tags: boolean;
+  /** Keep the source of each earlier import on its record (ADR 0031). */
+  readonly sources: boolean;
   /** Warm the examples the platform lists already, as well as each new import. */
   readonly warm: boolean;
   /** The web's origin to warm through, when the stage's own can't be known. */
@@ -167,12 +169,13 @@ export const initUntilAnswered = <A extends { readonly landed?: string }, E>(
   });
 
 const USAGE =
-  "bun scripts/import-examples.ts --world node | --stage <dev-…> [--url <origin>] [--web <origin>] [--only <project>] [--tags] [--warm] [--dry-run]";
+  "bun scripts/import-examples.ts --world node | --stage <dev-…> [--url <origin>] [--web <origin>] [--only <project>] [--tags] [--sources] [--warm] [--dry-run]";
 
 /** The flags the command takes; any other is a typo, refused. */
 const FLAGS = new Set([
   "--dry-run",
   "--only",
+  "--sources",
   "--stage",
   "--tags",
   "--url",
@@ -261,6 +264,7 @@ export const optionsOf = (
     return {
       dryRun: argv.includes("--dry-run"),
       only,
+      sources: argv.includes("--sources"),
       tags,
       warm: argv.includes("--warm"),
       web: Option.map(flagValue(argv, "--web"), (web) =>
@@ -356,23 +360,85 @@ const warmOne = (project: ProjectName) =>
     );
   });
 
+/**
+ * The projects the ledger records as imports on `stage`: an import the
+ * platform does not list (one adopted before adoptions were heard) is
+ * still this stage's, never imported again.
+ */
+const recordedImports = (stage: Option.Option<Stage>) =>
+  Effect.gen(function* () {
+    if (Option.isNone(stage)) {
+      return new Set<ProjectName>();
+    }
+
+    const ledger = yield* readLedger.pipe(
+      Effect.mapError((error) =>
+        failed(`the ledger (${ledgerPath}): ${error.message}`)
+      )
+    );
+
+    const imported = ledger.filter(({ by }) => by === "import");
+
+    return new Set(
+      examples.flatMap(({ project }) =>
+        isRecorded(imported, {
+          kind: "project",
+          name: project,
+          stage: stage.value,
+        })
+          ? [project]
+          : []
+      )
+    );
+  });
+
+/**
+ * `--sources` on one earlier import: `initProject` asked again with the
+ * same source, which the platform takes as the source to keep (ADR 0031)
+ * and answers as the import did; a refusal is printed, never fatal.
+ */
+const sourceOne = (example: ImportExample) =>
+  Effect.gen(function* () {
+    const target = yield* ImportTarget;
+
+    const outcome = yield* target.initProject(example).pipe(
+      Effect.map(() => `source kept: ${example.url} (${example.branch})`),
+      Effect.catch(({ reason }) => Effect.succeed(`source not kept: ${reason}`))
+    );
+
+    yield* Console.log(`  ${example.project}: ${outcome}`);
+  });
+
 /** The run itself, over a target, a backfill and a web. */
 const run = (options: ImportOptions) =>
   Effect.gen(function* () {
     const target = yield* ImportTarget;
     const listed = yield* target.listProjects;
     const stage = stageOfWhere(options.where);
+    const recorded = yield* recordedImports(stage);
+    const known = new Set([...listed, ...recorded]);
 
     const asked = planImports(examples, new Set(), options.only);
-    const plan = planImports(examples, listed, options.only);
-    const skipped = asked.filter(({ project }) => listed.has(project));
+    const plan = planImports(examples, known, options.only);
+    const skipped = asked.filter(({ project }) => known.has(project));
+
+    // The earlier imports `--tags` and `--sources` go back over: on a
+    // stage, those the ledger records; in the Node world, every one listed.
+    const earlier = skipped.filter(
+      ({ project }) => Option.isNone(stage) || recorded.has(project)
+    );
 
     yield* Console.log(
       `import-examples on ${target.label}: ${plan.length} to import, ${skipped.length} listed already`
     );
     yield* Effect.forEach(
       skipped,
-      ({ project }) => Console.log(`  skip ${project}: listed already`),
+      ({ project }) =>
+        Console.log(
+          listed.has(project)
+            ? `  skip ${project}: listed already`
+            : `  skip ${project}: imported already, as the ledger records`
+        ),
       { discard: true }
     );
 
@@ -383,6 +449,18 @@ const run = (options: ImportOptions) =>
           Console.log(`  would import ${project} from ${url} (${branch})`),
         { discard: true }
       );
+
+      if (options.sources) {
+        yield* Effect.forEach(
+          earlier,
+          ({ branch, project, url }) =>
+            Console.log(
+              `  would keep the source of ${project}: ${url} (${branch})`
+            ),
+          { discard: true }
+        );
+      }
+
       yield* Console.log("dry run: nothing imported, nothing recorded");
 
       return;
@@ -421,22 +499,6 @@ const run = (options: ImportOptions) =>
     // An import from an earlier run that this run skipped is backfilled
     // too, if the ledger holds it as an import of this stage.
     if (options.tags && Option.isSome(stage)) {
-      const ledger = yield* readLedger.pipe(
-        Effect.mapError((error) =>
-          failed(`the ledger (${ledgerPath}): ${error.message}`)
-        )
-      );
-
-      const imported = ledger.filter(({ by }) => by === "import");
-
-      const earlier = skipped.filter(({ project }) =>
-        isRecorded(imported, {
-          kind: "project",
-          name: project,
-          stage: stage.value,
-        })
-      );
-
       yield* Effect.forEach(
         earlier,
         (example) =>
@@ -445,6 +507,10 @@ const run = (options: ImportOptions) =>
           ),
         { discard: true }
       );
+    }
+
+    if (options.sources) {
+      yield* Effect.forEach(earlier, sourceOne, { discard: true });
     }
 
     if (options.warm) {

@@ -115,7 +115,7 @@ import type { AskKind } from "@repo/protocol/domain/kind";
 import { LandingView } from "@repo/protocol/domain/landing";
 import { Outcome } from "@repo/protocol/domain/outcome";
 import type { StageName } from "@repo/protocol/domain/outcome";
-import type { PublicPolicy } from "@repo/protocol/domain/policy";
+import type { ImportSource, PublicPolicy } from "@repo/protocol/domain/policy";
 import { Policy } from "@repo/protocol/domain/policy";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import {
@@ -1403,6 +1403,10 @@ const holds = (ask: Ask, wanted: AskKind["requires"][number]) =>
     Match.exhaustive
   );
 
+/** Whether two import sources name the same repo and branch (ADR 0031). */
+const sameSource = (a: ImportSource, b: ImportSource) =>
+  a.url === b.url && a.branch === b.branch;
+
 /** An optional field as an object to spread: the field when present, nothing when not. */
 const field = <K extends string, A>(
   key: K,
@@ -2606,19 +2610,26 @@ export const projectService = (
     const policyStatus: Effect.Effect<PolicyStatus> = Effect.gen(function* () {
       const h = yield* hydrate;
 
+      // Where the project came from, when it was imported (ADR 0031).
+      const origin = field(
+        "importedFrom",
+        Option.flatMapNullishOr(h.project, (row) => row.importedFrom)
+      );
+
       if (Option.isSome(h.policy)) {
-        return { policy: publicPolicy(h.policy.value) };
+        return { ...origin, policy: publicPolicy(h.policy.value) };
       }
 
       const landed = Option.flatMapNullishOr(h.project, (row) => row.landed);
 
       if (Option.isNone(landed)) {
-        return {};
+        return origin;
       }
 
       const at = landed.value;
 
       return {
+        ...origin,
         unevaluated: {
           at,
           reason: (yield* hasConfigAt(at))
@@ -3823,17 +3834,102 @@ export const projectService = (
       );
     };
 
-    const initBody =
-      (
-        caller: Person,
-        input: {
-          readonly import?: { readonly branch?: string; readonly url: string };
+    /**
+     * The project's adoption, the one landing with no parent: in the
+     * snapshot's newest landings, else found by walking back from the last
+     * landed SHA through each landing's parent.
+     */
+    const adoptionOf = (h: Hydrated, row: ProjectRow) =>
+      Effect.gen(function* () {
+        const kept = h.landings.find(({ parent }) => parent === undefined);
+
+        if (kept !== undefined || row.landed === undefined) {
+          return Option.fromNullishOr(kept);
         }
-      ) =>
+
+        let at = Option.some<CommitSha>(row.landed);
+
+        while (Option.isSome(at)) {
+          const found = yield* store.landing(at.value);
+
+          if (Option.isNone(found)) {
+            return Option.none<LandingView>();
+          }
+
+          if (found.value.parent === undefined) {
+            return found;
+          }
+
+          at = Option.some<CommitSha>(found.value.parent);
+        }
+
+        return Option.none<LandingView>();
+      });
+
+    /**
+     * An import asked again by its initializer converges (ADR 0031): with
+     * the source the row keeps, it answers as the first call did; for a row
+     * that keeps no source yet, the source is written first. Only an
+     * import's row takes one: its adoption landed in the call that made it,
+     * so the adoption's `landedAt` is the row's `createdAt`, where a first
+     * push lands later. Any other repeat is `ProjectExists`, as before.
+     */
+    const keepSource = (
+      caller: Person,
+      from: ImportSource,
+      row: ProjectRow,
+      h: Hydrated,
+      writes: Writes
+    ) =>
+      Effect.gen(function* () {
+        const exists = new ProjectExists({ project: name });
+
+        if (
+          row.landed === undefined ||
+          !sameHandle(row.initializer, caller.handle)
+        ) {
+          return yield* exists;
+        }
+
+        const answer = {
+          landed: row.landed,
+          project: name,
+          remote: `${yield* GatewayUrl}/${name}.git`,
+        };
+
+        if (row.importedFrom !== undefined) {
+          return sameSource(row.importedFrom, from) ? answer : yield* exists;
+        }
+
+        const adoption = yield* adoptionOf(h, row);
+
+        if (
+          Option.isNone(adoption) ||
+          DateTime.toEpochMillis(adoption.value.landedAt) !==
+            DateTime.toEpochMillis(row.createdAt)
+        ) {
+          return yield* exists;
+        }
+
+        writes.project.set("row", { ...row, importedFrom: from });
+
+        return answer;
+      });
+
+    const initBody =
+      (caller: Person, input: { readonly import?: ImportSource }) =>
       (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
         Effect.gen(function* () {
           if (Option.isSome(h.project)) {
-            return yield* new ProjectExists({ project: name });
+            return input.import === undefined
+              ? yield* new ProjectExists({ project: name })
+              : yield* keepSource(
+                  caller,
+                  input.import,
+                  h.project.value,
+                  h,
+                  writes
+                );
           }
 
           const remote = `${yield* GatewayUrl}/${name}.git`;
@@ -3861,7 +3957,11 @@ export const projectService = (
           landAdoption(writes, caller.handle, landed, now);
           writes.project.set(
             "row",
-            yield* withPolicyAt({ ...made, landed, state: "live" }, landed, now)
+            yield* withPolicyAt(
+              { ...made, importedFrom: input.import, landed, state: "live" },
+              landed,
+              now
+            )
           );
 
           return { landed, project: name, remote };

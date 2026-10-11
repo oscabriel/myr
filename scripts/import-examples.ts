@@ -23,8 +23,13 @@
  * the source's tags fetched into a temporary bare repo, then pushed to the
  * canonical repo with a write token minted over Artifacts' REST API for at
  * most ten minutes and revoked after, even on failure. It is the one write
- * that skips the gateway: tags only, by the operator, never `main`. The
- * core is `lib/import/`.
+ * that skips the gateway: tags only, by the operator, never `main`.
+ *
+ * `--sources` keeps the source of each earlier import on its record: the
+ * same `initProject` asked again by the operator, which the platform
+ * answers as the import did and takes as the source to keep (ADR 0031).
+ * A project the ledger records as this stage's import is never imported
+ * again, even when the platform does not list it. The core is `lib/import/`.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, Layer, Option, Stdio } from "effect";

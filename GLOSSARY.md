@@ -80,6 +80,10 @@ _Avoid_: merge, ship
 The commit the platform itself last landed on main; the only commit a project's rules are read from.
 _Avoid_: HEAD, tip of main
 
+**Import**:
+A project adopted from a public repo: a read-only copy, not run by its maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from.
+_Avoid_: mirror, fork (of the source), sync
+
 **Outcome**:
 Where an offered answer stands: Checking, Landed, WaitingOnParent, AwaitingFinish, AwaitingDecision or Refused; only Refused carries refusals, and waiting is not a refusal.
 _Avoid_: result, build state, CI status
