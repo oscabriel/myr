@@ -586,6 +586,10 @@ describe("signing up", () => {
     ["www", "reserved"],
     ["support", "reserved"],
     ["security", "reserved"],
+    ["people", "reserved"],
+    ["import", "reserved"],
+    ["datekit", "reserved"],
+    ["Click", "reserved"],
   ])(
     "refuses the handle %s with a plain reason",
     ([handle = "", reason = ""]) =>

@@ -15,9 +15,18 @@
  * on bound parameters. Every failure, a database the migration has not
  * reached among them, is a miss: logged, and never the list's.
  */
-import { ProjectName } from "@repo/protocol/ids";
+import { keyOf, nameOfKey, ProjectKey } from "@repo/protocol/ids";
+import type { ProjectName } from "@repo/protocol/ids";
 import { Posture } from "@repo/protocol/posture";
-import { Array as Arr, DateTime, Effect, Layer, Result, Schema } from "effect";
+import {
+  Array as Arr,
+  DateTime,
+  Effect,
+  Layer,
+  Option,
+  Result,
+  Schema,
+} from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 import type { SqlError } from "effect/sql/SqlError";
 
@@ -31,7 +40,7 @@ import type {
 const Row = Schema.Struct({
   moves_at: Schema.NullOr(Schema.DateTimeUtcFromString),
   posture: Posture,
-  project: ProjectName,
+  project: ProjectKey,
   seen: Schema.Int,
 });
 
@@ -41,7 +50,7 @@ const decodeRow = Schema.decodeUnknownOption(Row);
 const rowOf = (project: ProjectName, entry: StandingEntry) => ({
   moves_at: entry.until === undefined ? null : DateTime.formatIso(entry.until),
   posture: entry.posture,
-  project,
+  project: keyOf(project),
   seen: entry.seen,
 });
 
@@ -83,14 +92,19 @@ export const StandingPosturesD1 = Layer.effect(
           : Effect.map(
               orMissed(
                 sql`SELECT project, posture, moves_at, seen FROM standing_postures
-                  WHERE project IN (SELECT value FROM json_each(${JSON.stringify(projects)}))`,
+                  WHERE project IN (SELECT value FROM json_each(${JSON.stringify(projects.map(keyOf))}))`,
                 [],
                 "the kept standing postures were not read"
               ),
               (rows) =>
                 new Map(
-                  Arr.getSomes(rows.map((row) => decodeRow(row))).map(
-                    (row) => [row.project, entryOf(row)] as const
+                  Arr.getSomes(
+                    Arr.getSomes(rows.map((row) => decodeRow(row))).map((row) =>
+                      Option.map(
+                        nameOfKey(row.project),
+                        (project) => [project, entryOf(row)] as const
+                      )
+                    )
                   )
                 )
             ),

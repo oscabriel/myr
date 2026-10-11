@@ -75,7 +75,7 @@ describe("a project scenario", () => {
 
     expect({ initializer, project }).toStrictEqual({
       initializer: "alice",
-      project: "datekit",
+      project: "alice/datekit",
     });
     expect(policy.deciders).toStrictEqual([
       { handles: ["alice"], paths: "**" },
@@ -89,7 +89,7 @@ describe("a project scenario", () => {
       people: ["bob", "carol"],
     });
 
-    expect(scenario.project).toBe("burrow");
+    expect(scenario.project).toBe("dana/burrow");
     expect(scenario.initializer).toBe("dana");
     expect([...scenario.people]).toStrictEqual([
       ["dana", "dana"],
@@ -124,7 +124,7 @@ describe("a project scenario", () => {
       kind: "fix",
       openedAt: now,
       openedIn: scenario.landed,
-      project: "datekit",
+      project: "alice/datekit",
       state: "open",
       territory: { module: "parser", paths: ["packages/parser/**"] },
     });
@@ -304,7 +304,7 @@ describe("deterministic ids", () => {
     expect(sha("main")).toBe("72245cbe78d5b41b2cadf2502b38c3a5d6578b1a");
     expect(Schema.is(CommitSha)(sha("main"))).toBeTruthy();
     expect(sha("main")).not.toBe(sha("answer"));
-    expect(aProject().landed).toBe("6a1d765d8fd2f48cf995fb978771958e356e2bb1");
+    expect(aProject().landed).toBe("82d7409c24ead4d50f7614f6673ecdd72315be58");
   });
 
   it("mints request, proposal and decision ids from counters", () => {

@@ -14,7 +14,7 @@ import {
 import type { Principal } from "../src/principal.ts";
 import { unanswered } from "../src/testing.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const alice = Person.make({ handle: Handle.make("alice") });
 

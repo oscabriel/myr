@@ -668,7 +668,7 @@ describe("the callback", () => {
       expect(
         yield* Effect.forEach(
           [
-            "/datekit/asks/a1?tab=check",
+            "/oscabriel/datekit/asks/a1?tab=check",
             "https://elsewhere.example/",
             "//elsewhere.example/",
             "/\\elsewhere.example/",
@@ -676,7 +676,13 @@ describe("the callback", () => {
           ],
           backTo
         )
-      ).toStrictEqual(["/datekit/asks/a1?tab=check", "/", "/", "/", "/"]);
+      ).toStrictEqual([
+        "/oscabriel/datekit/asks/a1?tab=check",
+        "/",
+        "/",
+        "/",
+        "/",
+      ]);
     })
   );
 });
@@ -1002,11 +1008,13 @@ describe("the header's session slot", () => {
   it("comes back to the page without its #fragment, which the server never sees, so the link it renders matches in the browser", () => {
     const location = {
       hash: "L3",
-      href: "/datekit/blob/main/src/add.ts?plain=1#L3",
-      pathname: "/datekit/blob/main/src/add.ts",
+      href: "/oscabriel/datekit/blob/main/src/add.ts?plain=1#L3",
+      pathname: "/oscabriel/datekit/blob/main/src/add.ts",
       searchStr: "?plain=1",
     };
 
-    expect(hereOf(location)).toBe("/datekit/blob/main/src/add.ts?plain=1");
+    expect(hereOf(location)).toBe(
+      "/oscabriel/datekit/blob/main/src/add.ts?plain=1"
+    );
   });
 });

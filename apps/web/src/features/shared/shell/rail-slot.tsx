@@ -10,7 +10,7 @@
  * ```tsx
  * const CodeRail = () => <RailSlot label="Files"><ProjectTree /></RailSlot>;
  *
- * export const Route = createFileRoute("/$project/blob/$rev/$")({
+ * export const Route = createFileRoute("/$owner/$project/blob/$rev/$")({
  *   staticData: { rail: CodeRail },
  * });
  * ```

@@ -140,6 +140,9 @@ const elsewhere = {
   NotSensitive: {
     todo: "Only an `@sensitive` item holds a write-only value: `next` shows which items are.",
   },
+  NotYourNamespace: {
+    todo: "Make the project in your own namespace: `next` names it with your handle.",
+  },
   PostureChange: {
     todo: "A decider declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions.",
   },

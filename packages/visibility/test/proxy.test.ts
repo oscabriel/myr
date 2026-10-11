@@ -88,7 +88,7 @@ describe("the outbound map", () => {
           at: LandedSha.make("b2".repeat(20)),
           file,
           parsed,
-          project: ProjectName.make("datekit"),
+          project: ProjectName.make("oscabriel/datekit"),
         });
 
         expect(proxyMap(shown)).toStrictEqual(proxyMap(datekit));

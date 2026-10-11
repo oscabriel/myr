@@ -29,7 +29,7 @@ const carol = Handle.make("carol");
 const landing = formatLanding({
   ask: {
     ask: AskId.make("week-at-year-end"),
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
   },
   assisted: [{ harness: "claude-code", model: "opus-4", verified: true }],
   body: "The ISO week of December 31 was one too high.\nNow it rolls over.",
@@ -143,7 +143,7 @@ describe("landing trailers", () => {
           { key: "Signed-off-by", value: `bob <bob@users.${Brand.domain}>` },
           { key: "Decided-by", value: `carol <carol@users.${Brand.domain}>` },
           { key: "Assisted-by", value: "claude-code:opus-4 (verified)" },
-          { key: "Ask", value: "datekit/week-at-year-end" },
+          { key: "Ask", value: "oscabriel/datekit/week-at-year-end" },
         ];
 
         expect(yield* gitTrailers(landing)).toStrictEqual(expected);

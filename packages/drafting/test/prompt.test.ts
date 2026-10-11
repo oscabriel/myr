@@ -61,7 +61,7 @@ const firstInput = (attempt: number): DraftInput => ({
       },
     ],
     policy: policyDigest(policy, Option.some("test/asks")),
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
   },
   want: "Parse ISO week dates.",
 });

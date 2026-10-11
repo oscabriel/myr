@@ -27,11 +27,15 @@ import { noProjects, origin, served } from "./harness.ts";
 const webUrl = "https://web-test.example.workers.dev";
 
 const projects: readonly ProjectListing[] = [
-  { openAsks: 3, posture: "open", project: ProjectName.make("datekit") },
+  {
+    openAsks: 3,
+    posture: "open",
+    project: ProjectName.make("alice/datekit"),
+  },
   {
     openAsks: 1,
     posture: "openWithSealedEvidence",
-    project: ProjectName.make("burrow"),
+    project: ProjectName.make("alice/burrow"),
   },
 ];
 
@@ -45,7 +49,7 @@ const datekitSealed = Layer.succeed(
   Projects.of({
     create: () => Effect.die("the home page makes no project"),
     get: (project) =>
-      project === "datekit"
+      project === "alice/datekit"
         ? Effect.succeed(
             untouchable<ProjectApi>("ProjectApi", {
               standing: () =>
@@ -117,8 +121,8 @@ describe("the platform's /", () => {
       expect(text).toContain(`<h1>${Brand.name}</h1>`);
 
       for (const named of [
-        `git clone ${origin}/datekit.git`,
-        `git clone ${origin}/burrow.git`,
+        `git clone ${origin}/alice/datekit.git`,
+        `git clone ${origin}/alice/burrow.git`,
         `curl -fsSL ${origin}/install.sh | sh`,
         `${origin}/releases/manifest.json`,
         `${origin}/mcp`,
@@ -220,19 +224,19 @@ describe("the platform's /", () => {
               {
                 openAsks: 3,
                 posture: "openWithSealedEvidence",
-                project: ProjectName.make("datekit"),
+                project: ProjectName.make("alice/datekit"),
               },
               {
                 openAsks: 1,
                 posture: "openWithSealedEvidence",
-                project: ProjectName.make("burrow"),
+                project: ProjectName.make("alice/burrow"),
               },
             ],
             webUrl,
           })
         );
         expect(text).toContain(
-          `- [datekit](${webUrl}/datekit/llms.txt): Open with sealed evidence, 3 open asks.`
+          `- [alice/datekit](${webUrl}/alice/datekit/llms.txt): Open with sealed evidence, 3 open asks.`
         );
       })
   );
@@ -248,7 +252,7 @@ describe("the platform's /", () => {
           Projects.of({
             create: () => Effect.die("the home page makes no project"),
             get: (project) =>
-              project === "datekit"
+              project === "alice/datekit"
                 ? Effect.succeed(
                     untouchable<ProjectApi>("ProjectApi", {
                       standing: () =>
@@ -286,7 +290,7 @@ describe("the platform's /", () => {
           const text = yield* Effect.promise(() => response.text());
 
           expect(text).toContain(
-            `- [datekit](${webUrl}/datekit/llms.txt): Open with sealed evidence, 3 open asks.`
+            `- [alice/datekit](${webUrl}/alice/datekit/llms.txt): Open with sealed evidence, 3 open asks.`
           );
         }
 
@@ -348,7 +352,7 @@ describe("the platform's /", () => {
       });
 
       expect(status).toBe(200);
-      expect(text).toContain(`git clone ${origin}/datekit.git`);
+      expect(text).toContain(`git clone ${origin}/alice/datekit.git`);
     })
   );
 

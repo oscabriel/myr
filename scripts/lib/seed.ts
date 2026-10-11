@@ -29,9 +29,11 @@ import { Client, Contracts } from "@repo/protocol/contracts";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { LayerManifest } from "@repo/protocol/domain/visibility";
 import {
+  addressOfRepo,
   AskId,
   CommitSha,
   Handle,
+  keyOf,
   LayerName,
   ProjectName,
   RepoName,
@@ -387,9 +389,9 @@ const knownBadOf = (input: {
     })
   );
 
-/** A layer's repo in the private namespace: `<project>--<layer>`. */
+/** A layer's repo in the private namespace: `<project's key>--<layer>`. */
 const layerRepo = (project: ProjectName, layer: LayerName) =>
-  RepoName.make(`${project}--${layer}`);
+  RepoName.make(`${keyOf(project)}--${layer}`);
 
 const decodeManifest = Schema.decodeEffect(
   Schema.fromJsonString(LayerManifest)
@@ -1073,8 +1075,12 @@ export const platformTarget = (
       const path = yield* Path.Path;
       const { origin } = platform;
 
+      // A repo is reached at its project's name, its fork's or layer's
+      // parts after it (`oscabriel/datekit--maintainers`).
       const remoteOf = (repo: ProjectName | RepoName) =>
-        `${origin}/${repo}.git`;
+        repo.includes("/")
+          ? `${origin}/${repo}.git`
+          : `${origin}/${Option.getOrElse(addressOfRepo(RepoName.make(repo)), () => repo)}.git`;
 
       const tokenOf = (handle: Handle) =>
         Option.fromNullishOr(
@@ -1263,8 +1269,12 @@ const decodeServing = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ origin: Schema.String }))
 );
 
-/** The world's operator: a session of the world's own. */
-export const worldOperator = Handle.make("operator");
+/**
+ * The world's operator: a session of the world's own, under the handle the
+ * stages' operator has (`OPERATOR_HANDLE`), so the examples are made in the
+ * namespace they have on a stage (`oscabriel/datekit`).
+ */
+export const worldOperator = Handle.make("oscabriel");
 
 /** A token for `handle` in a world on this machine: no secret, never leaves it. */
 const worldToken = (handle: Handle) =>

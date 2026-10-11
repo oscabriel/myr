@@ -5,7 +5,8 @@
  * reuses, and its stub's `call` runs on the context the namespace was made
  * in, so each shell lives in that scope.
  */
-import { ProjectName } from "@repo/protocol/ids";
+import { nameOfKey, ProjectKey } from "@repo/protocol/ids";
+import type { ProjectName } from "@repo/protocol/ids";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Effect, Option, SynchronizedRef } from "effect";
 
@@ -29,7 +30,7 @@ export const inProcessNamespace = <R>(
         Option.match(Option.fromUndefinedOr(all.get(name)), {
           onNone: () =>
             Effect.map(
-              shellFor(ProjectName.make(name)),
+              shellFor(Option.getOrThrow(nameOfKey(ProjectKey.make(name)))),
               (shell) => [shell, new Map(all).set(name, shell)] as const
             ),
           onSome: (shell) => Effect.succeed([shell, all] as const),

@@ -188,7 +188,7 @@ export const platformTarget = (input: {
           runCommand(spawner, {
             argv: ["git", "ls-remote", `${input.origin}/${project}.git`],
           }).pipe(Effect.map(countsOf)),
-        initProject: ({ branch, project, url }) =>
+        initProject: ({ branch, name: project, url }) =>
           initUntilAnswered(
             client.initProject({ import: { branch, url }, project }),
             isRefusal
@@ -419,15 +419,15 @@ export const restBackfill = (
       );
 
       return TagBackfill.of({
-        backfill: ({ project, url }) =>
+        backfill: ({ key, name: project, url }) =>
           Effect.scoped(
             Effect.gen(function* () {
-              const name = RepoName.make(project);
+              // The repo is named by the key the project was imported under.
+              const name = RepoName.make(key);
 
-              const notFound = () =>
-                failed(
-                  `${project} has no repo in ${resources(stage).projects}`
-                );
+              const notFound = failed(
+                `${project} has no repo in ${resources(stage).projects}`
+              );
 
               const dir = yield* fs
                 .makeTempDirectoryScoped({ prefix: "import-tags-" })
@@ -435,15 +435,15 @@ export const restBackfill = (
                   Effect.mapError(() => failed("can't make a temporary folder"))
                 );
 
-              const mirror = `${dir}/${project}.git`;
+              const mirror = `${dir}/${key}.git`;
 
               const remote = yield* host
                 .remote(name)
-                .pipe(Effect.mapError(notFound));
+                .pipe(Effect.mapError(() => notFound));
 
               const minted = yield* host
                 .mintToken(name, "write", TOKEN_TTL)
-                .pipe(Effect.mapError(notFound));
+                .pipe(Effect.mapError(() => notFound));
 
               const pushed = Effect.gen(function* () {
                 yield* Effect.forEach(

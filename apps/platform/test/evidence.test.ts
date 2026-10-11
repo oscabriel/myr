@@ -22,6 +22,7 @@ import {
   ProjectName,
   RepoPath,
   RequestId,
+  keyOf,
   TreeSha,
 } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
@@ -38,7 +39,7 @@ import { fakeEnv } from "./fake-env.ts";
 import { coreLoopWorld } from "./world.ts";
 import type { Someone } from "./world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("dora/datekit");
 
 const parseIso = AskId.make("parse-iso");
 
@@ -61,7 +62,7 @@ const start = {
   ].join("\n"),
   [`${Brand.configDir}/vouched.td`]: "alice\nbob\n",
   "README.md": "datekit: dates, parsed\n",
-  "package.json": '{ "name": "datekit", "private": true }\n',
+  "package.json": '{ "name": "dora/datekit", "private": true }\n',
   "src/parse.ts":
     "export const parse = (iso: string) => ({ month: 0, year: 0 });\n",
 };
@@ -251,7 +252,7 @@ describe("a failing lane's log, through the platform", () => {
         // The fake env's EVIDENCE throws when touched: the store reached it.
         expect(
           Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "it kept the log"
-        ).toContain("could not put datekit/req-fix-0001/unit#1");
+        ).toContain("could not put dora__datekit/req-fix-0001/unit#1");
       })
   );
 
@@ -266,7 +267,7 @@ describe("a failing lane's log, through the platform", () => {
           outcome: verdict?.outcome,
         }).toStrictEqual({
           kept: {
-            customMetadata: { lane: "unit", project: "datekit" },
+            customMetadata: { lane: "unit", project: "dora/datekit" },
             text: unitLog,
           },
           outcome: Outcome.cases.Refused.make({
@@ -293,11 +294,15 @@ describe("a failing lane's log, through the platform", () => {
         // nobody made, both read as that project unknown.
         yield* world
           .rpc("bob")
-          .initProject({ project: ProjectName.make("burrow") });
+          .initProject({ project: ProjectName.make("bob/burrow") });
 
+        // A log's name carries its project's key (ADR 0032).
         const elsewhere = (other: string) => ({
           project,
-          ref: logRef.replace(`${project}/`, `${other}/`),
+          ref: logRef.replace(
+            `${keyOf(project)}/`,
+            `${keyOf(ProjectName.make(other))}/`
+          ),
         });
 
         const read = {
@@ -306,11 +311,11 @@ describe("a failing lane's log, through the platform", () => {
           bob: yield* asked("bob"),
           dora: yield* asked("dora"),
           ghost: yield* asked("dora", {
-            project: ProjectName.make("ghost"),
-            ref: logRef.replace(`${project}/`, "ghost/"),
+            project: ProjectName.make("alice/ghost"),
+            ref: logRef.replace(`${keyOf(project)}/`, "alice__ghost/"),
           }),
-          inBurrow: yield* asked("dora", elsewhere("burrow")),
-          inGhost: yield* asked("dora", elsewhere("ghost")),
+          inBurrow: yield* asked("dora", elsewhere("bob/burrow")),
+          inGhost: yield* asked("dora", elsewhere("alice/ghost")),
         };
 
         const whole = { lane: unit, text: unitLog, truncated: false };
@@ -321,13 +326,15 @@ describe("a failing lane's log, through the platform", () => {
           bob: Exit.fail(new NotDecider({})),
           dora: Exit.succeed(whole),
           ghost: Exit.fail(
-            new UnknownProject({ project: ProjectName.make("ghost") })
+            new UnknownProject({ project: ProjectName.make("alice/ghost") })
           ),
           inBurrow: Exit.fail(
-            new UnknownProject({ project: ProjectName.make("burrow") })
+            new UnknownProject({
+              project: ProjectName.make("bob/burrow"),
+            })
           ),
           inGhost: Exit.fail(
-            new UnknownProject({ project: ProjectName.make("ghost") })
+            new UnknownProject({ project: ProjectName.make("alice/ghost") })
           ),
         });
 

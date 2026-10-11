@@ -64,9 +64,9 @@ const request = Request.make({
   assisted: [],
   base: CommitSha.make(hex(0xba_5e)),
   credits: [{ handle: alice, role: "Asked-by" }],
-  fork: RepoName.make("datekit--parse-dates--bob"),
+  fork: RepoName.make("alice__datekit--parse-dates--bob"),
   head: CommitSha.make(hex(0x4e_ad)),
-  project: ProjectName.make("datekit"),
+  project: ProjectName.make("alice/datekit"),
   requestId: RequestId.make("push-4ead"),
 });
 

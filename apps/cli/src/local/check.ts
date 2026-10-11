@@ -39,6 +39,8 @@ import {
   LandedSha,
   ProjectName,
   RepoName,
+  addressOfRepo,
+  keyOf,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import {
@@ -190,7 +192,7 @@ const subjectOf = (
 
     if (Option.isNone(project)) {
       return yield* stop(
-        "No project: this repo has no remote on the platform. Name it with --project <name>."
+        "No project: this repo has no remote on the platform. Name it with --project <owner>/<name>."
       );
     }
 
@@ -287,6 +289,7 @@ const syntheticClaim = (input: {
 }) =>
   Effect.map(DateTime.now, (now): ClaimView => {
     const { ask, claimant, fork, policy } = input;
+    const address = Option.getOrElse(addressOfRepo(fork), () => fork);
 
     return {
       ask: ask.id,
@@ -300,9 +303,10 @@ const syntheticClaim = (input: {
       ),
       openedAt: now,
       project: ask.project,
+      // The fork's address: the project's name, then the fork's parts.
       remote: Option.match(input.origin, {
-        onNone: () => `${fork}.git`,
-        onSome: (origin) => `${origin}/${fork}.git`,
+        onNone: () => `${address}.git`,
+        onSome: (origin) => `${origin}/${address}.git`,
       }),
       state: "live",
       warnsAt: DateTime.addDuration(
@@ -664,9 +668,9 @@ export const check = Command.make(
         return yield* refuse(json, [new UnknownAsk({ ask: askId })]);
       }
 
-      // The claim's fork, named as the platform names it.
+      // The claim's fork, named as the platform names it: by the project's key.
       const fork = RepoName.make(
-        `${project}--${askId}--${handle.toLowerCase()}`
+        `${keyOf(project)}--${askId}--${handle.toLowerCase()}`
       );
 
       const facts = yield* localFacts({

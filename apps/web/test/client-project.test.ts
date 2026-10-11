@@ -17,7 +17,7 @@ import { familyEventsAtom, projectsKey } from "../src/client/project.ts";
 import { ContractsClient } from "../src/surfaces.ts";
 import { datekit, registryAs, seededWorld, settled } from "./dev-browser.ts";
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 describe("a project's page, through the web's atoms", seededWorld, () => {
   it.live("lists a project's asks", () =>
@@ -77,7 +77,7 @@ describe(
 
           const read = registry.get(familyEventsAtom(key));
 
-          expect(key).toBe("burrow datekit");
+          expect(key).toBe("oscabriel/burrow oscabriel/datekit");
           expect([...read.keys()]).toStrictEqual([burrow, datekit]);
           expect(read.get(datekit)?.length).toBeGreaterThan(0);
         })

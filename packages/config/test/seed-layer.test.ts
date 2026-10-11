@@ -34,7 +34,7 @@ import {
   LedgerEntry,
   VisibilityPolicy,
 } from "../../protocol/src/domain/visibility.ts";
-import { Handle, RepoName } from "../../protocol/src/ids.ts";
+import { Handle, keyOf, RepoName } from "../../protocol/src/ids.ts";
 import { repoRoot } from "./root.ts";
 
 /** The config folder's name, from the brand. */
@@ -486,18 +486,18 @@ describe("runSeed, for a project with a layer", () => {
       Effect.gen(function* () {
         const plan = yield* planSeed(example);
         const layer = yield* Effect.fromNullishOr(plan.layers[0]);
-        const project = RepoName.make(plan.project);
+        const project = RepoName.make(keyOf(plan.project));
 
         const story = Effect.gen(function* () {
           const target = yield* SeedTarget;
           const first = yield* runSeed(plan);
 
           expect(first.map(stepLine)).toStrictEqual([
-            "Init datekit: done",
-            "Push datekit: done",
-            "OpenAsk datekit/add-months-clamp: done",
-            "OpenAsk datekit/format-ordinal: done",
-            "OpenAsk datekit/parse-iso-week: done",
+            "Init oscabriel/datekit: done",
+            "Push oscabriel/datekit: done",
+            "OpenAsk oscabriel/datekit/add-months-clamp: done",
+            "OpenAsk oscabriel/datekit/format-ordinal: done",
+            "OpenAsk oscabriel/datekit/parse-iso-week: done",
             "Layer datekit--maintainers: done",
           ]);
 

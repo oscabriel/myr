@@ -89,7 +89,7 @@ export const verdictOn = (input: {
     lanes: [],
     outcome: Outcome.cases.Checking.make({ stage: "checks" }),
     patchId: PatchId.make("2".repeat(64)),
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
     stage: "checks",
     tree: input.tree,
     verifier: "platform",

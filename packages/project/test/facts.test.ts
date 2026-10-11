@@ -22,6 +22,7 @@ import {
   LaneName,
   ProjectName,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -36,9 +37,9 @@ import { evaluationFacts } from "../src/facts.ts";
 import { projectService } from "../src/project.ts";
 import { CheckScript, composedAt, Pusher, worldOf } from "./world.ts";
 
-const project = ProjectName.make("kit");
+const project = ProjectName.make("alice/kit");
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 /**
  * A tree whose judge reaches past the root and the CI folders: lefthook
@@ -192,7 +193,7 @@ const scenario = aProject({ people: ["bob"] }).pipe(
   withAsk({ id: "parse-iso", territory: "packages/parser" })
 );
 
-const gatedRepo = RepoName.make(scenario.project);
+const gatedRepo = RepoName.make(keyOf(scenario.project));
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -205,7 +206,7 @@ const bob = Person.make({
 });
 
 const bobFork = RepoName.make(
-  `${scenario.project}--${parseIso}--${bob.handle}`
+  `${keyOf(scenario.project)}--${parseIso}--${bob.handle}`
 );
 
 const ask = Option.getOrThrow(
@@ -228,7 +229,10 @@ const askFiles = Array.make(
  * or in a CI folder, and runs a script outside both.
  */
 const hooked: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/package.json", '{ "name": "parser" }\n'],
   ["packages/parser/src/parse.ts", "export const parse = (s) => 0;\n"],
   [

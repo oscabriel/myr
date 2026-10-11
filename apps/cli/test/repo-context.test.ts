@@ -13,7 +13,7 @@ import {
   repoContext,
 } from "../src/repo-context.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const platform = "https://platform-dev.example.workers.dev";
 
@@ -21,6 +21,20 @@ describe("a repo's name", () => {
   it("names a project's canonical repo", () => {
     expect(parseRepoName("datekit")).toStrictEqual(
       Option.some({ kind: "canonical", project })
+    );
+  });
+
+  it("reads a project's name of two or three segments, in lowercase", () => {
+    expect(parseRepoName("Oscabriel/Datekit")).toStrictEqual(
+      Option.some({ kind: "canonical", project })
+    );
+    expect(parseRepoName("github.com/pallets/click--fix--alice")).toStrictEqual(
+      Option.some({
+        ask: AskId.make("fix"),
+        handle: Handle.make("alice"),
+        kind: "claim",
+        project: ProjectName.make("github.com/pallets/click"),
+      })
     );
   });
 
@@ -53,7 +67,6 @@ describe("a repo's name", () => {
 
   it.each([
     "",
-    "Datekit",
     "datekit--fix-week--Alice",
     "datekit--fix-week--alice--again",
     "datekit--me--",
@@ -78,9 +91,15 @@ describe("a remote's url", () => {
     ).toStrictEqual(Option.some({ origin: platform, repo: "datekit" }));
   });
 
+  it("reads a project's name of two or three segments", () => {
+    expect(parseRemote("https://github.com/owner/datekit.git")).toStrictEqual(
+      Option.some({ origin: "https://github.com", repo: "owner/datekit" })
+    );
+  });
+
   it.each([
     "git@github.com:owner/datekit.git",
-    "https://github.com/owner/datekit.git",
+    "https://platform.example/a/b/c/d.git",
     "file:///srv/datekit.git",
     "not a url",
   ])("is no platform remote: %j", (url) => {

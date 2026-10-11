@@ -60,7 +60,7 @@ import { Contracts } from "@repo/protocol/contracts";
 import type { Client } from "@repo/protocol/contracts";
 import type { LaneOutcome, LaneResult } from "@repo/protocol/domain/answer";
 import type { ConfigFile } from "@repo/protocol/domain/common";
-import { CommitSha, LandedSha, RepoName } from "@repo/protocol/ids";
+import { CommitSha, keyOf, LandedSha, RepoName } from "@repo/protocol/ids";
 import type { LaneName, ProjectName } from "@repo/protocol/ids";
 import { RulesEvaluatorBun } from "@repo/rules/rules-evaluator/bun";
 import { git, gitOk } from "@repo/testkit/git";
@@ -650,7 +650,7 @@ export const coreLoopWorld = (
     return {
       composed: (project, files) =>
         Effect.gen(function* () {
-          const repo = RepoName.make(project);
+          const repo = RepoName.make(keyOf(project));
           const refs = yield* Context.get(base, RepoHost).refs(repo);
 
           const main = yield* Effect.fromNullishOr(

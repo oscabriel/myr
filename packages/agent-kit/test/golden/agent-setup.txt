@@ -132,5 +132,5 @@ Every refusal the platform gives, by group. Each one's row in https://web-test.e
 - Maintainers only: `LayerContentInPublicTree`, `SecretInOutput` and `UnstatedRequirement`
 - Decision: `PostureChange`, `NotDecider`, `DecisionClosed`, `ProposalClosed` and `DraftInProgress`
 - Lookup: `UnknownProject`, `UnknownAsk`, `UnknownCommit`, `UnknownDecision`, `UnknownPath`, `UnknownRevision` and `UnknownProposal`
-- Setup: `ProjectExists` and `ImportFailed`
+- Setup: `ProjectExists`, `NotYourNamespace` and `ImportFailed`
 - Env: `UnknownEnvItem`, `NotSensitive` and `ValueTooShort`

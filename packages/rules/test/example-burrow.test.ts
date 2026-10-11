@@ -135,7 +135,7 @@ const readBurrow = () =>
       ci: files,
       initializer: "okafor",
       now,
-      project: "burrow",
+      project: "oscabriel/burrow",
       seed: 508,
       vouchFile: yield* fs.readFileString(
         path.join(root, folder, "vouched.td")
@@ -215,7 +215,7 @@ const dropLegacyFetch = {
   kind: "migrate",
   openedAt: now,
   openedIn: at,
-  project: "burrow",
+  project: "oscabriel/burrow",
   state: "open",
   territory: { module: ".", paths: ["packages/**"] },
 };

@@ -4,7 +4,7 @@ import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { InitProject } from "@repo/protocol/contracts";
 import { Envelope } from "@repo/protocol/envelope";
-import { LandedSha, ProjectName } from "@repo/protocol/ids";
+import { Handle, LandedSha, ProjectName } from "@repo/protocol/ids";
 import { ProjectExists } from "@repo/protocol/refusal";
 import type { ImportFailed } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
@@ -17,6 +17,7 @@ import {
   Layer,
   Option,
   Path,
+  Redacted,
   Ref,
   Runtime,
   Schema,
@@ -26,10 +27,22 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { RpcTest } from "effect/rpc";
 import { TestConsole } from "effect/testing";
 
+import { Credentials } from "../../src/credentials.ts";
 import { projectFile } from "../../src/local/project-file.ts";
 import { program } from "../../src/main.ts";
 import { OutputPlain } from "../../src/output.ts";
 import { SignedOut } from "../signed-out.ts";
+
+/** Credentials for a run signed in as `handle`, whose profile `login` wrote. */
+const signedInAs = (handle: string) =>
+  Layer.mock(Credentials)({
+    current: Effect.succeedSome({
+      handle: Handle.make(handle),
+      token: Redacted.make("a-token-0123456789"),
+      url: "https://platform.example.test",
+    }),
+    forHost: () => Effect.succeedNone,
+  });
 
 const CONFIG = `${Brand.configDir}/project.ts`;
 
@@ -99,7 +112,7 @@ const aMachine = Effect.gen(function* () {
 
   yield* fs.writeFileString(
     path.join(repo, "package.json"),
-    JSON.stringify({ name: "demo", scripts }, null, 2)
+    JSON.stringify({ name: "oscabriel/demo", scripts }, null, 2)
   );
 
   yield* fs.makeDirectory(path.join(repo, ".github", "workflows"), {
@@ -188,7 +201,8 @@ const exitCodeOf = (exit: Exit.Exit<unknown, unknown>) =>
 const cli = (
   machine: Machine,
   platform: Layer.Layer<Client>,
-  argv: readonly string[]
+  argv: readonly string[],
+  credentials: Layer.Layer<Credentials> = SignedOut
 ) =>
   Effect.gen(function* () {
     const exit = yield* Effect.exit(program(argv));
@@ -208,7 +222,7 @@ const cli = (
         CliOutput.layer(CliOutput.defaultFormatter({ colors: false })),
         OutputPlain,
         platform,
-        SignedOut,
+        credentials,
         startedIn(machine)
       )
     )
@@ -255,7 +269,10 @@ const state = (machine: Machine) =>
 
 /** The platform made the project `demo`, served at the machine's bare repo. */
 const created = (machine: Machine) =>
-  Effect.succeed({ project: ProjectName.make("demo"), remote: machine.remote });
+  Effect.succeed({
+    project: ProjectName.make("oscabriel/demo"),
+    remote: machine.remote,
+  });
 
 describe(`${Brand.cli} init in an existing repo`, () => {
   it.live(
@@ -276,7 +293,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
           "--json",
         ]);
@@ -286,14 +303,16 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           command: "init",
           data: {
             files: [CONFIG],
-            project: "demo",
+            project: "oscabriel/demo",
             pushed: true,
             remote: machine.remote,
           },
           ok: true,
           v: 1,
         });
-        expect(yield* platform.calls).toStrictEqual([{ project: "demo" }]);
+        expect(yield* platform.calls).toStrictEqual([
+          { project: "oscabriel/demo" },
+        ]);
 
         const after = yield* state(machine);
 
@@ -340,7 +359,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
         ]);
 
         expect(ran.code).toBe(2);
@@ -365,7 +384,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--dry-run",
           "--json",
         ]);
@@ -432,7 +451,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
             ],
             ["git", "push", Brand.slug, "HEAD:main"],
           ],
-          payload: { project: "demo" },
+          payload: { project: "oscabriel/demo" },
         });
         expect({
           calls: yield* platform.calls,
@@ -462,7 +481,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
           "--json",
         ]);
@@ -477,7 +496,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           command: "init",
           data: {
             files: [],
-            project: "demo",
+            project: "oscabriel/demo",
             pushed: true,
             remote: machine.remote,
           },
@@ -519,7 +538,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
           "--json",
         ]);
@@ -529,7 +548,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           command: "init",
           data: {
             files: [CONFIG],
-            project: "demo",
+            project: "oscabriel/demo",
             pushed: true,
             remote: machine.remote,
           },
@@ -558,24 +577,28 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const machine = yield* aMachine;
 
         const platform = yield* aPlatform(
-          Effect.fail(new ProjectExists({ project: ProjectName.make("demo") }))
+          Effect.fail(
+            new ProjectExists({ project: ProjectName.make("oscabriel/demo") })
+          )
         );
 
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
         ]);
 
         expect(ran.code).toBe(65);
         expect(
           ran.err.filter((line) =>
-            line.includes("a project named demo already exists")
+            line.includes("a project named oscabriel/demo already exists")
           )
         ).toHaveLength(1);
         expect(ran.out).toStrictEqual([]);
-        expect(yield* platform.calls).toStrictEqual([{ project: "demo" }]);
+        expect(yield* platform.calls).toStrictEqual([
+          { project: "oscabriel/demo" },
+        ]);
 
         const after = yield* state(machine);
 
@@ -596,13 +619,16 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const gateway = `${platformUrl}/demo.git`;
 
         const platform = yield* aPlatform(
-          Effect.succeed({ project: ProjectName.make("demo"), remote: gateway })
+          Effect.succeed({
+            project: ProjectName.make("oscabriel/demo"),
+            remote: gateway,
+          })
         );
 
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
           "--no-push",
           "--json",
@@ -613,7 +639,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           command: "init",
           data: {
             files: [CONFIG],
-            project: "demo",
+            project: "oscabriel/demo",
             pushed: false,
             remote: gateway,
           },
@@ -672,7 +698,7 @@ describe(`${Brand.cli} init --import`, () => {
         const platform = yield* aPlatform(
           Effect.succeed({
             landed,
-            project: ProjectName.make("widgets"),
+            project: ProjectName.make("oscabriel/widgets"),
             remote: gateway,
           })
         );
@@ -681,6 +707,8 @@ describe(`${Brand.cli} init --import`, () => {
           "init",
           "--import",
           url,
+          "--project",
+          "oscabriel/widgets",
           "--branch",
           "trunk",
           "--yes",
@@ -689,7 +717,7 @@ describe(`${Brand.cli} init --import`, () => {
 
         expect(ran.code).toBe(0);
         expect(yield* platform.calls).toStrictEqual([
-          { import: { branch: "trunk", url }, project: "widgets" },
+          { import: { branch: "trunk", url }, project: "oscabriel/widgets" },
         ]);
         expect(yield* envelopeOf(ran.out)).toStrictEqual({
           command: "init",
@@ -697,7 +725,7 @@ describe(`${Brand.cli} init --import`, () => {
             clone: `git clone ${gateway}`,
             files: [],
             landed,
-            project: "widgets",
+            project: "oscabriel/widgets",
             pushed: false,
             remote: gateway,
           },
@@ -727,7 +755,7 @@ describe(`${Brand.cli} init --import`, () => {
 
         const platform = yield* aPlatform(
           Effect.succeed({
-            project: ProjectName.make("widgets"),
+            project: ProjectName.make("oscabriel/widgets"),
             remote: gateway,
           })
         );
@@ -736,6 +764,8 @@ describe(`${Brand.cli} init --import`, () => {
           "init",
           "--import",
           "https://example.test/acme/widgets.git",
+          "--project",
+          "oscabriel/widgets",
           "--yes",
         ]);
 
@@ -762,6 +792,8 @@ describe(`${Brand.cli} init --import`, () => {
           "widgets",
           "--import",
           url,
+          "--project",
+          "oscabriel/widgets",
           "--yes",
         ]);
 
@@ -805,6 +837,98 @@ describe(`${Brand.cli} init --import`, () => {
           lines: ran.err.filter((line) => line.includes(names)).length,
           state: yield* state(machine),
         }).toStrictEqual({ calls: [], code: 2, lines: 1, state: before });
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+    { timeout: 30_000 }
+  );
+});
+
+const decodeCalls = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ project: Schema.String }))
+);
+
+/** The project `init --import <url>` sends with `flags`, signed in as `handle`. */
+const importSends = (handle: string, url: string, flags: readonly string[]) =>
+  Effect.gen(function* () {
+    const machine = yield* aMachine;
+
+    const platform = yield* aPlatform(
+      Effect.succeed({
+        project: ProjectName.make("bob/foo"),
+        remote: "https://platform.example.test/bob/foo.git",
+      })
+    );
+
+    yield* cli(
+      machine,
+      platform.layer,
+      ["init", "--import", url, ...flags, "--yes", "--json"],
+      signedInAs(handle)
+    );
+
+    const calls = yield* decodeCalls(yield* platform.calls);
+
+    return calls.map(({ project }) => project);
+  }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
+
+// A bare word is the person's own, and an import named by nobody takes its
+// source path when its host is one the platform knows.
+describe(`${Brand.cli} init's project name`, () => {
+  it.live(
+    "gives a bare --project the profile's handle, even on an import from a known host",
+    () =>
+      Effect.gen(function* () {
+        const sent = yield* importSends(
+          "Bob",
+          "https://github.com/pallets/click",
+          ["--project", "foo"]
+        );
+
+        expect(sent).toStrictEqual(["bob/foo"]);
+      }),
+    { timeout: 30_000 }
+  );
+
+  it.live(
+    "names an import from a known host by its source path, and any other by the handle",
+    () =>
+      Effect.gen(function* () {
+        const known = yield* importSends(
+          "bob",
+          "https://github.com/Pallets/click.git",
+          []
+        );
+
+        const other = yield* importSends(
+          "bob",
+          "https://example.test/acme/widgets.git",
+          []
+        );
+
+        expect(known).toStrictEqual(["github.com/pallets/click"]);
+        expect(other).toStrictEqual(["bob/widgets"]);
+      }),
+    { timeout: 30_000 }
+  );
+
+  it.live(
+    "refuses a bare --project with no handle known, a usage error naming the full form",
+    () =>
+      Effect.gen(function* () {
+        const machine = yield* aMachine;
+        const platform = yield* aPlatform(created(machine));
+
+        const ran = yield* cli(machine, platform.layer, [
+          "init",
+          "--import",
+          "https://github.com/pallets/click",
+          "--project",
+          "foo",
+          "--yes",
+        ]);
+
+        expect(ran.code).toBe(2);
+        expect(ran.err.join("\n")).toContain("<owner>/<name>");
+        expect(yield* platform.calls).toStrictEqual([]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     { timeout: 30_000 }
   );

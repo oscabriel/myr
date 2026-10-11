@@ -1,9 +1,9 @@
-import { ProjectName } from "@repo/protocol/ids";
+import { nameOfKey, ProjectKey } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { fakeArtifactsBinding } from "@repo/testkit/fake-artifacts-binding";
 import type { HostLike } from "@repo/testkit/fake-artifacts-binding";
 import { untouchable } from "@repo/testkit/untouchable";
-import { Exit, Schema } from "effect";
+import { Exit, Option, Schema } from "effect";
 
 import type { ProjectStub } from "../src/adapters/do-projects.ts";
 import { CallRequest, ProjectCalls } from "../src/project-calls.ts";
@@ -91,7 +91,11 @@ const answer = (
     return ProjectCalls[method].refusesUnmade
       ? replyOf(
           method,
-          Exit.fail(new UnknownProject({ project: ProjectName.make(project) }))
+          Exit.fail(
+            new UnknownProject({
+              project: Option.getOrThrow(nameOfKey(ProjectKey.make(project))),
+            })
+          )
         )
       : replyOf(method, Exit.die(`no project ${project} to call ${method} on`));
   }

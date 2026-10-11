@@ -71,7 +71,7 @@ const askOf = (id: string) =>
     kind: "fix",
     openedAt: at(0),
     openedIn: sha(1),
-    project: "datekit",
+    project: "alice/datekit",
     state: "open",
     territory: { module: "core", paths: ["packages/core/**"] },
   }) satisfies (typeof AskRow)["Encoded"];
@@ -82,7 +82,7 @@ const project = {
   landed: sha(1),
   policy: { budget: { decisionsPerDay: 5 } },
   policyAt: sha(1),
-  project: "datekit",
+  project: "alice/datekit",
   state: "live",
 } satisfies (typeof ProjectRow)["Encoded"];
 
@@ -121,7 +121,7 @@ const queue = { active: "req-00000001", order: ["req-00000001"] };
 const outboxOf = (id: string) =>
   ({
     attempts: 0,
-    body: { fork: "datekit--empty-date--bob" },
+    body: { fork: "alice__datekit--empty-date--bob" },
     id,
     kind: "makeFork",
     notBefore: at(1),
@@ -138,7 +138,7 @@ const landingOf = (n: number) =>
     credits: [{ handle: "alice", role: "Asked-by" }],
     landedAt: at(n),
     parent: sha(n),
-    project: "datekit",
+    project: "alice/datekit",
     sha: sha(n + 1),
   }) satisfies (typeof LandingRow)["Encoded"];
 
@@ -147,7 +147,7 @@ const proposal = {
   files: ["asks/time-zones.ask.ts"],
   id: "prop-000001",
   openedAt: at(3),
-  project: "datekit",
+  project: "alice/datekit",
   proposer: "carol",
   state: "open",
   want: "Dates keep their time zone when formatted",
@@ -160,7 +160,7 @@ const decision = {
   expiresAt: at(30),
   id: "dec-000001",
   openedAt: at(3),
-  project: "datekit",
+  project: "alice/datekit",
   subject: DecisionSubject.cases.OpenProposal.make({
     proposal: ProposalId.make("prop-000001"),
   }),
@@ -187,7 +187,7 @@ const pushEventOf = (eventId: string) =>
     before: sha(2),
     eventId,
     ref: "refs/heads/main",
-    repo: "datekit--empty-date--bob",
+    repo: "alice__datekit--empty-date--bob",
   }) satisfies (typeof PushEventRow)["Encoded"];
 
 // The visibility tables: a declared layer, attempts on its held-back
@@ -198,7 +198,7 @@ const declared = {
   admittedAt: at(6),
   landedSha: sha(7),
   name: "maintainers",
-  repo: "datekit--maintainers",
+  repo: "alice__datekit--maintainers",
   saltRef: "c2FsdA==",
   suiteRoot: `sha256:${"ab".repeat(32)}`,
 } satisfies (typeof LayerRow)["Encoded"];
@@ -206,7 +206,7 @@ const declared = {
 const proposedLayer = {
   name: "security",
   proposed: sha(8),
-  repo: "datekit--security",
+  repo: "alice__datekit--security",
 } satisfies (typeof LayerRow)["Encoded"];
 
 const attempt = {

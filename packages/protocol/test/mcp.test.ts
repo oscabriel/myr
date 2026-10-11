@@ -21,7 +21,7 @@ import { serve } from "./mcp.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 /** An answer's arguments, as an agent passes them to `submitAnswer`. */
 const answer = { ask, base, head, project, requestId: "answer-0001" };
@@ -342,7 +342,7 @@ describe("the contracts as MCP tools", () => {
 
       const result = yield* mcp.call(
         "tools/call",
-        { arguments: { project: "demo" }, name: "listAsks" },
+        { arguments: { project: "oscabriel/demo" }, name: "listAsks" },
         Schema.Struct({
           isError: Schema.Boolean,
           structuredContent: Schema.Unknown,

@@ -17,7 +17,7 @@ import { RpcTest } from "effect/rpc";
 
 import { readFolderWithReadme } from "../src/server/folder.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const landed = CommitSha.make("a".repeat(40));
 

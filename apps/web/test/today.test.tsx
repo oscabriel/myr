@@ -122,9 +122,9 @@ const sha = (digit: string) => CommitSha.make(digit.repeat(40));
 
 const okonkwo = Handle.make("okonkwo");
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 /** A stray push to datekit's main, expiring in 22 hours: soon. */
 const stray: Decision = {
@@ -252,11 +252,14 @@ describe(TodayView, () => {
 
     expect(links).toStrictEqual([
       [
-        "datekit/dec-000002",
+        "oscabriel/datekit/dec-000002",
         "main moved without a landing, from aaaaaaa to bbbbbbb",
       ],
-      ["datekit/dec-000003", "Vouch for lin-h, so they may claim asks"],
-      ["burrow/dec-000001", "Open the ask proposed in prop-000004"],
+      [
+        "oscabriel/datekit/dec-000003",
+        "Vouch for lin-h, so they may claim asks",
+      ],
+      ["oscabriel/burrow/dec-000001", "Open the ask proposed in prop-000004"],
     ]);
   });
 
@@ -435,10 +438,10 @@ describe(orderDecisions, () => {
     expect(
       orderDecisions(merged).map(({ id, project }) => `${project}/${id}`)
     ).toStrictEqual([
-      "datekit/dec-000002",
-      "datekit/dec-000003",
-      "burrow/dec-000001",
-      "burrow/dec-000002",
+      "oscabriel/datekit/dec-000002",
+      "oscabriel/datekit/dec-000003",
+      "oscabriel/burrow/dec-000001",
+      "oscabriel/burrow/dec-000002",
     ]);
   });
 });
@@ -569,7 +572,7 @@ describe(consequenceOf, () => {
   });
 });
 
-const vellum = ProjectName.make("vellum");
+const vellum = ProjectName.make("oscabriel/vellum");
 
 /** The page the route renders from what `readToday` sent, as the browser decodes it. */
 const pageFrom = (encoded: typeof TodayPageData.Encoded) => {

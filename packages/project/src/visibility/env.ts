@@ -29,7 +29,7 @@ import type { EnvItem, EnvSchemaView } from "@repo/protocol/domain/env";
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { Territory } from "@repo/protocol/domain/territory";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
-import { RepoName, RepoPath, sameHandle } from "@repo/protocol/ids";
+import { keyOf, RepoName, RepoPath, sameHandle } from "@repo/protocol/ids";
 import type {
   DecisionId,
   EnvKey,
@@ -309,7 +309,7 @@ export const ProjectEnvLive: Layer.Layer<
     const viewOf = (key: ReadAt, file: RepoPath) =>
       host
         .readFile(
-          RepoName.make(key.project),
+          RepoName.make(keyOf(key.project)),
           Revision.Commit({ sha: key.at }),
           file
         )

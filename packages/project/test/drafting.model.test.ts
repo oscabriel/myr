@@ -6,7 +6,13 @@ import type { Decision } from "@repo/protocol/domain/decision";
 import { DraftState } from "@repo/protocol/domain/proposal";
 import type { Proposal } from "@repo/protocol/domain/proposal";
 import type { ProposalId } from "@repo/protocol/ids";
-import { LandedSha, LaneName, RepoName, RepoPath } from "@repo/protocol/ids";
+import {
+  keyOf,
+  LandedSha,
+  LaneName,
+  RepoName,
+  RepoPath,
+} from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { NotRedFirst } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
@@ -36,7 +42,7 @@ const scenario = aProject({ people: ["carol", "dave"] }).pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const People = Schema.Literals(["alice", "carol", "dave"]);
 
@@ -54,7 +60,10 @@ const ask = Option.getOrThrow(
 );
 
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
 ];
 

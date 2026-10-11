@@ -27,7 +27,7 @@ import { ask as fixture } from "./ask-fixtures.ts";
 import { attributeOf, tagsWith, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const at = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
@@ -104,7 +104,7 @@ const strip = (props: {
   readonly stamps?: ReadonlySet<AskId>;
 }) =>
   renderAt(
-    "/burrow",
+    "/oscabriel/burrow",
     <FamilyStrip
       expanded={props.expanded}
       finale={finale}
@@ -164,7 +164,7 @@ describe(FamilyStrip, () => {
       const markup = yield* strip({ expanded: false });
 
       for (const child of children) {
-        expect(markup).toContain(`href="/burrow/asks/${child}"`);
+        expect(markup).toContain(`href="/oscabriel/burrow/asks/${child}"`);
       }
     })
   );
@@ -184,7 +184,7 @@ describe(FamilyStrip, () => {
       expect(markup.match(/animate-stamp/gu)).toHaveLength(1);
 
       const node = markup.slice(
-        markup.indexOf(`href="/burrow/asks/${id("burrow-billing")}"`)
+        markup.indexOf(`href="/oscabriel/burrow/asks/${id("burrow-billing")}"`)
       );
 
       expect(node.indexOf("animate-stamp")).toBeLessThan(node.indexOf("</a>"));
@@ -217,7 +217,7 @@ describe(FamilyStrip, () => {
 
           for (const open of ["burrow-notify", "burrow-search"]) {
             expect(markup).toContain(
-              `<code class="sr-only">${Brand.cli} claim ${id(open)} --project burrow</code>`
+              `<code class="sr-only">${Brand.cli} claim ${id(open)} --project oscabriel/burrow</code>`
             );
           }
 
@@ -267,7 +267,7 @@ describe("FamilyStrip, once every child landed", () => {
     Effect.gen(function* () {
       const text = textIn(
         yield* renderAt(
-          "/burrow",
+          "/oscabriel/burrow",
           <FamilyStrip
             expanded={false}
             finale={finale}
@@ -315,7 +315,7 @@ describe(FamilyTree, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/burrow",
+          "/oscabriel/burrow",
           <FamilyTree
             finale={finale}
             parent={parent}
@@ -326,7 +326,7 @@ describe(FamilyTree, () => {
 
         const head = markup.slice(0, markup.indexOf("</a>"));
 
-        expect(head).toContain(`/burrow/asks/${parent.id}`);
+        expect(head).toContain(`/oscabriel/burrow/asks/${parent.id}`);
         expect(head).toContain("lucide-hourglass");
       })
   );
@@ -336,7 +336,7 @@ describe(FamilyTree, () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/burrow",
+          "/oscabriel/burrow",
           <FamilyTree
             current={id("burrow-kit")}
             finale={finale}
@@ -355,7 +355,9 @@ describe(FamilyTree, () => {
         expect(text.indexOf("search")).toBeLessThan(text.indexOf("delete"));
         expect(current).toHaveLength(1);
         expect(attributeOf(current[0] ?? "", "aria-current")).toBe("true");
-        expect(current[0]).toContain(`/burrow/asks/${id("burrow-kit")}`);
+        expect(current[0]).toContain(
+          `/oscabriel/burrow/asks/${id("burrow-kit")}`
+        );
       })
   );
 });

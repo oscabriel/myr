@@ -191,8 +191,11 @@ export const aProject = (
     readonly people?: readonly string[];
   } = {}
 ): Scenario => {
-  const name = options.name ?? "datekit";
   const [first = "alice", ...more] = options.deciders ?? [];
+  // A bare word is the first decider's (`alice/<word>`), who makes the
+  // project in every scenario; a full name is kept as given.
+  const given = options.name ?? "datekit";
+  const name = given.includes("/") ? given : `${first.toLowerCase()}/${given}`;
   const deciders = [first, ...more] as const;
   const landed = LandedSha.make(sha(`${name}:landed`));
 

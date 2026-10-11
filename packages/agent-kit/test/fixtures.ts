@@ -14,7 +14,7 @@ import { Schema } from "effect";
 
 import type { CommandDoc } from "../src/command-doc.ts";
 
-export const project = ProjectName.make("datekit");
+export const project = ProjectName.make("oscabriel/datekit");
 
 export const landed = LandedSha.make("a".repeat(40));
 

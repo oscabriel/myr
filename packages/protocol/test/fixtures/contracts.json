@@ -4,7 +4,7 @@
     "claim": {
       "payload": {
         "ask": "iso-week",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "claim": {
@@ -15,7 +15,7 @@
           "fork": "datekit--iso-week--alice",
           "lapsesAt": "2026-10-08T12:00:00.000Z",
           "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "remote": "https://example.com/git/datekit--iso-week--alice",
           "state": "live",
           "warnsAt": "2026-10-07T14:00:00.000Z"
@@ -31,7 +31,7 @@
           {
             "area": "@datekit/parse",
             "count": 4,
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "role": "Signed-off-by"
           }
         ]
@@ -42,7 +42,7 @@
         "choice": "accept",
         "decision": "dec-000001",
         "note": "Worth it.",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "decision": {
@@ -64,7 +64,7 @@
           "expiresAt": "2026-10-21T12:00:00.000Z",
           "id": "dec-000001",
           "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "subject": {
             "_tag": "OpenProposal",
             "proposal": "prop-000001"
@@ -75,7 +75,7 @@
     "draftAsk": {
       "payload": {
         "note": "The test should use UTC.",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "proposal": "prop-000001"
       },
       "success": {
@@ -84,7 +84,7 @@
           "files": [],
           "id": "prop-000001",
           "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "proposer": "dave",
           "state": "open",
           "territory": "@datekit/parse",
@@ -99,7 +99,7 @@
     },
     "envShape": {
       "payload": {
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "at": "4444444444444444444444444444444444444444",
@@ -117,12 +117,12 @@
             }
           }
         ],
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       }
     },
     "evidence": {
       "payload": {
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "ref": "datekit/push-1111111111111111111111111111111111111111-alice/unit#1"
       },
       "success": {
@@ -136,7 +136,7 @@
         "ask": "iso-week",
         "base": "1111111111111111111111111111111111111111",
         "head": "3333333333333333333333333333333333333333",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "requestId": "finish-0001"
       },
       "success": {
@@ -147,14 +147,14 @@
           "_tag": "Checking",
           "stage": "merge"
         },
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "requestId": "finish-0001"
       }
     },
     "flagAsk": {
       "payload": {
         "ask": "iso-week",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "reason": "The want names a file."
       },
       "success": {
@@ -163,7 +163,7 @@
           "files": ["config/asks/iso-week.ask.ts"],
           "id": "prop-000001",
           "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "proposer": "dave",
           "state": "open",
           "territory": "@datekit/parse",
@@ -174,7 +174,7 @@
     },
     "fork": {
       "payload": {
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "fork": "datekit--me--alice",
@@ -199,7 +199,7 @@
               "want": "An ISO week date parses to the Monday of that week."
             },
             "posture": "open",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "takeable": true
           }
         ]
@@ -211,11 +211,11 @@
           "branch": "trunk",
           "url": "https://example.com/acme/widgets.git"
         },
-        "project": "widgets"
+        "project": "oscabriel/widgets"
       },
       "success": {
         "landed": "4444444444444444444444444444444444444444",
-        "project": "widgets",
+        "project": "oscabriel/widgets",
         "remote": "https://example.com/git/widgets"
       }
     },
@@ -224,7 +224,7 @@
         "base": "1111111111111111111111111111111111111111",
         "head": "3333333333333333333333333333333333333333",
         "message": "Drop the moment shim",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "requestId": "land-00001"
       },
       "success": {
@@ -234,13 +234,13 @@
           "_tag": "Checking",
           "stage": "merge"
         },
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "requestId": "land-00001"
       }
     },
     "landing": {
       "payload": {
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "sha": "4444444444444444444444444444444444444444"
       },
       "success": {
@@ -267,7 +267,7 @@
           "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
           "landedAt": "2026-10-07T12:00:00.000Z",
           "parent": "1111111111111111111111111111111111111111",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "requestId": "push-33333333",
           "sha": "4444444444444444444444444444444444444444",
           "verdict": {
@@ -304,7 +304,7 @@
               "sha": "4444444444444444444444444444444444444444"
             },
             "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "stage": "checks",
             "tree": "5555555555555555555555555555555555555555",
             "verifier": "platform"
@@ -314,7 +314,7 @@
     },
     "ledger": {
       "payload": {
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "entries": [
@@ -329,12 +329,12 @@
         "layers": [],
         "posture": "open",
         "postureLabel": "Open",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       }
     },
     "listAsks": {
       "payload": {
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "asks": [
@@ -353,7 +353,7 @@
     "listPaths": {
       "payload": {
         "at": "v1.0.0",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "at": "1111111111111111111111111111111111111111",
@@ -369,19 +369,19 @@
             "landedAt": "2026-10-07T12:00:00.000Z",
             "openAsks": 3,
             "posture": "open",
-            "project": "datekit"
+            "project": "oscabriel/datekit"
           },
           {
             "openAsks": 0,
             "posture": "open",
-            "project": "widgets"
+            "project": "oscabriel/widgets"
           }
         ]
       }
     },
     "listRefs": {
       "payload": {
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "forks": [
@@ -399,7 +399,7 @@
           }
         ],
         "landed": "4444444444444444444444444444444444444444",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "tags": [
           {
             "name": "v1.0.0",
@@ -414,7 +414,7 @@
         "from": 30,
         "limit": 30,
         "path": "src/parse/iso.ts",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "commits": [
@@ -453,7 +453,7 @@
               "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
               "landedAt": "2026-10-07T12:00:00.000Z",
               "parent": "1111111111111111111111111111111111111111",
-              "project": "datekit",
+              "project": "oscabriel/datekit",
               "requestId": "push-33333333",
               "sha": "4444444444444444444444444444444444444444",
               "verdict": {
@@ -490,7 +490,7 @@
                   "sha": "4444444444444444444444444444444444444444"
                 },
                 "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-                "project": "datekit",
+                "project": "oscabriel/datekit",
                 "stage": "checks",
                 "tree": "5555555555555555555555555555555555555555",
                 "verifier": "platform"
@@ -524,7 +524,7 @@
             "path": "config/asks/iso-week.ask.ts"
           }
         ],
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "ask": {
@@ -547,7 +547,7 @@
           "mentor": "bob",
           "openedAt": "2026-10-07T12:00:00.000Z",
           "openedIn": "4444444444444444444444444444444444444444",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "reserve": "newcomers",
           "state": "open",
           "territory": {
@@ -561,7 +561,7 @@
     },
     "projectPolicy": {
       "payload": {
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "policy": {
@@ -664,7 +664,7 @@
             "path": "config/asks/iso-week.ask.ts"
           }
         ],
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "sealed": {
           "head": "3333333333333333333333333333333333333333"
         },
@@ -677,7 +677,7 @@
           "files": ["config/asks/iso-week.ask.ts"],
           "id": "prop-000001",
           "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "proposer": "dave",
           "state": "open",
           "territory": "@datekit/parse",
@@ -693,7 +693,7 @@
       "payload": {
         "at": "4444444444444444444444444444444444444444",
         "path": "README.md",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "at": "4444444444444444444444444444444444444444",
@@ -709,7 +709,7 @@
       "payload": {
         "at": "main",
         "path": "src",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "at": "4444444444444444444444444444444444444444",
@@ -739,7 +739,7 @@
     "release": {
       "payload": {
         "ask": "iso-week",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "released": true
@@ -749,7 +749,7 @@
       "payload": {
         "acknowledgeShort": false,
         "key": "PAYMENTS_KEY",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "value": "not-a-real-value-0123456789abcdef"
       },
       "success": {
@@ -761,7 +761,7 @@
     "showAsk": {
       "payload": {
         "ask": "iso-week",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "ask": {
@@ -784,7 +784,7 @@
           "mentor": "bob",
           "openedAt": "2026-10-07T12:00:00.000Z",
           "openedIn": "4444444444444444444444444444444444444444",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "reserve": "newcomers",
           "state": "open",
           "territory": {
@@ -798,7 +798,7 @@
     },
     "showCommit": {
       "payload": {
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "sha": "4444444444444444444444444444444444444444"
       },
       "success": {
@@ -837,7 +837,7 @@
             "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
             "landedAt": "2026-10-07T12:00:00.000Z",
             "parent": "1111111111111111111111111111111111111111",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "requestId": "push-33333333",
             "sha": "4444444444444444444444444444444444444444",
             "verdict": {
@@ -874,7 +874,7 @@
                 "sha": "4444444444444444444444444444444444444444"
               },
               "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-              "project": "datekit",
+              "project": "oscabriel/datekit",
               "stage": "checks",
               "tree": "5555555555555555555555555555555555555555",
               "verifier": "platform"
@@ -911,7 +911,7 @@
     },
     "showProposal": {
       "payload": {
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "proposal": "prop-000001"
       },
       "success": {
@@ -926,7 +926,7 @@
           "files": ["config/asks/iso-week.ask.ts"],
           "id": "prop-000001",
           "openedAt": "2026-10-07T12:00:00.000Z",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "proposer": "dave",
           "state": "open",
           "territory": "@datekit/parse",
@@ -946,7 +946,7 @@
     },
     "status": {
       "payload": {
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "answers": [
@@ -970,7 +970,7 @@
         "ask": "iso-week",
         "base": "1111111111111111111111111111111111111111",
         "head": "3333333333333333333333333333333333333333",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "requestId": "answer-0001"
       },
       "success": {
@@ -981,13 +981,13 @@
           "_tag": "Checking",
           "stage": "merge"
         },
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "requestId": "answer-0001"
       }
     },
     "today": {
       "payload": {
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "budget": {
@@ -1016,7 +1016,7 @@
             "expiresAt": "2026-10-21T12:00:00.000Z",
             "id": "dec-000001",
             "openedAt": "2026-10-07T12:00:00.000Z",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "subject": {
               "_tag": "OpenProposal",
               "proposal": "prop-000001"
@@ -1050,7 +1050,7 @@
             "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
             "landedAt": "2026-10-07T12:00:00.000Z",
             "parent": "1111111111111111111111111111111111111111",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "requestId": "push-33333333",
             "sha": "4444444444444444444444444444444444444444",
             "verdict": {
@@ -1087,7 +1087,7 @@
                 "sha": "4444444444444444444444444444444444444444"
               },
               "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-              "project": "datekit",
+              "project": "oscabriel/datekit",
               "stage": "checks",
               "tree": "5555555555555555555555555555555555555555",
               "verifier": "platform"
@@ -1100,7 +1100,7 @@
       "payload": {
         "ask": "iso-week",
         "head": "3333333333333333333333333333333333333333",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "verdict": {
@@ -1137,7 +1137,7 @@
             "sha": "4444444444444444444444444444444444444444"
           },
           "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "stage": "checks",
           "tree": "5555555555555555555555555555555555555555",
           "verifier": "platform"
@@ -1148,7 +1148,7 @@
       "payload": {
         "handle": "dave",
         "note": "Paired on the parser.",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "verdict": "vouch"
       },
       "success": {
@@ -1157,7 +1157,7 @@
     },
     "watch": {
       "payload": {
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "since": 41
       },
       "success": {
@@ -1179,7 +1179,7 @@
       "payload": {
         "at": "main",
         "path": "src/parse/iso.ts",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       "success": {
         "at": "4444444444444444444444444444444444444444",
@@ -1236,7 +1236,7 @@
             "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
             "landedAt": "2026-10-07T12:00:00.000Z",
             "parent": "1111111111111111111111111111111111111111",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "requestId": "push-33333333",
             "sha": "4444444444444444444444444444444444444444",
             "verdict": {
@@ -1273,7 +1273,7 @@
                 "sha": "4444444444444444444444444444444444444444"
               },
               "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-              "project": "datekit",
+              "project": "oscabriel/datekit",
               "stage": "checks",
               "tree": "5555555555555555555555555555555555555555",
               "verifier": "platform"

@@ -18,14 +18,17 @@ describe("an admission's instance", () => {
         AdmissionParams.make({
           head: CommitSha.make("a".repeat(40)),
           layer: LayerName.make("maintainers"),
-          project: ProjectName.make("datekit"),
+          project: ProjectName.make("alice/datekit"),
         })
       )
-    ).toBe(`admit-datekit-maintainers-${"a".repeat(40)}`);
+    ).toBe(`admit-alice__datekit-maintainers-${"a".repeat(40)}`);
   });
 
   it("keeps each pushed head its own instance under a long project and layer name, within the engine's 100 characters", () => {
-    const project = ProjectName.make(`${"a-long-project-name".repeat(3)}x`);
+    const project = ProjectName.make(
+      `alice/${"a-long-project-name".repeat(3)}x`
+    );
+
     const layer = LayerName.make("maintainers-of-the-sealed-suites");
 
     const heads = [

@@ -52,7 +52,7 @@ describe("the sandbox Worker's entrypoint", () => {
             at: CheckAt.cases.Tree.make({ tree }),
             lanes: [],
             placeholders: [],
-            project: ProjectName.make("datekit"),
+            project: ProjectName.make("oscabriel/datekit"),
             proxies: [],
             repo,
             run: { checks: {}, test: Command.make("bun test {path}") },

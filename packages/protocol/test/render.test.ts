@@ -484,7 +484,7 @@ const receiptAt = (outcome: Outcome) => ({
   base,
   head: main,
   outcome,
-  project: ProjectName.make("datekit"),
+  project: ProjectName.make("oscabriel/datekit"),
   requestId: RequestId.make("push-2222222"),
 });
 

@@ -10,6 +10,7 @@
  */
 import type { CheckRun } from "@repo/checks/check-runner";
 import { CheckExit, CheckWire } from "@repo/checks/check-runner/wire";
+import { keyOf } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { DurableObject } from "cloudflare:workers";
 import { Effect, Exit, Layer, Option, Schema } from "effect";
@@ -83,7 +84,10 @@ export class Checker extends DurableObject<Env> {
     }
 
     const checkers: Checkers = this.env;
-    const index = checkers.CHECKER.getByName(`snapshots:${wire.job.project}`);
+
+    const index = checkers.CHECKER.getByName(
+      `snapshots:${keyOf(wire.job.project)}`
+    );
 
     return check(wire).pipe(
       Effect.provide(

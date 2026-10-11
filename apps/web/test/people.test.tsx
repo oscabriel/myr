@@ -69,7 +69,7 @@ describe("a person's page", () => {
         ({ groups: found }) => textOf(found?.name ?? "")
       );
 
-      expect(groups).toStrictEqual(["burrow", "datekit"]);
+      expect(groups).toStrictEqual(["oscabriel/burrow", "oscabriel/datekit"]);
 
       const sentences = [
         ...html.matchAll(/data-area="(?<area>[^"]*)"[^>]*>/gu),
@@ -81,9 +81,9 @@ describe("a person's page", () => {
 
       for (const sentence of [
         "Decided in the whole project",
-        "Finished in burrow/format",
-        "Answered and asked in datekit/core",
-        "Answered in datekit/docs",
+        "Finished in oscabriel/burrow/format",
+        "Answered and asked in oscabriel/datekit/core",
+        "Answered in oscabriel/datekit/docs",
       ]) {
         expect(text).toContain(sentence);
       }
@@ -94,7 +94,7 @@ describe("a person's page", () => {
     Effect.gen(function* () {
       const html = creditsOf(yield* page);
 
-      for (const project of ["datekit", "burrow"]) {
+      for (const project of ["oscabriel/datekit", "oscabriel/burrow"]) {
         expect(html).toContain(`href="/${project}"`);
         expect(html).toContain(`href="/${project}/commits/main"`);
       }

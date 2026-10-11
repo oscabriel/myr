@@ -13,7 +13,14 @@ import { claimForkName, workingForkName } from "@repo/project/repo-names";
 import { Contracts } from "@repo/protocol/contracts";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
-import { AskId, Handle, KindName, ProjectName } from "@repo/protocol/ids";
+import {
+  addressOfRepo,
+  AskId,
+  Handle,
+  KindName,
+  ProjectName,
+} from "@repo/protocol/ids";
+import type { RepoName } from "@repo/protocol/ids";
 import { Effect, Option } from "effect";
 
 import { commands as catalog } from "../src/features/agents/catalog.ts";
@@ -27,7 +34,7 @@ import {
 import {
   projectPageHead,
   projectPageHeaders,
-} from "../src/routes/$project/index.tsx";
+} from "../src/routes/$owner/$project/index.tsx";
 import { frontPageHead, frontPageHeaders } from "../src/routes/asks.tsx";
 import { landingHead, landingHeaders } from "../src/routes/index.tsx";
 import { llmsFullHandler } from "../src/routes/llms-full[.]txt.ts";
@@ -39,9 +46,9 @@ const platformUrl = "https://platform-test.example.workers.dev";
 
 const webUrl = "https://web-test.example.workers.dev";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 /** A command row as `@repo/agent-kit`'s command list holds it. */
 const row = (
@@ -202,10 +209,10 @@ describe(frontLlms, () => {
 
   it("lists each project on one line, with its posture and its open asks", () => {
     expect(lines).toContain(
-      `- [datekit](${webUrl}/datekit/llms.txt): Open, 3 open asks.`
+      `- [oscabriel/datekit](${webUrl}/oscabriel/datekit/llms.txt): Open, 3 open asks.`
     );
     expect(lines).toContain(
-      `- [burrow](${webUrl}/burrow/llms.txt): Open with sealed evidence, 1 open ask.`
+      `- [oscabriel/burrow](${webUrl}/oscabriel/burrow/llms.txt): Open with sealed evidence, 1 open ask.`
     );
   });
 
@@ -247,7 +254,7 @@ describe(projectLlms, () => {
 
   it("opens with the project, its posture and how many asks are open, then the banner", () => {
     expect(lines.slice(0, 5)).toStrictEqual([
-      "# datekit",
+      "# oscabriel/datekit",
       "",
       `> A project on ${Brand.name}. Posture: Open with sealed evidence. 3 open asks.`,
       "",
@@ -256,9 +263,9 @@ describe(projectLlms, () => {
   });
 
   it("gives its page, its clone URL and the platform's llms.txt", () => {
-    expect(lines).toContain(`- Page: ${webUrl}/datekit`);
+    expect(lines).toContain(`- Page: ${webUrl}/oscabriel/datekit`);
     expect(lines).toContain(
-      `- Clone: \`git clone ${platformUrl}/datekit.git\``
+      `- Clone: \`git clone ${platformUrl}/oscabriel/datekit.git\``
     );
     expect(lines).toContain(
       `- Everything else, and every command: ${webUrl}/llms.txt`
@@ -267,18 +274,18 @@ describe(projectLlms, () => {
 
   it("lists each open ask on one line, linking its Markdown", () => {
     expect(lines.filter((line) => line.startsWith("- ["))).toStrictEqual([
-      `- [parse-iso](${webUrl}/datekit/asks/parse-iso.md): parse reads the year of an ISO date. Kind \`fix\`, territory \`src/parse.ts\`.`,
-      `- [parse-month](${webUrl}/datekit/asks/parse-month.md): parse reads the month of an ISO date. Kind \`fix\`, territory \`src/parse.ts\`. Claimed.`,
-      `- [drop-legacy](${webUrl}/datekit/asks/drop-legacy.md): the legacy parser is gone. Kind \`fix\`, territory \`src/parse.ts\`. Held for newcomers. Waits for \`parse-iso\`, \`parse-month\`.`,
+      `- [parse-iso](${webUrl}/oscabriel/datekit/asks/parse-iso.md): parse reads the year of an ISO date. Kind \`fix\`, territory \`src/parse.ts\`.`,
+      `- [parse-month](${webUrl}/oscabriel/datekit/asks/parse-month.md): parse reads the month of an ISO date. Kind \`fix\`, territory \`src/parse.ts\`. Claimed.`,
+      `- [drop-legacy](${webUrl}/oscabriel/datekit/asks/drop-legacy.md): the legacy parser is gone. Kind \`fix\`, territory \`src/parse.ts\`. Held for newcomers. Waits for \`parse-iso\`, \`parse-month\`.`,
     ]);
   });
 
   it("names the project in the commands that take an ask", () => {
     expect(lines).toContain(
-      `2. Read it: \`${cli} ask <ask> --project datekit\`.`
+      `2. Read it: \`${cli} ask <ask> --project oscabriel/datekit\`.`
     );
     expect(lines).toContain(
-      `3. Claim it: \`${cli} claim <ask> --project datekit\`. The claim prints your fork's remote; add it with \`git remote add ${Brand.slug} <remote>\`.`
+      `3. Claim it: \`${cli} claim <ask> --project oscabriel/datekit\`. The claim prints your fork's remote; add it with \`git remote add ${Brand.slug} <remote>\`.`
     );
   });
 
@@ -301,11 +308,11 @@ describe(missingProjectLlms, () => {
   it("names the project it did not find and where every project is", () => {
     expect(
       missingProjectLlms({
-        project: Option.some(ProjectName.make("nowhere")),
+        project: Option.some(ProjectName.make("oscabriel/nowhere")),
         webUrl,
       })
     ).toBe(
-      `# Not found\n\nNo project named \`nowhere\` is on ${Brand.name}. Every project is listed at ${webUrl}/llms.txt.\n`
+      `# Not found\n\nNo project named \`oscabriel/nowhere\` is on ${Brand.name}. Every project is listed at ${webUrl}/llms.txt.\n`
     );
   });
 
@@ -352,6 +359,10 @@ const listing = (listed: readonly ProjectListing[]) => () =>
 const unreachable = () => unreachablePlatform;
 
 const getFull = () => new Request(`${webUrl}/llms-full.txt`);
+
+/** A fork's gateway address: its project's name, then the fork's parts. */
+const addressed = (repo: RepoName) =>
+  Option.getOrElse(addressOfRepo(repo), () => repo);
 
 const read = (response: Response) =>
   Effect.map(
@@ -408,14 +419,16 @@ describe("/llms-full.txt", () => {
       (match) => match.groups?.name ?? ""
     );
 
-    it("spell a claim's fork as the platform names it", () => {
+    it("spell a claim's fork as the gateway addresses it", () => {
       expect(patterns.map(filled)).toContain(
-        claimForkName(datekit, parseIso, ada)
+        addressed(claimForkName(datekit, parseIso, ada))
       );
     });
 
-    it("spell a working fork as the platform names it", () => {
-      expect(patterns.map(filled)).toContain(workingForkName(datekit, ada));
+    it("spell a working fork as the gateway addresses it", () => {
+      expect(patterns.map(filled)).toContain(
+        addressed(workingForkName(datekit, ada))
+      );
     });
   });
 });
@@ -503,7 +516,7 @@ describe("the list pages, asked for Markdown", () => {
   );
 
   it.effect(
-    "answers /datekit with the project's llms.txt, varied by Accept",
+    "answers /oscabriel/datekit with the project's llms.txt, varied by Accept",
     () =>
       Effect.gen(function* () {
         const seen = yield* answered(
@@ -513,7 +526,7 @@ describe("the list pages, asked for Markdown", () => {
           )({
             next: () => "the page" as const,
             params: { project: "datekit" },
-            request: getAt("/datekit", "text/markdown"),
+            request: getAt("/oscabriel/datekit", "text/markdown"),
           })
         );
 
@@ -558,7 +571,7 @@ describe("the list pages, asked for Markdown", () => {
       )({
         next: () => "the page" as const,
         params: { project: "datekit" },
-        request: getAt("/datekit", BROWSER),
+        request: getAt("/oscabriel/datekit", BROWSER),
       })
     ).toBe("the page");
   });
@@ -578,12 +591,12 @@ describe("the list pages, asked for Markdown", () => {
     expect(
       projectPageHeaders({ params: { project: "datekit" } })
     ).toMatchObject({
-      link: '</datekit/llms.txt>; rel="alternate"; type="text/markdown"',
+      link: '</oscabriel/datekit/llms.txt>; rel="alternate"; type="text/markdown"',
       vary: "Accept",
     });
     expect(
       projectPageHead({ params: { project: "datekit" } }).links
-    ).toContainEqual(alternate("/datekit/llms.txt"));
+    ).toContainEqual(alternate("/oscabriel/datekit/llms.txt"));
   });
 
   it("names no Markdown for a path that can name no project", () => {

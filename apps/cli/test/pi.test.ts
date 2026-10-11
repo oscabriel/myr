@@ -771,7 +771,7 @@ const claimedIn = (root: string): SessionState => ({
     ask: AskId.make("fix-week"),
     base: CommitSha.make("1".repeat(40)),
     checkCommand: "bun test packages/a",
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
     territory: { module: "a", paths: [Glob.make("packages/a/**")] },
     want,
   },

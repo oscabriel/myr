@@ -243,7 +243,7 @@ const onlyCall = (ran: Ran) => {
   };
 };
 
-const always = ["--project", "datekit"];
+const always = ["--project", "oscabriel/datekit"];
 
 describe(`${Brand.cli} env set`, () => {
   it.live(
@@ -255,7 +255,7 @@ describe(`${Brand.cli} env set`, () => {
         expect(ran.code).toBe(0);
         expect(onlyCall(ran)).toStrictEqual({
           key: "SENTRY_AUTH_TOKEN",
-          project: "datekit",
+          project: "oscabriel/datekit",
           value: secret,
         });
         expect(ran.err).toBe("");
@@ -417,7 +417,7 @@ describe(`${Brand.cli} env set`, () => {
               json: true,
               payload: {
                 key: "SENTRY_AUTH_TOKEN",
-                project: "datekit",
+                project: "oscabriel/datekit",
                 value: "<redacted>",
               },
             },
@@ -430,7 +430,7 @@ describe(`${Brand.cli} env set`, () => {
             dryRun: true,
             payload: {
               key: "SENTRY_AUTH_TOKEN",
-              project: "datekit",
+              project: "oscabriel/datekit",
               value: "<redacted>",
             },
           },
@@ -467,7 +467,7 @@ describe(`${Brand.cli} env set`, () => {
       expect(onlyCall(ran)).toStrictEqual({
         acknowledgeShort: true,
         key: "SENTRY_AUTH_TOKEN",
-        project: "datekit",
+        project: "oscabriel/datekit",
         value: secret,
       });
     }).pipe(Effect.provide(NodeServices.layer))
@@ -502,7 +502,7 @@ describe(`${Brand.cli} env set`, () => {
         expect(ran.code).toBe(0);
         expect(onlyCall(ran)).toStrictEqual({
           key: "SENTRY_AUTH_TOKEN",
-          project: "datekit",
+          project: "oscabriel/datekit",
           value: secret,
         });
         expect(ran.shown).toContain(key);

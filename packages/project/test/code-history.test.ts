@@ -36,9 +36,9 @@ import { WHY_SCAN } from "../src/code/why.ts";
 import { Content, writer } from "./code-fixtures.ts";
 import type { Tree } from "./code-fixtures.ts";
 
-const project = ProjectName.make("histkit");
+const project = ProjectName.make("alice/histkit");
 
-const repo = RepoName.make(project);
+const repo = RepoName.make("histkit");
 
 const format = RepoPath.make("src/format.ts");
 

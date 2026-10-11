@@ -14,7 +14,7 @@ import type { RepoFile } from "@repo/checks/finder";
 import { ApprovalNeeded } from "@repo/protocol/cli";
 import { Client } from "@repo/protocol/contracts";
 import type { InitProject } from "@repo/protocol/contracts";
-import { ProjectName } from "@repo/protocol/ids";
+import { ProjectName, sourceNamespaceOf } from "@repo/protocol/ids";
 import type { LandedSha } from "@repo/protocol/ids";
 import type { Refusal } from "@repo/protocol/refusal";
 import {
@@ -29,7 +29,7 @@ import {
 import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { gitHelperConfig } from "../credentials.ts";
+import { Credentials, gitHelperConfig } from "../credentials.ts";
 import { endRefused, Output } from "../output.ts";
 import { parseRemote, repoContext } from "../repo-context.ts";
 import { projectFile } from "./project-file.ts";
@@ -102,7 +102,7 @@ const flags = {
   ),
   project: Flag.String("project").pipe(
     Flag.withDescription(
-      "The project's name; by default this repo's folder, or the imported repo's name."
+      "The project's name, <owner>/<name>; a bare name is yours (<your handle>/<name>). By default this repo's folder, or an import's source path."
     ),
     Flag.optional
   ),
@@ -194,25 +194,47 @@ const trackedFiles = (root: string) =>
     );
   });
 
-/** A name as a project's, or a usage error saying to name it. */
-const projectNamed = (given: Option.Option<string>, fallback: string) =>
-  Option.match(given, {
-    onNone: () =>
-      Effect.mapError(
-        Schema.decodeEffect(ProjectName)(fallback),
-        () =>
-          new InitMisused({
-            reason: `name the project with --project: "${fallback}" is no project name (lowercase words joined by dashes)`,
-          })
-      ),
-    onSome: (name) =>
-      Effect.mapError(
-        Schema.decodeEffect(ProjectName)(name),
-        () =>
-          new InitMisused({
-            reason: `--project "${name}" is no project name: use lowercase words joined by dashes`,
-          })
-      ),
+/** The owner a bare name is given: the profile's handle, when `login` learned it. */
+const profileOwner = Effect.map(
+  Effect.flatMap(Credentials, ({ current }) => current),
+  (profile) =>
+    Option.map(
+      Option.flatMap(profile, ({ handle }) => Option.fromUndefinedOr(handle)),
+      (handle) => handle.toLowerCase()
+    )
+);
+
+/**
+ * A name as a project's: `<owner>/<name>` as given, a bare word given under
+ * the profile's handle, and with none given `fallback.short` under
+ * `fallback.owner` (an import's source namespace), else under the
+ * profile's handle. A usage error says how to name it otherwise.
+ */
+const projectNamed = (
+  given: Option.Option<string>,
+  fallback: { readonly owner: Option.Option<string>; readonly short: string }
+) =>
+  Effect.gen(function* () {
+    const word = Option.getOrElse(given, () => fallback.short);
+    const known = yield* profileOwner;
+
+    const owner = Option.isSome(given)
+      ? known
+      : Option.orElse(fallback.owner, () => known);
+
+    const spelled = word.includes("/")
+      ? word
+      : `${Option.getOrElse(owner, () => "")}/${word}`;
+
+    return yield* Effect.mapError(
+      Schema.decodeEffect(ProjectName)(spelled),
+      () =>
+        new InitMisused({
+          reason: spelled.startsWith("/")
+            ? `name the project with --project <owner>/<name>: no handle is known here, so "${word}" needs its owner`
+            : `--project "${spelled}" is no project name: use <owner>/<name>, lowercase words joined by dashes`,
+        })
+    );
   });
 
 const HTTPS = /^https:\/\/\S+$/u;
@@ -350,8 +372,6 @@ const importing = (input: Input, url: string) =>
   Effect.gen(function* () {
     yield* httpsOnly(url);
 
-    const project = yield* projectNamed(input.project, lastSegment(url));
-
     // The contract takes a non-empty branch; the client can't send an empty one.
     const source = yield* Option.match(input.branch, {
       onNone: () => Effect.succeed({ url }),
@@ -363,6 +383,11 @@ const importing = (input: Input, url: string) =>
               })
             )
           : Effect.succeed({ branch, url }),
+    });
+
+    const project = yield* projectNamed(input.project, {
+      owner: sourceNamespaceOf(url),
+      short: lastSegment(url),
     });
 
     const payload: Payload = { import: source, project };
@@ -463,7 +488,12 @@ const inRepo = (input: Input) =>
     const path = yield* Path.Path;
     // The folder the CLI was started in: git and the spawner resolve it.
     const { root } = yield* repoContext(".");
-    const project = yield* projectNamed(input.project, path.basename(root));
+
+    const project = yield* projectNamed(input.project, {
+      owner: Option.none(),
+      short: path.basename(root),
+    });
+
     const inTree = yield* fs.exists(path.join(root, CONFIG));
 
     // HEAD is what the push sends: a config only the work tree has (a run

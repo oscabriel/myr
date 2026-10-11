@@ -21,12 +21,12 @@ import { RpcTest } from "effect/rpc";
 
 import { PeopleView } from "../src/features/project-people/people-view.tsx";
 import { projectSections } from "../src/features/shared/shell/sections.ts";
-import { readPeople } from "../src/routes/$project/people.tsx";
+import { readPeople } from "../src/routes/$owner/$project/people.tsx";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { elementWith, elementsWith, inspectorOf, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const sha = "4c2e6a8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c";
 
@@ -170,12 +170,12 @@ describe("a project's policy page", () => {
     );
     expect(markup).toMatch(
       new RegExp(
-        `<a\\b[^>]*href="/datekit/commit/${sha}"[^>]*>${sha.slice(0, 7)}</a>`,
+        `<a\\b[^>]*href="/oscabriel/datekit/commit/${sha}"[^>]*>${sha.slice(0, 7)}</a>`,
         "u"
       )
     );
     expect(mainOf(markup)).toContain(
-      `href="/datekit/blob/${sha}/${Brand.configDir}/project.ts"`
+      `href="/oscabriel/datekit/blob/${sha}/${Brand.configDir}/project.ts"`
     );
   });
 
@@ -183,14 +183,15 @@ describe("a project's policy page", () => {
     "reads Policy in the crumbs and the project's sections, at the address it has always had",
     () =>
       Effect.gen(function* () {
-        const markup = yield* renderAt("/datekit/people", page);
+        const markup = yield* renderAt("/oscabriel/datekit/people", page);
         const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
 
         expect(plainText(crumbs)).toContain("Policy");
         expect(plainText(crumbs)).not.toContain("People");
         expect(
-          projectSections("datekit").find(({ to }) => to === "/datekit/people")
-            ?.label
+          projectSections("oscabriel/datekit").find(
+            ({ to }) => to === "/oscabriel/datekit/people"
+          )?.label
         ).toBe("Policy");
       })
   );
@@ -230,7 +231,7 @@ describe("a project's policy page", () => {
     ).toBeTruthy();
     expect(vouching).toContain('data-vouch="spam-bot"');
     expect(vouching).toContain(
-      `href="/datekit/blob/${sha}/${Brand.configDir}/vouched.td"`
+      `href="/oscabriel/datekit/blob/${sha}/${Brand.configDir}/vouched.td"`
     );
   });
 
@@ -239,7 +240,7 @@ describe("a project's policy page", () => {
     const layers = elementWith(markup, "data-layers");
 
     expect(layers).toContain('data-layer="maintainers"');
-    expect(layers).toMatch(/<a\b[^>]*href="\/datekit\/ledger"/u);
+    expect(layers).toMatch(/<a\b[^>]*href="\/oscabriel\/datekit\/ledger"/u);
     expect(plainText(layers)).toContain("sealed");
     expect(layers.slice(layers.indexOf(">") + 1)).not.toMatch(
       /<(?:p|div|ul|ol|li|dl)\b/u
@@ -402,7 +403,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.some(burrowPolicy)}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.none()}
       />
     );
@@ -439,7 +440,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.none()}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.some(noConfig)}
       />
     );
@@ -457,7 +458,7 @@ describe("a project's policy page", () => {
     ).toBeTruthy();
     expect(markup).toMatch(
       new RegExp(
-        `<a\\b[^>]*href="/burrow/commit/${sha}"[^>]*>${sha.slice(0, 7)}</a>`,
+        `<a\\b[^>]*href="/oscabriel/burrow/commit/${sha}"[^>]*>${sha.slice(0, 7)}</a>`,
         "u"
       )
     );
@@ -475,7 +476,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.none()}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.some(noConfig)}
       />
     );
@@ -509,7 +510,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.none()}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.some({ ...noConfig, reason: "configFailed" })}
       />
     );
@@ -525,7 +526,7 @@ describe("a project's policy page", () => {
     );
     expect(markupOf(view)).toMatch(
       new RegExp(
-        `<a\\b[^>]*href="/burrow/tree/${sha}/${Brand.configDir}"[^>]*>${Brand.configDir}/</a>`,
+        `<a\\b[^>]*href="/oscabriel/burrow/tree/${sha}/${Brand.configDir}"[^>]*>${Brand.configDir}/</a>`,
         "u"
       )
     );
@@ -537,7 +538,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.some(burrowPolicy)}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.none()}
       />
     );
@@ -635,7 +636,7 @@ describe(readPeople, () => {
       const asked = yield* Ref.make(0);
 
       const failed = yield* Effect.flip(
-        readPeople("no-such-project").pipe(
+        readPeople("oscabriel/no-such-project").pipe(
           Effect.provide(platformOf(asked, { policy: datekitPolicy }))
         )
       );

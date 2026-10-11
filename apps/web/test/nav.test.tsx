@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ProjectNav } from "../src/features/project/project-nav.tsx";
 import { renderAt } from "./render.tsx";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 /** Each link in `markup`: its text, its href, and whether it is current. */
 const linksOf = (markup: string) =>
@@ -28,13 +28,13 @@ const linksOf = (markup: string) =>
 
 const sections = (current: string) =>
   [
-    { href: "/datekit", text: "Asks" },
-    { href: "/datekit/tree/main", text: "Code" },
-    { href: "/datekit/commits/main", text: "Landings" },
-    { href: "/datekit/refs", text: "Refs" },
-    { href: "/datekit/people", text: "Policy" },
-    { href: "/datekit/ledger", text: "Ledger" },
-    { href: "/datekit/env", text: "Env shape" },
+    { href: "/oscabriel/datekit", text: "Asks" },
+    { href: "/oscabriel/datekit/tree/main", text: "Code" },
+    { href: "/oscabriel/datekit/commits/main", text: "Landings" },
+    { href: "/oscabriel/datekit/refs", text: "Refs" },
+    { href: "/oscabriel/datekit/people", text: "Policy" },
+    { href: "/oscabriel/datekit/ledger", text: "Ledger" },
+    { href: "/oscabriel/datekit/env", text: "Env shape" },
   ].map((link) => ({ current: link.text === current, ...link }));
 
 describe("a project's section row", () => {
@@ -43,7 +43,7 @@ describe("a project's section row", () => {
       <ProjectNav current="code" project={datekit} />
     );
 
-    expect(markup).toMatch(/^<nav\b[^>]*aria-label="datekit"/u);
+    expect(markup).toMatch(/^<nav\b[^>]*aria-label="oscabriel\/datekit"/u);
     expect(linksOf(markup)).toStrictEqual(sections("Code"));
   });
 
@@ -53,7 +53,7 @@ describe("a project's section row", () => {
     ).filter(({ current }) => current);
 
     expect(policy).toStrictEqual([
-      { current: true, href: "/datekit/people", text: "Policy" },
+      { current: true, href: "/oscabriel/datekit/people", text: "Policy" },
     ]);
   });
 
@@ -70,7 +70,7 @@ describe("a project's section row", () => {
     () =>
       Effect.gen(function* () {
         const markup = yield* renderAt(
-          "/datekit/ledger",
+          "/oscabriel/datekit/ledger",
           <ProjectNav current="ledger" project={datekit} />
         );
 

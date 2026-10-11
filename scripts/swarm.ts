@@ -3,7 +3,7 @@
  * of a project's split family on a stage: it plans them, prepares each
  * one's workspace and runs their harnesses.
  *
- *   bun scripts/swarm.ts --stage dev-oscabriel --project burrow --dry-run
+ *   bun scripts/swarm.ts --stage dev-oscabriel --project oscabriel/burrow --dry-run
  *   bunx varlock run --path apps/platform/ -- bun scripts/swarm.ts --stage dev-oscabriel
  *
  * `--dry-run` reads the project's open asks anonymously and prints the plan:

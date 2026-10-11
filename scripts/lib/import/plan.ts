@@ -13,12 +13,18 @@
  * finds code they know; each is a copy, read-only here, under its own
  * licence.
  */
-import { ProjectName } from "@repo/protocol/ids";
+import { ProjectKey, ProjectName, sourceNamespaceOf } from "@repo/protocol/ids";
 import { Option, Redacted } from "effect";
 
-/** One repo to import: the project it becomes, where it is, its branch, what it is, and its licence. */
+/**
+ * One repo to import: the project it becomes, by its name at its source
+ * path (`github.com/pallets/click`) and the key it was first imported
+ * under (`click`), which the platform keeps as its repo's name and the
+ * ledger records; where it is, its branch, what it is, and its licence.
+ */
 export interface ImportExample {
-  readonly project: ProjectName;
+  readonly name: ProjectName;
+  readonly key: ProjectKey;
   readonly url: string;
   /** The remote's default branch, named so the import never guesses. */
   readonly branch: string;
@@ -28,17 +34,19 @@ export interface ImportExample {
   readonly licence: string;
 }
 
+/** A row: its key, and its name at its source path, read from the URL. */
 const example = (
-  project: string,
+  key: string,
   url: string,
   branch: string,
   kind: string,
   licence: string
 ): ImportExample => ({
   branch,
+  key: ProjectKey.make(key),
   kind,
   licence,
-  project: ProjectName.make(project),
+  name: ProjectName.make(`${Option.getOrThrow(sourceNamespaceOf(url))}/${key}`),
   url,
 });
 
@@ -325,11 +333,11 @@ export const planImports = (
   only: Option.Option<ProjectName>
 ): readonly ImportExample[] =>
   all.filter(
-    ({ project }) =>
+    ({ name }) =>
       Option.match(only, {
         onNone: () => true,
-        onSome: (named) => named === project,
-      }) && !listed.has(project)
+        onSome: (named) => named === name,
+      }) && !listed.has(name)
   );
 
 /**

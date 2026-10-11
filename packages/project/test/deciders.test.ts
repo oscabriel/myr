@@ -20,6 +20,7 @@ import {
   ProposalId,
   RepoName,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
@@ -80,7 +81,7 @@ const scenario = aProject({ people }).pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -123,7 +124,10 @@ const daysAfter = (from: DateTime.Utc, count: number) =>
 
 /** The project as alice first pushes it. */
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   [
     "packages/format/src/format.ts",
     "export const format = (d) => String(d);\n",
@@ -938,11 +942,11 @@ describe("a decider's own change", () => {
     "comes from a working fork that is made once, for vouched people only",
     () =>
       Effect.map(seen, (run) => {
-        const fork = RepoName.make(`${project}--me--alice`);
+        const fork = RepoName.make(`${keyOf(project)}--me--alice`);
 
         expect(run.forked).toStrictEqual({
           fork,
-          remote: `https://${Brand.domain}/${fork}.git`,
+          remote: `https://${Brand.domain}/${project}--me--alice.git`,
         });
         expect([run.again, run.forkMain]).toStrictEqual([run.forked, run.base]);
         expect(run.daveForks).toStrictEqual(new NotVouched({}));
@@ -1248,7 +1252,7 @@ describe("Today", () => {
   );
 });
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("alice/burrow");
 
 /** One landing's credit in the parser module. */
 const row = (name: ProjectName, role: "Asked-by" | "Signed-off-by") => ({
@@ -1266,7 +1270,7 @@ const crediting = Effect.gen(function* () {
 
   const answerIn = (name: ProjectName, who: Person) =>
     Effect.gen(function* () {
-      const on = RepoName.make(name);
+      const on = RepoName.make(keyOf(name));
       const api = yield* made(yield* projects.create(name), on);
 
       yield* openRed(api, "parse-iso", on);

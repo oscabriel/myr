@@ -10,7 +10,7 @@ import { envSchemaViewOf } from "../src/env-shape.ts";
 import { fixtures } from "./fixtures/env/cases.ts";
 import expressions from "./fixtures/env/expressions.env.schema?raw";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const at = LandedSha.make("b2".repeat(20));
 
@@ -104,7 +104,7 @@ describe("the /env-spec adapter", () => {
               tags: [],
             },
           ],
-          project: "datekit",
+          project: "oscabriel/datekit",
         });
       })
   );

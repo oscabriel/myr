@@ -42,7 +42,7 @@ import { Phase, phasePlan } from "@repo/checks/phases";
 import type { PlannedLane } from "@repo/checks/phases";
 import type { LaneResult } from "@repo/protocol/domain/answer";
 import type { RunBlock } from "@repo/protocol/domain/run";
-import { RepoName } from "@repo/protocol/ids";
+import { keyOf, RepoName } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { Duration, Effect, Option, Ref } from "effect";
 
@@ -451,7 +451,7 @@ const snapshot = (job: Job, key: string) =>
     }
 
     // A project's canonical repo carries the project's name.
-    if (!CheckAt.guards.Commit(at) || repo !== RepoName.make(project)) {
+    if (!CheckAt.guards.Commit(at) || repo !== RepoName.make(keyOf(project))) {
       yield* Effect.logInfo("an answer's setup is not kept").pipe(
         Effect.annotateLogs({ phase: "snapshot" })
       );

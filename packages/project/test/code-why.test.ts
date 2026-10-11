@@ -16,6 +16,7 @@ import {
   LandedSha,
   ProjectName,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
@@ -36,9 +37,9 @@ import {
   writer,
 } from "./code-fixtures.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("alice/datekit");
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const format = RepoPath.make("src/format.ts");
 

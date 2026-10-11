@@ -85,7 +85,7 @@ const evaluated = Effect.gen(function* () {
     ci: [],
     initializer: "ines-v",
     now,
-    project: "datekit",
+    project: "oscabriel/datekit",
     seed: 7,
     vouchFile: bundle.modules[`${folder}/vouched.td`] ?? "",
     workspaces: [],
@@ -112,7 +112,7 @@ const askOf = (
   kind: "fix",
   openedAt: now,
   openedIn: at,
-  project: "datekit",
+  project: "oscabriel/datekit",
   state: "open",
   territory: { module: ".", paths: territory },
 });

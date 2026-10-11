@@ -131,7 +131,7 @@ describe("smokeLoop, against the Node world", () => {
           committer: Brand.name,
           landed: tip,
           noteFound: true,
-          project: "smoke-r1",
+          project: "ines-v/smoke-r1",
           refusedWith: ["OutOfScope"],
           steps: [
             "people",
@@ -155,12 +155,22 @@ describe("smokeLoop, against the Node world", () => {
             Effect.provideService(LedgerFile, ledger)
           )).map(({ by, kind, name, stage }) => ({ by, kind, name, stage }))
         ).toStrictEqual([
-          { by: "smoke", kind: "project", name: "smoke-r1", stage: "node" },
-          { by: "smoke", kind: "repo", name: "smoke-r1", stage: "node" },
+          {
+            by: "smoke",
+            kind: "project",
+            name: "ines-v__smoke-r1",
+            stage: "node",
+          },
           {
             by: "smoke",
             kind: "repo",
-            name: "smoke-r1--parse-year--bram",
+            name: "ines-v__smoke-r1",
+            stage: "node",
+          },
+          {
+            by: "smoke",
+            kind: "repo",
+            name: "ines-v__smoke-r1--parse-year--bram",
             stage: "node",
           },
         ]);
@@ -341,13 +351,13 @@ describe("smoke --loop's throwaway ledger", () => {
             {
               by: "smoke",
               kind: "project",
-              name: "smoke-r1",
+              name: "ines-v__smoke-r1",
               stage: "dev-example",
             },
             {
               by: "smoke",
               kind: "repo",
-              name: "smoke-r1",
+              name: "ines-v__smoke-r1",
               stage: "dev-example",
             },
           ],
@@ -361,8 +371,8 @@ describe("smoke --loop's throwaway ledger", () => {
     () =>
       Effect.gen(function* () {
         const { cli, failure, ledger } = yield* loopOnScripted([
-          "datekit",
-          "smoke-r1",
+          "oscabriel/datekit",
+          "ines-v/smoke-r1",
         ]);
 
         expect({
@@ -374,7 +384,7 @@ describe("smoke --loop's throwaway ledger", () => {
           cli: ["status", "status", "projects"],
           ledger: [],
           reason:
-            "smoke-r1 is on the platform already, so nothing was made or recorded: a run a second later takes another name",
+            "ines-v/smoke-r1 is on the platform already, so nothing was made or recorded: a run a second later takes another name",
           step: "init",
         });
       })
@@ -486,7 +496,7 @@ describe("smokeLoop --draft, against the Node world", () => {
           trailers: [
             `Asked-by: ${credited("bram")}`,
             `Assisted-by: ${Brand.cli}-drafter:memory (verified)`,
-            "Ask: smoke-r2/parse-ordinal",
+            "Ask: ines-v/smoke-r2/parse-ordinal",
           ],
         });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),

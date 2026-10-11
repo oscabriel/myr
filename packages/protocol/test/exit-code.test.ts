@@ -40,6 +40,7 @@ const pinned = {
   NotRedFirst: 65,
   NotSensitive: 65,
   NotVouched: 77,
+  NotYourNamespace: 77,
   OutOfScope: 65,
   PostureChange: 65,
   PrivatePathInPublicTree: 65,

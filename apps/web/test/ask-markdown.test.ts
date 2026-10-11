@@ -25,8 +25,8 @@ import {
 import {
   askPageHandler,
   askPageHeaders,
-} from "../src/routes/$project/asks/$ask.tsx";
-import { askMarkdownHandler } from "../src/routes/$project/asks/{$ask}[.]md.ts";
+} from "../src/routes/$owner/$project/asks/$ask.tsx";
+import { askMarkdownHandler } from "../src/routes/$owner/$project/asks/{$ask}[.]md.ts";
 import { ask, askId, brief, project } from "./ask-fixtures.ts";
 
 const WEB = "https://web-test.example.workers.dev";
@@ -117,7 +117,7 @@ describe("an ask's URL with Accept: text/markdown", () => {
             askPageHandler(platformOf(calls))({
               next: () => PAGE,
               params: params(askId),
-              request: get(`/datekit/asks/${askId}`, "text/markdown"),
+              request: get(`/oscabriel/datekit/asks/${askId}`, "text/markdown"),
             })
           )
         );
@@ -142,7 +142,7 @@ describe("an ask's URL with Accept: text/markdown", () => {
         const answered = askPageHandler(platformOf(calls))({
           next: () => PAGE,
           params: params(askId),
-          request: get(`/datekit/asks/${askId}`, BROWSER),
+          request: get(`/oscabriel/datekit/asks/${askId}`, BROWSER),
         });
 
         expect(answered).toBe(PAGE);
@@ -161,7 +161,7 @@ describe("an ask's .md URL", () => {
         const response = yield* Effect.promise(() =>
           askMarkdownHandler(platformOf(calls))({
             params: params(askId),
-            request: get(`/datekit/asks/${askId}.md`, BROWSER),
+            request: get(`/oscabriel/datekit/asks/${askId}.md`, BROWSER),
           })
         );
 
@@ -185,7 +185,7 @@ describe("an ask's .md URL", () => {
         const response = yield* Effect.promise(() =>
           askMarkdownHandler(platformOf(calls))({
             params: params("no-such-ask"),
-            request: get("/datekit/asks/no-such-ask.md"),
+            request: get("/oscabriel/datekit/asks/no-such-ask.md"),
           })
         );
 
@@ -215,8 +215,8 @@ describe("an ask's .md URL", () => {
 
         const response = yield* Effect.promise(() =>
           askMarkdownHandler(platformOf(calls))({
-            params: params(askId, "nowhere"),
-            request: get(`/nowhere/asks/${askId}.md`),
+            params: params(askId, "oscabriel/nowhere"),
+            request: get(`/oscabriel/nowhere/asks/${askId}.md`),
           })
         );
 
@@ -225,11 +225,13 @@ describe("an ask's .md URL", () => {
         expect(seen.status).toBe(404);
         expect(seen.body).toBe(
           refusalsMarkdown([
-            new UnknownProject({ project: ProjectName.make("nowhere") }),
+            new UnknownProject({
+              project: ProjectName.make("oscabriel/nowhere"),
+            }),
           ])
         );
         expect(seen.body).toContain(
-          "UnknownProject: no project is named nowhere"
+          "UnknownProject: no project is named oscabriel/nowhere"
         );
       })
   );
@@ -243,7 +245,7 @@ describe("an ask's .md URL", () => {
         const response = yield* Effect.promise(() =>
           askMarkdownHandler(platformOf(calls))({
             params: params("Not_An-Ask"),
-            request: get("/datekit/asks/Not_An-Ask.md"),
+            request: get("/oscabriel/datekit/asks/Not_An-Ask.md"),
           })
         );
 
@@ -263,7 +265,7 @@ describe("an ask's .md URL", () => {
         const response = yield* Effect.promise(() =>
           askMarkdownHandler(unreachable)({
             params: params(askId),
-            request: get(`/datekit/asks/${askId}.md`),
+            request: get(`/oscabriel/datekit/asks/${askId}.md`),
           })
         );
 
@@ -279,7 +281,7 @@ describe("an ask's .md URL", () => {
 describe("the ask page", () => {
   it("names its Markdown as an alternate, and says it varies by Accept", () => {
     expect(askPageHeaders({ params: params(askId) })).toStrictEqual({
-      link: `</datekit/asks/${askId}.md>; rel="alternate"; type="text/markdown"`,
+      link: `</oscabriel/datekit/asks/${askId}.md>; rel="alternate"; type="text/markdown"`,
       vary: "Accept",
     });
   });
@@ -346,7 +348,7 @@ describe("an ask's Markdown with the index named", () => {
 describe(refusalsMarkdown, () => {
   it("sets every refusal's explain lines in one text block, then each distinct next command once", () => {
     const refusals = [
-      new UnknownProject({ project: ProjectName.make("nowhere") }),
+      new UnknownProject({ project: ProjectName.make("oscabriel/nowhere") }),
       new UnknownAsk({ ask: askId }),
     ] as const;
 
@@ -364,7 +366,7 @@ describe(refusalsMarkdown, () => {
 });
 
 const accepting = (accept: string | undefined) =>
-  wantsMarkdown(get("/datekit/asks/parse-iso-week", accept));
+  wantsMarkdown(get("/oscabriel/datekit/asks/parse-iso-week", accept));
 
 describe(wantsMarkdown, () => {
   it.each([

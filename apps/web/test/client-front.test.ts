@@ -38,16 +38,16 @@ describe("the front page, through the web's atoms", seededWorld, () => {
             )
             .toSorted()
         ).toStrictEqual([
-          "burrow/drop-legacy-fetch false",
-          "burrow/drop-legacy-fetch-burrow-auth true",
-          "burrow/drop-legacy-fetch-burrow-billing true",
-          "burrow/drop-legacy-fetch-burrow-catalog true",
-          "burrow/drop-legacy-fetch-burrow-kit true",
-          "burrow/drop-legacy-fetch-burrow-notify true",
-          "burrow/drop-legacy-fetch-burrow-search true",
-          "datekit/add-months-clamp true",
-          "datekit/format-ordinal false",
-          "datekit/parse-iso-week false",
+          "oscabriel/burrow/drop-legacy-fetch false",
+          "oscabriel/burrow/drop-legacy-fetch-burrow-auth true",
+          "oscabriel/burrow/drop-legacy-fetch-burrow-billing true",
+          "oscabriel/burrow/drop-legacy-fetch-burrow-catalog true",
+          "oscabriel/burrow/drop-legacy-fetch-burrow-kit true",
+          "oscabriel/burrow/drop-legacy-fetch-burrow-notify true",
+          "oscabriel/burrow/drop-legacy-fetch-burrow-search true",
+          "oscabriel/datekit/add-months-clamp true",
+          "oscabriel/datekit/format-ordinal false",
+          "oscabriel/datekit/parse-iso-week false",
         ]);
 
         const reserved = entries.find(({ ask }) => ask.reserve !== undefined);

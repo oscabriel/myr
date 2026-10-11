@@ -68,9 +68,13 @@ export type Services =
   | Stage
   | HostInfo;
 
-/** git's smart-HTTP paths: `/<repo>(.git)/info/refs` and the two services. */
+/**
+ * git's smart-HTTP paths: `/<address>(.git)/info/refs` and the two services,
+ * where an address is a project's name in one to three segments, a fork's
+ * parts on the last (ADR 0032).
+ */
 const GIT_PATH =
-  /^\/[A-Za-z0-9._-]+\/(?:info\/refs|git-upload-pack|git-receive-pack)$/u;
+  /^\/[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+){0,2}\/(?:info\/refs|git-upload-pack|git-receive-pack)$/u;
 
 /**
  * Where an OAuth client learns how to get a credential: these two
@@ -86,10 +90,11 @@ const DISCOVERY_PATH =
 const SIGN_IN_PATH = /^\/(?:authorize|signup|token|oauth(?:\/.*)?)$/u;
 
 /**
- * A project's raw files, `/<project>/raw/<rev>/<path…>`: no git path, whose
- * second segment is `info` or a git service, ever matches it.
+ * A project's raw files, `/<project>/raw/<rev>/<path…>`, the project's name
+ * in one to three segments: no git path, whose segment after the name is
+ * `info` or a git service, ever matches it.
  */
-const RAW_PATH = /^\/[a-z0-9]+(?:-[a-z0-9]+)*\/raw\/.+$/u;
+const RAW_PATH = /^\/[a-z0-9._-]+(?:\/[a-z0-9._-]+){0,2}\/raw\/.+$/u;
 
 /**
  * The CLI's install script and releases (`releases.ts`):
@@ -385,6 +390,26 @@ const home = HttpRouter.use((router) =>
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
+/**
+ * A project's address in the router's words: one to three segments, each
+ * a parameter, joined back by `addressOf` (ADR 0032).
+ */
+const ADDRESSES = ["/:a", "/:a/:b", "/:a/:b/:c"] as const;
+
+/** The address a route's parameters spell, with its segments joined. */
+const addressOf = (params: Readonly<Record<string, string | undefined>>) =>
+  [params.a, params.b, params.c]
+    .filter((segment) => segment !== undefined)
+    .join("/");
+
+const RAW_ROUTES = ADDRESSES.map((address) => `${address}/raw/*` as const);
+
+const GIT_ROUTES = ADDRESSES.flatMap((address) => [
+  `${address}/info/refs` as const,
+  `${address}/git-upload-pack` as const,
+  `${address}/git-receive-pack` as const,
+]);
+
 /** `/<project>/raw/<rev>/<path…>`: a project's raw files (`raw.ts`). */
 const raw = HttpRouter.use((router) =>
   Effect.gen(function* () {
@@ -397,20 +422,22 @@ const raw = HttpRouter.use((router) =>
       Context.add(CodeStore, yield* CodeStore)
     );
 
-    yield* router.add("GET", "/:project/raw/*", (request) =>
-      Effect.gen(function* () {
-        const params = yield* HttpRouter.params;
+    for (const path of RAW_ROUTES) {
+      yield* router.add("GET", path, (request) =>
+        Effect.gen(function* () {
+          const params = yield* HttpRouter.params;
 
-        return yield* Option.match(decodeProject(params.project), {
-          onNone: () =>
-            Effect.succeed(HttpServerResponse.empty({ status: 404 })),
-          onSome: (project) =>
-            fromWeb((web) =>
-              Effect.provide(rawResponse(web, project), services)
-            )(request),
-        });
-      })
-    );
+          return yield* Option.match(decodeProject(addressOf(params)), {
+            onNone: () =>
+              Effect.succeed(HttpServerResponse.empty({ status: 404 })),
+            onSome: (project) =>
+              fromWeb((web) =>
+                Effect.provide(rawResponse(web, project), services)
+              )(request),
+          });
+        })
+      );
+    }
   })
 );
 
@@ -441,12 +468,6 @@ const toGateway = (request: HttpServerRequest.HttpServerRequest) =>
     ),
     Effect.orElseSucceed(() => HttpServerResponse.empty({ status: 400 }))
   );
-
-const GIT_ROUTES = [
-  "/:repo/info/refs",
-  "/:repo/git-upload-pack",
-  "/:repo/git-receive-pack",
-] as const;
 
 /**
  * git's smart-HTTP paths, each handed to the gateway with the services it

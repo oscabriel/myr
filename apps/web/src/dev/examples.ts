@@ -138,6 +138,14 @@ export const askFileOf = (stated: StatedAsk): AskFile => {
 
 // ------------------------------------------------------------- datekit
 
+/**
+ * The operator, who makes the dev world's examples in their namespace as
+ * the stages' were made, so `oscabriel/datekit` is theirs and the legacy
+ * address `/datekit` leads to it. They decide nothing: each project's
+ * config folder names its deciders.
+ */
+export const operator = Handle.make("oscabriel");
+
 export const datekitPeople = {
   contributor: Handle.make("bram"),
   decider: Handle.make("ines-v"),
@@ -453,7 +461,7 @@ export const datekit = {
       [AskId.make(stated.id), [askFileOf(stated), test]] as const
   ),
   files: library,
-  project: ProjectName.make("datekit"),
+  project: ProjectName.make("oscabriel/datekit"),
   /** A commit someone pushed straight to main, past the platform. */
   stray: {
     files: new Map([
@@ -658,7 +666,7 @@ export const burrow = {
     (stated) => [AskId.make(stated.id), [askFileOf(stated)]] as const
   ),
   files: monorepo,
-  project: ProjectName.make("burrow"),
+  project: ProjectName.make("oscabriel/burrow"),
 } as const;
 
 /** How many times `text` calls `symbol`, as burrow's `scripts/count-callers.ts` counts. */

@@ -82,11 +82,15 @@ const commands: readonly CommandDoc[] = [
 ];
 
 const projects: readonly ProjectListing[] = [
-  { openAsks: 3, posture: "open", project: ProjectName.make("datekit") },
+  {
+    openAsks: 3,
+    posture: "open",
+    project: ProjectName.make("oscabriel/datekit"),
+  },
   {
     openAsks: 1,
     posture: "openWithSealedEvidence",
-    project: ProjectName.make("burrow"),
+    project: ProjectName.make("oscabriel/burrow"),
   },
 ];
 
@@ -116,10 +120,10 @@ describe("the host's Markdown", () => {
 
     it("gives each project's clone URL in place of a web page", () => {
       expect(lines).toContain(
-        `- datekit: Open, 3 open asks. Clone: \`git clone ${platformUrl}/datekit.git\`.`
+        `- oscabriel/datekit: Open, 3 open asks. Clone: \`git clone ${platformUrl}/oscabriel/datekit.git\`.`
       );
       expect(lines).toContain(
-        `- burrow: Open with sealed evidence, 1 open ask. Clone: \`git clone ${platformUrl}/burrow.git\`.`
+        `- oscabriel/burrow: Open with sealed evidence, 1 open ask. Clone: \`git clone ${platformUrl}/oscabriel/burrow.git\`.`
       );
     });
 
@@ -188,8 +192,8 @@ describe("the index banner", () => {
 
   it("names a project's own index when it has one", () => {
     expect(
-      indexBanner({ project: ProjectName.make("datekit"), webUrl })
-    ).toContain(`${webUrl}/datekit/llms.txt`);
+      indexBanner({ project: ProjectName.make("oscabriel/datekit"), webUrl })
+    ).toContain(`${webUrl}/oscabriel/datekit/llms.txt`);
   });
 
   it("follows a project's heading and summary in its llms.txt", () => {
@@ -200,18 +204,18 @@ describe("the index banner", () => {
         listing: projects[0] ?? {
           openAsks: 0,
           posture: "open",
-          project: ProjectName.make("datekit"),
+          project: ProjectName.make("oscabriel/datekit"),
         },
         platformUrl,
         webUrl,
       })
     );
 
-    expect(lines[0]).toBe("# datekit");
+    expect(lines[0]).toBe("# oscabriel/datekit");
     expect(lines[2]?.startsWith("> A project on ")).toBeTruthy();
     expect(lines.slice(3, 6)).toStrictEqual([
       "",
-      indexBanner({ project: ProjectName.make("datekit"), webUrl }),
+      indexBanner({ project: ProjectName.make("oscabriel/datekit"), webUrl }),
       "",
     ]);
   });

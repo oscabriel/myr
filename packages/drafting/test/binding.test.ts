@@ -37,7 +37,7 @@ const input: DraftInput = {
     at: LandedSha.make("4".repeat(40)),
     files: [],
     policy: "Ask kinds: fix (redThenGreen).",
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
   },
   want: "Parse ISO week dates.",
 };

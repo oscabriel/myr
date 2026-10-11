@@ -15,9 +15,10 @@
  * prints the versioned envelope.
  *
  * `--only <example> --as <name>` seeds a fresh copy of that example under
- * another project name (`--only burrow --as burrow-swarm-2`), so a live run
- * can take a family nobody has touched while the example itself stays fresh
- * for the recording. A name some project has is refused. A copy on a stage
+ * another project name (`--only burrow --as burrow-swarm-2`, which is the
+ * operator's `oscabriel/burrow-swarm-2`), so a live run can take a family
+ * nobody has touched while the example itself stays fresh for the
+ * recording. A name some project has is refused. A copy on a stage
  * is written to the throwaway ledger (`infra/created.ts`, by `seed`) as soon
  * as the platform has made it, with its repo and each layer's repo.
  *
@@ -30,7 +31,7 @@
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Envelope } from "@repo/protocol/envelope";
-import { Handle, ProjectName } from "@repo/protocol/ids";
+import { Handle, keyOf, ProjectName } from "@repo/protocol/ids";
 import {
   Array,
   Console,
@@ -63,6 +64,7 @@ import {
   seeded,
   SeedStep,
   stageTarget,
+  worldOperator,
   worldTarget,
 } from "./lib/seed.ts";
 import type { SeededProject, SeedPlan } from "./lib/seed.ts";
@@ -150,7 +152,9 @@ const stageFrom = (argv: readonly string[]) =>
 
 /**
  * `--as`'s name, for a copy of the example `--only` names: a project name,
- * and not the example's own.
+ * and not the example's own. A bare word is the operator's
+ * (`burrow-swarm-2` is `oscabriel/burrow-swarm-2`): the operator makes the
+ * copy, and makes projects only in their own namespace.
  */
 const copyName = (name: string, only: Option.Option<string>) =>
   Effect.gen(function* () {
@@ -160,15 +164,19 @@ const copyName = (name: string, only: Option.Option<string>) =>
       );
     }
 
-    const copy = yield* Schema.decodeEffect(ProjectName)(name).pipe(
+    const spelled = name.includes("/") ? name : `${worldOperator}/${name}`;
+
+    const copy = yield* Schema.decodeEffect(ProjectName)(spelled).pipe(
       Effect.mapError(() =>
         failed(
-          `--as ${name} is no project name: use lowercase words joined by dashes`
+          `--as ${name} is no project name: use <owner>/<name>, or a name in lowercase words joined by dashes for ${worldOperator}'s`
         )
       )
     );
 
-    return copy === only.value
+    const example = Schema.decodeOption(ProjectName)(only.value);
+
+    return Option.contains(example, copy)
       ? yield* failed(
           `--as ${name} is the example's own name: a copy needs a name of its own`
         )
@@ -239,10 +247,13 @@ export const optionsOf = (
 export const recordCopy = (stage: Stage, plan: SeedPlan, at: DateTime.Utc) => {
   const { layers, projects } = resources(stage);
   const by = "seed";
+  // The ledger names what the platform keeps: the project's key, which is
+  // its Durable Object's id and its repo's name.
+  const key = keyOf(plan.project);
 
   const entries: readonly Created[] = [
-    { at, by, kind: "project", name: plan.project, stage },
-    { at, by, kind: "repo", name: plan.project, namespace: projects, stage },
+    { at, by, kind: "project", name: key, stage },
+    { at, by, kind: "repo", name: key, namespace: projects, stage },
     ...plan.layers.map(({ repo }): Created => ({
       at,
       by,

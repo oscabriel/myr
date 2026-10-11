@@ -31,7 +31,7 @@ import { ledgerAtom } from "../src/client/ledger.ts";
 import { areaSummaries } from "../src/features/ledger/areas.ts";
 import { LedgerView } from "../src/features/ledger/ledger-page.tsx";
 import { ProjectView } from "../src/features/project/project-page.tsx";
-import { readLedger } from "../src/routes/$project/ledger.tsx";
+import { readLedger } from "../src/routes/$owner/$project/ledger.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { textIn } from "./markup.ts";
@@ -402,7 +402,7 @@ describe("a project's ledger", () => {
         "7 sealed checks",
         "parser",
         "4 sealed checks",
-        `${Brand.cli} ledger --project datekit`,
+        `${Brand.cli} ledger --project oscabriel/datekit`,
         "sealed: counts, authors and a salted root",
         "write-only: names, and who set each value and when",
       ])
@@ -412,7 +412,7 @@ describe("a project's ledger", () => {
       plainText(
         /<code\b[^>]*select-all[^>]*>.*?<\/code>/u.exec(facts)?.[0] ?? ""
       )
-    ).toContain("ledger --project datekit");
+    ).toContain("ledger --project oscabriel/datekit");
   });
 
   it("shows a project without layers as Open, with nothing held back", () => {
@@ -429,10 +429,12 @@ describe("a project's ledger", () => {
 
   it.effect("sits under the project's crumbs: datekit, then Ledger", () =>
     Effect.gen(function* () {
-      const markup = yield* renderAt("/datekit/ledger", page);
+      const markup = yield* renderAt("/oscabriel/datekit/ledger", page);
       const crumbs = elementWith(markup, 'aria-label="Breadcrumb"');
 
-      expect(crumbs).toMatch(/<a\b[^>]*href="\/datekit"[^>]*>datekit<\/a>/u);
+      expect(crumbs).toMatch(
+        /<a\b[^>]*href="\/oscabriel\/datekit"[^>]*>oscabriel\/datekit<\/a>/u
+      );
       expect(plainText(crumbs)).toContain("Ledger");
     })
   );
@@ -544,7 +546,9 @@ describe(readLedger, () => {
       const asked = yield* Ref.make(0);
 
       const failed = yield* Effect.flip(
-        readLedger("no-such-project").pipe(Effect.provide(platformOf(asked)))
+        readLedger("oscabriel/no-such-project").pipe(
+          Effect.provide(platformOf(asked))
+        )
       );
 
       expect(isNotFound(failed)).toBeTruthy();
@@ -648,7 +652,7 @@ describe("the ledger's way in", () => {
     );
 
     expect(markup).toMatch(
-      /<a\b[^>]*href="\/datekit\/ledger"[^>]*>Ledger<\/a>/u
+      /<a\b[^>]*href="\/oscabriel\/datekit\/ledger"[^>]*>Ledger<\/a>/u
     );
   });
 });

@@ -16,6 +16,7 @@ import {
   ProjectName,
   RepoName,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
@@ -86,7 +87,7 @@ const scenario = aProject({ people }).pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -110,7 +111,7 @@ const anyone = Anonymous.make({});
 const remoteOf = (name: string) => `https://${Brand.domain}/${name}.git`;
 
 const forkOf = (ask: string, who: Person) =>
-  RepoName.make(`${project}--${ask}--${who.handle}`);
+  RepoName.make(`${keyOf(project)}--${ask}--${who.handle}`);
 
 const userOf = (handle: string) =>
   `${handle} <${handle}@users.${Brand.domain}>`;
@@ -131,7 +132,10 @@ const hoursAfter = (from: DateTime.Utc, count: number) =>
 
 /** The project as alice first pushes it: a library of four small packages. */
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   [
     "packages/format/src/format.ts",
     "export const format = (d) => String(d);\n",
@@ -771,7 +775,7 @@ describe.each(["memory", "sqlite"] as const)(
               lapsesAt: hoursAfter(noon, 24),
               openedAt: noon,
               project,
-              remote: remoteOf(bobFork),
+              remote: remoteOf(`${project}--parse-iso--bob`),
               state: "live",
               warnsAt: hoursAfter(noon, 2),
             })
@@ -1041,7 +1045,7 @@ const routing = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
   const projects = yield* Projects;
-  const other = ProjectName.make("burrow");
+  const other = ProjectName.make("bob/burrow");
   const made = yield* projects.create(project);
   const again = yield* projects.create(project).pipe(Effect.flip);
   const unknown = yield* projects.get(other).pipe(Effect.flip);
@@ -1259,15 +1263,15 @@ describe("projects", () => {
       (seen) => {
         expect(seen.again).toStrictEqual(new ProjectExists({ project }));
         expect(seen.unknown).toStrictEqual(
-          new UnknownProject({ project: ProjectName.make("burrow") })
+          new UnknownProject({ project: ProjectName.make("bob/burrow") })
         );
         expect(seen.initializedAgain).toStrictEqual(
           new ProjectExists({ project })
         );
         expect(seen.otherInitialized).toStrictEqual(
           Exit.succeed({
-            project: ProjectName.make("burrow"),
-            remote: remoteOf("burrow"),
+            project: ProjectName.make("bob/burrow"),
+            remote: remoteOf("bob/burrow"),
           })
         );
       }

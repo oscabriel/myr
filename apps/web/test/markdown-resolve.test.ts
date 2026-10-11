@@ -18,7 +18,7 @@ const scriptUrl = ["javascript", "alert(1)"].join(":");
 const at = (dir: string, kind: "link" | "media") => ({
   dir,
   kind,
-  project: ProjectName.make("p"),
+  project: ProjectName.make("oscabriel/p"),
   sha,
 });
 
@@ -35,33 +35,33 @@ describe("a link in a Markdown file", () => {
   });
 
   it.each([
-    ["./guide.md", "docs", `/p/blob/${sha}/docs/guide.md`],
-    ["guide.md", "docs/api", `/p/blob/${sha}/docs/api/guide.md`],
-    ["../../x", "docs", `/p/blob/${sha}/x`],
-    ["../../../../x", "docs/api", `/p/blob/${sha}/x`],
-    ["/LICENSE", "docs/api", `/p/blob/${sha}/LICENSE`],
-    ["/../LICENSE", "docs", `/p/blob/${sha}/LICENSE`],
-    ["src/a.ts?raw=1#L3", "", `/p/blob/${sha}/src/a.ts?raw=1#L3`],
-    ["CONTRIBUTING.md", "", `/p/blob/${sha}/CONTRIBUTING.md`],
-    ["./a.md#usage", "docs", `/p/blob/${sha}/docs/a.md#usage`],
-    ["my file.md", "", `/p/blob/${sha}/my%20file.md`],
-    ["my%20file.md", "", `/p/blob/${sha}/my%20file.md`],
+    ["./guide.md", "docs", `/oscabriel/p/blob/${sha}/docs/guide.md`],
+    ["guide.md", "docs/api", `/oscabriel/p/blob/${sha}/docs/api/guide.md`],
+    ["../../x", "docs", `/oscabriel/p/blob/${sha}/x`],
+    ["../../../../x", "docs/api", `/oscabriel/p/blob/${sha}/x`],
+    ["/LICENSE", "docs/api", `/oscabriel/p/blob/${sha}/LICENSE`],
+    ["/../LICENSE", "docs", `/oscabriel/p/blob/${sha}/LICENSE`],
+    ["src/a.ts?raw=1#L3", "", `/oscabriel/p/blob/${sha}/src/a.ts?raw=1#L3`],
+    ["CONTRIBUTING.md", "", `/oscabriel/p/blob/${sha}/CONTRIBUTING.md`],
+    ["./a.md#usage", "docs", `/oscabriel/p/blob/${sha}/docs/a.md#usage`],
+    ["my file.md", "", `/oscabriel/p/blob/${sha}/my%20file.md`],
+    ["my%20file.md", "", `/oscabriel/p/blob/${sha}/my%20file.md`],
   ])("resolves %j in %j", (url, dir, expected) => {
     expect(resolveRepoUrl(url, at(dir, "link"))).toBe(expected);
   });
 
   it.each([
-    ["docs/", "", `/p/tree/${sha}/docs`],
-    ["..", "docs/api", `/p/tree/${sha}/docs`],
-    ["/", "docs", `/p/tree/${sha}`],
-    ["./", "", `/p/tree/${sha}`],
+    ["docs/", "", `/oscabriel/p/tree/${sha}/docs`],
+    ["..", "docs/api", `/oscabriel/p/tree/${sha}/docs`],
+    ["/", "docs", `/oscabriel/p/tree/${sha}`],
+    ["./", "", `/oscabriel/p/tree/${sha}`],
   ])("opens %j in %j as a folder", (url, dir, expected) => {
     expect(resolveRepoUrl(url, at(dir, "link"))).toBe(expected);
   });
 
   it.each([
-    ["/\\evil.example/x", `/p/blob/${sha}/x`],
-    ["\\\\evil.example/x", `/p/blob/${sha}/x`],
+    ["/\\evil.example/x", `/oscabriel/p/blob/${sha}/x`],
+    ["\\\\evil.example/x", `/oscabriel/p/blob/${sha}/x`],
   ])("keeps %j inside the project", (url, expected) => {
     expect(resolveRepoUrl(url, at("", "link"))).toBe(expected);
   });
@@ -69,10 +69,10 @@ describe("a link in a Markdown file", () => {
 
 describe("an image or a video in a Markdown file", () => {
   it.each([
-    ["./img/logo.png", "docs", `/p/raw/${sha}/docs/img/logo.png`],
-    ["media/logo.svg", "", `/p/raw/${sha}/media/logo.svg`],
-    ["/media/logo.svg", "docs", `/p/raw/${sha}/media/logo.svg`],
-    ["../demo.mp4", "docs", `/p/raw/${sha}/demo.mp4`],
+    ["./img/logo.png", "docs", `/oscabriel/p/raw/${sha}/docs/img/logo.png`],
+    ["media/logo.svg", "", `/oscabriel/p/raw/${sha}/media/logo.svg`],
+    ["/media/logo.svg", "docs", `/oscabriel/p/raw/${sha}/media/logo.svg`],
+    ["../demo.mp4", "docs", `/oscabriel/p/raw/${sha}/demo.mp4`],
     ["https://e.org/logo.png", "docs", "https://e.org/logo.png"],
   ])("resolves %j in %j", (url, dir, expected) => {
     expect(resolveRepoUrl(url, at(dir, "media"))).toBe(expected);

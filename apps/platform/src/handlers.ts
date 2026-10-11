@@ -42,8 +42,8 @@ import { Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
 import type { AnswerView } from "@repo/protocol/domain/answer";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import type { Decision, Today } from "@repo/protocol/domain/decision";
-import { sameHandle } from "@repo/protocol/ids";
-import type { ProjectName, RepoName } from "@repo/protocol/ids";
+import { addressOfRepo, sameHandle, RepoName } from "@repo/protocol/ids";
+import type { ProjectName } from "@repo/protocol/ids";
 import { CurrentPrincipal, Principal } from "@repo/protocol/principal";
 import type { Person } from "@repo/protocol/principal";
 import { NotDecider } from "@repo/protocol/refusal";
@@ -99,9 +99,16 @@ const gateway = Effect.gen(function* () {
   });
 });
 
-/** A repo's git URL at the gateway the caller came through. */
+/**
+ * A repo's git URL at the gateway the caller came through: a project by its
+ * name, a fork by its project's name and its own parts (ADR 0032).
+ */
 const remoteOf = (repo: RepoName | ProjectName) =>
-  Effect.map(gateway, (origin) => `${origin}/${repo}.git`);
+  Effect.map(
+    gateway,
+    (origin) =>
+      `${origin}/${repo.includes("/") ? repo : Option.getOrElse(addressOfRepo(RepoName.make(repo)), () => repo)}.git`
+  );
 
 /** A claim, with its fork's URL at the caller's gateway. */
 const atGateway = (claim: ClaimView) =>

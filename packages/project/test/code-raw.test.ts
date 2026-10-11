@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
-import { RepoPath } from "@repo/protocol/ids";
+import { ProjectName, RepoPath } from "@repo/protocol/ids";
 import { Effect, Option } from "effect";
 
 import { treeOf } from "../src/code.ts";
@@ -174,14 +174,16 @@ describe("a raw request's URL", () => {
   it("gives everything after the project's raw/, still encoded", () => {
     expect(
       [
-        "https://host.example/datekit/raw/%40datekit%2Fcore%402.0.0/README.md",
-        "/datekit/raw/main/docs/a%20b.md?plain=1#L2",
-        "/datekit/raw/main",
-      ].map(rawRestOf)
+        "https://host.example/alice/datekit/raw/%40datekit%2Fcore%402.0.0/README.md",
+        "/alice/datekit/raw/main/docs/a%20b.md?plain=1#L2",
+        "/alice/datekit/raw/main",
+        "/datekit/raw/main/README.md",
+      ].map((url) => rawRestOf(url, ProjectName.make("alice/datekit")))
     ).toStrictEqual([
       "%40datekit%2Fcore%402.0.0/README.md",
       "main/docs/a%20b.md",
       "main",
+      "main/README.md",
     ]);
   });
 });

@@ -5,7 +5,7 @@ import { projectSkill } from "@repo/agent-kit/project-skill";
 import { Client } from "@repo/protocol/contracts";
 import type { Policy } from "@repo/protocol/domain/policy";
 import { RunBlock } from "@repo/protocol/domain/run";
-import { Handle, LandedSha, ProjectName } from "@repo/protocol/ids";
+import { Handle, keyOf, LandedSha, ProjectName } from "@repo/protocol/ids";
 import { gitOk } from "@repo/testkit/git";
 import { Effect, Exit, FileSystem, Layer, Path, Schema } from "effect";
 import { CliOutput } from "effect/cli";
@@ -49,7 +49,7 @@ const checked = (root: string) =>
 
 const name = ProjectName.make(project);
 
-const skill = `.agents/skills/${project}-contribute/SKILL.md`;
+const skill = `.agents/skills/${keyOf(ProjectName.make(project))}-contribute/SKILL.md`;
 
 /** The landing an older copy of the skill came from. */
 const older = LandedSha.make("a".repeat(40));

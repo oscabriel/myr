@@ -37,7 +37,7 @@ const isProjectName = Schema.is(ProjectName);
  */
 export const useCurrentProject = (): ProjectName | undefined =>
   useMatch({
-    from: "/$project",
+    from: "/$owner/$project",
     select: ({ params }) =>
       isProjectName(params.project) ? params.project : undefined,
     shouldThrow: false,

@@ -177,7 +177,7 @@ const rows: readonly {
       target: PushTarget.ClaimFork({
         ask: ask.id,
         claimant: bob,
-        project: ProjectName.make("timekit"),
+        project: ProjectName.make("oscabriel/timekit"),
       }),
     }),
     name: "a push to another project's fork of an ask with the same name",

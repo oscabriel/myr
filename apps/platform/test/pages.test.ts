@@ -59,7 +59,7 @@ const home = Effect.gen(function* () {
           {
             openAsks: 2,
             posture: "open",
-            project: ProjectName.make("datekit"),
+            project: ProjectName.make("alice/datekit"),
           },
         ],
       }),

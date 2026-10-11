@@ -1,12 +1,21 @@
 /**
  * What a repo's name says it is: a project's canonical repo
- * `<project>`, a claim's fork `<project>--<ask>--<handle>`, or a person's
- * working fork `<project>--me--<handle>`, each handle in lowercase. `--`
- * occurs in no project or ask name, so a name splits back into its parts.
+ * `<key>`, a claim's fork `<key>--<ask>--<handle>`, or a person's
+ * working fork `<key>--me--<handle>`, each handle in lowercase, where the
+ * key is the project's flat key (ADR 0032). `--` occurs in no key or ask
+ * name, so a name splits back into its parts.
  * Pure: the platform's gateway, handlers and OnPush read names with it, and
  * a project lists its forks by it.
  */
-import { AskId, Handle, ProjectName, RepoName } from "@repo/protocol/ids";
+import {
+  AskId,
+  Handle,
+  keyOf,
+  nameOfKey,
+  ProjectKey,
+  RepoName,
+} from "@repo/protocol/ids";
+import type { ProjectName } from "@repo/protocol/ids";
 import { Data, Option, Schema } from "effect";
 
 import { forkName } from "./claim.ts";
@@ -31,7 +40,10 @@ export type RepoKind =
 
 export const RepoKind = Data.taggedEnum<RepoKind>();
 
-const asProject = Schema.decodeOption(ProjectName);
+const asKey = Schema.decodeOption(ProjectKey);
+
+/** The project a repo name's first part names: its key, read back (ADR 0032). */
+const asProject = (first: string) => Option.flatMap(asKey(first), nameOfKey);
 
 const asAsk = Schema.decodeOption(AskId);
 
@@ -84,4 +96,4 @@ export const claimForkName: (
 
 /** A person's working fork: `<project>--me--<handle in lowercase>`. */
 export const workingForkName = (project: ProjectName, handle: Handle) =>
-  RepoName.make(`${project}--${WORKING}--${handle.toLowerCase()}`);
+  RepoName.make(`${keyOf(project)}--${WORKING}--${handle.toLowerCase()}`);

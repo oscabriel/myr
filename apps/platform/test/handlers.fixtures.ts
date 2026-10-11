@@ -26,7 +26,7 @@ import { Contracts } from "@repo/protocol/contracts";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { Policy } from "@repo/protocol/domain/policy";
-import { Handle, RepoName, RepoPath } from "@repo/protocol/ids";
+import { Handle, keyOf, RepoName, RepoPath } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { asPerson } from "@repo/protocol/testing";
 import { Finishers } from "@repo/rules/finish";
@@ -43,7 +43,10 @@ const mainRef = RefName.make("refs/heads/main");
 
 /** A library of four small packages, as each project's first commit holds it. */
 const start = (name: string): Files => [
-  ["package.json", `{ "name": "${name}", "workspaces": ["packages/*"] }\n`],
+  [
+    "package.json",
+    `{ "name": "${name.slice(name.lastIndexOf("/") + 1)}", "workspaces": ["packages/*"] }\n`,
+  ],
   [
     "packages/format/src/format.ts",
     "export const format = (d) => String(d);\n",
@@ -182,7 +185,7 @@ export const seeded = (scenario: Scenario) =>
     const host = yield* RepoHost;
     const api = yield* (yield* Projects).create(scenario.project);
     const initializer = Person.make({ handle: scenario.initializer });
-    const repo = RepoName.make(scenario.project);
+    const repo = RepoName.make(keyOf(scenario.project));
     const client = yield* gitClient(memoryFs());
 
     yield* api.initProject(initializer, {});

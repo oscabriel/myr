@@ -27,6 +27,7 @@ import { keptEvents } from "@repo/project/project-store";
 import { Projects } from "@repo/project/projects";
 import { NoneOrMore } from "@repo/protocol/domain/common";
 import { ProjectEvent } from "@repo/protocol/domain/event";
+import { keyOf } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
 import type { UnknownProject } from "@repo/protocol/refusal";
 import {
@@ -302,7 +303,7 @@ const socketFrames = (
 ) =>
   Stream.callback<string, SocketRefused | SocketLost>((queue) =>
     Effect.gen(function* () {
-      const stub = namespace.get(namespace.idFromName(project));
+      const stub = namespace.get(namespace.idFromName(keyOf(project)));
 
       const answer = yield* Effect.tryPromise({
         catch: (cause) => new SocketRefused({ cause }),

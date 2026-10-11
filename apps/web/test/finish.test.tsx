@@ -78,7 +78,7 @@ const textOf = (element: ReactElement) => textIn(markupOf(element));
 
 const PLATFORM_URL = "https://platform-test.example.workers.dev";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const parseIso = AskId.make("parse-iso");
 
@@ -314,7 +314,9 @@ describe(FinishView, () => {
 
     expect(text).toContain(`git fetch ${PLATFORM_URL}/`);
     expect(text).toContain(` ${head}`);
-    expect(text).toContain(`${Brand.cli} finish parse-iso --project datekit`);
+    expect(text).toContain(
+      `${Brand.cli} finish parse-iso --project oscabriel/datekit`
+    );
     expect(markupOf(element)).not.toContain("<diffs-container");
     expect(markupOf(element)).not.toContain('data-diff="');
   });

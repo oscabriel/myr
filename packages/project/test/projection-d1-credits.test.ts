@@ -45,9 +45,9 @@ const beforeProjects = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
   Layer.provideMerge(migrated([frontPageMigration]))
 );
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("alice/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("alice/burrow");
 
 const fix = KindName.make("fix");
 
@@ -257,12 +257,12 @@ describe("the project list and credits in D1", () => {
         const sql = yield* SqlClient;
 
         // The rows the first projection wrote before the project list existed.
-        yield* sql`INSERT INTO cursor (project, seq) VALUES ('datekit', 4), ('burrow', 2)`;
+        yield* sql`INSERT INTO cursor (project, seq) VALUES ('alice__datekit', 4), ('alice__burrow', 2)`;
         yield* sql`INSERT INTO front_page
             (project, ask, kind, reserve, want, territory, claimed, blocked_by, opened_at)
           VALUES
-            ('datekit', 'week-start', 'fix', NULL, 'week-start works', 'src', 0, '[]', '2026-10-08T09:02:00.000Z'),
-            ('datekit', 'format-tz', 'fix', NULL, 'format-tz works', 'src', 0, '[]', '2026-10-08T09:03:00.000Z')`;
+            ('alice__datekit', 'week-start', 'fix', NULL, 'week-start works', 'src', 0, '[]', '2026-10-08T09:02:00.000Z'),
+            ('alice__datekit', 'format-tz', 'fix', NULL, 'format-tz works', 'src', 0, '[]', '2026-10-08T09:03:00.000Z')`;
 
         yield* applied(projectsMigration);
 

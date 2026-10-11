@@ -24,7 +24,7 @@ import { ContractsClient, webContracts } from "../src/surfaces.ts";
 
 export const WEB_URL = "http://localhost:3000";
 
-export const datekit = ProjectName.make("datekit");
+export const datekit = ProjectName.make("oscabriel/datekit");
 
 /** The decider of datekit in the dev world, and the token that signs them in. */
 export const DECIDER = "dev-ines-v";

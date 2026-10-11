@@ -11,6 +11,7 @@
  * `live.ts` holds the real ones.
  */
 import { ProjectName } from "@repo/protocol/ids";
+import type { ProjectKey } from "@repo/protocol/ids";
 import { ProjectExists } from "@repo/protocol/refusal";
 import {
   Array,
@@ -241,13 +242,13 @@ export const optionsOf = (
       onSome: (named) =>
         Option.match(
           Option.filter(decodeProject(named), (project) =>
-            examples.some((one) => one.project === project)
+            examples.some((one) => one.name === project)
           ),
           {
             onNone: () =>
               Effect.fail(
                 failed(
-                  `--only ${named} names no example: ${examples.map(({ project }) => project).join(", ")}`
+                  `--only ${named} names no example: ${examples.map(({ name }) => name).join(", ")}`
                 )
               ),
             onSome: Effect.succeedSome,
@@ -268,28 +269,31 @@ export const optionsOf = (
     };
   });
 
-/** The ledger's line for an import's repo, in the stage's public namespace. */
+/**
+ * The ledger's line for an import's repo, in the stage's public namespace,
+ * by its key: the repo's name, as the platform keeps it.
+ */
 const repoLine = (
   stage: Stage,
-  project: ProjectName,
+  key: ProjectKey,
   at: DateTime.Utc
 ): Created => ({
   at,
   by: "import",
   kind: "repo",
-  name: project,
+  name: key,
   namespace: resources(stage).projects,
   stage,
 });
 
-/** The ledger's two lines for a new import on `stage`: its project, and its repo. */
+/** The ledger's two lines for a new import on `stage`: its project, and its repo, by its key. */
 const importLines = (
   stage: Stage,
-  project: ProjectName,
+  key: ProjectKey,
   at: DateTime.Utc
 ): readonly Created[] => [
-  { at, by: "import", kind: "project", name: project, stage },
-  repoLine(stage, project, at),
+  { at, by: "import", kind: "project", name: key, stage },
+  repoLine(stage, key, at),
 ];
 
 const ledgerFailed = ({ message }: PlatformError.PlatformError) =>
@@ -328,13 +332,11 @@ const backfillOne = (
     yield* Option.match(stage, {
       onNone: () => Effect.void,
       onSome: (on) =>
-        record([
-          { ...repoLine(on, example.project, at), note: "tags backfilled" },
-        ]),
+        record([{ ...repoLine(on, example.key, at), note: "tags backfilled" }]),
     });
 
     yield* Console.log(
-      `  ${example.project}: ${pushed} tags backfilled from ${example.url}`
+      `  ${example.name}: ${pushed} tags backfilled from ${example.url}`
     );
   });
 
@@ -374,13 +376,13 @@ const recordedImports = (stage: Option.Option<Stage>) =>
     const imported = ledger.filter(({ by }) => by === "import");
 
     return new Set(
-      examples.flatMap(({ project }) =>
+      examples.flatMap(({ key, name }) =>
         isRecorded(imported, {
           kind: "project",
-          name: project,
+          name: key,
           stage: stage.value,
         })
-          ? [project]
+          ? [name]
           : []
       )
     );
@@ -400,7 +402,7 @@ const sourceOne = (example: ImportExample) =>
       Effect.catch(({ reason }) => Effect.succeed(`source not kept: ${reason}`))
     );
 
-    yield* Console.log(`  ${example.project}: ${outcome}`);
+    yield* Console.log(`  ${example.name}: ${outcome}`);
   });
 
 /** The run itself, over a target, a backfill and a web. */
@@ -414,12 +416,12 @@ const run = (options: ImportOptions) =>
 
     const asked = planImports(examples, new Set(), options.only);
     const plan = planImports(examples, known, options.only);
-    const skipped = asked.filter(({ project }) => known.has(project));
+    const skipped = asked.filter(({ name }) => known.has(name));
 
     // The earlier imports `--tags` and `--sources` go back over: on a
     // stage, those the ledger records; in the Node world, every one listed.
     const earlier = skipped.filter(
-      ({ project }) => Option.isNone(stage) || recorded.has(project)
+      ({ name }) => Option.isNone(stage) || recorded.has(name)
     );
 
     yield* Console.log(
@@ -427,11 +429,11 @@ const run = (options: ImportOptions) =>
     );
     yield* Effect.forEach(
       skipped,
-      ({ project }) =>
+      ({ name }) =>
         Console.log(
-          listed.has(project)
-            ? `  skip ${project}: listed already`
-            : `  skip ${project}: imported already, as the ledger records`
+          listed.has(name)
+            ? `  skip ${name}: listed already`
+            : `  skip ${name}: imported already, as the ledger records`
         ),
       { discard: true }
     );
@@ -439,17 +441,17 @@ const run = (options: ImportOptions) =>
     if (options.dryRun) {
       yield* Effect.forEach(
         plan,
-        ({ branch, project, url }) =>
-          Console.log(`  would import ${project} from ${url} (${branch})`),
+        ({ branch, name, url }) =>
+          Console.log(`  would import ${name} from ${url} (${branch})`),
         { discard: true }
       );
 
       if (options.sources) {
         yield* Effect.forEach(
           earlier,
-          ({ branch, project, url }) =>
+          ({ branch, name, url }) =>
             Console.log(
-              `  would keep the source of ${project}: ${url} (${branch})`
+              `  would keep the source of ${name}: ${url} (${branch})`
             ),
           { discard: true }
         );
@@ -472,20 +474,20 @@ const run = (options: ImportOptions) =>
           // can fail.
           yield* Option.match(stage, {
             onNone: () => Effect.void,
-            onSome: (on) => record(importLines(on, example.project, at)),
+            onSome: (on) => record(importLines(on, example.key, at)),
           });
 
-          const { heads, tags } = yield* target.counts(example.project);
+          const { heads, tags } = yield* target.counts(example.name);
 
           yield* Console.log(
-            `imported ${example.project} (${example.kind}, ${example.branch}): main at ${made.landed?.slice(0, 12) ?? "a SHA an earlier unanswered call landed"}, ${heads} heads, ${tags} tags`
+            `imported ${example.name} (${example.kind}, ${example.branch}): main at ${made.landed?.slice(0, 12) ?? "a SHA an earlier unanswered call landed"}, ${heads} heads, ${tags} tags`
           );
 
           if (options.tags) {
             yield* backfillOne(example, tags, stage);
           }
 
-          yield* warmOne(example.project);
+          yield* warmOne(example.name);
         }),
       { discard: true }
     );
@@ -496,7 +498,7 @@ const run = (options: ImportOptions) =>
       yield* Effect.forEach(
         earlier,
         (example) =>
-          Effect.flatMap(target.counts(example.project), ({ tags }) =>
+          Effect.flatMap(target.counts(example.name), ({ tags }) =>
             backfillOne(example, tags, stage)
           ),
         { discard: true }
@@ -508,7 +510,7 @@ const run = (options: ImportOptions) =>
     }
 
     if (options.warm) {
-      yield* Effect.forEach(skipped, ({ project }) => warmOne(project), {
+      yield* Effect.forEach(skipped, ({ name }) => warmOne(name), {
         discard: true,
       });
     }

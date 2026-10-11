@@ -58,15 +58,18 @@ const forkOf = (
       );
 
 /**
- * What a repo's name says it is: `<project>`, `<project>--<ask>--<handle>`,
- * `<project>--me--<handle>` or `<project>--<layer>`. `--` occurs in no
- * project or ask name, so a name splits back into its parts; any other name
- * is none of the platform's.
+ * What a repo's address says it is: `<project>`, `<project>--<ask>--<handle>`,
+ * `<project>--me--<handle>` or `<project>--<layer>`, where the project is its
+ * name (`alice/datekit`, `github.com/pallets/click`) or a key a project kept
+ * from before owners (`datekit`). `--` occurs in no name or ask, so an
+ * address splits back into its parts; any other is none of the platform's.
  */
 export const parseRepoName = (name: string): Option.Option<RepoRef> => {
-  const [first = "", ...rest] = name.split("--");
+  const slash = name.lastIndexOf("/");
+  const [first = "", ...rest] = name.slice(slash + 1).split("--");
+  const spelled = slash === -1 ? first : `${name.slice(0, slash)}/${first}`;
 
-  return Option.flatMap(asProject(first), (project) => {
+  return Option.flatMap(asProject(spelled), (project) => {
     const [second, third] = rest;
 
     if (second === undefined) {
@@ -100,8 +103,9 @@ const webOrigin = (url: string) =>
   );
 
 /**
- * A remote url as a platform serves repos: `https://<host>/<repo>.git`, one
- * path segment, over HTTP(S). The origin drops any user the url carries.
+ * A remote url as a platform serves repos: `https://<host>/<address>.git`,
+ * the address one to three path segments (a project's name, a fork's parts
+ * on the last), over HTTP(S). The origin drops any user the url carries.
  */
 export const parseRemote = (
   url: string
@@ -112,7 +116,7 @@ export const parseRemote = (
       .replace(/\/$/u, "")
       .replace(/\.git$/u, "");
 
-    return /^[A-Za-z0-9._-]+$/u.test(repo)
+    return /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+){0,2}$/u.test(repo)
       ? Option.some({ origin, repo })
       : Option.none();
   });

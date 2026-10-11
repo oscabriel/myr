@@ -1,14 +1,14 @@
 /**
  * Six small fictional projects beside the others, so a list of projects
  * runs past what fits beside it, each made through the project service as
- * datekit is: created, its first commit pushed, one ask opened by its
- * decider. `mossgate` opens none: a visitor's proposal is all it holds, so
+ * datekit is, in its decider's namespace (`okafor/amberlog`): created, its
+ * first commit pushed, one ask opened by its decider. `mossgate` opens none: a visitor's proposal is all it holds, so
  * it lists with no open asks.
  */
 import { Brand } from "@repo/brand";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { Handle } from "@repo/protocol/ids";
-import { AskId, ProjectName, RepoPath } from "@repo/protocol/ids";
+import { AskId, ProjectName, RepoPath, shortNameOf } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { Array, Effect, Schema } from "effect";
 
@@ -41,7 +41,10 @@ const filler = (input: {
   readonly summary: string;
   readonly source: string;
   readonly ask?: { readonly id: string; readonly want: string };
-}): Filler => ({ ...input, project: ProjectName.make(input.project) });
+}): Filler => ({
+  ...input,
+  project: ProjectName.make(`${input.decider}/${input.project}`),
+});
 
 const fillers: readonly Filler[] = [
   filler({
@@ -145,7 +148,7 @@ const filesOf = (project: Filler, stated: readonly StatedAsk[]): Files =>
     [
       "README.md",
       [
-        `# ${project.project}`,
+        `# ${shortNameOf(project.project)}`,
         "",
         project.summary,
         "",
@@ -155,7 +158,7 @@ const filesOf = (project: Filler, stated: readonly StatedAsk[]): Files =>
     ],
     [
       "package.json",
-      `${JSON.stringify({ name: project.project, scripts: { test: "bun test" }, type: "module", version: "0.1.0" }, null, 2)}\n`,
+      `${JSON.stringify({ name: shortNameOf(project.project), scripts: { test: "bun test" }, type: "module", version: "0.1.0" }, null, 2)}\n`,
     ],
     [
       `src/${project.source}.ts`,

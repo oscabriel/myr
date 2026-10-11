@@ -14,6 +14,7 @@ import {
   LandedSha,
   ProjectName,
   RepoName,
+  keyOf,
   TreeSha,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -67,7 +68,7 @@ const gitSays = (repo: CheckRepo, head: string) =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const hosted = yield* fs.makeTempDirectoryScoped();
-    const name = RepoName.make(project);
+    const name = RepoName.make(keyOf(ProjectName.make(project)));
 
     yield* gitOk(
       repo.root,

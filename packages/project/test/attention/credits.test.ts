@@ -19,7 +19,7 @@ const datekit = aProject({ now }).pipe(
 );
 
 /** `burrow`: an ask in `packages/p1`. */
-const burrow = aProject({ name: "burrow", now }).pipe(
+const burrow = aProject({ name: "alice/burrow", now }).pipe(
   withAsk({ id: "drop-legacy-p1", territory: "packages/p1" })
 );
 
@@ -96,13 +96,13 @@ describe("a person's credits", () => {
     ];
 
     expect(creditsByArea({ asks, handle: alice, landings })).toStrictEqual([
-      row("burrow", "p1", "Advised-by", 1),
-      row("burrow", "p1", "Released-by", 1),
-      row("datekit", "format", "Finished-by", 1),
-      row("datekit", "format", "Signed-off-by", 1),
-      row("datekit", "parser", "Asked-by", 2),
-      row("datekit", "parser", "Decided-by", 1),
-      row("datekit", "parser", "Mentored-by", 1),
+      row("alice/burrow", "p1", "Advised-by", 1),
+      row("alice/burrow", "p1", "Released-by", 1),
+      row("alice/datekit", "format", "Finished-by", 1),
+      row("alice/datekit", "format", "Signed-off-by", 1),
+      row("alice/datekit", "parser", "Asked-by", 2),
+      row("alice/datekit", "parser", "Decided-by", 1),
+      row("alice/datekit", "parser", "Mentored-by", 1),
     ]);
   });
 
@@ -120,13 +120,13 @@ describe("a person's credits", () => {
     expect(
       creditsByArea({ asks, handle: alice, landings: [all] })
     ).toStrictEqual([
-      row("datekit", "parser", "Advised-by", 1),
-      row("datekit", "parser", "Asked-by", 1),
-      row("datekit", "parser", "Decided-by", 1),
-      row("datekit", "parser", "Finished-by", 1),
-      row("datekit", "parser", "Mentored-by", 1),
-      row("datekit", "parser", "Released-by", 1),
-      row("datekit", "parser", "Signed-off-by", 1),
+      row("alice/datekit", "parser", "Advised-by", 1),
+      row("alice/datekit", "parser", "Asked-by", 1),
+      row("alice/datekit", "parser", "Decided-by", 1),
+      row("alice/datekit", "parser", "Finished-by", 1),
+      row("alice/datekit", "parser", "Mentored-by", 1),
+      row("alice/datekit", "parser", "Released-by", 1),
+      row("alice/datekit", "parser", "Signed-off-by", 1),
     ]);
   });
 
@@ -138,7 +138,7 @@ describe("a person's credits", () => {
 
     expect(
       creditsByArea({ asks, handle: alice, landings: [twice] })
-    ).toStrictEqual([row("datekit", "parser", "Signed-off-by", 1)]);
+    ).toStrictEqual([row("alice/datekit", "parser", "Signed-off-by", 1)]);
   });
 
   it("never counts Assisted-by: agent help is disclosed, not credited", () => {
@@ -159,7 +159,7 @@ describe("a person's credits", () => {
 
     expect(
       creditsByArea({ asks, handle: alice, landings: [helped, alone] })
-    ).toStrictEqual([row("datekit", "parser", "Signed-off-by", 2)]);
+    ).toStrictEqual([row("alice/datekit", "parser", "Signed-off-by", 2)]);
     expectTypeOf<"Assisted-by">().not.toExtend<CreditSummary["role"]>();
   });
 

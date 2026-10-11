@@ -24,6 +24,7 @@ import {
   LaneName,
   RepoName,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
@@ -61,7 +62,7 @@ const scenario = aProject({ deciders: ["ines-v"], people: ["bram"] });
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -227,7 +228,7 @@ const tokenRunEnv = {
 
 /** The project as ines-v first pushes it: a package and its env schema. */
 const start = (schema: string): Files => [
-  ["package.json", '{ "name": "datekit" }\n'],
+  ["package.json", '{ "name": "alice/datekit" }\n'],
   ["src/index.ts", "export const now = () => 0;\n"],
   [".env.schema", schema],
 ];

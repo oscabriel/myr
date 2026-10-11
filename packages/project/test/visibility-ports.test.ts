@@ -25,6 +25,7 @@ import {
   RepoName,
   RepoPath,
   RequestId,
+  keyOf,
   SuiteRoot,
 } from "@repo/protocol/ids";
 import { Anonymous, Person, Principal } from "@repo/protocol/principal";
@@ -56,7 +57,7 @@ const scenario = aProject({ people: ["bob"] }).pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const alice = Person.make({ handle: scenario.initializer });
 
@@ -80,7 +81,10 @@ const pinned = {
 const sealedPath = RepoPath.make("checks/held-back/export/escape.test.ts");
 
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
 ];
 
@@ -176,7 +180,7 @@ const fakeVisibility = (seen: Seen): VisibilityPort => ({
           {
             name: input.layer,
             proposed: input.head,
-            repo: RepoName.make(`${project}--${input.layer}`),
+            repo: RepoName.make(`${keyOf(project)}--${input.layer}`),
           },
         ],
       },
@@ -194,7 +198,7 @@ const fakeVisibility = (seen: Seen): VisibilityPort => ({
           layers: [
             {
               name: maintainers,
-              repo: RepoName.make(`${project}--${maintainers}`),
+              repo: RepoName.make(`${keyOf(project)}--${maintainers}`),
             },
           ],
           ledger: [

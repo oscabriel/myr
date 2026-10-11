@@ -31,7 +31,7 @@ import { DateTime } from "effect";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-export const project = ProjectName.make("datekit");
+export const project = ProjectName.make("oscabriel/datekit");
 
 export const askId = AskId.make("parse-iso-week");
 

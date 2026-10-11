@@ -35,6 +35,8 @@ import {
   Handle,
   LaneName,
   RepoName,
+  keyOf,
+  addressOfRepo,
   RepoPath,
 } from "@repo/protocol/ids";
 import type { LandedSha, ProjectName, RequestId } from "@repo/protocol/ids";
@@ -372,7 +374,7 @@ export const gatewayWorld = (scenarios: readonly Scenario[]) =>
         const { commit: composed } = yield* lander.compose({
           files,
           main,
-          repo: RepoName.make(ask.project),
+          repo: RepoName.make(keyOf(ask.project)),
         });
 
         script.set(
@@ -393,6 +395,12 @@ export const gatewayWorld = (scenarios: readonly Scenario[]) =>
       root,
       seen,
       /** A repo's URL at the gateway. */
-      urlOf: (repo: string) => `${origin}/${repo}.git`,
+      /** A repo's URL at the gateway: a project by its name, a fork by its address. */
+      urlOf: (repo: string) =>
+        `${origin}/${
+          repo.includes("/")
+            ? repo
+            : Option.getOrElse(addressOfRepo(RepoName.make(repo)), () => repo)
+        }.git`,
     };
   });

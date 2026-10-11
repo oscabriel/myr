@@ -43,7 +43,7 @@ const redThenGreen = (path: string) =>
 const opened = {
   openedAt: now,
   openedIn: at,
-  project: "datekit",
+  project: "oscabriel/datekit",
   state: "open",
 };
 

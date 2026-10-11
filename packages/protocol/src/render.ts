@@ -4,6 +4,7 @@ import type { Array } from "effect";
 
 import type { AnswerReceipt } from "./domain/answer.ts";
 import { Outcome } from "./domain/outcome.ts";
+import { ownerOf } from "./ids.ts";
 import { ChecksFailed } from "./refusal.ts";
 import type { CapReached, MovedBy, Refusal } from "./refusal.ts";
 
@@ -111,6 +112,8 @@ const reason = Match.typeTags<Refusal, string>()({
   NotSensitive: ({ key }) =>
     `${key} is not @sensitive, so it holds no write-only value`,
   NotVouched: () => "no member of this project has vouched for you",
+  NotYourNamespace: ({ handle, project }) =>
+    `${ownerOf(project)} is not yours to make projects in: you are ${handle}`,
   OutOfScope: ({ paths }) =>
     `changes paths outside the ask's territory: ${list(paths)}; put those files back, or flag the ask if the want needs them`,
   PostureChange: ({ from, to }) =>

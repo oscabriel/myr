@@ -143,8 +143,8 @@ describe("the answer page", () => {
     expect(
       inOrder(textOf(refusedPage), ["datekit", "Asks", askId, "Answer"])
     ).toBeTruthy();
-    expect(markup).toContain('href="/datekit"');
-    expect(markup).toContain(`href="/datekit/asks/${askId}"`);
+    expect(markup).toContain('href="/oscabriel/datekit"');
+    expect(markup).toContain(`href="/oscabriel/datekit/asks/${askId}"`);
   });
 
   it("leads with the outcome: the first heading after the title is the hero, and a landing links its commit", () => {
@@ -163,7 +163,7 @@ describe("the answer page", () => {
     );
     expect(plainText(hero?.groups?.inner ?? "")).toContain("Landed as 9b1c3e5");
     expect(hero?.groups?.inner).toContain(
-      `href="/datekit/commit/${landedSha}"`
+      `href="/oscabriel/datekit/commit/${landedSha}"`
     );
   });
 
@@ -228,7 +228,7 @@ describe("the answer page", () => {
       ["lint", "passed"],
     ]);
     expect(text).toContain(
-      `${Brand.cli} evidence logs/datekit/parse-iso-week/unit --project datekit`
+      `${Brand.cli} evidence logs/datekit/parse-iso-week/unit --project oscabriel/datekit`
     );
     expect(text).toContain("1 lane passed in 1.2 s");
     expect(
@@ -285,7 +285,7 @@ describe("the answer page", () => {
 
     expect(textIn(markup)).not.toContain(`${Brand.cli} claim`);
     expect(textIn(markup)).toContain("waits for 1 ask to land first");
-    expect(markup).toContain(`href="/datekit/asks/${askId}"`);
+    expect(markup).toContain(`href="/oscabriel/datekit/asks/${askId}"`);
   });
 
   it("names a lane's log only as the command that reads it", () => {
@@ -361,7 +361,9 @@ describe("the answer page", () => {
     const text = textOf(page({ verdict: undefined }));
 
     expect(text).toContain("Nobody has answered this ask yet.");
-    expect(text).toContain(`${Brand.cli} claim ${askId} --project datekit`);
+    expect(text).toContain(
+      `${Brand.cli} claim ${askId} --project oscabriel/datekit`
+    );
     expect(markupOf(page({ verdict: undefined }))).not.toContain("data-stage");
   });
 
@@ -371,7 +373,7 @@ describe("the answer page", () => {
     const main = mainOf(markupOf(element));
 
     expect(textIn(main)).toContain("Claimed by bram, no answer pushed yet.");
-    expect(main).toContain(`href="/datekit/asks/${askId}"`);
+    expect(main).toContain(`href="/oscabriel/datekit/asks/${askId}"`);
   });
 
   it("shows a landed answer's credit trailers in trailer order, its held-back trailer, and its commit", () => {

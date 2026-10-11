@@ -38,7 +38,7 @@ const caller = Effect.gen(function* () {
   const client = yield* RpcTest.makeClient(Contracts);
 
   const { asks } = yield* client.listAsks({
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
   });
 
   return asks.map(({ want }) => want);
@@ -68,7 +68,7 @@ describe("the unanswered handlers", () => {
         const client = yield* RpcTest.makeClient(Contracts);
 
         const listed = yield* client.listAsks({
-          project: ProjectName.make("datekit"),
+          project: ProjectName.make("oscabriel/datekit"),
         });
 
         const other = yield* Effect.exit(

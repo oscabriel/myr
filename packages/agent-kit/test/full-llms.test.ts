@@ -84,11 +84,15 @@ const commands: readonly CommandDoc[] = [
 ];
 
 const projects: readonly ProjectListing[] = [
-  { openAsks: 3, posture: "open", project: ProjectName.make("datekit") },
+  {
+    openAsks: 3,
+    posture: "open",
+    project: ProjectName.make("oscabriel/datekit"),
+  },
   {
     openAsks: 1,
     posture: "openWithSealedEvidence",
-    project: ProjectName.make("burrow"),
+    project: ProjectName.make("oscabriel/burrow"),
   },
 ];
 

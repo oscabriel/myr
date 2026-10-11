@@ -86,7 +86,7 @@ const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
 const okonkwo = Handle.make("okonkwo");
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const stray: Decision = {
   deciders: [okonkwo],
@@ -258,7 +258,7 @@ describe("the decide atom", () => {
             choice: "revert",
             decision: "dec-000002",
             note: "Pushed by the old deploy key.",
-            project: "datekit",
+            project: "oscabriel/datekit",
           },
         ]);
       })
@@ -269,7 +269,11 @@ describe("the decide atom", () => {
       const { asked } = yield* decideOnce(taken, { choice: "adopt" });
 
       expect(asked.decide).toStrictEqual([
-        { choice: "adopt", decision: "dec-000002", project: "datekit" },
+        {
+          choice: "adopt",
+          decision: "dec-000002",
+          project: "oscabriel/datekit",
+        },
       ]);
     })
   );
@@ -507,11 +511,13 @@ describe("DecisionCard for an OpenProposal", () => {
   });
 
   it("links the proposal's page", () => {
-    expect(card(ready)).toContain('href="/datekit/proposals/prop-000007"');
+    expect(card(ready)).toContain(
+      'href="/oscabriel/datekit/proposals/prop-000007"'
+    );
   });
 });
 
-const vellum = ProjectName.make("vellum");
+const vellum = ProjectName.make("oscabriel/vellum");
 
 /** A waiver on the answer to escape-attribute-quotes, carrying the answer's diff of the marker's file. */
 const waiver: Decision = {
@@ -570,7 +576,7 @@ const pageOf = (
     <DecisionView
       data={data}
       files={files}
-      here="/vellum/decisions/dec-000002"
+      here="/oscabriel/vellum/decisions/dec-000002"
       onDecide={() => {}}
       taken={chosen}
       {...(failure === undefined ? {} : { failure })}
@@ -667,7 +673,7 @@ describe(DecisionView, () => {
       <ProposalFailure
         cause={Cause.fail(closed)}
         doing="take this decision"
-        here="/vellum/decisions/dec-000002"
+        here="/oscabriel/vellum/decisions/dec-000002"
       />
     );
 
@@ -684,7 +690,7 @@ describe(DecisionView, () => {
     expect(markup).not.toContain("data-choice=");
     expect(markup).not.toContain(".skip(");
     expect(text).toContain("A decider takes it on their Today");
-    expect(markup).toContain('href="/vellum/people"');
-    expect(text).toContain(`${Brand.cli} today --project vellum`);
+    expect(markup).toContain('href="/oscabriel/vellum/people"');
+    expect(text).toContain(`${Brand.cli} today --project oscabriel/vellum`);
   });
 });

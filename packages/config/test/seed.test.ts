@@ -60,7 +60,7 @@ describe(planSeed, () => {
           ratchets: plan.ratchets,
         }).toStrictEqual({
           decider: "ines-v",
-          project: "datekit",
+          project: "oscabriel/datekit",
           ratchets: [],
         });
 
@@ -135,7 +135,7 @@ describe(planSeed, () => {
           ratchets: plan.ratchets,
         }).toStrictEqual({
           decider: "okafor",
-          project: "burrow",
+          project: "oscabriel/burrow",
           ratchets: ["no-module-level-mutable-state"],
         });
 
@@ -210,15 +210,15 @@ describe(runSeed, () => {
           const first = yield* seed;
 
           expect(first.flatMap(linesOf)).toStrictEqual([
-            "Init datekit: done",
-            "Push datekit: done",
-            "OpenAsk datekit/add-months-clamp: done",
-            "OpenAsk datekit/format-ordinal: done",
-            "OpenAsk datekit/parse-iso-week: done",
+            "Init oscabriel/datekit: done",
+            "Push oscabriel/datekit: done",
+            "OpenAsk oscabriel/datekit/add-months-clamp: done",
+            "OpenAsk oscabriel/datekit/format-ordinal: done",
+            "OpenAsk oscabriel/datekit/parse-iso-week: done",
             "Layer datekit--maintainers: done",
-            "Init burrow: done",
-            "Push burrow: done",
-            "OpenAsk burrow/drop-legacy-fetch: done",
+            "Init oscabriel/burrow: done",
+            "Push oscabriel/burrow: done",
+            "OpenAsk oscabriel/burrow/drop-legacy-fetch: done",
           ]);
 
           const held = yield* seeded(plans);
@@ -246,12 +246,12 @@ describe(runSeed, () => {
           ];
 
           expect(asks).toStrictEqual({
-            burrow: {
+            "oscabriel/burrow": {
               "drop-legacy-fetch": [...children, "drop-legacy-fetch-delete"],
               "drop-legacy-fetch-delete": children,
               ...Object.fromEntries(children.map((child) => [child, []])),
             },
-            datekit: {
+            "oscabriel/datekit": {
               "add-months-clamp": [],
               "format-ordinal": [],
               "parse-iso-week": [],
@@ -410,17 +410,17 @@ describe(main, () => {
         ]);
 
         expect(printed.slice(0, 7)).toStrictEqual([
-          "seed: datekit on the Node world",
-          "Init datekit: done",
-          "Push datekit: done",
-          "OpenAsk datekit/add-months-clamp: done",
-          "OpenAsk datekit/format-ordinal: done",
-          "OpenAsk datekit/parse-iso-week: done",
+          "seed: oscabriel/datekit on the Node world",
+          "Init oscabriel/datekit: done",
+          "Push oscabriel/datekit: done",
+          "OpenAsk oscabriel/datekit/add-months-clamp: done",
+          "OpenAsk oscabriel/datekit/format-ordinal: done",
+          "OpenAsk oscabriel/datekit/parse-iso-week: done",
           "Layer datekit--maintainers: done",
         ]);
 
         expect(printed[7]).toMatch(
-          /^datekit: main at [\da-f]{12}, 3 open asks, decided by ines-v$/u
+          /^oscabriel\/datekit: main at [\da-f]{12}, 3 open asks, decided by ines-v$/u
         );
 
         expect(printed.slice(8)).toStrictEqual([
@@ -457,9 +457,9 @@ describe(main, () => {
         const data = envelope.ok ? envelope.data : undefined;
 
         expect(data?.steps.map(stepLine)).toStrictEqual([
-          "Init burrow: done",
-          "Push burrow: done",
-          "OpenAsk burrow/drop-legacy-fetch: done",
+          "Init oscabriel/burrow: done",
+          "Push oscabriel/burrow: done",
+          "OpenAsk oscabriel/burrow/drop-legacy-fetch: done",
         ]);
 
         const [held] = data?.projects ?? [];
@@ -473,7 +473,7 @@ describe(main, () => {
           // The migrate ask's family: the parent, six children, the delete child.
           asks: 8,
           decider: "okafor",
-          project: "burrow",
+          project: "oscabriel/burrow",
           ratchets: ["no-module-level-mutable-state"],
         });
 

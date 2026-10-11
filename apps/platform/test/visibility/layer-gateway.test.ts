@@ -27,8 +27,8 @@ import {
   ProjectVisibility,
 } from "@repo/project/visibility-port";
 import type { VisibilityPort } from "@repo/project/visibility-port";
-import type { CommitSha } from "@repo/protocol/ids";
 import {
+  keyOf,
   AskId,
   Handle,
   LaneName,
@@ -36,6 +36,7 @@ import {
   ProjectName,
   RepoPath,
 } from "@repo/protocol/ids";
+import type { CommitSha } from "@repo/protocol/ids";
 import { Principal } from "@repo/protocol/principal";
 import { PrivatePathInPublicTree } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
@@ -60,12 +61,12 @@ import { LayerGateLive } from "../../src/visibility/layers.ts";
 import { fakeEnv } from "../fake-env.ts";
 import { coreLoopWorld } from "../world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("ines-v/datekit");
 
 const maintainers = LayerName.make("maintainers");
 
 /** The layer's repo, in the private namespace. */
-const layerRepo = RepoName.make(`${project}--${maintainers}`);
+const layerRepo = RepoName.make(`${keyOf(project)}--${maintainers}`);
 
 /** The sealed check the layer holds. */
 const sealed = "checks/held-back/export/escape.test.ts";
@@ -166,7 +167,7 @@ const start = {
   ].join("\n"),
   [`${Brand.configDir}/vouched.td`]: "bram\nines-v\n",
   "README.md": "datekit: dates, exported\n",
-  "package.json": '{ "name": "datekit", "private": true }\n',
+  "package.json": '{ "name": "ines-v/datekit", "private": true }\n',
   "src/export.ts": "export const toIso = (date: Date) => date.toISOString();\n",
 };
 
@@ -317,7 +318,7 @@ describe("a project's layer repos, through the gateway", () => {
           world,
         } = yield* layerWorld;
 
-        const layerUrl = `${world.origin}/${layerRepo}.git`;
+        const layerUrl = `${world.origin}/${project}--maintainers.git`;
 
         // Asked with no credential, the layer asks for one; a name that is
         // no declared layer is no repo at all.
@@ -335,7 +336,7 @@ describe("a project's layer repos, through the gateway", () => {
             )
           );
 
-        const anonymous = yield* ask(layerRepo);
+        const anonymous = yield* ask(`${project}--maintainers`);
         const undeclared = yield* ask(`${project}--secrets`);
 
         const undeclaredSignedIn = yield* ask(
@@ -346,7 +347,7 @@ describe("a project's layer repos, through the gateway", () => {
         // A keeper's request asks the project once: whether the layer is
         // declared and how far she reaches, in one answer.
         const asksBefore = heard.asks.length;
-        const keeper = yield* ask(layerRepo, tokens["ines-v"]);
+        const keeper = yield* ask(`${project}--maintainers`, tokens["ines-v"]);
 
         expect({
           anonymous: {
@@ -402,7 +403,7 @@ describe("a project's layer repos, through the gateway", () => {
         }).toStrictEqual({
           bram: {
             exitCode: 128,
-            remote: [`remote: bram may not read ${layerRepo}`],
+            remote: [`remote: bram may not read ${project}--maintainers`],
           },
           cloned: layered,
           file: "it('keeps the offset', () => {});\n",
@@ -455,7 +456,7 @@ describe("a project's layer repos, through the gateway", () => {
         }).toStrictEqual({
           bram: {
             exitCode: 128,
-            remote: [`remote: bram may not push to ${layerRepo}`],
+            remote: [`remote: bram may not push to ${project}--maintainers`],
           },
           main: next,
           pushed: 0,
@@ -567,7 +568,7 @@ describe("a project's layer repos, through the gateway", () => {
     () =>
       Effect.gen(function* () {
         const { heard, ines, layered, remote, seed, world } = yield* layerWorld;
-        const layerUrl = `${world.origin}/${layerRepo}.git`;
+        const layerUrl = `${world.origin}/${project}--maintainers.git`;
 
         // Forty more branches: a clone that wants them all sends git's
         // request gzipped (above 1 KiB).

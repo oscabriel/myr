@@ -8,6 +8,7 @@ import type {
   Handle,
   ProjectName,
 } from "@repo/protocol/ids";
+import { Result } from "effect";
 
 /** The front page: every open ask, across every project. */
 export const ASKS_PATH = "/asks";
@@ -42,3 +43,17 @@ export const envPath = (project: ProjectName) => `/${project}/env`;
 /** A decision's page. */
 export const decisionPath = (project: ProjectName, decision: DecisionId) =>
   `/${project}/decisions/${decision}`;
+
+/** `segment` decoded, or as it came when it does not decode. */
+const decoded = (segment: string) =>
+  Result.getOrElse(
+    Result.try(() => decodeURIComponent(segment)),
+    () => segment
+  );
+
+/** A pathname's segments, decoded, the empty ones dropped. */
+export const segmentsOf = (pathname: string) =>
+  pathname
+    .split("/")
+    .filter((segment) => segment !== "")
+    .map(decoded);

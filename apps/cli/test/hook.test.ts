@@ -84,7 +84,7 @@ const askWire = {
   kind: "fix",
   openedAt: "2026-10-07T12:00:00.000Z",
   openedIn: landedSha,
-  project: "datekit",
+  project: "oscabriel/datekit",
   state: "claimed",
   territory: {
     module: "a",
@@ -500,7 +500,7 @@ const liveClaim = (base: string) =>
     fork: "datekit--fix-week--alice",
     lapsesAt: "2026-10-08T12:00:00.000Z",
     openedAt: "2026-10-07T12:00:00.000Z",
-    project: "datekit",
+    project: "oscabriel/datekit",
     remote: "https://platform.example/datekit--fix-week--alice.git",
     state: "live",
     warnsAt: "2026-10-07T14:00:00.000Z",
@@ -521,7 +521,7 @@ const aClone = (remote: string) =>
       [checkPath, "test('week', () => {});\n"],
       [
         "package.json",
-        '{"name": "datekit", "scripts": {"test": "bun test"}}\n',
+        '{"name": "oscabriel/datekit", "scripts": {"test": "bun test"}}\n',
       ],
       ["packages/a/src/index.ts", "export {};\n"],
       ["packages/b/src/x.ts", "export {};\n"],
@@ -873,7 +873,7 @@ describe(`${Brand.cli} hook, as a harness runs it`, () => {
           hung
         ).pipe(Effect.forkChild);
 
-        expect(yield* Deferred.await(asked)).toBe("datekit");
+        expect(yield* Deferred.await(asked)).toBe("oscabriel/datekit");
 
         yield* TestClock.adjust("10 seconds");
 

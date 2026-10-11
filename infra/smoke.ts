@@ -84,8 +84,8 @@ export const webProbes = [
 /** How long an agent surface may take to answer before smoke warns: 500 ms. */
 export const AGENT_BUDGET_MS = 500;
 
-/** An example every seeded stage holds, and one of its asks. */
-const SEEDED = { ask: "format-ordinal", project: "datekit" } as const;
+/** An example every seeded stage holds, by its name, and one of its asks. */
+const SEEDED = { ask: "format-ordinal", project: "oscabriel/datekit" } as const;
 
 /** The probes that read the seeded example, skipped on a stage that does not hold it. */
 export const seededProbes: ReadonlySet<Probe> = new Set([
@@ -124,8 +124,8 @@ export const Probe = Schema.Literals(probes);
 
 export type Probe = typeof Probe.Type;
 
-/** A project no stage holds: smoke asks for it and expects to be refused. */
-const MISSING = "no-such-project";
+/** A project no stage holds, by a name one could have: smoke asks for it and expects to be refused. */
+const MISSING = "oscabriel/no-such-project";
 
 /** How long one probe waits for an answer: a cold Worker included. */
 const PATIENCE = Duration.seconds(30);

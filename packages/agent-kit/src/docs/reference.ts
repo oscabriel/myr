@@ -97,8 +97,8 @@ export const importedPage: DocSource = {
     "",
     ...table(
       ["Project", "Source", "Licence", "What it is"],
-      importedProjects.map(({ kind, licence, project, url }) => [
-        `[${project}](/${project})`,
+      importedProjects.map(({ kind, licence, name, url }) => [
+        `[${name}](/${name})`,
         url,
         licence,
         kind,

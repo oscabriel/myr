@@ -187,7 +187,11 @@ describe(filterEntries, () => {
 
   it("narrows the list to one project", () => {
     expect(
-      asksOf(filterEntries(entries, { project: ProjectName.make("burrow") }))
+      asksOf(
+        filterEntries(entries, {
+          project: ProjectName.make("oscabriel/burrow"),
+        })
+      )
     ).toStrictEqual(["split-format"]);
   });
 });
@@ -203,7 +207,7 @@ describe(readFilter, () => {
       })
     ).toStrictEqual({
       kind: "bug",
-      project: "datekit",
+      project: "oscabriel/datekit",
       reserved: "newcomers",
       take: "open",
     });
@@ -287,7 +291,7 @@ describe(familiesIn, () => {
       }),
       id: AskId.make("drop-fetch"),
       kind: KindName.make("migrate"),
-      project: ProjectName.make("burrow"),
+      project: ProjectName.make("oscabriel/burrow"),
       territory: { module: ".", paths: [Glob.make("packages/**")] },
     };
 
@@ -368,11 +372,11 @@ describe(FrontPageView, () => {
         const [datekit, burrow] = headers.map(([, header]) => header ?? "");
 
         expect(headers.map(([project]) => project)).toStrictEqual([
-          "datekit",
-          "burrow",
+          "oscabriel/datekit",
+          "oscabriel/burrow",
         ]);
         expect({
-          burrowLink: burrow?.includes('href="/burrow"'),
+          burrowLink: burrow?.includes('href="/oscabriel/burrow"'),
           burrowPosture: burrow?.includes(
             'data-posture="openWithSealedEvidence"'
           ),
@@ -428,7 +432,7 @@ describe(FrontPageView, () => {
       const row = rowOf(yield* front({}), "split-format");
 
       expect(row).toMatch(
-        /<a\b[^>]*href="\/burrow\/asks\/split-format"[^>]*>The format package calls the new parser\.<\/a>/u
+        /<a\b[^>]*href="\/oscabriel\/burrow\/asks\/split-format"[^>]*>The format package calls the new parser\.<\/a>/u
       );
       expect(textIn(row)).toContain("migrate · format · split-format");
     })
@@ -442,7 +446,7 @@ describe(FrontPageView, () => {
 
         expect(row).toMatch(
           new RegExp(
-            `<button[^>]*aria-label="Copy claim command"[\\s\\S]*?<code[^>]*>${Brand.cli} claim fix-week-start --project datekit</code>`,
+            `<button[^>]*aria-label="Copy claim command"[\\s\\S]*?<code[^>]*>${Brand.cli} claim fix-week-start --project oscabriel/datekit</code>`,
             "u"
           )
         );
@@ -476,7 +480,7 @@ describe(FrontPageView, () => {
           [
             'href="/asks?reserved=newcomers"',
             'href="/asks?take=open"',
-            'href="/asks?project=burrow"',
+            'href="/asks?project=oscabriel%2Fburrow"',
           ].filter((href) => !all.includes(href))
         ).toStrictEqual([]);
         expect(textIn(toolbar)).toMatch(
@@ -507,10 +511,10 @@ describe(FrontPageView, () => {
         ).toStrictEqual([]);
         expect(facts).toContain('href="/llms.txt"');
         expect(facts).toMatch(
-          /href="\/burrow"[\s\S]*?1 open ask\b[\s\S]*?Open with sealed evidence/u
+          /href="\/oscabriel\/burrow"[\s\S]*?1 open ask\b[\s\S]*?Open with sealed evidence/u
         );
         expect(facts).toMatch(
-          /href="\/datekit"[\s\S]*?2 open asks[\s\S]*?>Open</u
+          /href="\/oscabriel\/datekit"[\s\S]*?2 open asks[\s\S]*?>Open</u
         );
       })
   );
@@ -528,9 +532,11 @@ describe(FrontPageView, () => {
 
         expect(textIn(facts)).toContain("Selected ask");
         expect(textIn(facts)).toContain(
-          `${Brand.cli} claim fix-week-start --project datekit`
+          `${Brand.cli} claim fix-week-start --project oscabriel/datekit`
         );
-        expect(facts).toContain('href="/datekit/asks/fix-week-start"');
+        expect(facts).toContain(
+          'href="/oscabriel/datekit/asks/fix-week-start"'
+        );
         expect(textIn(facts)).toContain("Open the ask");
       })
   );
@@ -644,11 +650,11 @@ describe("the front page as the server sends it", () => {
 
         expect(listIn(markup)).not.toContain("Reading from the platform");
         expect(markup).toMatch(
-          /<a\b[^>]*href="\/datekit\/asks\/add-months-clamp"[^>]*>[^<]+<\/a>/u
+          /<a\b[^>]*href="\/oscabriel\/datekit\/asks\/add-months-clamp"[^>]*>[^<]+<\/a>/u
         );
         expect(headersIn(markup).map(([project]) => project)).toStrictEqual([
-          "burrow",
-          "datekit",
+          "oscabriel/burrow",
+          "oscabriel/datekit",
         ]);
         expect(text).toContain("10 open asks, 7 open to take");
 

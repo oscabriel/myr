@@ -55,7 +55,7 @@ import { main } from "../../../scripts/swarm.ts";
 import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const ListedAsks = Envelope(Schema.Struct({ asks: Schema.Array(AskListing) }));
 
@@ -423,7 +423,7 @@ const authPage = Effect.gen(function* () {
 
 describe("the brief", () => {
   const remote =
-    "https://platform-dev-oscabriel.example.workers.dev/burrow--drop-legacy-fetch-burrow-auth--wren.git";
+    "https://platform-dev-oscabriel.example.workers.dev/oscabriel/burrow--drop-legacy-fetch-burrow-auth--wren.git";
 
   it.effect(
     "gives the ask's page, the clone's remote and the four steps a contributor reads in AGENTS.md, and nothing about how answers are judged",
@@ -446,7 +446,7 @@ describe("the brief", () => {
             "AGENTS.md",
             `${Brand.cli} check`,
             "git push",
-            `${Brand.cli} status --project burrow`,
+            `${Brand.cli} status --project oscabriel/burrow`,
           ].filter((said) => !text.includes(said))
         ).toStrictEqual([]);
         expect(text).not.toMatch(
@@ -861,7 +861,7 @@ const reasonOf = (argv: readonly string[]) =>
 
 describe("the swarm's flags", () => {
   it.effect(
-    "takes burrow, plain, headless and 20 minutes when nothing else is named",
+    "takes oscabriel/burrow, plain, headless and 20 minutes when nothing else is named",
     () =>
       Effect.gen(function* () {
         const options = yield* optionsOf([
@@ -874,7 +874,7 @@ describe("the swarm's flags", () => {
           dryRun: true,
           json: false,
           only: [],
-          project: "burrow",
+          project: "oscabriel/burrow",
           scenario: "plain",
           stage: "dev-oscabriel",
           timeoutMin: 20,
@@ -1040,7 +1040,7 @@ describe("the dry run", () => {
         ]);
 
         expect(printed.slice(0, 2)).toStrictEqual([
-          `swarm: burrow on dev-oscabriel (${url}), scenario plain, 6 contributors`,
+          `swarm: oscabriel/burrow on dev-oscabriel (${url}), scenario plain, 6 contributors`,
           expect.stringMatching(
             /^handle +harness +model +ask +territory +command$/u
           ),
@@ -1094,7 +1094,7 @@ describe("the dry run", () => {
           }))
         ).toStrictEqual([
           {
-            args: ["asks", "--project", "burrow", "--json"],
+            args: ["asks", "--project", "oscabriel/burrow", "--json"],
             token: undefined,
             url,
           },
@@ -1446,8 +1446,8 @@ describe("a run", () => {
           .map(({ args }) => args);
 
         expect(reads).toStrictEqual([
-          ["status", "--project", "burrow", "--json"],
-          ["status", "--project", "burrow", "--json"],
+          ["status", "--project", "oscabriel/burrow", "--json"],
+          ["status", "--project", "oscabriel/burrow", "--json"],
         ]);
       })
   );

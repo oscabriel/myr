@@ -1,4 +1,5 @@
-import { RepoName } from "@repo/artifacts/repo-host";
+import type { RepoName } from "@repo/artifacts/repo-host";
+import { repoNameOfAddress } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
 import { RepoBusy, StaleBase } from "@repo/protocol/refusal";
 import { headline } from "@repo/protocol/render";
@@ -19,23 +20,38 @@ import type { Opening, RefStatus } from "./receive-pack.ts";
 import { Exchange, Upstream, UpstreamFailure } from "./upstream.ts";
 import type { Service } from "./upstream.ts";
 
+// A repo's address: one to three segments (`datekit`, `oscabriel/datekit`,
+// `github.com/pallets/click`, each with a fork's `--` parts on the last), with
+// or without `.git`, then the endpoint.
 const ROUTE =
-  /^\/(?<name>[A-Za-z0-9._-]+?)(?:\.git)?\/(?<endpoint>info\/refs|git-upload-pack|git-receive-pack)$/u;
+  /^\/(?<name>[A-Za-z0-9._-]+?(?:\/[A-Za-z0-9._-]+?){0,2})(?:\.git)?\/(?<endpoint>info\/refs|git-upload-pack|git-receive-pack)$/u;
 
 /** One of the three endpoints of git's smart HTTP. */
 export type GitEndpoint = "info/refs" | "git-upload-pack" | "git-receive-pack";
 
-/** The repo a smart HTTP path names, and the endpoint it asks for; `None` for any other path. */
-export const gitRoute = (
-  pathname: string
-): Option.Option<{ readonly endpoint: GitEndpoint; readonly name: string }> =>
-  Option.flatMap(Option.fromNullishOr(ROUTE.exec(pathname)?.groups), (route) =>
-    route.name === undefined ||
-    (route.endpoint !== "info/refs" &&
-      route.endpoint !== "git-upload-pack" &&
-      route.endpoint !== "git-receive-pack")
-      ? Option.none()
-      : Option.some({ endpoint: route.endpoint, name: route.name })
+/** What a smart HTTP path names: the address as spelled, its repo, and the endpoint. */
+export interface GitRoute {
+  readonly endpoint: GitEndpoint;
+  /** The address as the path spelled it, for a message. */
+  readonly name: string;
+  /** The repo the address names (ADR 0032); none for an address no project can have. */
+  readonly repo: Option.Option<RepoName>;
+}
+
+/**
+ * The repo a smart HTTP path names, and the endpoint it asks for; `None`
+ * for any other path.
+ */
+export const gitRoute = (pathname: string): Option.Option<GitRoute> =>
+  Option.flatMap(
+    Option.fromNullishOr(ROUTE.exec(pathname)?.groups),
+    ({ endpoint, name }) =>
+      name === undefined ||
+      (endpoint !== "info/refs" &&
+        endpoint !== "git-upload-pack" &&
+        endpoint !== "git-receive-pack")
+        ? Option.none()
+        : Option.some({ endpoint, name, repo: repoNameOfAddress(name) })
   );
 
 const isService = (service: string | null): service is Service =>
@@ -345,7 +361,12 @@ export const gateway = (
 
     const route = found.value;
     const upstream = yield* Upstream;
-    const repo = RepoName.make(route.name);
+
+    if (Option.isNone(route.repo)) {
+      return plain(404, `no repo ${route.name}`);
+    }
+
+    const repo = route.repo.value;
     const headers = forwarded(request.headers);
 
     return yield* Match.value(route.endpoint).pipe(

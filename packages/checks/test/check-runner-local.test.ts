@@ -55,7 +55,7 @@ const world = Effect.gen(function* () {
     at: CheckAt.cases.Commit.make({ commit: head }),
     lanes,
     placeholders: [],
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
     proxies: [],
     repo: RepoName.make("datekit"),
     run: { checks: {}, test: Command.make("bun test {path}") },

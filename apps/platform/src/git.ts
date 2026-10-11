@@ -17,13 +17,13 @@
 import { Brand } from "@repo/brand";
 import { Custody } from "@repo/git/custody";
 import { gateway, gitRoute, plain } from "@repo/git/gateway";
+import type { GitRoute } from "@repo/git/gateway";
 import { concat, packetAt, pkt, utf8 } from "@repo/git/pkt-line";
 import { readUpload } from "@repo/git/upload-pack";
 import type { UploadRequest } from "@repo/git/upload-pack";
 import { Upstream } from "@repo/git/upstream";
 import type { Projects } from "@repo/project/projects";
 import type { LayerAccess } from "@repo/project/visibility-port";
-import { RepoName } from "@repo/protocol/ids";
 import { Anonymous, Principal } from "@repo/protocol/principal";
 import { Effect, Option, Ref } from "effect";
 
@@ -251,18 +251,20 @@ const serveLayer = (
   });
 
 /** A git request to `name`, as `principal` may make it. */
-const serve = (
-  request: Request,
-  route: { readonly endpoint: string; readonly name: string },
-  principal: Principal
-) =>
+const serve = (request: Request, route: GitRoute, principal: Principal) =>
   Effect.gen(function* () {
-    const kind = repoKind(RepoName.make(route.name));
+    // An address no project can have names no repo.
+    if (Option.isNone(route.repo)) {
+      return notFound(route.name);
+    }
+
+    const repo = route.repo.value;
+    const kind = repoKind(repo);
 
     // A name the platform makes for no repo of its own may be a layer's.
     if (RepoKind.$is("Unknown")(kind)) {
       const layer = yield* LayerGate.use((gate) =>
-        gate.classify(RepoName.make(route.name), principal)
+        gate.classify(repo, principal)
       );
 
       return yield* Option.match(layer, {
@@ -305,11 +307,11 @@ const serve = (
 export const serveGit = (
   request: Request
 ): Option.Option<Effect.Effect<Response, never, GitServices>> =>
-  Option.map(gitRoute(new URL(request.url).pathname), ({ endpoint, name }) =>
+  Option.map(gitRoute(new URL(request.url).pathname), (route) =>
     Effect.flatMap(principalOf(request.headers), (principal) =>
       Option.match(principal, {
         onNone: () => Effect.succeed(signIn("that token is not one we know")),
-        onSome: (known) => serve(request, { endpoint, name }, known),
+        onSome: (known) => serve(request, route, known),
       })
     )
   );

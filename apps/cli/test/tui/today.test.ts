@@ -165,7 +165,7 @@ describe("Today as the terminal shows it", () => {
       // A decision's first row: the cursor's mark, then its project and id.
       const listed = rows.flatMap((row) => {
         const found =
-          /^(?<mark>[> ]) {1,3}(?:! )?datekit\/(?<id>dec-\d+) /u.exec(
+          /^(?<mark>[> ]) {1,3}(?:! )?oscabriel\/datekit\/(?<id>dec-\d+) /u.exec(
             row
           )?.groups;
 
@@ -197,7 +197,7 @@ describe("Today as the terminal shows it", () => {
             .filter((row) => row.includes("if nobody decides:"))
             .map((row) => row.includes("within the day"))
         ).toStrictEqual([true, false, false]);
-        expect(rowsWith(rows, "! datekit/")).toHaveLength(1);
+        expect(rowsWith(rows, "! oscabriel/datekit/")).toHaveLength(1);
       })
   );
 
@@ -224,7 +224,7 @@ describe("Today as the terminal shows it", () => {
         );
 
         expect(rows.filter((row) => row.startsWith(">"))).toStrictEqual([
-          ">   datekit/dec-000001  open the ask prop-000001 proposes",
+          ">   oscabriel/datekit/dec-000001  open the ask prop-000001 proposes",
         ]);
         expect(rowsWith(rows, "above")).toStrictEqual([
           "2 decisions above; up to read them",
@@ -246,8 +246,10 @@ describe("Today as the terminal shows it", () => {
           press(start(today), ["down", "a"]).state
         );
 
-        expect(rowsWith(asking, "Accept datekit/dec-000003?")).toStrictEqual([
-          "Accept datekit/dec-000003? Its default is decline. y to send it, n to keep it open.",
+        expect(
+          rowsWith(asking, "Accept oscabriel/datekit/dec-000003?")
+        ).toStrictEqual([
+          "Accept oscabriel/datekit/dec-000003? Its default is decline. y to send it, n to keep it open.",
         ]);
       })
   );
@@ -463,10 +465,10 @@ describe("Today full-screen, worked by a decider", () => {
           { choice: "decline", decision: vouch.id, project: datekit },
         ]);
         expect(states.map(({ notice }) => notice)).toContainEqual([
-          "Sending decline on datekit/dec-000003…",
+          "Sending decline on oscabriel/datekit/dec-000003…",
         ]);
         expect([last?.notice, ids(last), last?.cursor]).toStrictEqual([
-          ["Decided: decline on datekit/dec-000003"],
+          ["Decided: decline on oscabriel/datekit/dec-000003"],
           [proposal.id, stray.id],
           1,
         ]);
@@ -544,7 +546,7 @@ describe("the terminal Today is drawn on", () => {
 
         expect(rowsWith(moved, "Today for okonkwo")).toHaveLength(1);
         expect(rowsWith(moved, "> ").map((row) => row.trim())).toStrictEqual([
-          ">   datekit/dec-000003  vouch for ada",
+          ">   oscabriel/datekit/dec-000003  vouch for ada",
         ]);
 
         setup.mockInput.pressArrow("down");

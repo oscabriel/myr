@@ -92,7 +92,7 @@ describe("a project's tags", () => {
         forks: Effect.succeed([]),
         head: Effect.succeedNone,
         landings: () => Effect.succeed([]),
-        project: ProjectName.make("changesets"),
+        project: ProjectName.make("alice/changesets"),
         repo,
       };
 

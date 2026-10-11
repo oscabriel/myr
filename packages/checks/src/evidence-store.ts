@@ -6,7 +6,13 @@
  * Adapters: `/memory`, for tests and the web's dev backend, and `/r2` over
  * the stage's `evidence-<stage>` bucket, which the Worker runs.
  */
-import { LaneName, ProjectName, RequestId } from "@repo/protocol/ids";
+import type { ProjectName } from "@repo/protocol/ids";
+import {
+  keyOf,
+  LaneName,
+  ProjectNameFromKey,
+  RequestId,
+} from "@repo/protocol/ids";
 import { Context, Option, Schema } from "effect";
 import type { Effect } from "effect";
 
@@ -28,13 +34,18 @@ export interface LaneLog {
   readonly text: string;
 }
 
-/** The name a lane's log is kept under, whichever adapter keeps it. */
+/**
+ * The name a lane's log is kept under, whichever adapter keeps it: by the
+ * project's key, so a name holds one `/` before the request (ADR 0032).
+ */
 export const logRefOf = (log: Omit<LaneLog, "text">): LogRef =>
-  LogRef.make(`${log.project}/${log.requestId}/${log.lane}#${log.attempt}`);
+  LogRef.make(
+    `${keyOf(log.project)}/${log.requestId}/${log.lane}#${log.attempt}`
+  );
 
 /** A log's name, read back into what it names. */
 const LogName = Schema.TemplateLiteralParser([
-  ProjectName,
+  ProjectNameFromKey,
   "/",
   RequestId,
   "/",

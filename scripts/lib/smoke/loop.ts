@@ -4,8 +4,9 @@
  * steps):
  *
  * 1. `people`: who the decider's and the answerer's tokens name;
- * 2. `init`: the decider checks `smoke-<run>` is free, records it, then
- *    makes it a throwaway project and pushes its first commit;
+ * 2. `init`: the decider checks `<decider>/smoke-<run>` is free (on a stage
+ *    the operator's, `oscabriel/smoke-<run>`), records its key, then makes
+ *    it a throwaway project and pushes its first commit;
  * 3. `open-ask`: the decider opens an ask, red twice on main first;
  * 4. `claim`: the answerer claims it, and gets a fork;
  * 5. `out-of-scope`: an answer that reaches outside the ask's territory is
@@ -35,8 +36,8 @@
  * records.
  */
 import { Brand } from "@repo/brand";
-import { ProjectName } from "@repo/protocol/ids";
-import type { LandedSha } from "@repo/protocol/ids";
+import { keyOf, ProjectName } from "@repo/protocol/ids";
+import type { Handle, LandedSha } from "@repo/protocol/ids";
 import {
   Console,
   DateTime,
@@ -118,7 +119,7 @@ export interface SmokeLoopReport {
 export interface LoopInput {
   /** The stage, which names the throwaways in the ledger; never `demo`. */
   readonly stage: string;
-  /** This run's name: the project is `smoke-<run>`. */
+  /** This run's name: the project is `<decider>/smoke-<run>`. */
   readonly run: string;
   /** The platform: its `/rpc` and git live here. */
   readonly origin: string;
@@ -188,13 +189,16 @@ const recordThrowaway = (stage: string, kind: Created["kind"], name: string) =>
     )
   );
 
-/** The throwaway project of run `run`: `smoke-<run>`. */
-const projectOf = (run: string) =>
-  Schema.decodeEffect(ProjectName)(`smoke-${run}`).pipe(
+/**
+ * The throwaway project of run `run`, in the namespace of the decider who
+ * makes it: `<decider>/smoke-<run>`.
+ */
+const projectOf = (decider: Handle, run: string) =>
+  Schema.decodeEffect(ProjectName)(`${decider}/smoke-${run}`).pipe(
     Effect.mapError(
       () =>
         new LoopFailed({
-          reason: `smoke-${run} is no project name: a run is lowercase words joined by dashes`,
+          reason: `${decider}/smoke-${run} is no project name: a run is lowercase words joined by dashes`,
           step: "init",
         })
     )
@@ -219,7 +223,6 @@ export const smokeLoop = (
       return yield* new DemoStageRefused({ stage });
     }
 
-    const project = yield* projectOf(input.run);
     const fs = yield* FileSystem.FileSystem;
 
     const dir = yield* fs
@@ -252,17 +255,21 @@ export const smokeLoop = (
       })
     );
 
+    const project = yield* projectOf(decider.handle, input.run);
+
     // The name is checked free, then recorded, then made: an init that
     // makes the project and then fails still leaves it in the ledger, and
-    // a name someone else holds never enters teardown's plan.
+    // a name someone else holds never enters teardown's plan. The ledger
+    // names what the platform keeps: the project's key, its Durable
+    // Object's id and its repo's name.
     const [, init] = yield* timed(
       stage,
       "init"
     )(
       Effect.gen(function* () {
         yield* projectIsFree(decider, project);
-        yield* recordThrowaway(stage, "project", project);
-        yield* recordThrowaway(stage, "repo", project);
+        yield* recordThrowaway(stage, "project", keyOf(project));
+        yield* recordThrowaway(stage, "repo", keyOf(project));
 
         return yield* initProject({
           answerer: answerer.handle,

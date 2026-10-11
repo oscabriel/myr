@@ -39,6 +39,7 @@ import {
   LayerName,
   ProjectName,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import { LayerRepos } from "@repo/visibility/layer-repos";
@@ -54,11 +55,11 @@ import { memoSteps } from "../../src/workflows/step.ts";
 import type { StepRunner } from "../../src/workflows/step.ts";
 import { coreLoopWorld } from "../world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("ines-v/datekit");
 
 const maintainers = LayerName.make("maintainers");
 
-const layerRepo = RepoName.make(`${project}--${maintainers}`);
+const layerRepo = RepoName.make(`${keyOf(project)}--${maintainers}`);
 
 /** The people: datekit's maker, who decides it and keeps its layer, and two contributors. */
 const tokens = {
@@ -101,7 +102,7 @@ const start = {
     `});`,
     ``,
   ].join("\n"),
-  "package.json": '{ "name": "datekit", "private": true }\n',
+  "package.json": '{ "name": "ines-v/datekit", "private": true }\n',
   "src/export/svg.ts":
     'export const svg = (title: string) => title.replaceAll("<", "&lt;");\n',
   "src/parser/week.ts": "export const week = (iso: string) => 1;\n",
@@ -341,7 +342,7 @@ describe("admission of a layer push's held-back checks", () => {
         const { admit, bram, ines, jobs, openAsk, queued, redOnMain, world } =
           yield* admissionWorld;
 
-        const layerUrl = `${world.origin}/${layerRepo}.git`;
+        const layerUrl = `${world.origin}/${project}--maintainers.git`;
         const outside = yield* fs.makeTempDirectoryScoped();
 
         // The known-bad commit, on a branch of its own in the layer: the
@@ -494,7 +495,7 @@ describe("admission of a layer push's held-back checks", () => {
             JSON.stringify({
               at: CheckAt.cases.Commit.make({ commit: main }),
               lanes: [],
-              repo: project,
+              repo: keyOf(project),
             }),
           ],
         });

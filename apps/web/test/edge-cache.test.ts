@@ -69,7 +69,10 @@ describe("an answer to a request that says who is reading", () => {
     (_, headers) => {
       expect(
         kept(
-          forTheEdge(get("/datekit", { cookie: SIGNED_IN }), answer(headers))
+          forTheEdge(
+            get("/oscabriel/datekit", { cookie: SIGNED_IN }),
+            answer(headers)
+          )
         ).cacheControl
       ).toBe(KEPT_NOWHERE);
     }
@@ -78,7 +81,10 @@ describe("an answer to a request that says who is reading", () => {
   it.each(ANSWERS)("is kept nowhere, given any cookie: %s", (_, headers) => {
     expect(
       kept(
-        forTheEdge(get("/datekit", { cookie: "theme=dark" }), answer(headers))
+        forTheEdge(
+          get("/oscabriel/datekit", { cookie: "theme=dark" }),
+          answer(headers)
+        )
       ).cacheControl
     ).toBe(KEPT_NOWHERE);
   });
@@ -89,7 +95,7 @@ describe("an answer to a request that says who is reading", () => {
       expect(
         kept(
           forTheEdge(
-            get("/datekit", { authorization: "Bearer dev-ada" }),
+            get("/oscabriel/datekit", { authorization: "Bearer dev-ada" }),
             answer(headers)
           )
         ).cacheControl
@@ -133,7 +139,7 @@ describe("an answer to a request with no cookie", () => {
 
   it("keeps a page at main as the route says, varied by Cookie", () => {
     expect(
-      kept(forTheEdge(get("/datekit/tree/main"), answer(branchPage)))
+      kept(forTheEdge(get("/oscabriel/datekit/tree/main"), answer(branchPage)))
     ).toStrictEqual({
       cacheControl: branchPage["Cache-Control"],
       vary: "Cookie",
@@ -218,7 +224,7 @@ describe("the Worker's entry", () => {
       })
   );
 
-  it("is Start's server entry wrapped by edgeEntry, and nothing else", () => {
+  it("is Start's server entry behind the address redirects, wrapped by edgeEntry, and nothing else", () => {
     const sources: Readonly<Record<string, string>> = import.meta.glob(
       "../src/server.ts",
       { eager: true, import: "default", query: "?raw" }
@@ -230,8 +236,9 @@ describe("the Worker's entry", () => {
 
     expect(code.split(/\n+/u)).toStrictEqual([
       'import handler from "@tanstack/react-start/server-entry";',
+      'import { addressedEntry } from "./server/addresses.ts";',
       'import { edgeEntry } from "./server/edge-cache.ts";',
-      "export default edgeEntry(handler);",
+      "export default edgeEntry(addressedEntry(handler));",
     ]);
   });
 });
@@ -250,7 +257,7 @@ const listingDatekit = () =>
               {
                 openAsks: 0,
                 posture: "open" as const,
-                project: ProjectName.make("datekit"),
+                project: ProjectName.make("oscabriel/datekit"),
               },
             ],
           })
@@ -287,7 +294,7 @@ const CREDENTIAL_ROUTES: readonly (readonly [
     (request) => frontLlmsHandler(listingDatekit, PLATFORM_URL)({ request }),
   ],
   [
-    "/datekit/llms.txt",
+    "/oscabriel/datekit/llms.txt",
     (request) =>
       projectLlmsHandler(
         listingDatekit,
@@ -321,7 +328,7 @@ const CREDENTIAL_ROUTES: readonly (readonly [
       ),
   ],
   [
-    "/datekit/raw/main/README.md",
+    "/oscabriel/datekit/raw/main/README.md",
     (request) => forwarded(backend, platformEnv).GET({ request }),
   ],
   [
@@ -458,7 +465,7 @@ describe("a page", () => {
     );
 
     expect(reading.toSorted()).toStrictEqual([
-      "../src/routes/$project/decisions/$decision.tsx",
+      "../src/routes/$owner/$project/decisions/$decision.tsx",
       "../src/routes/home.tsx",
       "../src/routes/today.tsx",
     ]);

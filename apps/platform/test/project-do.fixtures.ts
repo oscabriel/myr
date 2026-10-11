@@ -29,6 +29,7 @@ import {
   LandedSha,
   LaneName,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import type { CommitSha, ProjectName } from "@repo/protocol/ids";
@@ -75,7 +76,7 @@ export const scenario = aProject({ people: ["bob", "carol"] }).pipe(
 
 export const { project } = scenario;
 
-export const repo = RepoName.make(project);
+export const repo = RepoName.make(keyOf(project));
 
 export const parseIso = AskId.make("parse-iso");
 
@@ -135,7 +136,7 @@ export const fixedFiles: Files = [
 
 /** The fork a claim of `parse-iso` pushes to. */
 export const forkOf = (who: Person) =>
-  RepoName.make(`${project}--${parseIso}--${who.handle}`);
+  RepoName.make(`${keyOf(project)}--${parseIso}--${who.handle}`);
 
 /** What the Checker answers, by `(tree or commit, lane)`; the test adds to it. */
 export class CheckScript extends Context.Service<

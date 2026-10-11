@@ -26,7 +26,10 @@ import { devStart } from "../src/dev/clock.ts";
 import { devServer } from "../src/dev/server.ts";
 import { devToken } from "../src/dev/sessions.ts";
 
-const PROJECTS = [ProjectName.make("burrow"), ProjectName.make("datekit")];
+const PROJECTS = [
+  ProjectName.make("oscabriel/burrow"),
+  ProjectName.make("oscabriel/datekit"),
+];
 
 const decider = devToken(Handle.make("ines-v"));
 
@@ -151,7 +154,7 @@ const listedWithLanding = inFreshWorld((as) =>
     const ines = yield* clientOf(as(decider));
     const { projects } = yield* anyone.listProjects({});
     const { unattended } = yield* ines.today({});
-    const burrow = ProjectName.make("burrow");
+    const burrow = ProjectName.make("oscabriel/burrow");
 
     const landed = yield* Effect.orDie(
       Effect.fromNullishOr((yield* anyone.listRefs({ project: burrow })).landed)
@@ -212,13 +215,13 @@ describe("the dev seed", seededWorlds, () => {
       const listed = new Set(projects.map(({ project }) => project));
 
       for (const fixture of [
-        "vellum",
-        "amberlog",
-        "cinderbox",
-        "fernwick",
-        "mossgate",
-        "quillon",
-        "tidepool",
+        "oscabriel/vellum",
+        "okafor/amberlog",
+        "lin-h/cinderbox",
+        "okonkwo/fernwick",
+        "lin-h/mossgate",
+        "okafor/quillon",
+        "okonkwo/tidepool",
       ]) {
         expect(listed.has(ProjectName.make(fixture))).toBeFalsy();
       }
@@ -254,8 +257,8 @@ describe("the dev seed", seededWorlds, () => {
         expect(
           projects.map(({ landedAt: at, project }) => [project, at])
         ).toStrictEqual([
-          ["burrow", opening.landedAt],
-          ["datekit", landedAt[0]],
+          ["oscabriel/burrow", opening.landedAt],
+          ["oscabriel/datekit", landedAt[0]],
         ]);
         expect(opening.opened).toBeDefined();
         expect(landedAt).toHaveLength(1);
@@ -341,8 +344,8 @@ describe("the dev world's raw files", seededWorlds, () => {
     () =>
       Effect.gen(function* () {
         const [manifest, climbed] = yield* fetched([
-          "/datekit/raw/main/package.json",
-          "/datekit/raw/main/..%2F..%2Fpackage.json",
+          "/oscabriel/datekit/raw/main/package.json",
+          "/oscabriel/datekit/raw/main/..%2F..%2Fpackage.json",
         ]);
 
         expect(manifest).toMatchObject({
@@ -366,7 +369,7 @@ const drafted = inFreshWorld((as) =>
     const anyone = yield* clientOf(as());
     const ines = yield* clientOf(as(decider));
     const bram = yield* clientOf(as(contributor));
-    const project = ProjectName.make("datekit");
+    const project = ProjectName.make("oscabriel/datekit");
     const before = yield* ines.today({ project });
 
     const { proposal } = yield* bram.proposeAsk({

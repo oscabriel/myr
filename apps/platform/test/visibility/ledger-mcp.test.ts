@@ -28,7 +28,7 @@ import { fakeEnv, operatorToken } from "../fake-env.ts";
 import { origin } from "../harness.ts";
 import { coreLoopWorld } from "../world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("dora/datekit");
 
 /** datekit as dora first pushes it: one source file and the config folder. */
 const start = {
@@ -41,7 +41,7 @@ const start = {
     `});`,
     ``,
   ].join("\n"),
-  "package.json": '{ "name": "datekit", "private": true }\n',
+  "package.json": '{ "name": "dora/datekit", "private": true }\n',
   "src/week.ts": "export const week = (iso: string) => 0;\n",
 };
 

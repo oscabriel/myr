@@ -31,7 +31,7 @@ describe("salts from WebCrypto", () => {
   );
 });
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("alice/datekit");
 
 const maintainers = LayerName.make("maintainers");
 
@@ -96,11 +96,11 @@ describe("an admission's start", () => {
           }))
         ).toStrictEqual([
           {
-            id: `admit-datekit-maintainers-${head}`,
+            id: `admit-alice__datekit-maintainers-${head}`,
             params: admissionOf(head),
           },
           {
-            id: `admit-datekit-maintainers-${later}`,
+            id: `admit-alice__datekit-maintainers-${later}`,
             params: admissionOf(later),
           },
         ]);

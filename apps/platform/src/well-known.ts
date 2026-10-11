@@ -34,8 +34,14 @@ import { CodeCache } from "@repo/project/code/cache";
 import { FrontPage } from "@repo/project/front-page";
 import { landedRef } from "@repo/project/lander";
 import { Projects } from "@repo/project/projects";
-import { ProjectName, RepoName, RepoPath } from "@repo/protocol/ids";
-import type { CommitSha } from "@repo/protocol/ids";
+import {
+  keyOf,
+  nameOfKey,
+  ProjectKey,
+  RepoName,
+  RepoPath,
+} from "@repo/protocol/ids";
+import type { ProjectName, CommitSha } from "@repo/protocol/ids";
 import type { Layer } from "effect";
 import {
   Array as Arr,
@@ -113,7 +119,7 @@ const landedOf = (
     }
 
     const host = yield* RepoHost;
-    const refs = yield* host.refs(RepoName.make(project));
+    const refs = yield* host.refs(RepoName.make(keyOf(project)));
 
     return Option.orElse(Option.fromUndefinedOr(refs.get(landedRef)), () =>
       Option.fromUndefinedOr(refs.get(mainRef))
@@ -127,7 +133,7 @@ const skillAt = (project: ProjectName, landed: CommitSha) =>
     const [path] = contributeSkillPaths(project);
 
     const bytes = yield* host.readFile(
-      RepoName.make(project),
+      RepoName.make(keyOf(project)),
       Revision.Commit({ sha: landed }),
       RepoPath.make(path)
     );
@@ -144,7 +150,7 @@ const keptSkillAt = (project: ProjectName, landed: CommitSha) =>
   Effect.gen(function* () {
     const cache = yield* CodeCache;
     const store = yield* CodeStore;
-    const key = `${RepoName.make(project)}/skill/v${SKILL_VERSION}/${landed}`;
+    const key = `${keyOf(project)}/skill/v${SKILL_VERSION}/${landed}`;
 
     return yield* cache.through(
       key,
@@ -188,7 +194,7 @@ const landedSkill = (
     })
   );
 
-const decodeProject = Schema.decodeUnknownOption(ProjectName);
+const decodeKey = Schema.decodeUnknownOption(ProjectKey);
 
 /** The index: every listed project's landed skill, by name. */
 const index = Effect.gen(function* () {
@@ -223,10 +229,10 @@ const index = Effect.gen(function* () {
   });
 });
 
-/** The project whose skill `name` names: `<project>-contribute`. */
+/** The project whose skill `name` names: `<key>-contribute`. */
 const projectNamed = (name: string) =>
   name.endsWith(CONTRIBUTE)
-    ? decodeProject(name.slice(0, -CONTRIBUTE.length))
+    ? Option.flatMap(decodeKey(name.slice(0, -CONTRIBUTE.length)), nameOfKey)
     : Option.none();
 
 /** One project's skill file, as it landed. */

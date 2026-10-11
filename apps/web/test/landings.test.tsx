@@ -47,14 +47,14 @@ describe("a project's landings list", () => {
 
     expect(plainText(item)).toContain("Open ask format-ordinal");
     expect(plainText(item)).not.toContain("Landed without an ask");
-    expect(hrefsOf(item)).toContain("/datekit/asks/format-ordinal");
+    expect(hrefsOf(item)).toContain("/oscabriel/datekit/asks/format-ordinal");
   });
 
   it("reads a landing that answers an ask as its answer, linking the ask", () => {
     const item = itemOf(markup, landing.sha);
 
     expect(plainText(item)).toContain("Answer parse-iso-week");
-    expect(hrefsOf(item)).toContain("/datekit/asks/parse-iso-week");
+    expect(hrefsOf(item)).toContain("/oscabriel/datekit/asks/parse-iso-week");
   });
 
   it("still reads a landing with neither as landed without an ask, linking none", () => {

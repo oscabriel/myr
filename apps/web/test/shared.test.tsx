@@ -77,7 +77,7 @@ describe(StateBadge, () => {
 
 describe(CopyAction, () => {
   it("holds its command as text and is named for what it copies", () => {
-    const command = `${Brand.cli} claim fix-week-start --project datekit`;
+    const command = `${Brand.cli} claim fix-week-start --project oscabriel/datekit`;
 
     const markup = markupOf(
       <CopyAction command={command} label="Copy claim command" />
@@ -166,7 +166,7 @@ describe(CommandLine, () => {
   });
 
   it("keeps each word whole on its line, so a narrow column breaks between words", () => {
-    const command = `${Brand.cli} claim lint-heading-levels --project vellum`;
+    const command = `${Brand.cli} claim lint-heading-levels --project oscabriel/vellum`;
     const markup = markupOf(<CommandLine command={command} />);
 
     const words = [
@@ -187,7 +187,7 @@ describe(CommandLine, () => {
     expect(hangs(`${Brand.cli} today`)).toStrictEqual([4]);
     expect(
       hangs(
-        `${Brand.cli} claim lint-heading-levels --project vellum \\\n  --json`
+        `${Brand.cli} claim lint-heading-levels --project oscabriel/vellum \\\n  --json`
       )
     ).toStrictEqual([6, 2]);
   });
@@ -208,7 +208,7 @@ describe(EmptyState, () => {
   it("gives a way onward when no command changes it", () => {
     const text = textOf(
       <EmptyState
-        onward={<a href="/datekit">Back to datekit</a>}
+        onward={<a href="/oscabriel/datekit">Back to datekit</a>}
         title="Nobody has answered this ask yet."
       />
     );

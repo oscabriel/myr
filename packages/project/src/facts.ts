@@ -19,7 +19,7 @@ import type { Ask } from "@repo/protocol/domain/ask";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import { RefNameText } from "@repo/protocol/domain/common";
 import type { Policy } from "@repo/protocol/domain/policy";
-import { AskId, Handle, LayerName, TreeSha } from "@repo/protocol/ids";
+import { AskId, Handle, keyOf, LayerName, TreeSha } from "@repo/protocol/ids";
 import type {
   CommitSha,
   LandedSha,
@@ -54,7 +54,7 @@ export const targetOf = (repo: RepoName, project: ProjectName): PushTarget => {
   const [named, second, third, ...rest] = repo.split("--");
   const canonical = PushTarget.Canonical({ project });
 
-  if (named !== project || rest.length > 0 || second === undefined) {
+  if (named !== keyOf(project) || rest.length > 0 || second === undefined) {
     return canonical;
   }
 

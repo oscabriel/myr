@@ -19,7 +19,10 @@ import {
   CommitSha,
   Handle,
   LandedSha,
+  ProjectKey,
   ProjectName,
+  keyOf,
+  nameOfKey,
   RepoName,
 } from "@repo/protocol/ids";
 import {
@@ -228,9 +231,9 @@ export const big = `${"x".repeat(1023)}\n`.repeat(1536);
 export const svg =
   '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>\n';
 
-export const project = ProjectName.make("datekit");
+export const project = ProjectName.make("alice/datekit");
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const text = (value: string) => Content.Text({ text: value });
 
@@ -273,7 +276,7 @@ export const fork: ForkRef = {
   ask: AskId.make("parse-iso"),
   handle: Handle.make("bob"),
   kind: "claim",
-  repo: RepoName.make("datekit--parse-iso--bob"),
+  repo: RepoName.make("alice__datekit--parse-iso--bob"),
 };
 
 /** The project's one landing, on `sha`. */
@@ -298,7 +301,7 @@ const recordOf = (
   head: Effect.succeedSome(LandedSha.make(head)),
   landings: (shas) =>
     Effect.succeed(landed.filter(({ sha }) => shas.includes(sha))),
-  project: ProjectName.make(name),
+  project: Option.getOrThrow(nameOfKey(ProjectKey.make(name))),
   repo: name,
 });
 
@@ -358,7 +361,7 @@ export const datekit = Effect.gen(function* () {
 export const longHistory = (count: number) =>
   Effect.gen(function* () {
     const git = yield* writer;
-    const name = RepoName.make("longkit");
+    const name = RepoName.make("oscabriel__longkit");
     const shas: CommitSha[] = [];
 
     for (let at = 1; at <= count; at += 1) {
@@ -393,7 +396,7 @@ export const longHistory = (count: number) =>
 export const growingHistory = (count: number) =>
   Effect.gen(function* () {
     const git = yield* writer;
-    const name = RepoName.make("growkit");
+    const name = RepoName.make("oscabriel__growkit");
     const shas: CommitSha[] = [];
 
     for (let at = 1; at <= count; at += 1) {
@@ -424,7 +427,7 @@ export const growingHistory = (count: number) =>
 export const wide = (count: number) =>
   Effect.gen(function* () {
     const git = yield* writer;
-    const name = RepoName.make("widekit");
+    const name = RepoName.make("oscabriel__widekit");
 
     const sha = yield* git.commit(
       "Many files",
@@ -447,7 +450,7 @@ export const wide = (count: number) =>
  */
 export const linkedReadmes = Effect.gen(function* () {
   const git = yield* writer;
-  const name = RepoName.make("linkkit");
+  const name = RepoName.make("oscabriel__linkkit");
 
   const sha = yield* git.commit(
     "Link the READMEs",

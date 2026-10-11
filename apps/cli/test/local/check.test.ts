@@ -20,6 +20,7 @@ import {
   ProjectName,
   RepoName,
   RepoPath,
+  keyOf,
   TreeSha,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -103,7 +104,7 @@ const claimedAt = (base: string) =>
                 base,
                 checkCommand: `true ${checkFile}`,
                 claimant: handle,
-                fork: `${project}--${ask}--${handle}`,
+                fork: `${keyOf(ProjectName.make(project))}--${ask}--${handle}`,
                 lapsesAt: "2099-01-02T00:00:00.000Z",
                 openedAt: "2026-10-07T12:00:00.000Z",
                 project,
@@ -191,7 +192,7 @@ const gateSays = (repo: CheckRepo, head: string) =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const hosted = yield* fs.makeTempDirectoryScoped();
-    const name = RepoName.make(project);
+    const name = RepoName.make(keyOf(ProjectName.make(project)));
 
     yield* gitOk(
       repo.root,
@@ -251,7 +252,9 @@ const gateSays = (repo: CheckRepo, head: string) =>
         base,
         checkCommand: `${Brand.cli} check`,
         claimant,
-        fork: RepoName.make(`${project}--${ask}--${handle}`),
+        fork: RepoName.make(
+          `${keyOf(ProjectName.make(project))}--${ask}--${handle}`
+        ),
         lapsesAt: now,
         openedAt: now,
         project: ProjectName.make(project),

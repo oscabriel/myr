@@ -69,7 +69,7 @@ import {
 import { coreLoopWorld } from "./world.ts";
 import type { CoreLoopWorld } from "./world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("dora/datekit");
 
 const parseIso = AskId.make("parse-iso");
 
@@ -91,7 +91,7 @@ const start = {
   ].join("\n"),
   [`${Brand.configDir}/vouched.td`]: "alice\nbob\n",
   "README.md": "datekit: dates, parsed\n",
-  "package.json": '{ "name": "datekit", "private": true }\n',
+  "package.json": '{ "name": "dora/datekit", "private": true }\n',
   "src/parse.ts":
     "export const parse = (iso: string) => ({ month: 0, year: 0 });\n",
 };
@@ -335,11 +335,11 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
         expect(
           yield* Effect.flip(
             Stream.runCollect(
-              framed.watch({ project: ProjectName.make("nowhere") })
+              framed.watch({ project: ProjectName.make("alice/nowhere") })
             )
           )
         ).toStrictEqual(
-          new UnknownProject({ project: ProjectName.make("nowhere") })
+          new UnknownProject({ project: ProjectName.make("alice/nowhere") })
         );
       }),
     60_000

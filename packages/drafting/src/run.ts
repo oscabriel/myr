@@ -28,7 +28,7 @@ import { RepoHost, Revision } from "@repo/artifacts/repo-host";
 import { DraftResult, DRAFT_ROUNDS, Rehearsal } from "@repo/project/draft-runs";
 import type { DraftParams } from "@repo/project/draft-runs";
 import { Projects } from "@repo/project/projects";
-import { RepoName, RepoPath } from "@repo/protocol/ids";
+import { keyOf, RepoName, RepoPath } from "@repo/protocol/ids";
 import type { Refusal } from "@repo/protocol/refusal";
 import { IncompleteBrief, VerifierBlocked } from "@repo/protocol/refusal";
 import { Cause, Context, Effect, Option, Record, Schema } from "effect";
@@ -159,7 +159,7 @@ export const runDraft = (
         return Prepared.cases.NoFix.make({});
       }
 
-      const repo = RepoName.make(data.project);
+      const repo = RepoName.make(keyOf(data.project));
 
       const read = (path: RepoPath) =>
         host.readFile(repo, Revision.Commit({ sha: data.at }), path).pipe(

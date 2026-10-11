@@ -16,6 +16,7 @@ import {
   ProjectName,
   RepoName,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
@@ -35,7 +36,7 @@ const scenario = aProject({ people: ["bob", "carol"] }).pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const person = (name: string) =>
   Person.make({ handle: scenario.people.get(name) ?? scenario.initializer });
@@ -58,7 +59,10 @@ const requestId = RequestId.make("req-fix-0001");
 const mainRef = RefName.make("refs/heads/main");
 
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
 ];
 
@@ -218,7 +222,7 @@ describe("reading a failing lane's log", () => {
     () =>
       Effect.gen(function* () {
         const api = yield* answered();
-        const other = ProjectName.make("burrow");
+        const other = ProjectName.make("alice/burrow");
 
         const elsewhere = logRefOf({
           attempt: 1,

@@ -29,6 +29,7 @@ import {
   LayerName,
   RepoName,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import type { CommitSha, ProjectName } from "@repo/protocol/ids";
@@ -82,7 +83,7 @@ export const scenario = aProject({
 
 export const { project } = scenario;
 
-export const repo = RepoName.make(project);
+export const repo = RepoName.make(keyOf(project));
 
 const person = (name: string) =>
   Person.make({ handle: scenario.people.get(name) ?? scenario.initializer });
@@ -96,7 +97,7 @@ export const bob = person("bob");
 export const maintainers = LayerName.make("maintainers");
 
 /** The maintainers layer's repo in the private namespace. */
-export const layerRepo = RepoName.make(`${project}--${maintainers}`);
+export const layerRepo = RepoName.make(`${keyOf(project)}--${maintainers}`);
 
 /** The config file that declares datekit's layers and held-back checks. */
 export const visibilityFile = RepoPath.make(`${Brand.configDir}/visibility.ts`);
@@ -133,7 +134,10 @@ export const datekitVisibility = Schema.decodeUnknownSync(VisibilityPolicy)({
 
 /** The project as ines-v first pushes it, with no visibility config. */
 export const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
   ["packages/trim/src/trim.ts", "export const trim = (s) => s;\n"],
 ];

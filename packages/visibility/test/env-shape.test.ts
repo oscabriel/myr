@@ -14,7 +14,7 @@ import {
 } from "../src/env-shape.ts";
 import { fixtures, parsedByFile, refused } from "./fixtures/env/cases.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const at = LandedSha.make("a1".repeat(20));
 

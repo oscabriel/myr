@@ -9,6 +9,7 @@ import {
   LaneName,
   ProjectName,
   RepoName,
+  keyOf,
   TreeSha,
 } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
@@ -56,21 +57,25 @@ const lanes = [
   { command: "bun test", lane: LaneName.make("unit") },
 ];
 
-const wireFor = (project = "datekit"): CheckWire => ({
-  clone: {
-    token: Redacted.make(TOKEN),
-    url: `https://0123abcd.artifacts.cloudflare.net/git/public/${project}.git`,
-  },
-  job: {
-    at: CheckAt.cases.Commit.make({ commit: CommitSha.make("a".repeat(40)) }),
-    lanes,
-    placeholders: [],
-    project: ProjectName.make(project),
-    proxies: [],
-    repo: RepoName.make(project),
-    run,
-  },
-});
+const wireFor = (name = "oscabriel/datekit"): CheckWire => {
+  const project = ProjectName.make(name);
+
+  return {
+    clone: {
+      token: Redacted.make(TOKEN),
+      url: `https://0123abcd.artifacts.cloudflare.net/git/public/${keyOf(project)}.git`,
+    },
+    job: {
+      at: CheckAt.cases.Commit.make({ commit: CommitSha.make("a".repeat(40)) }),
+      lanes,
+      placeholders: [],
+      project,
+      proxies: [],
+      repo: RepoName.make(keyOf(project)),
+      run,
+    },
+  };
+};
 
 const isShell = (call: Call, command: string) =>
   call.kind === "exec" &&
@@ -394,7 +399,9 @@ describe("the Checker", () => {
 
         yield* check(wireFor()).pipe(Effect.provide(first.layer));
         yield* check(wireFor()).pipe(Effect.provide(second.layer));
-        yield* check(wireFor("burrow")).pipe(Effect.provide(elsewhere.layer));
+        yield* check(wireFor("oscabriel/burrow")).pipe(
+          Effect.provide(elsewhere.layer)
+        );
 
         expect(
           [first, second, elsewhere].map(({ calls }) => setups(calls))

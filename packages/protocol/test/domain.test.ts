@@ -272,18 +272,27 @@ describe("names and ids", () => {
   });
 
   it.each(["a--b", "-a", "a-", "A", "a_b", ""])(
-    "a project or an ask may not be named %j",
+    "an ask may not be named %j",
     (name) => {
-      expect(refuses(ProjectName, name)).toBeTruthy();
       expect(refuses(AskId, name)).toBeTruthy();
     }
   );
 
   it.each(["a", "a-b", "iso-week-2", "datekit"])(
-    "a project or an ask may be named %j",
+    "an ask may be named %j",
     (name) => {
-      expect(refuses(ProjectName, name)).toBeFalsy();
       expect(refuses(AskId, name)).toBeFalsy();
+    }
+  );
+
+  // A project's name is `<owner>/<name>`; `project-name.test.ts` holds its
+  // grammar. An ask's name is one word, and the web serves its own pages at
+  // the words below, so a project's owner may not be one; an ask may still
+  // take them: an ask's page is under its project.
+  it.each(["a", "a-b", "iso-week-2"])(
+    "an owner may make a project named %j",
+    (name) => {
+      expect(refuses(ProjectName, `oscabriel/${name}`)).toBeFalsy();
     }
   );
 
@@ -295,26 +304,24 @@ describe("names and ids", () => {
     "an ask may not be named %j",
     (name) => {
       expect(refuses(AskId, name)).toBeTruthy();
-      expect(refuses(ProjectName, name)).toBeFalsy();
+      expect(refuses(ProjectName, `oscabriel/${name}`)).toBeFalsy();
     }
   );
 
-  // The web serves its own pages and files at these first path segments, so
-  // a project so named would be unreachable at `<web>/<project>`.
-  // An ask may still take them: an ask's page is under its project.
   it.each([
     "agents",
     "assets",
     "auth",
     "icons",
+    "import",
     "people",
     "releases",
     "rpc",
     "today",
   ])(
-    "a project may not be named %j, a path the web takes for itself",
+    "a project may not be owned by %j, a path the web takes for itself",
     (name) => {
-      expect(refuses(ProjectName, name)).toBeTruthy();
+      expect(refuses(ProjectName, `${name}/foo`)).toBeTruthy();
       expect(refuses(AskId, name)).toBeFalsy();
     }
   );

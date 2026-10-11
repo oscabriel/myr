@@ -96,7 +96,7 @@ export const projectOf = (
     {
       onNone: () =>
         usage(
-          "Name the project with --project <name>: this repo has no remote on a platform."
+          "Name the project with --project <owner>/<name>: this repo has no remote on a platform."
         ),
       onSome: Effect.succeed,
     }

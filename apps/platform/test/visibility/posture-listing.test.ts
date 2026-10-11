@@ -24,7 +24,7 @@ import { stateLive } from "../../src/visibility/state.ts";
 import { fakeEnv } from "../fake-env.ts";
 import { coreLoopWorld } from "../world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("dora/datekit");
 
 const sdk = `${Brand.cliPackage}/rules`;
 
@@ -57,7 +57,7 @@ const start = {
     `});`,
     ``,
   ].join("\n"),
-  "package.json": '{ "name": "datekit", "private": true }\n',
+  "package.json": '{ "name": "dora/datekit", "private": true }\n',
   "src/parse.ts": "export const parse = (iso: string) => 0;\n",
 };
 

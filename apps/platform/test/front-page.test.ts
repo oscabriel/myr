@@ -282,12 +282,12 @@ describe("the project list and credits over the platform's /rpc", () => {
         const { projects } = yield* world.anyone.listProjects({});
 
         expect(
-          projects.find(({ project: listed }) => listed === "quietkit")
+          projects.find(({ project: listed }) => listed === "alice/quietkit")
         ).toStrictEqual({
           landedAt: at(noon),
           openAsks: 0,
           posture: "open",
-          project: "quietkit",
+          project: "alice/quietkit",
         });
       }).pipe(Effect.scoped)
   );

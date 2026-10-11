@@ -12,7 +12,7 @@ import { gitOk } from "@repo/testkit/git";
 import { Effect, FileSystem, Path } from "effect";
 
 /** The project, the ask and the person the fixture's remote names. */
-export const project = "fixture";
+export const project = "alice/fixture";
 
 export const ask = "fix-a";
 

@@ -120,7 +120,7 @@ describe("a person's record", () => {
   it("takes no area from another project's ask with the same id", () => {
     const elsewhere = {
       ...landing("elsewhere", { ask: "parse-iso", days: 60 }),
-      project: ProjectName.make("burrow"),
+      project: ProjectName.make("alice/burrow"),
     };
 
     expect(recordAt([elsewhere])(alice)).toStrictEqual([]);

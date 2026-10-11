@@ -20,7 +20,7 @@ import { RepoHost } from "@repo/artifacts/repo-host";
 import { Upstream } from "@repo/git/upstream";
 import { UpstreamRepoHost } from "@repo/git/upstream/repo-host";
 import { Projects } from "@repo/project/projects";
-import { LayerName, ProjectName } from "@repo/protocol/ids";
+import { LayerName, nameOfKey, ProjectKey } from "@repo/protocol/ids";
 import { LayerRepos } from "@repo/visibility/layer-repos";
 import { Effect, Layer, Option, Schema } from "effect";
 
@@ -29,7 +29,10 @@ import type { LayerTarget } from "../layer-gate.ts";
 import type { PlatformConfig } from "../platform.ts";
 import { layerRepos } from "./layer-repos.ts";
 
-const asProject = Schema.decodeOption(ProjectName);
+const asKey = Schema.decodeOption(ProjectKey);
+
+// A layer repo's first part is its project's key (ADR 0032).
+const asProject = (first: string) => Option.flatMap(asKey(first), nameOfKey);
 
 const asLayer = Schema.decodeOption(LayerName);
 

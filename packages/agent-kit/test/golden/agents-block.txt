@@ -1,6 +1,6 @@
 ==> AGENTS.md <==
 <!-- BEGIN __SLUG__ contribute (generated; content-hash: sha256:__HASH__) -->
-## Contributing to datekit
+## Contributing to oscabriel/datekit
 
 This project takes changes through __NAME__: an answer to one of its asks lands only by passing the gate. This block is generated from the config folder, and the gate decides what lands. The full guide is the `datekit-contribute` skill (`.agents/skills/datekit-contribute/SKILL.md`).
 
