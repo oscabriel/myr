@@ -81,7 +81,7 @@ The commit the platform itself last landed on main; the only commit a project's 
 _Avoid_: HEAD, tip of main
 
 **Import**:
-A project adopted from a public repo: a read-only copy, not run by its maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from.
+A project adopted from a public repo: a read-only copy, not run by its maintainers, whose first `main` is the source branch's tip. The source, its address and branch, stays on the project's record and is shown as where it was imported from; by default the project is named at its source namespace.
 _Avoid_: mirror, fork (of the source), sync
 
 **Outcome**:
@@ -198,6 +198,18 @@ The stand-in that unlanded code sees for a write-only value; for a @proxy item t
 _Avoid_: dummy value, mock secret
 
 ## Platform
+
+**Project name**:
+A project's full name, `<owner>/<name>`: an owner, then the short name the owner chose. It is the project's address on every surface.
+_Avoid_: slug, repo name, full name, path
+
+**Owner**:
+The namespace a project is named in: a person's handle, or a source namespace. Owning a namespace is the right to make projects in it and nothing more; deciding stays with the config folder.
+_Avoid_: org, account, maintainer, admin
+
+**Source namespace**:
+An owner that is the host and account a repo was imported from, such as `github.com/pallets`, so an import's address says where it came from.
+_Avoid_: upstream, origin, mirror
 
 **Config folder**:
 The .myr/ folder on main holding the project's process as TypeScript: project.ts, kinds, asks, visibility.ts, the vouch file.
