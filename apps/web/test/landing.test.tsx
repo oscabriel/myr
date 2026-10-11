@@ -4,22 +4,25 @@
  * screen `git push` prints when the gate refuses (from the one renderer),
  * the four nouns, the loop, and the projects to read, each with its
  * posture. Drawn in the house style: no banned word, and no rounded,
- * shadowed or gradient surface. Its projects are the rail's read, in the
- * browser, so the page is the same for everyone.
+ * shadowed or gradient surface. Its projects are read on the server as
+ * nobody, so the page is the same for everyone, script or not.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { Contracts } from "@repo/protocol/contracts";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Effect, Schema } from "effect";
-import { AsyncResult } from "effect/reactivity";
 
 import { LandingView } from "../src/features/landing/landing-page.tsx";
 import {
   LandingProjects,
-  landingProjects,
   PROJECTS_SHOWN,
 } from "../src/features/landing/projects.ts";
+import { readLandingProjects } from "../src/features/landing/read.ts";
+import { LEDE } from "../src/features/landing/words.ts";
+import { landingHead } from "../src/routes/index.tsx";
 import { textIn } from "./markup.ts";
+import { platformWith, unreachablePlatform } from "./platform.ts";
 import { renderAt } from "./render.tsx";
 
 const PLATFORM = "https://platform.example.workers.dev";
@@ -115,8 +118,21 @@ describe(LandingView, () => {
         expect(markup).toMatch(
           /data-project="burrow"[\s\S]*?data-posture="open"/u
         );
+        // The posture badge, with its mark, not the word alone.
+        expect(
+          markup
+            .slice(markup.indexOf('data-project="datekit"'))
+            .split("</li>")[0]
+        ).toContain("<svg");
       })
   );
+
+  it("unfurls with its own sentence, the README's lede", () => {
+    expect(landingHead().meta).toContainEqual({
+      content: LEDE,
+      name: "description",
+    });
+  });
 
   it.effect(
     "says so when the projects did not come, and still leads to the asks",
@@ -171,8 +187,14 @@ describe(LandingView, () => {
   );
 });
 
-describe(landingProjects, () => {
-  const listing = Schema.decodeSync(Schema.Array(ProjectListing))(
+/** A platform that lists `projects`, and answers nothing else. */
+const listing = (projects: readonly ProjectListing[]) =>
+  platformWith(
+    Contracts.toLayerHandler("listProjects", () => Effect.succeed({ projects }))
+  );
+
+describe("the landing's projects, read on the server", () => {
+  const many = Schema.decodeSync(Schema.Array(ProjectListing))(
     Array.from({ length: PROJECTS_SHOWN + 2 }, (_, at) => ({
       openAsks: 1,
       posture: "open",
@@ -180,29 +202,30 @@ describe(landingProjects, () => {
     }))
   );
 
-  it("names the first eight projects, waits while they come, and says when they did not", () => {
-    expect(
-      LandingProjects.match(
-        landingProjects(AsyncResult.success({ projects: listing })),
-        {
-          Listed: ({ projects }) => projects.length,
-          Pending: () => -1,
-          Unreachable: () => -2,
-        }
-      )
-    ).toBe(PROJECTS_SHOWN);
-    expect(landingProjects(AsyncResult.initial())._tag).toBe("Pending");
-    expect(landingProjects(AsyncResult.fail("down"))._tag).toBe("Unreachable");
-  });
-});
-
-describe("the landing while its projects come", () => {
-  it.effect("keeps their place, busy, and still leads to the asks", () =>
+  it.effect("names the first eight projects the platform lists", () =>
     Effect.gen(function* () {
-      const markup = yield* pageWith(LandingProjects.cases.Pending.make({}));
+      const read = yield* readLandingProjects.pipe(
+        Effect.provide(listing(many))
+      );
 
-      expect(markup).toContain('aria-busy="true"');
-      expect(hrefsOf(markup)).toContain("/asks");
+      expect(
+        LandingProjects.match(read, {
+          Listed: ({ projects }) => projects.map(({ project }) => project),
+          Unreachable: () => [],
+        })
+      ).toStrictEqual(
+        many.slice(0, PROJECTS_SHOWN).map(({ project }) => project)
+      );
+    })
+  );
+
+  it.effect("says so, and never fails, when the platform did not answer", () =>
+    Effect.gen(function* () {
+      const read = yield* readLandingProjects.pipe(
+        Effect.provide(unreachablePlatform)
+      );
+
+      expect(read._tag).toBe("Unreachable");
     })
   );
 });
