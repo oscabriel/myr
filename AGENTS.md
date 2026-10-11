@@ -121,6 +121,7 @@ Each was weighed and turned down; re-adding one needs sign-off.
 - shadcn's `command` (it brings `cmdk`, built on Radix), `sidebar` (its source calls `Math.random()`, which typecheck refuses, and its `use-mobile` hook fails lint) and `resizable` (it adds `react-resizable-panels`, and a fixed grid does the job) in `apps/web`.
 - DOMPurify for a README's HTML: it needs a DOM, which the Worker has not got. `rehype-sanitize` runs the same on the server and in the browser.
 - Any inbound or two-way GitHub sync. It would be a second way onto `main` that skips the gate.
+- A decentralised-identity client (an atproto OAuth client, a DID resolver) behind the handle: a sign-in redesign and a third party's account as identity (ADR 0016). A second identity, if ever, is a key the person holds.
 
 ## Agent skills
 

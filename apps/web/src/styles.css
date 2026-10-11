@@ -117,11 +117,14 @@
   --background: #f5f8fa;
   --foreground: oklch(0.21 0.015 258);
   --surface: oklch(0.955 0.005 245);
+  /* One step past the surface, for a selected thing under the pointer only
+     (DESIGN.md "Pressed Surface"); every state role keeps 5:1 on it. */
+  --surface-2: oklch(0.935 0.006 250);
   --muted: oklch(0.48 0.012 258);
   --rule: oklch(0.86 0.007 255);
   --rule-strong: oklch(0.21 0.015 258);
 
-  /* State roles: text-safe on paper and on surface (at least 5:1). */
+  /* State roles: text-safe on paper, on surface and on surface-2 (at least 5:1). */
   --landed: oklch(0.47 0.11 155);
   --checking: oklch(0.48 0.13 252);
   --waiting: oklch(0.5 0.1 70);
@@ -190,6 +193,7 @@
     --background: #0e1114;
     --foreground: oklch(0.94 0.005 258);
     --surface: oklch(0.215 0.009 258);
+    --surface-2: oklch(0.25 0.01 258);
     --muted: oklch(0.72 0.01 258);
     --rule: oklch(0.33 0.01 258);
     --rule-strong: oklch(0.94 0.005 258);
@@ -302,6 +306,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-rule: var(--rule);
   --color-rule-strong: var(--rule-strong);
   --color-landed: var(--landed);
