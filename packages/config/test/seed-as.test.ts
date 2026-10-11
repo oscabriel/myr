@@ -42,11 +42,11 @@ describe(renameSeedPlan, () => {
           ratchets: copy.ratchets,
         }).toStrictEqual({
           asks: plan.asks,
-          copyOf: "burrow",
+          copyOf: "oscabriel/burrow",
           decider: "okafor",
           initFiles: plan.initFiles,
           layers: [],
-          project: "burrow-swarm-2",
+          project: "oscabriel/burrow-swarm-2",
           ratchets: ["no-module-level-mutable-state"],
         });
       }).pipe(Effect.provide(NodeServices.layer))
@@ -75,12 +75,12 @@ describe(renameSeedPlan, () => {
             files: files.length,
             knownBad: knownBad.map(({ commit }) => commit),
             layer,
-            repo: `datekit-copy-2--${layer}`,
+            repo: `oscabriel_datekit-copy-2--${layer}`,
           }))
         );
 
         // A copy of a copy is still a copy of the example.
-        expect(copy.copyOf).toBe("datekit");
+        expect(copy.copyOf).toBe("oscabriel/datekit");
       }).pipe(Effect.provide(NodeServices.layer))
   );
 });
@@ -117,7 +117,7 @@ describe("runSeed, for a copy", () => {
           refusals: failure.refusals,
         }).toStrictEqual({
           reason:
-            "burrow-taken is taken: --as makes a fresh copy of burrow, so name a project nobody has",
+            "oscabriel/burrow-taken is taken: --as makes a fresh copy of oscabriel/burrow, so name a project nobody has",
           refs: 0,
           refusals: [new ProjectExists({ project: taken })],
         });
@@ -158,13 +158,13 @@ describe("bun scripts/seed.ts --as", () => {
         ]);
 
         expect(printed.slice(0, 7)).toStrictEqual([
-          "seed: datekit-copy (a copy of datekit) on the Node world",
-          "Init datekit-copy: done",
-          "Push datekit-copy: done",
-          "OpenAsk datekit-copy/add-months-clamp: done",
-          "OpenAsk datekit-copy/format-ordinal: done",
-          "OpenAsk datekit-copy/parse-iso-week: done",
-          "Layer datekit-copy--maintainers: done",
+          "seed: oscabriel/datekit-copy (a copy of oscabriel/datekit) on the Node world",
+          "Init oscabriel/datekit-copy: done",
+          "Push oscabriel/datekit-copy: done",
+          "OpenAsk oscabriel/datekit-copy/add-months-clamp: done",
+          "OpenAsk oscabriel/datekit-copy/format-ordinal: done",
+          "OpenAsk oscabriel/datekit-copy/parse-iso-week: done",
+          "Layer oscabriel_datekit-copy--maintainers: done",
         ]);
       }),
     120_000
@@ -184,7 +184,7 @@ describe("optionsOf, with --as", () => {
       ]),
       (options) => {
         expect({ as: options.as, only: options.only }).toStrictEqual({
-          as: "burrow-swarm-2",
+          as: "oscabriel/burrow-swarm-2",
           only: "burrow",
         });
       }
@@ -229,14 +229,14 @@ describe(recordCopy, () => {
             at,
             by: "seed",
             kind: "project",
-            name: "datekit-copy",
+            name: "oscabriel_datekit-copy",
             stage: "dev-oscabriel",
           },
           {
             at,
             by: "seed",
             kind: "repo",
-            name: "datekit-copy",
+            name: "oscabriel_datekit-copy",
             namespace: "projects-dev-oscabriel",
             stage: "dev-oscabriel",
           },
@@ -244,7 +244,7 @@ describe(recordCopy, () => {
             at,
             by: "seed",
             kind: "repo",
-            name: "datekit-copy--maintainers",
+            name: "oscabriel_datekit-copy--maintainers",
             namespace: "layers-dev-oscabriel",
             stage: "dev-oscabriel",
           },

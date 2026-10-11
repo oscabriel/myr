@@ -3,7 +3,7 @@
  * `effect/process` only, so no `effect/cli`):
  *
  *   --stage <s>              required: a stage `infra/stages.ts` declares
- *   --project <name>         default burrow
+ *   --project <name>         default oscabriel/burrow
  *   --scenario plain|video   default plain
  *   --dry-run                print the plan; claim nothing, start nothing
  *   --json                   print JSON: the plan (dry run) or the run's summary
@@ -39,7 +39,7 @@ export interface SwarmOptions {
 }
 
 export const USAGE =
-  "bun scripts/swarm.ts --stage <dev-…|demo> [--project burrow] [--scenario plain|video] [--dry-run] [--json] [--allow-demo] [--only <handle>…] [--timeout-min 20] [--view headless|herdr] [--url <origin>]";
+  "bun scripts/swarm.ts --stage <dev-…|demo> [--project oscabriel/burrow] [--scenario plain|video] [--dry-run] [--json] [--allow-demo] [--only <handle>…] [--timeout-min 20] [--view headless|herdr] [--url <origin>]";
 
 /** The views a run can take. */
 export const ViewName = Schema.Literals(["headless", "herdr"]);
@@ -191,7 +191,7 @@ export const optionsOf = (
 
     const rawProject = Option.getOrElse(
       flagValue(argv, "--project"),
-      () => "burrow"
+      () => "oscabriel/burrow"
     );
 
     const project = yield* Effect.fromOption(decodeProject(rawProject)).pipe(

@@ -103,10 +103,10 @@ const holding =
 /**
  * The platform as smoke expects to find it: healthy, OAuth's resource
  * metadata published, MCP closed to anyone without a credential, anonymous
- * reads open, the seeded example `datekit` held and no repo it doesn't
+ * reads open, the seeded example `oscabriel/datekit` held and no repo it doesn't
  * hold, and a `/` that names MCP and the CLI's installer.
  */
-const healthy = holding(["datekit"]);
+const healthy = holding(["oscabriel/datekit"]);
 
 /**
  * A platform whose 401 gate is gone and whose stage is down: `/health` and
@@ -297,7 +297,8 @@ describe("smoke against a live stage", () => {
         },
         {
           probe: "missing-repo-404",
-          reason: "GET /no-such-project.git/info/refs answered 200, not 404",
+          reason:
+            "GET /oscabriel/no-such-project.git/info/refs answered 200, not 404",
         },
         { probe: "platform-root", reason: "GET / answered 404, not 200" },
       ]);
@@ -342,10 +343,11 @@ const healthyWeb = ({ method, path }: Seen): Reply => {
 
   if (
     method === "GET" &&
-    (path === "/datekit/llms.txt" || path === "/datekit/asks/format-ordinal.md")
+    (path === "/oscabriel/datekit/llms.txt" ||
+      path === "/oscabriel/datekit/asks/format-ordinal.md")
   ) {
     return {
-      body: "# datekit\n",
+      body: "# oscabriel/datekit\n",
       contentType: "text/markdown; charset=utf-8",
       status: 200,
     };
@@ -395,12 +397,12 @@ describe("smoke against a stage's web", () => {
         },
         {
           contentType: "text/markdown",
-          path: "/datekit/llms.txt",
+          path: "/oscabriel/datekit/llms.txt",
           probe: "web-project-llms-txt",
         },
         {
           contentType: "text/markdown",
-          path: "/datekit/asks/format-ordinal.md",
+          path: "/oscabriel/datekit/asks/format-ordinal.md",
           probe: "web-ask-md",
         },
         {
@@ -441,8 +443,8 @@ describe("smoke against a stage's web", () => {
               probe !== "web-project-llms-txt" && probe !== "web-ask-md"
           ),
           warnings: [
-            "web-project-llms-txt was skipped: datekit is not on this stage (bun run seed puts it there)",
-            "web-ask-md was skipped: datekit is not on this stage (bun run seed puts it there)",
+            "web-project-llms-txt was skipped: oscabriel/datekit is not on this stage (bun run seed puts it there)",
+            "web-ask-md was skipped: oscabriel/datekit is not on this stage (bun run seed puts it there)",
           ],
         });
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
@@ -512,9 +514,9 @@ describe("smoke against a stage's web", () => {
           asked: {
             "/": 3,
             "/.well-known/agent-skills/index.json": 3,
-            "/datekit/asks/format-ordinal.md": 3,
-            "/datekit/llms.txt": 3,
             "/llms.txt": 3,
+            "/oscabriel/datekit/asks/format-ordinal.md": 3,
+            "/oscabriel/datekit/llms.txt": 3,
           },
           probes: [...probes],
         });
@@ -557,12 +559,12 @@ describe("smoke against a stage's web", () => {
           {
             probe: "web-project-llms-txt",
             reason:
-              "GET /datekit/llms.txt on the web answered application/json, not text/markdown",
+              "GET /oscabriel/datekit/llms.txt on the web answered application/json, not text/markdown",
           },
           {
             probe: "web-ask-md",
             reason:
-              "GET /datekit/asks/format-ordinal.md on the web answered application/json, not text/markdown",
+              "GET /oscabriel/datekit/asks/format-ordinal.md on the web answered application/json, not text/markdown",
           },
         ]);
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
@@ -612,7 +614,7 @@ describe("smoke's own checks", () => {
           {
             probe: "anonymous-unknown-project",
             reason:
-              "POST /rpc listAsks for no-such-project answered 200 without an UnknownProject refusal",
+              "POST /rpc listAsks for oscabriel/no-such-project answered 200 without an UnknownProject refusal",
           },
         ]);
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))

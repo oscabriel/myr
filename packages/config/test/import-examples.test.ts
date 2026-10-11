@@ -39,21 +39,24 @@ import {
   importExamples,
   ImportTarget,
   initUntilAnswered,
+  optionsOf,
   TagBackfill,
   Warmer,
 } from "../../../scripts/lib/import/run.ts";
-import { ProjectName } from "../../protocol/src/ids.ts";
+import { keyOf, ProjectName } from "../../protocol/src/ids.ts";
 
-const project = (name: string) => ProjectName.make(name);
+// A project of the plan by the key it was imported under (`anyhow`), read
+// as its name (`github.com/dtolnay/anyhow`), as every surface reads it.
+const project = (key: string) => Schema.decodeSync(ProjectName)(key);
 
 const names = (planned: readonly ImportExample[]) =>
-  planned.map(({ project: name }) => name);
+  planned.map(({ name }) => name);
 
 describe("the import plan", () => {
   it("holds the eight repos of the preview first, then thirty well-known ones, each on its branch with its licence", () => {
     expect(
-      examples.map(({ branch, licence, project: name, url }) => [
-        name,
+      examples.map(({ branch, key, licence, url }) => [
+        key,
         branch,
         url,
         licence,
@@ -125,6 +128,28 @@ describe("the import plan", () => {
     ]);
   });
 
+  it("names each project at its source path, beside the key it was first imported under", () => {
+    expect(
+      examples
+        .filter(({ key }) => ["click", "commander", "fuzzel"].includes(key))
+        .map(({ key, name }) => [key, name])
+    ).toStrictEqual([
+      ["click", "github.com/pallets/click"],
+      ["fuzzel", "codeberg.org/dnkl/fuzzel"],
+      ["commander", "github.com/tj/commander"],
+    ]);
+  });
+
+  it.effect.each([
+    ["github.com/pallets/click"],
+    ["click"],
+    ["GitHub.com/Pallets/click"],
+  ] as const)("takes --only %s as click", ([named]) =>
+    Effect.map(optionsOf(["--world", "node", "--only", named]), ({ only }) => {
+      expect(only).toStrictEqual(Option.some("github.com/pallets/click"));
+    })
+  );
+
   it("names each project once, as a name the platform takes", () => {
     const all = names(examples);
 
@@ -154,9 +179,13 @@ describe("the import plan", () => {
         planImports(examples, new Set(), Option.some(project("gum")))
       ),
     }).toStrictEqual({
-      all: names(examples).filter((name) => name !== "ky" && name !== "stb"),
+      all: names(examples).filter(
+        (name) =>
+          name !== "github.com/sindresorhus/ky" &&
+          name !== "github.com/nothings/stb"
+      ),
       listed: [],
-      only: ["gum"],
+      only: ["github.com/charmbracelet/gum"],
     });
   });
 });
@@ -164,19 +193,19 @@ describe("the import plan", () => {
 describe("the warm plan", () => {
   it("reads a project's home, its tree, its landings, and its README and why the README is there", () => {
     expect(warmPaths(project("ky"), Option.some("readme.md"))).toStrictEqual([
-      "/ky",
-      "/ky/tree/main",
-      "/ky/commits/main",
-      "/ky/blob/main/readme.md",
-      "/ky/why/main/readme.md",
+      "/github.com/sindresorhus/ky",
+      "/github.com/sindresorhus/ky/tree/main",
+      "/github.com/sindresorhus/ky/commits/main",
+      "/github.com/sindresorhus/ky/blob/main/readme.md",
+      "/github.com/sindresorhus/ky/why/main/readme.md",
     ]);
   });
 
   it("reads no README when the project has none", () => {
     expect(warmPaths(project("awesome"), Option.none())).toStrictEqual([
-      "/awesome",
-      "/awesome/tree/main",
-      "/awesome/commits/main",
+      "/github.com/sindresorhus/awesome",
+      "/github.com/sindresorhus/awesome/tree/main",
+      "/github.com/sindresorhus/awesome/commits/main",
     ]);
   });
 });
@@ -256,10 +285,10 @@ const fakePlatform = (listed: readonly string[]) =>
 
     const target = ImportTarget.of({
       counts: (name) =>
-        note(`ls-remote ${name}`).pipe(Effect.as({ heads: 2, tags: 0 })),
+        note(`ls-remote ${keyOf(name)}`).pipe(Effect.as({ heads: 2, tags: 0 })),
       initProject: (example) =>
-        note(`init ${example.project} ${example.branch}`).pipe(
-          Effect.tap(() => Effect.sync(() => have.add(example.project))),
+        note(`init ${example.key} ${example.branch}`).pipe(
+          Effect.tap(() => Effect.sync(() => have.add(example.name))),
           Effect.as({ landed: "a".repeat(40) })
         ),
       label: "dev-oscabriel (https://platform.test)",
@@ -269,17 +298,16 @@ const fakePlatform = (listed: readonly string[]) =>
     });
 
     const backfill = TagBackfill.of({
-      backfill: (example) =>
-        note(`tags ${example.project}`).pipe(Effect.as(105)),
+      backfill: (example) => note(`tags ${example.key}`).pipe(Effect.as(105)),
     });
 
     // Every read answers but fuzzel's why, which the web never answered.
     const warmer = Warmer.of({
       warm: (name) =>
-        note(`warm ${name}`).pipe(
+        note(`warm ${keyOf(name)}`).pipe(
           Effect.as(
             warmPaths(name, Option.some("README.md")).map((path) =>
-              name === "fuzzel" && path.includes("/why/")
+              keyOf(name) === "fuzzel" && path.includes("/why/")
                 ? { ok: false, path, said: "no answer" }
                 : { ok: true, path, said: "200" }
             )
@@ -357,7 +385,7 @@ describe("bun scripts/import-examples.ts", () => {
           ledger: [],
           printed: [
             "import-examples on dev-oscabriel (https://platform.test): 1 to import, 0 listed already",
-            "  would import anyhow from https://github.com/dtolnay/anyhow (master)",
+            "  would import github.com/dtolnay/anyhow from https://github.com/dtolnay/anyhow (master)",
             "dry run: nothing imported, nothing recorded",
           ],
           result: true,
@@ -372,7 +400,9 @@ describe("bun scripts/import-examples.ts", () => {
         const fresh = ["anyhow", "awesome", "changesets", "fuzzel"];
 
         const platform = yield* fakePlatform(
-          names(examples).filter((name) => !fresh.includes(name))
+          examples.flatMap(({ key, name }) =>
+            fresh.includes(key) ? [] : [name]
+          )
         );
 
         const { ledger, printed, result } = yield* ran(onDev(), platform.layer);
@@ -416,14 +446,14 @@ describe("bun scripts/import-examples.ts", () => {
           ]),
           printed: [
             "import-examples on dev-oscabriel (https://platform.test): 4 to import, 34 listed already",
-            "imported anyhow (Rust crate, master): main at aaaaaaaaaaaa, 2 heads, 0 tags",
-            "  warmed anyhow: 5 of 5 pages read",
-            "imported awesome (Markdown list, main): main at aaaaaaaaaaaa, 2 heads, 0 tags",
-            "  warmed awesome: 5 of 5 pages read",
-            "imported changesets (TypeScript monorepo, main): main at aaaaaaaaaaaa, 2 heads, 0 tags",
-            "  warmed changesets: 5 of 5 pages read",
-            "imported fuzzel (C on Codeberg, master): main at aaaaaaaaaaaa, 2 heads, 0 tags",
-            "  warmed fuzzel: 4 of 5 pages read; /fuzzel/why/main/README.md: no answer",
+            "imported github.com/dtolnay/anyhow (Rust crate, master): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  warmed github.com/dtolnay/anyhow: 5 of 5 pages read",
+            "imported github.com/sindresorhus/awesome (Markdown list, main): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  warmed github.com/sindresorhus/awesome: 5 of 5 pages read",
+            "imported github.com/changesets/changesets (TypeScript monorepo, main): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  warmed github.com/changesets/changesets: 5 of 5 pages read",
+            "imported codeberg.org/dnkl/fuzzel (C on Codeberg, master): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  warmed codeberg.org/dnkl/fuzzel: 4 of 5 pages read; /codeberg.org/dnkl/fuzzel/why/main/README.md: no answer",
             "imported 4 of 4, each recorded in infra/created.jsonl as a kept import",
           ],
           result: true,
@@ -450,8 +480,8 @@ describe("bun scripts/import-examples.ts", () => {
           calls: ["listProjects", "warm ky"],
           printed: [
             "import-examples on dev-oscabriel (https://platform.test): 0 to import, 1 listed already",
-            "  skip ky: listed already",
-            "  warmed ky: 5 of 5 pages read",
+            "  skip github.com/sindresorhus/ky: listed already",
+            "  warmed github.com/sindresorhus/ky: 5 of 5 pages read",
             "imported 0 of 0, each recorded in infra/created.jsonl as a kept import",
           ],
         });
@@ -472,7 +502,7 @@ describe("bun scripts/import-examples.ts", () => {
         ledger: [],
         printed: [
           "import-examples on dev-oscabriel (https://platform.test): 1 to import, 0 listed already",
-          "  would import anyhow from https://github.com/dtolnay/anyhow (master)",
+          "  would import github.com/dtolnay/anyhow from https://github.com/dtolnay/anyhow (master)",
           "dry run: nothing imported, nothing recorded",
         ],
       });
@@ -508,8 +538,8 @@ describe("bun scripts/import-examples.ts", () => {
             ["repo", "anyhow", "tags backfilled"],
           ],
           printed: [
-            "imported anyhow (Rust crate, master): main at aaaaaaaaaaaa, 2 heads, 0 tags",
-            "  anyhow: 105 tags backfilled from https://github.com/dtolnay/anyhow",
+            "imported github.com/dtolnay/anyhow (Rust crate, master): main at aaaaaaaaaaaa, 2 heads, 0 tags",
+            "  github.com/dtolnay/anyhow: 105 tags backfilled from https://github.com/dtolnay/anyhow",
           ],
         });
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
@@ -604,8 +634,8 @@ describe("bun scripts/import-examples.ts", () => {
         ]);
         expect(printed).toStrictEqual([
           "import-examples on dev-oscabriel (https://platform.test): 0 to import, 1 listed already",
-          "  skip gum: imported already, as the ledger records",
-          "  gum: source kept: https://github.com/charmbracelet/gum (main)",
+          "  skip github.com/charmbracelet/gum: imported already, as the ledger records",
+          "  github.com/charmbracelet/gum: source kept: https://github.com/charmbracelet/gum (main)",
           "imported 0 of 0, each recorded in infra/created.jsonl as a kept import",
         ]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
@@ -647,8 +677,8 @@ describe("bun scripts/import-examples.ts", () => {
 
         expect(printed.filter((line) => line.includes("source"))).toStrictEqual(
           [
-            "  would keep the source of anyhow: https://github.com/dtolnay/anyhow (master)",
-            "  would keep the source of ky: https://github.com/sindresorhus/ky (main)",
+            "  would keep the source of github.com/dtolnay/anyhow: https://github.com/dtolnay/anyhow (master)",
+            "  would keep the source of github.com/sindresorhus/ky: https://github.com/sindresorhus/ky (main)",
           ]
         );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))

@@ -688,7 +688,7 @@ describe("a run in herdr's panes", () => {
             "--cwd",
             root,
             "--label",
-            "swarm burrow",
+            "swarm oscabriel/burrow",
             "--focus",
           ],
           ...[
@@ -870,7 +870,7 @@ describe("a run in herdr's panes", () => {
             onSuccess: () => "",
           })
         ).toBe(
-          "the counter couldn't read burrow's events: curl exited 7: curl: (7) Failed to connect to platform-dev-oscabriel.example.workers.dev port 443"
+          "the counter couldn't read oscabriel/burrow's events: curl exited 7: curl: (7) Failed to connect to platform-dev-oscabriel.example.workers.dev port 443"
         );
         expect(
           spawned.flatMap(({ args, command }) =>
@@ -1150,7 +1150,7 @@ describe("the counter's watch", () => {
             "--header",
             "content-type: application/json",
             "--data-binary",
-            '[{"_tag":"Request","headers":[],"id":"1","payload":{"project":"burrow"},"tag":"watch"}]',
+            '[{"_tag":"Request","headers":[],"id":"1","payload":{"project":"oscabriel/burrow"},"tag":"watch"}]',
             `${platformUrl}/rpc`,
           ],
         ]);
@@ -1186,8 +1186,8 @@ describe("the counter's watch", () => {
         );
 
         expect(reasons).toStrictEqual([
-          "the counter couldn't read burrow's events: curl exited 22: curl: (22) The requested URL returned error: 502",
-          "the counter couldn't read burrow's events: <html>502 Bad Gateway</html>",
+          "the counter couldn't read oscabriel/burrow's events: curl exited 22: curl: (22) The requested URL returned error: 502",
+          "the counter couldn't read oscabriel/burrow's events: <html>502 Bad Gateway</html>",
         ]);
       })
   );
@@ -1228,7 +1228,7 @@ describe("the counter's watch", () => {
       yield* Fiber.interrupt(fiber);
 
       expect(files.get("/work/counter.log")?.split("\n")).toStrictEqual([
-        "claims 0 · pushes 0 · landed 0  (burrow, after event 8)",
+        "claims 0 · pushes 0 · landed 0  (oscabriel/burrow, after event 8)",
         "counter: watch didn't run: curl exited 22: curl: (22) The requested URL returned error: 503",
         "",
       ]);
@@ -1271,7 +1271,7 @@ describe("the counter's watch", () => {
         yield* Fiber.interrupt(fiber);
 
         expect(files.get("/work/counter.log")?.split("\n")).toStrictEqual([
-          "claims 0 · pushes 0 · landed 0  (burrow, after event 8)",
+          "claims 0 · pushes 0 · landed 0  (oscabriel/burrow, after event 8)",
           "12:05:00  claims 1 · pushes 0 · landed 0  wren claimed drop-legacy-fetch-burrow-auth",
           "12:06:00  claims 1 · pushes 1 · landed 0  drop-legacy-fetch-burrow-auth pushed 1111111",
           "",
@@ -1282,7 +1282,7 @@ describe("the counter's watch", () => {
           [
             "content-type: application/ndjson",
             "--data-binary",
-            '{"_tag":"Request","headers":[],"id":"1","payload":{"project":"burrow","since":8},"tag":"watch"}\n',
+            '{"_tag":"Request","headers":[],"id":"1","payload":{"project":"oscabriel/burrow","since":8},"tag":"watch"}\n',
           ],
         ]);
       })

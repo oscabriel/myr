@@ -5,26 +5,32 @@
  * `packages/config` holds equal to it, so the docs can name each one's
  * source and licence.
  */
-import { ProjectName } from "@repo/protocol/ids";
-import { Schema } from "effect";
+import { ProjectKey, ProjectName, sourceNamespaceOf } from "@repo/protocol/ids";
+import { Option } from "effect";
 
-/** One imported project: its name here, its source, its licence, and what it is. */
+/**
+ * One imported project: its name here, at its source path
+ * (`github.com/pallets/click`), the key it was imported under (`click`),
+ * its source, its licence, and what it is.
+ */
 export interface ImportedProject {
-  readonly project: ProjectName;
+  readonly name: ProjectName;
+  readonly key: ProjectKey;
   readonly url: string;
   readonly licence: string;
   readonly kind: string;
 }
 
 const imported = (
-  project: string,
+  key: string,
   url: string,
   licence: string,
   kind: string
 ): ImportedProject => ({
+  key: ProjectKey.make(key),
   kind,
   licence,
-  project: Schema.decodeSync(ProjectName)(project),
+  name: ProjectName.make(`${Option.getOrThrow(sourceNamespaceOf(url))}/${key}`),
   url,
 });
 

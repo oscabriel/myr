@@ -493,11 +493,11 @@ describe("runSeed, for a project with a layer", () => {
           const first = yield* runSeed(plan);
 
           expect(first.map(stepLine)).toStrictEqual([
-            "Init datekit: done",
-            "Push datekit: done",
-            "OpenAsk datekit/add-months-clamp: done",
-            "OpenAsk datekit/format-ordinal: done",
-            "OpenAsk datekit/parse-iso-week: done",
+            "Init oscabriel/datekit: done",
+            "Push oscabriel/datekit: done",
+            "OpenAsk oscabriel/datekit/add-months-clamp: done",
+            "OpenAsk oscabriel/datekit/format-ordinal: done",
+            "OpenAsk oscabriel/datekit/parse-iso-week: done",
             "Layer datekit--maintainers: done",
           ]);
 

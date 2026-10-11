@@ -207,12 +207,12 @@ describe("the reference", () => {
     expect(
       importedProjects
         .filter(
-          ({ licence, project, url }) =>
-            !markdown.includes(`[${project}](/${project})`) ||
+          ({ licence, name, url }) =>
+            !markdown.includes(`[${name}](/${name})`) ||
             !markdown.includes(url) ||
             !markdown.includes(licence)
         )
-        .map(({ project }) => project)
+        .map(({ name }) => name)
     ).toStrictEqual([]);
   });
 });
