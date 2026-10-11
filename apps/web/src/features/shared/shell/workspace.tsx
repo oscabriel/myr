@@ -21,6 +21,7 @@ import { Suspense, useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../../components/ui/button.tsx";
+import { InspectorCommands } from "../command.tsx";
 import { CommandSlotProvider } from "../keys.tsx";
 import { ContextBar } from "./context-bar.tsx";
 import { LazyFactsSheet } from "./lazy-overlays.ts";
@@ -297,7 +298,9 @@ const WorkspaceView = ({
           <CommandSlotProvider slot="facts">
             <FactsHeading heading={factsHeading} />
             <div className="flex flex-col px-4 py-4">
-              <Settling id={factsKey}>{facts}</Settling>
+              <InspectorCommands>
+                <Settling id={factsKey}>{facts}</Settling>
+              </InspectorCommands>
             </div>
           </CommandSlotProvider>
         </aside>
