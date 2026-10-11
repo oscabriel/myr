@@ -53,7 +53,7 @@ import { CheckRunnerSandbox } from "../src/adapters/check-runner-sandbox.ts";
 import type { SandboxBinding } from "../src/adapters/check-runner-sandbox.ts";
 import { LanderSandbox } from "../src/adapters/lander-sandbox.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const canonical = RepoName.make("datekit");
 

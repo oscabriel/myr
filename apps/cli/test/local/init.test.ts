@@ -255,7 +255,10 @@ const state = (machine: Machine) =>
 
 /** The platform made the project `demo`, served at the machine's bare repo. */
 const created = (machine: Machine) =>
-  Effect.succeed({ project: ProjectName.make("demo"), remote: machine.remote });
+  Effect.succeed({
+    project: ProjectName.make("oscabriel/demo"),
+    remote: machine.remote,
+  });
 
 describe(`${Brand.cli} init in an existing repo`, () => {
   it.live(
@@ -558,7 +561,9 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const machine = yield* aMachine;
 
         const platform = yield* aPlatform(
-          Effect.fail(new ProjectExists({ project: ProjectName.make("demo") }))
+          Effect.fail(
+            new ProjectExists({ project: ProjectName.make("oscabriel/demo") })
+          )
         );
 
         const ran = yield* cli(machine, platform.layer, [
@@ -596,7 +601,10 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const gateway = `${platformUrl}/demo.git`;
 
         const platform = yield* aPlatform(
-          Effect.succeed({ project: ProjectName.make("demo"), remote: gateway })
+          Effect.succeed({
+            project: ProjectName.make("oscabriel/demo"),
+            remote: gateway,
+          })
         );
 
         const ran = yield* cli(machine, platform.layer, [
@@ -672,7 +680,7 @@ describe(`${Brand.cli} init --import`, () => {
         const platform = yield* aPlatform(
           Effect.succeed({
             landed,
-            project: ProjectName.make("widgets"),
+            project: ProjectName.make("oscabriel/widgets"),
             remote: gateway,
           })
         );
@@ -727,7 +735,7 @@ describe(`${Brand.cli} init --import`, () => {
 
         const platform = yield* aPlatform(
           Effect.succeed({
-            project: ProjectName.make("widgets"),
+            project: ProjectName.make("oscabriel/widgets"),
             remote: gateway,
           })
         );

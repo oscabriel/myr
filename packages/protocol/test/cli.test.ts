@@ -46,7 +46,7 @@ import { ask, base, main, path } from "./examples.ts";
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const requestId = RequestId.make("answer-0001");
 
@@ -167,10 +167,10 @@ describe("a contract as a CLI command", () => {
         const { printed } = yield* run(
           quiet,
           (output) => toCommand(ListAsks, Effect.service(Client), { output }),
-          ["--project", "demo"]
+          ["--project", "oscabriel/demo"]
         );
 
-        const data = { asks: [listing("demo")] };
+        const data = { asks: [listing("oscabriel/demo")] };
 
         expect(printed).toStrictEqual([
           {
@@ -203,14 +203,14 @@ describe("a contract as a CLI command", () => {
             render: ({ asks }) =>
               Option.some({ markdown: `**${asks.length}** open asks` }),
           }),
-        ["--project", "demo", "--json"]
+        ["--project", "oscabriel/demo", "--json"]
       );
 
       expect(printed).toStrictEqual([
         {
           input: {
             command: "asks",
-            data: { asks: [listing("demo")] },
+            data: { asks: [listing("oscabriel/demo")] },
             json: true,
             view: { markdown: "**1** open asks" },
           },
@@ -514,7 +514,7 @@ describe("defaults", () => {
         const defaults = {
           fields: { project: "the repo's project" },
           values: Ref.update(reads, (count) => count + 1).pipe(
-            Effect.as({ project: "datekit" })
+            Effect.as({ project: "oscabriel/datekit" })
           ),
         };
 
@@ -522,13 +522,22 @@ describe("defaults", () => {
           toCommand(ListAsks, Effect.service(Client), { defaults, output });
 
         const filled = yield* run(quiet, build, ["--json"]);
-        const given = yield* run(quiet, build, ["--project", "demo", "--json"]);
+
+        const given = yield* run(quiet, build, [
+          "--project",
+          "oscabriel/demo",
+          "--json",
+        ]);
 
         expect(
           [filled, given].map(({ printed }) => printed[0]?.input)
         ).toStrictEqual([
-          expect.objectContaining({ data: { asks: [listing("datekit")] } }),
-          expect.objectContaining({ data: { asks: [listing("demo")] } }),
+          expect.objectContaining({
+            data: { asks: [listing("oscabriel/datekit")] },
+          }),
+          expect.objectContaining({
+            data: { asks: [listing("oscabriel/demo")] },
+          }),
         ]);
         expect(yield* Ref.get(reads)).toBe(1);
       })
@@ -625,7 +634,7 @@ describe("the group as CLI commands", () => {
       const { printed } = yield* run(quiet, root, [
         "asks",
         "--project",
-        "demo",
+        "oscabriel/demo",
       ]);
 
       expect(printed[0]?.input).toHaveProperty("view", {

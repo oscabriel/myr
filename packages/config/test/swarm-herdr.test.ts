@@ -111,7 +111,7 @@ const takeEvents: readonly ProjectEvent[] = [
         author: Handle.make(handles[at] ?? "wren"),
         credits: [],
         landedAt: DateTime.makeUnsafe("2026-10-08T12:40:00.000Z"),
-        project: ProjectName.make("burrow"),
+        project: ProjectName.make("oscabriel/burrow"),
         sha: LandedSha.make(sha(at + 5)),
       },
     })
@@ -1135,7 +1135,7 @@ describe("the counter's watch", () => {
 
         const from = yield* lastHeld(
           platformUrl,
-          ProjectName.make("burrow")
+          ProjectName.make("oscabriel/burrow")
         ).pipe(Effect.provide(world.layer));
 
         expect(from).toBe(8);
@@ -1175,7 +1175,7 @@ describe("the counter's watch", () => {
 
               const read = yield* lastHeld(
                 platformUrl,
-                ProjectName.make("burrow")
+                ProjectName.make("oscabriel/burrow")
               ).pipe(Effect.provide(world.layer), Effect.result);
 
               return Result.match(read, {
@@ -1217,7 +1217,7 @@ describe("the counter's watch", () => {
         file: "/work/counter.log",
         from: 8,
         origin: platformUrl,
-        project: ProjectName.make("burrow"),
+        project: ProjectName.make("oscabriel/burrow"),
       }).pipe(
         Effect.provide(world.layer),
         Effect.provideService(FileSystem.FileSystem, memoryFs),
@@ -1260,7 +1260,7 @@ describe("the counter's watch", () => {
           file: "/work/counter.log",
           from: 8,
           origin: platformUrl,
-          project: ProjectName.make("burrow"),
+          project: ProjectName.make("oscabriel/burrow"),
         }).pipe(
           Effect.provide(world.layer),
           Effect.provideService(FileSystem.FileSystem, memoryFs),

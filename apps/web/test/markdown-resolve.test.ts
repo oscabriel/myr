@@ -18,7 +18,7 @@ const scriptUrl = ["javascript", "alert(1)"].join(":");
 const at = (dir: string, kind: "link" | "media") => ({
   dir,
   kind,
-  project: ProjectName.make("p"),
+  project: ProjectName.make("oscabriel/p"),
   sha,
 });
 

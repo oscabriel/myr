@@ -187,7 +187,11 @@ describe(filterEntries, () => {
 
   it("narrows the list to one project", () => {
     expect(
-      asksOf(filterEntries(entries, { project: ProjectName.make("burrow") }))
+      asksOf(
+        filterEntries(entries, {
+          project: ProjectName.make("oscabriel/burrow"),
+        })
+      )
     ).toStrictEqual(["split-format"]);
   });
 });
@@ -287,7 +291,7 @@ describe(familiesIn, () => {
       }),
       id: AskId.make("drop-fetch"),
       kind: KindName.make("migrate"),
-      project: ProjectName.make("burrow"),
+      project: ProjectName.make("oscabriel/burrow"),
       territory: { module: ".", paths: [Glob.make("packages/**")] },
     };
 

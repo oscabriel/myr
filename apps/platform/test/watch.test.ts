@@ -69,7 +69,7 @@ import {
 import { coreLoopWorld } from "./world.ts";
 import type { CoreLoopWorld } from "./world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const parseIso = AskId.make("parse-iso");
 
@@ -335,11 +335,11 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
         expect(
           yield* Effect.flip(
             Stream.runCollect(
-              framed.watch({ project: ProjectName.make("nowhere") })
+              framed.watch({ project: ProjectName.make("oscabriel/nowhere") })
             )
           )
         ).toStrictEqual(
-          new UnknownProject({ project: ProjectName.make("nowhere") })
+          new UnknownProject({ project: ProjectName.make("oscabriel/nowhere") })
         );
       }),
     60_000

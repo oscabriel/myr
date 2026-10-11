@@ -101,7 +101,7 @@ const navOf = (markup: string, attribute: string) =>
     markup
   )?.[0] ?? "";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
@@ -1316,7 +1316,7 @@ describe("the code pages' reads", () => {
           [
             refusedBy(readRefsPage("no-such-project")),
             new UnknownProject({
-              project: ProjectName.make("no-such-project"),
+              project: ProjectName.make("oscabriel/no-such-project"),
             }),
           ],
           [

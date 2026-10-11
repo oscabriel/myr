@@ -240,7 +240,7 @@ const vellumLedger: Ledger = {
   layers: [],
   posture: "openWithSealedEvidence",
   postureLabel: "Open with sealed evidence",
-  project: ProjectName.make("vellum"),
+  project: ProjectName.make("oscabriel/vellum"),
 };
 
 const props = (more: Partial<ProjectViewProps> = {}): ProjectViewProps => ({
@@ -800,7 +800,7 @@ describe("the project's home as the server sends it", () => {
   );
 });
 
-const vellum = ProjectName.make("vellum");
+const vellum = ProjectName.make("oscabriel/vellum");
 
 describe("a family child landing while the page is open", () => {
   it.live(

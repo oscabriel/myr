@@ -122,9 +122,9 @@ const sha = (digit: string) => CommitSha.make(digit.repeat(40));
 
 const okonkwo = Handle.make("okonkwo");
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 /** A stray push to datekit's main, expiring in 22 hours: soon. */
 const stray: Decision = {
@@ -569,7 +569,7 @@ describe(consequenceOf, () => {
   });
 });
 
-const vellum = ProjectName.make("vellum");
+const vellum = ProjectName.make("oscabriel/vellum");
 
 /** The page the route renders from what `readToday` sent, as the browser decodes it. */
 const pageFrom = (encoded: typeof TodayPageData.Encoded) => {

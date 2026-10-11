@@ -12,6 +12,7 @@ import {
   ProjectName,
   ProposalId,
   RepoPath,
+  shortNameOf,
 } from "./ids.ts";
 import { Posture } from "./posture.ts";
 
@@ -433,6 +434,26 @@ export class ProjectExists extends Schema.TaggedError<ProjectExists>()(
   { ...Final, ...nextIs(cli("asks")), project: ProjectName }
 ) {}
 
+/**
+ * The name's owner is neither the caller's handle nor the import's source
+ * namespace: a project is made only in a namespace of one's own (ADR 0032).
+ */
+export class NotYourNamespace extends Schema.TaggedError<NotYourNamespace>()(
+  "NotYourNamespace",
+  { ...Final, handle: Handle, project: ProjectName }
+) {
+  static readonly of = (project: ProjectName, handle: Handle) =>
+    new NotYourNamespace({
+      handle,
+      next: cli(
+        "init",
+        "--project",
+        `${handle.toLowerCase()}/${shortNameOf(project)}`
+      ),
+      project,
+    });
+}
+
 /** The repo to import could not be read; `reason` says what went wrong. */
 export class ImportFailed extends Schema.TaggedError<ImportFailed>()(
   "ImportFailed",
@@ -527,7 +548,7 @@ const lookup = [
   UnknownProposal,
 ] as const;
 
-const setup = [ProjectExists, ImportFailed] as const;
+const setup = [ProjectExists, NotYourNamespace, ImportFailed] as const;
 
 const env = [UnknownEnvItem, NotSensitive, ValueTooShort] as const;
 

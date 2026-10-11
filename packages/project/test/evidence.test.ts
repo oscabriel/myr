@@ -218,7 +218,7 @@ describe("reading a failing lane's log", () => {
     () =>
       Effect.gen(function* () {
         const api = yield* answered();
-        const other = ProjectName.make("burrow");
+        const other = ProjectName.make("oscabriel/burrow");
 
         const elsewhere = logRefOf({
           attempt: 1,

@@ -39,7 +39,7 @@ import {
   tokens,
 } from "./gateway.fixtures.ts";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 /** The ref the platform keeps a fork's verdict notes under. */
 const notesRef = `refs/notes/${Brand.slug}`;
@@ -47,7 +47,7 @@ const notesRef = `refs/notes/${Brand.slug}`;
 const parseIso = AskId.make("parse-iso");
 
 /** A project made empty, awaiting its first push. */
-const fresh = ProjectName.make("fresh");
+const fresh = ProjectName.make("oscabriel/fresh");
 
 const scenario = aProject({ name: datekit, people: ["bob"] }).pipe(
   withAsk({ id: parseIso, territory: "packages/parser" }),
@@ -818,7 +818,7 @@ describe("custody of one push", () => {
         const unmade = yield* judged(
           projects,
           alice,
-          ProjectName.make("nokit"),
+          ProjectName.make("oscabriel/nokit"),
           first
         );
 
@@ -837,7 +837,7 @@ describe("custody of one push", () => {
     () =>
       Effect.gen(function* () {
         const { projects } = yield* gatewayWorld([scenario]);
-        const nobody = ProjectName.make("nokit");
+        const nobody = ProjectName.make("oscabriel/nokit");
         const push = Array.of(moving(mainRef, Option.none()));
 
         expect(

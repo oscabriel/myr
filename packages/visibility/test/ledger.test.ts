@@ -16,7 +16,7 @@ import { DateTime, Option, Schema } from "effect";
 
 import { entriesForPolicy, ledgerOf } from "../src/ledger.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const at = DateTime.makeUnsafe("2026-10-11T09:00:00Z");
 

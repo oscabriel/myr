@@ -225,7 +225,9 @@ describe("an ask's .md URL", () => {
         expect(seen.status).toBe(404);
         expect(seen.body).toBe(
           refusalsMarkdown([
-            new UnknownProject({ project: ProjectName.make("nowhere") }),
+            new UnknownProject({
+              project: ProjectName.make("oscabriel/nowhere"),
+            }),
           ])
         );
         expect(seen.body).toContain(
@@ -346,7 +348,7 @@ describe("an ask's Markdown with the index named", () => {
 describe(refusalsMarkdown, () => {
   it("sets every refusal's explain lines in one text block, then each distinct next command once", () => {
     const refusals = [
-      new UnknownProject({ project: ProjectName.make("nowhere") }),
+      new UnknownProject({ project: ProjectName.make("oscabriel/nowhere") }),
       new UnknownAsk({ ask: askId }),
     ] as const;
 

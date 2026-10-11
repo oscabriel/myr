@@ -24,7 +24,7 @@ import { stateLive } from "../../src/visibility/state.ts";
 import { fakeEnv } from "../fake-env.ts";
 import { coreLoopWorld } from "../world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const sdk = `${Brand.cliPackage}/rules`;
 

@@ -13,7 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ProjectNav } from "../src/features/project/project-nav.tsx";
 import { renderAt } from "./render.tsx";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 /** Each link in `markup`: its text, its href, and whether it is current. */
 const linksOf = (markup: string) =>

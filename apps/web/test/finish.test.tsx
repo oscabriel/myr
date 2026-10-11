@@ -78,7 +78,7 @@ const textOf = (element: ReactElement) => textIn(markupOf(element));
 
 const PLATFORM_URL = "https://platform-test.example.workers.dev";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const parseIso = AskId.make("parse-iso");
 

@@ -54,9 +54,9 @@ const world = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
   Layer.provideMerge(database)
 );
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const fix = KindName.make("fix");
 
@@ -490,7 +490,7 @@ describe("the kept standing postures in D1", () => {
       ]);
 
       expect(
-        yield* keptFor([datekit, burrow, ProjectName.make("ghost")])
+        yield* keptFor([datekit, burrow, ProjectName.make("oscabriel/ghost")])
       ).toStrictEqual(
         new Map([
           [datekit, sealed],

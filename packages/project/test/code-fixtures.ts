@@ -228,7 +228,7 @@ export const big = `${"x".repeat(1023)}\n`.repeat(1536);
 export const svg =
   '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>\n';
 
-export const project = ProjectName.make("datekit");
+export const project = ProjectName.make("oscabriel/datekit");
 
 const repo = RepoName.make(project);
 

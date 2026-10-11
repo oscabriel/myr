@@ -74,7 +74,7 @@ import { RemoteClient } from "../../src/remote.ts";
 /** The world, from the repo root: the platform's Node world, cartridge composed. */
 const WORLD = "apps/platform/test/visibility/serve-cartridge-world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const token = EnvKey.make("SENTRY_AUTH_TOKEN");
 

@@ -17,7 +17,7 @@ import { familyEventsAtom, projectsKey } from "../src/client/project.ts";
 import { ContractsClient } from "../src/surfaces.ts";
 import { datekit, registryAs, seededWorld, settled } from "./dev-browser.ts";
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 describe("a project's page, through the web's atoms", seededWorld, () => {
   it.live("lists a project's asks", () =>

@@ -46,7 +46,7 @@ import { program } from "../../src/main.ts";
 import { Output, OutputPlain } from "../../src/output.ts";
 import { SignedOut } from "../signed-out.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const alice = Handle.make("alice");
 

@@ -27,12 +27,12 @@ import { Effect, Layer, Option, Ref, Schema } from "effect";
 import { agentSkills } from "../src/well-known.ts";
 import { coreLoopWorld } from "./world.ts";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 /** Listed by the front page, but never made. */
-const ghost = ProjectName.make("ghost");
+const ghost = ProjectName.make("oscabriel/ghost");
 
 const skillPath = ".agents/skills/datekit-contribute/SKILL.md";
 

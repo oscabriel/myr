@@ -36,7 +36,7 @@ import {
   writer,
 } from "./code-fixtures.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const repo = RepoName.make(project);
 

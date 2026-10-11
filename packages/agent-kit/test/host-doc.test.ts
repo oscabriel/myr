@@ -82,11 +82,15 @@ const commands: readonly CommandDoc[] = [
 ];
 
 const projects: readonly ProjectListing[] = [
-  { openAsks: 3, posture: "open", project: ProjectName.make("datekit") },
+  {
+    openAsks: 3,
+    posture: "open",
+    project: ProjectName.make("oscabriel/datekit"),
+  },
   {
     openAsks: 1,
     posture: "openWithSealedEvidence",
-    project: ProjectName.make("burrow"),
+    project: ProjectName.make("oscabriel/burrow"),
   },
 ];
 
@@ -188,7 +192,7 @@ describe("the index banner", () => {
 
   it("names a project's own index when it has one", () => {
     expect(
-      indexBanner({ project: ProjectName.make("datekit"), webUrl })
+      indexBanner({ project: ProjectName.make("oscabriel/datekit"), webUrl })
     ).toContain(`${webUrl}/datekit/llms.txt`);
   });
 
@@ -200,7 +204,7 @@ describe("the index banner", () => {
         listing: projects[0] ?? {
           openAsks: 0,
           posture: "open",
-          project: ProjectName.make("datekit"),
+          project: ProjectName.make("oscabriel/datekit"),
         },
         platformUrl,
         webUrl,
@@ -211,7 +215,7 @@ describe("the index banner", () => {
     expect(lines[2]?.startsWith("> A project on ")).toBeTruthy();
     expect(lines.slice(3, 6)).toStrictEqual([
       "",
-      indexBanner({ project: ProjectName.make("datekit"), webUrl }),
+      indexBanner({ project: ProjectName.make("oscabriel/datekit"), webUrl }),
       "",
     ]);
   });

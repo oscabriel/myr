@@ -67,6 +67,7 @@ import {
   Denounced,
   DraftInProgress,
   ImportFailed,
+  NotYourNamespace,
   IncompleteBrief,
   NotClaimed,
   NotDecider,
@@ -132,7 +133,7 @@ const servedOn = {
   flagAsk: ["rpc", "mcp", "cli"],
   fork: ["rpc", "mcp", "cli"],
   frontPage: SurfaceName.literals,
-  initProject: ["rpc", "mcp", "cli"],
+  initProject: ["rpc", "mcp", "cli", "web"],
   land: ["rpc", "mcp", "cli"],
   landing: SurfaceName.literals,
   ledger: SurfaceName.literals,
@@ -612,7 +613,7 @@ export class ShowProposal extends Rpc.make("showProposal", {
 // --- Writes -----------------------------------------------------------------
 
 export class InitProject extends Rpc.make("initProject", {
-  error: Schema.Union([ProjectExists, ImportFailed]),
+  error: Schema.Union([ProjectExists, NotYourNamespace, ImportFailed]),
   payload: {
     /** A public repo to import, instead of starting empty. */
     import: Schema.optionalKey(ImportSource),

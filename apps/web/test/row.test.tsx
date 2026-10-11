@@ -18,7 +18,7 @@ import { AskRow, Row, RowGroup } from "../src/features/shared/row.tsx";
 import { attributeOf, tagsWith, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const listing = (territory: string) =>
   Schema.decodeSync(AskListing)({

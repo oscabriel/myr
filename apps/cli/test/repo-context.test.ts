@@ -13,7 +13,7 @@ import {
   repoContext,
 } from "../src/repo-context.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const platform = "https://platform-dev.example.workers.dev";
 

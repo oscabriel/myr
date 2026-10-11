@@ -55,7 +55,7 @@ import { main } from "../../../scripts/swarm.ts";
 import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const ListedAsks = Envelope(Schema.Struct({ asks: Schema.Array(AskListing) }));
 

@@ -1041,7 +1041,7 @@ const routing = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
   const projects = yield* Projects;
-  const other = ProjectName.make("burrow");
+  const other = ProjectName.make("oscabriel/burrow");
   const made = yield* projects.create(project);
   const again = yield* projects.create(project).pipe(Effect.flip);
   const unknown = yield* projects.get(other).pipe(Effect.flip);
@@ -1259,14 +1259,14 @@ describe("projects", () => {
       (seen) => {
         expect(seen.again).toStrictEqual(new ProjectExists({ project }));
         expect(seen.unknown).toStrictEqual(
-          new UnknownProject({ project: ProjectName.make("burrow") })
+          new UnknownProject({ project: ProjectName.make("oscabriel/burrow") })
         );
         expect(seen.initializedAgain).toStrictEqual(
           new ProjectExists({ project })
         );
         expect(seen.otherInitialized).toStrictEqual(
           Exit.succeed({
-            project: ProjectName.make("burrow"),
+            project: ProjectName.make("oscabriel/burrow"),
             remote: remoteOf("burrow"),
           })
         );

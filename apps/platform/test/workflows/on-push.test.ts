@@ -134,7 +134,7 @@ const pushed = (on: {
   };
 };
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const parseIso = AskId.make("parse-iso");
 

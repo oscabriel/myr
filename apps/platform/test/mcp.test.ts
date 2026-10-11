@@ -61,14 +61,14 @@ import { noProjects, origin, served } from "./harness.ts";
 import { coreLoopWorld } from "./world.ts";
 import type { CoreLoopWorld } from "./world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const fixWeek = AskId.make("fix-week");
 
 /** An ask datekit never opened, and a project nobody made. */
 const nope = AskId.make("no-such-ask");
 
-const nowhere = ProjectName.make("nowhere");
+const nowhere = ProjectName.make("oscabriel/nowhere");
 
 /** The lane an ask's `redThenGreen` check runs in. */
 const redThenGreen = LaneName.make("redThenGreen");

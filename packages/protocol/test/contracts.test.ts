@@ -207,9 +207,9 @@ const table = [
   {
     audience: "signedIn",
     cli: "init",
-    errors: ["ProjectExists", "ImportFailed"],
+    errors: ["ProjectExists", "NotYourNamespace", "ImportFailed"],
     flags: "A",
-    on: "RMC",
+    on: "RMCW",
     tag: "initProject",
   },
   {

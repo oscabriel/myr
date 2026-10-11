@@ -26,7 +26,10 @@ import { devStart } from "../src/dev/clock.ts";
 import { devServer } from "../src/dev/server.ts";
 import { devToken } from "../src/dev/sessions.ts";
 
-const PROJECTS = [ProjectName.make("burrow"), ProjectName.make("datekit")];
+const PROJECTS = [
+  ProjectName.make("oscabriel/burrow"),
+  ProjectName.make("oscabriel/datekit"),
+];
 
 const decider = devToken(Handle.make("ines-v"));
 
@@ -151,7 +154,7 @@ const listedWithLanding = inFreshWorld((as) =>
     const ines = yield* clientOf(as(decider));
     const { projects } = yield* anyone.listProjects({});
     const { unattended } = yield* ines.today({});
-    const burrow = ProjectName.make("burrow");
+    const burrow = ProjectName.make("oscabriel/burrow");
 
     const landed = yield* Effect.orDie(
       Effect.fromNullishOr((yield* anyone.listRefs({ project: burrow })).landed)
@@ -366,7 +369,7 @@ const drafted = inFreshWorld((as) =>
     const anyone = yield* clientOf(as());
     const ines = yield* clientOf(as(decider));
     const bram = yield* clientOf(as(contributor));
-    const project = ProjectName.make("datekit");
+    const project = ProjectName.make("oscabriel/datekit");
     const before = yield* ines.today({ project });
 
     const { proposal } = yield* bram.proposeAsk({

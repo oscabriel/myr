@@ -45,9 +45,9 @@ const beforeProjects = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
   Layer.provideMerge(migrated([frontPageMigration]))
 );
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const fix = KindName.make("fix");
 

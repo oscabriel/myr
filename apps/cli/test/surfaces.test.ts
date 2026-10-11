@@ -39,7 +39,7 @@ const main = CommitSha.make("2222222222222222222222222222222222222222");
 
 const head = CommitSha.make("3333333333333333333333333333333333333333");
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const requestId = RequestId.make("answer-0001");
 

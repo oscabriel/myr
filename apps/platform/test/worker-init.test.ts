@@ -66,9 +66,9 @@ const context = untouchable<ExecutionContext>("ExecutionContext");
 const workerFetch = (request: Request) =>
   Promise.resolve(worker.fetch(request, env, context));
 
-const nowhere = ProjectName.make("nowhere");
+const nowhere = ProjectName.make("oscabriel/nowhere");
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const canonical = RepoName.make("datekit");
 

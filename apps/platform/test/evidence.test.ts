@@ -38,7 +38,7 @@ import { fakeEnv } from "./fake-env.ts";
 import { coreLoopWorld } from "./world.ts";
 import type { Someone } from "./world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const parseIso = AskId.make("parse-iso");
 
@@ -293,7 +293,7 @@ describe("a failing lane's log, through the platform", () => {
         // nobody made, both read as that project unknown.
         yield* world
           .rpc("bob")
-          .initProject({ project: ProjectName.make("burrow") });
+          .initProject({ project: ProjectName.make("oscabriel/burrow") });
 
         const elsewhere = (other: string) => ({
           project,
@@ -306,7 +306,7 @@ describe("a failing lane's log, through the platform", () => {
           bob: yield* asked("bob"),
           dora: yield* asked("dora"),
           ghost: yield* asked("dora", {
-            project: ProjectName.make("ghost"),
+            project: ProjectName.make("oscabriel/ghost"),
             ref: logRef.replace(`${project}/`, "ghost/"),
           }),
           inBurrow: yield* asked("dora", elsewhere("burrow")),
@@ -321,13 +321,15 @@ describe("a failing lane's log, through the platform", () => {
           bob: Exit.fail(new NotDecider({})),
           dora: Exit.succeed(whole),
           ghost: Exit.fail(
-            new UnknownProject({ project: ProjectName.make("ghost") })
+            new UnknownProject({ project: ProjectName.make("oscabriel/ghost") })
           ),
           inBurrow: Exit.fail(
-            new UnknownProject({ project: ProjectName.make("burrow") })
+            new UnknownProject({
+              project: ProjectName.make("oscabriel/burrow"),
+            })
           ),
           inGhost: Exit.fail(
-            new UnknownProject({ project: ProjectName.make("ghost") })
+            new UnknownProject({ project: ProjectName.make("oscabriel/ghost") })
           ),
         });
 

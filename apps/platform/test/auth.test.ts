@@ -24,7 +24,7 @@ import {
   toolResult,
 } from "./harness.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const alice = Handle.make("alice");
 

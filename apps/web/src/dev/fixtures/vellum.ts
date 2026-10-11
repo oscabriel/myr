@@ -78,7 +78,7 @@ import { checkOf } from "./fillers.ts";
 import { headOf, instant, present, storyOf, suiteOf } from "./story.ts";
 import type { Story } from "./story.ts";
 
-export const vellum = ProjectName.make("vellum");
+export const vellum = ProjectName.make("oscabriel/vellum");
 
 /** The calendar's instant the world's clock stands at once the fixtures are told. */
 export const fixturesNow = instant("2026-10-07T10:00");

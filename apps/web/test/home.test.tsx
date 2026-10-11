@@ -322,8 +322,8 @@ describe(pairWork, () => {
 
     const work = pairWork({
       again: new Map([
-        [ProjectName.make("datekit"), [datekitAnswer]],
-        [ProjectName.make("burrow"), []],
+        [ProjectName.make("oscabriel/datekit"), [datekitAnswer]],
+        [ProjectName.make("oscabriel/burrow"), []],
       ]),
       // `status` across every project: which project this answer is in, it does not say.
       answers: [datekitAnswer],

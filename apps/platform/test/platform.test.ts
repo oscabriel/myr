@@ -12,7 +12,7 @@ import {
 } from "./fake-env.ts";
 import { rpcClient, served, toolCall } from "./harness.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 /** What building the platform from `env` failed with. */
 const failureOf = (env: Env) => Effect.flip(Layer.build(platform(env)));

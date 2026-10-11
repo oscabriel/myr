@@ -46,7 +46,7 @@ import {
   world,
 } from "./project-do.fixtures.ts";
 
-const other = ProjectName.make("other");
+const other = ProjectName.make("oscabriel/other");
 
 const sha = CommitSha.make("a".repeat(40));
 

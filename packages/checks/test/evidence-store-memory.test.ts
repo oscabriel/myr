@@ -11,7 +11,7 @@ import {
 const unitLog = {
   attempt: 1,
   lane: LaneName.make("unit"),
-  project: ProjectName.make("datekit"),
+  project: ProjectName.make("oscabriel/datekit"),
   requestId: RequestId.make("push-0123456789"),
   text: "FAIL test/parse.test.ts > parses ISO weeks\nexpected 52 to be 53",
 };

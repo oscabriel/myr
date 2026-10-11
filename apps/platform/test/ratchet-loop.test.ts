@@ -34,7 +34,7 @@ import { pushRequestId } from "../src/adapters/custody.ts";
 import { coreLoopWorld } from "./world.ts";
 import type { CoreLoopWorld, GitClient, Someone } from "./world.ts";
 
-const project = ProjectName.make("burrow");
+const project = ProjectName.make("oscabriel/burrow");
 
 const noAnyInParser = AskId.make("no-any-in-parser");
 

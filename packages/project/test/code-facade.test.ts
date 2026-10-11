@@ -12,7 +12,7 @@ import { Effect, Option } from "effect";
 import { codeProjectOf } from "../src/code.ts";
 import { CodeCache } from "../src/code/cache.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const landed = LandedSha.make("4".repeat(40));
 

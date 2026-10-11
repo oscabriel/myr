@@ -25,7 +25,7 @@ import {
 import type { About } from "../src/features/propose/propose-view.tsx";
 import { markupOf, plainText } from "./ask-fixtures.ts";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const at = CommitSha.make("4c2e6a8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c");
 

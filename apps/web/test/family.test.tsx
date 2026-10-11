@@ -27,7 +27,7 @@ import { ask as fixture } from "./ask-fixtures.ts";
 import { attributeOf, tagsWith, textIn } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const at = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 

@@ -69,7 +69,7 @@ const jobWith = (env: Partial<CheckJob> = {}): CheckWire => ({
     at: CheckAt.cases.Commit.make({ commit: CommitSha.make("a".repeat(40)) }),
     lanes: [{ command: UNIT, lane: LaneName.make("unit") }],
     placeholders: [{ key: SENTRY, placeholder: PLACEHOLDER }],
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
     proxies: [sentryRule],
     repo: RepoName.make("datekit"),
     run,

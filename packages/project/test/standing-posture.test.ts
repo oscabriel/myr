@@ -45,13 +45,13 @@ import {
   projectsMigration,
 } from "./projection-d1.fixtures.ts";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const ghost = ProjectName.make("ghost");
+const ghost = ProjectName.make("oscabriel/ghost");
 
-const broken = ProjectName.make("broken");
+const broken = ProjectName.make("oscabriel/broken");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const landedAt = DateTime.makeUnsafe("2026-10-08T12:00:00Z");
 

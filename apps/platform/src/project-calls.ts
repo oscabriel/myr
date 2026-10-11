@@ -59,7 +59,9 @@ export interface ProjectCall<M extends ProjectMethod> {
   readonly refusesUnmade: boolean;
 }
 
-const unmade = new UnknownProject({ project: ProjectName.make("unmade") });
+const unmade = new UnknownProject({
+  project: ProjectName.make("oscabriel/unmade"),
+});
 
 /** One method's row, from its `MethodSchemas` entry. */
 const callOf = <

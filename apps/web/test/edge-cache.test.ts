@@ -250,7 +250,7 @@ const listingDatekit = () =>
               {
                 openAsks: 0,
                 posture: "open" as const,
-                project: ProjectName.make("datekit"),
+                project: ProjectName.make("oscabriel/datekit"),
               },
             ],
           })

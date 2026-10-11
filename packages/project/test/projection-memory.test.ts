@@ -17,9 +17,9 @@ import { ProjectedRows, ProjectionMemory } from "../src/projection/memory.ts";
 
 const now = DateTime.makeUnsafe("2026-10-07T09:00:00Z");
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 const released = (ask: string, seq: number) =>
   ProjectEvent.cases.Released.make({ ask: AskId.make(ask), at: now, seq });

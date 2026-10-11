@@ -29,7 +29,7 @@ const carol = Handle.make("carol");
 const landing = formatLanding({
   ask: {
     ask: AskId.make("week-at-year-end"),
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
   },
   assisted: [{ harness: "claude-code", model: "opus-4", verified: true }],
   body: "The ISO week of December 31 was one too high.\nNow it rolls over.",

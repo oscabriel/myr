@@ -39,9 +39,9 @@ const platformUrl = "https://platform-test.example.workers.dev";
 
 const webUrl = "https://web-test.example.workers.dev";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 /** A command row as `@repo/agent-kit`'s command list holds it. */
 const row = (
@@ -301,7 +301,7 @@ describe(missingProjectLlms, () => {
   it("names the project it did not find and where every project is", () => {
     expect(
       missingProjectLlms({
-        project: Option.some(ProjectName.make("nowhere")),
+        project: Option.some(ProjectName.make("oscabriel/nowhere")),
         webUrl,
       })
     ).toBe(

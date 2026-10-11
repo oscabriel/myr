@@ -25,7 +25,7 @@ import { renderAt } from "./render.tsx";
 
 const sha = CommitSha.make("0123456789abcdef0123456789abcdef01234567");
 
-const project = ProjectName.make("p");
+const project = ProjectName.make("oscabriel/p");
 
 /** The file `<dir>/README.md` at `sha`, rendered with no router around it, as a view's test renders it. */
 const rendered = (source: string, dir = "") =>

@@ -77,7 +77,7 @@ const trimInput = AskId.make("trim-input");
 
 const lexTokens = AskId.make("lex-tokens");
 
-const nowhere = ProjectName.make("nowhere");
+const nowhere = ProjectName.make("oscabriel/nowhere");
 
 /**
  * Both projects as the projection lists them, and one it lists that the
@@ -776,7 +776,7 @@ describe("making a project", () => {
         yield* advanceTo("2026-10-07T12:00:00Z");
 
         const carol = yield* as("carol");
-        const fresh = ProjectName.make("fresh");
+        const fresh = ProjectName.make("oscabriel/fresh");
 
         const first = yield* carol
           .initProject({ project: fresh })
@@ -799,7 +799,7 @@ describe("making a project", () => {
         yield* advanceTo("2026-10-07T12:00:00Z");
 
         const carol = yield* as("carol");
-        const fresh = ProjectName.make("fresh");
+        const fresh = ProjectName.make("oscabriel/fresh");
 
         const failed = yield* Effect.flip(
           carol.initProject({

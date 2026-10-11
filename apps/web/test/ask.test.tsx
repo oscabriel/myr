@@ -474,7 +474,7 @@ describe(NoSuchAsk, () => {
 
   it("links no project the platform says it does not have", () => {
     const refusal = new UnknownProject({
-      project: ProjectName.make("nowhere"),
+      project: ProjectName.make("oscabriel/nowhere"),
     });
 
     const data = structuredClone(Schema.encodeSync(Refusals)([refusal]));

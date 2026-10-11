@@ -54,7 +54,7 @@ import { memoSteps } from "../../src/workflows/step.ts";
 import type { StepRunner } from "../../src/workflows/step.ts";
 import { coreLoopWorld } from "../world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const maintainers = LayerName.make("maintainers");
 

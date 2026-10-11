@@ -100,7 +100,7 @@ const refusedOn = (head: CommitSha) =>
       ],
     }),
     patchId: PatchId.make("2".repeat(64)),
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
     stage: "checks",
     tree: TreeSha.make("3".repeat(40)),
     verifier: "platform",

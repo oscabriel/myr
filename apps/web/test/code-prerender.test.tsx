@@ -31,7 +31,7 @@ import {
 } from "../src/features/code/prerender.ts";
 import { FileFallback } from "../src/features/code/server-code.tsx";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 

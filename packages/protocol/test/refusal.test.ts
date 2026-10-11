@@ -180,6 +180,7 @@ describe("the refusal union", () => {
       "UnknownProposal",
       // Setup
       "ProjectExists",
+      "NotYourNamespace",
       "ImportFailed",
       // Env
       "UnknownEnvItem",
@@ -234,6 +235,7 @@ describe("the refusal union", () => {
       NotRedFirst: false,
       NotSensitive: false,
       NotVouched: false,
+      NotYourNamespace: false,
       OutOfScope: false,
       PostureChange: false,
       PrivatePathInPublicTree: false,

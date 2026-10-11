@@ -40,7 +40,7 @@ const hrefsOf = (markup: string) =>
     (match.groups?.href ?? "").replaceAll("&amp;", "&")
   );
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const AT = "a".repeat(40);
 

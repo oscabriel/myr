@@ -18,7 +18,7 @@ describe("an admission's instance", () => {
         AdmissionParams.make({
           head: CommitSha.make("a".repeat(40)),
           layer: LayerName.make("maintainers"),
-          project: ProjectName.make("datekit"),
+          project: ProjectName.make("oscabriel/datekit"),
         })
       )
     ).toBe(`admit-datekit-maintainers-${"a".repeat(40)}`);

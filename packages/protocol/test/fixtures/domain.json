@@ -33,7 +33,7 @@
             "openedAt": "2026-10-07T12:00:00.000Z",
             "openedIn": "4444444444444444444444444444444444444444",
             "parent": "drop-moment",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "state": "open"
           }
         ],
@@ -153,7 +153,7 @@
             "openedAt": "2026-10-07T12:00:00.000Z",
             "openedIn": "4444444444444444444444444444444444444444",
             "parent": "drop-moment",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "state": "open"
           }
         ],
@@ -679,7 +679,7 @@
         "landedAt": "2026-10-07T12:00:00.000Z",
         "opened": "Not An Ask!",
         "parent": "1111111111111111111111111111111111111111",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "sha": "4444444444444444444444444444444444444444"
       }
     }
@@ -700,7 +700,7 @@
           "_tag": "Checking",
           "stage": "merge"
         },
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "requestId": "push-33333333"
       }
     ],
@@ -744,7 +744,7 @@
         "openedAt": "2026-10-07T12:00:00.000Z",
         "openedIn": "4444444444444444444444444444444444444444",
         "parent": "drop-moment",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "state": "open"
       }
     ],
@@ -873,7 +873,7 @@
         "lapsesAt": "2026-10-08T12:00:00.000Z",
         "lastPushAt": "2026-10-07T12:00:00.000Z",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "remote": "https://example.com/git/datekit--iso-week--alice",
         "state": "live",
         "suite": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
@@ -890,7 +890,7 @@
       {
         "area": "@datekit/parse",
         "count": 4,
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "role": "Signed-off-by"
       }
     ],
@@ -914,7 +914,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "OpenProposal",
           "proposal": "prop-000001"
@@ -939,7 +939,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "Finish",
           "ask": "iso-week",
@@ -965,7 +965,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "RaiseRatchet",
           "after": 12,
@@ -994,7 +994,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "Waiver",
           "ask": "iso-week",
@@ -1025,7 +1025,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "StrayPush",
           "after": "3333333333333333333333333333333333333333",
@@ -1052,7 +1052,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "PostureChange",
           "from": "open",
@@ -1078,7 +1078,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "Vouch",
           "handle": "dave"
@@ -1103,7 +1103,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "SecretInTree",
           "ask": "iso-week",
@@ -1129,7 +1129,7 @@
         "expiresAt": "2026-10-21T12:00:00.000Z",
         "id": "dec-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "subject": {
           "_tag": "ProxyWidened",
           "hosts": ["api.stripe.com"],
@@ -1172,7 +1172,7 @@
             "tags": []
           }
         ],
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       }
     ],
     "Envelope": [
@@ -1226,7 +1226,7 @@
           "want": "An ISO week date parses to the Monday of that week."
         },
         "posture": "open",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "takeable": true
       }
     ],
@@ -1254,7 +1254,7 @@
         "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
         "landedAt": "2026-10-07T12:00:00.000Z",
         "parent": "1111111111111111111111111111111111111111",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "requestId": "push-33333333",
         "sha": "4444444444444444444444444444444444444444",
         "verdict": {
@@ -1291,7 +1291,7 @@
             "sha": "4444444444444444444444444444444444444444"
           },
           "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "stage": "checks",
           "tree": "5555555555555555555555555555555555555555",
           "verifier": "platform"
@@ -1309,7 +1309,7 @@
         "landedAt": "2026-10-07T12:00:00.000Z",
         "opened": "iso-week",
         "parent": "1111111111111111111111111111111111111111",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "sha": "4444444444444444444444444444444444444444"
       }
     ],
@@ -1391,7 +1391,7 @@
         ],
         "posture": "openWithSealedEvidence",
         "postureLabel": "Open with sealed evidence",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       }
     ],
     "Outcome": [
@@ -1458,7 +1458,7 @@
             "openedAt": "2026-10-07T12:00:00.000Z",
             "openedIn": "4444444444444444444444444444444444444444",
             "parent": "drop-moment",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "state": "open"
           }
         ],
@@ -1861,7 +1861,7 @@
           "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
           "landedAt": "2026-10-07T12:00:00.000Z",
           "parent": "1111111111111111111111111111111111111111",
-          "project": "datekit",
+          "project": "oscabriel/datekit",
           "requestId": "push-33333333",
           "sha": "4444444444444444444444444444444444444444",
           "verdict": {
@@ -1898,7 +1898,7 @@
               "sha": "4444444444444444444444444444444444444444"
             },
             "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "stage": "checks",
             "tree": "5555555555555555555555555555555555555555",
             "verifier": "platform"
@@ -1937,12 +1937,12 @@
         "landedAt": "2026-10-07T12:00:00.000Z",
         "openAsks": 3,
         "posture": "open",
-        "project": "datekit"
+        "project": "oscabriel/datekit"
       },
       {
         "openAsks": 0,
         "posture": "open",
-        "project": "burrow"
+        "project": "oscabriel/burrow"
       }
     ],
     "Proposal": [
@@ -1952,7 +1952,7 @@
         "flags": "drop-moment",
         "id": "prop-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "proposer": "dave",
         "sealed": {
           "fork": "datekit--me--dave",
@@ -1973,7 +1973,7 @@
         "files": ["config/asks/iso-week.ask.ts"],
         "id": "prop-000001",
         "openedAt": "2026-10-07T12:00:00.000Z",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "proposer": "dave",
         "state": "open",
         "territory": "@datekit/parse",
@@ -2044,7 +2044,7 @@
             "expiresAt": "2026-10-21T12:00:00.000Z",
             "id": "dec-000001",
             "openedAt": "2026-10-07T12:00:00.000Z",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "subject": {
               "_tag": "OpenProposal",
               "proposal": "prop-000001"
@@ -2078,7 +2078,7 @@
             "heldBackTrailer": "parse 7/7 @ sha256:7777777777777777777777777777777777777777777777777777777777777777",
             "landedAt": "2026-10-07T12:00:00.000Z",
             "parent": "1111111111111111111111111111111111111111",
-            "project": "datekit",
+            "project": "oscabriel/datekit",
             "requestId": "push-33333333",
             "sha": "4444444444444444444444444444444444444444",
             "verdict": {
@@ -2115,7 +2115,7 @@
                 "sha": "4444444444444444444444444444444444444444"
               },
               "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-              "project": "datekit",
+              "project": "oscabriel/datekit",
               "stage": "checks",
               "tree": "5555555555555555555555555555555555555555",
               "verifier": "platform"
@@ -2166,7 +2166,7 @@
           ]
         },
         "patchId": "6666666666666666666666666666666666666666666666666666666666666666",
-        "project": "datekit",
+        "project": "oscabriel/datekit",
         "stage": "checks",
         "tree": "5555555555555555555555555555555555555555",
         "verifier": "platform"

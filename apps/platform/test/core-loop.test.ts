@@ -41,7 +41,7 @@ import { Array, Context, Deferred, Effect, Layer } from "effect";
 import { pushRequestId } from "../src/adapters/custody.ts";
 import { coreLoopWorld } from "./world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const parseIso = AskId.make("parse-iso");
 

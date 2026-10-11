@@ -36,7 +36,7 @@ import { evaluationFacts } from "../src/facts.ts";
 import { projectService } from "../src/project.ts";
 import { CheckScript, composedAt, Pusher, worldOf } from "./world.ts";
 
-const project = ProjectName.make("kit");
+const project = ProjectName.make("oscabriel/kit");
 
 const repo = RepoName.make(project);
 

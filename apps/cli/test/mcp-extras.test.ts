@@ -18,7 +18,7 @@ import { Effect, Layer, Option, Schema } from "effect";
 
 import { session } from "./stdio.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const fixWeek = AskId.make("fix-week");
 

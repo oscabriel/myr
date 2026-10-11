@@ -31,7 +31,7 @@ describe("salts from WebCrypto", () => {
   );
 });
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const maintainers = LayerName.make("maintainers");
 

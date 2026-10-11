@@ -86,7 +86,7 @@ const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
 const okonkwo = Handle.make("okonkwo");
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const stray: Decision = {
   deciders: [okonkwo],
@@ -511,7 +511,7 @@ describe("DecisionCard for an OpenProposal", () => {
   });
 });
 
-const vellum = ProjectName.make("vellum");
+const vellum = ProjectName.make("oscabriel/vellum");
 
 /** A waiver on the answer to escape-attribute-quotes, carrying the answer's diff of the marker's file. */
 const waiver: Decision = {

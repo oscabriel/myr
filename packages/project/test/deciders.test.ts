@@ -1248,7 +1248,7 @@ describe("Today", () => {
   );
 });
 
-const burrow = ProjectName.make("burrow");
+const burrow = ProjectName.make("oscabriel/burrow");
 
 /** One landing's credit in the parser module. */
 const row = (name: ProjectName, role: "Asked-by" | "Signed-off-by") => ({

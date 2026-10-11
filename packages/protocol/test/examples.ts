@@ -5,6 +5,7 @@ import {
   CommitSha,
   DecisionId,
   EnvKey,
+  Handle,
   ProjectName,
   ProposalId,
   RepoPath,
@@ -34,6 +35,7 @@ import {
   OutOfScope,
   PostureChange,
   PrivatePathInPublicTree,
+  NotYourNamespace,
   ProjectExists,
   ProposalClosed,
   ReachedInternals,
@@ -66,7 +68,7 @@ export const main = CommitSha.make("2222222222222222222222222222222222222222");
 
 export const path = RepoPath.make("src/a.ts");
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 const decision = DecisionId.make("dec-000001");
 
@@ -131,6 +133,7 @@ export const examples: readonly Refusal[] = [
   new UnknownRevision({ rev: "v9.9.9" }),
   new UnknownProposal({ proposal }),
   new ProjectExists({ project }),
+  NotYourNamespace.of(project, Handle.make("bob")),
   new ImportFailed({ reason: "the repo needs a sign-in to read" }),
   new UnknownEnvItem({ key }),
   new NotSensitive({ key }),

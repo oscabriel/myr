@@ -23,7 +23,7 @@ import { movedBy } from "../src/answer-runs/movers.ts";
 import { Content, writer } from "./code-fixtures.ts";
 import type { Tree } from "./code-fixtures.ts";
 
-const project = ProjectName.make("movekit");
+const project = ProjectName.make("oscabriel/movekit");
 
 const repo = RepoName.make(project);
 

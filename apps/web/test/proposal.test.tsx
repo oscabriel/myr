@@ -32,7 +32,7 @@ import { readProposal } from "../src/routes/$project/proposals/$proposal.tsx";
 import { ContractsClient, webContracts } from "../src/surfaces.ts";
 import { markupOf, plainText } from "./ask-fixtures.ts";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const decodeShown = Schema.decodeUnknownSync(ShowProposal.successSchema);
 

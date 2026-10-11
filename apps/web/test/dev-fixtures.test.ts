@@ -30,7 +30,7 @@ import type { DevWorldOptions } from "../src/dev/server.ts";
 import { devServer } from "../src/dev/server.ts";
 import { devToken } from "../src/dev/sessions.ts";
 
-const vellum = ProjectName.make("vellum");
+const vellum = ProjectName.make("oscabriel/vellum");
 
 const ask = (id: string) => AskId.make(id);
 
@@ -743,7 +743,10 @@ const timesIn = (options: DevWorldOptions) =>
       const proposedAt = (handle: string, want: string) =>
         Effect.flatMap(as(signedIn(handle)), (client) =>
           Effect.map(
-            client.proposeAsk({ project: ProjectName.make("datekit"), want }),
+            client.proposeAsk({
+              project: ProjectName.make("oscabriel/datekit"),
+              want,
+            }),
             ({ proposal }) => proposal.openedAt
           )
         );

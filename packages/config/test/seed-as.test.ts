@@ -22,7 +22,7 @@ import { Client } from "../../protocol/src/contracts.ts";
 import { ProjectName } from "../../protocol/src/ids.ts";
 import { ProjectExists } from "../../protocol/src/refusal.ts";
 
-const swarmCopy = ProjectName.make("burrow-swarm-2");
+const swarmCopy = ProjectName.make("oscabriel/burrow-swarm-2");
 
 describe(renameSeedPlan, () => {
   it.effect(
@@ -59,8 +59,8 @@ describe(renameSeedPlan, () => {
         const plan = yield* planSeed("examples/datekit");
 
         const copy = renameSeedPlan(
-          renameSeedPlan(plan, ProjectName.make("datekit-copy")),
-          ProjectName.make("datekit-copy-2")
+          renameSeedPlan(plan, ProjectName.make("oscabriel/datekit-copy")),
+          ProjectName.make("oscabriel/datekit-copy-2")
         );
 
         expect(
@@ -91,7 +91,7 @@ describe("runSeed, for a copy", () => {
     () =>
       Effect.gen(function* () {
         const plan = yield* planSeed("examples/burrow");
-        const taken = ProjectName.make("burrow-taken");
+        const taken = ProjectName.make("oscabriel/burrow-taken");
 
         const { failure, refs } = yield* Effect.gen(function* () {
           const target = yield* SeedTarget;
@@ -217,7 +217,7 @@ describe(recordCopy, () => {
         const written = yield* Effect.gen(function* () {
           yield* recordCopy(
             "dev-oscabriel",
-            renameSeedPlan(plan, ProjectName.make("datekit-copy")),
+            renameSeedPlan(plan, ProjectName.make("oscabriel/datekit-copy")),
             at
           );
 

@@ -28,7 +28,7 @@ import { fakeEnv, operatorToken } from "../fake-env.ts";
 import { origin } from "../harness.ts";
 import { coreLoopWorld } from "../world.ts";
 
-const project = ProjectName.make("datekit");
+const project = ProjectName.make("oscabriel/datekit");
 
 /** datekit as dora first pushes it: one source file and the config folder. */
 const start = {

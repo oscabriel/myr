@@ -8,13 +8,16 @@ import {
   workingForkName,
 } from "../src/repo-names.ts";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const parseIso = AskId.make("parse-iso");
 
 const kinds: readonly (readonly [string, RepoKind])[] = [
   ["datekit", RepoKind.Canonical({ project: datekit })],
-  ["date-kit", RepoKind.Canonical({ project: ProjectName.make("date-kit") })],
+  [
+    "date-kit",
+    RepoKind.Canonical({ project: ProjectName.make("oscabriel/date-kit") }),
+  ],
   [
     "datekit--parse-iso--bob",
     RepoKind.ClaimFork({

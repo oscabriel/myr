@@ -453,7 +453,7 @@ export const datekit = {
       [AskId.make(stated.id), [askFileOf(stated), test]] as const
   ),
   files: library,
-  project: ProjectName.make("datekit"),
+  project: ProjectName.make("oscabriel/datekit"),
   /** A commit someone pushed straight to main, past the platform. */
   stray: {
     files: new Map([
@@ -658,7 +658,7 @@ export const burrow = {
     (stated) => [AskId.make(stated.id), [askFileOf(stated)]] as const
   ),
   files: monorepo,
-  project: ProjectName.make("burrow"),
+  project: ProjectName.make("oscabriel/burrow"),
 } as const;
 
 /** How many times `text` calls `symbol`, as burrow's `scripts/count-callers.ts` counts. */

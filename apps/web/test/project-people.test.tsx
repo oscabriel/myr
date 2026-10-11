@@ -26,7 +26,7 @@ import { inOrder, markupOf, plainText, textOf } from "./ask-fixtures.ts";
 import { elementWith, elementsWith, inspectorOf, mainOf } from "./records.ts";
 import { renderAt } from "./render.tsx";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const sha = "4c2e6a8b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c";
 
@@ -402,7 +402,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.some(burrowPolicy)}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.none()}
       />
     );
@@ -439,7 +439,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.none()}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.some(noConfig)}
       />
     );
@@ -475,7 +475,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.none()}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.some(noConfig)}
       />
     );
@@ -509,7 +509,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.none()}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.some({ ...noConfig, reason: "configFailed" })}
       />
     );
@@ -537,7 +537,7 @@ describe("a project's policy page", () => {
       <PeopleView
         ledger={burrowLedger}
         policy={Option.some(burrowPolicy)}
-        project={ProjectName.make("burrow")}
+        project={ProjectName.make("oscabriel/burrow")}
         unevaluated={Option.none()}
       />
     );

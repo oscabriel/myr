@@ -125,7 +125,7 @@ const wireFor = (
     }),
     lanes: [{ command: UNIT, lane: LaneName.make("unit") }],
     placeholders: [],
-    project: ProjectName.make("datekit"),
+    project: ProjectName.make("oscabriel/datekit"),
     proxies: [],
     repo: RepoName.make("datekit"),
     run,

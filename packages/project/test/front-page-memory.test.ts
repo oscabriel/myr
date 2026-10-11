@@ -6,7 +6,7 @@ import { Effect } from "effect";
 import { FrontPage } from "../src/front-page.ts";
 import { FrontPageMemory } from "../src/front-page/memory.ts";
 
-const datekit = ProjectName.make("datekit");
+const datekit = ProjectName.make("oscabriel/datekit");
 
 const entry = (
   ask: string,

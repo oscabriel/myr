@@ -1,4 +1,6 @@
-import { Schema } from "effect";
+import { Option, Schema, SchemaGetter } from "effect";
+
+import { legacyProjects } from "./legacy.ts";
 
 // Lowercase words joined by single dashes: no `--`, which separates a fork's
 // parts (`<project>--<ask>--<handle>`), and no leading or trailing dash.
@@ -228,14 +230,15 @@ export const RepoPath = Schema.NonEmptyString.pipe(Schema.brand("RepoPath"));
 export type RepoPath = typeof RepoPath.Type;
 
 /**
- * Words a project may not be named: the web serves its own pages and files
- * at these first path segments (`/asks`, `/home`, `/docs`, `/agents`,
- * `/today`, `/people/<handle>`,
- * `/auth/…`, `/rpc`, `/releases/…`, `/icons/…` and the client build's
- * `/assets/…`), so a project so named would be unreachable at
- * `<web>/<project>`. A name with a dot (`llms.txt`, `agents.md`,
- * `install.sh`, `.well-known`) is no project's name anyway.
- * `apps/web/test/routes.test.ts` holds this list to the web's routes.
+ * Words no owner may be named: the web serves its own pages and files at
+ * these first path segments (`/asks`, `/home`, `/docs`, `/import`,
+ * `/agents`, `/today`, `/people/<handle>`, `/auth/…`, `/rpc`,
+ * `/releases/…`, `/icons/…` and the client build's `/assets/…`), and an
+ * owner is the first segment of a project's address, so a project so owned
+ * would be unreachable at `<web>/<owner>/<name>`. A name with a dot
+ * (`llms.txt`, `agents.md`, `install.sh`, `.well-known`) is no handle
+ * anyway. `apps/web/test/routes.test.ts` holds this list to the web's
+ * routes, and sign-up refuses each as a handle.
  */
 export const reservedProjectNames = [
   "agents",
@@ -245,38 +248,257 @@ export const reservedProjectNames = [
   "docs",
   "home",
   "icons",
+  "import",
   "people",
   "releases",
   "rpc",
   "today",
 ] as const;
 
+const isReservedOwner = (owner: string) =>
+  reservedProjectNames.some((reserved) => reserved === owner);
+
 /**
- * A project's name. Lowercase words joined by single dashes, like an ask's,
- * so a command that names it is safe to paste into a shell; none of
- * `reservedProjectNames`, which the web's own pages take.
+ * The hosts a repo may be imported from under its own name: an import
+ * from one of these is owned by its source namespace, `<host>/<account>`,
+ * unless the importer takes it under their handle. Every account on each
+ * is letters, digits, dots, dashes and underscores. The list grows by a
+ * line.
  */
-export const ProjectName = Schema.String.pipe(
+export const sourceHosts = [
+  "github.com",
+  "gitlab.com",
+  "codeberg.org",
+  "bitbucket.org",
+] as const;
+
+export type SourceHost = (typeof sourceHosts)[number];
+
+const isSourceHost = (host: string): host is SourceHost =>
+  sourceHosts.some((known) => known === host);
+
+// A segment of a project's name: lowercase letters and digits joined by
+// single dots, dashes or underscores, so `--` never occurs (it separates a
+// fork's parts) and the segment is safe to paste into a shell.
+const SEGMENT = String.raw`[a-z0-9]+(?:[._-][a-z0-9]+)*`;
+
+// A handle as an owner: a lowercase handle with single dashes. A handle may
+// not hold `_` or `.`, so it is never mistaken for a host.
+const HANDLE_OWNER = String.raw`[a-z0-9]+(?:-[a-z0-9]+)*`;
+
+const HOSTS = sourceHosts.map((host) => host.replaceAll(".", "\\.")).join("|");
+
+const SourceNamespacePattern = new RegExp(
+  String.raw`^(?:${HOSTS})/${SEGMENT}$`,
+  "u"
+);
+
+const OwnerPattern = new RegExp(
+  String.raw`^(?:${HANDLE_OWNER}|(?:${HOSTS})/${SEGMENT})$`,
+  "u"
+);
+
+const ShortNamePattern = new RegExp(String.raw`^${SEGMENT}$`, "u");
+
+const FullNamePattern = new RegExp(
+  String.raw`^(?:${HANDLE_OWNER}|(?:${HOSTS})/${SEGMENT})/${SEGMENT}$`,
+  "u"
+);
+
+// What a request may spell before the parser lowercases it and reads a
+// legacy key: one to three segments of the characters a name may hold.
+const SpelledPattern = /^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+){0,2}$/u;
+
+/**
+ * A source namespace: the host and account a repo was imported from,
+ * `github.com/pallets`, as an owner (ADR 0032).
+ */
+export const SourceNamespace = Schema.String.pipe(
+  Schema.check(Schema.isPattern(SourceNamespacePattern)),
+  Schema.brand("SourceNamespace")
+);
+
+export type SourceNamespace = typeof SourceNamespace.Type;
+
+/**
+ * A project's owner: a person's handle in lowercase (`oscabriel`), or a
+ * source namespace (`github.com/pallets`). Never a word the web serves its
+ * own pages at. A name is a person or a namespace, never both: a handle
+ * holds no dot, a host always does.
+ */
+export const Owner = Schema.String.pipe(
   Schema.check(
-    Schema.isPattern(Words),
+    Schema.isPattern(OwnerPattern),
     Schema.makeFilter(
-      (name: string) =>
-        reservedProjectNames.some((reserved) => reserved === name)
-          ? `${name} is a path the web serves its own pages at, so no project takes it`
+      (owner: string) =>
+        isReservedOwner(owner)
+          ? `${owner} is a path the web serves its own pages at, so no owner takes it`
           : true,
       {
-        expected: `a project name other than ${reservedProjectNames.join(" or ")}`,
+        expected: `an owner other than ${reservedProjectNames.join(" or ")}`,
         toCode: () => ({
-          runtime: `Schema.makeFilter((name: string) => !${JSON.stringify(reservedProjectNames)}.includes(name))`,
+          runtime: `Schema.makeFilter((owner: string) => !${JSON.stringify(reservedProjectNames)}.includes(owner))`,
         }),
         toJsonSchema: () => ({ not: { enum: [...reservedProjectNames] } }),
+      }
+    )
+  ),
+  Schema.brand("Owner")
+);
+
+export type Owner = typeof Owner.Type;
+
+/** Whether an owner is a source namespace, not a person. */
+export const isSourceNamespace = (
+  owner: Owner
+): owner is Owner & SourceNamespace => SourceNamespacePattern.test(owner);
+
+/**
+ * A project's short name, the last segment of its name: `datekit`,
+ * `commander.js`. Lowercase, single separators, so a command that names
+ * the project is safe to paste into a shell and never holds `--`.
+ */
+export const ShortName = Schema.String.pipe(
+  Schema.check(Schema.isPattern(ShortNamePattern)),
+  Schema.brand("ShortName")
+);
+
+export type ShortName = typeof ShortName.Type;
+
+/**
+ * A project's full name as every surface reads it: `<owner>/<name>`,
+ * `oscabriel/datekit` or `github.com/pallets/click`. The canonical form,
+ * with its owner checked.
+ */
+const FullName = Schema.String.pipe(
+  Schema.check(
+    Schema.isPattern(FullNamePattern),
+    Schema.makeFilter(
+      (name: string) => {
+        const owner = name.slice(0, name.lastIndexOf("/"));
+
+        return isReservedOwner(owner)
+          ? `${owner} is a path the web serves its own pages at, so no project is owned by it`
+          : true;
+      },
+      {
+        expected: `a project name whose owner is none of ${reservedProjectNames.join(", ")}`,
+        toCode: () => ({
+          runtime: `Schema.makeFilter((name: string) => !${JSON.stringify(reservedProjectNames)}.includes(name.slice(0, name.lastIndexOf("/"))))`,
+        }),
       }
     )
   ),
   Schema.brand("ProjectName")
 );
 
+/**
+ * The flat key a project keeps inside the platform: its Durable Object's
+ * id, its repo's name, its code cache's key and its projection rows. The
+ * name with `/` made `_` (`oscabriel_foo`, `github.com_pallets_click`), or
+ * the key a project made before owners kept (`datekit`). `_` occurs in no
+ * handle, host, account or short name, so a key reads back to its name.
+ * Never `--`, which separates a fork's parts.
+ */
+export const ProjectKey = Schema.String.pipe(
+  Schema.check(Schema.isPattern(/^(?!.*--)[a-z0-9._-]+$/u)),
+  Schema.brand("ProjectKey")
+);
+
+export type ProjectKey = typeof ProjectKey.Type;
+
+// The forty made before owners, keyed both ways (`legacy.ts`).
+const legacyNameByKey: Readonly<Record<string, string>> = Object.fromEntries(
+  legacyProjects.map(({ key, name }) => [key, name])
+);
+
+const legacyKeyByName: Readonly<Record<string, string>> = Object.fromEntries(
+  legacyProjects.map(({ key, name }) => [name, key])
+);
+
+/**
+ * What a request spelled, read as a name: lowercased, and a bare legacy
+ * key given its name. A bare word that is no legacy key stays as it is, and
+ * the full name's pattern then refuses it, saying what a name looks like.
+ */
+const spelledToName = (spelled: string): string => {
+  const lower = spelled.toLowerCase();
+
+  return lower.includes("/") ? lower : (legacyNameByKey[lower] ?? lower);
+};
+
+/**
+ * A project's name, `<owner>/<name>`, on every surface: the web's address,
+ * the gateway's path, the CLI's `--project`, every contract's `project`
+ * field. One parser: it lowercases what was spelled and reads a key a
+ * project kept from before owners (`datekit`) as its name
+ * (`oscabriel/datekit`), so a stored event, an old clone's remote and an
+ * agent's `project: "datekit"` all mean the same project. It encodes only
+ * the full name. ADR 0032.
+ */
+export const ProjectName = Schema.String.pipe(
+  Schema.check(Schema.isPattern(SpelledPattern)),
+  Schema.decodeTo(FullName, {
+    decode: SchemaGetter.transform(spelledToName),
+    encode: SchemaGetter.transform((name: string) => name),
+  })
+);
+
 export type ProjectName = typeof ProjectName.Type;
+
+/** A project's owner, the name before its last slash. */
+export const ownerOf = (name: ProjectName): Owner =>
+  Owner.make(name.slice(0, name.lastIndexOf("/")));
+
+/** A project's short name, after its last slash. */
+export const shortNameOf = (name: ProjectName): ShortName =>
+  ShortName.make(name.slice(name.lastIndexOf("/") + 1));
+
+/** The name an owner and a short name make. */
+export const projectNameOf = (owner: Owner, short: ShortName): ProjectName =>
+  ProjectName.make(`${owner}/${short}`);
+
+/** The key a project keeps inside the platform for its name. */
+export const keyOf = (name: ProjectName): ProjectKey =>
+  ProjectKey.make(legacyKeyByName[name] ?? name.replaceAll("/", "_"));
+
+const decodeFullName = Schema.decodeOption(FullName);
+
+/** The name a key reads back to; none for a key no project can have. */
+export const nameOfKey = (key: ProjectKey): Option.Option<ProjectName> => {
+  const legacy = legacyNameByKey[key];
+
+  if (legacy !== undefined) {
+    return Option.some(ProjectName.make(legacy));
+  }
+
+  return key.includes("_")
+    ? decodeFullName(key.replaceAll("_", "/"))
+    : Option.none();
+};
+
+/**
+ * The source namespace an import's URL names, when its host is one the
+ * platform knows: `https://github.com/Pallets/click.git` is
+ * `github.com/pallets`.
+ */
+export const sourceNamespaceOf = (
+  url: string
+): Option.Option<SourceNamespace> =>
+  Option.flatMap(Option.liftThrowable(() => new URL(url))(), (parsed) => {
+    const [account, repo, ...rest] = parsed.pathname
+      .split("/")
+      .filter((s) => s !== "");
+
+    return account === undefined ||
+      repo === undefined ||
+      rest.length > 0 ||
+      !isSourceHost(parsed.hostname.toLowerCase())
+      ? Option.none()
+      : Schema.decodeOption(SourceNamespace)(
+          `${parsed.hostname.toLowerCase()}/${account.toLowerCase()}`
+        );
+  });
 
 /** A person's handle on the platform, as their sign-in provider spells it. */
 export const Handle = Schema.String.pipe(

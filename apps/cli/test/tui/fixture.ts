@@ -21,7 +21,7 @@ const sha = (digit: string) => CommitSha.make(digit.repeat(40));
 
 export const okonkwo = Handle.make("okonkwo");
 
-export const datekit = ProjectName.make("datekit");
+export const datekit = ProjectName.make("oscabriel/datekit");
 
 /** An ask proposed for datekit, expiring tomorrow: last in expiry order. */
 export const proposal: Decision = {

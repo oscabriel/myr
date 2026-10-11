@@ -57,6 +57,7 @@ const final = {
   NotRedFirst: ExitCode.dataErr,
   NotSensitive: ExitCode.dataErr,
   NotVouched: ExitCode.noPerm,
+  NotYourNamespace: ExitCode.noPerm,
   OutOfScope: ExitCode.dataErr,
   // A declined decision, as a declined waiver is `Weakened`: the answer changes.
   PostureChange: ExitCode.dataErr,
