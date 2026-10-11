@@ -1,19 +1,24 @@
 /**
  * DESIGN.md's named values, held against the components that draw them:
  * the inspector's widths (its `spacing` tokens) and the row's state word
- * (the Mark Carries Rule). A change to either side without the other
+ * (the Mark Carries Rule), and a path's file name read before its
+ * folders. A change to either side without the other
  * fails here, so the document and the web never drift apart.
  */
 import { describe, expect, it } from "@effect/vitest";
+import { ProjectName } from "@repo/protocol/ids";
+import { Effect } from "effect";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import design from "../../../DESIGN.md?raw";
+import { PathTrail } from "../src/features/code/file-header.tsx";
 import {
   STATE_MARK_NAMES,
   STATE_MARKS,
 } from "../src/features/shared/marks.tsx";
 import { wordTone } from "../src/features/shared/row.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
+import { renderAt } from "./render.tsx";
 
 /** A `spacing` token's value in DESIGN.md's frontmatter. */
 const spacing = (name: string) =>
@@ -71,4 +76,35 @@ describe("DESIGN.md's named values", () => {
       STATE_MARKS.refused.tone,
     ]);
   });
+
+  it.effect(
+    "sets a path's folders muted and its file name in ink in the code header",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/datekit/blob/main/src/parse/week.ts",
+          <PathTrail
+            path="src/parse/week.ts"
+            project={ProjectName.make("datekit")}
+            rev="main"
+          />
+        );
+
+        const folders = [
+          ...markup.matchAll(
+            /<a\b[^>]*class="(?<classes>[^"]*)"[^>]*>(?:src|parse)<\/a>/gu
+          ),
+        ].map((match) => match.groups?.classes ?? "");
+
+        expect(folders).toHaveLength(2);
+        expect(
+          folders.every((classes) =>
+            classes.split(" ").includes("text-muted-foreground")
+          )
+        ).toBeTruthy();
+        expect(markup).toMatch(
+          /<span aria-current="page" class="[^"]*\btext-foreground\b[^"]*"[^>]*>week\.ts<\/span>/u
+        );
+      })
+  );
 });

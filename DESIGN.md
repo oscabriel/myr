@@ -497,7 +497,6 @@ Each rule below is decided in this document (ADR 0039) and not yet in the code; 
 
 - "mentored by" in an ask row's line 2: the row reads an `AskListing`, which carries no mentor, so it waits on the listing gaining one (a contract change in `packages/protocol`): `apps/web/src/features/shared/row.tsx`. Decided, not yet drawn.
 - The head meta line's `files · +n −m` on an answer's subject: the answer page reads an `AnswerView`, which carries no diff stats, so it waits on the view gaining them (a contract change in `packages/protocol`); the commit's head has it. `apps/web/src/features/answer/answer-page.tsx`. Decided, not yet drawn.
-- The path split (directories muted, name ink) in the code file header and the tree's flattened rows: `apps/web/src/features/code/file-header.tsx`, `apps/web/src/features/code/repo-tree.tsx`. Decided, not yet drawn.
 - The `kbd` look in the keys dialog: `apps/web/src/features/shared/keys.tsx`. Decided, not yet drawn.
 
 ## Do's and Don'ts
