@@ -194,16 +194,28 @@ const statesNear = (scheme: Scheme, hue: number) =>
 
 describe.each(["light", "dark"] as const)("the %s scheme", (scheme) => {
   it.each(["foreground", "muted"])(
-    "keeps --%s at 4.5:1 on paper and on the surface",
+    "keeps --%s at 4.5:1 on paper, on the surface and on the pressed surface",
     (text) => {
       expect(contrast(scheme, text, "background")).toBeGreaterThanOrEqual(4.5);
       expect(contrast(scheme, text, "surface")).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(scheme, text, "surface-2")).toBeGreaterThanOrEqual(4.5);
     }
   );
 
-  it.each(STATES)("keeps --%s at 5:1 on paper and on the surface", (state) => {
-    expect(contrast(scheme, state, "background")).toBeGreaterThanOrEqual(5);
-    expect(contrast(scheme, state, "surface")).toBeGreaterThanOrEqual(5);
+  it.each(STATES)(
+    "keeps --%s at 5:1 on paper, on the surface and on the pressed surface",
+    (state) => {
+      expect(contrast(scheme, state, "background")).toBeGreaterThanOrEqual(5);
+      expect(contrast(scheme, state, "surface")).toBeGreaterThanOrEqual(5);
+      expect(contrast(scheme, state, "surface-2")).toBeGreaterThanOrEqual(5);
+    }
+  );
+
+  // A selected row under the pointer is one step past the surface: a step
+  // that can be seen, and never a zone of its own.
+  it("steps the pressed surface just past the surface", () => {
+    expect(contrast(scheme, "surface-2", "surface")).toBeGreaterThan(1);
+    expect(contrast(scheme, "surface-2", "background")).toBeLessThan(1.25);
   });
 
   it("draws a control's border at 3:1 on paper and on the surface", () => {

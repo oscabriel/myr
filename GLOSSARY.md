@@ -16,6 +16,10 @@ _Avoid_: issue template, label
 A commit in a claimant's fork offered to satisfy one ask.
 _Avoid_: pull request, PR, patch, attempt, submission
 
+**Round**:
+One push of an answer that the gate checked: its head commit, the gate's verdict on it, and when. The next push starts the next round, numbered from 1, and a verdict is never read against a later round.
+_Avoid_: revision, iteration, attempt, submission
+
 **Claim**:
 One person's exclusive, expiring right to answer an ask, made of a fork and a scoped token; kept alive only by pushes.
 _Avoid_: lease, lock, assignment
@@ -41,7 +45,7 @@ The shape of an ask's check: redThenGreen, lintToZero, ratchet, migrate, or symb
 
 **Family**:
 A migrate ask whose old name is used in two or more modules, opened as one child ask per module that uses it, each with that module as its territory, plus a delete child that waits on every child and checks the name is gone; the parent closes when its last child lands.
-_Avoid_: epic, subtasks, batch
+_Avoid_: epic, subtasks, batch, stack
 
 **Territory**:
 The module (by default a workspace package) an answer may change.
@@ -73,7 +77,7 @@ The cost-ordered chain of stages that narrows a push to a checked tree or a refu
 _Avoid_: CI, pipeline, merge queue
 
 **Landing**:
-The platform's commit of a checked tree to main, written by the platform with credit trailers. An ask's opening is a landing too: it opens an ask and answers none. So is a project's adoption, its first `main` from the initializer's first push or an import: it answers no ask, has no parent and credits no one.
+The platform's commit of a checked tree to main, written by the platform alone, with credit trailers; when it carries the platform's signature, a clone can prove that without the platform. An ask's opening is a landing too: it opens an ask and answers none. So is a project's adoption, its first `main` from the initializer's first push or an import: it answers no ask, has no parent and credits no one.
 _Avoid_: merge, ship
 
 **Landed SHA**:
@@ -121,12 +125,12 @@ The accountable human who signs an answer; any agent works through their token.
 _Avoid_: contributor (when meaning this role), agent identity
 
 **Decider**:
-A person whose decisions open asks, accept proposals and finish answers for an area.
-_Avoid_: reviewer, approver, owner
+A person whose decisions open asks, accept proposals and finish answers for an area; a path may name several, and may ask that more than one of them agree.
+_Avoid_: reviewer, approver, owner, delegate
 
 **Decision**:
-One choice put to a project's deciders, with its evidence and a safe default that is taken if nobody decides before it expires.
-_Avoid_: approval, vote, review request
+One choice put to a project's deciders, with its evidence and a safe default that is taken if nobody decides before it expires. Where a path asks for more than one decider, the choice takes effect once that many have chosen alike, and waits until then.
+_Avoid_: approval, vote, review request, quorum
 
 **Today**:
 A decider's daily page of open decisions, ordered by expiry and held to their budget; the overflow waits for a later day.
@@ -136,12 +140,12 @@ _Avoid_: inbox, queue, dashboard
 The number of decisions a decider takes per day; a decision past it waits, and one that expires undecided takes its default.
 
 **Vouch**:
-A line in the project's vouch file by which a member admits a person to claim and to submit sealed answers.
-_Avoid_: approval, whitelist
+A line in the project's vouch file by which a member admits a person to claim and to submit sealed answers; it may carry the member's reason and the landing it followed, and it is read as a line, never counted.
+_Avoid_: approval, whitelist, endorsement, trust score
 
 **Denouncement**:
-A line in the project's vouch file that bars a person from making proposals.
-_Avoid_: ban, block
+A line in the project's vouch file that bars a person from making proposals; it is shown as the line it is, never as a warning beside the person's name.
+_Avoid_: ban, block, flag
 
 **Record**:
 A person's landings by area and kind that stayed unreverted for 30 days, used only for trust rules, never shown as a score.
@@ -179,11 +183,11 @@ _Avoid_: hidden test, private test, holdout, sealed test
 The salted SHA-256 root of a held-back suite, printed on every landing it judged.
 
 **Posture**:
-The label the platform computes from a project's visibility config as it stands now: Open, Open with sealed evidence, Open on schedule, Open core, or Source available. A narrowing stands only once a decider accepts it and its notice runs out. Every page and list shows the posture the ledger shows.
+The label the platform computes from a project's visibility config as it stands now: Open, Open with sealed evidence, Open on schedule, Open core, or Source available. A narrowing stands only once a decider accepts it and its notice runs out. Every page and list shows the posture the ledger shows, said once per page.
 _Avoid_: licence (they are different things)
 
 **Ledger**:
-The public, append-only record of a project's layers, counts, commitments, releases and posture changes.
+The public, append-only record of a project's layers, counts, commitments, releases and posture changes; the one record a clone does not yet carry, until the platform writes it as a note on main.
 
 **Env shape**:
 The public schema of a project's environment variables: its committed .env.schema file, in the @env-spec format that varlock reads, which the platform parses from the landed SHA and never resolves.
@@ -227,8 +231,8 @@ _Avoid_: release (a GitHub Release's notes and assets are not git data)
 The config folder's declaration of the project's own commands: setup, doctor, test, checks.
 
 **Gateway**:
-The platform's git endpoint, which holds every storage credential, enforces custody and visibility, and returns refusals in git's own output.
-_Avoid_: remote (alone), proxy
+The platform's git endpoint, which holds every storage credential, enforces custody and visibility, and returns refusals in git's own output; whichever host keeps the repos sits behind it.
+_Avoid_: remote (alone), proxy, knot, seed
 
 **Project skill**:
 The agent skill and AGENTS.md block generated from the run block, whose local check matches the gate.
