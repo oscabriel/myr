@@ -48,9 +48,16 @@ export interface RepoTreeProps {
 
 const NO_STATUS: readonly GitStatusEntry[] = [];
 
-/** The page's own row: its name set heavier than its neighbours'. */
-const SELECTED_CSS =
-  "[data-type='item'][aria-selected='true'] { font-weight: 600; color: var(--foreground); }";
+/**
+ * The page's own row: its name set heavier than its neighbours'. A
+ * flattened row (`src / parse`) mutes the folders it passes through and
+ * keeps its last name in ink, so the name reads first.
+ */
+const TREE_CSS = [
+  "[data-type='item'][aria-selected='true'] { font-weight: 600; color: var(--foreground); }",
+  "[data-item-flattened-subitems] { color: var(--muted); }",
+  "[data-item-flattened-subitem]:last-child { color: var(--foreground); }",
+].join("\n");
 
 /** A folder's id in the tree: its path and a slash. */
 const folderId = (path: string) => `${path}/`;
@@ -97,7 +104,7 @@ export const treeOptionsFor = (
     stickyFolders: true,
     // The selected row's fill is faint on paper: its name in ink at 600
     // says it too.
-    unsafeCSS: SELECTED_CSS,
+    unsafeCSS: TREE_CSS,
   };
 
   if (counts !== undefined) {

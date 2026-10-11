@@ -22,14 +22,21 @@ const wordTone = {
 export const PostureBadge = ({
   label,
   posture,
+  title,
 }: {
   readonly label: string;
   readonly posture: Posture;
+  /** The platform's full label, when the badge says a short form. */
+  readonly title?: string | undefined;
 }) => (
   <StateBadge
     className="text-ui items-start [&>svg]:mt-0.5"
     mark={POSTURE_MARKS[posture]}
-    word={<span data-posture={posture}>{label}</span>}
+    word={
+      <span data-posture={posture} title={title}>
+        {label}
+      </span>
+    }
     wordTone={wordTone[posture]}
   />
 );

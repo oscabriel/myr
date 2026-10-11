@@ -129,6 +129,28 @@ describe(ProvenanceFacts, () => {
     expect(outside).not.toContain("<button");
   });
 
+  it("sets each entry as a label over its value, the block shape every other block has", () => {
+    const markup = markupOf(
+      <ProvenanceFacts entries={verdictProvenance(verdictOf(checking), now)} />
+    );
+
+    const terms = [
+      ...markup.matchAll(/<dt\b[^>]*class="(?<classes>[^"]*)"/gu),
+    ].map((match) => match.groups?.classes ?? "");
+
+    const entries = (
+      markup.match(/<div\b[^>]*data-provenance="[^"]*"[^>]*>/gu) ?? []
+    ).map(
+      (tag) => /class="(?<classes>[^"]*)"/u.exec(tag)?.groups?.classes ?? ""
+    );
+
+    expect(entries).toHaveLength(7);
+    expect(
+      entries.every((classes) => classes.split(" ").includes("flex-col"))
+    ).toBeTruthy();
+    expect(terms.some((classes) => /\bw-\d+\b/u.test(classes))).toBeFalsy();
+  });
+
   it("shortens a hash named by its algorithm, keeping the algorithm", () => {
     const markup = markupOf(
       <ProvenanceFacts entries={[{ label: "Suite", value: suite }]} />

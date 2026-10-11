@@ -360,7 +360,7 @@ Square. The radius is 2 px (`--radius: 0.125rem`), and shadcn's base-lyra compon
 ### Rail (`Rail`)
 
 - **Character:** where you are, always in the same place.
-- **Shape:** the wordmark row (44 px, linking `/`, the landing); the site's sections, each a 32 px row of a 16 px mark and its word (Home, Asks at `/asks`, Today with the count of decisions waiting for a signed-in decider, Docs, For agents); "Projects" over one 32 px row per project, its posture's mark and one short word at the row's end (the same short form the project's head uses, from `posture-label.ts`; "Sealed" in the rail where the head says "Open with sealed evidence" is the thing to fix, not a second form); the current project's sections indented under it (Asks with its open count, Code, Landings, Refs, Policy, Ledger, Env shape); "All projects" opening the switcher after the first eight; the session (handle or Sign in) and a Keys button pinned at the foot.
+- **Shape:** the wordmark row (44 px, linking `/`, the landing); the site's sections, each a 32 px row of a 16 px mark and its word (Home, Asks at `/asks`, Today with the count of decisions waiting for a signed-in decider, Docs, For agents); "Projects" over one 32 px row per project, its posture's mark and one short word at the row's end (`postureWord` in `posture-label.ts`, the same short form the project's head says, such as "Sealed evidence", the platform's full label its title); the current project's sections indented under it (Asks with its open count, Code, Landings, Refs, Policy, Ledger, Env shape); "All projects" opening the switcher after the first eight; the session (handle or Sign in) and a Keys button pinned at the foot.
 - **Current item:** the surface fill, ink at 600, `aria-current`. Never a coloured bar or an accent.
 - **Code form:** a route that fills the rail's slot (`staticData.rail`: the tree on tree, blob and why; the changed files on a commit and a finish) folds the site's sections and projects into a Menu button on the wordmark row and the project's sections into a one-line disclosure, and the slot fills the rest.
 
@@ -495,15 +495,8 @@ shadcn 4.21.2, style `base-lyra` on Base UI, in `src/components/ui/` (generated,
 
 Each rule below is decided in this document (ADR 0039) and not yet in the code; the build issues are cut from this list, and an item leaves it when its file changes.
 
-- The inspector at 20 rem from `shell` and 22 rem from `codefacts`: `apps/web/src/features/shared/shell/workspace.tsx` (its `w-[19rem]`). Decided, not yet drawn.
-- The command line's bleed form in the inspector (pane-wide, hairlines top and bottom, a 28 px icon-only Copy) and the 2ch hang there, 6ch in main: `apps/web/src/features/shared/command.tsx`. Decided, not yet drawn.
-- The row's state word in ink at 500 except Refused and Landed (`wordTone`), the time slot filled on every ask row, "round n" and "mentored by" in line 2, the two-line want below `tablet`, the pressed surface on a selected row under the pointer, and held-for-newcomers read before takeable (`askState`): `apps/web/src/features/shared/row.tsx`. Decided, not yet drawn.
-- The head meta line's `files · +n −m` on answer and commit subjects: `apps/web/src/features/shared/status-line.tsx` and the answer and commit heads. Decided, not yet drawn.
-- Provenance in the one block shape, the Rounds block removed from the inspector, the front page's Projects block as counts only, and the held-back roots shortened: `apps/web/src/features/shared/facts.tsx`. Decided, not yet drawn.
-- The Rounds region, the waiting sentence and the Landing region's sentence-first order with "The landing commit" as its onward link: `apps/web/src/features/answer/answer-page.tsx`; "Credit" at Title weight there: `apps/web/src/features/shared/credits.tsx`. Decided, not yet drawn.
-- The project head's one rule sentence, the How a change lands block without its Posture, and one short posture form for the rail and the head: `apps/web/src/features/project/project-page.tsx`, `apps/web/src/features/project/posture-label.ts`, `apps/web/src/features/shared/posture.tsx`. Decided, not yet drawn.
-- The path split (directories muted, name ink) in the code file header and the tree's flattened rows: `apps/web/src/features/code/file-header.tsx`, `apps/web/src/features/code/repo-tree.tsx`. Decided, not yet drawn.
-- The `kbd` look in the keys dialog: `apps/web/src/features/shared/keys.tsx`. Decided, not yet drawn.
+- "mentored by" in an ask row's line 2: the row reads an `AskListing`, which carries no mentor, so it waits on the listing gaining one (a contract change in `packages/protocol`): `apps/web/src/features/shared/row.tsx`. Decided, not yet drawn.
+- The head meta line's `files · +n −m` on an answer's subject: the answer page reads an `AnswerView`, which carries no diff stats, so it waits on the view gaining them (a contract change in `packages/protocol`); the commit's head has it. `apps/web/src/features/answer/answer-page.tsx`. Decided, not yet drawn.
 
 ## Do's and Don'ts
 

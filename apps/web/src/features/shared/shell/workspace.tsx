@@ -21,6 +21,7 @@ import { Suspense, useState } from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "../../../components/ui/button.tsx";
+import { InspectorCommands } from "../command.tsx";
 import { CommandSlotProvider } from "../keys.tsx";
 import { ContextBar } from "./context-bar.tsx";
 import { LazyFactsSheet } from "./lazy-overlays.ts";
@@ -288,7 +289,7 @@ const WorkspaceView = ({
       {hasFacts ? (
         <aside
           aria-label="Facts"
-          className={`border-rule bg-background h-dvh w-[19rem] shrink-0 flex-col overflow-y-auto overscroll-contain border-l ${
+          className={`border-rule bg-background codefacts:w-[22rem] h-dvh w-[20rem] shrink-0 flex-col overflow-y-auto overscroll-contain border-l ${
             code ? "codefacts:flex hidden" : "shell:flex hidden"
           }`}
           data-facts="inspector"
@@ -297,7 +298,9 @@ const WorkspaceView = ({
           <CommandSlotProvider slot="facts">
             <FactsHeading heading={factsHeading} />
             <div className="flex flex-col px-4 py-4">
-              <Settling id={factsKey}>{facts}</Settling>
+              <InspectorCommands>
+                <Settling id={factsKey}>{facts}</Settling>
+              </InspectorCommands>
             </div>
           </CommandSlotProvider>
         </aside>

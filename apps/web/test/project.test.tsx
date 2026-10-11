@@ -40,6 +40,7 @@ import { devServer } from "../src/dev/server.ts";
 import { ledeOf } from "../src/features/front/head.ts";
 import { stampStep } from "../src/features/front/stamps.ts";
 import { recentShown } from "../src/features/project/landings.tsx";
+import { postureWord } from "../src/features/project/posture-label.ts";
 import {
   ProjectView,
   heldBackOf,
@@ -48,6 +49,7 @@ import {
 import type { ProjectViewProps } from "../src/features/project/project-page.tsx";
 import { UnknownProjectView } from "../src/features/project/unknown-project.tsx";
 import { askStates } from "../src/features/shared/ask-progress.ts";
+import { PostureMark } from "../src/features/shared/shell/rail.tsx";
 import {
   ProjectPageData,
   readProjectPage,
@@ -334,7 +336,7 @@ describe(ProjectView, () => {
   );
 
   it.effect(
-    "says its posture once, in the platform's words, then its open asks and when it last landed",
+    "says its posture once, in the short form the rail uses, the platform's words in its title, then its open asks",
     () =>
       Effect.gen(function* () {
         const markup = yield* page({
@@ -346,19 +348,53 @@ describe(ProjectView, () => {
           markup.indexOf('id="open-asks"')
         );
 
+        const rail = markupOf(<PostureMark posture="openWithSealedEvidence" />);
+
         expect(head).toContain('data-posture="openWithSealedEvidence"');
-        expect(textIn(head)).toContain(
-          "Open with sealed evidence · sealed checks in export"
+        expect(textIn(head)).toMatch(
+          new RegExp(
+            `${postureWord("openWithSealedEvidence")}\\s*·\\s*5 open asks`,
+            "u"
+          )
         );
-        expect(textIn(head)).toContain("5 open asks");
-        expect(textIn(head)).toContain("last landed 1 d ago");
+        expect(textIn(rail)).toContain(postureWord("openWithSealedEvidence"));
+        expect(head).toContain(
+          'title="Open with sealed evidence · sealed checks in export"'
+        );
         // The delete child waits on its siblings, so it is not counted open yet.
         expect(textIn(markup)).toContain("5 open asks, 2 open to take");
       })
   );
 
   it.effect(
-    "says how a change lands here: the posture, the gate, who decides, what is held back",
+    "states how a change lands in one rule sentence under the head, from typed facts, the ledger linked",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* page({
+          deciders: [
+            {
+              handles: [Handle.make("ines-v")],
+              paths: Glob.make("src/**"),
+            },
+          ],
+          heldBack: heldBackOf(vellumLedger),
+        });
+
+        const rule =
+          /<p\b[^>]*data-rule=""[^>]*>[\s\S]*?<\/p>/u.exec(
+            mainOf(markup)
+          )?.[0] ?? "";
+
+        expect(textIn(rule)).toBe(
+          "Gate: 7 stages · deciders set for 1 path · 7 sealed checks in 1 area · last landed 1 d ago"
+        );
+        expect(rule).toContain('href="/oscabriel/datekit/ledger"');
+        expect(inspectorOf(markup)).not.toContain("data-posture=");
+      })
+  );
+
+  it.effect(
+    "says how a change lands here: the gate, who decides, what is held back",
     () =>
       Effect.gen(function* () {
         const facts = inspectorOf(
@@ -742,7 +778,7 @@ describe("the project's home as the server sends it", () => {
 
         expect(yield* Ref.get(listed)).toBe(0);
         expect(head).toContain('data-posture="openWithSealedEvidence"');
-        expect(textIn(head)).toContain("Open with sealed evidence");
+        expect(head).toContain('title="Open with sealed evidence');
       }),
     seededWorld
   );

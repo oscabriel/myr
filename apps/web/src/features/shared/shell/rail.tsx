@@ -35,7 +35,7 @@ import type { ReactNode } from "react";
 import { Button } from "../../../components/ui/button.tsx";
 import { Skeleton } from "../../../components/ui/skeleton.tsx";
 import { SessionSlot } from "../../auth/session-slot.tsx";
-import { postureLabel } from "../../project/posture-label.ts";
+import { postureLabel, postureWord } from "../../project/posture-label.ts";
 import { AppLink } from "../link.tsx";
 import { POSTURE_MARKS } from "../mark-look.ts";
 import { ASKS_PATH, docsPath, HOME_PATH } from "../paths.ts";
@@ -46,7 +46,7 @@ import {
   useTodayCount,
 } from "./context.ts";
 import { RailSlotOutlet, useRailContent } from "./rail-slot.tsx";
-import { POSTURE_WORD, projectSections, sectionOf } from "./sections.ts";
+import { projectSections, sectionOf } from "./sections.ts";
 
 /** A row of the rail, before the fill that marks the current one. */
 const RAIL_BASE =
@@ -123,7 +123,7 @@ const SiteSections = () => (
   </ul>
 );
 
-/** A project's posture at its row's end: the mark in its role, a short word muted, the full label as its title. */
+/** A project's posture at its row's end: the mark in its role, its short form muted (the head's), the full label as its title. */
 export const PostureMark = ({ posture }: { readonly posture: Posture }) => {
   const { icon: Icon, tone } = POSTURE_MARKS[posture];
 
@@ -138,7 +138,7 @@ export const PostureMark = ({ posture }: { readonly posture: Posture }) => {
         className={`size-3.5 ${tone}`}
         strokeWidth={1.75}
       />
-      {POSTURE_WORD[posture]}
+      {postureWord(posture)}
       <span className="sr-only">: {postureLabel(posture)}</span>
     </span>
   );

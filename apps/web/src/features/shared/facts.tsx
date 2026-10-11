@@ -6,7 +6,7 @@
  * Blocks never repeat the page's prose: they hold the facts it refers to.
  *
  * The blocks every page shares are here (State, Take it, Claim, Gate,
- * Posture, Held back, Family, Territory and check, Rounds, Credit,
+ * Posture, Held back, Family, Territory and check, Credit,
  * Provenance); a block only one page has is that page's own.
  */
 import { Brand } from "@repo/brand";
@@ -17,13 +17,7 @@ import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { StageName } from "@repo/protocol/domain/outcome";
 import type { Outcome } from "@repo/protocol/domain/outcome";
-import type {
-  AreaName,
-  AskId,
-  CommitSha,
-  Handle,
-  ProjectName,
-} from "@repo/protocol/ids";
+import type { AreaName, Handle, ProjectName } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
 import { DateTime, Match } from "effect";
 import { ChevronDown, LockKeyhole } from "lucide-react";
@@ -31,7 +25,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { blobHref, shortSha, treeHref } from "../code/paths.ts";
-import type { AskProgress, Round } from "./ask-progress.ts";
+import type { AskProgress } from "./ask-progress.ts";
 import { CommandLine } from "./command.tsx";
 import { CopyAction } from "./copy-action.tsx";
 import { CreditTrailers } from "./credits.tsx";
@@ -42,9 +36,9 @@ import { StateMarkIcon } from "./marks.tsx";
 import type { StateMark } from "./marks.tsx";
 import { stageStates } from "./outcome.tsx";
 import type { StageHolds, StageState } from "./outcome.tsx";
-import { answerPath, ledgerPath } from "./paths.ts";
+import { ledgerPath } from "./paths.ts";
 import { PostureBadge } from "./posture.tsx";
-import { MetaCode, Row } from "./row.tsx";
+import { MetaCode } from "./row.tsx";
 import { StatusLine, readStatus, stageNames } from "./status-line.tsx";
 import type { StatusSubject } from "./status-line.tsx";
 import { When } from "./time.tsx";
@@ -525,52 +519,6 @@ export const TerritoryFacts = ({ ask }: { readonly ask: Ask }) => (
   </FactBlock>
 );
 
-/** An outcome's mark and word in a round's row. */
-const roundState = (outcome: Outcome) =>
-  readStatus({ kind: "answer", outcome });
-
-/** Every answer to an ask, one row each, oldest first; the one on the page marked. */
-export const RoundsFacts = ({
-  ask,
-  current,
-  now,
-  project,
-  rounds,
-}: {
-  readonly ask: AskId;
-  readonly project: ProjectName;
-  readonly rounds: readonly Round[];
-  /** The head the page shows. */
-  readonly current?: CommitSha;
-  readonly now: DateTime.Utc;
-}) => (
-  <FactBlock label="Rounds">
-    {rounds.length === 0 ? (
-      <p className="text-ui text-muted-foreground">No answer checked yet.</p>
-    ) : (
-      <ul className="flex flex-col">
-        {rounds.map(({ at, head, outcome }, index) => {
-          const { lead, mark } = roundState(outcome);
-
-          return (
-            <Row
-              href={answerPath(project, ask)}
-              id={head}
-              key={`${head}:${DateTime.formatIso(at)}`}
-              meta={<CodeValue value={head} />}
-              search={{ head }}
-              selected={head === current}
-              size="one-line"
-              state={{ mark, time: <When at={at} now={now} />, word: lead }}
-              title={`Round ${index + 1}`}
-            />
-          );
-        })}
-      </ul>
-    )}
-  </FactBlock>
-);
-
 /** A landing's credit as the commit carries it, the agents apart. */
 export const CreditFacts = (props: {
   readonly assisted: readonly AgentTrailer[];
@@ -659,13 +607,17 @@ export const ProvenanceFacts = ({
           strokeWidth={1.75}
         />
       </button>
-      <dl className={`${open ? "flex" : "shell:flex hidden"} flex-col`}>
+      <dl className={`${open ? "flex" : "shell:flex hidden"} flex-col gap-1.5`}>
         {entries.map(({ label, shown, value }) => (
-          <div className="flex min-h-8 min-w-0 items-center gap-3" key={label}>
-            <dt className="text-label text-muted-foreground w-24 shrink-0">
-              {label}
-            </dt>
-            <dd className="text-ui flex min-w-0 flex-1 items-center gap-3">
+          // A label over its value, as every block is: never a key and
+          // value grid.
+          <div
+            className="flex min-w-0 flex-col"
+            data-provenance={label}
+            key={label}
+          >
+            <dt className="text-label text-muted-foreground">{label}</dt>
+            <dd className="text-ui flex min-h-8 min-w-0 items-center gap-3">
               <span className="min-w-0 flex-1 truncate">
                 {shown ?? <CodeValue value={value} />}
               </span>

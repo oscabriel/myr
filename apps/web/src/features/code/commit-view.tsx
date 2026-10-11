@@ -119,10 +119,12 @@ const GitLine = ({
   commit,
   now,
   project,
+  stats,
 }: {
   readonly commit: Commit;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
+  readonly stats: DiffStats;
 }) => (
   <span className="[overflow-wrap:anywhere]">
     authored by {commit.author.name} <When at={commit.author.at} now={now} />
@@ -152,6 +154,17 @@ const GitLine = ({
     <AppLink className={LINK} to={treeHref(project, commit.sha)}>
       Browse files
     </AppLink>
+    {" · "}
+    <a
+      className="inline-flex items-baseline gap-[1ch] no-underline hover:underline"
+      href="#diff"
+    >
+      <span className="tabular-nums">
+        {stats.files} {stats.files === 1 ? "file" : "files"}
+      </span>
+      <span aria-hidden="true">·</span>
+      <ChangeCounts additions={stats.additions} deletions={stats.deletions} />
+    </a>
   </span>
 );
 
@@ -400,7 +413,9 @@ export const CommitView = ({
       factsHeading={
         commit.landing === undefined ? "This commit" : "This landing"
       }
-      meta={<GitLine commit={commit} now={now} project={project} />}
+      meta={
+        <GitLine commit={commit} now={now} project={project} stats={stats} />
+      }
       state={
         commit.landing === undefined ? undefined : (
           <span className="flex items-center gap-1.5">
@@ -448,7 +463,7 @@ export const CommitView = ({
           </p>
         </div>
       ) : null}
-      <DiffPane>
+      <DiffPane id="diff">
         {drawing ?? (
           <div className={PANE_SCROLLER}>
             <PlainDiff

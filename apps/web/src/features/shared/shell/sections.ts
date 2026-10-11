@@ -5,7 +5,6 @@
  * so one address names one place everywhere.
  */
 import { projectAddressOf } from "@repo/protocol/ids";
-import type { Posture } from "@repo/protocol/posture";
 import { Option } from "effect";
 
 import { segmentsOf } from "../paths.ts";
@@ -244,12 +243,3 @@ export const crumbsFor = (pathname: string): readonly Crumb[] => {
       ]
     : projectCrumbs(project, tab, false);
 };
-
-/** A posture in one short word for the rail, beside its mark; the full label is its title. */
-export const POSTURE_WORD = {
-  open: "Open",
-  openCore: "Core",
-  openOnSchedule: "Scheduled",
-  openWithSealedEvidence: "Sealed",
-  sourceAvailable: "Source",
-} as const satisfies Record<Posture, string>;

@@ -116,6 +116,17 @@ describe("the file tree", () => {
     expect(opened).toStrictEqual([]);
   });
 
+  it("sets a flattened row's leading folders muted and its last name in ink, so the name reads first", () => {
+    const css = treeOptionsFor({ paths: PATHS }).unsafeCSS ?? "";
+
+    expect(css).toMatch(
+      /\[data-item-flattened-subitems\]\s*\{[^}]*color:\s*var\(--muted\)/u
+    );
+    expect(css).toMatch(
+      /\[data-item-flattened-subitem\]:last-child\s*\{[^}]*color:\s*var\(--foreground\)/u
+    );
+  });
+
   it("keeps its filter outside the tree, which holds only rows", () => {
     const { tree } = treeAt("src/parse.ts");
 

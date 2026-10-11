@@ -6,24 +6,49 @@
 // each shows its number before the `$`, and that number key copies it
 // ("Copy (1)" in the button's title).
 import { Check, Copy } from "lucide-react";
+import { createContext, useContext } from "react";
+import type { ReactNode } from "react";
 
 import { Button } from "../../components/ui/button.tsx";
 import { useCopy } from "./copy-action.tsx";
 import { useNumberedCommand } from "./keys.tsx";
 
-/** How far a line of the command hangs, in ch, when the column breaks it. */
-const HANG = 6;
+/**
+ * Where a command line is drawn: a box hugging its command in main, or
+ * the inspector's bleed form, pane-wide between two hairlines, where the
+ * column is narrow and every character of the line counts.
+ */
+type Form = "bleed" | "box";
+
+const FormContext = createContext<Form>("box");
+
+/** Command lines under it take the inspector's bleed form. */
+export const InspectorCommands = ({
+  children,
+}: {
+  readonly children: ReactNode;
+}) => <FormContext value="bleed">{children}</FormContext>;
+
+/** How far a line of the command hangs, in ch, when the column breaks it: less in the inspector's narrow column. */
+const HANGS = { bleed: 2, box: 6 } as const satisfies Record<Form, number>;
+
+/** The box around the command, in each form. */
+const BOXES = {
+  bleed:
+    "border-rule bg-surface text-mono leading-terminal -mx-4 flex min-w-0 items-start gap-2 border-y py-1 pr-1 pl-4 font-mono",
+  box: "border-rule bg-surface text-mono leading-terminal flex w-fit max-w-full min-w-0 items-start gap-2 border py-1 pr-1 pl-3 font-mono",
+} as const satisfies Record<Form, string>;
 
 /**
- * A line's hang: 6ch, or less on a line so short that its longest word
+ * A line's hang: `hang` ch, or less on a line so short that its longest word
  * would not fit beside the hang. The box hugs its longest line, so a line's
  * room beside its hang is its own length less the hang; a word wider than
  * that room is broken in two (`<cli> today` read "tod" / "<cli> ay"). Such a
  * line fits whole wherever its box does, so its hang never shows.
  */
-const hangOf = (words: readonly string[], line: string) =>
+const hangOf = (hang: number, words: readonly string[], line: string) =>
   Math.min(
-    HANG,
+    hang,
     line.length - Math.max(0, ...words.map(({ length }) => length))
   );
 
@@ -33,11 +58,12 @@ const hangOf = (words: readonly string[], line: string) =>
 // longer than the line (a URL) still breaks, anywhere. Each of the
 // command's own lines hangs, so a line the column breaks reads as one line
 // going on. The text is the command's, space for space.
-const wordsOf = (command: string) =>
+const wordsOf = (command: string, form: Form) =>
   command.split("\n").map((line, at, lines) => {
     const parts = line.split(/(?<space>\s+)(?!\\$)/u);
 
     const hang = hangOf(
+      HANGS[form],
       parts.filter((part) => part.trim() !== ""),
       line
     );
@@ -74,9 +100,11 @@ const Line = ({
   readonly number: number | undefined;
 }) => {
   const { copied, copy } = useCopy(command);
+  const form = useContext(FormContext);
+  const bleed = form === "bleed";
 
   return (
-    <div className="border-rule bg-surface text-mono leading-terminal flex w-fit max-w-full min-w-0 items-start gap-2 border py-1 pr-1 pl-3 font-mono">
+    <div className={BOXES[form]} data-form={form}>
       {number === undefined ? null : (
         <span
           aria-hidden="true"
@@ -89,18 +117,22 @@ const Line = ({
         $
       </span>
       <code className="min-w-0 flex-1 py-0.5 whitespace-pre-wrap select-all">
-        {wordsOf(command)}
+        {wordsOf(command, form)}
       </code>
       <Button
         className="shrink-0 font-sans"
         onClick={copy}
-        size="sm"
+        size={bleed ? "icon-sm" : "sm"}
         title={number === undefined ? undefined : `Copy (${number})`}
         type="button"
         variant="ghost"
       >
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-        <span className="sr-only sm:not-sr-only @max-xs:sr-only">
+        <span
+          className={
+            bleed ? "sr-only" : "sr-only sm:not-sr-only @max-xs:sr-only"
+          }
+        >
           {copied ? "Copied" : "Copy"}
         </span>
       </Button>

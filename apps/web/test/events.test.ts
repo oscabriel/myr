@@ -153,7 +153,7 @@ describe(askStates, () => {
     ).toStrictEqual(once);
   });
 
-  it("knows an ask from its opening on", () => {
+  it("knows an ask from its opening on, and when it was opened", () => {
     const states = askStates([
       ProjectEvent.cases.AskOpened.make({
         ask: {
@@ -169,7 +169,11 @@ describe(askStates, () => {
       }),
     ]);
 
-    expect(states.get(ask)).toStrictEqual({ lastSeq: 4, rounds: [] });
+    expect(states.get(ask)).toStrictEqual({
+      lastSeq: 4,
+      opened: at,
+      rounds: [],
+    });
   });
 });
 

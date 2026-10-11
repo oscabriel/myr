@@ -38,6 +38,8 @@ export interface AskProgress {
    * speaks for it (its round stays in `rounds`).
    */
   readonly latest?: Outcome;
+  /** When it was opened, once the events say so. */
+  readonly opened?: DateTime.Utc;
   /** Every answer checked, oldest first. */
   readonly rounds: readonly Round[];
 }
@@ -104,8 +106,8 @@ const apply = (states: Map<AskId, AskProgress>, event: ProjectEvent): void => {
         landed: { seq, sha: landing },
       }));
     },
-    AskOpened: ({ ask }) => {
-      change(ask.ask, identity);
+    AskOpened: ({ ask, at }) => {
+      change(ask.ask, (progress) => ({ ...progress, opened: at }));
     },
     Claimed: ({ ask, claimant }) => {
       change(ask, (progress) => ({ ...startedOver(progress), claimant }));

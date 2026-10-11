@@ -1040,6 +1040,25 @@ describe(CommitView, () => {
     expect(text).toContain(`parent ${IMPORTED.slice(0, 7)}`);
   });
 
+  it("ends its head's meta line with the files and lines it changed, linking the diff", () => {
+    const markup = markupOf(page);
+
+    const meta =
+      /<div class="text-ui text-muted-foreground">[\s\S]*?<\/div>/u.exec(
+        markup
+      )?.[0] ?? "";
+
+    expect(
+      meta
+        .replaceAll(/<[^>]+>/gu, " ")
+        .replaceAll(/\s+/gu, " ")
+        .trim()
+    ).toMatch(/Browse files · \d+ files? · \+\d+ added −\d+ removed$/u);
+    expect(meta).toMatch(/<a\b[^>]*href="#diff"/u);
+    expect(meta).toContain("text-diff-add-sign");
+    expect(markup).toMatch(/<div\b[^>]*id="diff"/u);
+  });
+
   it("sends each changed file's diff as plain text, at the drawing's measures", () => {
     const markup = markupOf(page);
 

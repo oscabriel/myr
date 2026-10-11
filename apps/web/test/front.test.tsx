@@ -400,6 +400,26 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
+    "lists the projects in the inspector by their counts, leaving the posture to the group headers",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* front({});
+
+        const inspector = markup.slice(
+          markup.indexOf('data-facts="inspector"')
+        );
+
+        const block =
+          /<section aria-label="Projects"[\s\S]*?<\/section>/u.exec(
+            inspector
+          )?.[0] ?? "";
+
+        expect(textIn(block)).toContain("open ask");
+        expect(block).not.toContain("data-posture=");
+      })
+  );
+
+  it.effect(
     "draws its rows when the list of projects has not arrived, with no posture yet",
     () =>
       Effect.gen(function* () {
@@ -411,7 +431,7 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "marks an ask the viewer may not take with the reason, and no command",
+    "says an ask held for newcomers is held for them whoever reads it, with no command for a viewer who may not take it",
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
@@ -419,7 +439,7 @@ describe(FrontPageView, () => {
 
         expect(row).toContain('data-takeable="false"');
         expect(textIn(row)).toMatch(
-          /Not open to you[\s\S]*held for newcomers/u
+          /^(?!.*Not open to you).*Held for newcomers/su
         );
         expect(row).not.toContain("Open to take");
         expect(row).not.toContain(`${Brand.cli} claim explain-iso-week`);
@@ -495,7 +515,7 @@ describe(FrontPageView, () => {
   );
 
   it.effect(
-    "with nothing selected, says where to start and lists every project with its posture",
+    "with nothing selected, says where to start and lists every project with its open asks",
     () =>
       Effect.gen(function* () {
         const markup = yield* front({});
@@ -511,10 +531,10 @@ describe(FrontPageView, () => {
         ).toStrictEqual([]);
         expect(facts).toContain('href="/llms.txt"');
         expect(facts).toMatch(
-          /href="\/oscabriel\/burrow"[\s\S]*?1 open ask\b[\s\S]*?Open with sealed evidence/u
+          /href="\/oscabriel\/burrow"[\s\S]*?1 open ask\b/u
         );
         expect(facts).toMatch(
-          /href="\/oscabriel\/datekit"[\s\S]*?2 open asks[\s\S]*?>Open</u
+          /href="\/oscabriel\/datekit"[\s\S]*?2 open asks/u
         );
       })
   );
