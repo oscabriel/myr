@@ -25,7 +25,7 @@ const MARKDOWN = "text/markdown";
 
 /**
  * Where an ask's brief is read: `<scheme>ask/<key>/<ask>`, by the
- * project's key (`datekit`, `alice_datekit`): a resource template's
+ * project's key (`datekit`, `alice__datekit`): a resource template's
  * parameter is one segment, and a name has two or three (ADR 0032).
  */
 const briefUri = (project: ProjectName, ask: AskId) =>

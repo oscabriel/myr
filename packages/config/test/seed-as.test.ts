@@ -75,7 +75,7 @@ describe(renameSeedPlan, () => {
             files: files.length,
             knownBad: knownBad.map(({ commit }) => commit),
             layer,
-            repo: `oscabriel_datekit-copy-2--${layer}`,
+            repo: `oscabriel__datekit-copy-2--${layer}`,
           }))
         );
 
@@ -164,7 +164,7 @@ describe("bun scripts/seed.ts --as", () => {
           "OpenAsk oscabriel/datekit-copy/add-months-clamp: done",
           "OpenAsk oscabriel/datekit-copy/format-ordinal: done",
           "OpenAsk oscabriel/datekit-copy/parse-iso-week: done",
-          "Layer oscabriel_datekit-copy--maintainers: done",
+          "Layer oscabriel__datekit-copy--maintainers: done",
         ]);
       }),
     120_000
@@ -229,14 +229,14 @@ describe(recordCopy, () => {
             at,
             by: "seed",
             kind: "project",
-            name: "oscabriel_datekit-copy",
+            name: "oscabriel__datekit-copy",
             stage: "dev-oscabriel",
           },
           {
             at,
             by: "seed",
             kind: "repo",
-            name: "oscabriel_datekit-copy",
+            name: "oscabriel__datekit-copy",
             namespace: "projects-dev-oscabriel",
             stage: "dev-oscabriel",
           },
@@ -244,7 +244,7 @@ describe(recordCopy, () => {
             at,
             by: "seed",
             kind: "repo",
-            name: "oscabriel_datekit-copy--maintainers",
+            name: "oscabriel__datekit-copy--maintainers",
             namespace: "layers-dev-oscabriel",
             stage: "dev-oscabriel",
           },

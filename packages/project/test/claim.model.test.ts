@@ -38,7 +38,7 @@ const policy = { lapseAfterMs: 24 * HOUR, warnAfterMs: 2 * HOUR };
 
 const project = ProjectName.make("alice/datekit");
 
-const canonical = RepoName.make("alice_datekit");
+const canonical = RepoName.make("alice__datekit");
 
 const ask = AskId.make("parse-iso");
 

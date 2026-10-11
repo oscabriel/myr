@@ -34,11 +34,11 @@ const burrow = ProjectName.make("dora/burrow");
 /** Listed by the front page, but never made. */
 const ghost = ProjectName.make("alice/ghost");
 
-const skillPath = ".agents/skills/dora_datekit-contribute/SKILL.md";
+const skillPath = ".agents/skills/dora__datekit-contribute/SKILL.md";
 
 const skill = [
   "---",
-  "name: dora_datekit-contribute",
+  "name: dora__datekit-contribute",
   `description: "Answer one of datekit's asks."`,
   "---",
   "# Contribute to datekit",
@@ -49,7 +49,7 @@ const skill = [
 
 /** `sha256sum` of `skill`, worked out apart from the platform. */
 const skillDigest =
-  "sha256:57d83c7a661d93340b2c3fbf4f524e0a0e28bddf7914b740aff5cbe3b35333ac";
+  "sha256:07b4246a86d79a7a0d0975e5e0b32f6f12b10a8e2cd5fad3188722e26b841f52";
 
 const Index = Schema.fromJsonString(
   Schema.Struct({
@@ -133,16 +133,16 @@ describe("the agent skills index", () => {
             {
               description: "Answer one of datekit's asks.",
               digest: skillDigest,
-              name: "dora_datekit-contribute",
+              name: "dora__datekit-contribute",
               type: "skill-md",
-              url: "/.well-known/agent-skills/dora_datekit-contribute/SKILL.md",
+              url: "/.well-known/agent-skills/dora__datekit-contribute/SKILL.md",
             },
           ],
         });
 
         expect(
           yield* get(
-            "/.well-known/agent-skills/dora_datekit-contribute/SKILL.md"
+            "/.well-known/agent-skills/dora__datekit-contribute/SKILL.md"
           )
         ).toStrictEqual({
           body: skill,
@@ -160,7 +160,7 @@ describe("the agent skills index", () => {
         expect(
           yield* Effect.forEach(
             [
-              "/.well-known/agent-skills/dora_burrow-contribute/SKILL.md",
+              "/.well-known/agent-skills/dora__burrow-contribute/SKILL.md",
               "/.well-known/agent-skills/ghost-contribute/SKILL.md",
               "/.well-known/agent-skills/datekit/SKILL.md",
               "/.well-known/agent-skills/Datekit-contribute/SKILL.md",
@@ -169,7 +169,7 @@ describe("the agent skills index", () => {
             (path) => Effect.map(get(path), ({ status }) => [path, status])
           )
         ).toStrictEqual([
-          ["/.well-known/agent-skills/dora_burrow-contribute/SKILL.md", 404],
+          ["/.well-known/agent-skills/dora__burrow-contribute/SKILL.md", 404],
           ["/.well-known/agent-skills/ghost-contribute/SKILL.md", 404],
           ["/.well-known/agent-skills/datekit/SKILL.md", 404],
           ["/.well-known/agent-skills/Datekit-contribute/SKILL.md", 404],
@@ -231,7 +231,7 @@ describe(agentSkills, () => {
 
         expect({
           file: (yield* at(
-            "/.well-known/agent-skills/dora_datekit-contribute/SKILL.md"
+            "/.well-known/agent-skills/dora__datekit-contribute/SKILL.md"
           )).body,
           skills: skills.map(({ description, digest }) => ({
             description,

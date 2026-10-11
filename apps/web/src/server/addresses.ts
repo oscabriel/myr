@@ -22,27 +22,15 @@ import {
   sourceHosts,
 } from "@repo/protocol/ids";
 import type { LocationRewrite } from "@tanstack/react-router";
-import { Option, Result, Schema } from "effect";
+import { Option, Schema } from "effect";
+
+import { segmentsOf } from "../features/shared/paths.ts";
 
 const isSourceHost = (segment: string) =>
   sourceHosts.some((host) => host === segment.toLowerCase());
 
 const isReserved = (segment: string) =>
   reservedProjectNames.some((reserved) => reserved === segment.toLowerCase());
-
-/** `segment` decoded, or as it came when it does not decode. */
-const decoded = (segment: string) =>
-  Result.getOrElse(
-    Result.try(() => decodeURIComponent(segment)),
-    () => segment
-  );
-
-/** A pathname's segments, decoded, the empty ones dropped. */
-const segmentsOf = (pathname: string) =>
-  pathname
-    .split("/")
-    .filter((segment) => segment !== "")
-    .map(decoded);
 
 /** `/github.com/pallets/…` as the route tree reads it: the owner in one segment. */
 const intoTree = (pathname: string) => {

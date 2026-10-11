@@ -96,11 +96,11 @@ describe("an admission's start", () => {
           }))
         ).toStrictEqual([
           {
-            id: `admit-alice_datekit-maintainers-${head}`,
+            id: `admit-alice__datekit-maintainers-${head}`,
             params: admissionOf(head),
           },
           {
-            id: `admit-alice_datekit-maintainers-${later}`,
+            id: `admit-alice__datekit-maintainers-${later}`,
             params: admissionOf(later),
           },
         ]);

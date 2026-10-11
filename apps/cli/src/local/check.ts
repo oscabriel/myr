@@ -192,7 +192,7 @@ const subjectOf = (
 
     if (Option.isNone(project)) {
       return yield* stop(
-        "No project: this repo has no remote on the platform. Name it with --project <name>."
+        "No project: this repo has no remote on the platform. Name it with --project <owner>/<name>."
       );
     }
 

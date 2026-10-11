@@ -54,7 +54,7 @@ const bob = Handle.make("Bob");
 const carol = Handle.make("carol");
 
 /** Bob's fork: his handle in lowercase. */
-const fork = RepoName.make("alice_datekit--parse-iso--bob");
+const fork = RepoName.make("alice__datekit--parse-iso--bob");
 
 const start = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
@@ -108,7 +108,7 @@ describe("claiming an ask", () => {
     expect(transition(open, claimBy(bob), start, policy)).toStrictEqual(
       step(live, [
         ClaimEffect.MakeFork({
-          from: RepoName.make("alice_datekit"),
+          from: RepoName.make("alice__datekit"),
           name: fork,
         }),
         ClaimEffect.SetAlarm({ at: at(2) }),
@@ -120,7 +120,7 @@ describe("claiming an ask", () => {
   });
 
   it("names the fork after the project, the ask and the handle in lowercase", () => {
-    expect(forkName(project, ask, bob)).toBe("alice_datekit--parse-iso--bob");
+    expect(forkName(project, ask, bob)).toBe("alice__datekit--parse-iso--bob");
   });
 
   it("refuses a second person with AskFull, and forks nothing", () => {
@@ -229,8 +229,8 @@ describe("claiming an ask", () => {
     expect(Result.map(result, ({ effects }) => effects[0])).toStrictEqual(
       Result.succeed(
         ClaimEffect.MakeFork({
-          from: RepoName.make("alice_datekit"),
-          name: RepoName.make("alice_datekit--parse-iso--carol"),
+          from: RepoName.make("alice__datekit"),
+          name: RepoName.make("alice__datekit--parse-iso--carol"),
         })
       )
     );

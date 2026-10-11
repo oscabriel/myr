@@ -252,7 +252,7 @@ describe("a failing lane's log, through the platform", () => {
         // The fake env's EVIDENCE throws when touched: the store reached it.
         expect(
           Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "it kept the log"
-        ).toContain("could not put dora_datekit/req-fix-0001/unit#1");
+        ).toContain("could not put dora__datekit/req-fix-0001/unit#1");
       })
   );
 
@@ -312,7 +312,7 @@ describe("a failing lane's log, through the platform", () => {
           dora: yield* asked("dora"),
           ghost: yield* asked("dora", {
             project: ProjectName.make("alice/ghost"),
-            ref: logRef.replace(`${keyOf(project)}/`, "alice_ghost/"),
+            ref: logRef.replace(`${keyOf(project)}/`, "alice__ghost/"),
           }),
           inBurrow: yield* asked("dora", elsewhere("bob/burrow")),
           inGhost: yield* asked("dora", elsewhere("alice/ghost")),

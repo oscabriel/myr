@@ -205,7 +205,8 @@ const profileOwner = Effect.map(
 );
 
 /**
- * A name as a project's: `<owner>/<name>` as given, or a bare word under
+ * A name as a project's: `<owner>/<name>` as given, a bare word given under
+ * the profile's handle, and with none given `fallback.short` under
  * `fallback.owner` (an import's source namespace), else under the
  * profile's handle. A usage error says how to name it otherwise.
  */
@@ -216,7 +217,10 @@ const projectNamed = (
   Effect.gen(function* () {
     const word = Option.getOrElse(given, () => fallback.short);
     const known = yield* profileOwner;
-    const owner = Option.orElse(fallback.owner, () => known);
+
+    const owner = Option.isSome(given)
+      ? known
+      : Option.orElse(fallback.owner, () => known);
 
     const spelled = word.includes("/")
       ? word

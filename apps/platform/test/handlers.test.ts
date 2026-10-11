@@ -258,7 +258,7 @@ describe("claims", () => {
           remote: claim.remote,
         }).toStrictEqual({
           claimant: "alice",
-          fork: "alice_datekit--parse-iso--alice",
+          fork: "alice__datekit--parse-iso--alice",
           remote:
             "https://platform-dev.example.workers.dev/alice/datekit--parse-iso--alice.git",
         });
@@ -379,12 +379,12 @@ describe("calls that name no project", () => {
           status.claims.map(({ fork, remote }) => ({ fork, remote }))
         ).toStrictEqual([
           {
-            fork: "alice_burrow--lex-tokens--alice",
+            fork: "alice__burrow--lex-tokens--alice",
             remote:
               "https://platform-dev.example.workers.dev/alice/burrow--lex-tokens--alice.git",
           },
           {
-            fork: "alice_datekit--parse-iso--alice",
+            fork: "alice__datekit--parse-iso--alice",
             remote:
               "https://platform-dev.example.workers.dev/alice/datekit--parse-iso--alice.git",
           },
@@ -672,7 +672,7 @@ describe("each call", () => {
           aliceSets: new UnknownEnvItem({ key: setPaymentsKey.key }),
           alicesClaims: [],
           alicesFork: {
-            fork: "alice_datekit--me--alice",
+            fork: "alice__datekit--me--alice",
             remote:
               "https://platform-dev.example.workers.dev/alice/datekit--me--alice.git",
           },

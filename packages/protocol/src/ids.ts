@@ -298,10 +298,14 @@ const OwnerPattern = new RegExp(
   "u"
 );
 
-const ShortNamePattern = new RegExp(String.raw`^${SEGMENT}$`, "u");
+// A short name never ends as a file the web serves beside a page does
+// (`llms.txt`, `<ask>.md`), so `/<owner>/llms.txt` is never a project.
+const SHORT = String.raw`(?![^/]*\.(?:txt|md)$)${SEGMENT}`;
+
+const ShortNamePattern = new RegExp(String.raw`^${SHORT}$`, "u");
 
 const FullNamePattern = new RegExp(
-  String.raw`^(?:${HANDLE_OWNER}|(?:${HOSTS})/${SEGMENT})/${SEGMENT}$`,
+  String.raw`^(?:${HANDLE_OWNER}|(?:${HOSTS})/${SEGMENT})/${SHORT}$`,
   "u"
 );
 
@@ -395,10 +399,12 @@ const FullName = Schema.String.pipe(
 /**
  * The flat key a project keeps inside the platform: its Durable Object's
  * id, its repo's name, its code cache's key and its projection rows. The
- * name with `/` made `_` (`oscabriel_foo`, `github.com_pallets_click`), or
- * the key a project made before owners kept (`datekit`). `_` occurs in no
- * handle, host, account or short name, so a key reads back to its name.
- * Never `--`, which separates a fork's parts.
+ * name with each `/` made `__` (`oscabriel__foo`,
+ * `github.com__pallets__click`), or the key a project made before owners
+ * kept (`datekit`). A segment of a name never holds two separators in a
+ * row, so `__` occurs in no name and a key reads back to its name, even
+ * one whose segments hold `_` (`alice/the_thing`). Never `--`, which
+ * separates a fork's parts.
  */
 export const ProjectKey = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^(?!.*--)[a-z0-9._-]+$/u)),
@@ -460,7 +466,7 @@ export const projectNameOf = (owner: Owner, short: ShortName): ProjectName =>
 
 /** The key a project keeps inside the platform for its name. */
 export const keyOf = (name: ProjectName): ProjectKey =>
-  ProjectKey.make(legacyKeyByName[name] ?? name.replaceAll("/", "_"));
+  ProjectKey.make(legacyKeyByName[name] ?? name.replaceAll("/", "__"));
 
 const decodeFullName = Schema.decodeOption(FullName);
 
@@ -472,8 +478,8 @@ export const nameOfKey = (key: ProjectKey): Option.Option<ProjectName> => {
     return Option.some(ProjectName.make(legacy));
   }
 
-  return key.includes("_")
-    ? decodeFullName(key.replaceAll("_", "/"))
+  return key.includes("__")
+    ? decodeFullName(key.replaceAll("__", "/"))
     : Option.none();
 };
 

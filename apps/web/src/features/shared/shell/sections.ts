@@ -6,7 +6,9 @@
  */
 import { projectAddressOf } from "@repo/protocol/ids";
 import type { Posture } from "@repo/protocol/posture";
-import { Option, Result } from "effect";
+import { Option } from "effect";
+
+import { segmentsOf } from "../paths.ts";
 
 /** Which of a project's pages is being read. */
 export type ProjectTab =
@@ -57,21 +59,15 @@ const SECTION_OF = {
 } as const satisfies Record<string, ProjectTab>;
 
 /** The site's own first segments: every other one starts a project's address. */
-const SITE = new Set(["agents", "asks", "docs", "home", "people", "today"]);
-
-/** `segment` decoded, or as it came when it does not decode. */
-const decoded = (segment: string) =>
-  Result.getOrElse(
-    Result.try(() => decodeURIComponent(segment)),
-    () => segment
-  );
-
-/** The address's segments, decoded. */
-const segmentsOf = (pathname: string) =>
-  pathname
-    .split("/")
-    .filter((segment) => segment !== "")
-    .map(decoded);
+const SITE = new Set([
+  "agents",
+  "asks",
+  "docs",
+  "home",
+  "import",
+  "people",
+  "today",
+]);
 
 /**
  * The project an address is in, as the address spells it, and the

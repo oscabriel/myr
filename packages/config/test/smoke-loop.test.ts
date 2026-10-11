@@ -158,14 +158,19 @@ describe("smokeLoop, against the Node world", () => {
           {
             by: "smoke",
             kind: "project",
-            name: "ines-v_smoke-r1",
+            name: "ines-v__smoke-r1",
             stage: "node",
           },
-          { by: "smoke", kind: "repo", name: "ines-v_smoke-r1", stage: "node" },
           {
             by: "smoke",
             kind: "repo",
-            name: "ines-v_smoke-r1--parse-year--bram",
+            name: "ines-v__smoke-r1",
+            stage: "node",
+          },
+          {
+            by: "smoke",
+            kind: "repo",
+            name: "ines-v__smoke-r1--parse-year--bram",
             stage: "node",
           },
         ]);
@@ -346,13 +351,13 @@ describe("smoke --loop's throwaway ledger", () => {
             {
               by: "smoke",
               kind: "project",
-              name: "ines-v_smoke-r1",
+              name: "ines-v__smoke-r1",
               stage: "dev-example",
             },
             {
               by: "smoke",
               kind: "repo",
-              name: "ines-v_smoke-r1",
+              name: "ines-v__smoke-r1",
               stage: "dev-example",
             },
           ],

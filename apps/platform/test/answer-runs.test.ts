@@ -21,7 +21,7 @@ describe("an admission's instance", () => {
           project: ProjectName.make("alice/datekit"),
         })
       )
-    ).toBe(`admit-alice_datekit-maintainers-${"a".repeat(40)}`);
+    ).toBe(`admit-alice__datekit-maintainers-${"a".repeat(40)}`);
   });
 
   it("keeps each pushed head its own instance under a long project and layer name, within the engine's 100 characters", () => {

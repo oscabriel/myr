@@ -71,7 +71,7 @@ const nowhere = ProjectName.make("alice/nowhere");
 
 const datekit = ProjectName.make("alice/datekit");
 
-const canonical = RepoName.make("alice_datekit");
+const canonical = RepoName.make("alice__datekit");
 
 const landed = LandedSha.make("7".repeat(40));
 

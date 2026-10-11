@@ -67,7 +67,7 @@ import {
 } from "./workflows/answer.fixtures.ts";
 import type { Admitted } from "./workflows/answer.fixtures.ts";
 
-const fork = RepoName.make("alice_datekit--fix-week--alice");
+const fork = RepoName.make("alice__datekit--fix-week--alice");
 
 const main = RefName.make("refs/heads/main");
 

@@ -75,6 +75,8 @@ describe("a project's name", () => {
     "gitlab.com/a/b/c",
     "example.com/a/b",
     "oscabriel/foo--bar",
+    "oscabriel/LLMS.txt",
+    "oscabriel/notes.md",
     "oscabriel/-foo",
     "oscabriel/foo.",
     "a--b/foo",
@@ -156,9 +158,9 @@ describe("an owner", () => {
 
 describe("a project's key", () => {
   it("is the name with its slashes made underscores", () => {
-    expect(keyOf(ProjectName.make("oscabriel/foo"))).toBe("oscabriel_foo");
+    expect(keyOf(ProjectName.make("oscabriel/foo"))).toBe("oscabriel__foo");
     expect(keyOf(ProjectName.make("github.com/pallets/werkzeug"))).toBe(
-      "github.com_pallets_werkzeug"
+      "github.com__pallets__werkzeug"
     );
   });
 
@@ -171,11 +173,11 @@ describe("a project's key", () => {
     expect(nameOfKey(ProjectKey.make("datekit"))).toStrictEqual(
       Option.some("oscabriel/datekit")
     );
-    expect(nameOfKey(ProjectKey.make("oscabriel_foo"))).toStrictEqual(
+    expect(nameOfKey(ProjectKey.make("oscabriel__foo"))).toStrictEqual(
       Option.some("oscabriel/foo")
     );
     expect(
-      nameOfKey(ProjectKey.make("github.com_pallets_werkzeug"))
+      nameOfKey(ProjectKey.make("github.com__pallets__werkzeug"))
     ).toStrictEqual(Option.some("github.com/pallets/werkzeug"));
     expect(nameOfKey(ProjectKey.make("smoke-20251010"))).toStrictEqual(
       Option.none()
@@ -237,4 +239,20 @@ describe("a project's address", () => {
       expect(addressOf(path)).toStrictEqual(Option.none());
     }
   );
+});
+
+// A segment may hold `_` (`the_thing`), so a key joins segments with `__`,
+// which no segment holds, and two names never share a key.
+describe("a key of a name whose segments hold underscores", () => {
+  it("reads back to its name", () => {
+    const name = ProjectName.make("alice/the_thing");
+
+    expect(nameOfKey(keyOf(name))).toStrictEqual(Option.some(name));
+  });
+
+  it("is not another name's key", () => {
+    expect(keyOf(ProjectName.make("github.com/a_b/c"))).not.toBe(
+      keyOf(ProjectName.make("github.com/a/b_c"))
+    );
+  });
 });

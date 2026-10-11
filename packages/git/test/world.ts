@@ -130,7 +130,7 @@ export interface Repos {
 }
 
 /**
- * A bare upstream repo `alice_demo.git`, the project `alice/demo`'s, whose
+ * A bare upstream repo `alice__demo.git`, the project `alice/demo`'s, whose
  * `main` holds one commit, a `seed`
  * clone that pushes to it directly, and the gateway in front of it on a
  * local port, judging pushes with `custody`. `atPush` runs as each push
@@ -149,7 +149,7 @@ export const world = (
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const root = yield* fs.makeTempDirectoryScoped().pipe(Effect.orDie);
-    const upstream = `${root}/alice_demo.git`;
+    const upstream = `${root}/alice__demo.git`;
     const seed = `${root}/seed`;
 
     yield* gitOk(

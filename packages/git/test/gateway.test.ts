@@ -383,7 +383,7 @@ describe(gitRoute, () => {
       Option.some({
         endpoint: "git-receive-pack",
         name: "alice/notes--fix-week--bob",
-        repo: Option.some("alice_notes--fix-week--bob"),
+        repo: Option.some("alice__notes--fix-week--bob"),
       }),
       Option.none(),
       Option.none(),

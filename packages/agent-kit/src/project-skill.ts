@@ -25,7 +25,7 @@ import { code, page } from "./text.ts";
 
 /**
  * The skill's name: `<key>-contribute`, by the project's key
- * (`datekit-contribute`, `oscabriel_foo-contribute`), its folder's name too,
+ * (`datekit-contribute`, `oscabriel__foo-contribute`), its folder's name too,
  * so the forty's skills keep their names and a name reads back to its
  * project (ADR 0032).
  */
