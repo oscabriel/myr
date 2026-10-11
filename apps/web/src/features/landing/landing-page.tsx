@@ -22,13 +22,11 @@ import {
   HOME_PATH,
   projectPath,
 } from "../shared/paths.ts";
-import { ReadingRows, UnreachableNotice } from "../shared/pending.tsx";
+import { UnreachableNotice } from "../shared/pending.tsx";
+import { PostureBadge } from "../shared/posture.tsx";
 import { LandingProjects } from "./projects.ts";
 import { pushTranscript } from "./transcript.ts";
-
-/** The README's opening line: what the platform is. */
-const WHAT_IT_IS =
-  "A Git platform for the boundary between a project and everyone else.";
+import { LEDE, WHAT_IT_IS } from "./words.ts";
 
 /** A link in a plain row (the top, the foot): ink, underlined only on hover. */
 const ROW_LINK = "no-underline hover:underline";
@@ -43,6 +41,22 @@ const AGENTS_PATH = "/agents";
 const Code = ({ children }: { readonly children: ReactNode }) => (
   <code className={ID}>{children}</code>
 );
+
+/** The branch's name, as git takes it. */
+const MAIN = "main";
+
+/** The lede, its one branch name set as git takes it. */
+const Lede = () => {
+  const [before, after] = LEDE.split(MAIN);
+
+  return (
+    <>
+      {before}
+      <Code>{MAIN}</Code>
+      {after}
+    </>
+  );
+};
 
 /** One part of the page under its name, parted from the last by a hairline. */
 const Part = ({
@@ -254,7 +268,7 @@ const Transcript = ({ platformUrl }: { readonly platformUrl: string }) => {
   );
 };
 
-/** The projects on the platform, each with its posture word, or why none shows yet. */
+/** The projects on the platform, each with its posture, or that the list did not come. */
 const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
   LandingProjects.match(projects, {
     Listed: ({ projects: listed }) => (
@@ -271,20 +285,11 @@ const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
             >
               {project}
             </AppLink>
-            {/* The word alone, not the posture badge: the badge's marks
-                would split into chunks every page preloads, past the
-                root's byte ceiling (production-bundle.test.ts). */}
-            <span
-              className="text-ui text-muted-foreground"
-              data-posture={posture}
-            >
-              {postureLabel(posture)}
-            </span>
+            <PostureBadge label={postureLabel(posture)} posture={posture} />
           </li>
         ))}
       </ul>
     ),
-    Pending: () => <ReadingRows />,
     Unreachable: () => <UnreachableNotice />,
   });
 
@@ -310,9 +315,7 @@ export const LandingView = ({
         <div className="flex max-w-[60ch] flex-col gap-3">
           <h1 className="text-headline text-balance">{WHAT_IT_IS}</h1>
           <p className="text-body">
-            Everything a project ships is public, its contribution process is
-            typed code on <Code>main</Code>, and a push lands only by passing a
-            typed gate.
+            <Lede />
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">

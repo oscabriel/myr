@@ -1,7 +1,9 @@
 /**
- * The landing as a first-time reader meets it in a browser: its first action
- * takes them to the open asks, and on the narrowest phone it scrolls nothing
- * sideways and axe finds no serious or critical violation, in either scheme.
+ * The landing as a first-time reader meets it in a browser: the page as
+ * sent names its projects, so a reader with no script sees them; its first
+ * action takes them to the open asks; and on the narrowest phone it scrolls
+ * nothing sideways and axe finds no serious or critical violation, in
+ * either scheme.
  * `a11y.e2e.ts` checks it with every other page at 1440 and 390 px.
  *
  * It runs only against `WEB_URL` (a stage's web origin, or a `vite dev`
@@ -30,6 +32,22 @@ test.describe("the landing", () => {
     Option.isNone(web),
     "WEB_URL is not set: point it at a web's origin to run this check"
   );
+
+  // A seeded stage, or the dev world: a platform with no project yet sends
+  // an empty list, which is a page of its own and not this check's.
+  test("names its projects in the page as sent, before any script runs", ({
+    page,
+  }) =>
+    Effect.runPromise(
+      Effect.gen(function* () {
+        const response = yield* Effect.promise(() => page.request.get(at("/")));
+        const html = yield* Effect.promise(() => response.text());
+
+        expect(response.status()).toBe(200);
+        expect(html).toMatch(/data-project="[^"]+"/u);
+        expect(html).toMatch(/data-posture="[^"]+"/u);
+      })
+    ));
 
   test("leads to the open asks", ({ page }) =>
     Effect.runPromise(

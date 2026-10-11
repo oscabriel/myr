@@ -10,13 +10,11 @@ import type { CommandDoc } from "@repo/agent-kit/command-doc";
 import { fullLlms } from "@repo/agent-kit/full-llms";
 import { Brand } from "@repo/brand";
 import { claimForkName, workingForkName } from "@repo/project/repo-names";
-import { Client, Contracts } from "@repo/protocol/contracts";
+import { Contracts } from "@repo/protocol/contracts";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
 import { AskId, Handle, KindName, ProjectName } from "@repo/protocol/ids";
-import { asTester, unanswered } from "@repo/protocol/testing";
-import { Effect, Layer, Option } from "effect";
-import { RpcTest } from "effect/rpc";
+import { Effect, Option } from "effect";
 
 import { commands as catalog } from "../src/features/agents/catalog.ts";
 import {
@@ -35,6 +33,7 @@ import { landingHead, landingHeaders } from "../src/routes/index.tsx";
 import { llmsFullHandler } from "../src/routes/llms-full[.]txt.ts";
 import { frontPageHandler, landingHandler } from "../src/server/front-page.ts";
 import { projectPageHandler } from "../src/server/project-page.ts";
+import { platformWith, unreachablePlatform } from "./platform.ts";
 
 const platformUrl = "https://platform-test.example.workers.dev";
 
@@ -343,23 +342,14 @@ describe("the command catalog", () => {
 
 /** A platform that lists `listed` as its projects, and answers nothing else. */
 const listing = (listed: readonly ProjectListing[]) => () =>
-  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
-    Layer.provide([
-      Layer.mergeAll(
-        unanswered,
-        Contracts.toLayerHandler("listProjects", () =>
-          Effect.succeed({ projects: listed })
-        )
-      ),
-      asTester,
-    ])
+  platformWith(
+    Contracts.toLayerHandler("listProjects", () =>
+      Effect.succeed({ projects: listed })
+    )
   );
 
 /** A platform that cannot be reached: every call dies on the way. */
-const unreachable = () =>
-  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
-    Layer.provide([unanswered, asTester])
-  );
+const unreachable = () => unreachablePlatform;
 
 const getFull = () => new Request(`${webUrl}/llms-full.txt`);
 
@@ -451,19 +441,13 @@ describe(mcpCard, () => {
 const listingWithAsks =
   (listed: readonly ProjectListing[], listedAsks: readonly AskListing[]) =>
   () =>
-    Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
-      Layer.provide([
-        Layer.mergeAll(
-          unanswered,
-          Contracts.toLayerHandler("listProjects", () =>
-            Effect.succeed({ projects: listed })
-          ),
-          Contracts.toLayerHandler("listAsks", () =>
-            Effect.succeed({ asks: listedAsks })
-          )
-        ),
-        asTester,
-      ])
+    platformWith(
+      Contracts.toLayerHandler("listProjects", () =>
+        Effect.succeed({ projects: listed })
+      ),
+      Contracts.toLayerHandler("listAsks", () =>
+        Effect.succeed({ asks: listedAsks })
+      )
     );
 
 /** A request for `path` on the web host, accepting `accept`. */

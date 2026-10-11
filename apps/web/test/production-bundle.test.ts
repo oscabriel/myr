@@ -61,11 +61,15 @@ const DEV_MODULES = [
 
 /**
  * The most the chunks every page preloads (the root route's) may weigh,
- * gzipped: about 10% above what they weighed (222,169 bytes in 19 chunks)
- * once the Markdown renderer and the views it came with left them (322,049
- * in 31 before).
+ * gzipped: about 10% above what they weighed (244,172 bytes in 47 chunks)
+ * once the landing read its projects on the server (243,991 before; 222,169
+ * in 19 chunks when the Markdown renderer left them, 322,049 in 31 before
+ * that). Raised on the user's sign-off, 2026-10-10. A route's `head`,
+ * `loader` and server functions ride in the route tree every page loads,
+ * so what they import counts here; its view does not, and the landing's
+ * must not: the next case holds it out.
  */
-const ROOT_PRELOADS_GZIP = 244_000;
+const ROOT_PRELOADS_GZIP = 268_000;
 
 /** A Shiki grammar module, by its name. */
 const GRAMMAR = /node_modules\/@shikijs\/langs\/dist\/(?<name>[\w-]+)\.mjs$/u;
@@ -399,21 +403,30 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
             missing: preloads.filter(
               (chunk) => !output.texts.has(`client${chunk}`)
             ),
-            underCeiling: total <= ROOT_PRELOADS_GZIP,
-          }).toStrictEqual({ markdown: [], missing: [], underCeiling: true });
+          }).toStrictEqual({ markdown: [], missing: [] });
+          // The weight itself, so a failure says how far over it is.
+          expect(
+            total,
+            `${preloads.length} root preloads, gzipped`
+          ).toBeLessThanOrEqual(ROOT_PRELOADS_GZIP);
         })
     );
 
     it.effect(
-      "preloads on every page no grammar and nothing of the server's highlighting",
+      "preloads on every page no grammar, nothing of the server's highlighting, and not the landing's view",
       () =>
         Effect.gen(function* () {
           const output = yield* Built;
 
+          // Nor the landing's view: a route's head or loader that imported
+          // it would carry the whole page into every page's preloads.
           expect(
             rootPreloads(output).flatMap((chunk) =>
               (output.holding.get(`client${chunk}`) ?? []).filter(
-                (module) => GRAMMAR.test(module) || module.includes("prerender")
+                (module) =>
+                  GRAMMAR.test(module) ||
+                  module.includes("prerender") ||
+                  module.endsWith("features/landing/landing-page.tsx")
               )
             )
           ).toStrictEqual([]);
