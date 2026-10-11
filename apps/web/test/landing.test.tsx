@@ -9,21 +9,20 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
-import { Client, Contracts } from "@repo/protocol/contracts";
+import { Contracts } from "@repo/protocol/contracts";
 import { ProjectListing } from "@repo/protocol/domain/front-page";
-import { asTester, unanswered } from "@repo/protocol/testing";
-import { Effect, Layer, Schema } from "effect";
-import { RpcTest } from "effect/rpc";
+import { Effect, Schema } from "effect";
 
 import { LandingView } from "../src/features/landing/landing-page.tsx";
 import {
   LandingProjects,
   PROJECTS_SHOWN,
-  readLandingProjects,
 } from "../src/features/landing/projects.ts";
+import { readLandingProjects } from "../src/features/landing/read.ts";
 import { LEDE } from "../src/features/landing/words.ts";
 import { landingHead } from "../src/routes/index.tsx";
 import { textIn } from "./markup.ts";
+import { platformWith, unreachablePlatform } from "./platform.ts";
 import { renderAt } from "./render.tsx";
 
 const PLATFORM = "https://platform.example.workers.dev";
@@ -190,22 +189,9 @@ describe(LandingView, () => {
 
 /** A platform that lists `projects`, and answers nothing else. */
 const listing = (projects: readonly ProjectListing[]) =>
-  Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
-    Layer.provide([
-      Layer.mergeAll(
-        unanswered,
-        Contracts.toLayerHandler("listProjects", () =>
-          Effect.succeed({ projects })
-        )
-      ),
-      asTester,
-    ])
+  platformWith(
+    Contracts.toLayerHandler("listProjects", () => Effect.succeed({ projects }))
   );
-
-/** A platform that cannot be reached: every call dies on the way. */
-const unreachable = Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
-  Layer.provide([unanswered, asTester])
-);
 
 describe("the landing's projects, read on the server", () => {
   const many = Schema.decodeSync(Schema.Array(ProjectListing))(
@@ -235,7 +221,9 @@ describe("the landing's projects, read on the server", () => {
 
   it.effect("says so, and never fails, when the platform did not answer", () =>
     Effect.gen(function* () {
-      const read = yield* readLandingProjects.pipe(Effect.provide(unreachable));
+      const read = yield* readLandingProjects.pipe(
+        Effect.provide(unreachablePlatform)
+      );
 
       expect(read._tag).toBe("Unreachable");
     })

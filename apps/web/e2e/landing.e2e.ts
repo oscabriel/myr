@@ -33,6 +33,8 @@ test.describe("the landing", () => {
     "WEB_URL is not set: point it at a web's origin to run this check"
   );
 
+  // A seeded stage, or the dev world: a platform with no project yet sends
+  // an empty list, which is a page of its own and not this check's.
   test("names its projects in the page as sent, before any script runs", ({
     page,
   }) =>

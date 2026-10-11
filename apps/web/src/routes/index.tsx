@@ -14,10 +14,8 @@ import {
   markdownLink,
 } from "../features/front/markdown.ts";
 import { LandingView } from "../features/landing/landing-page.tsx";
-import {
-  LandingProjects,
-  readLandingProjects,
-} from "../features/landing/projects.ts";
+import { LandingProjects } from "../features/landing/projects.ts";
+import { readLandingProjects } from "../features/landing/read.ts";
 import { LEDE } from "../features/landing/words.ts";
 import { pageHead } from "../features/shared/head.ts";
 import { HOME_PATH } from "../features/shared/paths.ts";
@@ -38,7 +36,12 @@ const root = getRouteApi("__root__");
 /** Where the page's Markdown is. */
 const MARKDOWN = "/llms.txt";
 
-/** The projects to read, as nobody, encoded for the loader to carry. */
+/**
+ * The projects to read, as nobody (the client without the request, so no
+ * cookie reaches the platform), encoded for the loader to carry. The list
+ * ignores the caller, so nobody's read is everyone's, and the page stays
+ * one the edge may keep.
+ */
 const landingData = createServerFn({ method: "GET" }).handler(() =>
   Effect.runPromise(
     readLandingProjects.pipe(

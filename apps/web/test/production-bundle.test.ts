@@ -64,8 +64,10 @@ const DEV_MODULES = [
  * gzipped: about 10% above what they weighed (244,172 bytes in 47 chunks)
  * once the landing read its projects on the server (243,991 before; 222,169
  * in 19 chunks when the Markdown renderer left them, 322,049 in 31 before
- * that). A route's `head`, `loader` and server functions ride in the route
- * tree every page loads, so what they import counts here; its view does not.
+ * that). Raised on the user's sign-off, 2026-10-10. A route's `head`,
+ * `loader` and server functions ride in the route tree every page loads,
+ * so what they import counts here; its view does not, and the landing's
+ * must not: the next case holds it out.
  */
 const ROOT_PRELOADS_GZIP = 268_000;
 
@@ -411,15 +413,20 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
     );
 
     it.effect(
-      "preloads on every page no grammar and nothing of the server's highlighting",
+      "preloads on every page no grammar, nothing of the server's highlighting, and not the landing's view",
       () =>
         Effect.gen(function* () {
           const output = yield* Built;
 
+          // Nor the landing's view: a route's head or loader that imported
+          // it would carry the whole page into every page's preloads.
           expect(
             rootPreloads(output).flatMap((chunk) =>
               (output.holding.get(`client${chunk}`) ?? []).filter(
-                (module) => GRAMMAR.test(module) || module.includes("prerender")
+                (module) =>
+                  GRAMMAR.test(module) ||
+                  module.includes("prerender") ||
+                  module.endsWith("features/landing/landing-page.tsx")
               )
             )
           ).toStrictEqual([]);

@@ -26,7 +26,7 @@ import { UnreachableNotice } from "../shared/pending.tsx";
 import { PostureBadge } from "../shared/posture.tsx";
 import { LandingProjects } from "./projects.ts";
 import { pushTranscript } from "./transcript.ts";
-import { WHAT_IT_IS } from "./words.ts";
+import { LEDE, WHAT_IT_IS } from "./words.ts";
 
 /** A link in a plain row (the top, the foot): ink, underlined only on hover. */
 const ROW_LINK = "no-underline hover:underline";
@@ -41,6 +41,22 @@ const AGENTS_PATH = "/agents";
 const Code = ({ children }: { readonly children: ReactNode }) => (
   <code className={ID}>{children}</code>
 );
+
+/** The branch's name, as git takes it. */
+const MAIN = "main";
+
+/** The lede, its one branch name set as git takes it. */
+const Lede = () => {
+  const [before, after] = LEDE.split(MAIN);
+
+  return (
+    <>
+      {before}
+      <Code>{MAIN}</Code>
+      {after}
+    </>
+  );
+};
 
 /** One part of the page under its name, parted from the last by a hairline. */
 const Part = ({
@@ -299,9 +315,7 @@ export const LandingView = ({
         <div className="flex max-w-[60ch] flex-col gap-3">
           <h1 className="text-headline text-balance">{WHAT_IT_IS}</h1>
           <p className="text-body">
-            Everything a project ships is public, its contribution process is
-            typed code on <Code>main</Code>, and a push lands only by passing a
-            typed gate.
+            <Lede />
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
