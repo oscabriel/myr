@@ -39,6 +39,7 @@ import { postureLabel, postureWord } from "../../project/posture-label.ts";
 import { AppLink } from "../link.tsx";
 import { POSTURE_MARKS } from "../mark-look.ts";
 import { ASKS_PATH, docsPath, HOME_PATH } from "../paths.ts";
+import { leadingProjects, PROJECTS_SHOWN } from "../project-order.ts";
 import {
   useCurrentProject,
   useProjectList,
@@ -57,9 +58,6 @@ export const RAIL_ROW = `${RAIL_BASE} [&[aria-current]]:bg-surface`;
 
 /** A row's mark: 16 px at the marks' stroke, muted until the row is current. */
 const MARK = "text-muted-foreground size-4 shrink-0";
-
-/** At most this many projects in the rail; more open the switcher. */
-const SHOWN = 8;
 
 const SITE = [
   { icon: House, label: "Home", to: HOME_PATH },
@@ -221,8 +219,9 @@ const PlaceholderRows = () => (
 
 /**
  * The projects: the current one first, its sections under it, so the list
- * arriving after the page moves nothing above it; then the others, up to
- * eight in all, and the switcher for the rest.
+ * arriving after the page moves nothing above it; then the others that
+ * lead (the most open asks first, a tie by name), up to eight in all, and
+ * the switcher for the rest.
  */
 const Projects = () => {
   const current = useCurrentProject();
@@ -233,7 +232,8 @@ const Projects = () => {
     listed?.find((listing) => listing.project === project);
 
   const others = (listed ?? []).filter(({ project }) => project !== current);
-  const room = SHOWN - (current === undefined ? 0 : 1);
+  const room = PROJECTS_SHOWN - (current === undefined ? 0 : 1);
+  const leading = leadingProjects(others, room);
 
   return (
     <div className="flex flex-col gap-1">
@@ -257,7 +257,7 @@ const Projects = () => {
         {listed === undefined ? (
           <PlaceholderRows />
         ) : (
-          others.slice(0, room).map((listing) => (
+          leading.map((listing) => (
             <li key={listing.project}>
               <ProjectRow
                 current={false}

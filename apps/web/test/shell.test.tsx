@@ -25,8 +25,11 @@ import { AppLink } from "../src/features/shared/link.tsx";
 import { projectPath } from "../src/features/shared/paths.ts";
 import { RouteError } from "../src/features/shared/pending.tsx";
 import { AppShell } from "../src/features/shared/shell/app-shell.tsx";
+import { ShellReadsContext } from "../src/features/shared/shell/context.ts";
+import { ProjectsSheetBody } from "../src/features/shared/shell/overlays.tsx";
 import { RailSlot } from "../src/features/shared/shell/rail-slot.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
+import { EIGHT_LEADING, TEN_LISTED } from "./listings.ts";
 import { renderAt } from "./render.tsx";
 
 /** The element `tag` whose opening tag carries `attribute`, whole (no nested `tag`). */
@@ -371,6 +374,76 @@ const ProjectParamsView = () => {
     </p>
   );
 };
+
+/** The projects named in `markup`'s rail rows, in order. */
+const railProjectsOf = (markup: string) =>
+  [
+    ...elementOf(markup, "nav", 'aria-label="Site"').matchAll(
+      /<a\b[^>]*data-project="(?<project>[^"]+)"/gu
+    ),
+  ].map(({ groups }) => groups?.project);
+
+/** The ledger page at `url`, its rail fed the ten listed projects. */
+const listedAt = (url: string) =>
+  renderAt(
+    url,
+    <AppShell projects={TEN_LISTED}>
+      <Workspace title="Ledger">
+        <p>Entries</p>
+      </Workspace>
+    </AppShell>
+  );
+
+describe("the rail's projects", () => {
+  it.effect(
+    "are eight, the most open asks first and a tie by name, each by its full name",
+    () =>
+      Effect.gen(function* () {
+        expect(railProjectsOf(yield* listedAt("/agents"))).toStrictEqual(
+          EIGHT_LEADING
+        );
+      })
+  );
+
+  it.effect(
+    "pin the current project first, then the seven that lead among the others",
+    () =>
+      Effect.gen(function* () {
+        expect(
+          railProjectsOf(yield* listedAt("/oscabriel/yarrow/ledger"))
+        ).toStrictEqual(["oscabriel/yarrow", ...EIGHT_LEADING.slice(0, 7)]);
+        expect(
+          railProjectsOf(yield* listedAt("/oscabriel/datekit/ledger"))
+        ).toStrictEqual([
+          "oscabriel/datekit",
+          ...EIGHT_LEADING.filter((name) => name !== "oscabriel/datekit"),
+        ]);
+      })
+  );
+});
+
+describe("the project switcher", () => {
+  it.effect(
+    "lists every project by its full name, and ends with the way to import a repo",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/agents",
+          <ShellReadsContext value={{ projects: TEN_LISTED }}>
+            <ProjectsSheetBody input={{ current: null }} onChosen={() => {}} />
+          </ShellReadsContext>
+        );
+
+        expect(
+          TEN_LISTED.filter(({ project }) => !markup.includes(`>${project}<`))
+        ).toStrictEqual([]);
+        expect(linksOf(markup).at(-1)).toMatchObject({
+          href: "/import",
+          text: "Import a repo",
+        });
+      })
+  );
+});
 
 describe("a project at its source path", () => {
   it.effect(
