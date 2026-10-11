@@ -131,6 +131,7 @@ import {
   RequestId,
   TreeSha,
   addressOfRepo,
+  claimForkName,
   isSourceNamespace,
   keyOf,
   ownerOf,
@@ -212,7 +213,6 @@ import {
   ClaimCommand,
   ClaimEffect,
   ClaimState,
-  forkName,
   toView,
   transition as claimTransition,
 } from "./claim.ts";
@@ -5226,7 +5226,7 @@ export const projectService = (
               Option.flatMap(own, ({ state }) => claimOf(state)),
               (held) => held.fork
             ),
-            () => forkName(name, input.ask, caller.handle)
+            () => claimForkName(name, input.ask, caller.handle)
           );
 
           const view = yield* Option.match(own, {

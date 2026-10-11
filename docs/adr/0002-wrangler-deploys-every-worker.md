@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Wrangler deploys every Worker during the competition; `cf` is an ops CLI; after the deadline, cf or Alchemy

@@ -1,6 +1,7 @@
 import { assert, describe, it } from "@effect/vitest";
 import {
   AskId,
+  claimForkName,
   CommitSha,
   Handle,
   LandedSha,
@@ -22,7 +23,6 @@ import {
   ClaimCommand,
   ClaimEffect,
   ClaimState,
-  forkName,
   transition,
 } from "../src/claim.ts";
 import type { ClaimResult, ClaimStep, Live } from "../src/claim.ts";
@@ -359,7 +359,7 @@ const forksOnlyNewClaims: Invariant = ({ before }, { effects, state }) => {
   }
 
   const named = Option.map(live(state), (claim) =>
-    forkName(project, ask, claim.claimant)
+    claimForkName(project, ask, claim.claimant)
   );
 
   return forks.length === 1 &&

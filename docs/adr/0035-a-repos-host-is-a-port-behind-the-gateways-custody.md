@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # A repo's host is a port behind the gateway's custody

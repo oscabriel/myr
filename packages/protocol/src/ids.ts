@@ -505,6 +505,18 @@ export const ProjectNameFromKey = ProjectKey.pipe(
 );
 
 /**
+ * A name split at its first `--`: what comes before, and the fork's parts
+ * from the `--` on (`""` when there are none).
+ */
+const forkPartsOf = (name: string) => {
+  const dashes = name.indexOf("--");
+
+  return dashes === -1
+    ? { head: name, suffix: "" }
+    : { head: name.slice(0, dashes), suffix: name.slice(dashes) };
+};
+
+/**
  * The repo a gateway address names, the `.git` already stripped:
  * `oscabriel/datekit` is the project's key, `oscabriel/datekit--fix--alice`
  * is `<key>--fix--alice`, and a one-segment address is a legacy key with
@@ -513,10 +525,7 @@ export const ProjectNameFromKey = ProjectKey.pipe(
  */
 export const repoNameOfAddress = (address: string): Option.Option<RepoName> => {
   const slash = address.lastIndexOf("/");
-  const last = address.slice(slash + 1);
-  const dashes = last.indexOf("--");
-  const short = dashes === -1 ? last : last.slice(0, dashes);
-  const suffix = dashes === -1 ? "" : last.slice(dashes);
+  const { head: short, suffix } = forkPartsOf(address.slice(slash + 1));
   const spelled = slash === -1 ? short : `${address.slice(0, slash)}/${short}`;
 
   return Option.flatMap(decodeName(spelled), (name) =>
@@ -530,9 +539,7 @@ export const repoNameOfAddress = (address: string): Option.Option<RepoName> => {
  * a repo whose key no project can have.
  */
 export const addressOfRepo = (repo: RepoName): Option.Option<string> => {
-  const dashes = repo.indexOf("--");
-  const first = dashes === -1 ? repo : repo.slice(0, dashes);
-  const suffix = dashes === -1 ? "" : repo.slice(dashes);
+  const { head: first, suffix } = forkPartsOf(repo);
 
   return Option.map(
     Option.flatMap(Schema.decodeOption(ProjectKey)(first), nameOfKey),
@@ -615,3 +622,15 @@ export type Handle = typeof Handle.Type;
  */
 export const sameHandle = (one: Handle, other: Handle): boolean =>
   one.toLowerCase() === other.toLowerCase();
+
+/**
+ * A claim's fork: `<key>--<ask>--<handle in lowercase>`, by the project's
+ * key (ADR 0032). The one spelling the platform makes a fork by and the CLI
+ * and the web's dev world name one by.
+ */
+export const claimForkName = (
+  project: ProjectName,
+  ask: AskId,
+  handle: Handle
+): RepoName =>
+  RepoName.make(`${keyOf(project)}--${ask}--${handle.toLowerCase()}`);
