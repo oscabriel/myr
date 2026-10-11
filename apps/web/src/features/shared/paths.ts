@@ -16,6 +16,9 @@ export const ASKS_PATH = "/asks";
 /** A signed-in reader's own page. */
 export const HOME_PATH = "/home";
 
+/** The import page: a public repo made a project. */
+export const IMPORT_PATH = "/import";
+
 /** The docs' index, or one of its pages. */
 export const docsPath = (page?: string) =>
   page === undefined ? "/docs" : `/docs/${page}`;

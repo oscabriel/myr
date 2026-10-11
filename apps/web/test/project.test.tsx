@@ -30,7 +30,16 @@ import {
 import { UnknownRevision } from "@repo/protocol/refusal";
 import { asTester, unanswered } from "@repo/protocol/testing";
 import { isNotFound } from "@tanstack/react-router";
-import { DateTime, Duration, Effect, Layer, Ref, Schema, Stream } from "effect";
+import {
+  DateTime,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Ref,
+  Schema,
+  Stream,
+} from "effect";
 import { FetchHttpClient } from "effect/http";
 import { RpcClient, RpcSerialization, RpcTest } from "effect/rpc";
 
@@ -919,6 +928,68 @@ describe(UnknownProjectView, () => {
         expect(markup).toContain('data-refusal="UnknownProject"');
         expect(markup).toContain("oscabriel/no-such-project");
         expect(markup).toMatch(/<a\b[^>]*href="\/asks"[^>]*>Open asks<\/a>/u);
+      })
+  );
+
+  it.effect(
+    "offers the import at a source namespace's address nobody has made: the form prefilled, the owner fixed",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/github.com/pallets/click",
+          <UnknownProjectView
+            importer={{ handle: Option.some(Handle.make("oscabriel")) }}
+            name="github.com/pallets/click"
+          />
+        );
+
+        expect(markup).toMatch(
+          /<input[^>]*name="url"[^>]*value="https:\/\/github\.com\/pallets\/click"/u
+        );
+        expect(markup).toMatch(
+          /<input[^>]*type="hidden"[^>]*name="owner"[^>]*value="github\.com\/pallets"|<input[^>]*name="owner"[^>]*type="hidden"[^>]*value="github\.com\/pallets"/u
+        );
+        expect(markup).toMatch(/<input[^>]*name="name"[^>]*value="click"/u);
+        expect(markup).not.toContain('data-slot="select-trigger"');
+        expect(markup).not.toContain("data-refusal");
+      })
+  );
+
+  it.effect(
+    "signed out, offers the same import with the sign-in link back to the address",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/github.com/pallets/click",
+          <UnknownProjectView
+            importer={{ handle: Option.none() }}
+            name="github.com/pallets/click"
+          />
+        );
+
+        expect(markup).not.toContain("<form");
+        expect(markup).toContain(
+          `href="/auth/signin?return=${encodeURIComponent("/github.com/pallets/click")}"`
+        );
+        expect(textIn(markup)).toContain("https://github.com/pallets/click");
+      })
+  );
+
+  it.effect(
+    "keeps the one-sentence not-found, and no offer, for a person's address",
+    () =>
+      Effect.gen(function* () {
+        const markup = yield* renderAt(
+          "/oscabriel/no-such",
+          <UnknownProjectView
+            importer={{ handle: Option.some(Handle.make("oscabriel")) }}
+            name="oscabriel/no-such"
+          />
+        );
+
+        expect(markup).toContain('data-refusal="UnknownProject"');
+        expect(markup).not.toContain("<form");
+        expect(markup).not.toContain('name="url"');
       })
   );
 

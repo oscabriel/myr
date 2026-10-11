@@ -413,20 +413,22 @@ layer(Layer.effect(Built, productionBuild), { timeout: BUILD })(
     );
 
     it.effect(
-      "preloads on every page no grammar, nothing of the server's highlighting, and not the landing's view",
+      "preloads on every page no grammar, nothing of the server's highlighting, and neither the landing's view nor the import page's",
       () =>
         Effect.gen(function* () {
           const output = yield* Built;
 
-          // Nor the landing's view: a route's head or loader that imported
-          // it would carry the whole page into every page's preloads.
+          // Nor the landing's view, nor the import page's: a route's head or
+          // loader that imported one would carry the whole page into every
+          // page's preloads.
           expect(
             rootPreloads(output).flatMap((chunk) =>
               (output.holding.get(`client${chunk}`) ?? []).filter(
                 (module) =>
                   GRAMMAR.test(module) ||
                   module.includes("prerender") ||
-                  module.endsWith("features/landing/landing-page.tsx")
+                  module.endsWith("features/landing/landing-page.tsx") ||
+                  module.includes("features/import/")
               )
             )
           ).toStrictEqual([]);

@@ -18,6 +18,7 @@ import { SkipLink } from "../shared/layout.tsx";
 import { AppLink } from "../shared/link.tsx";
 import {
   ASKS_PATH,
+  IMPORT_PATH,
   docsPath,
   HOME_PATH,
   projectPath,
@@ -372,9 +373,12 @@ export const LandingView = ({
           public to everyone.
         </p>
         <Projects projects={projects} />
-        <p className="text-ui">
+        <p className="text-ui flex flex-wrap gap-x-4 gap-y-1">
           <AppLink className={LINK} to={ASKS_PATH}>
             All asks
+          </AppLink>
+          <AppLink className={LINK} to={IMPORT_PATH}>
+            Import a repo
           </AppLink>
         </p>
       </Part>

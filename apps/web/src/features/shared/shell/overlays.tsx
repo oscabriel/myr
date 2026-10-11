@@ -8,7 +8,7 @@
  */
 import { Brand } from "@repo/brand";
 import { useRouter } from "@tanstack/react-router";
-import { BookOpen, Bot, Keyboard } from "lucide-react";
+import { BookOpen, Bot, FolderInput, Keyboard } from "lucide-react";
 import { useRef } from "react";
 import type { RefObject } from "react";
 
@@ -30,7 +30,7 @@ import { Sheet, SheetContent } from "../../../components/ui/sheet.tsx";
 import { SessionSlot } from "../../auth/session-slot.tsx";
 import { KeysHelp, useKeys } from "../keys.tsx";
 import { AppLink } from "../link.tsx";
-import { docsPath } from "../paths.ts";
+import { docsPath, IMPORT_PATH } from "../paths.ts";
 import { useCurrentProject, useProjectList, useShell } from "./context.ts";
 import type { Overlay } from "./context.ts";
 import {
@@ -264,6 +264,16 @@ const ShellOverlays = ({ onClose, overlay }: OverlayProps) => {
           title="Projects"
         >
           <ProjectSwitcher input={filter} onChosen={onClose} />
+          <div className="border-rule border-t p-1">
+            <AppLink className={RAIL_ROW} to={IMPORT_PATH}>
+              <FolderInput
+                aria-hidden="true"
+                className="text-muted-foreground size-4 shrink-0"
+                strokeWidth={1.75}
+              />
+              Import a repo
+            </AppLink>
+          </div>
         </SheetContent>
       </Sheet>
       <KeysDialog onClose={onClose} open={overlay === "keys"} />
