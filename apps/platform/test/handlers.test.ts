@@ -66,7 +66,7 @@ const datekit = aProject({ people }).pipe(
 );
 
 /** burrow: alice decides here too; one ask of its own. */
-const burrow = aProject({ name: "burrow", people }).pipe(
+const burrow = aProject({ name: "alice/burrow", people }).pipe(
   withVouches(people),
   withAsk({ id: "lex-tokens", territory: "packages/lexer" })
 );
@@ -77,7 +77,7 @@ const trimInput = AskId.make("trim-input");
 
 const lexTokens = AskId.make("lex-tokens");
 
-const nowhere = ProjectName.make("oscabriel/nowhere");
+const nowhere = ProjectName.make("alice/nowhere");
 
 /**
  * Both projects as the projection lists them, and one it lists that the
@@ -258,9 +258,9 @@ describe("claims", () => {
           remote: claim.remote,
         }).toStrictEqual({
           claimant: "alice",
-          fork: "datekit--parse-iso--alice",
+          fork: "alice_datekit--parse-iso--alice",
           remote:
-            "https://platform-dev.example.workers.dev/datekit--parse-iso--alice.git",
+            "https://platform-dev.example.workers.dev/alice/datekit--parse-iso--alice.git",
         });
         expect(
           yield* Effect.flip(
@@ -284,7 +284,7 @@ describe("claims", () => {
         });
 
         expect(claim.remote).toBe(
-          `https://${Brand.domain}/datekit--parse-iso--alice.git`
+          `https://${Brand.domain}/alice/datekit--parse-iso--alice.git`
         );
       }).pipe(Effect.provide(platform()))
   );
@@ -379,14 +379,14 @@ describe("calls that name no project", () => {
           status.claims.map(({ fork, remote }) => ({ fork, remote }))
         ).toStrictEqual([
           {
-            fork: "burrow--lex-tokens--alice",
+            fork: "alice_burrow--lex-tokens--alice",
             remote:
-              "https://platform-dev.example.workers.dev/burrow--lex-tokens--alice.git",
+              "https://platform-dev.example.workers.dev/alice/burrow--lex-tokens--alice.git",
           },
           {
-            fork: "datekit--parse-iso--alice",
+            fork: "alice_datekit--parse-iso--alice",
             remote:
-              "https://platform-dev.example.workers.dev/datekit--parse-iso--alice.git",
+              "https://platform-dev.example.workers.dev/alice/datekit--parse-iso--alice.git",
           },
         ]);
         expect(status.answers).toStrictEqual([]);
@@ -460,8 +460,8 @@ describe("calls that name no project", () => {
           budget: { finishes: 0, total: 10, used: 1 },
           decider: "alice",
           decisions: [
-            { openedAt: "2026-10-07T12:05:00.000Z", project: "datekit" },
-            { openedAt: "2026-10-07T12:10:00.000Z", project: "burrow" },
+            { openedAt: "2026-10-07T12:05:00.000Z", project: "alice/datekit" },
+            { openedAt: "2026-10-07T12:10:00.000Z", project: "alice/burrow" },
           ],
           expiringSoon: [],
           newcomers: ["bob"],
@@ -672,9 +672,9 @@ describe("each call", () => {
           aliceSets: new UnknownEnvItem({ key: setPaymentsKey.key }),
           alicesClaims: [],
           alicesFork: {
-            fork: "datekit--me--alice",
+            fork: "alice_datekit--me--alice",
             remote:
-              "https://platform-dev.example.workers.dev/datekit--me--alice.git",
+              "https://platform-dev.example.workers.dev/alice/datekit--me--alice.git",
           },
           bobDecides: new NotDecider({}),
           bobOpens: new NotDecider({}),
@@ -731,11 +731,11 @@ describe("each call", () => {
           verdict,
           vouches,
         }).toStrictEqual({
-          envItems: "burrow",
+          envItems: "alice/burrow",
           finishes: new NotDecider({}),
           landing: new UnknownCommit({ sha: unseen }),
           lands: new NotDecider({}),
-          ledger: "burrow",
+          ledger: "alice/burrow",
           submits: NotClaimed.of(lexTokens),
           verdict: {},
           vouches: new NotDecider({}),
@@ -776,7 +776,7 @@ describe("making a project", () => {
         yield* advanceTo("2026-10-07T12:00:00Z");
 
         const carol = yield* as("carol");
-        const fresh = ProjectName.make("oscabriel/fresh");
+        const fresh = ProjectName.make("carol/fresh");
 
         const first = yield* carol
           .initProject({ project: fresh })
@@ -785,8 +785,8 @@ describe("making a project", () => {
         const again = yield* Effect.flip(carol.initProject({ project: fresh }));
 
         expect(first).toStrictEqual({
-          project: "fresh",
-          remote: "https://platform-dev.example.workers.dev/fresh.git",
+          project: "carol/fresh",
+          remote: "https://platform-dev.example.workers.dev/carol/fresh.git",
         });
         expect(again).toStrictEqual(new ProjectExists({ project: fresh }));
       }).pipe(Effect.provide(platform()))
@@ -799,7 +799,7 @@ describe("making a project", () => {
         yield* advanceTo("2026-10-07T12:00:00Z");
 
         const carol = yield* as("carol");
-        const fresh = ProjectName.make("oscabriel/fresh");
+        const fresh = ProjectName.make("carol/fresh");
 
         const failed = yield* Effect.flip(
           carol.initProject({
@@ -811,7 +811,7 @@ describe("making a project", () => {
         const second = yield* carol.initProject({ project: fresh });
 
         expect(failed._tag).toBe("ImportFailed");
-        expect(second.project).toBe("fresh");
+        expect(second.project).toBe("carol/fresh");
       }).pipe(Effect.provide(platform()))
   );
 });

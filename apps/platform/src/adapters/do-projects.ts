@@ -14,6 +14,7 @@
 import { envSchemaMethod } from "@repo/project/deciders";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
+import { keyOf } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
 import { Anonymous } from "@repo/protocol/principal";
 import { ProjectExists, UnknownProject } from "@repo/protocol/refusal";
@@ -64,7 +65,7 @@ const remote =
     args: ArgsOf<M>
   ): Effect.Effect<SuccessOf<M>, ErrorOf<M>> =>
     Effect.gen(function* () {
-      const stub = namespace.get(namespace.idFromName(project));
+      const stub = namespace.get(namespace.idFromName(keyOf(project)));
       const request = yield* encodeCall(method, args);
 
       // A DO that cannot answer (reset, storage gone) is a defect.

@@ -347,20 +347,54 @@ describe(gitRoute, () => {
         "/datekit.git/info/refs",
         "/datekit/git-upload-pack",
         "/datekit--parse-iso--alice.git/git-receive-pack",
+        "/oscabriel/datekit.git/info/refs",
+        "/github.com/pallets/click.git/info/refs",
+        "/alice/notes--fix-week--bob.git/git-receive-pack",
         "/datekit.git/HEAD",
-        "/org/datekit.git/info/refs",
+        "/a/b/c/d.git/info/refs",
         "/rpc",
       ].map(gitRoute)
     ).toStrictEqual([
-      Option.some({ endpoint: "info/refs", name: "datekit" }),
-      Option.some({ endpoint: "git-upload-pack", name: "datekit" }),
+      Option.some({
+        endpoint: "info/refs",
+        name: "datekit",
+        repo: Option.some("datekit"),
+      }),
+      Option.some({
+        endpoint: "git-upload-pack",
+        name: "datekit",
+        repo: Option.some("datekit"),
+      }),
       Option.some({
         endpoint: "git-receive-pack",
         name: "datekit--parse-iso--alice",
+        repo: Option.some("datekit--parse-iso--alice"),
+      }),
+      Option.some({
+        endpoint: "info/refs",
+        name: "oscabriel/datekit",
+        repo: Option.some("datekit"),
+      }),
+      Option.some({
+        endpoint: "info/refs",
+        name: "github.com/pallets/click",
+        repo: Option.some("click"),
+      }),
+      Option.some({
+        endpoint: "git-receive-pack",
+        name: "alice/notes--fix-week--bob",
+        repo: Option.some("alice_notes--fix-week--bob"),
       }),
       Option.none(),
       Option.none(),
       Option.none(),
     ]);
+  });
+
+  // A one-segment address is a legacy key; any other bare word is no project's.
+  it("names no repo for an address no project can have", () => {
+    expect(gitRoute("/demo.git/info/refs")).toStrictEqual(
+      Option.some({ endpoint: "info/refs", name: "demo", repo: Option.none() })
+    );
   });
 });

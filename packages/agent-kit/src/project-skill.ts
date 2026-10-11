@@ -6,6 +6,7 @@
  */
 import { Brand } from "@repo/brand";
 import type { Policy } from "@repo/protocol/domain/policy";
+import { keyOf } from "@repo/protocol/ids";
 import type { LandedSha, ProjectName } from "@repo/protocol/ids";
 import { Effect, Option } from "effect";
 
@@ -22,9 +23,14 @@ import {
 } from "./sections.ts";
 import { code, page } from "./text.ts";
 
-/** The skill's name: `<project>-contribute`, its folder's name too. */
+/**
+ * The skill's name: `<key>-contribute`, by the project's key
+ * (`datekit-contribute`, `oscabriel_foo-contribute`), its folder's name too,
+ * so the forty's skills keep their names and a name reads back to its
+ * project (ADR 0032).
+ */
 export const contributeSkillName = (project: ProjectName) =>
-  `${project}-contribute`;
+  `${keyOf(project)}-contribute`;
 
 /** Where the skill goes: the folders harnesses read project skills from, `.agents` first. */
 export const contributeSkillPaths = (project: ProjectName) => {

@@ -12,7 +12,7 @@ import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
 import { Ask, AskListing } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
-import { AskId, ProjectName, RepoPath } from "@repo/protocol/ids";
+import { AskId, keyOf, ProjectName, RepoPath } from "@repo/protocol/ids";
 import { unanswered } from "@repo/protocol/testing";
 import { Effect, Layer, Option, Schema } from "effect";
 
@@ -124,7 +124,7 @@ const skillBody = platformSkill({ commands: commandDocs(Contracts) }).pipe(
 describe("the CLI's MCP server over stdio, beside its tools", () => {
   it.effect("reads an ask's brief through the Client, in Markdown", () =>
     Effect.gen(function* () {
-      const uri = `${Brand.urlScheme}ask/${project}/${fixWeek}`;
+      const uri = `${Brand.urlScheme}ask/${keyOf(project)}/${fixWeek}`;
 
       const replies = yield* session(datekit, [
         request(1, "server/discover"),

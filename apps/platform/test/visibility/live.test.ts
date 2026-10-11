@@ -49,7 +49,7 @@ describe("the visibility cartridge, plugged in", () => {
       Effect.gen(function* () {
         const publicHost = yield* freshHost;
         const privateHost = yield* freshHost;
-        const layer = RepoName.make("datekit--maintainers");
+        const layer = RepoName.make("alice_datekit--maintainers");
 
         yield* privateHost.create(layer);
 
@@ -59,12 +59,12 @@ describe("the visibility cartridge, plugged in", () => {
           ARTIFACTS_PRIVATE: fakeArtifactsBinding(privateHost, { remoteBase }),
         }).pipe(Effect.orDie);
 
-        yield* publicHost.create(RepoName.make("datekit"));
+        yield* publicHost.create(RepoName.make("alice_datekit"));
 
         const found = yield* LayerRepos.use((repos) =>
           Effect.all({
             layer: Effect.exit(repos.remote(layer)),
-            public: Effect.exit(repos.remote(RepoName.make("datekit"))),
+            public: Effect.exit(repos.remote(RepoName.make("alice_datekit"))),
           })
         ).pipe(Effect.provide(layerRepos(config).pipe(Layer.provide(noFetch))));
 

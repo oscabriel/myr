@@ -1,15 +1,15 @@
 ==> .agents/skills/datekit-contribute/SKILL.md <==
 ---
 name: datekit-contribute
-description: "Answer one of datekit's asks on __NAME__: claim it, change only its territory, run `__CLI__ check`, push it to your fork, and read the verdict. Use when working on datekit, or when a push to it was refused."
+description: "Answer one of oscabriel/datekit's asks on __NAME__: claim it, change only its territory, run `__CLI__ check`, push it to your fork, and read the verdict. Use when working on oscabriel/datekit, or when a push to it was refused."
 metadata:
   managed-by: "__SLUG__"
   landed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   content-hash: "sha256:__HASH__"
 ---
-# Contribute to datekit
+# Contribute to oscabriel/datekit
 
-How to answer datekit's asks on __NAME__. It is generated from datekit's config folder: the gate decides what lands, and where this text and the gate differ, the gate wins. Don't edit it by hand; it is regenerated when the config changes.
+How to answer oscabriel/datekit's asks on __NAME__. It is generated from oscabriel/datekit's config folder: the gate decides what lands, and where this text and the gate differ, the gate wins. Don't edit it by hand; it is regenerated when the config changes.
 
 ## The loop
 
@@ -112,15 +112,15 @@ Norms that nothing checks yet. Keep them; the gate does not refuse an answer tha
 ==> .claude/skills/datekit-contribute/SKILL.md <==
 ---
 name: datekit-contribute
-description: "Answer one of datekit's asks on __NAME__: claim it, change only its territory, run `__CLI__ check`, push it to your fork, and read the verdict. Use when working on datekit, or when a push to it was refused."
+description: "Answer one of oscabriel/datekit's asks on __NAME__: claim it, change only its territory, run `__CLI__ check`, push it to your fork, and read the verdict. Use when working on oscabriel/datekit, or when a push to it was refused."
 metadata:
   managed-by: "__SLUG__"
   landed: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   content-hash: "sha256:__HASH__"
 ---
-# Contribute to datekit
+# Contribute to oscabriel/datekit
 
-How to answer datekit's asks on __NAME__. It is generated from datekit's config folder: the gate decides what lands, and where this text and the gate differ, the gate wins. Don't edit it by hand; it is regenerated when the config changes.
+How to answer oscabriel/datekit's asks on __NAME__. It is generated from oscabriel/datekit's config folder: the gate decides what lands, and where this text and the gate differ, the gate wins. Don't edit it by hand; it is regenerated when the config changes.
 
 ## The loop
 

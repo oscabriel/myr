@@ -47,8 +47,8 @@ __CLI__ login --url https://platform-test.example.workers.dev
 
 ## Projects
 
-- [datekit](https://web-test.example.workers.dev/datekit/llms.txt): Open, 3 open asks.
-- [burrow](https://web-test.example.workers.dev/burrow/llms.txt): Open with sealed evidence, 1 open ask.
+- [oscabriel/datekit](https://web-test.example.workers.dev/oscabriel/datekit/llms.txt): Open, 3 open asks.
+- [oscabriel/burrow](https://web-test.example.workers.dev/oscabriel/burrow/llms.txt): Open with sealed evidence, 1 open ask.
 
 ## Refusals
 
@@ -97,6 +97,7 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | `UnknownRevision` | Lookup | no | 66 | `git ls-remote` | Name `main`, a commit the project holds or one of its tags: `next` lists its refs. |
 | `UnknownProposal` | Lookup | no | 66 | `__CLI__ today` | Check the proposal's id: `next` lists the proposals waiting on you. |
 | `ProjectExists` | Setup | no | 65 | `__CLI__ asks` | Pick another name: that one is taken. |
+| `NotYourNamespace` | Setup | no | 77 |  | Make the project in your own namespace: `next` names it with your handle. |
 | `ImportFailed` | Setup | yes | 75 | `__CLI__ init` | Read `reason`, then import again. |
 | `UnknownEnvItem` | Env | no | 66 | `__CLI__ env shape` | Name a key the project's env shape has: `next` lists them. |
 | `NotSensitive` | Env | no | 65 | `__CLI__ env shape` | Only an `@sensitive` item holds a write-only value: `next` shows which items are. |

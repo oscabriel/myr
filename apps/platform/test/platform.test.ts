@@ -12,7 +12,7 @@ import {
 } from "./fake-env.ts";
 import { rpcClient, served, toolCall } from "./harness.ts";
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("alice/datekit");
 
 /** What building the platform from `env` failed with. */
 const failureOf = (env: Env) => Effect.flip(Layer.build(platform(env)));
@@ -227,7 +227,7 @@ describe("the platform Worker's env", () => {
       // before any port, and nobody is asked to sign in.
       const response = yield* fetch(
         new Request(
-          "http://localhost/datekit--layer--alice.git/info/refs?service=git-upload-pack"
+          "http://localhost/alice/datekit--layer--alice.git/info/refs?service=git-upload-pack"
         )
       );
 

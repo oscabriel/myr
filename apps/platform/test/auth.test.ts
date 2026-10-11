@@ -24,7 +24,7 @@ import {
   toolResult,
 } from "./harness.ts";
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("alice/datekit");
 
 const alice = Handle.make("alice");
 
@@ -154,7 +154,7 @@ describe("discovering how to sign in", () => {
 
         const response = yield* fetch(
           new Request(
-            `${origin}/datekit.git/info/refs?service=git-upload-pack`,
+            `${origin}/alice/datekit.git/info/refs?service=git-upload-pack`,
             { headers: { authorization: "Bearer a-token-nobody-knows" } }
           )
         );

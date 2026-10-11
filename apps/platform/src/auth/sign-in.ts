@@ -23,7 +23,7 @@ import type {
   OAuthAuthorizationServer,
 } from "@cloudflare/workers-oauth-provider";
 import { Brand } from "@repo/brand";
-import { Handle, sameHandle } from "@repo/protocol/ids";
+import { Handle, reservedProjectNames, sameHandle } from "@repo/protocol/ids";
 import {
   Context,
   Data,
@@ -116,8 +116,13 @@ export const SIGN_IN_PATHS = [
   CLI_CLIENT_PATH,
 ] as const;
 
-/** Handles nobody may sign up with: the platform's own words. */
+/**
+ * Handles nobody may sign up with: the platform's own words, and every word
+ * the web serves its own pages at, since a handle is an owner and an owner
+ * is the first segment of a project's address (ADR 0032).
+ */
 const RESERVED_HANDLES: ReadonlySet<string> = new Set([
+  ...reservedProjectNames,
   Brand.slug,
   "admin",
   "api",

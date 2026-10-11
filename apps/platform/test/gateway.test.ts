@@ -11,6 +11,9 @@ import {
   Handle,
   LandedSha,
   ProjectName,
+  keyOf,
+  addressOfRepo,
+  repoNameOfAddress,
   RepoPath,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -39,7 +42,7 @@ import {
   tokens,
 } from "./gateway.fixtures.ts";
 
-const datekit = ProjectName.make("oscabriel/datekit");
+const datekit = ProjectName.make("alice/datekit");
 
 /** The ref the platform keeps a fork's verdict notes under. */
 const notesRef = `refs/notes/${Brand.slug}`;
@@ -47,7 +50,7 @@ const notesRef = `refs/notes/${Brand.slug}`;
 const parseIso = AskId.make("parse-iso");
 
 /** A project made empty, awaiting its first push. */
-const fresh = ProjectName.make("oscabriel/fresh");
+const fresh = ProjectName.make("alice/fresh");
 
 const scenario = aProject({ name: datekit, people: ["bob"] }).pipe(
   withAsk({ id: parseIso, territory: "packages/parser" }),
@@ -82,7 +85,7 @@ const withDatekit = Effect.gen(function* () {
     seed,
     "push",
     "--quiet",
-    `${world.repos}/${datekit}.git`,
+    `${world.repos}/${keyOf(datekit)}.git`,
     "HEAD:refs/heads/main"
   );
   yield* api.recordFirstPush(alice, first).pipe(Effect.orDie);
@@ -176,7 +179,7 @@ describe("git through the platform", () => {
           " ! [remote rejected] HEAD -> main (DirectPush)"
         );
         expect(
-          yield* gitOk(`${repos}/${datekit}.git`, "rev-parse", "main")
+          yield* gitOk(`${repos}/${keyOf(datekit)}.git`, "rev-parse", "main")
         ).toBe(landed);
       }).pipe(Effect.provide(NodeServices.layer)),
     30_000
@@ -217,7 +220,7 @@ describe("git through the platform", () => {
         );
 
         const mainAfterFirst = yield* gitOk(
-          `${repos}/${fresh}.git`,
+          `${repos}/${keyOf(fresh)}.git`,
           "rev-parse",
           "main"
         );
@@ -240,9 +243,9 @@ describe("git through the platform", () => {
           first: byAlice.exitCode,
           main: mainAfterFirst,
         }).toStrictEqual({ again: true, bob: true, first: 0, main: first });
-        expect(yield* gitOk(`${repos}/${fresh}.git`, "rev-parse", "main")).toBe(
-          first
-        );
+        expect(
+          yield* gitOk(`${repos}/${keyOf(fresh)}.git`, "rev-parse", "main")
+        ).toBe(first);
         // The first push became the landed SHA: no other commit can now.
         expect(
           yield* Effect.flip(api.recordFirstPush(alice, second))
@@ -611,8 +614,13 @@ describe("git through the platform", () => {
         const { api, origin } = yield* withDatekit;
         const { claim } = yield* api.claim(alice, parseIso).pipe(Effect.orDie);
 
+        // A fork by its repo's name, a project by its address.
         const refs = (repo: string) =>
-          `${origin}/${repo}.git/info/refs?service=git-upload-pack`;
+          `${origin}/${
+            repo.includes("/")
+              ? repo
+              : Option.getOrElse(addressOfRepo(RepoName.make(repo)), () => repo)
+          }.git/info/refs?service=git-upload-pack`;
 
         expect(yield* request(refs(claim.fork))).toStrictEqual({
           basic: true,
@@ -621,9 +629,9 @@ describe("git through the platform", () => {
         expect(
           (yield* request(refs(claim.fork), `Bearer ${tokens.bob}`)).status
         ).toBe(200);
-        expect((yield* request(refs(`${datekit}--layer--alice`))).status).toBe(
-          404
-        );
+        expect(
+          (yield* request(refs(`${keyOf(datekit)}--layer--alice`))).status
+        ).toBe(404);
         expect(
           (yield* request(refs(`${datekit}--${parseIso}--Alice`))).status
         ).toBe(404);
@@ -672,7 +680,11 @@ const judged = (
   commands: Array.NonEmptyReadonlyArray<Command>
 ) =>
   Effect.gen(function* () {
-    const name = RepoName.make(repo);
+    // A project by its name, or a fork by its repo's name.
+    const name = Option.getOrElse(repoNameOfAddress(repo), () =>
+      RepoName.make(repo)
+    );
+
     const custody = yield* custodyFor(pusher, repoKind(name));
 
     return {
@@ -743,7 +755,7 @@ describe("custody of one push", () => {
     () =>
       Effect.gen(function* () {
         const { projects } = yield* withDatekit;
-        const fork = `${datekit}--me--alice`;
+        const fork = `${keyOf(datekit)}--me--alice`;
         const push = Array.of(moving(mainRef, Option.none()));
 
         expect(yield* judged(projects, alice, fork, push)).toStrictEqual({
@@ -763,7 +775,7 @@ describe("custody of one push", () => {
       Effect.gen(function* () {
         const { api, landed, projects } = yield* withDatekit;
         const { claim } = yield* api.claim(bob, parseIso).pipe(Effect.orDie);
-        const working = `${datekit}--me--alice`;
+        const working = `${keyOf(datekit)}--me--alice`;
         const tag = RefName.make("refs/tags/v1");
         const side = RefName.make("refs/heads/side");
         const tagged = Array.of(moving(tag, Option.none()));
@@ -818,7 +830,7 @@ describe("custody of one push", () => {
         const unmade = yield* judged(
           projects,
           alice,
-          ProjectName.make("oscabriel/nokit"),
+          ProjectName.make("alice/nokit"),
           first
         );
 
@@ -837,14 +849,14 @@ describe("custody of one push", () => {
     () =>
       Effect.gen(function* () {
         const { projects } = yield* gatewayWorld([scenario]);
-        const nobody = ProjectName.make("oscabriel/nokit");
+        const nobody = ProjectName.make("alice/nokit");
         const push = Array.of(moving(mainRef, Option.none()));
 
         expect(
           (yield* judged(
             projects,
             alice,
-            `${nobody}--${parseIso}--alice`,
+            `${keyOf(nobody)}--${parseIso}--alice`,
             push
           )).admitted
         ).toStrictEqual([new UnknownProject({ project: nobody })]);

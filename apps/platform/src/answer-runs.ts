@@ -18,6 +18,7 @@
 import { DraftParams as DraftRun } from "@repo/project/draft-runs";
 import {
   CommitSha,
+  keyOf,
   LayerName,
   ProjectName,
   RequestId,
@@ -94,7 +95,10 @@ const instanceId = (named: string, suffix: string) => {
 
 /** The instance an admission runs as: one per project, layer and pushed head. */
 export const admissionId = (params: AdmissionParams) =>
-  instanceId(`admit-${params.project}-${params.layer}`, `-${params.head}`);
+  instanceId(
+    `admit-${keyOf(params.project)}-${params.layer}`,
+    `-${params.head}`
+  );
 
 /**
  * The instance a draft's round runs as: one per project, proposal and
@@ -103,4 +107,7 @@ export const admissionId = (params: AdmissionParams) =>
 export const draftId = (
   params: Pick<DraftParams, "project" | "proposal" | "round">
 ) =>
-  instanceId(`draft-${params.project}`, `-${params.proposal}-r${params.round}`);
+  instanceId(
+    `draft-${keyOf(params.project)}`,
+    `-${params.proposal}-r${params.round}`
+  );

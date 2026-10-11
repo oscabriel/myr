@@ -14,7 +14,7 @@
  * licence.
  */
 import { ProjectName } from "@repo/protocol/ids";
-import { Option, Redacted } from "effect";
+import { Option, Redacted, Schema } from "effect";
 
 /** One repo to import: the project it becomes, where it is, its branch, what it is, and its licence. */
 export interface ImportExample {
@@ -38,7 +38,7 @@ const example = (
   branch,
   kind,
   licence,
-  project: ProjectName.make(project),
+  project: Schema.decodeSync(ProjectName)(project),
   url,
 });
 

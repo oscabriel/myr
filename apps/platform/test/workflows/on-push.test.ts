@@ -60,7 +60,7 @@ import { fakeEnv, without } from "../fake-env.ts";
  * namespace and repo, renamed to a test project's.
  */
 const deliveredLine =
-  '{"id": "88018624-a405-49c4-ba41-7dc60e4a2c89", "type": "cf.artifacts.repo.pushed", "source": {"namespace": "projects-local", "repoName": "datekit"}, "payload": {"ref": "refs/heads/main", "before": "cfc3cc308874a348d38c7143c9093c17a196e4af", "after": "88359ce33219db41afafbcad7adc19f4f4d84381", "commits": [{"id": "88359ce33219db41afafbcad7adc19f4f4d84381", "message": "ev-0", "messageTruncated": false, "timestamp": "2026-10-06T20:10:48.000Z", "author": {"name": "probe", "email": "probe@invalid"}, "committer": {"name": "probe", "email": "probe@invalid"}, "parents": ["cfc3cc308874a348d38c7143c9093c17a196e4af"]}], "totalCommitsCount": 1, "commitsTruncated": false}}';
+  '{"id": "88018624-a405-49c4-ba41-7dc60e4a2c89", "type": "cf.artifacts.repo.pushed", "source": {"namespace": "projects-local", "repoName": "alice_datekit"}, "payload": {"ref": "refs/heads/main", "before": "cfc3cc308874a348d38c7143c9093c17a196e4af", "after": "88359ce33219db41afafbcad7adc19f4f4d84381", "commits": [{"id": "88359ce33219db41afafbcad7adc19f4f4d84381", "message": "ev-0", "messageTruncated": false, "timestamp": "2026-10-06T20:10:48.000Z", "author": {"name": "probe", "email": "probe@invalid"}, "committer": {"name": "probe", "email": "probe@invalid"}, "parents": ["cfc3cc308874a348d38c7143c9093c17a196e4af"]}], "totalCommitsCount": 1, "commitsTruncated": false}}';
 
 /**
  * The event the same spike saw for a custom ref pushed beside `main`: its
@@ -68,7 +68,7 @@ const deliveredLine =
  * lists no commits.
  */
 const createdLine =
-  '{"id": "bc6f5f68-4f76-45a7-8258-ad4ffd465cae", "type": "cf.artifacts.repo.pushed", "source": {"namespace": "projects-local", "repoName": "datekit"}, "payload": {"ref": "refs/asked/ev", "before": "0000000000000000000000000000000000000000", "after": "8812c641c30d4a4633c6e77e3efe52c8f029f87d", "commits": [], "totalCommitsCount": 0, "commitsTruncated": false}}';
+  '{"id": "bc6f5f68-4f76-45a7-8258-ad4ffd465cae", "type": "cf.artifacts.repo.pushed", "source": {"namespace": "projects-local", "repoName": "alice_datekit"}, "payload": {"ref": "refs/asked/ev", "before": "0000000000000000000000000000000000000000", "after": "8812c641c30d4a4633c6e77e3efe52c8f029f87d", "commits": [], "totalCommitsCount": 0, "commitsTruncated": false}}';
 
 const fromLine = Schema.decodeUnknownEffect(Schema.fromJsonString(OnPushEvent));
 
@@ -89,7 +89,7 @@ describe(OnPushEvent, () => {
         before: CommitSha.make("cfc3cc308874a348d38c7143c9093c17a196e4af"),
         id: "88018624-a405-49c4-ba41-7dc60e4a2c89",
         ref: "refs/heads/main",
-        repo: RepoName.make("datekit"),
+        repo: RepoName.make("alice_datekit"),
         timestamps: [DateTime.makeUnsafe("2026-10-06T20:10:48.000Z")],
       });
     })
@@ -134,7 +134,7 @@ const pushed = (on: {
   };
 };
 
-const datekit = ProjectName.make("oscabriel/datekit");
+const datekit = ProjectName.make("alice/datekit");
 
 const parseIso = AskId.make("parse-iso");
 
@@ -172,7 +172,7 @@ const table: readonly {
   readonly verdict: PushVerdict;
 }[] = [
   {
-    event: pushed({ after: landedSha, repo: "datekit" }),
+    event: pushed({ after: landedSha, repo: "alice_datekit" }),
     facts: facts(canonical, { landed: new Set([landedSha]) }),
     title: "canonical main moved to a commit the platform landed",
     verdict: ignored("own landing"),
@@ -181,7 +181,7 @@ const table: readonly {
     event: pushed({
       after: landedSha,
       ref: `${Brand.refsPrefix}landed`,
-      repo: "datekit",
+      repo: "alice_datekit",
     }),
     facts: facts(canonical),
     title: "the landed mirror moved",
@@ -191,7 +191,7 @@ const table: readonly {
     event: pushed({
       after: strayHead,
       ref: `refs/notes/${Brand.slug}`,
-      repo: "datekit",
+      repo: "alice_datekit",
     }),
     facts: facts(canonical),
     title: "the verdict notes moved",
@@ -201,7 +201,7 @@ const table: readonly {
     event: pushed({
       after: strayHead,
       ref: `${Brand.refsPrefix}compose/${"e".repeat(40)}`,
-      repo: "datekit",
+      repo: "alice_datekit",
     }),
     facts: facts(canonical),
     title: "a composed commit was parked under the platform's prefix",
@@ -211,14 +211,18 @@ const table: readonly {
     event: pushed({
       after: strayHead,
       ref: "refs/heads/release",
-      repo: "datekit",
+      repo: "alice_datekit",
     }),
     facts: facts(canonical),
     title: "a canonical branch other than main moved",
     verdict: ignored("not main"),
   },
   {
-    event: pushed({ after: strayHead, before: landedSha, repo: "datekit" }),
+    event: pushed({
+      after: strayHead,
+      before: landedSha,
+      repo: "alice_datekit",
+    }),
     facts: facts(canonical, { landed: new Set([landedSha]) }),
     title: "canonical main moved to a commit no landing made",
     verdict: PushVerdict.cases.Stray.make({
@@ -229,7 +233,7 @@ const table: readonly {
     }),
   },
   {
-    event: pushed({ after: ZeroSha, before: landedSha, repo: "datekit" }),
+    event: pushed({ after: ZeroSha, before: landedSha, repo: "alice_datekit" }),
     facts: facts(canonical, { landed: new Set([landedSha]) }),
     title: "canonical main was deleted",
     verdict: PushVerdict.cases.Stray.make({
@@ -240,13 +244,13 @@ const table: readonly {
     }),
   },
   {
-    event: pushed({ after: answerHead, repo: "datekit--parse-iso--bob" }),
+    event: pushed({ after: answerHead, repo: "alice_datekit--parse-iso--bob" }),
     facts: facts(bobsFork, { seen: true }),
     title: "a claim fork took a push the gateway recorded",
     verdict: ignored("seen"),
   },
   {
-    event: pushed({ after: answerHead, repo: "datekit--parse-iso--bob" }),
+    event: pushed({ after: answerHead, repo: "alice_datekit--parse-iso--bob" }),
     facts: facts(bobsFork),
     title: "a claim fork took a push the gateway never recorded",
     verdict: PushVerdict.cases.ForkPush.make({
@@ -259,7 +263,7 @@ const table: readonly {
     event: pushed({
       after: answerHead,
       ref: `refs/notes/${Brand.slug}`,
-      repo: "datekit--parse-iso--bob",
+      repo: "alice_datekit--parse-iso--bob",
     }),
     facts: facts(bobsFork),
     title: "a claim fork's verdict notes moved",
@@ -269,14 +273,14 @@ const table: readonly {
     event: pushed({
       after: ZeroSha,
       before: answerHead,
-      repo: "datekit--parse-iso--bob",
+      repo: "alice_datekit--parse-iso--bob",
     }),
     facts: facts(bobsFork),
     title: "a claim fork's branch was deleted",
     verdict: ignored("deleted ref"),
   },
   {
-    event: pushed({ after: answerHead, repo: "datekit--me--alice" }),
+    event: pushed({ after: answerHead, repo: "alice_datekit--me--alice" }),
     facts: facts(
       RepoKind.WorkingFork({ handle: Handle.make("alice"), project: datekit })
     ),
@@ -443,16 +447,16 @@ describe(runOnPush, () => {
 
         const verdicts = yield* Effect.forEach(
           [
-            pushed({ after: scenario.landed, repo: "datekit" }),
+            pushed({ after: scenario.landed, repo: "alice_datekit" }),
             pushed({
               after: scenario.landed,
               ref: `${Brand.refsPrefix}landed`,
-              repo: "datekit",
+              repo: "alice_datekit",
             }),
             pushed({
               after: strayHead,
               ref: `refs/notes/${Brand.slug}`,
-              repo: "datekit",
+              repo: "alice_datekit",
             }),
           ],
           (event) => onPush(event, projects)
@@ -472,7 +476,7 @@ describe(runOnPush, () => {
     () =>
       Effect.gen(function* () {
         const { api, projects } = yield* world;
-        const fork = "datekit--parse-iso--bob";
+        const fork = "alice_datekit--parse-iso--bob";
         const elsewhere = sha("datekit:elsewhere");
 
         /** When bob's claim last heard a push, as he sees it. */
@@ -538,7 +542,7 @@ describe(runOnPush, () => {
           pushed({
             after: strayHead,
             before: scenario.landed,
-            repo: "datekit",
+            repo: "alice_datekit",
           }),
           projects
         );
@@ -582,7 +586,7 @@ describe(runOnPush, () => {
           after: strayHead,
           before: scenario.landed,
           id: "2027e2b8-96df-4364-a992-3be1b702d7f4",
-          repo: "datekit",
+          repo: "alice_datekit",
         });
 
         const steps = yield* memoSteps();
@@ -627,7 +631,7 @@ describe(runOnPush, () => {
         const stray = pushed({
           after: strayHead,
           before: scenario.landed,
-          repo: "datekit",
+          repo: "alice_datekit",
         });
 
         // The instance's run, then the same run replayed by the engine.
@@ -699,7 +703,7 @@ describe(runOnPush, () => {
           pushed({
             after: strayHead,
             before: scenario.landed,
-            repo: "datekit",
+            repo: "alice_datekit",
           }),
           Layer.succeed(Projects, late)
         );
@@ -720,7 +724,11 @@ describe(runOnPush, () => {
         const engine = engineSteps();
 
         const verdict = yield* runOnPush(
-          pushed({ after: ZeroSha, before: scenario.landed, repo: "datekit" })
+          pushed({
+            after: ZeroSha,
+            before: scenario.landed,
+            repo: "alice_datekit",
+          })
         ).pipe(Effect.provide([workflowSteps(engine.steps), projects]));
 
         const { decisions } = yield* api.today(alice);
@@ -753,7 +761,7 @@ describe(runOnPush, () => {
       const { projects } = yield* world;
 
       const verdicts = yield* Effect.forEach(
-        ["Not.A.Project", "datekit--parse-iso", "elsewhere"],
+        ["Not.A.Project", "alice_datekit--parse-iso", "elsewhere"],
         (repo) => onPush(pushed({ after: strayHead, repo }), projects)
       );
 

@@ -224,7 +224,7 @@ const world = (kept: Kept) =>
     const first = yield* client.commit(
       "Start",
       [
-        ["package.json", '{ "name": "datekit" }\n'],
+        ["package.json", '{ "name": "alice/datekit" }\n'],
         [".env.schema", datekitSchema],
       ],
       []

@@ -49,7 +49,7 @@ const platformWith = (reads: Option.Option<Ref.Ref<number>>) =>
 
       const sha = yield* client.commit("Start", [
         ["README.md", readme],
-        ["package.json", '{ "name": "datekit" }\n'],
+        ["package.json", '{ "name": "alice/datekit" }\n'],
       ]);
 
       yield* host.push(RepoName.make(keyOf(project)), client.source, [

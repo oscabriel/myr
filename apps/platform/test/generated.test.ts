@@ -61,9 +61,9 @@ const mainRef = RefName.make("refs/heads/main");
 
 const runFile = `${Brand.configDir}/run.json`;
 
-const skill = `.agents/skills/${project}-contribute/SKILL.md`;
+const skill = `.agents/skills/${keyOf(project)}-contribute/SKILL.md`;
 
-const claudeSkill = `.claude/skills/${project}-contribute/SKILL.md`;
+const claudeSkill = `.claude/skills/${keyOf(project)}-contribute/SKILL.md`;
 
 const generatedPaths = [skill, claudeSkill, "AGENTS.md"];
 
@@ -76,7 +76,7 @@ const withUnit = {
 
 /** What alice pushes first: a package, the run block, and notes of the project's own. */
 const start: Files = [
-  ["package.json", '{ "name": "datekit" }\n'],
+  ["package.json", '{ "name": "alice/datekit" }\n'],
   ["src/parse.ts", "export const parse = (s) => ({});\n"],
   [runFile, `${JSON.stringify(lintOnly)}\n`],
   ["AGENTS.md", "# Datekit\n\nOur own notes for agents.\n"],

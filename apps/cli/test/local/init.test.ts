@@ -99,7 +99,7 @@ const aMachine = Effect.gen(function* () {
 
   yield* fs.writeFileString(
     path.join(repo, "package.json"),
-    JSON.stringify({ name: "demo", scripts }, null, 2)
+    JSON.stringify({ name: "oscabriel/demo", scripts }, null, 2)
   );
 
   yield* fs.makeDirectory(path.join(repo, ".github", "workflows"), {
@@ -279,7 +279,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
           "--json",
         ]);
@@ -289,14 +289,16 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           command: "init",
           data: {
             files: [CONFIG],
-            project: "demo",
+            project: "oscabriel/demo",
             pushed: true,
             remote: machine.remote,
           },
           ok: true,
           v: 1,
         });
-        expect(yield* platform.calls).toStrictEqual([{ project: "demo" }]);
+        expect(yield* platform.calls).toStrictEqual([
+          { project: "oscabriel/demo" },
+        ]);
 
         const after = yield* state(machine);
 
@@ -343,7 +345,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
         ]);
 
         expect(ran.code).toBe(2);
@@ -368,7 +370,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--dry-run",
           "--json",
         ]);
@@ -435,7 +437,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
             ],
             ["git", "push", Brand.slug, "HEAD:main"],
           ],
-          payload: { project: "demo" },
+          payload: { project: "oscabriel/demo" },
         });
         expect({
           calls: yield* platform.calls,
@@ -465,7 +467,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
           "--json",
         ]);
@@ -480,7 +482,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           command: "init",
           data: {
             files: [],
-            project: "demo",
+            project: "oscabriel/demo",
             pushed: true,
             remote: machine.remote,
           },
@@ -522,7 +524,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
           "--json",
         ]);
@@ -532,7 +534,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           command: "init",
           data: {
             files: [CONFIG],
-            project: "demo",
+            project: "oscabriel/demo",
             pushed: true,
             remote: machine.remote,
           },
@@ -569,18 +571,20 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
         ]);
 
         expect(ran.code).toBe(65);
         expect(
           ran.err.filter((line) =>
-            line.includes("a project named demo already exists")
+            line.includes("a project named oscabriel/demo already exists")
           )
         ).toHaveLength(1);
         expect(ran.out).toStrictEqual([]);
-        expect(yield* platform.calls).toStrictEqual([{ project: "demo" }]);
+        expect(yield* platform.calls).toStrictEqual([
+          { project: "oscabriel/demo" },
+        ]);
 
         const after = yield* state(machine);
 
@@ -610,7 +614,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
         const ran = yield* cli(machine, platform.layer, [
           "init",
           "--project",
-          "demo",
+          "oscabriel/demo",
           "--yes",
           "--no-push",
           "--json",
@@ -621,7 +625,7 @@ describe(`${Brand.cli} init in an existing repo`, () => {
           command: "init",
           data: {
             files: [CONFIG],
-            project: "demo",
+            project: "oscabriel/demo",
             pushed: false,
             remote: gateway,
           },
@@ -689,6 +693,8 @@ describe(`${Brand.cli} init --import`, () => {
           "init",
           "--import",
           url,
+          "--project",
+          "oscabriel/widgets",
           "--branch",
           "trunk",
           "--yes",
@@ -697,7 +703,7 @@ describe(`${Brand.cli} init --import`, () => {
 
         expect(ran.code).toBe(0);
         expect(yield* platform.calls).toStrictEqual([
-          { import: { branch: "trunk", url }, project: "widgets" },
+          { import: { branch: "trunk", url }, project: "oscabriel/widgets" },
         ]);
         expect(yield* envelopeOf(ran.out)).toStrictEqual({
           command: "init",
@@ -705,7 +711,7 @@ describe(`${Brand.cli} init --import`, () => {
             clone: `git clone ${gateway}`,
             files: [],
             landed,
-            project: "widgets",
+            project: "oscabriel/widgets",
             pushed: false,
             remote: gateway,
           },
@@ -744,6 +750,8 @@ describe(`${Brand.cli} init --import`, () => {
           "init",
           "--import",
           "https://example.test/acme/widgets.git",
+          "--project",
+          "oscabriel/widgets",
           "--yes",
         ]);
 
@@ -770,6 +778,8 @@ describe(`${Brand.cli} init --import`, () => {
           "widgets",
           "--import",
           url,
+          "--project",
+          "oscabriel/widgets",
           "--yes",
         ]);
 

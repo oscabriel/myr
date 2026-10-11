@@ -20,6 +20,7 @@ import {
   ProjectName,
   RepoName,
   RequestId,
+  keyOf,
   TreeSha,
 } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
@@ -66,11 +67,11 @@ const context = untouchable<ExecutionContext>("ExecutionContext");
 const workerFetch = (request: Request) =>
   Promise.resolve(worker.fetch(request, env, context));
 
-const nowhere = ProjectName.make("oscabriel/nowhere");
+const nowhere = ProjectName.make("alice/nowhere");
 
-const datekit = ProjectName.make("oscabriel/datekit");
+const datekit = ProjectName.make("alice/datekit");
 
-const canonical = RepoName.make("datekit");
+const canonical = RepoName.make("alice_datekit");
 
 const landed = LandedSha.make("7".repeat(40));
 
@@ -213,7 +214,11 @@ describe("the Worker module", () => {
           yield* Effect.exit(anyone.listAsks({ project: nowhere }))
         ).toStrictEqual(Exit.fail(new UnknownProject({ project: nowhere })));
         expect(callsTo(env.PROJECT).slice(before)).toStrictEqual([
-          { caller: Anonymous.make({}), method: "listAsks", project: nowhere },
+          {
+            caller: Anonymous.make({}),
+            method: "listAsks",
+            project: keyOf(nowhere),
+          },
         ]);
       })
   );
@@ -331,7 +336,7 @@ const signedUp = (handle: string, password: string) =>
     const config = yield* Schema.decodeUnknownEffect(PlatformEnv)({
       ...fakeEnv(),
       OAUTH_KV: store,
-      PROJECT: fakeProjects([datekit]),
+      PROJECT: fakeProjects([keyOf(datekit)]),
     }).pipe(Effect.orDie);
 
     const { dispose: disposePlatform, handler: platformFetch } = serve(
@@ -435,7 +440,7 @@ describe("the Worker's sessions", () => {
           {
             caller: Person.make({ handle: Handle.make("alice") }),
             method: "status",
-            project: datekit,
+            project: keyOf(datekit),
           },
         ]);
       })

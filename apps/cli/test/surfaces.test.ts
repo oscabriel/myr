@@ -233,7 +233,7 @@ const decision = DecisionId.make("dec-000001");
 const decideArgs = [
   "decide",
   "--project",
-  "datekit",
+  "oscabriel/datekit",
   "--decision",
   decision,
   "--choice",
@@ -290,7 +290,11 @@ describe("a command that needs approval", () => {
           command: "decide",
           data: {
             dryRun: true,
-            payload: { choice: "accept", decision, project: "datekit" },
+            payload: {
+              choice: "accept",
+              decision,
+              project: "oscabriel/datekit",
+            },
           },
           ok: true,
           v: 1,
@@ -331,7 +335,7 @@ describe("a read", () => {
   it.effect("has no --dry-run: asking for one is a usage error", () =>
     Effect.gen(function* () {
       const run = yield* runProgram(
-        ["asks", "--project", "datekit", "--dry-run"],
+        ["asks", "--project", "oscabriel/datekit", "--dry-run"],
         { handlers: unanswered }
       );
 
@@ -377,7 +381,7 @@ describe("the project a command is about", () => {
       });
 
       expect(run.code).toBe(0);
-      expect(yield* Ref.get(asked)).toStrictEqual(["datekit"]);
+      expect(yield* Ref.get(asked)).toStrictEqual(["oscabriel/datekit"]);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
@@ -405,7 +409,7 @@ describe("a misuse", () => {
     () =>
       Effect.gen(function* () {
         const run = yield* runProgram(
-          ["asks", "--project", "datekit", "--bogus", "--json"],
+          ["asks", "--project", "oscabriel/datekit", "--bogus", "--json"],
           { env: { CLAUDECODE: "1" }, handlers: unanswered }
         );
 

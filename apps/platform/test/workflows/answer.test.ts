@@ -17,7 +17,7 @@ import { Projects } from "@repo/project/projects";
 import { Verdict } from "@repo/protocol/domain/answer";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Outcome } from "@repo/protocol/domain/outcome";
-import { LaneName, RequestId } from "@repo/protocol/ids";
+import { keyOf, LaneName, RequestId } from "@repo/protocol/ids";
 import type { CommitSha, LandedSha } from "@repo/protocol/ids";
 import {
   ChecksFailed,
@@ -337,7 +337,7 @@ describe(runAnswer, () => {
             refusals: [
               new ChecksFailed({
                 lane: unit,
-                logRef: `${project}/${answer.requestId}/unit#1`,
+                logRef: `${keyOf(project)}/${answer.requestId}/unit#1`,
                 next: "bun run test",
               }),
             ],
@@ -446,7 +446,7 @@ describe(runAnswer, () => {
             refusals: [
               new ChecksFailed({
                 lane: unit,
-                logRef: `${project}/${answer.requestId}/unit#1`,
+                logRef: `${keyOf(project)}/${answer.requestId}/unit#1`,
                 next: "bun run test",
               }),
             ],
@@ -468,7 +468,7 @@ describe(runAnswer, () => {
           refusals: [
             new ChecksFailed({
               lane: lint,
-              logRef: `${project}/${answer.requestId}/lint#1`,
+              logRef: `${keyOf(project)}/${answer.requestId}/lint#1`,
               next: "bun run lint",
             }),
           ],

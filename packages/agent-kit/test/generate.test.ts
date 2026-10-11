@@ -1,6 +1,7 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
+import { keyOf } from "@repo/protocol/ids";
 import { Effect, Option, Schema } from "effect";
 
 import { agentsBlock, upsertAgentsBlock } from "../src/agents-block.ts";
@@ -29,7 +30,7 @@ const plugin = `plugins/${Brand.slug}`;
 const frontmatterName = (content: string) =>
   Option.fromNullishOr(/^name: (?<name>.+)$/mu.exec(content)?.groups?.name);
 
-const skill = `${project}-contribute`;
+const skill = `${keyOf(project)}-contribute`;
 
 /** `sha256("hello\n")`, as every tool that hashes prints it. */
 const helloDigest =

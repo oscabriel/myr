@@ -43,7 +43,10 @@ const mainRef = RefName.make("refs/heads/main");
 
 /** A library of four small packages, as each project's first commit holds it. */
 const start = (name: string): Files => [
-  ["package.json", `{ "name": "${name}", "workspaces": ["packages/*"] }\n`],
+  [
+    "package.json",
+    `{ "name": "${name.slice(name.lastIndexOf("/") + 1)}", "workspaces": ["packages/*"] }\n`,
+  ],
   [
     "packages/format/src/format.ts",
     "export const format = (d) => String(d);\n",

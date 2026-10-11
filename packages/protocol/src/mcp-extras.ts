@@ -17,15 +17,19 @@ import { McpSchema, McpServer } from "effect/ai";
 import { Client } from "./contracts.ts";
 import type { AskListing } from "./domain/ask.ts";
 import type { ProjectListing } from "./domain/front-page.ts";
-import { AskId, ProjectName } from "./ids.ts";
+import { AskId, keyOf, ProjectName, ProjectNameFromKey } from "./ids.ts";
 import { Refusal } from "./refusal.ts";
 import { explain } from "./render.ts";
 
 const MARKDOWN = "text/markdown";
 
-/** Where an ask's brief is read: `<scheme>ask/<project>/<ask>`. */
+/**
+ * Where an ask's brief is read: `<scheme>ask/<key>/<ask>`, by the
+ * project's key (`datekit`, `alice_datekit`): a resource template's
+ * parameter is one segment, and a name has two or three (ADR 0032).
+ */
 const briefUri = (project: ProjectName, ask: AskId) =>
-  `${Brand.urlScheme}ask/${project}/${ask}`;
+  `${Brand.urlScheme}ask/${keyOf(project)}/${ask}`;
 
 /** Where the platform's projects are read. */
 const projectsUri = `${Brand.urlScheme}projects`;
@@ -85,7 +89,7 @@ const briefTemplate: TemplateStringsArray = Object.assign(briefParts, {
 /** An ask's brief, read as `showAsk` gives it. */
 const askBrief = McpServer.resource(
   briefTemplate,
-  McpSchema.param("project", ProjectName),
+  McpSchema.param("project", ProjectNameFromKey),
   McpSchema.param("ask", AskId)
 )({
   content: (uri, project, ask) =>

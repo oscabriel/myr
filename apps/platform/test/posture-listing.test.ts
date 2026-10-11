@@ -29,9 +29,9 @@ import { RpcTest } from "effect/rpc";
 import { MemoryRateLimits, WorkerCaps } from "../src/adapters/rate-limits.ts";
 import { Handlers } from "../src/handlers.ts";
 
-const datekit = ProjectName.make("oscabriel/datekit");
+const datekit = ProjectName.make("alice/datekit");
 
-const ghost = ProjectName.make("oscabriel/ghost");
+const ghost = ProjectName.make("alice/ghost");
 
 /**
  * datekit's project, whose only answered read is the posture its ledger

@@ -123,7 +123,7 @@ const landingJson = (sha: string) => ({
     { handle: "alice", role: "Signed-off-by" },
   ],
   landedAt: "2026-10-06T12:00:00.000Z",
-  project: "datekit",
+  project: "oscabriel/datekit",
   sha,
 });
 
@@ -257,7 +257,7 @@ describe(`${Brand.cli} why`, () => {
 
         const ran = yield* run(
           dir,
-          ["src/week.ts:3", "--project", "datekit", "--json"],
+          ["src/week.ts:3", "--project", "oscabriel/datekit", "--json"],
           platformKnowing(Option.some(second), calls)
         );
 
@@ -275,7 +275,7 @@ describe(`${Brand.cli} why`, () => {
           v: 1,
         });
         expect(yield* Ref.get(calls)).toStrictEqual([
-          { project: "datekit", sha: second },
+          { project: "oscabriel/datekit", sha: second },
         ]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
@@ -289,7 +289,7 @@ describe(`${Brand.cli} why`, () => {
 
         const ran = yield* run(
           dir,
-          ["src/week.ts:3", "--project", "datekit"],
+          ["src/week.ts:3", "--project", "oscabriel/datekit"],
           platformKnowing(Option.some(second), calls),
           OutputForAgent
         );
@@ -325,7 +325,7 @@ describe(`${Brand.cli} why`, () => {
 
         const agent = yield* run(
           dir,
-          ["src/week.ts:3", "--project", "datekit"],
+          ["src/week.ts:3", "--project", "oscabriel/datekit"],
           opening,
           OutputForAgent
         );
@@ -338,7 +338,7 @@ describe(`${Brand.cli} why`, () => {
 
         const person = yield* run(
           dir,
-          ["src/week.ts:3", "--project", "datekit"],
+          ["src/week.ts:3", "--project", "oscabriel/datekit"],
           opening
         );
 
@@ -359,7 +359,7 @@ describe(`${Brand.cli} why`, () => {
 
         const json = yield* run(
           dir,
-          ["src/week.ts:3", "--project", "datekit", "--json"],
+          ["src/week.ts:3", "--project", "oscabriel/datekit", "--json"],
           unknowing
         );
 
@@ -382,7 +382,7 @@ describe(`${Brand.cli} why`, () => {
 
         const text = yield* run(
           dir,
-          ["src/week.ts:3", "--project", "datekit"],
+          ["src/week.ts:3", "--project", "oscabriel/datekit"],
           unknowing
         );
 
@@ -409,7 +409,7 @@ describe(`${Brand.cli} why`, () => {
 
       const ran = yield* run(
         dir,
-        [...args, "--project", "datekit"],
+        [...args, "--project", "oscabriel/datekit"],
         platformKnowing(Option.none(), calls)
       );
 
@@ -429,7 +429,7 @@ describe(`${Brand.cli} why`, () => {
 
         const ran = yield* run(
           `${dir}/src`,
-          ["week.ts:3", "--project", "datekit", "--json"],
+          ["week.ts:3", "--project", "oscabriel/datekit", "--json"],
           platformKnowing(Option.some(second), calls)
         );
 
@@ -463,7 +463,7 @@ describe(`${Brand.cli} why`, () => {
 
         expect(ran.code).toBe(0);
         expect(yield* Ref.get(calls)).toStrictEqual([
-          { project: "datekit", sha: second },
+          { project: "oscabriel/datekit", sha: second },
         ]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
@@ -527,7 +527,7 @@ describe(`${Brand.cli} why`, () => {
 
       const ran = yield* run(
         dir,
-        ["src/week.ts:3", "--project", "datekit", "--json"],
+        ["src/week.ts:3", "--project", "oscabriel/datekit", "--json"],
         platformKnowing(Option.some(second), calls)
       );
 
@@ -555,7 +555,7 @@ describe(`${Brand.cli} why`, () => {
 
         const ran = yield* run(
           dir,
-          ["src/week.ts:3", "--project", "datekit"],
+          ["src/week.ts:3", "--project", "oscabriel/datekit"],
           platform(() => Effect.fail(new UnknownProject({ project })))
         );
 

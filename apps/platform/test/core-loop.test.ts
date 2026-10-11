@@ -41,7 +41,7 @@ import { Array, Context, Deferred, Effect, Layer } from "effect";
 import { pushRequestId } from "../src/adapters/custody.ts";
 import { coreLoopWorld } from "./world.ts";
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("dora/datekit");
 
 const parseIso = AskId.make("parse-iso");
 
@@ -70,7 +70,7 @@ const start = {
   ].join("\n"),
   [`${Brand.configDir}/vouched.td`]: "alice\nbob\n",
   "README.md": readme,
-  "package.json": '{ "name": "datekit", "private": true }\n',
+  "package.json": '{ "name": "dora/datekit", "private": true }\n',
   "src/parse.ts":
     "export const parse = (iso: string) => ({ month: 0, year: 0 });\n",
 };
@@ -308,7 +308,7 @@ describe("the core loop, through the platform's fetch handler with real git", ()
               new OutOfScope({ paths: [RepoPath.make("README.md")] }),
             ]),
           },
-          remote: `${world.origin}/${claim.fork}.git`,
+          remote: `${world.origin}/${project}--parse-iso--alice.git`,
         });
 
         // 5. She puts the readme back and pushes again, through a harness

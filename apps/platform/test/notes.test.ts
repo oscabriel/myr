@@ -67,7 +67,7 @@ import {
 } from "./workflows/answer.fixtures.ts";
 import type { Admitted } from "./workflows/answer.fixtures.ts";
 
-const fork = RepoName.make("datekit--fix-week--alice");
+const fork = RepoName.make("alice_datekit--fix-week--alice");
 
 const main = RefName.make("refs/heads/main");
 
@@ -100,7 +100,7 @@ const refusedOn = (head: CommitSha) =>
       ],
     }),
     patchId: PatchId.make("2".repeat(64)),
-    project: ProjectName.make("oscabriel/datekit"),
+    project: ProjectName.make("alice/datekit"),
     stage: "checks",
     tree: TreeSha.make("3".repeat(40)),
     verifier: "platform",

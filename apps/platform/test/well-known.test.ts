@@ -27,18 +27,18 @@ import { Effect, Layer, Option, Ref, Schema } from "effect";
 import { agentSkills } from "../src/well-known.ts";
 import { coreLoopWorld } from "./world.ts";
 
-const datekit = ProjectName.make("oscabriel/datekit");
+const datekit = ProjectName.make("dora/datekit");
 
-const burrow = ProjectName.make("oscabriel/burrow");
+const burrow = ProjectName.make("dora/burrow");
 
 /** Listed by the front page, but never made. */
-const ghost = ProjectName.make("oscabriel/ghost");
+const ghost = ProjectName.make("alice/ghost");
 
-const skillPath = ".agents/skills/datekit-contribute/SKILL.md";
+const skillPath = ".agents/skills/dora_datekit-contribute/SKILL.md";
 
 const skill = [
   "---",
-  "name: datekit-contribute",
+  "name: dora_datekit-contribute",
   `description: "Answer one of datekit's asks."`,
   "---",
   "# Contribute to datekit",
@@ -49,7 +49,7 @@ const skill = [
 
 /** `sha256sum` of `skill`, worked out apart from the platform. */
 const skillDigest =
-  "sha256:d1eea4794e8625845990e8eefea0d6eeca4d1cde4f376418334ac7541bf1066d";
+  "sha256:57d83c7a661d93340b2c3fbf4f524e0a0e28bddf7914b740aff5cbe3b35333ac";
 
 const Index = Schema.fromJsonString(
   Schema.Struct({
@@ -133,15 +133,17 @@ describe("the agent skills index", () => {
             {
               description: "Answer one of datekit's asks.",
               digest: skillDigest,
-              name: "datekit-contribute",
+              name: "dora_datekit-contribute",
               type: "skill-md",
-              url: "/.well-known/agent-skills/datekit-contribute/SKILL.md",
+              url: "/.well-known/agent-skills/dora_datekit-contribute/SKILL.md",
             },
           ],
         });
 
         expect(
-          yield* get("/.well-known/agent-skills/datekit-contribute/SKILL.md")
+          yield* get(
+            "/.well-known/agent-skills/dora_datekit-contribute/SKILL.md"
+          )
         ).toStrictEqual({
           body: skill,
           contentType: "text/markdown; charset=utf-8",
@@ -158,7 +160,7 @@ describe("the agent skills index", () => {
         expect(
           yield* Effect.forEach(
             [
-              "/.well-known/agent-skills/burrow-contribute/SKILL.md",
+              "/.well-known/agent-skills/dora_burrow-contribute/SKILL.md",
               "/.well-known/agent-skills/ghost-contribute/SKILL.md",
               "/.well-known/agent-skills/datekit/SKILL.md",
               "/.well-known/agent-skills/Datekit-contribute/SKILL.md",
@@ -167,7 +169,7 @@ describe("the agent skills index", () => {
             (path) => Effect.map(get(path), ({ status }) => [path, status])
           )
         ).toStrictEqual([
-          ["/.well-known/agent-skills/burrow-contribute/SKILL.md", 404],
+          ["/.well-known/agent-skills/dora_burrow-contribute/SKILL.md", 404],
           ["/.well-known/agent-skills/ghost-contribute/SKILL.md", 404],
           ["/.well-known/agent-skills/datekit/SKILL.md", 404],
           ["/.well-known/agent-skills/Datekit-contribute/SKILL.md", 404],
@@ -201,7 +203,7 @@ describe(agentSkills, () => {
       Effect.gen(function* () {
         const host = yield* RepoHost;
         const client = yield* gitClient(memoryFs());
-        const repo = RepoName.make(datekit);
+        const repo = RepoName.make(keyOf(datekit));
 
         // The mirror holds the last landing; main has moved on without one,
         // as between a landing's two pushes, or after a stray push.
@@ -229,7 +231,7 @@ describe(agentSkills, () => {
 
         expect({
           file: (yield* at(
-            "/.well-known/agent-skills/datekit-contribute/SKILL.md"
+            "/.well-known/agent-skills/dora_datekit-contribute/SKILL.md"
           )).body,
           skills: skills.map(({ description, digest }) => ({
             description,

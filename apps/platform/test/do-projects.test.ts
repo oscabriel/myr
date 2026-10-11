@@ -10,6 +10,7 @@ import {
   CommitSha,
   DecisionId,
   EnvKey,
+  keyOf,
   LandedSha,
   LayerName,
   ProjectName,
@@ -46,7 +47,7 @@ import {
   world,
 } from "./project-do.fixtures.ts";
 
-const other = ProjectName.make("oscabriel/other");
+const other = ProjectName.make("alice/other");
 
 const sha = CommitSha.make("a".repeat(40));
 
@@ -249,7 +250,7 @@ describe("Projects over the Project DO namespace", () => {
       expect(outcome.other).toStrictEqual({
         refused: new UnknownProject({ project: other }),
       });
-      expect(yield* names).toStrictEqual([project, other]);
+      expect(yield* names).toStrictEqual([keyOf(project), keyOf(other)]);
     }).pipe(Effect.provide(world))
   );
 

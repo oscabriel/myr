@@ -123,7 +123,10 @@ describe("the code reads over /rpc", () => {
 
         // The wire's request, written as a client would send it, with a
         // `repo` beside the project that no contract has.
-        const payload = JSON.stringify({ project, repo: "datekit--me--alice" });
+        const payload = JSON.stringify({
+          project,
+          repo: "alice_datekit--me--alice",
+        });
 
         const response = yield* Effect.promise(() =>
           handler(
@@ -140,7 +143,7 @@ describe("the code reads over /rpc", () => {
         const canonical = yield* anyone.readTree({ project });
 
         expect(response.status).toBe(200);
-        expect(text).not.toContain("datekit--me--alice");
+        expect(text).not.toContain("alice_datekit--me--alice");
         expect(text).toContain(canonical.at);
       })
   );

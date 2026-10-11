@@ -16,7 +16,8 @@
  */
 import { SqliteClient } from "@effect/sql-sqlite-do";
 import { AnswerRuns } from "@repo/project/answer-runs";
-import { ProjectName } from "@repo/protocol/ids";
+import { nameOfKey, ProjectKey } from "@repo/protocol/ids";
+import type { ProjectName } from "@repo/protocol/ids";
 import { DurableObject } from "cloudflare:workers";
 import { Context, Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 
@@ -75,7 +76,12 @@ const shellOf = (ctx: DurableObjectState, env: Env) =>
     Shell,
     Effect.gen(function* () {
       const config = yield* decodeEnv(env);
-      const name = Schema.decodeUnknownOption(ProjectName)(ctx.id.name);
+
+      // The DO is named by the project's key (ADR 0032).
+      const name = Option.flatMap(
+        Schema.decodeUnknownOption(ProjectKey)(ctx.id.name),
+        nameOfKey
+      );
 
       return yield* projectShell({
         name: Option.getOrUndefined(name),

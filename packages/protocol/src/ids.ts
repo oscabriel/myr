@@ -479,6 +479,25 @@ export const nameOfKey = (key: ProjectKey): Option.Option<ProjectName> => {
 
 const decodeName = Schema.decodeOption(ProjectName);
 
+const SOURCE_URL =
+  /^https:\/\/(?<host>[^/?#]+)\/(?<account>[^/?#]+)\/(?<repo>[^/?#]+?)(?:\.git)?\/?$/u;
+
+/**
+ * A project's name read from its key, where a surface carries the key in
+ * one segment (an MCP resource's URI, a projection row): a key no project
+ * can have stays as it is, and the name's pattern then refuses it.
+ */
+export const ProjectNameFromKey = ProjectKey.pipe(
+  Schema.decodeTo(FullName, {
+    decode: SchemaGetter.transform((key: string) =>
+      Option.getOrElse(nameOfKey(ProjectKey.make(key)), () => key)
+    ),
+    encode: SchemaGetter.transform((name: string) =>
+      keyOf(ProjectName.make(name))
+    ),
+  })
+);
+
 /**
  * The repo a gateway address names, the `.git` already stripped:
  * `oscabriel/datekit` is the project's key, `oscabriel/datekit--fix--alice`
@@ -522,21 +541,17 @@ export const addressOfRepo = (repo: RepoName): Option.Option<string> => {
  */
 export const sourceNamespaceOf = (
   url: string
-): Option.Option<SourceNamespace> =>
-  Option.flatMap(Option.liftThrowable(() => new URL(url))(), (parsed) => {
-    const [account, repo, ...rest] = parsed.pathname
-      .split("/")
-      .filter((s) => s !== "");
+): Option.Option<SourceNamespace> => {
+  // `https://<host>/<account>/<repo>(.git)(/)`, read without `URL`, which
+  // not every host the protocol compiles on provides.
+  const parts = SOURCE_URL.exec(url);
+  const host = parts?.groups?.host?.toLowerCase();
+  const account = parts?.groups?.account?.toLowerCase();
 
-    return account === undefined ||
-      repo === undefined ||
-      rest.length > 0 ||
-      !isSourceHost(parsed.hostname.toLowerCase())
-      ? Option.none()
-      : Schema.decodeOption(SourceNamespace)(
-          `${parsed.hostname.toLowerCase()}/${account.toLowerCase()}`
-        );
-  });
+  return host === undefined || account === undefined || !isSourceHost(host)
+    ? Option.none()
+    : Schema.decodeOption(SourceNamespace)(`${host}/${account}`);
+};
 
 /** A person's handle on the platform, as their sign-in provider spells it. */
 export const Handle = Schema.String.pipe(

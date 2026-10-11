@@ -41,8 +41,8 @@ import {
   LaneName,
   RepoName,
   RepoPath,
-  keyOf,
   RequestId,
+  keyOf as projectKeyOf,
 } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -83,7 +83,7 @@ export const policy: Policy = Schema.decodeSync(Policy)({
 
 export const { project } = scenario;
 
-export const repo = RepoName.make(keyOf(project));
+export const repo = RepoName.make(projectKeyOf(project));
 
 export const alice = Person.make({ handle: scenario.initializer });
 
@@ -93,7 +93,9 @@ export const bob = Person.make({
 
 export const parseIso = AskId.make("parse-iso");
 
-export const bobFork = RepoName.make(`${project}--${parseIso}--${bob.handle}`);
+export const bobFork = RepoName.make(
+  `${projectKeyOf(project)}--${parseIso}--${bob.handle}`
+);
 
 const ask: Ask = Option.getOrThrow(
   Array.findFirst(policy.asks, ({ id }) => id === parseIso)

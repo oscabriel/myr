@@ -81,7 +81,7 @@ const proposal = ProposalId.make("prop-000001");
 const params = DraftParams.make({ project, proposal, round: 1 });
 
 const start = [
-  ["package.json", '{ "name": "datekit", "type": "module" }\n'],
+  ["package.json", '{ "name": "alice/datekit", "type": "module" }\n'],
   ["src/parse.ts", "export const parse = (s) => ({});\n"],
 ] as const;
 
@@ -503,17 +503,21 @@ describe("the Workflow's draft runs", () => {
           made: fake.made,
           restarted: fake.restarted,
         }).toStrictEqual({
-          made: [`draft-${project}-${proposal}-r1`],
+          made: [`draft-${keyOf(project)}-${proposal}-r1`],
           restarted: [],
         });
 
-        expect(draftId(params)).toBe(`draft-${project}-${proposal}-r1`);
+        expect(draftId(params)).toBe(`draft-${keyOf(project)}-${proposal}-r1`);
       })
   );
 
   it("keeps every round of a long-named project's proposals its own instance, within the engine's 100 characters", () => {
-    const long = ProjectName.make(`${"a-long-project-name".repeat(6)}x`);
-    const longToo = ProjectName.make(`${"a-long-project-name".repeat(6)}y`);
+    const long = ProjectName.make(`alice/${"a-long-project-name".repeat(6)}x`);
+
+    const longToo = ProjectName.make(
+      `alice/${"a-long-project-name".repeat(6)}y`
+    );
+
     const other = ProposalId.make("prop-000002");
 
     const rounds = [
@@ -562,7 +566,7 @@ describe("the Workflow's draft runs", () => {
           errored: errored.restarted,
         }).toStrictEqual({
           complete: [],
-          errored: [`draft-${project}-${proposal}-r1`],
+          errored: [`draft-${keyOf(project)}-${proposal}-r1`],
         });
       })
   );

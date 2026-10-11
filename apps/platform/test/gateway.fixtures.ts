@@ -36,6 +36,7 @@ import {
   LaneName,
   RepoName,
   keyOf,
+  addressOfRepo,
   RepoPath,
 } from "@repo/protocol/ids";
 import type { LandedSha, ProjectName, RequestId } from "@repo/protocol/ids";
@@ -394,6 +395,12 @@ export const gatewayWorld = (scenarios: readonly Scenario[]) =>
       root,
       seen,
       /** A repo's URL at the gateway. */
-      urlOf: (repo: string) => `${origin}/${repo}.git`,
+      /** A repo's URL at the gateway: a project by its name, a fork by its address. */
+      urlOf: (repo: string) =>
+        `${origin}/${
+          repo.includes("/")
+            ? repo
+            : Option.getOrElse(addressOfRepo(RepoName.make(repo)), () => repo)
+        }.git`,
     };
   });

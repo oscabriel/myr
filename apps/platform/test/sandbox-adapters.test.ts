@@ -53,11 +53,11 @@ import { CheckRunnerSandbox } from "../src/adapters/check-runner-sandbox.ts";
 import type { SandboxBinding } from "../src/adapters/check-runner-sandbox.ts";
 import { LanderSandbox } from "../src/adapters/lander-sandbox.ts";
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("alice/datekit");
 
-const canonical = RepoName.make("datekit");
+const canonical = RepoName.make("alice_datekit");
 
-const fork = RepoName.make("datekit--fix-parse--alice");
+const fork = RepoName.make("alice_datekit--fix-parse--alice");
 
 const base = CommitSha.make("2".repeat(40));
 
@@ -632,7 +632,7 @@ describe("a sandbox job that fails", () => {
     () =>
       Effect.gen(function* () {
         const { lander, minted, revoked } = yield* world();
-        const gone = RepoName.make("datekit--gone--bob");
+        const gone = RepoName.make("alice_datekit--gone--bob");
 
         const { exit, lines } = yield* withLogs(
           lander.merge({ ...mergeJob, fork: gone })

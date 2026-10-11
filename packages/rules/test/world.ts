@@ -47,7 +47,7 @@ export const factsEncoded = {
   ci: [{ content: "steps: [bun test]", path: ".github/workflows/ci.yml" }],
   initializer: "olivia",
   now,
-  project: "datekit",
+  project: "oscabriel/datekit",
   seed: 7,
   vouchFile: "# vouched\npriya\n-mallory Spam\ngitlab:eve\n",
   workspaces: [

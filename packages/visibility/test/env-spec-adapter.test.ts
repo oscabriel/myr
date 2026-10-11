@@ -104,7 +104,7 @@ describe("the /env-spec adapter", () => {
               tags: [],
             },
           ],
-          project: "datekit",
+          project: "oscabriel/datekit",
         });
       })
   );

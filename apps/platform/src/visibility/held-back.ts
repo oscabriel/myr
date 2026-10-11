@@ -22,8 +22,8 @@ import type { RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
 import type { Layer as LayerDeclaration } from "@repo/protocol/domain/visibility";
-import { BlobSha, RepoName, RepoPath } from "@repo/protocol/ids";
-import type { Handle } from "@repo/protocol/ids";
+import { BlobSha, keyOf, RepoName, RepoPath } from "@repo/protocol/ids";
+import type { Handle, ProjectName } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
 import { privatePaths, writeDown } from "@repo/visibility/guards";
 import { LayerRepos } from "@repo/visibility/layer-repos";
@@ -36,9 +36,9 @@ import { layerRepos } from "./layer-repos.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** A layer's repo: as declared, or `<project>--<layer>`. */
-const repoOf = (project: string, layer: LayerDeclaration) =>
-  layer.repo ?? RepoName.make(`${project}--${layer.name}`);
+/** A layer's repo: as declared, or `<key>--<layer>`, by the project's key. */
+const repoOf = (project: ProjectName, layer: LayerDeclaration) =>
+  layer.repo ?? RepoName.make(`${keyOf(project)}--${layer.name}`);
 
 /** Every blob under `tree` in `repo`, at any depth. */
 const blobsUnder = (

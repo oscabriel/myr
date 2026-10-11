@@ -6,6 +6,7 @@
  * source and licence.
  */
 import { ProjectName } from "@repo/protocol/ids";
+import { Schema } from "effect";
 
 /** One imported project: its name here, its source, its licence, and what it is. */
 export interface ImportedProject {
@@ -23,7 +24,7 @@ const imported = (
 ): ImportedProject => ({
   kind,
   licence,
-  project: ProjectName.make(project),
+  project: Schema.decodeSync(ProjectName)(project),
   url,
 });
 

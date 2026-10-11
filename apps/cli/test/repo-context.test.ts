@@ -24,6 +24,20 @@ describe("a repo's name", () => {
     );
   });
 
+  it("reads a project's name of two or three segments, in lowercase", () => {
+    expect(parseRepoName("Oscabriel/Datekit")).toStrictEqual(
+      Option.some({ kind: "canonical", project })
+    );
+    expect(parseRepoName("github.com/pallets/click--fix--alice")).toStrictEqual(
+      Option.some({
+        ask: AskId.make("fix"),
+        handle: Handle.make("alice"),
+        kind: "claim",
+        project: ProjectName.make("github.com/pallets/click"),
+      })
+    );
+  });
+
   it("names a claim's fork: project, ask and handle", () => {
     expect(parseRepoName("datekit--fix-week--alice")).toStrictEqual(
       Option.some({
@@ -53,7 +67,6 @@ describe("a repo's name", () => {
 
   it.each([
     "",
-    "Datekit",
     "datekit--fix-week--Alice",
     "datekit--fix-week--alice--again",
     "datekit--me--",
@@ -78,9 +91,15 @@ describe("a remote's url", () => {
     ).toStrictEqual(Option.some({ origin: platform, repo: "datekit" }));
   });
 
+  it("reads a project's name of two or three segments", () => {
+    expect(parseRemote("https://github.com/owner/datekit.git")).toStrictEqual(
+      Option.some({ origin: "https://github.com", repo: "owner/datekit" })
+    );
+  });
+
   it.each([
     "git@github.com:owner/datekit.git",
-    "https://github.com/owner/datekit.git",
+    "https://platform.example/a/b/c/d.git",
     "file:///srv/datekit.git",
     "not a url",
   ])("is no platform remote: %j", (url) => {

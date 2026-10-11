@@ -846,7 +846,7 @@ describe("a stored value where it must not be", () => {
 });
 
 /** A fork the adapter clones from, in a store of its own. */
-const sandboxFork = RepoName.make("datekit--parse-iso--bob");
+const sandboxFork = RepoName.make("alice_datekit--parse-iso--bob");
 
 /** A held-back job, as the held-back step sends it: the suite alone. */
 const sealedJob: CheckJob = {

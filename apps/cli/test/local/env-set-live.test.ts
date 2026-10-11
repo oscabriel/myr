@@ -30,6 +30,7 @@ import {
   EnvKey,
   Handle,
   ProjectName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import {
@@ -74,7 +75,7 @@ import { RemoteClient } from "../../src/remote.ts";
 /** The world, from the repo root: the platform's Node world, cartridge composed. */
 const WORLD = "apps/platform/test/visibility/serve-cartridge-world.ts";
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("ines-v/datekit");
 
 const token = EnvKey.make("SENTRY_AUTH_TOKEN");
 
@@ -709,7 +710,7 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
             err: [],
             out: [
               expect.stringMatching(
-                /^SENTRY_AUTH_TOKEN on datekit was set by ines-v at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\. Nobody can read it back\.$/u
+                /^SENTRY_AUTH_TOKEN on ines-v\/datekit was set by ines-v at \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\. Nobody can read it back\.$/u
               ),
             ],
           });
@@ -896,7 +897,7 @@ layer(ScenarioOnce, { excludeTestServices: true, timeout: "240 seconds" })(
           expect(answered.exitCode).toBe(0);
           expect(answered.stderr).toContain(`remote: checking ${ask} at `);
           expect(answerJobs.map(({ repo }) => repo)).toContain(
-            `${project}--${ask}--${bram.handle}`
+            `${keyOf(project)}--${ask}--${bram.handle}`
           );
           expect(
             answerJobs.map((job) => ({

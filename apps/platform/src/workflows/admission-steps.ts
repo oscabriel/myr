@@ -26,7 +26,13 @@ import { Projects } from "@repo/project/projects";
 import { AdmissionRun } from "@repo/project/visibility-port";
 import type { AdmissionPlan } from "@repo/project/visibility-port";
 import { HeldBackResult } from "@repo/protocol/domain/answer";
-import { AreaName, CommitSha, LandedSha, RepoName } from "@repo/protocol/ids";
+import {
+  AreaName,
+  CommitSha,
+  keyOf,
+  LandedSha,
+  RepoName,
+} from "@repo/protocol/ids";
 import { Array as Arr, Effect, Option, Schema } from "effect";
 
 import type { AdmissionParams } from "../answer-runs.ts";
@@ -140,7 +146,7 @@ export const admissionSteps = (
             heldBack: found.value.job,
             lanes: [],
             project: params.project,
-            repo: RepoName.make(params.project),
+            repo: RepoName.make(keyOf(params.project)),
             run: plan.value.run,
           });
 

@@ -34,6 +34,7 @@ import {
   LayerName,
   RepoName,
   RepoPath,
+  keyOf,
   SuiteRoot,
 } from "@repo/protocol/ids";
 import { Principal } from "@repo/protocol/principal";
@@ -64,7 +65,7 @@ import { alice, project, worldWith } from "../workflows/answer.fixtures.ts";
 
 export const maintainers = LayerName.make("maintainers");
 
-export const layerRepo = RepoName.make(`${project}--maintainers`);
+export const layerRepo = RepoName.make(`${keyOf(project)}--maintainers`);
 
 export const exportArea = AreaName.make("export");
 

@@ -136,7 +136,7 @@ export const fixedFiles: Files = [
 
 /** The fork a claim of `parse-iso` pushes to. */
 export const forkOf = (who: Person) =>
-  RepoName.make(`${project}--${parseIso}--${who.handle}`);
+  RepoName.make(`${keyOf(project)}--${parseIso}--${who.handle}`);
 
 /** What the Checker answers, by `(tree or commit, lane)`; the test adds to it. */
 export class CheckScript extends Context.Service<

@@ -47,5 +47,5 @@ __CLI__ login --url https://platform-test.example.workers.dev
 
 ## Projects
 
-- [datekit](https://web-test.example.workers.dev/datekit/llms.txt): Open, 3 open asks.
-- [burrow](https://web-test.example.workers.dev/burrow/llms.txt): Open with sealed evidence, 1 open ask.
+- [oscabriel/datekit](https://web-test.example.workers.dev/oscabriel/datekit/llms.txt): Open, 3 open asks.
+- [oscabriel/burrow](https://web-test.example.workers.dev/oscabriel/burrow/llms.txt): Open with sealed evidence, 1 open ask.

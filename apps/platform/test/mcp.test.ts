@@ -27,6 +27,7 @@ import {
   ProjectName,
   ProposalId,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import { CurrentPrincipal, Principal } from "@repo/protocol/principal";
@@ -61,14 +62,14 @@ import { noProjects, origin, served } from "./harness.ts";
 import { coreLoopWorld } from "./world.ts";
 import type { CoreLoopWorld } from "./world.ts";
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("dora/datekit");
 
 const fixWeek = AskId.make("fix-week");
 
 /** An ask datekit never opened, and a project nobody made. */
 const nope = AskId.make("no-such-ask");
 
-const nowhere = ProjectName.make("oscabriel/nowhere");
+const nowhere = ProjectName.make("alice/nowhere");
 
 /** The lane an ask's `redThenGreen` check runs in. */
 const redThenGreen = LaneName.make("redThenGreen");
@@ -89,7 +90,7 @@ const start = {
   ].join("\n"),
   [`${Brand.configDir}/vouched.td`]: "alice\nbob\n",
   "README.md": "datekit: dates, parsed\n",
-  "package.json": '{ "name": "datekit", "private": true }\n',
+  "package.json": '{ "name": "dora/datekit", "private": true }\n',
   "src/week.ts": "export const week = (iso: string) => 0;\n",
 };
 
@@ -345,7 +346,7 @@ const Answered = Schema.Struct({
 
 /** Where an ask's brief is read: `<scheme>ask/<project>/<ask>`. */
 const briefUri = (of: ProjectName, ask: AskId) =>
-  `${Brand.urlScheme}ask/${of}/${ask}`;
+  `${Brand.urlScheme}ask/${keyOf(of)}/${ask}`;
 
 /**
  * The platform's skill body, from agent-kit's command list: the contracts'

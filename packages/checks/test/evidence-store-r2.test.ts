@@ -153,7 +153,7 @@ describe("EvidenceStore over an R2 bucket", () => {
 
         expect(objects.get(key)?.options.customMetadata).toStrictEqual({
           lane: "unit",
-          project: "datekit",
+          project: "oscabriel/datekit",
         });
       }).pipe(over(bucket));
     }
