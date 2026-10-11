@@ -29,6 +29,7 @@ import {
   ProjectName,
   ProposalId,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
@@ -61,7 +62,7 @@ const scenario = aProject({ people: ["carol"] }).pipe(
 
 const { policy, project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const alice = Person.make({ handle: scenario.initializer });
 

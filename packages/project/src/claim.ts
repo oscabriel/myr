@@ -10,6 +10,7 @@ import {
   AskId,
   CommitSha,
   Handle,
+  keyOf,
   LandedSha,
   ProjectName,
   RepoName,
@@ -127,9 +128,9 @@ export interface ClaimStep {
   readonly state: ClaimState;
 }
 
-/** A claim's fork: `<project>--<ask>--<handle in lowercase>`. */
+/** A claim's fork: `<key>--<ask>--<handle in lowercase>`, by the project's key. */
 export const forkName = (project: ProjectName, ask: AskId, handle: Handle) =>
-  RepoName.make(`${project}--${ask}--${handle.toLowerCase()}`);
+  RepoName.make(`${keyOf(project)}--${ask}--${handle.toLowerCase()}`);
 
 /** What `transition` returns: a step, or the refusal that changes nothing. */
 export type ClaimResult = Result.Result<ClaimStep, ClaimRefusal>;
@@ -218,7 +219,7 @@ const grant = (
   return move(
     live,
     ClaimEffect.MakeFork({
-      from: RepoName.make(made.project),
+      from: RepoName.make(keyOf(made.project)),
       name: live.fork,
     }),
     ClaimEffect.SetAlarm({ at: live.warnsAt }),

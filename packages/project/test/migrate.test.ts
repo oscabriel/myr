@@ -39,6 +39,7 @@ import {
   LaneName,
   RepoName,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
@@ -145,7 +146,7 @@ const scenario = family.pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -184,7 +185,10 @@ const legacyFile = "packages/p1/src/legacy.ts";
 
 /** The project as alice first pushes it: six packages calling `legacyFetch`. */
 const start: Files = [
-  ["package.json", '{ "name": "burrow", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/burrow", "workspaces": ["packages/*"] }\n',
+  ],
   ["scripts/count-callers.mjs", "// prints {total, byModule} for a name\n"],
   [legacyFile, "export const legacyFetch = (url) => fetch(url);\n"],
   ...packages.map((name): readonly [string, string] => [
@@ -611,7 +615,9 @@ const answer = (
   }
 ) =>
   Effect.gen(function* () {
-    const fork = RepoName.make(`${project}--${input.ask}--${input.who.handle}`);
+    const fork = RepoName.make(
+      `${keyOf(project)}--${input.ask}--${input.who.handle}`
+    );
     const files = yield* filesAt(input.base);
 
     const head = yield* Pusher.use((pusher) =>

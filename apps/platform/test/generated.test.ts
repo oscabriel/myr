@@ -35,6 +35,7 @@ import {
   RepoName,
   RepoPath,
   RequestId,
+  keyOf,
   TreeSha,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -52,7 +53,7 @@ const scenario = aProject();
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const alice = Person.make({ handle: scenario.initializer });
 

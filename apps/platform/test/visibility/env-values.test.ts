@@ -31,7 +31,7 @@ import { Contracts } from "@repo/protocol/contracts";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { Policy } from "@repo/protocol/domain/policy";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
-import { EnvKey, Handle, RepoName } from "@repo/protocol/ids";
+import { EnvKey, Handle, keyOf, RepoName } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { NotDecider } from "@repo/protocol/refusal";
 import { Finishers } from "@repo/rules/finish";
@@ -72,7 +72,7 @@ const scenario = aProject({ deciders: ["ines-v"], people: ["bram"] });
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const token = EnvKey.make("SENTRY_AUTH_TOKEN");
 

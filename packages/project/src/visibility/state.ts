@@ -45,6 +45,7 @@ import {
   AreaName,
   BlobSha,
   CommitSha,
+  keyOf,
   LayerName,
   ProjectName,
   RepoName,
@@ -157,7 +158,7 @@ const decodeManifest = Schema.decodeUnknownEffect(
 
 /** The repo a declared layer keeps in the private namespace. */
 const repoFor = (project: ProjectName, layer: LayerName) =>
-  RepoName.make(`${project}--${layer}`);
+  RepoName.make(`${keyOf(project)}--${layer}`);
 
 /**
  * Whether a layer gets a repo of its own. A personal layer is each

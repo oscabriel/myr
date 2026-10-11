@@ -41,6 +41,7 @@ import {
   LaneName,
   RepoName,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
@@ -82,7 +83,7 @@ export const policy: Policy = Schema.decodeSync(Policy)({
 
 export const { project } = scenario;
 
-export const repo = RepoName.make(project);
+export const repo = RepoName.make(keyOf(project));
 
 export const alice = Person.make({ handle: scenario.initializer });
 

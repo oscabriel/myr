@@ -60,11 +60,11 @@ const landed = LandedSha.make(hex(0xa3));
 
 const tree = TreeSha.make(hex(0x7_e1));
 
-const fork = RepoName.make("datekit--parse-dates--bob");
+const fork = RepoName.make("alice_datekit--parse-dates--bob");
 
 const ask = AskId.make("parse-dates");
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("alice/datekit");
 
 const requestId = RequestId.make("push-4ead");
 

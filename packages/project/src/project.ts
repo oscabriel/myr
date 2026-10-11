@@ -130,7 +130,12 @@ import {
   RepoPath,
   RequestId,
   TreeSha,
+  addressOfRepo,
+  isSourceNamespace,
+  keyOf,
+  ownerOf,
   sameHandle,
+  sourceNamespaceOf,
 } from "@repo/protocol/ids";
 import type { DecisionId, LaneName, ProjectName } from "@repo/protocol/ids";
 import { Posture } from "@repo/protocol/posture";
@@ -143,6 +148,7 @@ import {
   NotClaimed,
   NotDecider,
   NotRedFirst,
+  NotYourNamespace,
   ProjectExists,
   ProposalClosed,
   Refusal,
@@ -513,7 +519,7 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
       readonly project: ProjectName;
       readonly remote: string;
     },
-    ProjectExists | ImportFailed
+    ProjectExists | NotYourNamespace | ImportFailed
   >;
   readonly recordFirstPush: (
     caller: Person,
@@ -2049,7 +2055,8 @@ export const projectService = (
     const envPort = yield* ProjectEnv;
     const draftRuns = yield* DraftRuns;
     const lock = yield* Semaphore.make(1);
-    const repo = RepoName.make(name);
+    // The repo is the project's key, as every repo of its forks is (ADR 0032).
+    const repo = RepoName.make(keyOf(name));
 
     const withPorts = <A, E>(effect: Effect.Effect<A, E, ProjectPorts>) =>
       Effect.provideContext(effect, ports);
@@ -2220,7 +2227,7 @@ export const projectService = (
             toView(state, {
               checkCommand,
               project: name,
-              remote: `${gateway}/${fork}.git`,
+              remote: `${gateway}/${Option.getOrElse(addressOfRepo(fork), () => fork)}.git`,
             }),
             (view): ClaimView =>
               pinned === undefined ? view : { ...view, suite: pinned.suite }
@@ -3932,6 +3939,19 @@ export const projectService = (
                 );
           }
 
+          // A project is made only in a namespace of one's own: the caller's
+          // handle, or the source namespace the import's URL names (ADR 0032).
+          const owner = ownerOf(name);
+
+          const mine = isSourceNamespace(owner)
+            ? input.import !== undefined &&
+              Option.contains(sourceNamespaceOf(input.import.url), owner)
+            : owner === caller.handle.toLowerCase();
+
+          if (!mine) {
+            return yield* NotYourNamespace.of(name, caller.handle);
+          }
+
           const remote = `${yield* GatewayUrl}/${name}.git`;
 
           const made: ProjectRow = {
@@ -5601,7 +5621,7 @@ export const projectService = (
       read: hydrate,
       remote: (fork) =>
         Effect.gen(function* () {
-          return `${yield* GatewayUrl}/${fork}.git`;
+          return `${yield* GatewayUrl}/${Option.getOrElse(addressOfRepo(fork), () => fork)}.git`;
         }),
       repo,
       runEnv: unlandedEnv,

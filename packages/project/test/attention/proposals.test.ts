@@ -34,7 +34,7 @@ const mode = (vouch: Policy["vouch"]["mode"]): Policy => ({
 });
 
 const sealed = {
-  fork: RepoName.make("datekit--me--carol"),
+  fork: RepoName.make("alice_datekit--me--carol"),
   head: sha("carol's fix for ISO weeks"),
 };
 

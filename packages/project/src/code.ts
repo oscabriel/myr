@@ -22,7 +22,7 @@ import type {
   WhyView,
 } from "@repo/protocol/domain/code";
 import type { LandingView } from "@repo/protocol/domain/landing";
-import { RepoName } from "@repo/protocol/ids";
+import { keyOf, RepoName } from "@repo/protocol/ids";
 import type {
   CommitSha,
   LandedSha,
@@ -69,7 +69,7 @@ export const codeProjectOf = (
   head: Effect.map(api.head(), ({ landed }) => Option.fromUndefinedOr(landed)),
   landings: api.landings,
   project,
-  repo: RepoName.make(project),
+  repo: RepoName.make(keyOf(project)),
 });
 
 /** Main's landed commit, its tags peeled and sorted newest first, and its forks. */

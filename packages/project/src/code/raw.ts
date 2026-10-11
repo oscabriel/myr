@@ -168,12 +168,22 @@ export const rawRequestOf = (
 
 /**
  * Everything after `/<project>/raw/` in a request's URL (whole, or its path
- * and query), still encoded. Read from the URL itself, not a router's
- * parameter: a router decodes `%2F`, which would cut a tag's name
+ * and query), still encoded, where the project's name takes as many
+ * segments as it has (`oscabriel/datekit`, `github.com/pallets/click`, or a
+ * legacy key's one). Read from the URL itself, not a router's parameter: a
+ * router decodes `%2F`, which would cut a tag's name
  * (`%40datekit%2Fcore%402.0.0`) in two.
  */
-export const rawRestOf = (url: string): string =>
-  new URL(url, "http://raw.invalid").pathname.split("/").slice(3).join("/");
+export const rawRestOf = (url: string, project: ProjectName): string => {
+  const segments = new URL(url, "http://raw.invalid").pathname.split("/");
+  const named = project.split("/").length;
+
+  if (segments[named + 1] === "raw") {
+    return segments.slice(named + 2).join("/");
+  }
+
+  return segments[2] === "raw" ? segments.slice(3).join("/") : "";
+};
 
 /**
  * The answer to `GET /<project>/raw/<rest>` at `url` (whole, or its path
@@ -184,7 +194,7 @@ export const rawFor = (
   project: ProjectName,
   url: string
 ): Effect.Effect<Response, never, RepoHost | Projects> =>
-  Option.match(rawRequestOf(rawRestOf(url)), {
+  Option.match(rawRequestOf(rawRestOf(url, project)), {
     onNone: () => Effect.succeed(notFound()),
     onSome: ({ path, rev }) =>
       Projects.use((projects) => projects.get(project)).pipe(

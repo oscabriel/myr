@@ -14,6 +14,7 @@ import {
   LandedSha,
   ProjectName,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
@@ -23,9 +24,9 @@ import { movedBy } from "../src/answer-runs/movers.ts";
 import { Content, writer } from "./code-fixtures.ts";
 import type { Tree } from "./code-fixtures.ts";
 
-const project = ProjectName.make("oscabriel/movekit");
+const project = ProjectName.make("alice/movekit");
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const pathOf = (name: string) => RepoPath.make(`src/${name}.ts`);
 

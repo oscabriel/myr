@@ -9,6 +9,7 @@ import {
   LaneName,
   ProjectName,
   RepoName,
+  keyOf,
   TreeSha,
 } from "@repo/protocol/ids";
 import { VerifierBlocked } from "@repo/protocol/refusal";
@@ -67,7 +68,7 @@ const wireFor = (project = "datekit"): CheckWire => ({
     placeholders: [],
     project: ProjectName.make(project),
     proxies: [],
-    repo: RepoName.make(project),
+    repo: RepoName.make(keyOf(project)),
     run,
   },
 });

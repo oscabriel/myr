@@ -9,7 +9,7 @@ import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { CodeCacheLive } from "@repo/project/code/cache";
 import { Projects } from "@repo/project/projects";
-import { RepoName } from "@repo/protocol/ids";
+import { keyOf, RepoName } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { advanceTo } from "@repo/testkit/clock";
 import { gitClient } from "@repo/testkit/git-client";
@@ -52,7 +52,7 @@ const platformWith = (reads: Option.Option<Ref.Ref<number>>) =>
         ["package.json", '{ "name": "datekit" }\n'],
       ]);
 
-      yield* host.push(RepoName.make(project), client.source, [
+      yield* host.push(RepoName.make(keyOf(project)), client.source, [
         { from: Option.none(), ref: RefName.make("refs/heads/main"), to: sha },
         {
           from: Option.none(),

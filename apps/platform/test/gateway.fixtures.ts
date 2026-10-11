@@ -35,6 +35,7 @@ import {
   Handle,
   LaneName,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import type { LandedSha, ProjectName, RequestId } from "@repo/protocol/ids";
@@ -372,7 +373,7 @@ export const gatewayWorld = (scenarios: readonly Scenario[]) =>
         const { commit: composed } = yield* lander.compose({
           files,
           main,
-          repo: RepoName.make(ask.project),
+          repo: RepoName.make(keyOf(ask.project)),
         });
 
         script.set(

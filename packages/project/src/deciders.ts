@@ -51,6 +51,7 @@ import {
   RepoPath,
   RequestId,
   TreeSha,
+  keyOf,
   sameHandle,
 } from "@repo/protocol/ids";
 import type { ProjectName, Handle, EnvKey } from "@repo/protocol/ids";
@@ -488,7 +489,7 @@ const minted = (prefix: string, taken: number) =>
 
 /** A person's working fork, `<project>--me--<handle in lowercase>`. */
 const workingFork = (project: ProjectName, handle: Handle) =>
-  RepoName.make(`${project}--me--${handle.toLowerCase()}`);
+  RepoName.make(`${keyOf(project)}--me--${handle.toLowerCase()}`);
 
 /** The module a proposal's territory names: by its name, or by its folder. */
 const moduleOf = (policy: Policy, territory: string) =>

@@ -20,6 +20,7 @@ import {
   ProjectName,
   RepoName,
   RepoPath,
+  keyOf,
   TreeSha,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -191,7 +192,7 @@ const gateSays = (repo: CheckRepo, head: string) =>
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const hosted = yield* fs.makeTempDirectoryScoped();
-    const name = RepoName.make(project);
+    const name = RepoName.make(keyOf(project));
 
     yield* gitOk(
       repo.root,

@@ -14,6 +14,7 @@ import {
   LandedSha,
   LaneName,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
@@ -36,7 +37,7 @@ const scenario = aProject({ people: ["bob"] }).pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const alice = Person.make({ handle: scenario.initializer });
 
@@ -45,7 +46,10 @@ const bob = Person.make({
 });
 
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
 ];
 

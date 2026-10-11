@@ -293,7 +293,7 @@ describe("who may claim an ask of a record kind", () => {
   });
 
   it("counts only landings in the ask's project, not an area of the same name elsewhere", () => {
-    const burrow = ProjectName.make("oscabriel/burrow");
+    const burrow = ProjectName.make("alice/burrow");
 
     expect(
       claim("parser-iso", "unknown", {

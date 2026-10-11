@@ -18,7 +18,7 @@ import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { landedRef } from "@repo/project/lander";
 import type { ProjectApi } from "@repo/project/project";
 import { Projects } from "@repo/project/projects";
-import { LandedSha, ProjectName, RepoName } from "@repo/protocol/ids";
+import { keyOf, LandedSha, ProjectName, RepoName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import { gitClient } from "@repo/testkit/git-client";
 import { untouchable } from "@repo/testkit/untouchable";
@@ -334,8 +334,8 @@ describe("the agent skills index, kept by each project's landed commit", () => {
             [datekit, moved],
             [burrow, bare],
           ] as const) {
-            yield* host.create(RepoName.make(project));
-            yield* host.push(RepoName.make(project), client.source, [
+            yield* host.create(RepoName.make(keyOf(project)));
+            yield* host.push(RepoName.make(keyOf(project)), client.source, [
               { from: Option.none(), ref: landedRef, to: sha },
             ]);
           }

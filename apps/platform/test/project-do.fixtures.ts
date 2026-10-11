@@ -29,6 +29,7 @@ import {
   LandedSha,
   LaneName,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import type { CommitSha, ProjectName } from "@repo/protocol/ids";
@@ -75,7 +76,7 @@ export const scenario = aProject({ people: ["bob", "carol"] }).pipe(
 
 export const { project } = scenario;
 
-export const repo = RepoName.make(project);
+export const repo = RepoName.make(keyOf(project));
 
 export const parseIso = AskId.make("parse-iso");
 

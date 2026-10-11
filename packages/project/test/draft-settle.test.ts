@@ -15,6 +15,7 @@ import {
   LaneName,
   ProposalId,
   RepoName,
+  keyOf,
   RepoPath,
 } from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
@@ -46,7 +47,7 @@ const scenario = aProject({ people: ["carol", "dave"] }).pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const person = (name: string) =>
   Person.make({ handle: scenario.people.get(name) ?? scenario.initializer });
@@ -74,7 +75,10 @@ const ask = Option.getOrThrow(
 );
 
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
 ];
 

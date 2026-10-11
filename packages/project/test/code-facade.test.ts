@@ -5,14 +5,14 @@
  */
 import { describe, expect, it } from "@effect/vitest";
 import type { ProjectApi } from "@repo/project/project";
-import { LandedSha, ProjectName } from "@repo/protocol/ids";
+import { keyOf, LandedSha, ProjectName } from "@repo/protocol/ids";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Effect, Option } from "effect";
 
 import { codeProjectOf } from "../src/code.ts";
 import { CodeCache } from "../src/code/cache.ts";
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("alice/datekit");
 
 const landed = LandedSha.make("4".repeat(40));
 
@@ -30,7 +30,7 @@ describe("a project's code, read through the façade", () => {
     "reads the canonical repo, with main from the project's record",
     () =>
       Effect.gen(function* () {
-        expect(code.repo).toBe(project);
+        expect(code.repo).toBe(keyOf(project));
         expect(yield* code.head).toStrictEqual(Option.some(landed));
         expect(yield* code.forks).toStrictEqual([]);
       })

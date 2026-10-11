@@ -213,7 +213,7 @@ const verdictOn = (head: CommitSha, base: CommitSha, tree: TreeSha) =>
     lanes: [],
     outcome: Outcome.cases.Checking.make({ stage: "checks" }),
     patchId: PatchId.make("2".repeat(64)),
-    project: ProjectName.make("oscabriel/demo"),
+    project: ProjectName.make("alice/demo"),
     stage: "checks",
     tree,
     verifier: "platform",

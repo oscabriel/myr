@@ -477,6 +477,44 @@ export const nameOfKey = (key: ProjectKey): Option.Option<ProjectName> => {
     : Option.none();
 };
 
+const decodeName = Schema.decodeOption(ProjectName);
+
+/**
+ * The repo a gateway address names, the `.git` already stripped:
+ * `oscabriel/datekit` is the project's key, `oscabriel/datekit--fix--alice`
+ * is `<key>--fix--alice`, and a one-segment address is a legacy key with
+ * its fork's parts as they are. The parts after `--` are kept verbatim;
+ * `repoKind` reads them. None for an address no project can have.
+ */
+export const repoNameOfAddress = (address: string): Option.Option<RepoName> => {
+  const slash = address.lastIndexOf("/");
+  const last = address.slice(slash + 1);
+  const dashes = last.indexOf("--");
+  const short = dashes === -1 ? last : last.slice(0, dashes);
+  const suffix = dashes === -1 ? "" : last.slice(dashes);
+  const spelled = slash === -1 ? short : `${address.slice(0, slash)}/${short}`;
+
+  return Option.flatMap(decodeName(spelled), (name) =>
+    Schema.decodeOption(RepoName)(`${keyOf(name)}${suffix}`)
+  );
+};
+
+/**
+ * The gateway address of a repo: its project's name, then its fork's parts
+ * as the repo's name spells them (`oscabriel/datekit--fix--alice`). None for
+ * a repo whose key no project can have.
+ */
+export const addressOfRepo = (repo: RepoName): Option.Option<string> => {
+  const dashes = repo.indexOf("--");
+  const first = dashes === -1 ? repo : repo.slice(0, dashes);
+  const suffix = dashes === -1 ? "" : repo.slice(dashes);
+
+  return Option.map(
+    Option.flatMap(Schema.decodeOption(ProjectKey)(first), nameOfKey),
+    (name) => `${name}${suffix}`
+  );
+};
+
 /**
  * The source namespace an import's URL names, when its host is one the
  * platform knows: `https://github.com/Pallets/click.git` is

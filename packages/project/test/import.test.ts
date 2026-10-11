@@ -8,7 +8,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
 import { ProjectEvent } from "@repo/protocol/domain/event";
-import { Handle, LandedSha, RepoName } from "@repo/protocol/ids";
+import { Handle, keyOf, LandedSha, RepoName } from "@repo/protocol/ids";
 import { Person } from "@repo/protocol/principal";
 import { ProjectExists } from "@repo/protocol/refusal";
 import { advanceTo } from "@repo/testkit/clock";
@@ -24,7 +24,7 @@ const scenario = aProject({ people: ["bob"] });
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const alice = Person.make({ handle: scenario.initializer });
 

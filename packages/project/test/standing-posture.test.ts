@@ -45,13 +45,13 @@ import {
   projectsMigration,
 } from "./projection-d1.fixtures.ts";
 
-const datekit = ProjectName.make("oscabriel/datekit");
+const datekit = ProjectName.make("alice/datekit");
 
-const ghost = ProjectName.make("oscabriel/ghost");
+const ghost = ProjectName.make("alice/ghost");
 
-const broken = ProjectName.make("oscabriel/broken");
+const broken = ProjectName.make("alice/broken");
 
-const burrow = ProjectName.make("oscabriel/burrow");
+const burrow = ProjectName.make("alice/burrow");
 
 const landedAt = DateTime.makeUnsafe("2026-10-08T12:00:00Z");
 
@@ -216,8 +216,8 @@ describe("a listing's standing posture", () => {
         );
 
         expect(warned.toSorted()).toStrictEqual([
-          "Warn: broken's posture is the projection's: its ledger was not read",
-          "Warn: ghost's posture is the projection's: its ledger was not read",
+          "Warn: alice/broken's posture is the projection's: its ledger was not read",
+          "Warn: alice/ghost's posture is the projection's: its ledger was not read",
         ]);
       }).pipe(Effect.provide(platform))
   );
@@ -250,7 +250,7 @@ describe("a listing's standing posture", () => {
       const many = Array.makeBy(20, (at): ProjectListing => ({
         openAsks: at,
         posture: "open",
-        project: ProjectName.make(`p${at}`),
+        project: ProjectName.make(`alice/p${at}`),
       }));
 
       const standing = yield* withStandingPosture(many).pipe(

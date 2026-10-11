@@ -18,6 +18,7 @@ import {
   LaneName,
   RepoName,
   RepoPath,
+  keyOf,
   RequestId,
 } from "@repo/protocol/ids";
 import type { CommitSha } from "@repo/protocol/ids";
@@ -38,7 +39,7 @@ const scenario = aProject({ people: ["bob"] }).pipe(
 
 const { project } = scenario;
 
-const repo = RepoName.make(project);
+const repo = RepoName.make(keyOf(project));
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -50,7 +51,7 @@ const bob = Person.make({
   handle: scenario.people.get("bob") ?? scenario.initializer,
 });
 
-const bobFork = RepoName.make(`${project}--${parseIso}--${bob.handle}`);
+const bobFork = RepoName.make(`${keyOf(project)}--${parseIso}--${bob.handle}`);
 
 const lanes = [
   LaneName.make("redThenGreen"),
@@ -82,7 +83,10 @@ const askFiles = Array.make(
 );
 
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/package.json", '{ "name": "parser" }\n'],
   ["packages/parser/src/parse.ts", "export const parse = (s) => 0;\n"],
 ];

@@ -46,9 +46,18 @@ import type { D1Client } from "@effect/sql-d1/D1Client";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
-import { ProjectName } from "@repo/protocol/ids";
-import type { AskId } from "@repo/protocol/ids";
-import { Array, DateTime, Effect, Layer, Order, Ref, Schema } from "effect";
+import { keyOf, nameOfKey, ProjectKey } from "@repo/protocol/ids";
+import type { AskId, ProjectName } from "@repo/protocol/ids";
+import {
+  Array,
+  DateTime,
+  Effect,
+  Layer,
+  Option,
+  Order,
+  Ref,
+  Schema,
+} from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 import type { SqlError } from "effect/sql/SqlError";
 import type { Statement } from "effect/sql/Statement";
@@ -62,7 +71,7 @@ const decodeProjected = Schema.decodeUnknownEffect(
 );
 
 const Cursors = Schema.Array(
-  Schema.Struct({ project: ProjectName, seq: Schema.Int })
+  Schema.Struct({ project: ProjectKey, seq: Schema.Int })
 );
 
 const decodeCursors = Schema.decodeUnknownEffect(Cursors);
@@ -134,7 +143,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
 
       /** Whether the project's cursor stands just before event `seq`. */
       const isNext = (project: ProjectName, seq: number) =>
-        sql`(SELECT COALESCE(MAX(seq), 0) FROM cursor WHERE project = ${project}) = ${seq - 1}`;
+        sql`(SELECT COALESCE(MAX(seq), 0) FROM cursor WHERE project = ${keyOf(project)}) = ${seq - 1}`;
 
       /**
        * What one event changes in the read model, if anything: the project's
@@ -146,25 +155,28 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
       ) => {
         const next = isNext(project, event.seq);
 
+        // Every row keeps the project's key, never its name (ADR 0032).
+        const key = keyOf(project);
+
         /** The project's kept posture, cleared: this event may move it. */
         const unkept = postures
           ? [
               sql`DELETE FROM standing_postures
-                WHERE project = ${project} AND ${next}`,
+                WHERE project = ${key} AND ${next}`,
             ]
           : [];
 
         const listed = sql`INSERT INTO projects (project, posture, open_asks, landed_at)
-          SELECT ${project}, 'open', 0, NULL WHERE ${next}
+          SELECT ${key}, 'open', 0, NULL WHERE ${next}
           ON CONFLICT (project) DO NOTHING`;
 
         const counted = sql`UPDATE projects SET open_asks =
-            (SELECT COUNT(*) FROM front_page WHERE front_page.project = ${project})
-          WHERE project = ${project} AND ${next}`;
+            (SELECT COUNT(*) FROM front_page WHERE front_page.project = ${key})
+          WHERE project = ${key} AND ${next}`;
 
         const claims = (ask: AskId, change: number) =>
           sql`UPDATE front_page SET claimed = MAX(claimed + ${change}, 0)
-            WHERE project = ${project} AND ask = ${ask} AND ${next}`;
+            WHERE project = ${key} AND ask = ${ask} AND ${next}`;
 
         /**
          * One more landing for each person `landing` credits, in each role,
@@ -179,9 +191,9 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
             : creditedOn(landing).map(
                 ({ person, role }) =>
                   sql`INSERT INTO credits (handle_key, project, area, role, count)
-                    SELECT ${person}, ${project}, page.territory, ${role}, 1
+                    SELECT ${person}, ${key}, page.territory, ${role}, 1
                     FROM front_page AS page
-                    WHERE page.project = ${project} AND page.ask = ${ask} AND ${next}
+                    WHERE page.project = ${key} AND page.ask = ${ask} AND ${next}
                     ON CONFLICT (handle_key, project, area, role)
                       DO UPDATE SET count = credits.count + 1`
               );
@@ -189,13 +201,13 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
         const changes = ProjectEvent.match(event, {
           AskClosed: ({ ask }) => [
             sql`DELETE FROM front_page
-              WHERE project = ${project} AND ask = ${ask} AND ${next}`,
+              WHERE project = ${key} AND ask = ${ask} AND ${next}`,
             counted,
           ],
           AskOpened: ({ ask, at }) => [
             sql`INSERT INTO front_page
                 (project, ask, kind, reserve, want, territory, claimed, blocked_by, opened_at)
-              SELECT ${project}, ${ask.ask}, ${ask.kind}, ${ask.reserve ?? null},
+              SELECT ${key}, ${ask.ask}, ${ask.kind}, ${ask.reserve ?? null},
                 ${ask.want}, ${ask.territory}, ${ask.claimed ? 1 : 0},
                 ${JSON.stringify(ask.blockedBy)}, ${DateTime.formatIso(at)}
               WHERE ${next}
@@ -211,7 +223,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
           Judged: () => [],
           Landed: ({ landing }) => [
             sql`UPDATE projects SET landed_at = ${DateTime.formatIso(landing.landedAt)}
-              WHERE project = ${project} AND ${next}`,
+              WHERE project = ${key} AND ${next}`,
             ...credited(landing),
             ...unkept,
           ],
@@ -220,7 +232,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
             ...(LedgerEntry.guards.PostureChanged(entry)
               ? [
                   sql`UPDATE projects SET posture = ${entry.to}
-                    WHERE project = ${project} AND ${next}`,
+                    WHERE project = ${key} AND ${next}`,
                 ]
               : []),
             ...unkept,
@@ -238,11 +250,11 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
       /** Moves the project's cursor on to `seq`, if it stands just before it. */
       const advance = (project: ProjectName, seq: number) =>
         sql`INSERT INTO cursor (project, seq)
-          SELECT ${project}, ${seq} WHERE ${isNext(project, seq)}
+          SELECT ${keyOf(project)}, ${seq} WHERE ${isNext(project, seq)}
           ON CONFLICT (project) DO UPDATE SET seq = excluded.seq`;
 
       const cursorsOf = (projects: readonly ProjectName[]) =>
-        sql`SELECT project, seq FROM cursor WHERE ${sql.in("project", projects)}`;
+        sql`SELECT project, seq FROM cursor WHERE ${sql.in("project", projects.map(keyOf))}`;
 
       /**
        * Applies the events in one write, then reads where each project's
@@ -271,8 +283,11 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
           );
 
           const reached = new Map(
-            (yield* Effect.orDie(decodeCursors(results.at(-1) ?? []))).map(
-              ({ project, seq }) => [project, seq]
+            Array.getSomes(
+              (yield* Effect.orDie(decodeCursors(results.at(-1) ?? []))).map(
+                ({ project, seq }) =>
+                  Option.map(nameOfKey(project), (name) => [name, seq] as const)
+              )
             )
           );
 

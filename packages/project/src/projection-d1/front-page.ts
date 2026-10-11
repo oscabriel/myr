@@ -17,10 +17,10 @@ import type {
   ProjectListing,
 } from "@repo/protocol/domain/front-page";
 import { CreditSummary } from "@repo/protocol/domain/record";
-import { AskId, KindName, ProjectName } from "@repo/protocol/ids";
+import { AskId, KindName, nameOfKey, ProjectKey } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
 import { Posture } from "@repo/protocol/posture";
-import { Effect, Layer, Schema } from "effect";
+import { Array as Arr, Effect, Layer, Option, Schema } from "effect";
 import { SqlClient } from "effect/sql/SqlClient";
 
 import { FrontPage } from "../front-page.ts";
@@ -38,7 +38,7 @@ const EntryRow = Schema.Struct({
   /** The asks it waits on that are still on the front page. */
   open_blockers: AskIds,
   posture: Posture,
-  project: ProjectName,
+  project: ProjectKey,
   reserve: Schema.NullOr(Reserve),
   territory: Schema.NonEmptyString,
   want: Schema.NonEmptyString,
@@ -53,28 +53,41 @@ const ProjectRow = Schema.Struct({
   landed_at: Schema.NullOr(Schema.DateTimeUtcFromString),
   open_asks: Schema.Int,
   posture: Posture,
-  project: ProjectName,
+  project: ProjectKey,
 });
 
 type ProjectRow = typeof ProjectRow.Type;
 
 const decodeProjectRows = Schema.decodeUnknownEffect(Schema.Array(ProjectRow));
 
-const decodeCredits = Schema.decodeUnknownEffect(Schema.Array(CreditSummary));
+// Each row keeps the project's key (ADR 0032); a row whose key no project
+// can have (a throwaway torn down before owners) is left out of every list.
+const CreditRow = Schema.Struct({
+  ...CreditSummary.fields,
+  project: ProjectKey,
+});
 
-const listingOf = (row: ProjectRow): ProjectListing => {
-  const listing = {
-    openAsks: row.open_asks,
-    posture: row.posture,
-    project: row.project,
-  };
+type CreditRow = typeof CreditRow.Type;
 
-  return row.landed_at === null
-    ? listing
-    : { ...listing, landedAt: row.landed_at };
-};
+const decodeCredits = Schema.decodeUnknownEffect(Schema.Array(CreditRow));
 
-const entryOf = (row: EntryRow): FrontPageEntry => {
+const creditOf = (row: CreditRow): Option.Option<CreditSummary> =>
+  Option.map(nameOfKey(row.project), (project) => ({ ...row, project }));
+
+const listingOf = (row: ProjectRow): Option.Option<ProjectListing> =>
+  Option.map(nameOfKey(row.project), (project) => {
+    const listing = {
+      openAsks: row.open_asks,
+      posture: row.posture,
+      project,
+    };
+
+    return row.landed_at === null
+      ? listing
+      : { ...listing, landedAt: row.landed_at };
+  });
+
+const entryOf = (row: EntryRow): Option.Option<FrontPageEntry> => {
   const blockedBy = row.blocked_by.filter((ask) =>
     row.open_blockers.includes(ask)
   );
@@ -90,12 +103,12 @@ const entryOf = (row: EntryRow): FrontPageEntry => {
     want: row.want,
   };
 
-  return {
+  return Option.map(nameOfKey(row.project), (project) => ({
     ask: row.reserve === null ? listing : { ...listing, reserve: row.reserve },
     posture: row.posture,
-    project: row.project,
+    project,
     takeable: !claimed && blockedBy.length === 0 && row.reserve === null,
-  };
+  }));
 };
 
 export const FrontPageD1: Layer.Layer<FrontPage, never, SqlClient> =
@@ -121,7 +134,7 @@ export const FrontPageD1: Layer.Layer<FrontPage, never, SqlClient> =
           ])}
           ORDER BY opened_at DESC, page.project, ask`.pipe(
           Effect.flatMap(decodeRows),
-          Effect.map((rows) => rows.map(entryOf)),
+          Effect.map((rows) => Arr.getSomes(rows.map(entryOf))),
           Effect.orDie
         );
 
@@ -130,7 +143,7 @@ export const FrontPageD1: Layer.Layer<FrontPage, never, SqlClient> =
           FROM projects
           ORDER BY project`.pipe(
           Effect.flatMap(decodeProjectRows),
-          Effect.map((rows) => rows.map(listingOf)),
+          Effect.map((rows) => Arr.getSomes(rows.map(listingOf))),
           Effect.orDie
         );
 
@@ -141,6 +154,7 @@ export const FrontPageD1: Layer.Layer<FrontPage, never, SqlClient> =
           WHERE handle_key = ${handleKey(handle)}
           ORDER BY project, area, role`.pipe(
           Effect.flatMap(decodeCredits),
+          Effect.map((rows) => Arr.getSomes(rows.map(creditOf))),
           Effect.orDie
         );
 

@@ -36,9 +36,9 @@ const HOUR = 3_600_000;
 /** The defaults: warned after 2 quiet hours, lapsed after 24. */
 const policy = { lapseAfterMs: 24 * HOUR, warnAfterMs: 2 * HOUR };
 
-const project = ProjectName.make("oscabriel/datekit");
+const project = ProjectName.make("alice/datekit");
 
-const canonical = RepoName.make("datekit");
+const canonical = RepoName.make("alice_datekit");
 
 const ask = AskId.make("parse-iso");
 

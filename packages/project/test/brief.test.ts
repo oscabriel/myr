@@ -3,7 +3,13 @@ import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { Glob } from "@repo/protocol/domain/common";
-import { AskId, LandedSha, LaneName, RepoName } from "@repo/protocol/ids";
+import {
+  AskId,
+  keyOf,
+  LandedSha,
+  LaneName,
+  RepoName,
+} from "@repo/protocol/ids";
 import { Anonymous, Person } from "@repo/protocol/principal";
 import { advanceTo } from "@repo/testkit/clock";
 import type { Files } from "@repo/testkit/git-client";
@@ -40,7 +46,7 @@ const policy = {
   asks: scenario.policy.asks.map(byPaths),
 };
 
-const repo = RepoName.make(scenario.project);
+const repo = RepoName.make(keyOf(scenario.project));
 
 const mainRef = RefName.make("refs/heads/main");
 
@@ -52,7 +58,10 @@ const askOf = (id: string): Ask =>
   Option.getOrThrow(Array.findFirst(policy.asks, (ask) => ask.id === id));
 
 const start: Files = [
-  ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
+  [
+    "package.json",
+    '{ "name": "alice/datekit", "workspaces": ["packages/*"] }\n',
+  ],
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
   ["src/trim.ts", "export const trim = (s) => s;\n"],
 ];
