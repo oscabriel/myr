@@ -495,7 +495,6 @@ shadcn 4.21.2, style `base-lyra` on Base UI, in `src/components/ui/` (generated,
 
 Each rule below is decided in this document (ADR 0039) and not yet in the code; the build issues are cut from this list, and an item leaves it when its file changes.
 
-- The inspector at 20 rem from `shell` and 22 rem from `codefacts`: `apps/web/src/features/shared/shell/workspace.tsx` (its `w-[19rem]`). Decided, not yet drawn.
 - The command line's bleed form in the inspector (pane-wide, hairlines top and bottom, a 28 px icon-only Copy) and the 2ch hang there, 6ch in main: `apps/web/src/features/shared/command.tsx`. Decided, not yet drawn.
 - The row's state word in ink at 500 except Refused and Landed (`wordTone`), the time slot filled on every ask row, "round n" and "mentored by" in line 2, the two-line want below `tablet`, the pressed surface on a selected row under the pointer, and held-for-newcomers read before takeable (`askState`): `apps/web/src/features/shared/row.tsx`. Decided, not yet drawn.
 - The head meta line's `files · +n −m` on answer and commit subjects: `apps/web/src/features/shared/status-line.tsx` and the answer and commit heads. Decided, not yet drawn.

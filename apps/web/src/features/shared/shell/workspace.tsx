@@ -288,7 +288,7 @@ const WorkspaceView = ({
       {hasFacts ? (
         <aside
           aria-label="Facts"
-          className={`border-rule bg-background h-dvh w-[19rem] shrink-0 flex-col overflow-y-auto overscroll-contain border-l ${
+          className={`border-rule bg-background h-dvh w-[20rem] codefacts:w-[22rem] shrink-0 flex-col overflow-y-auto overscroll-contain border-l ${
             code ? "codefacts:flex hidden" : "shell:flex hidden"
           }`}
           data-facts="inspector"
