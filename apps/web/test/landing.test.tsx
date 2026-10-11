@@ -14,13 +14,11 @@ import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Effect, Schema } from "effect";
 
 import { LandingView } from "../src/features/landing/landing-page.tsx";
-import {
-  LandingProjects,
-  PROJECTS_SHOWN,
-} from "../src/features/landing/projects.ts";
+import { LandingProjects } from "../src/features/landing/projects.ts";
 import { readLandingProjects } from "../src/features/landing/read.ts";
 import { LEDE } from "../src/features/landing/words.ts";
 import { landingHead } from "../src/routes/index.tsx";
+import { EIGHT_LEADING, TEN_LISTED } from "./listings.ts";
 import { textIn } from "./markup.ts";
 import { platformWith, unreachablePlatform } from "./platform.ts";
 import { renderAt } from "./render.tsx";
@@ -202,29 +200,21 @@ const listing = (projects: readonly ProjectListing[]) =>
   );
 
 describe("the landing's projects, read on the server", () => {
-  const many = Schema.decodeSync(Schema.Array(ProjectListing))(
-    Array.from({ length: PROJECTS_SHOWN + 2 }, (_, at) => ({
-      openAsks: 1,
-      posture: "open",
-      project: `oscabriel/project-${at}`,
-    }))
-  );
+  it.effect(
+    "names eight, the most open asks first and a tie by name, each by its full name",
+    () =>
+      Effect.gen(function* () {
+        const read = yield* readLandingProjects.pipe(
+          Effect.provide(listing(TEN_LISTED))
+        );
 
-  it.effect("names the first eight projects the platform lists", () =>
-    Effect.gen(function* () {
-      const read = yield* readLandingProjects.pipe(
-        Effect.provide(listing(many))
-      );
-
-      expect(
-        LandingProjects.match(read, {
-          Listed: ({ projects }) => projects.map(({ project }) => project),
-          Unreachable: () => [],
-        })
-      ).toStrictEqual(
-        many.slice(0, PROJECTS_SHOWN).map(({ project }) => project)
-      );
-    })
+        expect(
+          LandingProjects.match(read, {
+            Listed: ({ projects }) => projects.map(({ project }) => project),
+            Unreachable: () => [],
+          })
+        ).toStrictEqual(EIGHT_LEADING);
+      })
   );
 
   it.effect("says so, and never fails, when the platform did not answer", () =>

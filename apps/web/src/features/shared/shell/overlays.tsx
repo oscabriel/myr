@@ -137,7 +137,30 @@ const ProjectSwitcher = ({
   );
 };
 
-/** The phone's More: Docs, For agents, the project's sections, the keys, the session. */
+/** The Projects sheet's body: the switcher, and the way to import a repo at its foot. */
+export const ProjectsSheetBody = ({
+  input,
+  onChosen,
+}: {
+  readonly input: RefObject<HTMLInputElement | null>;
+  readonly onChosen: () => void;
+}) => (
+  <>
+    <ProjectSwitcher input={input} onChosen={onChosen} />
+    <div className="border-rule border-t p-1">
+      <AppLink className={RAIL_ROW} to={IMPORT_PATH}>
+        <FolderInput
+          aria-hidden="true"
+          className="text-muted-foreground size-4 shrink-0"
+          strokeWidth={1.75}
+        />
+        Import a repo
+      </AppLink>
+    </div>
+  </>
+);
+
+/** The phone's More:Docs, For agents, the project's sections, the keys, the session. */
 const More = () => {
   const project = useCurrentProject();
   const listed = useProjectList();
@@ -263,17 +286,7 @@ const ShellOverlays = ({ onClose, overlay }: OverlayProps) => {
           side={overlay === "projects" && atLeastTablet() ? "left" : "full"}
           title="Projects"
         >
-          <ProjectSwitcher input={filter} onChosen={onClose} />
-          <div className="border-rule border-t p-1">
-            <AppLink className={RAIL_ROW} to={IMPORT_PATH}>
-              <FolderInput
-                aria-hidden="true"
-                className="text-muted-foreground size-4 shrink-0"
-                strokeWidth={1.75}
-              />
-              Import a repo
-            </AppLink>
-          </div>
+          <ProjectsSheetBody input={filter} onChosen={onClose} />
         </SheetContent>
       </Sheet>
       <KeysDialog onClose={onClose} open={overlay === "keys"} />
