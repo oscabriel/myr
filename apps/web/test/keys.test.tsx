@@ -141,6 +141,38 @@ describe("the switch", () => {
     expect(readShortcuts()).toBeTruthy();
   });
 
+  it("draws each key as a key: label type on the paper, a hairline border, the 2 px radius, 4 px of side padding", () => {
+    const markup = renderToStaticMarkup(
+      <KeysHelp
+        on
+        onChange={() => {
+          // A static render never presses it.
+        }}
+      />
+    );
+
+    const caps = [
+      ...markup.matchAll(/<kbd\b[^>]*class="(?<classes>[^"]*)"/gu),
+    ].map(({ groups }) => groups?.classes?.split(" ") ?? []);
+
+    expect(caps.length).toBeGreaterThan(0);
+    expect(
+      caps.filter(
+        (classes) =>
+          ![
+            "bg-background",
+            "border",
+            "border-rule",
+            "rounded-md",
+            "px-1",
+            "text-label",
+            "font-sans",
+          ].every((one) => classes.includes(one)) ||
+          classes.includes("font-mono")
+      )
+    ).toStrictEqual([]);
+  });
+
   it("is in the dialog, with every key and what it does", () => {
     const markup = renderToStaticMarkup(
       <KeysHelp

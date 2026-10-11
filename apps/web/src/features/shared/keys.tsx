@@ -158,9 +158,7 @@ export const KeysHelp = ({
                   to
                 </span>
               ) : (
-                <Kbd className="font-mono" key={key}>
-                  {key}
-                </Kbd>
+                <Kbd key={key}>{key}</Kbd>
               )
             )}
           </dt>
