@@ -169,7 +169,7 @@ export const initUntilAnswered = <A extends { readonly landed?: string }, E>(
   });
 
 const USAGE =
-  "bun scripts/import-examples.ts --world node | --stage <dev-…> [--url <origin>] [--web <origin>] [--only <project>] [--tags] [--sources] [--warm] [--dry-run]";
+  "bun scripts/import-examples.ts --world node | --stage <stage> [--url <origin>] [--web <origin>] [--only <project>] [--tags] [--sources] [--warm] [--dry-run]";
 
 /** The flags the command takes; any other is a typo, refused. */
 const FLAGS = new Set([
@@ -186,7 +186,7 @@ const FLAGS = new Set([
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
-/** The command's flags, read; `--stage demo` is refused before anything runs. */
+/** The command's flags, read; a typo or a stage the table does not declare is refused before anything runs. */
 export const optionsOf = (
   argv: readonly string[]
 ): Effect.Effect<ImportOptions, ImportExamplesFailed> =>
@@ -209,12 +209,6 @@ export const optionsOf = (
     if (Option.isSome(world) && world.value !== "node") {
       return yield* failed(
         `--world ${world.value}: the imports know only --world node`
-      );
-    }
-
-    if (Option.contains(raw, "demo")) {
-      return yield* failed(
-        "--stage demo is the recording stage: the imports go on a dev stage only"
       );
     }
 
@@ -527,7 +521,7 @@ const run = (options: ImportOptions) =>
   });
 
 /**
- * `bun scripts/import-examples.ts …`: reads the flags (refusing `demo`
+ * `bun scripts/import-examples.ts …`: reads the flags (a bad one refused
  * before anything is built or called), then runs over the target, backfill
  * and web `layersOf` gives for them.
  */

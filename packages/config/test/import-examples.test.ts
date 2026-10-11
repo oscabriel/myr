@@ -1,9 +1,9 @@
 /**
  * `bun scripts/import-examples.ts`: the open-source repos the code browser
  * is previewed on, imported one at a time as the operator, skipped once a
- * platform lists them, recorded in the ledger as kept imports, never on
- * `demo`; and `--tags`' backfill, which pushes tags only and never shows
- * its token.
+ * platform lists them, recorded in the ledger as kept imports, on `demo`
+ * as on a dev stage; and `--tags`' backfill, which pushes tags only and
+ * never shows its token.
  */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
@@ -36,7 +36,6 @@ import {
 } from "../../../scripts/lib/import/plan.ts";
 import type { ImportExample } from "../../../scripts/lib/import/plan.ts";
 import {
-  ImportExamplesFailed,
   importExamples,
   ImportTarget,
   initUntilAnswered,
@@ -340,31 +339,30 @@ const onDev = (...flags: readonly string[]) => [
 
 describe("bun scripts/import-examples.ts", () => {
   it.live(
-    "refuses --stage demo before it builds a target or calls anything",
+    "takes --stage demo as any declared stage: its dry run plans the import onto demo",
     () =>
       Effect.gen(function* () {
-        let built = 0;
+        const platform = yield* fakePlatform(["ky"]);
 
-        const result = yield* importExamples(["--stage", "demo"], () => {
-          built += 1;
+        const { ledger, printed, result } = yield* ran(
+          ["--stage", "demo", "--dry-run", "--only", "anyhow"],
+          platform.layer
+        );
 
-          return Layer.mergeAll(
-            Layer.effect(ImportTarget, Effect.die("a target was built")),
-            Layer.effect(TagBackfill, Effect.die("a backfill was built")),
-            Layer.effect(Warmer, Effect.die("a warmer was built"))
-          );
-        }).pipe(Effect.result);
-
-        expect({ built, result }).toStrictEqual({
-          built: 0,
-          result: Result.fail(
-            new ImportExamplesFailed({
-              reason:
-                "--stage demo is the recording stage: the imports go on a dev stage only",
-            })
-          ),
+        expect({
+          ledger,
+          printed,
+          result: Result.isSuccess(result),
+        }).toStrictEqual({
+          ledger: [],
+          printed: [
+            "import-examples on dev-oscabriel (https://platform.test): 1 to import, 0 listed already",
+            "  would import anyhow from https://github.com/dtolnay/anyhow (master)",
+            "dry run: nothing imported, nothing recorded",
+          ],
+          result: true,
         });
-      }).pipe(Effect.provide(NodeServices.layer))
+      }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
 
   it.live(

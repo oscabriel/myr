@@ -1,8 +1,10 @@
 /**
  * `bun run import-examples`: imports the open-source repos the code browser
  * is previewed on (the eight that test its shapes, anyhow first, then
- * thirty well-known projects), one at a time, as the operator, onto a dev
- * stage or the Node world; never `demo`. Each new import is warmed: its
+ * thirty well-known projects), one at a time, as the operator, onto a
+ * stage or the Node world (`demo` included, since 2026-10-11, on the
+ * user's approval: the recording shows them beside the fictional two, each
+ * with its source). Each new import is warmed: its
  * pages read once through the stage's web, so its first reader finds why
  * and its history kept; `--warm` warms the ones listed already too.
  *
