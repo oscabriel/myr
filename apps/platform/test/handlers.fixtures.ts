@@ -1,13 +1,3 @@
-/**
- * The world the contracts' handlers run over in tests: `ProjectsMemory`
- * over memory adapters (the isomorphic-git Lander on `RepoHostMemory`, a
- * Checker that fails every lane by an assertion, a rules evaluator that
- * returns each scenario's policy), a seeded `FrontPageMemory`, and memory
- * rate limits. `seeded` makes a scenario's project the way its initializer
- * would: made, its first commit pushed, and each of its asks opened red
- * first. Callers reach the handlers through the in-process RPC client, each
- * as the person `as` names.
- */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
@@ -41,7 +31,6 @@ import { MemoryRateLimits } from "../src/adapters/rate-limits.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** A library of four small packages, as each project's first commit holds it. */
 const start = (name: string): Files => [
   [
     "package.json",
@@ -56,7 +45,6 @@ const start = (name: string): Files => [
   ["packages/trim/src/trim.ts", "export const trim = (s) => s;\n"],
 ];
 
-/** An ask's own files: its file in the config folder, and its check. */
 const askFiles = ({ check, file, id, territory }: Ask) =>
   Array.make(
     { content: `export default "${id}";\n`, path: file },
@@ -76,10 +64,6 @@ const askFiles = ({ check, file, id, territory }: Ask) =>
     }
   );
 
-/**
- * A Checker before any answer: every lane fails by the same assertion each
- * time, so every ask a test opens is red first on main.
- */
 const allRed = Layer.succeed(
   CheckRunner,
   CheckRunner.of({
@@ -101,11 +85,6 @@ const allRed = Layer.succeed(
   })
 );
 
-/**
- * A `RulesEvaluator` that evaluates nothing: for a project it returns its
- * scenario's policy, holding the asks whose files the commit's config folder
- * has, and the judge closure `checks` derives.
- */
 const rulesOf = (scenarios: readonly Scenario[]) =>
   Layer.effect(
     RulesEvaluator,
@@ -134,11 +113,8 @@ const rulesOf = (scenarios: readonly Scenario[]) =>
     })
   ).pipe(Layer.provide(FinishersFromChecks));
 
-/** What the world is made of besides its scenarios' projects. */
 export interface WorldOptions {
-  /** What the front page reads back; nothing by default. */
   readonly frontPage?: FrontPageSeed;
-  /** Claims and proposals each person may make; 100 of each by default. */
   readonly limits?: {
     readonly claim: number;
     readonly draft?: number;
@@ -148,10 +124,6 @@ export interface WorldOptions {
 
 const noFrontPage: FrontPageSeed = { credits: [], entries: [], projects: [] };
 
-/**
- * The ports the handlers run on, `RepoHost` beside them for `seeded`, fresh
- * for each test.
- */
 export const worldOf = (
   scenarios: readonly Scenario[],
   options: WorldOptions = {}
@@ -176,10 +148,6 @@ export const worldOf = (
     EvidenceStoreMemory
   ).pipe(Layer.provideMerge(RepoHostMemory));
 
-/**
- * The scenario's project as its initializer makes it: made, its first
- * commit pushed to `main`, then each of its asks opened, red first.
- */
 export const seeded = (scenario: Scenario) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -205,7 +173,6 @@ export const seeded = (scenario: Scenario) =>
     );
   }).pipe(Effect.orDie);
 
-/** A client of the contracts in process, each call made as `handle`. */
 export const as = (handle: string) =>
   RpcTest.makeClient(Contracts).pipe(
     Effect.provide(asPerson(Handle.make(handle)))

@@ -1,14 +1,10 @@
-/**
- * The instance ids the `Answer` Workflow's runs take. The engine refuses an
- * id past 100 characters, and starting an id that exists changes nothing, so
- * two runs that must both happen need two ids however long their names are.
- */
+// The engine refuses an instance id past 100 characters, and starting an id that
+// exists changes nothing.
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha, LayerName, ProjectName } from "@repo/protocol/ids";
 
 import { AdmissionParams, admissionId } from "../src/answer-runs.ts";
 
-/** What the engine takes as an instance id. */
 const INSTANCE_ID = /^[a-zA-Z0-9_][a-zA-Z0-9-_]*$/u;
 
 describe("an admission's instance", () => {

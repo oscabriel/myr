@@ -14,7 +14,6 @@ const parseIso = AskId.make("parse-iso");
 
 const kinds: readonly (readonly [string, RepoKind])[] = [
   ["alice__datekit", RepoKind.Canonical({ project: datekit })],
-  // A project made before owners keeps its flat key (ADR 0032).
   [
     "datekit",
     RepoKind.Canonical({ project: ProjectName.make("oscabriel/datekit") }),
@@ -23,7 +22,6 @@ const kinds: readonly (readonly [string, RepoKind])[] = [
     "alice__date-kit",
     RepoKind.Canonical({ project: ProjectName.make("alice/date-kit") }),
   ],
-  // A bare key no project has names nothing.
   ["date-kit", RepoKind.Unknown()],
   [
     "alice__datekit--parse-iso--bob",
@@ -37,18 +35,14 @@ const kinds: readonly (readonly [string, RepoKind])[] = [
     "alice__datekit--me--alice",
     RepoKind.WorkingFork({ handle: Handle.make("alice"), project: datekit }),
   ],
-  // `layer` is no ask's name; a layer's repo is the visibility cartridge's.
   ["alice__datekit--layer--alice", RepoKind.Unknown()],
   ["alice__datekit--maintainers", RepoKind.Unknown()],
-  // A stray `--` splits a name into parts no repo has.
   ["alice__datekit--parse-iso--bob--extra", RepoKind.Unknown()],
   ["alice__datekit----bob", RepoKind.Unknown()],
   ["alice__datekit---parse-iso--bob", RepoKind.Unknown()],
   ["alice__datekit--parse-iso--", RepoKind.Unknown()],
   ["--datekit", RepoKind.Unknown()],
-  // The platform spells every handle in a name in lowercase.
   ["alice__datekit--parse-iso--Bob", RepoKind.Unknown()],
-  // Not a project's name at all.
   ["Datekit", RepoKind.Unknown()],
   ["datekit.git", RepoKind.Unknown()],
 ];

@@ -1,17 +1,3 @@
-/**
- * One project with one answer admitted and waiting for its Answer Workflow,
- * over in-process adapters: `RepoHostMemory`, the isomorphic-git `Lander`
- * over it (recorded, and able to answer `RepoBusy`), a `CheckRunner`
- * scripted per (tree or commit, lane), a `RulesEvaluator` that returns the
- * scenario's policy, `ProjectsMemory`, `EvidenceStoreMemory`, and an
- * `AnswerRuns` that only records which runs the project started: the test
- * runs the Workflow's program itself.
- *
- * The Lander is the isomorphic-git one, not the scripted `/memory` one,
- * because the project reads real commits on the way to an admitted answer
- * (the ask's files composed onto main, the answer's diff for the gate), and
- * a re-merge after main moved must produce a real tree.
- */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
@@ -65,10 +51,6 @@ const scenario = aProject({ people: ["bob"] }).pipe(
   withAsk({ id: "parse-iso", territory: "packages/parser" })
 );
 
-/**
- * The scenario's policy, with a `unit` lane beside its cheap `lint` and
- * `types` lanes: the checks stage runs the ask's own check and `unit`.
- */
 export const policy: Policy = Schema.decodeSync(Policy)({
   ...Schema.encodeSync(Policy)(scenario.policy),
   run: {
@@ -101,28 +83,22 @@ const ask: Ask = Option.getOrThrow(
   Array.findFirst(policy.asks, ({ id }) => id === parseIso)
 );
 
-/** The lane the ask's own check reports as. */
 export const askLane = LaneName.make("redThenGreen");
 
-/** Where the ask's check lives: red on main, green once answered. */
 export const checkPath = CheckSpec.guards.RedThenGreen(ask.check)
   ? ask.check.path
   : RepoPath.make("packages/parser/test/parse-iso.test.ts");
 
-/** The file the answer changes. */
 export const parsePath = RepoPath.make("packages/parser/src/parse.ts");
 
-/** A file the answer leaves alone. */
 export const lexPath = RepoPath.make("packages/lexer/src/lex.ts");
 
-/** The project as alice first pushes it. */
 const start: Files = [
   ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
   [lexPath, "export const lex = (s) => s.split(' ');\n"],
   [parsePath, "export const parse = (s) => ({});\n"],
 ];
 
-/** The ask's own files: its file in the config folder, and its check. */
 const askFiles = Array.make(
   { content: `export default "${parseIso}";\n`, path: ask.file },
   {
@@ -139,35 +115,27 @@ const askFiles = Array.make(
   }
 );
 
-/** Main once the ask opened: alice's files and the ask's. */
 export const openedFiles: Files = [
   ...start,
   ...askFiles.map(({ content, path }) => [path, content] as const),
 ];
 
-/** `files` with `path` holding `content`, added or replaced. */
 export const changed = (files: Files, path: string, content: string): Files => [
   ...files.filter(([each]) => each !== path),
   [path, content],
 ];
 
-/** Bob's answer: main once the ask opened, with `parse` fixed. */
 export const fixed = changed(
   openedFiles,
   parsePath,
   "export const parse = (s) => ({ year: 2026 });\n"
 );
 
-// ------------------------------------------------------------------ checker
-
-/** One scripted run of a lane: how it ends, and its failure's signature. */
 export interface ScriptedRun {
   readonly result: LaneOutcome;
-  /** What the failing test said, as `checks.classify` writes a signature. */
   readonly signature?: string;
 }
 
-/** The scripted Checker's script, and every job it was given. */
 export class Checker extends Context.Service<
   Checker,
   {
@@ -180,15 +148,8 @@ export class Checker extends Context.Service<
   }
 >()("test/Checker") {}
 
-/** Where a lane's script lives: `<tree or commit sha>:<lane>`. */
 const keyOf = (at: CheckAt, lane: LaneName) => `${shaOf(at)}:${lane}`;
 
-/**
- * `CheckRunner` scripted per (tree or commit, lane), as `CheckRunnerMemory`
- * is, with each failure's signature too: each key serves its runs in order,
- * then the last again. A job with a lane nobody scripted is
- * `VerifierBlocked`, as a Checker that cannot run is.
- */
 const checker = Layer.effectContext(
   Effect.gen(function* () {
     const scripts = yield* Ref.make<
@@ -269,22 +230,15 @@ const checker = Layer.effectContext(
   })
 );
 
-// ------------------------------------------------------------------- lander
-
-/** What the Lander was asked, and a way to make its next lands busy. */
 export class LanderCalls extends Context.Service<
   LanderCalls,
   {
-    /** Every job the project and the program gave the Lander, in order. */
     readonly jobs: Effect.Effect<readonly LanderJob[]>;
-    /** The next `count` lands find the repo busy, and push nothing. */
     readonly busyFor: (count: number) => Effect.Effect<void>;
-    /** The merge a test scripts the checks for, unrecorded. */
     readonly preview: (job: MergeJob) => Effect.Effect<CheckAt>;
   }
 >()("test/LanderCalls") {}
 
-/** The isomorphic-git Lander, recorded, whose lands a test can make busy. */
 const lander = Layer.effectContext(
   Effect.gen(function* () {
     const inner = yield* Lander;
@@ -325,13 +279,6 @@ const lander = Layer.effectContext(
   })
 ).pipe(Layer.provide(LanderIsogit));
 
-// ------------------------------------------------------------- the project
-
-/**
- * A `RulesEvaluator` that evaluates nothing: at any commit it returns
- * `given`, holding the asks whose files the commit's config folder has, and
- * the judge closure `checks` derives.
- */
 const rulesOf = (given: Policy) =>
   Layer.effect(
     RulesEvaluator,
@@ -351,7 +298,6 @@ const rulesOf = (given: Policy) =>
     })
   ).pipe(Layer.provide(FinishersFromChecks));
 
-/** Which answer runs the project started: the program runs them in the test. */
 export class Started extends Context.Service<
   Started,
   { readonly ids: Effect.Effect<readonly RequestId[]> }
@@ -365,19 +311,16 @@ const started = Layer.effectContext(
   )
 );
 
-/** One `advanceAnswer` call the project took, as the program made it. */
 export interface Advance {
   readonly command: LandingCommand;
   readonly report: AnswerReport | undefined;
 }
 
-/** Every `advanceAnswer` call made through `Projects`, in order. */
 export class DoCalls extends Context.Service<
   DoCalls,
   { readonly advances: Effect.Effect<readonly Advance[]> }
 >()("test/DoCalls") {}
 
-/** `ProjectsMemory`, with every `advanceAnswer` through it recorded. */
 const projects = Layer.effectContext(
   Effect.gen(function* () {
     const inner = yield* Projects;
@@ -399,7 +342,6 @@ const projects = Layer.effectContext(
   })
 ).pipe(Layer.provide(ProjectsMemory));
 
-/** Commits made the way git would make them, pushed to a repo's `main`. */
 export class Pusher extends Context.Service<
   Pusher,
   {
@@ -436,10 +378,6 @@ const pusher = Layer.effect(
   })
 );
 
-/**
- * Every port the program runs on, and what the test reads back, with the
- * project's rules evaluating to `given`; fresh per build.
- */
 export const worldWith = (given: Policy) =>
   Layer.mergeAll(projects, pusher).pipe(
     Layer.provideMerge(
@@ -456,10 +394,8 @@ export const worldWith = (given: Policy) =>
     Layer.provideMerge(RepoHostMemory)
   );
 
-/** The world over the scenario's policy. */
 export const world = worldWith(policy);
 
-/** The scenario's policy, with answers to a `fix` ask landing only once a decider finishes them. */
 export const finishRequired: Policy = {
   ...policy,
   kinds: policy.kinds.map((kind) =>
@@ -467,7 +403,6 @@ export const finishRequired: Policy = {
   ),
 };
 
-/** Where canonical `main` stands now. */
 export const mainTip = Effect.gen(function* () {
   const refs = yield* (yield* RepoHost).refs(repo).pipe(Effect.orDie);
 
@@ -476,7 +411,6 @@ export const mainTip = Effect.gen(function* () {
   );
 });
 
-/** Every lane but the ask's, scripted the same on `at`. */
 export const scriptProjectLanes = (at: CheckAt, run: ScriptedRun) =>
   Checker.use((script) =>
     Effect.forEach(
@@ -486,22 +420,14 @@ export const scriptProjectLanes = (at: CheckAt, run: ScriptedRun) =>
     )
   );
 
-/** One answer admitted: its project, its request, where it was made and checked. */
 export interface Admitted {
   readonly api: ProjectApi;
   readonly requestId: RequestId;
-  /** The main the answer was made on: the ask's opening landing. */
   readonly opened: LandedSha;
   readonly head: CommitSha;
-  /** The tree the answer merges onto `opened` as. */
   readonly merged: CheckAt;
 }
 
-/**
- * The project made, its ask opened red first, bob's claim, his push of
- * `files` to his fork and his answer admitted: its run started, and no step
- * of it run yet. The checks on the merged tree are left to the test.
- */
 export const admitted = (files: Files = fixed) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-07T12:00:00Z");
@@ -568,22 +494,17 @@ export const admitted = (files: Files = fixed) =>
     } satisfies Admitted;
   });
 
-/** Main moved by a push the platform did not make: `files` on top of `from`. */
 export const mainMoved = (from: LandedSha, files: Files) =>
   Effect.map(
     Pusher.use((each) => each.push(repo, Option.some(from), files)),
     (sha) => LandedSha.make(sha)
   );
 
-/** The verdict the project keeps on bob's answer. */
 export const verdictOf = (api: ProjectApi) =>
   Effect.map(api.verdict(bob, { ask: parseIso }), ({ verdict }) =>
     Option.fromUndefinedOr(verdict)
   ).pipe(Effect.orDie);
 
-// -------------------------------------------------------------------- steps
-
-/** Every step the program asked for, by name, in order, and each one's retries. */
 export class StepLog extends Context.Service<
   StepLog,
   {
@@ -592,16 +513,8 @@ export class StepLog extends Context.Service<
   }
 >()("test/StepLog") {}
 
-/** More steps than any run of the scenario asks for: past it, the program ran away. */
 const runaway = 64;
 
-/**
- * `inner`'s steps, each name the program asks for recorded, replays
- * included. With `twice`, a step that runs runs its effect twice and keeps
- * the second value, as an engine does when it retries a step whose first
- * run took effect before its record was written. A program that asks for
- * more than `runaway` steps dies there, so a test fails rather than hangs.
- */
 export const logged = (
   inner: Layer.Layer<StepRunner>,
   options: { readonly twice?: boolean } = {}

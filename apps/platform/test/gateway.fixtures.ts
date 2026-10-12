@@ -1,16 +1,3 @@
-/**
- * The platform's git endpoint as `gateway.test.ts` drives it: `serveGit`
- * served on a local port, in front of bare repos on disk, the way
- * `packages/git/test/world.ts` serves the gateway. Behind it run the real
- * pieces production runs, over local stand-ins: `UpstreamRepoHost`
- * over `RepoHostLocal` and the Worker's `fetch` (`WorkerFetch`), reaching
- * real `git http-backend` on a second port, and `Projects` over its memory
- * adapter with a testkit scenario's policy.
- *
- * The world also writes down what a test checks beyond git's own output:
- * every request the upstream got (method, path, credential), every token
- * the store minted, and every answer run started.
- */
 import { NodeHttpServer, NodeServices } from "@effect/platform-node";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostLocal } from "@repo/artifacts/repo-host/local";
@@ -62,7 +49,6 @@ import { WorkerFetch } from "../src/adapters/fetch.ts";
 import { serveGit } from "../src/git.ts";
 import { MemorySessions } from "../src/sessions/memory.ts";
 
-/** A platform token for each person, as the credential helper would hand git one. */
 export const tokens = {
   alice: "alice-platform-token-0123456789abcdef",
   bob: "bob-platform-token-0123456789abcdefghi",
@@ -72,24 +58,18 @@ export const alice = Person.make({ handle: Handle.make("alice") });
 
 export const bob = Person.make({ handle: Handle.make("bob") });
 
-/** One exchange the upstream served: what was asked, and with which credential. */
 export interface Served {
   readonly method: string;
   readonly path: string;
   readonly authorization: Option.Option<string>;
 }
 
-/** What a test reads back besides git's output. */
 export interface Seen {
-  /** Every exchange the upstream served, in order. */
   readonly upstream: Ref.Ref<readonly Served[]>;
-  /** Every token secret the store minted. */
   readonly minted: Ref.Ref<readonly string[]>;
-  /** Every answer run started, by request id. */
   readonly started: Ref.Ref<readonly RequestId[]>;
 }
 
-/** Writes the files, commits them all, and returns the commit's id. */
 export const commit = (
   cwd: string,
   message: string,
@@ -116,16 +96,11 @@ export const commit = (
     return CommitSha.make(yield* gitOk(cwd, "rev-parse", "HEAD"));
   });
 
-/**
- * git's arguments for sending `token` as the password of Basic auth on every
- * request, as git does once the credential helper answered.
- */
 export const as = (token: string) => [
   "-c",
   `http.extraHeader=Authorization: Basic ${btoa(`x:${token}`)}`,
 ];
 
-/** Serves `app` on a local port for as long as the scope lasts, and returns its origin. */
 const listen = <E, R>(
   app: Effect.Effect<
     HttpServerResponse.HttpServerResponse,
@@ -150,11 +125,6 @@ const listen = <E, R>(
     return `http://127.0.0.1:${address.port}`;
   });
 
-/**
- * `git http-backend` over the bare repos in `root`, as Artifacts stands
- * behind the gateway: it takes whatever credential it is sent, and writes
- * each exchange down.
- */
 const upstreamApp = (root: string, seen: Seen["upstream"]) =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -175,7 +145,6 @@ const upstreamApp = (root: string, seen: Seen["upstream"]) =>
     );
   });
 
-/** The platform's git endpoint: `serveGit`, and a 404 for any other path. */
 const gatewayApp = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const web = yield* HttpServerRequest.toWeb(request);
@@ -189,7 +158,6 @@ const gatewayApp = Effect.gen(function* () {
   return HttpServerResponse.fromWeb(response);
 });
 
-/** `RepoHostLocal`, writing down every token secret it mints. */
 const mintingHost = (minted: Seen["minted"]) =>
   Layer.effect(
     RepoHost,
@@ -206,10 +174,6 @@ const mintingHost = (minted: Seen["minted"]) =>
     })
   );
 
-/**
- * The policy `project`'s scenario holds; a project with none gets the first
- * scenario's, with no asks.
- */
 const policyOf = (
   scenarios: readonly Scenario[],
   project: ProjectName
@@ -225,11 +189,6 @@ const policyOf = (
       }))
   );
 
-/**
- * A `RulesEvaluator` that evaluates nothing: at any commit it returns the
- * policy its project's scenario holds, and the judge closure `checks`
- * derives.
- */
 const rulesOf = (scenarios: readonly Scenario[]) =>
   Layer.effect(
     RulesEvaluator,
@@ -252,10 +211,8 @@ const rulesOf = (scenarios: readonly Scenario[]) =>
     })
   ).pipe(Layer.provide(FinishersFromChecks));
 
-/** The lane an ask's `redThenGreen` check runs in. */
 const checkLane = LaneName.make("redThenGreen");
 
-/** One scripted run of the ask's check, failing. */
 const failedOnce: LaneResult = {
   command: "bun test",
   durationMs: 1,
@@ -263,7 +220,6 @@ const failedOnce: LaneResult = {
   result: "failed",
 };
 
-/** An ask's own files: its file in the config folder, and its check, which asserts. */
 const askFiles = (ask: Ask) =>
   Array.make(
     { content: `export default "${ask.id}";\n`, path: ask.file },
@@ -283,7 +239,6 @@ const askFiles = (ask: Ask) =>
     }
   );
 
-/** Answer runs that only write down that they started: no push here lands. */
 const startedRuns = (started: Seen["started"]) =>
   Layer.succeed(
     AnswerRuns,
@@ -292,12 +247,6 @@ const startedRuns = (started: Seen["started"]) =>
     })
   );
 
-/**
- * The world: bare repos under a temporary folder, `git http-backend` over
- * them on one port, and the platform's git endpoint on another, whose
- * services are built here once. Projects follow `scenarios`; alice made
- * every one of them.
- */
 export const gatewayWorld = (scenarios: readonly Scenario[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -358,10 +307,6 @@ export const gatewayWorld = (scenarios: readonly Scenario[]) =>
 
     const origin = yield* listen(gatewayApp, services);
 
-    /**
-     * `decider` opens `ask` (one of the scenario's) on main: the Checker
-     * fails its check twice the same way on the composed commit.
-     */
     const openAsk = (
       api: ProjectApi,
       main: LandedSha,
@@ -390,12 +335,9 @@ export const gatewayWorld = (scenarios: readonly Scenario[]) =>
       openAsk,
       origin,
       projects: Context.get(services, Projects),
-      /** Where the store keeps each repo: `<repos>/<name>.git`. */
       repos,
       root,
       seen,
-      /** A repo's URL at the gateway. */
-      /** A repo's URL at the gateway: a project by its name, a fork by its address. */
       urlOf: (repo: string) =>
         `${origin}/${
           repo.includes("/")

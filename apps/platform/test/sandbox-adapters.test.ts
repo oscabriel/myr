@@ -82,7 +82,6 @@ const failed: LaneResult = {
   result: "failed",
 };
 
-/** One lane on an answer's merged tree, cloned from the claim's fork. */
 const checkJob: CheckJob = {
   at: CheckAt.cases.Tree.make({ tree }),
   lanes: [{ command: "bun test", lane }],
@@ -126,7 +125,6 @@ const merged = { changes: [{ path, status: "modified" as const }], tree };
 
 const stale = new StaleBase({ base, conflicts: [path], main });
 
-/** What the memory Lander inside the fake sandbox answers, unless a test says otherwise. */
 const landerScript: LanderScript = {
   bundle: [Result.succeed(bundle)],
   compose: [Result.succeed({ commit: composed, tree })],
@@ -134,7 +132,6 @@ const landerScript: LanderScript = {
   merge: [Result.succeed(merged)],
 };
 
-/** One token a job minted, as the store gave it out. */
 interface Minted {
   readonly repo: RepoName;
   readonly scope: TokenScope;
@@ -143,12 +140,6 @@ interface Minted {
   readonly secret: string;
 }
 
-/**
- * The memory store with the canonical repo and a claim's fork, recording
- * every token it mints and every revoke it is asked for; with `failRevoke`,
- * every revoke dies after it is recorded, its error echoing the token's
- * secret.
- */
 const recordingRepoHost = (failRevoke: boolean) =>
   Effect.gen(function* () {
     const store = yield* RepoHost;
@@ -191,7 +182,6 @@ const recordingRepoHost = (failRevoke: boolean) =>
     return { host, minted, revoked };
   }).pipe(Effect.provide(RepoHostMemory));
 
-/** Every wire the fake sandbox decoded, by method. */
 interface Seen {
   readonly bundleRules: (typeof BundleWire.Type)[];
   readonly check: (typeof CheckWire.Type)[];
@@ -200,12 +190,6 @@ interface Seen {
   readonly merge: (typeof MergeWire.Type)[];
 }
 
-/**
- * The sandbox Worker's entrypoint as the service binding reaches it, in
- * memory: each method decodes its wire with its schema, runs the memory
- * `CheckRunner` or `Lander` it was built over, and encodes the `Exit`. It
- * keeps every wire it decoded, by method.
- */
 const fakeSandbox = Effect.gen(function* () {
   const run = yield* FiberSet.makeRuntimePromise<CheckRunner | Lander>();
 
@@ -217,7 +201,6 @@ const fakeSandbox = Effect.gen(function* () {
     merge: [],
   };
 
-  /** Decodes a wire into `into`, runs its job, and encodes the outcome. */
   const answer =
     <W, WI, A, E, X>(
       wire: Schema.Codec<W, WI>,
@@ -261,15 +244,10 @@ const fakeSandbox = Effect.gen(function* () {
 
 interface WorldOptions {
   readonly script?: LanderScript;
-  /** The binding the adapters get, made from the fake's. */
   readonly binding?: (sandbox: SandboxBinding) => SandboxBinding;
   readonly failRevoke?: boolean;
 }
 
-/**
- * Both adapters over a fake sandbox and a recording store, and what the
- * fake and the store saw.
- */
 const world = (options: WorldOptions = {}) =>
   Effect.gen(function* () {
     const { host, minted, revoked } = yield* recordingRepoHost(
@@ -303,10 +281,8 @@ const world = (options: WorldOptions = {}) =>
     return { host, lander, minted, revoked, runner, seen: fake.seen };
   });
 
-/** One log line, as the structured logger renders it. */
 type Line = ReturnType<typeof Logger.formatStructured.log>;
 
-/** Runs `body` with every log line it writes kept: its exit, and the lines. */
 const withLogs = <A, E>(body: Effect.Effect<A, E>) =>
   Effect.gen(function* () {
     const lines: Line[] = [];
@@ -324,11 +300,9 @@ const withLogs = <A, E>(body: Effect.Effect<A, E>) =>
     return { exit, lines };
   });
 
-/** Which repo each token was minted on, with which scope. */
 const mintsOf = (minted: readonly Minted[]) =>
   minted.map(({ repo, scope }) => ({ repo, scope }));
 
-/** A wire remote, with its token in the clear for comparing. */
 const opened = (remote: {
   readonly token: Redacted.Redacted;
   readonly url: string;
@@ -339,7 +313,6 @@ const opened = (remote: {
 
 type World = Effect.Success<ReturnType<typeof world>>;
 
-/** Every operation of both adapters once, a land for each rebuild that reads a fork or not. */
 const everyJob = ({
   lander,
   runner,
@@ -355,14 +328,9 @@ const everyJob = ({
   lander.bundleRules(bundleJob),
 ];
 
-/** By token id, so revokes in any order compare. */
 const byId = <T extends { readonly id: string }>(tokens: readonly T[]) =>
   tokens.toSorted((a, b) => a.id.localeCompare(b.id));
 
-/**
- * The sandbox Worker's default entrypoint, by its shape in
- * `apps/sandbox/src/worker.ts` (an app may not import another app).
- */
 interface SandboxEntrypoint extends WorkerEntrypoint<Env> {
   readonly check: (
     wire: typeof CheckWire.Encoded
@@ -537,7 +505,6 @@ describe("the sandbox Lander", () => {
   );
 });
 
-/** A way the sandbox's `merge` can fail to answer with an `Exit`, each echoing a token it was sent. */
 interface Breakage {
   readonly name: string;
   readonly failure: string;
@@ -577,7 +544,6 @@ const breakages: readonly Breakage[] = [
   },
 ];
 
-/** Every secret in `minted` that `text` contains. */
 const leaked = (text: string, minted: readonly Minted[]) =>
   minted.flatMap(({ secret }) => (text.includes(secret) ? [secret] : []));
 

@@ -1,11 +1,3 @@
-/**
- * A draft's run as the `Answer` Workflow takes it (ADR 0018): the program's
- * steps over memory steps that record and replay as the engine does
- * (`memoSteps`), the memory drafter scripted per attempt, and a project in
- * memory whose rehearsals run on the scripted Checker. The Workflow's own
- * start (`DraftRunsWorkflow`) is held to create-or-restart over a fake
- * binding, and the engine is handed each draft step's timeout.
- */
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { CheckAt } from "@repo/checks/check-runner";
@@ -51,10 +43,8 @@ import type { StepRetry } from "../../src/workflows/step.ts";
 import { as, seeded, worldOf } from "../handlers.fixtures.ts";
 import { Checker, Pusher, worldWith } from "./answer.fixtures.ts";
 
-/** What the engine is handed with each step. */
 type EngineConfig = Parameters<EngineSteps["do"]>[1];
 
-/** datekit, decided by alice, with carol vouched and one `fix` ask she may want drafted. */
 const scenario = aProject({ people: ["carol"] }).pipe(
   withVouches(["carol"]),
   withAsk({ id: "parse-week", territory: "." })
@@ -85,7 +75,6 @@ const start = [
   ["src/parse.ts", "export const parse = (s) => ({});\n"],
 ] as const;
 
-/** A draft of the scenario's ask whose test says `assertion`. */
 const draftOf = (assertion: string, id = "parse-week"): DraftedAsk => ({
   id: AskId.make(id),
   kind: "fix",
@@ -106,22 +95,17 @@ const draftOf = (assertion: string, id = "parse-week"): DraftedAsk => ({
   want,
 });
 
-/** A test that passes on main, so its draft is not red first. */
 const passing = draftOf("expect(parse('2026-W41')).toStrictEqual({});");
 
-/** A second test that passes on main. */
 const passingToo = draftOf("expect(parse('2026-W42')).toStrictEqual({});");
 
-/** A test that fails on main by its assertion. */
 const red = draftOf("expect(parse('2026-W41').week).toBe(41);");
 
-/** A draft of an ask the project's rules do not state. */
 const unstated = draftOf(
   "expect(parse('2026-W41').week).toBe(41);",
   "parse-month"
 );
 
-/** carol proposes the want with a draft, on datekit's first push. */
 const proposed = Effect.gen(function* () {
   yield* advanceTo("2026-10-08T12:00:00Z");
 
@@ -137,7 +121,6 @@ const proposed = Effect.gen(function* () {
 
   yield* api.recordFirstPush(alice, first).pipe(Effect.orDie);
 
-  // The project's first proposal: `proposal`.
   yield* api
     .proposeAsk(carol, { draft: true, territory: "src/parse.ts", want })
     .pipe(Effect.orDie);
@@ -145,7 +128,6 @@ const proposed = Effect.gen(function* () {
   return { api, main: LandedSha.make(first) };
 });
 
-/** `drafted`'s files composed onto `main`, its check scripted to end `runs` there. */
 const scripted = (
   main: LandedSha,
   drafted: DraftedAsk,
@@ -165,14 +147,12 @@ const scripted = (
     );
   });
 
-/** The proposal's draft state, as anyone reads it. */
 const draftOfProposal = (api: ProjectApi) =>
   Effect.map(
     Effect.orDie(api.showProposal(Anonymous.make({}), proposal)),
     ({ proposal: shown }) => shown.draft
   );
 
-/** alice's open-proposal decisions on Today. */
 const proposalDecisions = (api: ProjectApi) =>
   Effect.map(Effect.orDie(api.today(alice)), ({ decisions }) =>
     decisions.filter(({ subject }) =>
@@ -182,7 +162,6 @@ const proposalDecisions = (api: ProjectApi) =>
 
 const asked = DraftsAsked.use(({ inputs }) => inputs);
 
-/** The world, the memory drafter scripted with `script`, and the platform's model. */
 const worldDrafting = (script: Parameters<typeof DrafterMemory>[0]) =>
   Layer.mergeAll(
     worldWith(policy),
@@ -233,7 +212,6 @@ describe("a draft's run, over steps that replay", () => {
           refusedWith: "NotRedFirst",
         });
 
-        // The finished instance, run again: every step reads its record.
         yield* draftSteps(params).pipe(Effect.provide(steps));
 
         expect({
@@ -321,8 +299,6 @@ describe("a draft's run, over steps that replay", () => {
           feedback: (yield* asked)[5]?.feedback,
         };
 
-        // The finished instance, run again: `draft-1` is thrown again,
-        // unrun, and its `gave-up` record says what the first run made of it.
         yield* draftSteps(params).pipe(Effect.provide(steps));
 
         expect({
@@ -392,7 +368,6 @@ describe("a draft's run, over steps that replay", () => {
       Effect.gen(function* () {
         const { api } = yield* proposed;
 
-        // Nothing scripted for the draft's commit: the Checker cannot run it.
         const steps = yield* memoSteps();
 
         yield* draftSteps(params).pipe(Effect.provide(steps));
@@ -452,7 +427,6 @@ describe("a draft's run, over steps that replay", () => {
   );
 });
 
-/** A fake `ANSWER` binding: each instance made and restarted, every instance in `status`. */
 const fakeWorkflow = (status: InstanceStatus["status"]) => {
   const made: string[] = [];
   const restarted: string[] = [];

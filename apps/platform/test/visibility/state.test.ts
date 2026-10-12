@@ -1,9 +1,3 @@
-/**
- * The cartridge's project state as the platform provides it: salts
- * from WebCrypto's randomness, 32 fresh bytes each, and admissions started
- * as runs of the `Answer` Workflow, one instance per project, layer and
- * head, so a start the outbox runs again finds the first run.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { AdmissionStarts, SaltSource } from "@repo/project/visibility/state";
 import { CommitSha, LayerName, ProjectName } from "@repo/protocol/ids";
@@ -39,11 +33,6 @@ const head = CommitSha.make("a".repeat(40));
 
 const later = CommitSha.make("b".repeat(40));
 
-/**
- * The `Answer` Workflow's binding, in memory: `create` refuses an id it
- * holds, as Workflows do, and `get` finds only the ids it holds. With
- * `down`, both refuse everything.
- */
 const workflowOf = (down = false) => {
   const created: { readonly id: string; readonly params: unknown }[] = [];
 
@@ -68,7 +57,6 @@ const workflowOf = (down = false) => {
 
 const decodeParams = Schema.decodeUnknownSync(AdmissionParams);
 
-/** The admission of `at` to datekit's maintainers layer. */
 const admissionOf = (at: CommitSha) =>
   AdmissionParams.make({ head: at, layer: maintainers, project: datekit });
 
@@ -88,7 +76,6 @@ describe("an admission's start", () => {
         yield* start({ head });
         yield* start({ head: later });
 
-        // What each instance was created with, read back as the Workflow reads it.
         expect(
           created.map(({ id, params: given }) => ({
             id,

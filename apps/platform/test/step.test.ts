@@ -12,7 +12,6 @@ import type {
 
 const sha = LandedSha.make("a".repeat(40));
 
-/** A value whose encoded form differs from it: a date and an option. */
 const Landing = Schema.Struct({
   at: Schema.DateTimeUtcFromString,
   sha: Schema.OptionFromOptionalKey(LandedSha),
@@ -23,11 +22,6 @@ const landing = {
   sha: Option.some(sha),
 };
 
-/**
- * A Workflow's steps as the engine runs them, in memory: a step's first run
- * records what its body returns under its name; a replay returns the
- * record without running it. It keeps every retry config it was given.
- */
 const fakeWorkflowStep = () => {
   const recorded = new Map<string, Promise<Schema.Json>>();
   const retries: WorkflowStepRetries[] = [];
@@ -46,14 +40,12 @@ const fakeWorkflowStep = () => {
     },
   };
 
-  /** What the engine recorded for `name`; `null` if it ran no such step. */
   const record = (name: string) =>
     Effect.promise(() => recorded.get(name) ?? Promise.resolve(null));
 
   return { record, retries, steps };
 };
 
-/** A step that counts its runs and lands. */
 const counted = (runs: Ref.Ref<number>) =>
   Effect.as(
     Ref.update(runs, (n) => n + 1),

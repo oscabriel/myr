@@ -53,7 +53,6 @@ import {
   tokenRequest,
 } from "./oauth.fixtures.ts";
 
-/** Alice's password, for the accounts signed up with one. */
 const alicePassword = "correct horse battery";
 
 describe("the Worker's env, for Google sign-in", () => {
@@ -106,11 +105,6 @@ const alice = Handle.make("alice");
 const handleOf = (subject: string) =>
   Identities.use((identities) => identities.handleOf("google", subject));
 
-/**
- * What every `Identities` adapter must do, written against the port:
- * `/memory` and the D1 adapter (over sqlite-node, with the migration D1
- * applies) run it on every `verify`.
- */
 const describeIdentities = (
   adapter: string,
   layer: Layer.Layer<Identities>
@@ -205,7 +199,6 @@ const describeIdentities = (
 
 describeIdentities("memory", Layer.fresh(IdentitiesMemory.layer));
 
-/** The identities table, as `wrangler d1 migrations apply` makes it. */
 const migrated = Layer.effectDiscard(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -220,7 +213,6 @@ const migrated = Layer.effectDiscard(
   })
 ).pipe(Layer.orDie, Layer.provide(NodeServices.layer));
 
-/** A fresh in-memory database, migrated, each time the layer is built. */
 const database = migrated.pipe(
   Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
   Layer.orDie
@@ -231,7 +223,6 @@ describeIdentities(
   IdentitiesD1.pipe(Layer.provide(database))
 );
 
-/** RFC 7636 appendix B's verifier and its S256 challenge. */
 const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 
 const challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
@@ -271,7 +262,6 @@ describe("Google's authorization request", () => {
   });
 });
 
-/** The request `googleAuthorizeUrl` would send the browser to, built by hand. */
 const authorizationRequest = new URL(
   `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
     client_id: clientId,
@@ -285,10 +275,6 @@ const authorizationRequest = new URL(
   }).toString()}`
 ).toString();
 
-/**
- * The person Google names for one consent, as `googleSubject` confirms it
- * (with the verifier and nonce the platform kept, unless a test changes them).
- */
 const subjectOf = (
   google: FakeGoogle,
   consent: Consent,
@@ -307,7 +293,6 @@ const subjectOf = (
     });
   });
 
-/** Runs `body` with one fake Google and one isolate's kept keys. */
 const withGoogle = <A, E>(
   body: (google: FakeGoogle) => Effect.Effect<A, E, Fetch | GoogleKeys>
 ) =>
@@ -457,7 +442,6 @@ describe("the person Google confirms", () => {
   );
 });
 
-/** A page's text, beside the response it came in. */
 interface Page {
   readonly html: string;
   readonly response: Response;
@@ -468,25 +452,21 @@ const read = (response: Response) =>
     Effect.map((html): Page => ({ html, response }))
   );
 
-/** The browser asks the sign-in Worker for `path` (or a full request). */
 const visit = (world: GoogleWorld, path: Request | string, from?: Site) =>
   world.browser.send(
     path instanceof Request ? path : new Request(new URL(path, origin)),
     from
   );
 
-/** Opens the CLI's sign-in page, as a browser would. */
 const openSignIn = (world: GoogleWorld) =>
   visit(world, new Request(authorizeUrl())).pipe(Effect.flatMap(read));
 
-/** Where the sign-in page's "Continue with Google" goes, if it offers it. */
 const googleLinkIn = (page: Page) =>
   Option.fromNullishOr(
     /<a href="(?<href>\/oauth\/google\/start\?[^"]*)"/u.exec(page.html)?.groups
       ?.href
   ).pipe(Option.map((href) => href.replaceAll("&amp;", "&")));
 
-/** "Continue with Google" from a fresh sign-in page: the Worker's answer, unread. */
 const continueWithGoogle = (world: GoogleWorld) =>
   Effect.gen(function* () {
     const page = yield* openSignIn(world);
@@ -498,17 +478,11 @@ const continueWithGoogle = (world: GoogleWorld) =>
     return yield* visit(world, href);
   });
 
-/** Where a response redirects to, parsed. */
 const locationOf = (response: Response) =>
   Option.fromNullishOr(response.headers.get("location")).pipe(
     Option.flatMap((location) => Option.fromNullishOr(URL.parse(location)))
   );
 
-/**
- * A request to `src/worker.ts`'s own handler, on the shim's fake env (no
- * Google client): a GET, or an empty form post to a POST-only path (a GET
- * there answers 404 with Google on too).
- */
 const sendToWorker = (method: "GET" | "POST", path: string) =>
   Effect.promise(() =>
     Promise.resolve(
@@ -588,8 +562,6 @@ describe("Google sign-in, with a Google OAuth client", () => {
         expect(Option.isSome(googleLinkIn(page))).toBeTruthy();
         expect(page.html).toContain("Continue with Google");
         expect(page.html).toContain('formaction="/oauth/google/link"');
-        // "Sign in and link Google" posts, then goes on to Google: a browser
-        // holds that redirect to `form-action`.
         expect(page.response.headers.get("content-security-policy")).toContain(
           "https://accounts.google.com"
         );
@@ -660,7 +632,6 @@ describe("Google sign-in, with a Google OAuth client", () => {
   );
 });
 
-/** A browser's form post to `path`; the browser adds its cookies. */
 const formPost = (path: string, fields: Readonly<Record<string, string>>) =>
   new Request(new URL(path, origin), {
     body: new URLSearchParams(fields),
@@ -671,17 +642,11 @@ const formPost = (path: string, fields: Readonly<Record<string, string>>) =>
     method: "POST",
   });
 
-/** The form `page` carries; the test dies if it carries none. */
 const formIn = (page: Page) =>
   Effect.fromOption(formOf(page.response, page.html, "kept")).pipe(
     Effect.orDie
   );
 
-/**
- * Google's consent for the authorization request `response` redirects to:
- * `consent.sub` signs in at Google, and Google sends the browser back to
- * the callback, from its own site. The callback's answer, read.
- */
 const backFromGoogle = (
   world: GoogleWorld,
   response: Response,
@@ -699,7 +664,6 @@ const backFromGoogle = (
     );
   });
 
-/** Chooses `handle` on the pick-a-handle page; the response, unread. */
 const chooseHandle = (world: GoogleWorld, page: Page, handle: string) =>
   Effect.gen(function* () {
     const form = yield* formIn(page);
@@ -714,12 +678,10 @@ const chooseHandle = (world: GoogleWorld, page: Page, handle: string) =>
     );
   });
 
-/** What `/token` answers, as far as a client reads it. */
 const AccessToken = Schema.fromJsonString(
   Schema.Struct({ access_token: Schema.String })
 );
 
-/** The props of the token a code in `response`'s redirect is traded for. */
 const propsFor = (world: GoogleWorld, response: Response) =>
   Effect.gen(function* () {
     const code = yield* Effect.fromOption(codeOf(response)).pipe(Effect.orDie);
@@ -817,9 +779,6 @@ describe("coming back from Google", () => {
 
         const first = yield* chooseHandle(world, page, "carol");
 
-        // The second click left before the first answer cleared the CSRF
-        // cookie, so it still carries it; the jar is empty by now, so the
-        // browser adds nothing over it.
         const second = new Request(
           formPost("/oauth/google/handle", {
             csrf: form.csrf,
@@ -1033,7 +992,6 @@ describe("Google not confirming anyone", () => {
   );
 });
 
-/** Alice's account, signed up with a password. */
 const withAlice = (world: GoogleWorld) =>
   Effect.gen(function* () {
     yield* world.accounts.create(
@@ -1045,7 +1003,6 @@ const withAlice = (world: GoogleWorld) =>
     );
   });
 
-/** "Sign in and link Google" from a fresh sign-in page; the response, unread. */
 const signInAndLink = (world: GoogleWorld, handle: string, password: string) =>
   Effect.gen(function* () {
     const form = yield* formIn(yield* openSignIn(world));

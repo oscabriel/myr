@@ -1,12 +1,3 @@
-/**
- * The platform's MCP surface beside its tools, through its fetch
- * handler composed as the Worker's is (the core loop's world), once dora has made
- * datekit and opened fix-week: an ask's brief is a resource, the projects
- * are one, the platform's skill is the prompt `contribute`, the capped code
- * reads browse datekit for an agent without git, and every tool whose
- * contract can refuse returns its refusal as typed JSON. Requests are
- * MCP's stateless 2026-07-28 ones, built as `harness.ts` builds a tool call.
- */
 import { describe, expect, it, layer } from "@effect/vitest";
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { readManaged } from "@repo/agent-kit/generated-file";
@@ -66,18 +57,14 @@ const project = ProjectName.make("dora/datekit");
 
 const fixWeek = AskId.make("fix-week");
 
-/** An ask datekit never opened, and a project nobody made. */
 const nope = AskId.make("no-such-ask");
 
 const nowhere = ProjectName.make("alice/nowhere");
 
-/** The lane an ask's `redThenGreen` check runs in. */
 const redThenGreen = LaneName.make("redThenGreen");
 
-/** Where the config folder's sdk is imported from, as a maintainer writes it. */
 const sdk = `${Brand.cliPackage}/rules`;
 
-/** The project as dora first pushes it: one source file, the config folder, the vouches. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
     `import { kinds, project } from "${sdk}";`,
@@ -96,7 +83,6 @@ const start = {
 
 const want = "week reads the ISO week of a date";
 
-/** fix-week's own files: its file in the config folder, and its check, which asserts. */
 const askFiles = Array.make(
   {
     content: [
@@ -125,7 +111,6 @@ const askFiles = Array.make(
   }
 );
 
-/** The core loop's world once dora has made datekit, pushed it, and opened fix-week. */
 class Seeded extends Context.Service<Seeded, CoreLoopWorld>()("test/Seeded") {}
 
 const seeded = Layer.effect(
@@ -155,8 +140,6 @@ const seeded = Layer.effect(
   }).pipe(Effect.orDie)
 );
 
-// --- MCP over HTTP, stateless ------------------------------------------------
-
 const version = "2026-07-28";
 
 const meta = {
@@ -165,14 +148,12 @@ const meta = {
   "io.modelcontextprotocol/protocolVersion": version,
 };
 
-/** The param the `mcp-name` header repeats, for the methods that route by one. */
 const routedBy = new Map([
   ["prompts/get", "name"],
   ["resources/read", "uri"],
   ["tools/call", "name"],
 ]);
 
-/** One MCP request over the HTTP transport, as `token`'s bearer if given. */
 const mcpRequest = (
   method: string,
   params: Readonly<Record<string, Schema.Json>>,
@@ -208,7 +189,6 @@ const mcpRequest = (
   });
 };
 
-/** A JSON-RPC reply: a result, or an error's message. */
 const Reply = Schema.fromJsonString(
   Schema.Struct({
     error: Schema.optionalKey(Schema.Struct({ message: Schema.String })),
@@ -216,7 +196,6 @@ const Reply = Schema.fromJsonString(
   })
 );
 
-/** The last JSON-RPC message in a reply, which is plain JSON or an event stream. */
 const replyOf = (response: Response) =>
   Effect.promise(() => response.text()).pipe(
     Effect.map((text) =>
@@ -231,7 +210,6 @@ const replyOf = (response: Response) =>
     Effect.flatMap(Schema.decodeEffect(Reply))
   );
 
-/** The result of an MCP call as `token`, decoded with `schema`. */
 const resultOf = <S extends Schema.Top>(
   fetch: (request: Request) => Effect.Effect<Response>,
   schema: S,
@@ -248,7 +226,6 @@ const resultOf = <S extends Schema.Top>(
     })
   );
 
-/** The error message of an MCP call that fails, as `token`. */
 const errorOf = (
   fetch: (request: Request) => Effect.Effect<Response>,
   method: string,
@@ -319,7 +296,6 @@ const PromptText = Schema.Struct({
   ),
 });
 
-/** A tools/call result: whether it failed, and its one content block's JSON. */
 const ToolResult = Schema.Struct({
   content: Schema.Tuple([
     Schema.Struct({
@@ -330,7 +306,6 @@ const ToolResult = Schema.Struct({
   isError: Schema.Boolean,
 });
 
-/** A tools/call result whose one content block is plain text, not JSON. */
 const ToolText = Schema.Struct({
   content: Schema.Tuple([
     Schema.Struct({ text: Schema.String, type: Schema.Literal("text") }),
@@ -338,20 +313,14 @@ const ToolText = Schema.Struct({
   isError: Schema.Boolean,
 });
 
-/** A tools/call result that answered: whether it failed, and its structured content. */
 const Answered = Schema.Struct({
   isError: Schema.Boolean,
   structuredContent: Schema.Unknown,
 });
 
-/** Where an ask's brief is read: `<scheme>ask/<project>/<ask>`. */
 const briefUri = (of: ProjectName, ask: AskId) =>
   `${Brand.urlScheme}ask/${keyOf(of)}/${ask}`;
 
-/**
- * The platform's skill body, from agent-kit's command list: the contracts'
- * commands and the hand-written ones.
- */
 const skillBody = platformSkill({ commands: commandDocs(Contracts) }).pipe(
   Effect.map(([file]) =>
     Option.match(
@@ -363,9 +332,6 @@ const skillBody = platformSkill({ commands: commandDocs(Contracts) }).pipe(
   )
 );
 
-// --- Each refusing tool, refused --------------------------------------------
-
-/** A contract's own error union, without the `Unauthenticated` its middleware adds. */
 type OwnError<R> =
   R extends Rpc.Rpc<
     infer _Tag,
@@ -378,14 +344,12 @@ type OwnError<R> =
     ? Error["Type"]
     : never;
 
-/** The tags of the contracts whose own error union is not empty. */
 type Refusing<R> = R extends Rpc.Any
   ? [OwnError<R>] extends [never]
     ? never
     : R["_tag"]
   : never;
 
-/** A call a contract refuses in the seeded world, and the refusal it gives. */
 interface Provoked<Tag extends string> {
   readonly args: Rpc.Payload<Rpc.ExtractTag<Contract, Tag>>;
   readonly refusal: OwnError<Rpc.ExtractTag<Contract, Tag>>;
@@ -399,14 +363,8 @@ const requestId = RequestId.make("mcp-refused-0001");
 
 const decision = DecisionId.make("dec-000001");
 
-/** A tag datekit never made. */
 const untagged = "v9.9.9";
 
-/**
- * Every contract MCP serves that can refuse, one call it refuses as the
- * operator (who neither made datekit nor claims anything in it), and the
- * refusal it gives.
- */
 const provoked = {
   claim: {
     args: { ask: nope, project },
@@ -525,7 +483,6 @@ const provoked = {
   readonly [Tag in Refusing<ContractOn<"mcp">>]: Provoked<Tag>;
 };
 
-/** The contracts MCP serves whose error union is not empty, in the group's order. */
 const refusingOnMcp = [...Contracts.requests.values()].filter(
   (rpc) =>
     Context.get(rpc.annotations, Surfaces).includes("mcp") &&
@@ -536,8 +493,6 @@ const provokedBy = new Map<
   string,
   { readonly args: unknown; readonly refusal: Refusal }
 >(Object.entries(provoked));
-
-// --- The tests ----------------------------------------------------------------
 
 layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
   "the platform's MCP surface, once datekit has fix-week open",
@@ -725,7 +680,6 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
         })
     );
 
-    // A connector with no shell browses the canonical repo through these.
     test.effect("reads a file at main as structured content", () =>
       Effect.gen(function* () {
         const world = yield* Seeded;
@@ -775,7 +729,6 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
         )(result.structuredContent);
 
         expect(result.isError).toBeFalsy();
-        // Folders first, then by name: fix-week added `test/`.
         expect(listing.entries).toStrictEqual([
           { name: Brand.configDir, type: "tree" },
           { name: "src", type: "tree" },
@@ -819,7 +772,6 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
         })
     );
 
-    // At most 100 commits a page reach a transcript.
     test.effect(
       "refuses a log page of more than 100 commits by its input",
       () =>
@@ -868,8 +820,7 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
 
           const [{ text }] = result.content;
 
-          // Before decoding: a call that wrongly succeeded fails here, by
-          // this assertion, rather than as a decode error.
+          // Before decoding, so a call that wrongly succeeded fails here, not as a decode error.
           expect(result.isError, `${tag} was not refused`).toBeTruthy();
 
           const refusal = yield* Schema.decodeUnknownEffect(rpc.errorSchema)(
@@ -887,14 +838,11 @@ layer(seeded, { excludeTestServices: true, timeout: "120 seconds" })(
   }
 );
 
-// --- As the caller --------------------------------------------------------------
-
 const sessions = MemorySessions.layer({
   "alice-token": Handle.make("alice"),
   "bob-token": Handle.make("bob"),
 });
 
-/** Who a contract is called as, in a word. */
 const callerName = CurrentPrincipal.useSync((principal) =>
   Principal.match(principal, {
     Anonymous: () => "anyone",
@@ -902,7 +850,6 @@ const callerName = CurrentPrincipal.useSync((principal) =>
   })
 );
 
-/** fix-week as `showAsk` returns it. */
 const askWire = {
   askedBy: "dora",
   blockedBy: [],
@@ -922,11 +869,6 @@ const askWire = {
   territory: { module: ".", paths: ["src/week.ts"] },
 } as const;
 
-/**
- * A platform with datekit alone, whose `showAsk` and `listAsks` say who
- * called them: the brief names the caller, and so does the one open ask's
- * want.
- */
 const naming = Layer.mergeAll(
   noProjects,
   Contracts.toLayerHandler("showAsk", () =>

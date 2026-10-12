@@ -11,7 +11,6 @@ import { MemorySessions } from "../src/sessions/memory.ts";
 import { fakeEnv } from "./fake-env.ts";
 import { noProjects, origin, served, toolCall, toolList } from "./harness.ts";
 
-/** The two binaries a release carries, named as the platform names them. */
 const linux = `${Brand.slug}-linux-x64`;
 
 const darwin = `${Brand.slug}-darwin-arm64`;
@@ -31,7 +30,6 @@ const darwinSha =
 const oldLinuxSha =
   "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf";
 
-/** The manifest the release script writes: two releases, the newer one latest. */
 const manifest = {
   latest: "0.1.0",
   versions: {
@@ -45,11 +43,9 @@ const manifest = {
   },
 };
 
-/** An install script that says which release it installs. */
 const script = (version: string) =>
   `#!/bin/sh\nset -eu\necho "installing ${Brand.cli} ${version}"\n`;
 
-/** The bucket as 715 leaves it, and one file outside `releases/`. */
 const files = {
   "releases/0.0.9/install.sh": script("0.0.9"),
   [`releases/0.0.9/${linux}`]: oldLinuxBytes,
@@ -62,11 +58,6 @@ const files = {
 
 const sessions = MemorySessions.layer({ "alice-token": Handle.make("alice") });
 
-/**
- * The platform's fetch handler with the release store in memory holding
- * `stored`: `send` takes a path and request options, `fetch` a request, and
- * `reads` lists every key the store was asked for.
- */
 const releasesServed = (
   stored: Readonly<Record<string, string | Uint8Array>>
 ) =>
@@ -85,10 +76,8 @@ const releasesServed = (
     };
   });
 
-/** A response's body as text. */
 const textOf = (response: Response) => Effect.promise(() => response.text());
 
-/** What a reply says besides its body. */
 const headersOf = (reply: Response) => ({
   cache: reply.headers.get("cache-control"),
   etag: reply.headers.get("etag"),
@@ -98,7 +87,6 @@ const headersOf = (reply: Response) => ({
   type: reply.headers.get("content-type"),
 });
 
-/** A response's body as bytes. */
 const bytesOf = (response: Response) =>
   Effect.map(
     Effect.promise(() => response.arrayBuffer()),
@@ -256,9 +244,6 @@ describe("the CLI's releases, served by the platform", () => {
     "makes a version's checksums from its manifest, even when the manifest lists an uploaded SHA256SUMS",
     () =>
       Effect.gen(function* () {
-        // The release may list the SHA256SUMS it uploaded among a version's files:
-        // the served file is still made from the manifest, without a line
-        // for itself, and the uploaded copy is never read.
         const listingSums = {
           ...manifest,
           versions: {
@@ -302,14 +287,11 @@ describe("the CLI's releases, served by the platform", () => {
         const { reads, send } = yield* releasesServed(files);
 
         const paths = [
-          // A version never released, and one released without this binary.
           `/releases/9.9.9/${linux}`,
           `/releases/0.0.9/${darwin}`,
-          // Names that are not a binary or the checksums.
           `/releases/0.1.0/${Brand.slug}-windows-x64`,
           "/releases/0.1.0/install.sh",
           "/releases/latest/manifest.json",
-          // `..` and an encoded `/` in a segment.
           "/releases/0.1.0/..%2F..%2Fsecrets%2Foperator",
           "/releases/..%2F..%2Fsecrets/operator",
           `/releases/..%2F..%2Fsecrets%2Foperator%23/${linux}`,
@@ -405,8 +387,6 @@ describe("the CLI's releases, served by the platform", () => {
           }),
         ];
 
-        // Beside the releases, a stale token is still refused, and MCP
-        // still asks for one.
         const others = [
           yield* send("/install.sh.asc", stale),
           yield* send("/releases", stale),
@@ -480,10 +460,9 @@ describe("the CLI's releases, served by the platform", () => {
       })
   );
 
-  // `releases` is a name no project may take (the web forwards
-  // `/releases/*` here), so git's paths under it reach the gateway and find
-  // no repo; a project's own push still asks for a credential. The releases'
-  // own 404 has no body, so the text says the gateway answered.
+  // `releases` is a name no project may take, so git's paths under it reach the gateway
+  // and find no repo. The releases' own 404 has no body, so the text says the gateway
+  // answered.
   it.effect(
     "leaves git's paths to the gateway, which knows no repo named releases",
     () =>
@@ -494,7 +473,6 @@ describe("the CLI's releases, served by the platform", () => {
           "/releases/info/refs?service=git-receive-pack"
         );
 
-        // A push with no credential: the gateway asks git for one.
         const push = yield* send("/datekit/info/refs?service=git-receive-pack");
 
         expect({
@@ -512,10 +490,6 @@ describe("the CLI's releases, served by the platform", () => {
   );
 });
 
-/**
- * `RELEASES` as R2 answers `get`, over `stored`: each object reads only its
- * body and size; anything else read from the bucket or an object throws.
- */
 const bucketOf = (stored: Readonly<Record<string, string | Uint8Array>>) =>
   untouchable<R2Bucket>("RELEASES", {
     get: (key: string) =>
@@ -583,7 +557,6 @@ describe("the Worker's releases, from its RELEASES bucket", () => {
   );
 });
 
-/** A manifest whose one release holds one file, `name`, as given. */
 const holding = (
   name: string,
   asset: { readonly bytes: number | string; readonly sha256: string }

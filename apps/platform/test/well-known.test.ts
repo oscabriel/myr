@@ -1,14 +1,3 @@
-/**
- * The projects' contribute skills, found where agents look for skills:
- * `/.well-known/agent-skills/index.json` lists each
- * project whose landed tree holds `.agents/skills/<project>-contribute/SKILL.md`,
- * with the SHA-256 of that file's bytes, and each listed URL serves the file
- * as it landed. Anyone may read them, with no credential or a stale one.
- * Through the platform's fetch handler over the Node world, with real git;
- * and `agentSkills` itself over memory adapters, for a `main` that moved
- * past the landed mirror, and for skills kept by each project's landed
- * commit, so the index reads a file only for a project whose main moved.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -31,7 +20,6 @@ const datekit = ProjectName.make("dora/datekit");
 
 const burrow = ProjectName.make("dora/burrow");
 
-/** Listed by the front page, but never made. */
 const ghost = ProjectName.make("alice/ghost");
 
 const skillPath = ".agents/skills/dora__datekit-contribute/SKILL.md";
@@ -47,7 +35,6 @@ const skill = [
   "",
 ].join("\n");
 
-/** `sha256sum` of `skill`, worked out apart from the platform. */
 const skillDigest =
   "sha256:07b4246a86d79a7a0d0975e5e0b32f6f12b10a8e2cd5fad3188722e26b841f52";
 
@@ -72,7 +59,6 @@ const listing = (project: ProjectName) => ({
   project,
 });
 
-/** What a reply says: its status, its type and its body. */
 const read = (response: Response) =>
   Effect.map(
     Effect.promise(() => response.text()),
@@ -99,7 +85,6 @@ describe("the agent skills index", () => {
         const dora = world.rpc("dora");
         const doraGit = world.git("dora");
 
-        // datekit lands its skill with its first push; burrow lands none.
         for (const [project, files] of [
           [datekit, { [skillPath]: skill, "README.md": "datekit\n" }],
           [burrow, { "README.md": "burrow\n" }],
@@ -150,7 +135,6 @@ describe("the agent skills index", () => {
           status: 200,
         });
 
-        // A credential the platform does not know is no reason to refuse.
         expect(
           (yield* get("/.well-known/agent-skills/index.json", {
             authorization: "Bearer a-token-the-platform-never-issued-0123",
@@ -180,14 +164,12 @@ describe("the agent skills index", () => {
   );
 });
 
-/** What `agentSkills` itself answers for a path. */
 const at = (path: string) =>
   Effect.flatMap(
     agentSkills(new Request(`https://platform.test${path}`)),
     read
   );
 
-/** Projects the platform never made: each skill is read at its repo's refs. */
 const noneMade = Layer.succeed(
   Projects,
   Projects.of({
@@ -205,8 +187,6 @@ describe(agentSkills, () => {
         const client = yield* gitClient(memoryFs());
         const repo = RepoName.make(keyOf(datekit));
 
-        // The mirror holds the last landing; main has moved on without one,
-        // as between a landing's two pushes, or after a stray push.
         const landing = yield* client.commit("Land", [[skillPath, skill]]);
 
         const unlanded = yield* client.commit(
@@ -261,7 +241,6 @@ describe(agentSkills, () => {
   );
 });
 
-/** The memory store, each file read and each refs read counted. */
 const countedHost = (counts: Ref.Ref<{ files: number; refs: number }>) =>
   Layer.effect(
     RepoHost,
@@ -284,7 +263,6 @@ const countedHost = (counts: Ref.Ref<{ files: number; refs: number }>) =>
     })
   ).pipe(Layer.provide(RepoHostMemory));
 
-/** Projects whose record says each one's main landed where `landed` holds. */
 const landedWhere = (landed: Ref.Ref<ReadonlyMap<ProjectName, LandedSha>>) =>
   Layer.succeed(
     Projects,
@@ -358,7 +336,6 @@ describe("the agent skills index, kept by each project's landed commit", () => {
             ({ skills }) => skills.map(({ description }) => description)
           );
 
-          /** What one request read: files and refs, since the last. */
           const reads = Effect.flatMap(
             Ref.getAndSet(counts, { files: 0, refs: 0 }),
             Effect.succeed

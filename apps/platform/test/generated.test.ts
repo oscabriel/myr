@@ -1,13 +1,3 @@
-/**
- * The project's contribute skill kept current on the platform: a
- * landing that changes what the generated files say is followed by the
- * platform's own landing of only those files, regenerated with
- * `@repo/agent-kit` as the platform's Project DOs do it
- * (`workflows/generated.ts`), credited `Decided-by` the decider whose
- * landing changed the config. Node world, memory adapters: `RepoHostMemory`,
- * the isomorphic-git `Lander` over it, a scripted Checker, `ProjectsMemory`,
- * and a rules evaluator whose run block is the config folder's `run.json`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost, Revision } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -74,7 +64,6 @@ const withUnit = {
   test: "bun test {path}",
 };
 
-/** What alice pushes first: a package, the run block, and notes of the project's own. */
 const start: Files = [
   ["package.json", '{ "name": "alice/datekit" }\n'],
   ["src/parse.ts", "export const parse = (s) => ({});\n"],
@@ -84,10 +73,6 @@ const start: Files = [
 
 const decodeRun = Schema.decodeEffect(Schema.fromJsonString(RunBlock));
 
-/**
- * The scenario's policy at any commit, with the run block its config
- * folder's `run.json` states, or lint alone when it states none.
- */
 const rules = Layer.succeed(
   RulesEvaluator,
   RulesEvaluator.of({
@@ -102,7 +87,6 @@ const rules = Layer.succeed(
   })
 );
 
-/** What the Checker answers: every lane passes on any tree the test names. */
 class Passing extends Context.Service<
   Passing,
   {
@@ -141,11 +125,6 @@ const checker = Layer.effectContext(
   })
 );
 
-/**
- * What goes wrong with the next follow-up's land, once: nothing, a busy
- * repo before anything is pushed, or a push that went through and whose
- * answer was lost on the way back (a Lander call that timed out after it).
- */
 type Mishap = "none" | "busy" | "lost";
 
 class Mishaps extends Context.Service<
@@ -153,7 +132,6 @@ class Mishaps extends Context.Service<
   { readonly next: (mishap: Mishap) => Effect.Effect<void> }
 >()("test/Mishaps") {}
 
-/** The isomorphic-git Lander, with the next follow-up's mishap played on its land. */
 const mishapLander = Layer.effectContext(
   Effect.gen(function* () {
     const real = Context.get(yield* Layer.build(LanderIsogit), Lander);
@@ -180,7 +158,6 @@ const mishapLander = Layer.effectContext(
   })
 );
 
-/** Commits made the way git would make them, pushed to a repo's `main`. */
 class Pusher extends Context.Service<
   Pusher,
   {
@@ -217,10 +194,6 @@ const pusher = Layer.effect(
   })
 );
 
-/**
- * The project's ports, the generator only among the Project's own, as a
- * Project DO's shell gives them: the calls the test makes run without it.
- */
 const world = Layer.mergeAll(
   ProjectsMemory.pipe(Layer.provide(ProjectSkillGenerator)),
   pusher
@@ -232,7 +205,6 @@ const world = Layer.mergeAll(
   Layer.provideMerge(RepoHostMemory)
 );
 
-/** Where canonical `main` stands. */
 const mainTip = Effect.gen(function* () {
   const refs = yield* (yield* RepoHost).refs(repo).pipe(Effect.orDie);
 
@@ -248,7 +220,6 @@ const commitAt = (sha: CommitSha) =>
       .pipe(Effect.orDie, Effect.flatMap(Effect.fromOption))
   ).pipe(Effect.orDie);
 
-/** A file's text at a commit of the canonical repo. */
 const textAt = (sha: CommitSha, path: string) =>
   Effect.flatMap(RepoHost, (host) =>
     host
@@ -259,7 +230,6 @@ const textAt = (sha: CommitSha, path: string) =>
       )
   );
 
-/** What one commit changed against its first parent, by path. */
 const changedBy = (sha: CommitSha) =>
   Effect.gen(function* () {
     const commit = yield* commitAt(sha);
@@ -274,7 +244,6 @@ const changedBy = (sha: CommitSha) =>
     return changes.map(({ path }) => path).toSorted();
   });
 
-/** The platform's follow-up at `sha`: its parent, what it changed, who it credits and names. */
 const followUpAt = (sha: CommitSha) =>
   Effect.gen(function* () {
     const commit = yield* commitAt(sha);
@@ -291,7 +260,6 @@ const followUpAt = (sha: CommitSha) =>
     };
   });
 
-/** Every file of the tree at `sha` the test knows of, as a commit on it would carry them. */
 const filesAt = (sha: CommitSha, run: typeof RunBlock.Encoded) =>
   Effect.gen(function* () {
     const generated = yield* Effect.forEach(generatedPaths, (path) =>
@@ -308,7 +276,6 @@ const filesAt = (sha: CommitSha, run: typeof RunBlock.Encoded) =>
     ] satisfies Files;
   });
 
-/** The project made, and alice's first push to it recorded. */
 const firstPushed = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -327,7 +294,6 @@ const firstPushed = Effect.gen(function* () {
   return { api, first };
 });
 
-/** alice's own change from her working fork, `files` on top of `base`, made ready to land. */
 const aliceLands = (base: LandedSha, files: Files, requestId: string) =>
   Effect.gen(function* () {
     const api = yield* Projects.use((each) => each.get(project)).pipe(
@@ -393,7 +359,6 @@ describe("the contribute skill, regenerated by the platform", () => {
           yield* textAt(tip, claudeSkill)
         );
 
-        // The same first push recorded again is still the project's first push.
         expect(
           yield* Effect.exit(api.recordFirstPush(alice, first))
         ).toStrictEqual(Exit.succeed({ landed: first }));

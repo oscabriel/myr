@@ -7,7 +7,6 @@ const token = "alice-token-0123456789abcdef01234567";
 
 const authorized = (authorization: string) => new Headers({ authorization });
 
-/** What git sends for `https://<user>:<password>@host/…`: base64 of `user:password`. */
 const basic = (user: string, password: string) =>
   `Basic ${btoa(`${user}:${password}`)}`;
 

@@ -138,7 +138,6 @@ const pending: PendingSignIn = {
   },
 };
 
-/** `sealed` with one character of its payload changed. */
 const tampered = (sealed: string) =>
   `${sealed.startsWith("A") ? "B" : "A"}${sealed.slice(1)}`;
 
@@ -202,7 +201,6 @@ describe("the CLI's OAuth client", () => {
   });
 });
 
-/** A token the fake provider knows, its props, and when it expires (seconds). */
 const issued = (
   props: Readonly<Record<string, string>>,
   expiresAt: number
@@ -289,7 +287,6 @@ describe("sign-in attempts in memory", () => {
   );
 });
 
-/** A page's text, beside the response it came in. */
 const read = (response: Response) =>
   Effect.promise(() => response.text()).pipe(
     Effect.map((html) => ({ html, response }))
@@ -300,17 +297,14 @@ interface Page {
   readonly response: Response;
 }
 
-/** Opens the CLI's sign-in page, as a browser would. */
 const openSignIn = (world: World, state = "state-1") =>
   world.fetch(new Request(authorizeUrl(state))).pipe(Effect.flatMap(read));
 
-/** The form `page` carries; the test dies if it carries none. */
 const formIn = (page: Page, cookie?: string) =>
   Effect.fromOption(formOf(page.response, page.html, cookie)).pipe(
     Effect.orDie
   );
 
-/** Signs up as `handle` from the CLI's sign-in page; the response, unread. */
 const signUp = (world: World, handle: string, secret: string) =>
   Effect.gen(function* () {
     const signInForm = yield* formIn(yield* openSignIn(world));
@@ -337,7 +331,6 @@ const signUp = (world: World, handle: string, secret: string) =>
     );
   });
 
-/** Signs in as `handle` from a fresh sign-in page; the response, unread. */
 const signIn = (
   world: World,
   handle: string,
@@ -362,11 +355,9 @@ const TokenResponse = Schema.Struct({
   token_type: Schema.String,
 });
 
-/** A code from `response`'s redirect; the test dies without one. */
 const codeIn = (response: Response) =>
   Effect.fromOption(codeOf(response)).pipe(Effect.orDie);
 
-/** An access token for `handle`, by the CLI's whole PKCE flow. */
 const accessTokenFor = (world: World, handle: string, secret: string) =>
   Effect.gen(function* () {
     const code = yield* signIn(world, handle, secret).pipe(
@@ -441,8 +432,6 @@ describe("the platform as its own OAuth authorization server", () => {
 
         const page = yield* openSignIn(world);
 
-        // The code goes to the CLI's loopback after the form posts: a
-        // browser holds that redirect to `form-action` too.
         expect([
           page.response.status,
           page.response.headers.get("content-type"),
@@ -482,7 +471,6 @@ describe("the platform as its own OAuth authorization server", () => {
   );
 });
 
-/** A request to `src/worker.ts`'s own handler, on the shim's fake env. */
 const sendToWorker = (path: string) =>
   Effect.promise(() =>
     Promise.resolve(

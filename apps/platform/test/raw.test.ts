@@ -1,9 +1,3 @@
-/**
- * A project's raw files through the platform's fetch handler:
- * `GET /<project>/raw/<rev>/<path…>` answers the bytes with their headers
- * to anyone, a stale bearer token or not; a path that climbs out is a
- * 404; and git's own paths beside it still reach git.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
@@ -27,12 +21,6 @@ const { project } = datekit;
 
 const readme = "# datekit\n\nDates, parsed.\n";
 
-/**
- * The platform over a world where datekit was made and its first commit,
- * a README and a manifest, pushed to main; and that commit's id. With
- * `reads`, the platform has the isolate's code cache, as `ports.ts` gives
- * it, and each tree its repo host is asked for is counted there.
- */
 const platformWith = (reads: Option.Option<Ref.Ref<number>>) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-07T12:00:00Z");

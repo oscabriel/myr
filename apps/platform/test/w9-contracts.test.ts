@@ -1,11 +1,3 @@
-/**
- * The code browser's, the people page's and drafting's contracts and
- * routes, wired end to end through the platform's fetch handler: the
- * policy read answers, the code reads reach the façade (`why` here; the
- * others are `code-reads.test.ts`'), a draft needs a person, and `/` and a
- * project's raw files have their routes, open to a stale credential as
- * every public path is (a raw file at no revision is a 404).
- */
 import { describe, expect, it } from "@effect/vitest";
 import { AskId, ProposalId, RepoPath } from "@repo/protocol/ids";
 import { Unauthenticated } from "@repo/protocol/principal";
@@ -27,7 +19,6 @@ const { project } = datekit;
 
 const sessions = MemorySessions.layer({});
 
-/** The platform over datekit's world, seeded: made, pushed to, its ask open. */
 const platform = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -51,7 +42,6 @@ describe("the code, policy and drafting contracts over /rpc", () => {
       const read = yield* anyone.projectPolicy({ project });
       const { policy } = read;
 
-      // It evaluated, so there is nothing to say why not.
       expect(Object.keys(read)).toStrictEqual(["policy"]);
       expect(policy?.source).toBe("config");
       expect(policy?.deciders).toStrictEqual(datekit.policy.deciders);

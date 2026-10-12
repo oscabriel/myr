@@ -1,12 +1,3 @@
-/**
- * The platform's own HTML pages (sign-in, which is an MCP client's
- * consent, sign-up, Google's handle page, the problem page, and `/`) load
- * nothing, so each carries its look in one inline `<style>`. This reads
- * that style the way a browser would for each colour scheme and holds its
- * literal colours to WCAG's contrast floors in both: text and links at
- * 4.5:1, input borders at 3:1. The formulas are WCAG 2.2's own (relative
- * luminance over sRGB), written here.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { FrontPageMemory } from "@repo/project/front-page/memory";
 import { Projects } from "@repo/project/projects";
@@ -23,8 +14,6 @@ import {
 import type { Asker, PendingForm } from "../src/auth/pages.ts";
 import { homeResponse } from "../src/home.ts";
 import { HostInfo } from "../src/host-info.ts";
-
-// --- The pages, from stand-in inputs ------------------------------------------
 
 const claude: Asker = {
   clientDomain: "claude.ai",
@@ -105,19 +94,14 @@ const PAGES = {
   ),
 } as const;
 
-/** The pages with a form: each input's border must be seen. */
 const FORMS = new Set(["Google's handle page", "sign-in", "sign-up"]);
-
-// --- Reading a style as a browser would ---------------------------------------
 
 interface Rule {
   readonly selectors: readonly string[];
   readonly declarations: ReadonlyMap<string, string>;
-  /** Whether it sits in the dark scheme's media query. */
   readonly dark: boolean;
 }
 
-/** The one inline style of a page. */
 const styleOf = (html: string) => {
   const styles = [...html.matchAll(/<style>(?<css>.*?)<\/style>/gsu)];
 
@@ -126,7 +110,6 @@ const styleOf = (html: string) => {
   return styles[0]?.groups?.css ?? "";
 };
 
-/** How a brace moves the depth of a rule. */
 const DEPTH: ReadonlyMap<string, number> = new Map([
   ["{", 1],
   ["}", -1],
@@ -134,7 +117,6 @@ const DEPTH: ReadonlyMap<string, number> = new Map([
 
 const DARK = /^@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)$/u;
 
-/** Every rule of `css`, a dark-scheme media query's marked dark. */
 const rulesOf = (css: string, dark = false): readonly Rule[] => {
   const rules: Rule[] = [];
   const text = css.replaceAll(/\/\*.*?\*\//gsu, "");
@@ -185,13 +167,11 @@ const rulesOf = (css: string, dark = false): readonly Rule[] => {
 
 type Scheme = "dark" | "light";
 
-/** A property's value as the scheme sets it, with whether the dark query set any of it. */
 interface Resolved {
   readonly value: string | undefined;
   readonly fromDark: boolean;
 }
 
-/** `property` on `selector` in `scheme`: the last rule that sets it wins, and `var()` resolves on `:root`. */
 const resolve = (
   rules: readonly Rule[],
   scheme: Scheme,
@@ -223,7 +203,6 @@ const resolve = (
   };
 };
 
-/** `#rgb` or `#rrggbb` as its three channels, 0–255. */
 const channelsOf = (hex: string) => {
   const digits = /^#(?<body>[\da-f]{3}|[\da-f]{6})$/iu.exec(hex)?.groups?.body;
 
@@ -239,7 +218,6 @@ const channelsOf = (hex: string) => {
   );
 };
 
-/** WCAG 2.2's relative luminance of an sRGB colour. */
 const luminanceOf = (hex: string) => {
   const [r = 0, g = 0, b = 0] = channelsOf(hex).map((channel) => {
     const unit = channel / 255;
@@ -250,7 +228,6 @@ const luminanceOf = (hex: string) => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
-/** WCAG 2.2's contrast ratio of two colours. */
 const contrast = (one: string, other: string) => {
   const [light, dark] = [luminanceOf(one), luminanceOf(other)].toSorted(
     (a, b) => b - a
@@ -259,7 +236,6 @@ const contrast = (one: string, other: string) => {
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
 };
 
-/** A colour the scheme sets: fails the test when it sets none. */
 const colour = (
   rules: readonly Rule[],
   scheme: Scheme,
@@ -273,9 +249,6 @@ const colour = (
   return value ?? "";
 };
 
-// --- The checks -----------------------------------------------------------------
-
-/** Every floor, in one scheme, on one page's style. */
 const holdsTheFloors = (
   rules: readonly Rule[],
   scheme: Scheme,
@@ -359,8 +332,6 @@ describe("the platform's own pages", () => {
       Effect.gen(function* () {
         const html = yield* page.html;
 
-        // A command wider than a phone scrolls in its box: Tab reaches the
-        // box, so a keyboard can scroll it.
         expect(html.match(/<pre\b[^>]*>/gu) ?? []).toStrictEqual(
           (html.match(/<pre\b[^>]*>/gu) ?? []).map(() => '<pre tabindex="0">')
         );

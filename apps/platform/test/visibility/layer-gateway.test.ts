@@ -1,19 +1,3 @@
-/**
- * A project's layer repos through the platform's own fetch handler, with
- * real git: the maintainers clone their layer
- * and push to it, a contributor is turned away with one line git prints,
- * every read is logged with who and which commit, and a push to a public
- * fork cannot carry a layer's path, without telling a contributor which of
- * their paths collided.
- *
- * The world is the core loop's (`world.ts`) with the cartridge's gateway side
- * plugged into the Worker (`LayerGateLive`), its public repos and the private
- * namespace's each a store of bare repos behind `git http-backend`. Each
- * Project DO runs on a stand-in for the cartridge's `ProjectVisibility`:
- * datekit declares one layer, `maintainers`, which its deciders ines-v and
- * okonkwo read and push to, holding one sealed check; it writes down every read
- * and every layer push the DO hears.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoName } from "@repo/artifacts/repo-host";
@@ -65,30 +49,24 @@ const project = ProjectName.make("ines-v/datekit");
 
 const maintainers = LayerName.make("maintainers");
 
-/** The layer's repo, in the private namespace. */
 const layerRepo = RepoName.make(`${keyOf(project)}--${maintainers}`);
 
-/** The sealed check the layer holds. */
 const sealed = "checks/held-back/export/escape.test.ts";
 
 const mainRef = "refs/heads/main";
 
-/** The people: two deciders who maintain the layer, and a contributor. */
 const tokens = {
   bram: "bram-layer-gateway-token-0123456789abcdef",
   "ines-v": "ines-v-layer-gateway-token-0123456789abcdef",
   okonkwo: "okonkwo-layer-gateway-token-0123456789abcdef",
 } as const;
 
-/** The layer's readers and writers: datekit's deciders. */
 const keepers: ReadonlySet<string> = new Set(["ines-v", "okonkwo"]);
 
 const keeps = (who: Principal) =>
   Principal.guards.Person(who) && keepers.has(who.handle);
 
-/** What the stand-in for the visibility port heard from the DO. */
 interface Heard {
-  /** Each time the DO was asked how far someone reaches into a layer. */
   readonly asks: LayerName[];
   readonly reads: {
     readonly handle: Handle;
@@ -102,11 +80,6 @@ interface Heard {
   }[];
 }
 
-/**
- * The cartridge's `ProjectVisibility`, as far as the gateway reaches it:
- * datekit's one layer, its keepers' access, its one path, and every read and
- * layer push written down.
- */
 const visibilityHeard = (heard: Heard): VisibilityPort => ({
   ...noVisibility,
   access: (who, layer) => {
@@ -123,8 +96,6 @@ const visibilityHeard = (heard: Heard): VisibilityPort => ({
 
       return noPlan;
     }),
-  // The layer's row, as the visibility port writes it once the config lands:
-  // stage 1 names exact paths only to someone who reads every layer kept.
   onPolicy: () =>
     Effect.succeed({
       effects: [],
@@ -138,7 +109,6 @@ const visibilityHeard = (heard: Heard): VisibilityPort => ({
   },
 });
 
-/** The private namespace's store, writing down every token secret it mints. */
 const minting = (
   host: RepoHost["Service"],
   minted: string[]
@@ -154,7 +124,6 @@ const minting = (
 
 const sdk = `${Brand.cliPackage}/rules`;
 
-/** datekit as ines-v first pushes it. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
     `import { kinds, project } from "${sdk}";`,
@@ -171,7 +140,6 @@ const start = {
   "src/export.ts": "export const toIso = (date: Date) => date.toISOString();\n",
 };
 
-/** An ask whose territory holds both the code and its checks. */
 const askFiles = (ask: AskId) =>
   Array.make(
     {
@@ -201,29 +169,20 @@ const askFiles = (ask: AskId) =>
     }
   );
 
-/** The lines git printed from the server, less the padding git adds. */
 const remoteLines = (stderr: string) =>
   stderr
     .split("\n")
     .filter((line) => line.startsWith("remote: "))
     .map((line) => line.trimEnd());
 
-/** What `protocol/render` says of `refusals`, as git prints it. */
 const rendered = (refusals: Parameters<typeof explain>[0]) =>
   explain(refusals).map((line) => `remote: ${line}`);
 
-/** The answer both pushes carry: a fix, and a copy of the layer's sealed check. */
 const escaping = {
   [sealed]: "it('escapes', () => {});\n",
   "src/fix.ts": "export const fix = true;\n",
 };
 
-/**
- * The world, with datekit landed by ines-v and its maintainers layer's
- * repo in the private namespace holding the sealed check: the people, what
- * the stand-in port heard, every token the private store minted, and every
- * git run a test keeps for the leak check.
- */
 const layerWorld = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const heard: Heard = { asks: [], pushes: [], reads: [] };
@@ -253,7 +212,6 @@ const layerWorld = Effect.gen(function* () {
   const ines = yield* world.person("ines-v");
   const bram = yield* world.person("bram");
 
-  /** git, kept for the check that no token reached anyone. */
   const kept = <R>(ran: Effect.Effect<Ran, never, R>) =>
     Effect.tap(ran, (output) =>
       Effect.sync(() => {
@@ -261,15 +219,12 @@ const layerWorld = Effect.gen(function* () {
       })
     );
 
-  // ines-v makes datekit and lands its first tree.
   const made = yield* ines.rpc.initProject({ project });
   const home = yield* ines.git.clone(made.remote);
 
   yield* ines.git.commit(home, "Start datekit", start);
   yield* kept(ines.git.push(home));
 
-  // The layer's repo in the private namespace, holding its sealed check,
-  // pushed there as the cartridge's provisioning would leave it.
   yield* layers.create(layerRepo);
 
   const seed = yield* fs.makeTempDirectoryScoped();
@@ -320,8 +275,6 @@ describe("a project's layer repos, through the gateway", () => {
 
         const layerUrl = `${world.origin}/${project}--maintainers.git`;
 
-        // Asked with no credential, the layer asks for one; a name that is
-        // no declared layer is no repo at all.
         const ask = (repo: string, token?: string) =>
           world.fetch(
             new Request(
@@ -344,8 +297,6 @@ describe("a project's layer repos, through the gateway", () => {
           tokens.bram
         );
 
-        // A keeper's request asks the project once: whether the layer is
-        // declared and how far she reaches, in one answer.
         const asksBefore = heard.asks.length;
         const keeper = yield* ask(`${project}--maintainers`, tokens["ines-v"]);
 
@@ -367,9 +318,6 @@ describe("a project's layer repos, through the gateway", () => {
           undeclaredSignedIn: 404,
         });
 
-        // ines-v clones the layer and gets its files; her read is logged
-        // once, with the commit she read. bram is told why he can't; with
-        // no credential at all, git is asked for one.
         const outside = yield* fs.makeTempDirectoryScoped();
         const clone = `${outside}/ines-v`;
 
@@ -419,8 +367,6 @@ describe("a project's layer repos, through the gateway", () => {
           readsAfterRefusals: readsAfterClone,
         });
 
-        // ines-v pushes a new sealed check: the layer's main moves, and the
-        // project hears the head. bram's push is turned away.
         const next = yield* ines.git.commit(clone, "Seal a second check", {
           "checks/held-back/export/offset.test.ts":
             "it('offsets', () => {});\n",
@@ -465,7 +411,6 @@ describe("a project's layer repos, through the gateway", () => {
           ],
         });
 
-        // Two asks, red first, so bram and ines-v each hold a claim.
         const asks = [
           AskId.make("keep-offset"),
           AskId.make("keep-zone"),
@@ -497,8 +442,6 @@ describe("a project's layer repos, through the gateway", () => {
           project,
         });
 
-        // bram's fork push carries the layer's path: he reads no layer, so
-        // he hears every path he added, and his fork keeps the commit.
         const bramsWork = yield* bram.git.clone(bramsClaim.remote);
 
         const bramsHead = yield* bram.git.commit(
@@ -509,7 +452,6 @@ describe("a project's layer repos, through the gateway", () => {
 
         const bramsAnswer = yield* kept(bram.git.push(bramsWork));
 
-        // ines-v reads the layer, so she hears only the path that collides.
         const inesWork = yield* ines.git.clone(inesClaim.remote);
 
         yield* ines.git.commit(inesWork, "Fix, and copy", escaping);
@@ -544,8 +486,6 @@ describe("a project's layer repos, through the gateway", () => {
           },
         });
 
-        // The layer's tokens stayed with the platform: the private store
-        // minted some, and none reached git's output or a log line.
         const logged = yield* world.logged;
 
         const said = [
@@ -571,7 +511,6 @@ describe("a project's layer repos, through the gateway", () => {
         const layerUrl = `${world.origin}/${project}--maintainers.git`;
 
         // Forty more branches: a clone that wants them all sends git's
-        // request gzipped (above 1 KiB).
         const branches = Array.makeBy(40, (n) => `refs/heads/area-${n}`);
 
         yield* ines.git.ok(
@@ -640,8 +579,6 @@ describe("a project's layer repos, through the gateway", () => {
     })
   );
 
-  // Found live: the gate's upstream was memoized with the public
-  // namespace's, so every layer clone on a stage answered "no repo".
   it.effect(
     "the stage's layer gate asks the private namespace for a layer repo, never the public one",
     () =>
@@ -658,7 +595,6 @@ describe("a project's layer repos, through the gateway", () => {
           )
         ).pipe(Effect.provide(workerPorts(config)), Effect.exit);
 
-        // Both fake bindings refuse every call, each naming itself.
         expect(Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "").toContain(
           "a test touched ARTIFACTS_PRIVATE."
         );

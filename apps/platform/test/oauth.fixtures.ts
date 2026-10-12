@@ -1,10 +1,3 @@
-/**
- * A platform Worker for sign-in tests: the OAuth provider over an in-memory
- * `OAUTH_KV`, accounts and sign-in attempts in their `/memory` adapters,
- * and a stand-in for the rest of the platform. The provider fetches a
- * client's metadata document through the global `fetch`; here the Worker
- * itself answers it, as the public internet does on Cloudflare.
- */
 import { Fetch } from "@repo/artifacts/fetch";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Clock, Effect, Layer, Option, Schema } from "effect";
@@ -25,7 +18,6 @@ export const origin = "https://platform.test";
 
 export const cliClient = cliClientId(origin);
 
-/** RFC 7636 appendix B's verifier and its S256 challenge. */
 export const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
 
 export const challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
@@ -34,10 +26,8 @@ export const port = 43_123;
 
 export const redirectUri = `http://127.0.0.1:${port}/callback`;
 
-/** A person a named session holds, in the world's `SESSION_TOKENS`. */
 export const namedPerson = "carol";
 
-/** The fake env with one named session, as the demo's stages run. */
 const worldEnv = () => ({
   ...fakeEnv(),
   SESSION_TOKENS: JSON.stringify({
@@ -45,25 +35,17 @@ const worldEnv = () => ({
   }),
 });
 
-/** A Worker's context the provider is handed and never needs. */
 const context = untouchable<ExecutionContext>("ExecutionContext");
 
-/** What the rest of the platform answers: only the auth routes are the provider's. */
 const platformFetch = (request: Request) =>
   Promise.resolve(
     new Response(`platform: ${new URL(request.url).pathname}`, { status: 418 })
   );
 
-/** A stored access token record, kept whole while its expiry is moved. */
 const decodeTokenRecord = Schema.decodeUnknownEffect(
   Schema.Record(Schema.String, Schema.Unknown)
 );
 
-/**
- * The sign-in Worker, its store and its accounts, for one test. The global
- * `fetch` and the compatibility flag CIMD needs are stubbed for the test's
- * length.
- */
 export const signInWorld = Effect.gen(function* () {
   const config = yield* decodeEnv(worldEnv()).pipe(Effect.orDie);
 
@@ -74,8 +56,6 @@ export const signInWorld = Effect.gen(function* () {
 
   const store = OAuthStoreMemory.make();
 
-  // Google sign-in is off here (no Google client), so it reaches neither
-  // its links nor Google.
   const services = Layer.mergeAll(
     Layer.succeed(Accounts, accounts),
     Layer.succeed(OAuthStore, store),
@@ -106,7 +86,6 @@ export const signInWorld = Effect.gen(function* () {
 
   const fetch = (request: Request) => Effect.promise(() => send(request));
 
-  /** Every access token in the store, made to have expired a second ago. */
   const expireTokens = Effect.gen(function* () {
     const { keys } = yield* Effect.promise(() =>
       store.list({ prefix: "token:" })
@@ -134,7 +113,6 @@ export const signInWorld = Effect.gen(function* () {
 
 export type World = Effect.Success<typeof signInWorld>;
 
-/** The hidden fields and the CSRF cookie a sign-in page hands the browser. */
 export interface SignInForm {
   readonly cookie: string;
   readonly csrf: string;
@@ -147,7 +125,6 @@ const field = (html: string, name: string) =>
       ?.value
   );
 
-/** The form a page carries, read as a browser would; `cookie` is the one it already holds. */
 export const formOf = (
   response: Response,
   html: string,
@@ -166,7 +143,6 @@ export const formOf = (
     request: field(html, "request"),
   });
 
-/** The code a response sends the CLI's loopback, if it redirects there with one. */
 export const codeOf = (response: Response) =>
   Option.fromNullishOr(response.headers.get("location")).pipe(
     Option.flatMap((location) => Option.fromNullishOr(URL.parse(location))),
@@ -174,7 +150,6 @@ export const codeOf = (response: Response) =>
     Option.flatMap((url) => Option.fromNullishOr(url.searchParams.get("code")))
   );
 
-/** The authorization request the CLI opens in a browser. */
 export const authorizeUrl = (state = "state-1", redirect = redirectUri) => {
   const url = new URL("/authorize", origin);
 
@@ -192,7 +167,6 @@ export const authorizeUrl = (state = "state-1", redirect = redirectUri) => {
   return url;
 };
 
-/** A browser's form post: the fields, the CSRF cookie and the client's address. */
 export const post = (
   path: string,
   fields: Readonly<Record<string, string>>,
@@ -210,7 +184,6 @@ export const post = (
     redirect: "manual",
   });
 
-/** The token request the CLI makes with its code and verifier. */
 export const tokenRequest = (code: string, codeVerifier = verifier) =>
   new Request(new URL("/token", origin), {
     body: new URLSearchParams({

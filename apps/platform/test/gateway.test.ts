@@ -44,12 +44,10 @@ import {
 
 const datekit = ProjectName.make("alice/datekit");
 
-/** The ref the platform keeps a fork's verdict notes under. */
 const notesRef = `refs/notes/${Brand.slug}`;
 
 const parseIso = AskId.make("parse-iso");
 
-/** A project made empty, awaiting its first push. */
 const fresh = ProjectName.make("alice/fresh");
 
 const scenario = aProject({ name: datekit, people: ["bob"] }).pipe(
@@ -57,17 +55,11 @@ const scenario = aProject({ name: datekit, people: ["bob"] }).pipe(
   withVouches(["bob"])
 );
 
-/** One of the scenario's asks, by id. */
 const askOf = (id: AskId) =>
   Option.getOrThrow(
     Array.findFirst(scenario.policy.asks, (ask) => ask.id === id)
   );
 
-/**
- * The world, with `datekit` made by alice: its first commit (two files) put
- * straight into its repo and recorded as its landed SHA, then `parse-iso`
- * (over `packages/parser`) opened on it red first, which lands as main.
- */
 const withDatekit = Effect.gen(function* () {
   const world = yield* gatewayWorld([scenario]);
   const seed = `${world.root}/seed`;
@@ -99,26 +91,17 @@ const withDatekit = Effect.gen(function* () {
   return { ...world, api, first, landed, seed };
 });
 
-/**
- * The lines git printed from the server's side band, less the spaces git pads
- * them with to clear a progress line.
- */
 const remoteLines = (stderr: string) =>
   stderr
     .split("\n")
     .filter((line) => line.startsWith("remote: "))
     .map((line) => line.trimEnd());
 
-/** What git says of a push custody turned away as a direct push of `ref`. */
 const refusedAs = (ref: string) => ({
   exitCode: 1,
   remote: explain([new DirectPush({ ref })]).map((line) => `remote: ${line}`),
 });
 
-/**
- * A GET of `url`, with `authorization` if given, through the Worker's fetch:
- * its status, and whether it asks for Basic.
- */
 const request = (url: string, authorization?: string) =>
   Fetch.use(({ fetch }) =>
     fetch(
@@ -246,7 +229,6 @@ describe("git through the platform", () => {
         expect(
           yield* gitOk(`${repos}/${keyOf(fresh)}.git`, "rev-parse", "main")
         ).toBe(first);
-        // The first push became the landed SHA: no other commit can now.
         expect(
           yield* Effect.flip(api.recordFirstPush(alice, second))
         ).toStrictEqual(new DirectPush({ ref: "refs/heads/main" }));
@@ -433,8 +415,6 @@ describe("git through the platform", () => {
         ).toStrictEqual([[requestId, fix]]);
         expect(yield* Ref.get(seen.started)).toStrictEqual([requestId]);
 
-        // The platform's tokens reached the upstream, and only they did:
-        // never the person's, and never back to git.
         const minted = yield* Ref.get(seen.minted);
 
         const credentials = new Set(
@@ -533,8 +513,6 @@ describe("git through the platform", () => {
           clone
         );
 
-        // The platform's own verdict note, written straight to the fork as
-        // `RepoHost.push` writes it, never through the gateway.
         yield* gitOk(clone, "notes", `--ref=${Brand.slug}`, "add", "-m", "{}");
         yield* gitOk(clone, "push", "--quiet", forkRepo, notesRef);
 
@@ -614,7 +592,6 @@ describe("git through the platform", () => {
         const { api, origin } = yield* withDatekit;
         const { claim } = yield* api.claim(alice, parseIso).pipe(Effect.orDie);
 
-        // A fork by its repo's name, a project by its address.
         const refs = (repo: string) =>
           `${origin}/${
             repo.includes("/")
@@ -660,19 +637,16 @@ describe("a push's request id", () => {
   });
 });
 
-/** A person no project here names, who decides nothing. */
 const carol = Person.make({ handle: Handle.make("carol") });
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** A push moving `ref` from `from` to a commit made up for the test. */
 const moving = (ref: RefName, from: Option.Option<CommitSha>): Command => ({
   from,
   ref,
   to: Option.some(CommitSha.make("c".repeat(40))),
 });
 
-/** What custody says of `commands` pushed by `pusher` to `repo`, before and after the upstream. */
 const judged = (
   projects: Projects["Service"],
   pusher: Person,
@@ -680,7 +654,6 @@ const judged = (
   commands: Array.NonEmptyReadonlyArray<Command>
 ) =>
   Effect.gen(function* () {
-    // A project by its name, or a fork by its repo's name.
     const name = Option.getOrElse(repoNameOfAddress(repo), () =>
       RepoName.make(repo)
     );
@@ -741,7 +714,6 @@ describe("custody of one push", () => {
           admitted: [],
           reviewed: [],
         });
-        // No answer run started: neither the decider's nor the claimant's.
         expect(yield* Ref.get(seen.started)).toStrictEqual([]);
         expect(
           (yield* judged(projects, carol, claim.fork, push)).admitted
@@ -823,7 +795,6 @@ describe("custody of one push", () => {
 
         yield* api.initProject(alice, {}).pipe(Effect.orDie);
 
-        // bob first: alice's push, once reviewed, is the project's first.
         const byBob = yield* judged(projects, bob, fresh, first);
         const byAlice = yield* judged(projects, alice, fresh, first);
 

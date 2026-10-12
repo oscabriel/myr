@@ -1,15 +1,3 @@
-/**
- * `watch` live. Over the Node platform world, a
- * watcher that speaks the framed `/rpc` (NDJSON) hears a project's kept
- * events in order and then each one as it is committed, until it goes
- * away; a watcher from a sequence number hears only what came after.
- *
- * Underneath, the Project DO's watch room (the hibernation API, over a fake
- * `DurableObjectState` that records the sockets it accepts, and a real
- * shell over sqlite-node) keeps the newest 500 events for a socket opened
- * from 0 and sends every socket what a call or an alarm committed, after
- * the commit.
- */
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { CheckAt } from "@repo/checks/check-runner";
@@ -75,10 +63,8 @@ const parseIso = AskId.make("parse-iso");
 
 const redThenGreen = LaneName.make("redThenGreen");
 
-/** Where the config folder's sdk is imported from, as a maintainer writes it. */
 const sdk = `${Brand.cliPackage}/rules`;
 
-/** The project as dora first pushes it. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
     `import { kinds, project } from "${sdk}";`,
@@ -96,7 +82,6 @@ const start = {
     "export const parse = (iso: string) => ({ month: 0, year: 0 });\n",
 };
 
-/** `parse-iso`'s own files: its file in the config folder, and its check. */
 const isoFiles = Array.make(
   {
     content: [
@@ -125,17 +110,11 @@ const isoFiles = Array.make(
   }
 );
 
-/** alice's answer to parse-iso: the year, read. */
 const yearRead =
   "export const parse = (iso: string) => ({ month: 0, year: Number(iso.slice(0, 4)) });\n";
 
-/** How long a live event may take to reach a watcher. */
 const LIVE = "5 seconds";
 
-/**
- * Anyone's client of the contracts over the framed `/rpc`: each call
- * posted as NDJSON, and its answer read message by message as it comes.
- */
 const framedClient = (world: CoreLoopWorld) =>
   RpcClient.make(Contracts).pipe(
     Effect.provide(
@@ -145,11 +124,6 @@ const framedClient = (world: CoreLoopWorld) =>
     )
   );
 
-/**
- * `events` heard for as long as the test lasts: what has come so far, in
- * the order it came. A stream that fails stops the hearing; what it heard
- * stays.
- */
 const hearing = <E, R>(events: Stream.Stream<ProjectEvent, E, R>) =>
   Effect.gen(function* () {
     const heard = yield* Ref.make<readonly ProjectEvent[]>([]);
@@ -163,11 +137,9 @@ const hearing = <E, R>(events: Stream.Stream<ProjectEvent, E, R>) =>
     return heard;
   });
 
-/** A watcher of `project` from `since` over `client`. */
 const watcher = (client: Client["Service"], since: number) =>
   hearing(client.watch({ project, since }));
 
-/** What `heard` holds once `done` says so, or once `LIVE` has passed. */
 const heardUntil = (
   heard: Ref.Ref<readonly ProjectEvent[]>,
   done: (events: readonly ProjectEvent[]) => boolean
@@ -178,19 +150,15 @@ const heardUntil = (
     Effect.andThen(Ref.get(heard))
   );
 
-/** Each event's tag and sequence number: what a watcher heard, in brief. */
 const brief = (events: readonly ProjectEvent[]) =>
   events.map(({ _tag, seq }) => `${seq} ${_tag}`);
 
-/** Whether `events` run on from `since` with no number skipped or repeated. */
 const unbroken = (events: readonly ProjectEvent[], since: number) =>
   events.every(({ seq }, index) => seq === since + index + 1);
 
-/** Whether `event` is an answer's landing, not an ask's opening. */
 const answered = (event: ProjectEvent) =>
   ProjectEvent.guards.Landed(event) && event.landing.ask !== undefined;
 
-/** The project made, first pushed, and `parse-iso` opened red first by dora. */
 const datekitOpened = (world: CoreLoopWorld) =>
   Effect.gen(function* () {
     const dora = world.rpc("dora");
@@ -223,8 +191,6 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
 
         yield* datekitOpened(world);
 
-        // Over JSON, `watch` still replays and ends: a buffered answer
-        // cannot carry a live tail. It is what the replay should be.
         const kept = yield* Stream.runCollect(
           reader.watch({ project, since: 0 })
         );
@@ -236,7 +202,6 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
           (events) => events.length >= kept.length
         );
 
-        // alice claims: the watcher hears it without asking again.
         const { claim } = yield* world
           .rpc("alice")
           .claim({ ask: parseIso, project });
@@ -247,7 +212,6 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
 
         const claimedAt = claimed.findLast(ProjectEvent.guards.Claimed);
 
-        // Her answer lands.
         const aliceGit = world.git("alice");
         const work = yield* aliceGit.clone(claim.remote);
 
@@ -269,7 +233,6 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
 
         yield* world.settle();
 
-        // Her answer's landing: the opening's was heard in the replay.
         const landedAt = (yield* heardUntil(first, (events) =>
           events.some(answered)
         ))
@@ -284,7 +247,6 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
                 sha: LandedSha.make(landedAt.landing.sha),
               })).landing;
 
-        // A second watcher from the claim's number hears only what came after.
         const since = claimedAt?.seq ?? 0;
 
         const after = yield* Stream.runCollect(
@@ -326,7 +288,6 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
           resumed: ["5 Pushed", "6 Judged", "7 Landed", "8 AskClosed"],
           unbroken: { first: true, second: true },
         });
-        // Over JSON, the same events replay and end.
         expect({ after: brief(after), kept: brief(kept) }).toStrictEqual({
           after: brief(resumed),
           kept: brief(replayed.slice(0, kept.length)),
@@ -358,8 +319,6 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
           reader.watch({ project, since: 0 })
         );
 
-        // The RPC server puts a call's own headers after the HTTP
-        // request's, so only the request itself says how it was framed.
         const claimingFramed = yield* Stream.runCollect(
           reader.watch(
             { project, since: 0 },
@@ -377,10 +336,6 @@ describe("watch over the framed /rpc, through the Node platform world", () => {
   );
 });
 
-/**
- * A Project DO's state as far as its watch sockets go: it records every
- * socket it accepts with its tags, and finds the ones still open again.
- */
 const fakeState = () => {
   const accepted: { readonly socket: WebSocket; readonly tags: string[] }[] =
     [];
@@ -403,7 +358,6 @@ const fakeState = () => {
 
   return {
     accepted,
-    /** The watcher went away: the runtime no longer lists its socket. */
     close: (socket: WebSocket) => {
       closed.add(socket);
     },
@@ -413,17 +367,14 @@ const fakeState = () => {
 
 const decodeFrame = Schema.decodeEffect(Schema.fromJsonString(WatchFrame));
 
-/** What the room keeps on a socket: where it stands, or nothing once hibernation lost it. */
 type Attachment = { readonly seq: number } | null;
 
-/** The DO's end of a watcher's socket: every frame it was sent, decoded, in order. */
 const doSocket = () => {
   const sent: string[] = [];
   let attachment: Attachment = null;
 
   const socket = untouchable<WebSocket>("WebSocket", {
     deserializeAttachment: () => attachment,
-    // The room sends text frames only.
     send: (message: string) => {
       sent.push(message);
     },
@@ -438,7 +389,6 @@ const doSocket = () => {
   };
 };
 
-/** Each frame's number and its event's tag. */
 const framed = (frames: readonly WatchFrame[]) =>
   frames.map(({ event, seq }) => `${seq} ${event._tag}`);
 
@@ -455,8 +405,6 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
         const room = watchRoom(state, yield* shellOver(":memory:"));
         const call = through(room);
 
-        // The adoption lands, parse-iso opens and its opening lands (3
-        // events), then 300 claims, each released (600).
         yield* opening(call);
         yield* Effect.forEach(
           Array.range(1, 300),
@@ -604,7 +552,6 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
         const watched = doSocket();
 
         yield* room.admit(watched.socket, 3);
-        // Hibernation woke it without its attachment.
         watched.socket.serializeAttachment(null);
 
         yield* call("claim", [bob, doParseIso]);
@@ -614,12 +561,6 @@ describe("a Project DO's watch room, over a fake state and a real shell", () => 
   );
 });
 
-/**
- * A watcher's socket as `WebSocketPair` makes it: the Worker's end hears
- * what the DO's end sends (held until it listens, as the runtime holds it
- * until `accept`), and either end's close reaches the other. `gone` is told
- * when the socket closes, as the runtime stops listing it.
- */
 const socketPair = (gone: (socket: WebSocket) => void) => {
   const events = new EventTarget<WebSocketEventMap>();
   const held: string[] = [];
@@ -638,7 +579,6 @@ const socketPair = (gone: (socket: WebSocket) => void) => {
       events.dispatchEvent(new Event("close"));
     },
     deserializeAttachment: () => attachment,
-    // The room sends text frames only.
     send: (message: string) => {
       if (!open) {
         throw new Error("the socket is closed");
@@ -677,13 +617,6 @@ const socketPair = (gone: (socket: WebSocket) => void) => {
   return { client, server };
 };
 
-/**
- * The `PROJECT` namespace over one project's watch room, as the Worker
- * reaches it: `call` runs on the room, so its watchers are settled after
- * each, and `fetch` opens a watch socket on it, or none when `refuses`.
- * `opened` lists the number each socket was opened from, in order;
- * `server` is the DO's end of the newest.
- */
 const roomNamespace = (refuses = false) =>
   Effect.gen(function* () {
     const run = yield* FiberSet.makeRuntimePromise();
@@ -725,7 +658,6 @@ const roomNamespace = (refuses = false) =>
     };
   });
 
-/** `watch` live from `since` on the room's project, through the Worker's handler and the namespace. */
 const relayedFrom = (namespace: ProjectNamespace & WatchNamespace, since = 0) =>
   watchHandler({ project: doProject, since }, { live: true }).pipe(
     Stream.provideService(ProjectSockets, Option.some(namespace)),
@@ -779,7 +711,6 @@ describe("the Worker's relay of a Project DO's watch socket", () => {
 
         yield* heardUntil(heard, (events) => events.length >= 4);
 
-        // The DO restarts: its end of the socket closes.
         (yield* server)?.close(1012, "restarting");
 
         yield* heardUntil(heard, () => false).pipe(

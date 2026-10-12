@@ -1,13 +1,3 @@
-/**
- * The project list's posture over the platform's Node world (the core
- * loop's world) with the visibility cartridge's project state composed
- * into every Project DO, as `ledger-mcp.test.ts` composes it. datekit's
- * first push carries a `visibility.ts` that declares sealed checks: a first
- * config stands at once and writes no `PostureChanged` row, so the
- * projection still lists datekit as `open`, the row D1 holds on demo. The
- * list reads datekit's posture from datekit's own ledger, so the badge and
- * the ledger say the same.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Fetch } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
@@ -28,7 +18,6 @@ const project = ProjectName.make("dora/datekit");
 
 const sdk = `${Brand.cliPackage}/rules`;
 
-/** datekit as dora first pushes it, its visibility config declaring sealed checks. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
     `import { kinds, project } from "${sdk}";`,
@@ -61,10 +50,8 @@ const start = {
   "src/parse.ts": "export const parse = (iso: string) => 0;\n",
 };
 
-/** A `Fetch` that nothing here may call. */
 const noFetch = Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch"));
 
-/** The cartridge's project state for the world's stage, over a private namespace of its own. */
 const cartridge = Layer.unwrap(
   Effect.gen(function* () {
     const host = yield* Effect.provide(

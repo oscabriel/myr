@@ -1,11 +1,3 @@
-/**
- * The binding fence: what each Worker's code reads from its env and what its
- * `wrangler.jsonc` declares are one set, at the top level and in every
- * stage, since Wrangler does not inherit bindings into an environment. A
- * binding added or removed on one side only fails here; one removed from
- * `wrangler.jsonc` and regenerated (`bun run types`) also fails `typecheck`
- * where the code reads it.
- */
 import { NodeServices } from "@effect/platform-node";
 import type { D1Client } from "@effect/sql-d1";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
@@ -39,7 +31,6 @@ import {
 } from "../src/platform.ts";
 import type { PlatformConfig } from "../src/platform.ts";
 
-/** The offset just past the string literal that opens at `start`. */
 const stringEnd = (text: string, start: number) => {
   let at = start + 1;
 
@@ -50,7 +41,6 @@ const stringEnd = (text: string, start: number) => {
   return at + 1;
 };
 
-/** Where the token that opens at `at` ends: a string literal, a comment, or one character. */
 const tokenEnd = (text: string, at: number) => {
   if (text[at] === '"') {
     return stringEnd(text, at);
@@ -71,7 +61,6 @@ const tokenEnd = (text: string, at: number) => {
   return at + 1;
 };
 
-/** `text` cut into its tokens, so nothing below looks inside a string. */
 const tokensOf = (text: string) => {
   const tokens: string[] = [];
   let at = 0;
@@ -89,18 +78,12 @@ const tokensOf = (text: string) => {
 const isComment = (token: string) =>
   token.startsWith("//") || token.startsWith("/*");
 
-/** Whether the next token after `tokens[index]` that is not whitespace closes a bracket. */
 const closesAfter = (tokens: readonly string[], index: number) => {
   const next = tokens.find((token, at) => at > index && token.trim() !== "");
 
   return next === "]" || next === "}";
 };
 
-/**
- * `text` (JSONC, as `wrangler.jsonc` is written) as JSON: its comments
- * dropped first, then each comma that only a closing bracket follows, so a
- * comment between the two hides nothing; every string is kept whole.
- */
 const fromJsonc = (text: string) => {
   const tokens = tokensOf(text).filter((token) => !isComment(token));
 
@@ -113,11 +96,6 @@ const Bound = Schema.Array(Schema.Struct({ binding: Schema.String }));
 
 const Named = Schema.Array(Schema.Struct({ name: Schema.String }));
 
-/**
- * The keys of a block that declare bindings, each with how it names them.
- * A key that is neither here nor in `NOT_BINDINGS` fails the test: whoever
- * adds it says which it is.
- */
 const BindingKinds = Schema.Struct({
   ai: Schema.optionalKey(Schema.Struct({ binding: Schema.String })),
   artifacts: Schema.optionalKey(Bound),
@@ -131,7 +109,6 @@ const BindingKinds = Schema.Struct({
   workflows: Schema.optionalKey(Bound),
 });
 
-/** The keys a block may carry that declare no binding. */
 const NOT_BINDINGS: ReadonlySet<string> = new Set([
   "$schema",
   "compatibility_date",
@@ -151,7 +128,6 @@ const NOT_BINDINGS: ReadonlySet<string> = new Set([
   "workers_dev",
 ]);
 
-/** One block: the top level, or a stage's. */
 const Block = Schema.Struct({
   ...BindingKinds.fields,
   secrets: Schema.optionalKey(
@@ -160,14 +136,11 @@ const Block = Schema.Struct({
   vars: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
 });
 
-/** A config as data: its blocks are read one key at a time. */
 const Raw = Schema.Record(Schema.String, Schema.Unknown);
 
-/** A config's text, JSONC as `wrangler.jsonc` is written, as data. */
 const readJsonc = (text: string) =>
   Schema.decodeEffect(Schema.fromJsonString(Raw))(fromJsonc(text));
 
-/** The stages' blocks, by name. */
 const Staged = Schema.Struct({
   env: Schema.optionalKey(Schema.Record(Schema.String, Raw)),
 });
@@ -177,7 +150,6 @@ const decodeBlock = Schema.decodeUnknownEffect(Block);
 const sorted = (names: Iterable<string>) =>
   Array.sort(Array.fromIterable(names), Order.String);
 
-/** What one block declares: its bindings, vars and required secrets, each sorted, and any key this test does not know. */
 const declaredIn = (raw: typeof Raw.Type) =>
   Effect.map(decodeBlock(raw), (block) => ({
     bindings: sorted([
@@ -199,13 +171,11 @@ const declaredIn = (raw: typeof Raw.Type) =>
     vars: sorted(Object.keys(block.vars ?? {})),
   }));
 
-/** A file of this repo, by its path from `apps/platform`. */
 const fileText = (path: string) =>
   Effect.flatMap(FileSystem.FileSystem, (fs) =>
     fs.readFileString(new URL(`../${path}`, import.meta.url).pathname)
   );
 
-/** What the `wrangler.jsonc` at `path` declares, by block: `top` and each stage. */
 const wranglerOf = (path: string) =>
   Effect.gen(function* () {
     const raw = yield* Effect.flatMap(fileText(path), readJsonc);
@@ -223,7 +193,6 @@ const wranglerOf = (path: string) =>
     return { stages: Object.fromEntries(stages), top };
   });
 
-/** A struct's keys, sorted; `required` leaves out its optional ones. */
 const keysOf = (
   fields: Readonly<Record<string, Schema.Top>>,
   only: "all" | "required" = "all"
@@ -236,10 +205,6 @@ const keysOf = (
       .map(([key]) => key)
   );
 
-/**
- * The bindings the sandbox's code reads from its env: the members of the
- * `Env` its generated types give it (`bun run types` in `apps/sandbox`).
- */
 const sandboxEnvKeys = Effect.map(
   fileText("../sandbox/worker-configuration.d.ts"),
   (text) =>
@@ -253,7 +218,6 @@ const sandboxEnvKeys = Effect.map(
     )
 );
 
-/** The draft limit as a stage's block declares it, under its own namespace id. */
 const draftLimit = (id: string) => ({
   name: "DRAFT_LIMIT",
   namespace_id: id,
@@ -308,8 +272,6 @@ describe("the platform Worker's bindings", () => {
       }).pipe(Effect.provide(NodeServices.layer))
   );
 
-  // The drafter's model and the web's address are stage vars, and drafts
-  // are rate-limited apart from proposals, two a minute per person.
   it.effect(
     "set the drafter's model, the web's address and the draft limit in every stage",
     () =>
@@ -376,8 +338,6 @@ describe("the platform Worker's bindings", () => {
       }).pipe(Effect.provide(NodeServices.layer))
   );
 
-  // Code history persists in a bucket of its own per stage, named for its
-  // job, never another job's bucket.
   it.effect("keep code history in each block's own code-cache bucket", () =>
     Effect.gen(function* () {
       const raw = yield* Effect.flatMap(fileText("wrangler.jsonc"), readJsonc);
@@ -419,8 +379,6 @@ describe("the platform Worker's bindings", () => {
     >();
   });
 
-  // Principle 7: this Worker binds the private namespace deliberately;
-  // the web's `test/env.test-d.ts` holds that no public-serving Worker does.
   it("hold the private namespace, decoded as the public one is", () => {
     expectTypeOf<Env>().toHaveProperty("ARTIFACTS_PRIVATE");
     expectTypeOf<PlatformConfig["ARTIFACTS_PRIVATE"]>().toEqualTypeOf<
@@ -470,11 +428,8 @@ describe("the platform Worker's bindings", () => {
   });
 
   it("type the sandbox service binding by the entrypoint the platform calls", () => {
-    // The generated `Env` types `SANDBOX` as a plain `Fetcher` (an app's
-    // types may not name another app's entrypoint), so the env's decode
-    // declares the entrypoint's methods on it (`SandboxBinding`). Should
-    // `Env` ever carry them, or turn `any`, the first line fails: drop the
-    // declaration, or find what made the binding untyped.
+    // If the generated `Env` ever types `SANDBOX`'s methods, or turns `any`, this fails:
+    // drop the `SandboxBinding` declaration, or find what made the binding untyped.
     expectTypeOf<Env["SANDBOX"]>().not.toExtend<SandboxBinding>();
     expectTypeOf<PlatformConfig["SANDBOX"]>().toExtend<Env["SANDBOX"]>();
     expectTypeOf<PlatformConfig["SANDBOX"]>().toExtend<

@@ -54,19 +54,9 @@ import { memoSteps, workflowSteps } from "../../src/workflows/step.ts";
 import type { WorkflowSteps } from "../../src/workflows/step.ts";
 import { fakeEnv, without } from "../fake-env.ts";
 
-/**
- * One `cf.artifacts.repo.pushed` event as Artifacts delivered it to a spike's
- * Workflow (the first line of its recorded events), verbatim but for the
- * namespace and repo, renamed to a test project's.
- */
 const deliveredLine =
   '{"id": "88018624-a405-49c4-ba41-7dc60e4a2c89", "type": "cf.artifacts.repo.pushed", "source": {"namespace": "projects-local", "repoName": "alice__datekit"}, "payload": {"ref": "refs/heads/main", "before": "cfc3cc308874a348d38c7143c9093c17a196e4af", "after": "88359ce33219db41afafbcad7adc19f4f4d84381", "commits": [{"id": "88359ce33219db41afafbcad7adc19f4f4d84381", "message": "ev-0", "messageTruncated": false, "timestamp": "2026-10-06T20:10:48.000Z", "author": {"name": "probe", "email": "probe@invalid"}, "committer": {"name": "probe", "email": "probe@invalid"}, "parents": ["cfc3cc308874a348d38c7143c9093c17a196e4af"]}], "totalCommitsCount": 1, "commitsTruncated": false}}';
 
-/**
- * The event the same spike saw for a custom ref pushed beside `main`: its
- * `before` is git's all-zero id, since the push created the ref, and it
- * lists no commits.
- */
 const createdLine =
   '{"id": "bc6f5f68-4f76-45a7-8258-ad4ffd465cae", "type": "cf.artifacts.repo.pushed", "source": {"namespace": "projects-local", "repoName": "alice__datekit"}, "payload": {"ref": "refs/asked/ev", "before": "0000000000000000000000000000000000000000", "after": "8812c641c30d4a4633c6e77e3efe52c8f029f87d", "commits": [], "totalCommitsCount": 0, "commitsTruncated": false}}';
 
@@ -106,12 +96,10 @@ describe(OnPushEvent, () => {
   );
 });
 
-/** The delivered event, decoded: what every other event here is made from. */
 const delivered = Schema.decodeSync(Schema.fromJsonString(OnPushEvent))(
   deliveredLine
 );
 
-/** A push event like the delivered one, for `repo`'s `ref` moving to `after`. */
 const pushed = (on: {
   readonly after: CommitSha;
   readonly before?: CommitSha;
@@ -154,7 +142,6 @@ const bobsFork = RepoKind.ClaimFork({
   project: datekit,
 });
 
-/** What the DO said: nothing landed, nothing seen, unless a row says so. */
 const facts = (repo: RepoKind, more: Partial<PushFacts> = {}): PushFacts => ({
   landed: new Set(),
   repo,
@@ -311,11 +298,6 @@ describe(classifyPush, () => {
   });
 });
 
-/**
- * datekit at its landed commit, which the platform landed on top of its
- * first: alice decides everything, bob is vouched for, and `parse-iso` is
- * open.
- */
 const scenario = aProject({ people: ["bob"] }).pipe(
   withVouches(["bob"]),
   withAsk({ id: "parse-iso", territory: "packages/parser" })
@@ -325,7 +307,6 @@ const alice = Person.make({ handle: scenario.initializer });
 
 const bob = Person.make({ handle: Handle.make("bob") });
 
-/** The project's one landing: its landed commit. */
 const theLanding: LandingView = {
   assisted: [],
   author: scenario.initializer,
@@ -336,11 +317,6 @@ const theLanding: LandingView = {
   sha: scenario.landed,
 };
 
-/**
- * Every port the project's service runs on, in memory. The Lander, the
- * Checker, the rules and answer runs are never needed by a push event:
- * touching one fails the test.
- */
 const ports = Layer.mergeAll(
   AlarmsMemory,
   ProjectionMemory,
@@ -361,7 +337,6 @@ const ports = Layer.mergeAll(
   )
 );
 
-/** datekit live at its landed commit, with its one landing and its asks, as its store holds them. */
 const seeded = Effect.gen(function* () {
   const store = yield* ProjectStore;
 
@@ -384,7 +359,6 @@ const seeded = Effect.gen(function* () {
   });
 });
 
-/** `Projects` in memory, holding datekit's service and no other project. */
 const projectsOf = (api: ProjectApi) =>
   Layer.succeed(
     Projects,
@@ -397,7 +371,6 @@ const projectsOf = (api: ProjectApi) =>
     })
   );
 
-/** datekit's service over its seeded store, and `Projects` holding it, at noon. */
 const world = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
   yield* seeded;
@@ -407,13 +380,11 @@ const world = Effect.gen(function* () {
   return { api, projects: projectsOf(api), store: yield* ProjectStore };
 }).pipe(Effect.provide(ports));
 
-/** OnPush's program over `event`, with a fresh record of steps. */
 const onPush = (event: OnPushEvent, projects: Layer.Layer<Projects>) =>
   Effect.flatMap(memoSteps(), (steps) =>
     runOnPush(event).pipe(Effect.provide([steps, projects]))
   );
 
-/** `Projects` holding `api`, and the id of every push event the DO is told of. */
 const telling = (api: ProjectApi) =>
   Effect.map(Ref.make<readonly string[]>([]), (told) => ({
     projects: projectsOf({
@@ -427,11 +398,6 @@ const telling = (api: ProjectApi) =>
     told,
   }));
 
-/**
- * A Workflow engine's steps in memory, as the engine keeps them: each runs
- * once, and what it ended with, its JSON or its failure, is kept by name and
- * handed to a replay without running it again.
- */
 const engineSteps = () => {
   const recorded = new Map<string, Promise<Schema.Json>>();
 
@@ -489,7 +455,6 @@ describe(runOnPush, () => {
         const fork = "alice__datekit--parse-iso--bob";
         const elsewhere = sha("datekit:elsewhere");
 
-        /** When bob's claim last heard a push, as he sees it. */
         const lastPush = Effect.map(api.status(bob), ({ claims }) =>
           claims.map(({ lastPushAt }) =>
             Option.map(Option.fromUndefinedOr(lastPushAt), DateTime.formatIso)
@@ -498,7 +463,6 @@ describe(runOnPush, () => {
 
         yield* api.claim(bob, parseIso);
 
-        // The gateway forwarded bob's push and recorded it.
         yield* advanceTo("2026-10-07T13:00:00Z");
         yield* api.recordPush({
           after: answerHead,
@@ -518,7 +482,6 @@ describe(runOnPush, () => {
 
         const afterSeen = yield* lastPush;
 
-        // A commit that reached the fork without passing the gateway.
         yield* advanceTo("2026-10-07T14:00:00Z");
 
         const unseen = yield* onPush(
@@ -605,7 +568,6 @@ describe(runOnPush, () => {
           Effect.provide([steps, projects])
         );
 
-        // The same instance replayed, then the same event in a second instance.
         const verdicts = [
           yield* replayed,
           yield* replayed,
@@ -644,7 +606,6 @@ describe(runOnPush, () => {
           repo: "alice__datekit",
         });
 
-        // The instance's run, then the same run replayed by the engine.
         const run = runOnPush(stray).pipe(
           Effect.provide([workflowSteps(engine.steps), projects]),
           Effect.catchDefect(() => Effect.succeed("died"))
@@ -681,7 +642,6 @@ describe(runOnPush, () => {
         const { api, store } = yield* world;
         const asked = yield* Ref.make(0);
 
-        // The platform pushed main; its DO records the landing just after the first ask.
         const late = Projects.of({
           create: (project) => Effect.fail(new ProjectExists({ project })),
           get: () =>
@@ -784,13 +744,11 @@ describe(runOnPush, () => {
   );
 });
 
-/** The delivered event as the engine hands it to an instance: its params. */
 const sent = Schema.encodeSync(OnPushEvent)(delivered);
 
 describe(runInstance, () => {
   it.effect("decodes its params before it reads the env", () =>
     Effect.gen(function* () {
-      // A ref name where a commit id belongs, and an env missing its stage.
       const failure = yield* runInstance(
         without(fakeEnv(), "STAGE"),
         { ...sent, payload: { ...sent.payload, after: "HEAD" } },

@@ -55,7 +55,6 @@ const requestId = RequestId.make("req-none0001");
 
 const layer = LayerName.make("maintainers");
 
-/** A call's `Exit` as JSON, by its method's own schemas: equal when the outcomes are. */
 const settled = <A, E, R>(
   method: ProjectMethod,
   effect: Effect.Effect<A, E, R>
@@ -67,7 +66,6 @@ const settled = <A, E, R>(
     Effect.orDie
   );
 
-/** Every `ProjectApi` method once, on a project made and not yet pushed to. */
 const everyMethod = (api: ProjectApi) =>
   Effect.all({
     admissionPlan: settled(
@@ -211,10 +209,6 @@ const everyMethod = (api: ProjectApi) =>
     ),
   });
 
-/**
- * What `Projects` answers: for a name never made, for the project once made
- * (made again, and every method on it), and for another name.
- */
 const script = Effect.gen(function* () {
   const projects = yield* Projects;
   const before = yield* outcomeOf(projects.get(project));
@@ -281,7 +275,6 @@ describe("Projects over the Project DO namespace", () => {
           projectMethods.toSorted()
         );
         expect(throughDo).toStrictEqual(inProcess);
-        // Only a step reported for an answer request that never was dies.
         expect(died).toStrictEqual(["advanceAnswer"]);
       })
   );

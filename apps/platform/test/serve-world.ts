@@ -1,41 +1,6 @@
-/**
- * The core loop's world (`world.ts`) as a process of its own:
- * `bun apps/platform/test/serve-world.ts` serves the platform's fetch
- * handler on a local port, composed as the Worker composes it, and prints
- * one JSON line, `{"origin":"http://127.0.0.1:<port>"}`, once it serves. It
- * serves until its stdin ends (the process that started it closed it, or
- * died) or it is told to stop.
- *
- * Three things differ from the world a test builds in process:
- *
- * - The Checker runs each lane for real, under `sh -c`, in a clone of the
- *   commit or tree it is given (`CheckRunnerLocal`), so an ask's check is
- *   red first, or not, by what it really does.
- * - Beside dora, alice and bob, the people in `WORLD_SESSIONS` (a JSON
- *   object from token to handle, as `SESSION_TOKENS` is) may call.
- * - Every answer run a push queues is carried a moment later, for as long
- *   as the world serves, as the `Answer` Workflow carries it on a stage:
- *   an answer pushed over git lands with nobody calling `settle` (smoke's
- *   `--loop` runs against this world).
- * - Every cartridge the platform plugs in (`cartridges.ts`) is plugged in
- *   here too, as `ports.ts` plugs them into the Worker, for a stage whose
- *   private namespace is the world's second store of bare repos: so a
- *   project that declares a layer gets its repo there, and its maintainers
- *   clone and push it through the gateway. The `Answer` Workflow
- *   the cartridge starts an admission on keeps the instance and runs
- *   nothing: the world carries no Workflow.
- * - A proposal made with a draft is drafted in process as it is made
- *   (`@repo/drafting`'s inline runs, over the Worker's ports), by the
- *   memory drafter scripted with the canned draft, whose test fails on any
- *   `src/parse.ts` without a `parseOrdinal`: so smoke's `--loop --draft`
- *   sees a draft go red first and open on accept with no model.
- *
- * The seed's `--world node` runs it (`scripts/lib/seed.ts`) and
- * reaches it over HTTP and git, as it reaches a stage. A process, not an
- * import: apps never import apps, and no file outside the platform imports
- * its test world. The Worker's modules import `cloudflare:workers`, which
- * `world-process.ts` serves from the shim before this file loads them.
- */
+// Run as a process (`bun apps/platform/test/serve-world.ts`), not imported: apps never
+// import apps. Prints `{"origin":"http://127.0.0.1:<port>"}` once it serves, and
+// serves until its stdin ends.
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { CheckRunner, shaOf } from "@repo/checks/check-runner";
@@ -69,11 +34,6 @@ import { fakeEnv, withPrivateNamespace } from "./fake-env.ts";
 import { shimWorkers, worldSessions } from "./world-process.ts";
 import type { PlugIn } from "./world.ts";
 
-/**
- * A clone of the bare repo at `bare`, its work tree set to `at`, removed
- * when the job ends. The clone shares the repo's objects, so a composed or
- * merged commit is there whatever ref holds it.
- */
 const checkoutIn = (bare: string) => (at: CheckAt) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -102,7 +62,6 @@ const checkoutIn = (bare: string) => (at: CheckAt) =>
     return read.exitCode === 0 ? tree : yield* new VerifierBlocked({});
   }).pipe(Effect.provide(NodeServices.layer));
 
-/** The Checker over the world's bare repos: each job's lanes, for real, in a clone of its repo. */
 const localChecker = (repos: string): Layer.Layer<CheckRunner> =>
   Layer.succeed(
     CheckRunner,
@@ -118,10 +77,6 @@ const localChecker = (repos: string): Layer.Layer<CheckRunner> =>
     })
   );
 
-/**
- * The `Answer` Workflow, as far as an admission's start reaches it: the
- * instance is made, or found, and kept; nothing runs it.
- */
 const keptAdmissions = untouchable<Env["ANSWER"]>("ANSWER", {
   create: (options) =>
     Promise.resolve(
@@ -133,11 +88,8 @@ const keptAdmissions = untouchable<Env["ANSWER"]>("ANSWER", {
     Promise.resolve(untouchable<WorkflowInstance>("an admission", { id })),
 });
 
-/**
- * Every cartridge in `plugged`, for one stage's config, merged. Typed as
- * `ports.ts` types them, so a platform whose `cartridges.ts` names none (a
- * cartridge deleted) still typechecks here.
- */
+// Typed as `ports.ts` types them, so a platform whose `cartridges.ts` names none
+// still typechecks here.
 const pluggedFor =
   (plugged: typeof Cartridges) =>
   (config: PlatformConfig): Layer.Layer<never, never, WorkerPorts> => {
@@ -149,12 +101,6 @@ const pluggedFor =
     );
   };
 
-/**
- * Every cartridge in `plugged`, over the world's ports, for a stage whose
- * private namespace is `aside`: over the Worker's ports as they are, and
- * over each Project DO's, which reach no `Projects` (only the gateway's
- * side asks it, and a DO serves no git).
- */
 const cartridgesOver =
   (
     plugged: typeof Cartridges,
@@ -180,11 +126,6 @@ const cartridgesOver =
     };
   };
 
-/**
- * `plugIn` with draft runs in process beside it: each Project DO starts its
- * rounds inline, on the Worker's ports (which the Worker's side hands over
- * once built) and `drafter`.
- */
 const withDrafts = (
   plugIn: PlugIn,
   ready: Deferred.Deferred<Context.Context<InlinePorts>>,
@@ -204,7 +145,6 @@ const withDrafts = (
   ),
 });
 
-/** How long after the last round the world carries queued answer runs again. */
 const CARRY_EVERY = Duration.millis(250);
 
 const serve = Effect.gen(function* () {
@@ -232,9 +172,6 @@ const serve = Effect.gen(function* () {
     sessions,
   });
 
-  // The Answer Workflow's stand-in: the queued runs, carried every
-  // `CARRY_EVERY` while the world serves. A run that dies is logged, and
-  // the next round carries on.
   yield* world.settle().pipe(
     Effect.catchCause((cause) =>
       Effect.logWarning("the world's answer runs failed", cause)
