@@ -1,25 +1,5 @@
-/**
- * Admission of a layer push's held-back checks, as steps of the `Answer`
- * Workflow: the project plans the runs
- * (`ProjectApi.admissionPlan`: each changed area's checks green on main k
- * times, red on each known-bad tree its manifest names), the Checker runs
- * each, and the project judges the area bits (`recordAdmission`), moving
- * the layer's landed SHA under a fresh commitment, or leaving it.
- *
- * Every step is durable, named for what it runs, inside the instance
- * `admit-<project>-<layer>-<head>`: a replay reads each recorded value back,
- * and the project's judgement changes nothing once the head is no longer
- * proposed (principle 8). What the steps record is the plan's outline (the
- * main it runs on, and each run by area and attempt or tree) and each
- * run's area bits: never a check's file, path or name. Each step asks the
- * project for the plan again and runs the planned job it names, so the
- * sealed files go from the project to the Checker and nowhere else.
- *
- * Each job runs on main as the plan found it, in the project's own repo,
- * with no public lane beside the held-back checks, and with no env: no
- * placeholder, no proxy, no value. A Checker that stays blocked through a
- * step's retries leaves the push proposed, unjudged.
- */
+// Steps record only the plan's outline and each run's area bits, never a check's
+// file, path or name: the sealed files go from the project to the Checker alone.
 import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import { noRunEnv } from "@repo/project/env-port";
 import { Projects } from "@repo/project/projects";
@@ -39,7 +19,6 @@ import type { AdmissionParams } from "../answer-runs.ts";
 import { StepRunner } from "./step.ts";
 import type { StepRetry } from "./step.ts";
 
-/** A planned run, by what names it in its plan: its area, and main's attempt or the known-bad tree. */
 const RunRef = Schema.TaggedUnion({
   OnKnownBad: { area: AreaName, tree: CommitSha },
   OnMain: { area: AreaName, attempt: Schema.Int },
@@ -47,7 +26,6 @@ const RunRef = Schema.TaggedUnion({
 
 type RunRef = typeof RunRef.Type;
 
-/** What the plan step records: the main every run checks out, and each run by reference. */
 const Outline = Schema.Struct({
   main: LandedSha,
   runs: Schema.Array(RunRef),
@@ -55,7 +33,6 @@ const Outline = Schema.Struct({
 
 type Outline = typeof Outline.Type;
 
-/** What one run's step records: its area bits, or that its plan is gone (the head moved on). */
 const Ran = Schema.TaggedUnion({
   Bits: { areas: Schema.Array(HeldBackResult) },
   Gone: {},
@@ -63,30 +40,25 @@ const Ran = Schema.TaggedUnion({
 
 type Ran = typeof Ran.Type;
 
-/** How a run step retries a Checker that could not run, before the push is left unjudged. */
 const admissionRetry: StepRetry = {
   backoff: "exponential",
   delayMs: 10_000,
   limit: 3,
 };
 
-/** How many runs go to the Checker at once. */
 const RUNS_AT_ONCE = 4;
 
-/** A planned run, by reference: no job, so no file. */
 const refOf = (run: AdmissionRun): RunRef =>
   AdmissionRun.guards.OnMain(run)
     ? RunRef.cases.OnMain.make({ area: run.area, attempt: run.attempt })
     : RunRef.cases.OnKnownBad.make({ area: run.area, tree: run.tree });
 
-/** A run's step name, and its identity within its plan. */
 const nameOf = (ref: RunRef) =>
   RunRef.match(ref, {
     OnKnownBad: ({ area, tree }) => `admission:${area}:known-bad:${tree}`,
     OnMain: ({ area, attempt }) => `admission:${area}:main#${attempt}`,
   });
 
-/** One admission of a layer push, carried from its plan to its judgement. */
 export const admissionSteps = (
   params: AdmissionParams
 ): Effect.Effect<void, never, CheckRunner | Projects | StepRunner> =>
@@ -95,7 +67,6 @@ export const admissionSteps = (
     const runner = yield* CheckRunner;
     const projects = yield* Projects;
 
-    /** The project's plan as it stands now; none once nothing waits to be admitted. */
     const planNow = projects.get(params.project).pipe(
       Effect.flatMap((api) =>
         api.admissionPlan({ head: params.head, layer: params.layer })
@@ -124,7 +95,6 @@ export const admissionSteps = (
 
     const { main } = outline.value;
 
-    /** One planned run, in the Checker: the plan asked for again, and the job it names run on main. */
     const runOne = (ref: RunRef) =>
       step(
         nameOf(ref),

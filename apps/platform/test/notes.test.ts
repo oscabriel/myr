@@ -73,7 +73,6 @@ const main = RefName.make("refs/heads/main");
 
 const unit = LaneName.make("unit");
 
-/** The verdict the checks gave on `head`: refused, its `unit` lane red. */
 const refusedOn = (head: CommitSha) =>
   Verdict.make({
     ask: AskId.make("fix-week"),
@@ -106,7 +105,6 @@ const refusedOn = (head: CommitSha) =>
     verifier: "platform",
   });
 
-/** A later verdict on `head`: its checks passed, and it landed. */
 const landedOn = (head: CommitSha) =>
   Verdict.make({
     ...refusedOn(head),
@@ -127,7 +125,6 @@ const landedOn = (head: CommitSha) =>
 
 const encoded = Schema.encodeEffect(Verdict);
 
-/** A note's text read back as a verdict, encoded again, to compare with what was written. */
 const asVerdict = (note: Option.Option<string>) =>
   Effect.option(
     Schema.decodeEffect(Schema.fromJsonString(Verdict))(
@@ -135,7 +132,6 @@ const asVerdict = (note: Option.Option<string>) =>
     ).pipe(Effect.flatMap(encoded))
   );
 
-/** Real `git http-backend` over the bare repos in `root`, on a local port: its origin. */
 const served = (root: string) =>
   Effect.gen(function* () {
     const node = yield* Effect.context<NodeServices.NodeServices>();
@@ -163,17 +159,11 @@ const served = (root: string) =>
       : yield* Effect.die("the test server listens on a socket, not a port");
   });
 
-/** What a test of the notes works with: the store, and a folder for clones. */
 interface DiskWorld {
   readonly host: RepoHost["Service"];
   readonly work: string;
 }
 
-/**
- * Bare repos on local disk (`RepoHost` `/local`), served by real `git
- * http-backend`, as the core loop's world serves them: what the platform writes
- * through the port, git reads from the remote.
- */
 const diskWorld: Effect.Effect<
   DiskWorld,
   never,
@@ -192,10 +182,6 @@ const diskWorld: Effect.Effect<
   return { host: Context.get(hosts, RepoHost), work };
 });
 
-/**
- * The fork, made with two commits on its main, each an answer's head: the
- * answerer pushed `first`, then `second` on top of it.
- */
 const forkWithTwoHeads = (host: RepoHost["Service"]) =>
   Effect.gen(function* () {
     const client = yield* gitClient(memoryFs());
@@ -221,17 +207,11 @@ const forkWithTwoHeads = (host: RepoHost["Service"]) =>
     return { first, second };
   });
 
-/** `verdict` written as the note on `head` in the fork, through the disk's store. */
 const write = (disk: DiskWorld, head: CommitSha, verdict: Verdict) =>
   writeVerdictNote({ fork, head, verdict }).pipe(
     Effect.provideService(RepoHost, disk.host)
   );
 
-/**
- * The disk's store, whose first `stale` listings of a repo's refs show no
- * notes ref, as a listing made just before another write moved it would;
- * every push it takes is counted.
- */
 const movedUnder = (disk: DiskWorld, stale: number) =>
   Effect.gen(function* () {
     const listings = yield* Ref.make(0);
@@ -258,11 +238,6 @@ const movedUnder = (disk: DiskWorld, stale: number) =>
     return { host, pushes: Ref.get(pushes) };
   });
 
-/**
- * The disk's store, whose pushes go over git smart HTTP to the repo's
- * remote, as `RepoHost` `/binding` pushes to Artifacts: the push sends
- * every object its source holds that the remote's refs do not reach.
- */
 const overSmartHttp = (disk: DiskWorld) =>
   RepoHost.of({
     ...disk.host,
@@ -277,7 +252,6 @@ const overSmartHttp = (disk: DiskWorld) =>
       ),
   });
 
-/** The disk's store, keeping the updates of every push it takes, in order. */
 const recordingPushes = (disk: DiskWorld) =>
   Effect.map(Ref.make<readonly (readonly RefUpdate[])[]>([]), (pushed) => ({
     host: RepoHost.of({
@@ -291,17 +265,11 @@ const recordingPushes = (disk: DiskWorld) =>
     pushed: Ref.get(pushed),
   }));
 
-/** Where the fork's notes ref stands, through the port. */
 const notesTip = (host: RepoHost["Service"]) =>
   Effect.map(host.refs(fork).pipe(Effect.orDie), (refs) =>
     Option.fromNullishOr(refs.get(notesRef))
   );
 
-/**
- * A clone of the fork in `work/<name>`, made the first time, then the
- * answerer's read with nothing but git: fetch the notes ref and show the
- * note on `head`. `None` when git shows none.
- */
 const noteInClone = (disk: DiskWorld, name: string, head: CommitSha) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -534,10 +502,6 @@ describe(writeVerdictNote, () => {
   );
 });
 
-/**
- * The note on `head` in bob's fork, read through the port as plain git
- * finds it: the notes ref's tip, that commit's parents, and the note's text.
- */
 const noteOnBobsFork = (head: CommitSha) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -571,11 +535,6 @@ const noteOnBobsFork = (head: CommitSha) =>
     });
   });
 
-/**
- * The world's store, each push to the fork's notes ref counted; with
- * `refuse`, every such push fails as a store that lost the fork would; with
- * `busy`, that many first ones find the fork busy with another push.
- */
 const countingNotes = (
   options: { readonly busy?: number; readonly refuse?: boolean } = {}
 ) =>
@@ -605,12 +564,10 @@ const countingNotes = (
     return { counted, pushes: Ref.get(pushes) };
   });
 
-/** Steps over a fresh in-memory record, as a new run of the Workflow instance has. */
 const freshSteps = Effect.flatMap(memoSteps(), (memo) =>
   Layer.build(logged(memo))
 );
 
-/** Every lane on the merged tree green but `unit`, which fails in the file the answer changed. */
 const unitFails = (answer: Admitted) =>
   Effect.gen(function* () {
     yield* scriptProjectLanes(answer.merged, { result: "passed" });
@@ -632,7 +589,6 @@ const unitFails = (answer: Admitted) =>
     );
   });
 
-/** Every lane on the merged tree green. */
 const allGreen = (answer: Admitted) =>
   Effect.andThen(
     scriptProjectLanes(answer.merged, { result: "passed" }),
@@ -641,7 +597,6 @@ const allGreen = (answer: Admitted) =>
     )
   );
 
-/** The answer's run, over `steps`, its store `host`. */
 const runOver = (
   answer: Admitted,
   steps: Context.Context<StepRunner | StepLog>,
@@ -652,7 +607,6 @@ const runOver = (
     Effect.provideService(RepoHost, host)
   );
 
-/** The note `noted` holds, as a verdict encoded again. */
 const noteIn = (
   noted: Option.Option<{ readonly note: Option.Option<string> }>
 ) => asVerdict(Option.flatMap(noted, ({ note }) => note));
@@ -696,7 +650,6 @@ describe(runAnswer, () => {
         const outcome = yield* runOver(answer, steps, counted);
         const noted = yield* noteOnBobsFork(answer.head);
 
-        // The engine replays the run from its records, the note's step too.
         expect(yield* runOver(answer, steps, counted)).toStrictEqual(outcome);
         expect(yield* pushes).toBe(1);
         expect(
@@ -705,7 +658,6 @@ describe(runAnswer, () => {
           )).filter((name) => name.startsWith("notes:"))
         ).toStrictEqual(["notes:Refused", "notes:Refused"]);
 
-        // A restarted run starts over a fresh record of steps.
         const restarted = yield* runOver(answer, yield* freshSteps, counted);
 
         expect({

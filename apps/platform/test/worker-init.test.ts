@@ -1,10 +1,3 @@
-/**
- * The Worker as Cloudflare starts it, in Node: `src/worker.ts` imported
- * through the `cloudflare:workers` shim, whose env is `fakeEnv()` (every
- * binding a fake that throws if touched; `PROJECT` a namespace of DOs that
- * hold no project). Then the ports `workerPorts` composes from a decoded
- * env, each over a fake of the binding it is built on.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Fetch } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
@@ -53,17 +46,10 @@ import {
   tokenRequest,
 } from "./oauth.fixtures.ts";
 
-/**
- * What the shim's `PROJECT` was sent while `src/worker.ts` loaded, read
- * before any test runs: importing the module built its handler, and any
- * other binding it read would have thrown there.
- */
 const sentWhileLoading = [...callsTo(env.PROJECT)];
 
-/** A Worker's context, which nothing here needs. */
 const context = untouchable<ExecutionContext>("ExecutionContext");
 
-/** The Worker module's own fetch, as Cloudflare calls it, with the shim's env. */
 const workerFetch = (request: Request) =>
   Promise.resolve(worker.fetch(request, env, context));
 
@@ -75,7 +61,6 @@ const canonical = RepoName.make("alice__datekit");
 
 const landed = LandedSha.make("7".repeat(40));
 
-/** A land of a commit the answer already made, onto canonical `main`. */
 const landJob: LandJob = {
   author: Handle.make("alice"),
   main: LandedSha.make("4".repeat(40)),
@@ -87,14 +72,8 @@ const landJob: LandJob = {
   verdict: Option.none(),
 };
 
-/** Where the fake Artifacts binding says each repo's git lives. */
 const artifactsBase = "https://artifacts.test";
 
-/**
- * The global `fetch`, for the test's length, as a stub that notes each URL
- * it is asked for and answers 503: the Worker's `Fetch` port goes through
- * it, so nothing here reaches a network.
- */
 const fetchedUrls = Effect.acquireRelease(
   Effect.sync(() => {
     const urls: string[] = [];
@@ -110,11 +89,6 @@ const fetchedUrls = Effect.acquireRelease(
   () => Effect.sync(() => vi.unstubAllGlobals())
 );
 
-/**
- * The sandbox Worker's entrypoint as the `SANDBOX` binding reaches it: a
- * land answers `landed`, and each land's request id is noted; anything
- * else read from it throws.
- */
 const fakeSandbox = () => {
   const lands: string[] = [];
 
@@ -131,12 +105,6 @@ const fakeSandbox = () => {
   return { lands, sandbox };
 };
 
-/**
- * One land through the ports `workerPorts` composes for `LANDER_ADAPTER`,
- * over a fake Artifacts binding that holds the canonical repo and a fake
- * sandbox: what the land came to, which lands the sandbox was sent, and
- * which URLs the Worker fetched.
- */
 const landThrough = (adapter: "container" | "isogit") =>
   Effect.gen(function* () {
     const urls = yield* fetchedUrls;
@@ -166,12 +134,10 @@ const landThrough = (adapter: "container" | "isogit") =>
     return { fetched: [...urls], lands: [...lands], outcome };
   });
 
-/** What `/health` answers. */
 const Health = Schema.fromJsonString(
   Schema.Struct({ ok: Schema.Boolean, stage: Schema.String })
 );
 
-/** A response's body, decoded by `schema`; one that won't decode is the test's defect. */
 const bodyOf =
   <A>(schema: Schema.Codec<A, string>) =>
   (response: Response) =>
@@ -302,33 +268,21 @@ describe("the Worker's ports", () => {
   );
 });
 
-/** A sign-in page's text, beside its response. */
 const pageOf = (response: Response) =>
   Effect.map(
     Effect.promise(() => response.text()),
     (html) => ({ html, response })
   );
 
-/** What `/token` answers, as far as a client reads it. */
 const AccessToken = Schema.fromJsonString(
   Schema.Struct({ access_token: Schema.String })
 );
 
-/** The sign-in form `page` carries; the test dies if it carries none. */
 const formIn = (
   page: { readonly html: string; readonly response: Response },
   cookie?: string
 ) => Effect.orDie(Effect.fromOption(formOf(page.response, page.html, cookie)));
 
-/**
- * The platform as `worker.ts` puts it together, OAuth and sign-in in front,
- * over the fake env with its `OAUTH_KV` in memory and a Project DO for
- * datekit (accounts in memory too), and an access token for a new account
- * `handle`, by the CLI's PKCE flow: sign up from the sign-in page, then
- * trade the code for a token. The global `fetch` answers the client
- * metadata document from the Worker itself, as the public internet does on
- * Cloudflare.
- */
 const signedUp = (handle: string, password: string) =>
   Effect.gen(function* () {
     const store = OAuthStoreMemory.make();
@@ -347,7 +301,6 @@ const signedUp = (handle: string, password: string) =>
       Layer.mergeAll(
         AccountsMemory.layer,
         Layer.succeed(OAuthStore, store),
-        // No Google client in the fake env: Google sign-in touches neither.
         IdentitiesMemory.layer,
         Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch")),
         SignInAttemptsMemory.layer,
@@ -453,7 +406,6 @@ describe("the Worker's sessions", () => {
         "correct horse battery"
       );
 
-      // The same user and grant, another secret: the provider knows no such token.
       const forged = [...accessToken.split(":").slice(0, 2), "forged"].join(
         ":"
       );

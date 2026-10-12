@@ -1,9 +1,3 @@
-/**
- * The visibility cartridge as the platform plugs it in: over the
- * stage's ports, built from the decoded env without touching a binding, and
- * reaching the private namespace through `ARTIFACTS_PRIVATE` alone. These
- * tests live in the cartridge and go with it.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Fetch } from "@repo/artifacts/fetch";
 import { RepoHost } from "@repo/artifacts/repo-host";
@@ -19,13 +13,10 @@ import { workerPorts } from "../../src/ports.ts";
 import { layerRepos } from "../../src/visibility/layer-repos.ts";
 import { fakeEnv } from "../fake-env.ts";
 
-/** Where each fake binding says its repos' git lives. */
 const remoteBase = "https://artifacts.test";
 
-/** A repo host of its own, empty. */
 const freshHost = Effect.provide(Effect.service(RepoHost), RepoHostMemory);
 
-/** A `Fetch` that nothing here may call. */
 const noFetch = Layer.succeed(Fetch, untouchable<Fetch["Service"]>("Fetch"));
 
 describe("the visibility cartridge, plugged in", () => {

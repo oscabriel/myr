@@ -14,7 +14,6 @@ import { rpcClient, served, toolCall } from "./harness.ts";
 
 const project = ProjectName.make("alice/datekit");
 
-/** What building the platform from `env` failed with. */
 const failureOf = (env: Env) => Effect.flip(Layer.build(platform(env)));
 
 describe("the platform Worker's env", () => {
@@ -31,7 +30,6 @@ describe("the platform Worker's env", () => {
       expect(yield* operator.listProjects({})).toStrictEqual({
         projects: [],
       });
-      // The projects come from the front page's projection in D1.
       expect(prepared).toHaveLength(1);
     })
   );
@@ -70,8 +68,6 @@ describe("the platform Worker's env", () => {
     })
   );
 
-  // Layer repos live in a namespace of their own, which only
-  // this Worker binds.
   it.effect("fails to start without the private namespace", () =>
     Effect.gen(function* () {
       const failure = yield* failureOf(without(fakeEnv(), "ARTIFACTS_PRIVATE"));
@@ -114,7 +110,6 @@ describe("the platform Worker's env", () => {
       const { MASTER_KEY } = yield* decodeEnv(fakeEnv());
 
       expect(Redacted.isRedacted(MASTER_KEY)).toBeTruthy();
-      // A redacted value prints as its `toString`, never as the value.
       expect(JSON.stringify({ MASTER_KEY })).toBe(
         '{"MASTER_KEY":"<redacted>"}'
       );
@@ -223,8 +218,6 @@ describe("the platform Worker's env", () => {
     Effect.gen(function* () {
       const { fetch } = yield* served(platform(fakeEnv()));
 
-      // A name the platform never makes: the gateway answers
-      // before any port, and nobody is asked to sign in.
       const response = yield* fetch(
         new Request(
           "http://localhost/alice/datekit--layer--alice.git/info/refs?service=git-upload-pack"

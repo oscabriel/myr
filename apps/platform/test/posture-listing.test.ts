@@ -1,12 +1,3 @@
-/**
- * `listProjects` as the platform's handlers answer it: the projection lists
- * each project, and each listed project's posture is the one its own
- * ledger stands at now, so the badge and the ledger say the same. The
- * projection here lists datekit as `open`, the row D1 holds for a project
- * whose first config declared sealed checks (that config writes no
- * `PostureChanged` row); datekit's ledger stands sealed. A project the
- * platform never made keeps the posture the projection listed.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { EvidenceStoreMemory } from "@repo/checks/evidence-store/memory";
@@ -33,10 +24,6 @@ const datekit = ProjectName.make("alice/datekit");
 
 const ghost = ProjectName.make("alice/ghost");
 
-/**
- * datekit's project, whose only answered read is the posture its ledger
- * shows, standing sealed; each read counted in `reads`.
- */
 const datekitApi = (reads: Ref.Ref<number>) =>
   untouchable<ProjectApi>("ProjectApi", {
     standing: () =>
@@ -49,7 +36,6 @@ const datekitApi = (reads: Ref.Ref<number>) =>
       ),
   });
 
-/** The handlers over projects whose datekit counts its reads in `reads`. */
 const platformCounting = (reads: Ref.Ref<number>) =>
   Handlers.pipe(
     Layer.provide([

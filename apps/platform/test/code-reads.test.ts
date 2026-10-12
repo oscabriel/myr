@@ -1,10 +1,3 @@
-/**
- * The code reads over `/rpc`, as anyone not signed in calls them: datekit's
- * refs, a folder, a file, the log and a commit's changes, read from its
- * canonical repo only. No code read's payload names a repo, so a caller
- * cannot point one at a fork: an extra `repo` key is dropped or refused,
- * and the canonical repo is read either way.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Contracts } from "@repo/protocol/contracts";
 import { RepoName, RepoPath } from "@repo/protocol/ids";
@@ -24,7 +17,6 @@ const datekit = aProject({ people: ["bob"] }).pipe(
 
 const { project } = datekit;
 
-/** The platform over datekit's world, seeded: made, pushed to, its ask open. */
 const platform = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -43,7 +35,6 @@ const platform = Effect.gen(function* () {
   );
 });
 
-/** The contracts that read a project's code. */
 const codeReads = [
   "listRefs",
   "readTree",
@@ -54,7 +45,6 @@ const codeReads = [
   "why",
 ];
 
-/** Every field of a payload, nested ones included: its name and its type's AST. */
 const fieldsIn = (
   ast: SchemaAST.AST
 ): readonly (readonly [string, SchemaAST.AST])[] => {
@@ -121,8 +111,6 @@ describe("the code reads over /rpc", () => {
       Effect.gen(function* () {
         const { handler } = yield* platform;
 
-        // The wire's request, written as a client would send it, with a
-        // `repo` beside the project that no contract has.
         const payload = JSON.stringify({
           project,
           repo: "alice__datekit--me--alice",
@@ -164,7 +152,6 @@ describe("the code reads over /rpc", () => {
     expect(
       rpcs.flatMap(([tag, rpc]) => (rpc === undefined ? [tag] : []))
     ).toStrictEqual([]);
-    // The check sees a branded field: `readFile`'s path is a `RepoPath`.
     expect(
       fields.some(
         ([tag, name, type]) =>

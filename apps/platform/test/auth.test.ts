@@ -40,10 +40,6 @@ const metadataUrl = `${origin}/.well-known/oauth-protected-resource`;
 
 const isPerson = Schema.is(Person);
 
-/**
- * The platform before any project exists, except that `listAsks` and
- * `status` answer, each noting who called it in `seen`.
- */
 const noting = (seen: Ref.Ref<readonly Principal[]>) => {
   const note = Effect.flatMap(Effect.service(CurrentPrincipal), (principal) =>
     Ref.update(seen, (principals) => [...principals, principal])
@@ -68,7 +64,6 @@ const noting = (seen: Ref.Ref<readonly Principal[]>) => {
   );
 };
 
-/** Sessions that count every token they are asked to verify. */
 const counting = Effect.gen(function* () {
   const verified = yield* Ref.make(0);
 
@@ -88,7 +83,6 @@ const counting = Effect.gen(function* () {
   return { layer, verified };
 });
 
-/** The challenge a 401 carries, and its status. */
 const challengeOf = (response: Response) => ({
   challenge: response.headers.get("www-authenticate"),
   status: response.status,
@@ -144,8 +138,6 @@ describe("discovering how to sign in", () => {
       })
   );
 
-  // The gateway answers git's paths itself: an unknown credential there is
-  // its 401, with git's Basic challenge, never this one.
   it.effect(
     "leaves git's paths to the gateway, whatever credential they carry",
     () =>
@@ -270,8 +262,6 @@ describe("the 401", () => {
       })
   );
 
-  // RFC 6750 §3.1: a credential of another scheme is not an invalid bearer
-  // token, so the challenge carries no error code.
   it.effect(
     "turns away an RPC call whose credential is not a bearer token, with no error code",
     () =>
@@ -296,8 +286,6 @@ describe("the 401", () => {
       })
   );
 
-  // The router matches `/mcp` however its path is spelled, so the 401 must
-  // hold wherever the router sends a request to MCP.
   it.effect("asks for a credential however MCP's path is spelled", () =>
     Effect.gen(function* () {
       const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));
@@ -341,9 +329,6 @@ describe("the 401", () => {
           )
         );
 
-        // An RPC message may carry headers of its own (here, alice's token,
-        // encoded as the wire carries it); only the HTTP request's
-        // credential says who is calling.
         const message = `{"_tag":"Request","id":"1","tag":"status","payload":{},"headers":[["authorization","Bearer ${aliceToken}"]]}`;
 
         const status = (headers: Readonly<Record<string, string>>) =>

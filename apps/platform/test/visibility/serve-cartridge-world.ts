@@ -1,36 +1,5 @@
-/**
- * The core loop's world (`../world.ts`) with the visibility cartridge
- * plugged in as the Worker plugs it, as a process of its own that keeps
- * what it served: `bun apps/platform/test/visibility/serve-cartridge-world.ts`
- * prints one JSON line, `{"origin":"http://127.0.0.1:<port>","kept":"http://127.0.0.1:<port>"}`,
- * once it serves, and serves until its stdin ends (the process that started
- * it closed it, or died).
- *
- * - `origin` is the platform's fetch handler, as `../serve-world.ts` serves
- *   it; every body it answers with JSON or an event stream (the contracts'
- *   at `/rpc`, MCP's at `/mcp`) is kept as it went out.
- * - `kept` is a test's window on the world: `POST /settle` carries every
- *   queued answer run (`world.settle`), and `GET /kept?project=<name>`
- *   answers, as JSON, every body kept, every line logged (the handler's and
- *   each Project DO's, with their annotations), every job the Checker was
- *   given, and the project's Durable Object store as its rows encode: its
- *   `env_values` and ledger rows and its event log.
- *
- * The cartridge is the Worker's (`../../src/visibility/live.ts`) for the
- * world's stage, over the fake env's test `MASTER_KEY`, with the world's
- * second store of bare repos as the private namespace; each Project DO
- * gets its project state and its env. The Checker keeps each job and fails
- * every lane the same way, so an ask's check is red first and an answer's
- * checks run (and fail): what a job carries is what a test reads. Beside
- * dora, alice and bob, the people in `WORLD_SESSIONS` (a JSON object from
- * token to handle, as `SESSION_TOKENS` is) may call.
- *
- * A process, not an import: apps never import apps, and the CLI's
- * end-to-end `env set` test runs it. It lives in the cartridge
- * and goes with it. The Worker's modules import `cloudflare:workers`, which
- * `../world-process.ts` serves from the shim before this file loads them,
- * as it does for `../serve-world.ts`.
- */
+// Run as a process: prints `{"origin":…,"kept":…}` once it serves, and serves until
+// its stdin ends.
 import { NodeRuntime, NodeServices } from "@effect/platform-node";
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { CheckJob, CheckRunner } from "@repo/checks/check-runner";
@@ -56,10 +25,6 @@ import {
 import { shimWorkers, worldSessions } from "../world-process.ts";
 import type { PlugIn } from "../world.ts";
 
-/**
- * The Checker: each job kept as it came, and every lane failed the same
- * way, a count lane printing nothing.
- */
 const keepingChecker = (jobs: CheckJob[]): Layer.Layer<CheckRunner> =>
   Layer.succeed(
     CheckRunner,
@@ -89,11 +54,6 @@ const keepingChecker = (jobs: CheckJob[]): Layer.Layer<CheckRunner> =>
     })
   );
 
-/**
- * Each job as the Checker got it, encoded by its fields alone: without
- * `CheckJob`'s rule that only landed code carries values, so a job that
- * breaks the rule still shows, values and all, for a test to refuse.
- */
 const encodeJobs = Schema.encodeEffect(
   Schema.Array(Schema.Struct(CheckJob.fields))
 );
@@ -106,11 +66,6 @@ const encodeStore = Schema.encodeEffect(
   })
 );
 
-/**
- * Whether a response is a contract's or a tool's reply: JSON, or an MCP
- * event stream. Git's packs and adverts are not, and neither is NDJSON,
- * which only a framed `watch` gets and which never ends while it follows.
- */
 const isReply = (response: Response) => {
   const type = response.headers.get("content-type") ?? "";
 
@@ -144,15 +99,9 @@ const serve = Effect.gen(function* () {
     ])
   );
 
-  /** The world's stage config, the second store standing in for the private namespace. */
   const configOver = (aside: RepoHost["Service"]) =>
     decodeEnv(withPrivateNamespace(fakeEnv(), aside)).pipe(Effect.orDie);
 
-  /**
-   * The cartridge as the Worker plugs it: whole over the Worker's ports, and
-   * the project service's part of it (its visibility state and its env)
-   * over each Project DO's, which reach no other DO.
-   */
   const plugIn = (aside: RepoHost["Service"]): PlugIn => ({
     project: Layer.unwrap(
       Effect.map(configOver(aside), (config) =>
@@ -164,10 +113,8 @@ const serve = Effect.gen(function* () {
 
   const jobs: CheckJob[] = [];
   const bodies: string[] = [];
-  // What the Project DOs and everything else in this process logged.
   const lines: string[] = [];
 
-  // Each line as its message and its annotations, both JSON.
   const keeper = Logger.make(({ fiber, message }) => {
     const annotations = fiber.getRef(References.CurrentLogAnnotations);
 
@@ -192,7 +139,6 @@ const serve = Effect.gen(function* () {
     })
   );
 
-  /** What the world kept, for `project`'s store. */
   const keptFor = (project: ProjectName) =>
     Effect.gen(function* () {
       const logged = yield* world.logged;

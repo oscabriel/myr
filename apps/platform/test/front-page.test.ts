@@ -1,16 +1,3 @@
-/**
- * The project list and a person's credits as the platform serves them, over
- * a Node platform world: the platform's fetch handler composed as the
- * Worker composes it (`platformOn`), on the ports `workerPorts` gives it,
- * each a Node adapter. The front page and its projection are the D1
- * cartridge (`FrontPageD1`, `ProjectionD1`) over sqlite-node with the
- * platform's D1 migrations applied from their files; each project is a
- * project service in memory (`ProjectsMemory`) whose outbox feeds that
- * projection; the Lander is the `/isogit` one over `RepoHostMemory`; and the
- * Checker fails every lane on a commit of main (an ask's check, red first)
- * and passes every lane on an answer's merged tree. The world's `Projects`
- * counts every call, so a test shows which reads never reach a project.
- */
 import { NodeServices } from "@effect/platform-node";
 import { SqliteClient } from "@effect/sql-sqlite-node";
 import { describe, expect, it } from "@effect/vitest";
@@ -54,7 +41,6 @@ import { fakeEnv } from "./fake-env.ts";
 import { seeded } from "./handlers.fixtures.ts";
 import { rpcClient } from "./harness.ts";
 
-/** datekit: alice decides and asks; bob is vouched for. */
 const datekit = aProject({ people: ["bob"] }).pipe(
   withVouches(["bob"]),
   withAsk({ id: "parse-iso", territory: "packages/parser" }),
@@ -71,12 +57,7 @@ const alice = Handle.make("alice");
 
 const noon = "2026-10-07T12:00:00Z";
 
-/**
- * The platform's D1 database: every migration in its own folder, in
- * file-name order as `wrangler d1 migrations apply` runs them, statement by
- * statement. Comment lines go before the split: a comment may hold a `;`
- * (`0002_accounts.sql`'s does).
- */
+// Comment lines go before the split: a comment may hold a `;`.
 const migrated = Layer.effectDiscard(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -113,10 +94,6 @@ const migrated = Layer.effectDiscard(
   Layer.orDie
 );
 
-/**
- * An ask's check fails on a commit of main, every time the same way, and
- * every lane passes on an answer's merged tree.
- */
 const redOnMainGreenOnAnswers = Layer.succeed(
   CheckRunner,
   CheckRunner.of({
@@ -140,7 +117,6 @@ const redOnMainGreenOnAnswers = Layer.succeed(
   })
 );
 
-/** At any commit, datekit's policy, holding the asks whose files the commit has. */
 const rules = Layer.effect(
   RulesEvaluator,
   Effect.gen(function* () {
@@ -160,23 +136,16 @@ const rules = Layer.effect(
   })
 ).pipe(Layer.provide(FinishersFromChecks));
 
-/** The world a front-page test drives. */
 interface FrontPageWorld {
-  /** Every call the platform made to a project through `Projects`, in order. */
   readonly calls: Effect.Effect<readonly string[]>;
-  /** Forgets the calls made so far. */
   readonly forget: Effect.Effect<void>;
-  /** A client of the contracts over HTTP at `/rpc`, as anyone. */
   readonly anyone: Client["Service"];
-  /** bob's answer to `parse-iso` landed, as his claim, push and submission make it. */
   readonly landAnswer: Effect.Effect<void>;
-  /** quietkit made and first pushed, and nothing else: no ask, no policy evaluated. */
   readonly makeQuiet: Effect.Effect<void>;
 }
 
 const frontPageWorld: Effect.Effect<FrontPageWorld, never, Scope.Scope> =
   Effect.gen(function* () {
-    // Every port but `Projects`, built once: the Worker's and each project's.
     const base = yield* Layer.build(
       Layer.mergeAll(
         AlarmsMemory,
@@ -321,7 +290,6 @@ describe("the project list and credits over the platform's /rpc", () => {
               { area: "parser", count: 1, project, role: "Signed-off-by" },
             ],
           },
-          // The list's one read: datekit's posture, from its ledger.
           calls: [`get ${project}`],
           listed: {
             projects: [
@@ -332,8 +300,6 @@ describe("the project list and credits over the platform's /rpc", () => {
 
         yield* world.forget;
 
-        // The posture read is kept in D1 beside the projection: the next
-        // list asks no project.
         expect(yield* world.anyone.listProjects({})).toStrictEqual(listed);
         expect(yield* world.calls).toStrictEqual([]);
       }).pipe(Effect.scoped)

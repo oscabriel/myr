@@ -58,14 +58,12 @@ import type { WorldOptions } from "./handlers.fixtures.ts";
 
 const people = ["bob", "carol"];
 
-/** datekit: alice decides; bob and carol are vouched for. */
 const datekit = aProject({ people }).pipe(
   withVouches(people),
   withAsk({ id: "parse-iso", territory: "packages/parser" }),
   withAsk({ id: "trim-input", territory: "packages/trim" })
 );
 
-/** burrow: alice decides here too; one ask of its own. */
 const burrow = aProject({ name: "alice/burrow", people }).pipe(
   withVouches(people),
   withAsk({ id: "lex-tokens", territory: "packages/lexer" })
@@ -79,28 +77,21 @@ const lexTokens = AskId.make("lex-tokens");
 
 const nowhere = ProjectName.make("alice/nowhere");
 
-/**
- * Both projects as the projection lists them, and one it lists that the
- * platform never made, which a call across projects passes over.
- */
 const listed: FrontPageSeed["projects"] = [
   { openAsks: 2, posture: "open", project: datekit.project },
   { openAsks: 1, posture: "open", project: burrow.project },
   { openAsks: 0, posture: "open", project: nowhere },
 ];
 
-/** The handlers over both projects' world. */
 const platform = (options: WorldOptions = {}) =>
   Handlers.pipe(Layer.provideMerge(worldOf([datekit, burrow], options)));
 
-/** Both projects made, at the scenarios' noon. */
 const made = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
   yield* seeded(datekit);
   yield* seeded(burrow);
 });
 
-/** A call made while serving an HTTP request that reached the platform at `url`. */
 const reachedAt =
   (url: string) =>
   <A, E, R>(call: Effect.Effect<A, E, R>) =>
@@ -110,7 +101,6 @@ const reachedAt =
       HttpServerRequest.fromWeb(new Request(url, { method: "POST" }))
     );
 
-/** The open decision on `proposal` among a Today's; none fails the test. */
 const decisionOn = (
   decisions: readonly Decision[],
   proposal: Pick<Proposal, "id">
@@ -180,8 +170,6 @@ describe("project reads", () => {
           bob.watch({ project: datekit.project, since: 1 })
         );
 
-        // The adoption lands first; then each ask's opening lands, so each
-        // is heard opened, then landed.
         expect(all.map(({ _tag }) => _tag)).toStrictEqual([
           "Landed",
           "AskOpened",
@@ -203,8 +191,6 @@ describe("project reads", () => {
       const api = yield* (yield* Projects).get(datekit.project);
       const bobs = Person.make({ handle: Handle.make("bob") });
 
-      // 60 claims, each released: 120 events after datekit's adoption
-      // landed and its two asks opened, each heard opened and landed.
       yield* Effect.forEach(
         Array.range(1, 60),
         () =>
@@ -304,7 +290,6 @@ describe("claims", () => {
           alice.claim({ ask: trimInput, project: datekit.project })
         );
 
-        // alice's refused claim never reached datekit, so trim-input is free.
         const bobs = yield* bob.claim({
           ask: trimInput,
           project: datekit.project,
@@ -409,8 +394,6 @@ describe("calls that name no project", () => {
         const bob = yield* as("bob");
         const carol = yield* as("carol");
 
-        // bob is new in both projects; datekit's second proposal opens
-        // before burrow's, so it expires first.
         yield* bob.claim({ ask: parseIso, project: datekit.project });
         yield* bob.claim({ ask: lexTokens, project: burrow.project });
 
@@ -456,7 +439,6 @@ describe("calls that name no project", () => {
           overflow: today.overflow,
           unattended: today.unattended,
         }).toStrictEqual({
-          // Five decisions a day in each project; one spent in datekit.
           budget: { finishes: 0, total: 10, used: 1 },
           decider: "alice",
           decisions: [
@@ -552,8 +534,6 @@ describe("reads across projects", () => {
     "come from the front-page projection, and a project the platform never made keeps its listed posture",
     () =>
       Effect.gen(function* () {
-        // No project is made: only the projection answers, so each listed
-        // posture is the projection's own fallback.
         const bob = yield* as("bob");
 
         expect(yield* bob.listProjects({})).toStrictEqual({
@@ -581,7 +561,6 @@ describe("reads across projects", () => {
   );
 });
 
-/** A server side that takes every call as nobody signed in. */
 const anonymous = Layer.succeed(Authenticated, (effect) =>
   Effect.provideService(effect, CurrentPrincipal, Anonymous.make({}))
 );
@@ -621,8 +600,6 @@ describe("each call", () => {
           })
         );
 
-        // The project declares no env item, so none takes a value: a
-        // decider hears the key is unknown, anyone else that deciders set.
         const setPaymentsKey = {
           key: EnvKey.make("PAYMENTS_KEY"),
           project,
@@ -816,10 +793,6 @@ describe("making a project", () => {
   );
 });
 
-/**
- * A rate-limit binding that admits `allowed` calls per key, and keeps every
- * key it was asked about, in order.
- */
 const fakeLimit = (allowed: number) => {
   const keys: string[] = [];
 

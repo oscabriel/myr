@@ -1,12 +1,3 @@
-/**
- * The router's handlers are built at module load, before any request, and
- * the build awaits nothing. Workers cancels a request whose client
- * left without interrupting its fibers, so a build that awaited a request's
- * I/O would leave every later request waiting on it. `buildHandler` builds
- * the router's layer at once or refuses: a layer that awaits a promise or
- * a timer while it is built throws where the handler is made, so the
- * Worker cannot start with one.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { untouchable } from "@repo/testkit/untouchable";
 import { env } from "cloudflare:workers";
@@ -20,15 +11,12 @@ import { serve } from "../src/surfaces.ts";
 import { callsTo, fakeEnv } from "./fake-env.ts";
 import { origin } from "./harness.ts";
 
-/** A Worker's context, which nothing here needs. */
 const context = untouchable<ExecutionContext>("ExecutionContext");
 
-/** One route, `GET /ping`, answering `pong`. */
 const ping = HttpRouter.use((router) =>
   router.add("GET", "/ping", Effect.succeed(HttpServerResponse.text("pong")))
 );
 
-/** `ping`, beside a layer that counts each time it is built. */
 const counted = () => {
   const builds: number[] = [];
 
@@ -40,17 +28,11 @@ const counted = () => {
   return { builds, layer };
 };
 
-/** `ping`, beside a layer that awaits a promise while it is built. */
 const awaiting = Layer.merge(
   ping,
   Layer.effectDiscard(Effect.promise(() => Promise.resolve()))
 );
 
-/**
- * `GET /scheduler`, answering the execution mode of the scheduler its
- * effect runs on, in the context its layer captured while it was built (as
- * `authenticated` does for each credential it verifies).
- */
 const capturing = Layer.unwrap(
   Effect.map(Effect.context(), (built) =>
     HttpRouter.use((router) =>
@@ -117,7 +99,6 @@ describe("the router's build", () => {
   );
 });
 
-/** What `/health` answers. */
 const Health = Schema.fromJsonString(
   Schema.Struct({ ok: Schema.Boolean, stage: Schema.String })
 );
@@ -129,8 +110,6 @@ describe("the Worker's two handlers", () => {
       Effect.gen(function* () {
         const before = callsTo(env.PROJECT).length;
 
-        // Loading runs `serve` and `oauthProvider`, each of which throws if
-        // its build awaited anything: a module that loads has both built.
         const worker = yield* Effect.promise(() => import("../src/worker.ts"));
 
         expect(Object.keys(worker.default)).toStrictEqual(["fetch"]);
@@ -146,8 +125,6 @@ describe("the Worker's two handlers", () => {
 
         const config = yield* decodeEnv(shim).pipe(Effect.orDie);
 
-        // As `worker.ts` composes them: each would throw here if its build
-        // awaited anything, and `fakeEnv`'s bindings throw when touched.
         const platform = serve(platformOf(config));
 
         const { handler } = oauthProvider(signInServices(config), (request) =>

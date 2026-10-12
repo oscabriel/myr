@@ -1,23 +1,3 @@
-/**
- * Admission of held-back checks over the platform's Node world:
- * a maintainer's push to datekit's maintainers layer,
- * through the gateway, starts an admission run of the `Answer`
- * Workflow (tagged `Admission`); its steps ask the project for the plan,
- * run each changed area's checks on main three times and on the known-bad
- * tree the layer's manifest names, and hand the area bits back. An
- * admitted push moves the layer's landed SHA under a new commitment, and
- * a claim opened afterwards is pinned to it; a refused one leaves the
- * suite that was there pinned.
- *
- * The world is the core loop's (`world.ts`) with the cartridge's gateway
- * (`LayerGateLive`) and project state (`ProjectVisibilityLive`) plugged in
- * over a private namespace of its own; admissions are queued instead of
- * started, and the test runs each over the Worker's ports with the steps
- * kept in memory, as the `Answer` Workflow runs one over the engine's. The
- * DO's rules read datekit's visibility config from its `visibility.ts`.
- * The Checker answers lane jobs from a script, and held-back jobs with area
- * bits: green on main, red on the known-bad tree.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import type { RepoHost } from "@repo/artifacts/repo-host";
@@ -61,7 +41,6 @@ const maintainers = LayerName.make("maintainers");
 
 const layerRepo = RepoName.make(`${keyOf(project)}--${maintainers}`);
 
-/** The people: datekit's maker, who decides it and keeps its layer, and two contributors. */
 const tokens = {
   bram: "bram-admission-token-0123456789abcdef",
   "ines-v": "ines-v-admission-token-0123456789abcdef",
@@ -70,7 +49,6 @@ const tokens = {
 
 const sdk = `${Brand.cliPackage}/rules`;
 
-/** datekit as ines-v first pushes it, its visibility config with it. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
     `import { kinds, project } from "${sdk}";`,
@@ -82,7 +60,6 @@ const start = {
     ``,
   ].join("\n"),
   [`${Brand.configDir}/vouched.td`]: "bram\nines-v\nokonkwo\n",
-  // Admission on: three runs green on main, red on one known-bad tree.
   [`${Brand.configDir}/visibility.ts`]: [
     `import { flows, layer, sealedChecks, visibility } from "${sdk}";`,
     ``,
@@ -108,7 +85,6 @@ const start = {
   "src/parser/week.ts": "export const week = (iso: string) => 1;\n",
 };
 
-/** A held-back check, by path: its area and its source. */
 const checkFile = (area: string, name: string, body: string) =>
   [
     `checks/held-back/${area}/${name}.test.ts`,
@@ -123,7 +99,6 @@ const isoWeek = checkFile("parser", "iso-week", "reads week dates");
 
 const ordinal = checkFile("parser", "iso-week", "reads ordinal dates");
 
-/** The layer's files: its checks, and the manifest naming each with its clause and `knownBad`. */
 const layerTree = (
   checks: readonly (readonly [string, string])[],
   knownBad: readonly CommitSha[]
@@ -145,12 +120,10 @@ const layerTree = (
   })}\n`,
 });
 
-/** The public file the known-bad commit breaks: export without its escaping. */
 const unescaped = "src/export/svg.ts";
 
 const redThenGreen = LaneName.make("redThenGreen");
 
-/** An ask on datekit, red first: its file and its check. */
 const askFiles = (ask: AskId) =>
   Array.make(
     {
@@ -172,22 +145,15 @@ const askFiles = (ask: AskId) =>
     }
   );
 
-/**
- * The world: datekit made and landed by ines-v with its visibility config,
- * the cartridge plugged in, the Checker scripted, and every admission the
- * project starts queued for the test.
- */
 const admissionWorld = Effect.gen(function* () {
   const jobs: CheckJob[] = [];
   const script = new Map<string, readonly LaneResult[]>();
   const queued: AdmissionParams[] = [];
   const stores: RepoHost["Service"][] = [];
   const captured: Context.Context<WorkerPorts>[] = [];
-  // How many runs on main each area had, and which of them come back red.
   const mainRuns = new Map<string, number>();
   const redOnMain = new Set<string>();
 
-  /** The area bits of a held-back job: red on the known-bad tree, green on main unless told otherwise. */
   const bitsOf = (part: HeldBackPart): readonly HeldBackResult[] =>
     part.areas.map((area) => {
       const total = part.runs.filter((run) => run.area === area).length;
@@ -281,20 +247,17 @@ const admissionWorld = Effect.gen(function* () {
   const ines = yield* world.person("ines-v");
   const bram = yield* world.person("bram");
 
-  // ines-v makes datekit and lands its first tree, visibility config and all.
   const made = yield* ines.rpc.initProject({ project });
   const home = yield* ines.git.clone(made.remote);
 
   yield* ines.git.commit(home, "Start datekit", start);
   yield* ines.git.ok(home, "push", "--quiet", "origin", "HEAD:main");
 
-  /** One admission, run over the Worker's ports and `steps`, as the Workflow runs it. */
   const admit = (params: AdmissionParams, steps: Layer.Layer<StepRunner>) =>
     admissionSteps(params).pipe(
       Effect.provide(Layer.merge(Layer.succeedContext(ports), steps))
     );
 
-  /** Opens `ask`, red first on main, as ines-v. */
   const openAsk = (ask: AskId) =>
     Effect.gen(function* () {
       const files = askFiles(ask);
@@ -345,8 +308,6 @@ describe("admission of a layer push's held-back checks", () => {
         const layerUrl = `${world.origin}/${project}--maintainers.git`;
         const outside = yield* fs.makeTempDirectoryScoped();
 
-        // The known-bad commit, on a branch of its own in the layer: the
-        // public file it breaks, at main's path.
         const bad = `${outside}/known-bad`;
 
         yield* ines.git.ok(
@@ -369,8 +330,6 @@ describe("admission of a layer push's held-back checks", () => {
           "HEAD:refs/heads/known-bad"
         );
 
-        // The suite: two export checks and one parser check, each citing a
-        // clause, and the known-bad commit named in the manifest.
         const suite = `${outside}/suite`;
 
         yield* ines.git.ok(
@@ -389,7 +348,6 @@ describe("admission of a layer push's held-back checks", () => {
 
         yield* ines.git.ok(suite, "push", "--quiet", layerUrl, "HEAD:main");
 
-        // The push started one admission, of its head, against main as it stands.
         const started = [...queued];
 
         const main = CommitSha.make(
@@ -440,9 +398,6 @@ describe("admission of a layer push's held-back checks", () => {
 
         const rootOf = (area: string) => roots.get(AreaName.make(area));
 
-        // What the Checker was given: each area's checks on main, three
-        // times, and on main with the known-bad file laid over it; no
-        // public lane, no layer repo named.
         const ran = jobs.map((job) => ({
           areas: job.heldBack?.areas,
           at: job.at,
@@ -454,7 +409,6 @@ describe("admission of a layer push's held-back checks", () => {
         const exportFiles = [csvQuote[0], svgTitle[0]];
 
         expect({
-          // In any order: the runs go to the Checker four at a time.
           ran: Array.sort(
             ran.map(({ areas, files }) => JSON.stringify([areas, files])),
             Order.String
@@ -500,7 +454,6 @@ describe("admission of a layer push's held-back checks", () => {
           ],
         });
 
-        // A claim opened now is pinned to the admitted suite.
         const firstAsk = AskId.make("keep-titles");
 
         yield* openAsk(firstAsk);
@@ -510,7 +463,6 @@ describe("admission of a layer push's held-back checks", () => {
           project,
         });
 
-        // The parser check rewritten; this time it is red on its second run on main.
         const second = yield* ines.git.commit(
           suite,
           "Read ordinal dates",
@@ -519,7 +471,6 @@ describe("admission of a layer push's held-back checks", () => {
 
         const jobsBefore = jobs.length;
 
-        // The parser's fifth run on main: the second of this push's three.
         redOnMain.add("parser on main #5");
 
         yield* ines.git.ok(suite, "push", "--quiet", layerUrl, "HEAD:main");
@@ -539,9 +490,6 @@ describe("admission of a layer push's held-back checks", () => {
 
         const after = yield* world.rpc("anonymous").ledger({ project });
 
-        // The first admission run again, over its own steps: it reads
-        // back what it recorded and changes nothing; run afresh, it finds
-        // nothing left to admit.
         yield* admit(
           AdmissionParams.make({ head: first, layer: maintainers, project }),
           steps
@@ -566,7 +514,6 @@ describe("admission of a layer push's held-back checks", () => {
           inesSuite: bramsClaim.suite,
           queued: [first, second],
           replayed: ledger.entries.length,
-          // Only the rewritten area runs again.
           secondRuns: [["parser"], ["parser"], ["parser"], ["parser"]],
         });
       }).pipe(Effect.provide(NodeServices.layer)),

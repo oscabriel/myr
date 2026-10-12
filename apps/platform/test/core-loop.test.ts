@@ -1,12 +1,3 @@
-/**
- * The product's core loop as a decider and two contributors live it,
- * through the platform's own fetch handler
- * with real git: a project made and first pushed, two asks opened red
- * first, claimed, an answer refused out of scope and then landed with its
- * credit, a second answer refused on a stale base, and a replayed request
- * that lands nothing new. Every step goes through a surface: git's output,
- * or a contract over `/rpc`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
@@ -47,17 +38,14 @@ const parseIso = AskId.make("parse-iso");
 
 const parseMonth = AskId.make("parse-month");
 
-/** The lane an ask's `redThenGreen` check runs in. */
 const redThenGreen = LaneName.make("redThenGreen");
 
 const mainRef = "refs/heads/main";
 
-/** Where the config folder's sdk is imported from, as a maintainer writes it. */
 const sdk = `${Brand.cliPackage}/rules`;
 
 const readme = "datekit: dates, parsed\n";
 
-/** The project as dora first pushes it: one source file, the config folder, the vouches. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
     `import { kinds, project } from "${sdk}";`,
@@ -75,7 +63,6 @@ const start = {
     "export const parse = (iso: string) => ({ month: 0, year: 0 });\n",
 };
 
-/** An ask's own files: its file in the config folder, and its check, which asserts. */
 const askFiles = (ask: AskId, want: string, assertion: string) =>
   Array.make(
     {
@@ -117,29 +104,21 @@ const monthFiles = askFiles(
   'expect(parse("2026-10-07").month).toBe(10);'
 );
 
-/** alice's answer to parse-iso: the year, read. */
 const yearRead =
   "export const parse = (iso: string) => ({ month: 0, year: Number(iso.slice(0, 4)) });\n";
 
-/** bob's answer to parse-month, on the same line: the month, read. */
 const monthRead =
   "export const parse = (iso: string) => ({ month: Number(iso.slice(5, 7)), year: 0 });\n";
 
-/**
- * The lines git printed from the server's side band, less the spaces git
- * pads them with to clear a progress line.
- */
 const remoteLines = (stderr: string) =>
   stderr
     .split("\n")
     .filter((line) => line.startsWith("remote: "))
     .map((line) => line.trimEnd());
 
-/** What `protocol/render` says of `refusals`, as git prints it. */
 const rendered = (refusals: Parameters<typeof explain>[0]) =>
   explain(refusals).map((line) => `remote: ${line}`);
 
-/** A person in a trailer: their handle and the address the platform gives them. */
 const credited = (handle: string) =>
   `${handle} <${handle}@users.${Brand.domain}>`;
 
@@ -156,8 +135,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
         const aliceGit = world.git("alice");
         const bobGit = world.git("bob");
 
-        // 1. dora makes the project; her first push lands the first tree,
-        // and a second push straight to main is a direct push.
         const made = yield* dora.initProject({ project });
         const home = yield* doraGit.clone(made.remote);
         const first = yield* doraGit.commit(home, "Start datekit", start);
@@ -201,9 +178,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           remote: `${world.origin}/${project}.git`,
         });
 
-        // 2. dora opens two asks over the same file; each check fails
-        // twice on main the same way, and each lands as a platform commit
-        // dora asked, the first on her first push.
         yield* world.script(
           CheckAt.cases.Commit.make({
             commit: yield* world.composed(project, isoFiles),
@@ -244,7 +218,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
             iso.landed
           ),
           main: yield* doraGit.ok(home, "rev-parse", "origin/main"),
-          // parse-month's parent, then parse-iso's.
           parents: yield* doraGit.ok(
             home,
             "log",
@@ -267,14 +240,10 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           trailer: credited("dora"),
         });
 
-        // 3. alice claims parse-iso, so bob's claim on it is AskFull; bob
-        // claims parse-month instead.
         const { claim } = yield* alice.claim({ ask: parseIso, project });
         const full = yield* Effect.flip(bob.claim({ ask: parseIso, project }));
         const { claim: bobs } = yield* bob.claim({ ask: parseMonth, project });
 
-        // 4. alice's first try reaches outside the ask's territory: git
-        // prints OutOfScope, and her fork keeps the commit.
         const work = yield* aliceGit.clone(claim.remote);
 
         const wide = yield* aliceGit.commit(work, "Read the year, and say so", {
@@ -286,7 +255,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
 
         expect({
           base: claim.base,
-          // The run block is the config folder's, as `/bun` evaluated it.
           checkCommand: claim.checkCommand,
           fork: yield* aliceGit.ok(work, "ls-remote", "origin", mainRef),
           full,
@@ -311,10 +279,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           remote: `${world.origin}/${project}--parse-iso--alice.git`,
         });
 
-        // 5. She puts the readme back and pushes again, through a harness
-        // that names itself in her credential helper's username: the answer
-        // is being checked, then merged, checked green and landed, and the
-        // landing discloses the harness (never as its author or a credit).
         const fix = yield* aliceGit.commit(work, "Leave the readme alone", {
           "README.md": readme,
         });
@@ -327,8 +291,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
         const offered = yield* harnessGit.push(work);
         const tree = yield* aliceGit.ok(work, "rev-parse", `${fix}^{tree}`);
 
-        // main has not moved since alice claimed, so the merged tree is
-        // her head's, and her check passes on it.
         yield* world.script(
           CheckAt.cases.Tree.make({ tree: TreeSha.make(tree) }),
           redThenGreen,
@@ -433,9 +395,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           verdict: [[redThenGreen, "passed"]],
         });
 
-        // 6. bob answered parse-month on the main he claimed at, in the
-        // line alice's answer changed: his run ends refused, StaleBase,
-        // naming alice's landing as the one that moved the file.
         const bobsWork = yield* bobGit.clone(bobs.remote);
 
         const stale = yield* bobGit.commit(bobsWork, "Read the month", {
@@ -448,8 +407,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
 
         const bobsAnswers = (yield* bob.status({ project })).answers;
 
-        // 7. alice offers her landed head again: the same receipt comes
-        // back, and nothing new lands.
         const receipt = { ask: parseIso, base: claim.base, head: fix, project };
 
         const replayed = yield* alice.submitAnswer({
@@ -532,8 +489,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
           want: "parse reads the day of an ISO date",
         };
 
-        // The rounds the Project DOs start run in process, on the Worker's
-        // ports and the memory drafter, once the world hands them over.
         const ready = yield* Deferred.make<Context.Context<InlinePorts>>();
         const drafter = yield* Layer.build(DrafterMemory([drafted]));
 
@@ -560,7 +515,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
         yield* doraGit.commit(home, "Start datekit", start);
         yield* doraGit.push(home);
 
-        // The drafted files fail on main twice the same way.
         yield* world.script(
           CheckAt.cases.Commit.make({
             commit: yield* world.composed(project, draftedFiles(drafted)),
@@ -624,7 +578,6 @@ describe("the core loop, through the platform's fetch handler with real git", ()
             "origin/main"
           ))
             .split("\n")
-            // Who it credits and which agents it discloses: every `-by` trailer.
             .filter((line) => /^[A-Za-z-]+-by: /u.test(line)),
         }).toStrictEqual({
           asks: [{ ask: drafted.id, claimed: false }],

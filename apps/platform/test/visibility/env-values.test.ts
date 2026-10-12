@@ -1,14 +1,3 @@
-/**
- * Write-only values over the platform's surfaces: the handler the
- * Worker serves, its Project DOs in process on SQLite, the platform's ports
- * in memory, and the visibility cartridge's env as the Worker composes it
- * (the real parser and the WebCrypto vault) under the fake env's test
- * `MASTER_KEY`. A decider sets datekit's token over `/rpc` with their
- * token; anyone reads the env shape over `/rpc` and sees who set it and
- * when. The value is in no response body, no log line and no event, and
- * the row the DO keeps is sealed. These tests live in the cartridge and go
- * with it.
- */
 import { SqliteClient } from "@effect/sql-sqlite-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Fetch } from "@repo/artifacts/fetch";
@@ -76,16 +65,13 @@ const repo = RepoName.make(keyOf(project));
 
 const token = EnvKey.make("SENTRY_AUTH_TOKEN");
 
-/** What ines-v sets: a token-shaped value of 24 characters. */
 const value = "sntrys_eyJpYXQiOjE3MjA5X";
 
-/** Each person's platform token, as `SESSION_TOKENS` lists them. */
 const tokens = {
   bram: "bram-env-values-token-0123456789abcdef",
   "ines-v": "ines-env-values-token-0123456789abcdef",
 } as const;
 
-/** datekit's `.env.schema` cut to its header, one public item and its one sensitive item. */
 const datekitSchema = [
   "# @currentEnv=$APP_ENV",
   "# @defaultRequired=infer @defaultSensitive=false",
@@ -101,7 +87,6 @@ const datekitSchema = [
   "",
 ].join("\n");
 
-/** A `RulesEvaluator` that evaluates nothing: at any commit, the scenario's policy. */
 const rules = Layer.effect(
   RulesEvaluator,
   Effect.gen(function* () {
@@ -120,7 +105,6 @@ const rules = Layer.effect(
   })
 ).pipe(Layer.provide(FinishersFromChecks));
 
-/** Every line logged, with its annotations and cause, as text. */
 const keeper = (logged: string[]) =>
   Logger.make(({ cause, fiber, message }) => {
     logged.push(
@@ -132,21 +116,14 @@ const keeper = (logged: string[]) =>
     );
   });
 
-/** What the world kept: every response body and log line, and each DO's SQLite. */
 interface Kept {
   readonly bodies: string[];
   readonly logged: string[];
   readonly databases: Map<string, Context.Context<SqlClient>>;
 }
 
-/**
- * The platform's handler over its ports, the env cartridge composed with
- * the real parser and the fake env's master key, its Project DOs in
- * process; datekit made by ines-v and its first commit landed.
- */
 const world = (kept: Kept) =>
   Effect.gen(function* () {
-    // The stage's env as the Worker decodes it, with the people's tokens.
     const env = {
       ...fakeEnv(),
       SESSION_TOKENS: JSON.stringify(
@@ -209,12 +186,10 @@ const world = (kept: Kept) =>
 
     yield* Effect.addFinalizer(() => Effect.promise(dispose));
 
-    // The handler logs through the keeper too, as the Worker's would.
     const logging = yield* Layer.build(
       Logger.layer([keeper(kept.logged)], { mergeWithExisting: true })
     );
 
-    // ines-v makes datekit and pushes its first commit, its env schema in it.
     const ines = Person.make({ handle: Handle.make("ines-v") });
     const api = yield* Context.get(ports, Projects).create(project);
     const client = yield* gitClient(memoryFs());
@@ -242,8 +217,6 @@ const world = (kept: Kept) =>
 
     yield* api.recordFirstPush(ines, first);
 
-    // Every request reaches the handler as a fetch would send it, and
-    // every response body is kept as it went out.
     const context = yield* Effect.context();
 
     const fetch: typeof globalThis.fetch = (input, init) =>
@@ -261,7 +234,6 @@ const world = (kept: Kept) =>
         })
       );
 
-    /** A client of the contracts over `/rpc`, as `who` (a bearer) or as anyone. */
     return (who?: keyof typeof tokens) =>
       RpcClient.make(Contracts).pipe(
         Effect.provide(
@@ -280,7 +252,6 @@ const world = (kept: Kept) =>
       );
   }).pipe(Effect.orDie);
 
-/** The project's rows and events as its DO's SQLite keeps them. */
 const storedIn = (kept: Kept) =>
   Effect.gen(function* () {
     const sql = yield* Effect.orDie(
@@ -299,11 +270,6 @@ const storedIn = (kept: Kept) =>
     );
   });
 
-/**
- * bram (no decider) tries to set datekit's token, then ines-v sets it, both
- * over `/rpc` with their tokens; then anyone reads the env shape. Every
- * response body, log line and stored row and event is kept.
- */
 const settingTheToken = (kept: Kept) =>
   Effect.gen(function* () {
     const clientAs = yield* world(kept);

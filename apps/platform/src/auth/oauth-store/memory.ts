@@ -5,11 +5,7 @@ import type { OAuthStoreList } from "../oauth-store.ts";
 
 const parseJson = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json));
 
-/**
- * `OAUTH_KV` in memory, for tests and local runs: values as text with their
- * metadata, listed by prefix in key order, one page. TTLs are not kept: a
- * record lives until it is deleted.
- */
+// TTLs are not kept: a record lives until it is deleted.
 const make = (): OAuthStore["Service"] => {
   const records = new Map<string, { metadata: unknown; value: string }>();
 
@@ -47,7 +43,6 @@ const make = (): OAuthStore["Service"] => {
 };
 
 export const OAuthStoreMemory = {
-  /** A fresh, empty store each time the layer is built. */
   layer: Layer.sync(OAuthStore, make),
   make,
 };

@@ -34,10 +34,8 @@ const project = ProjectName.make("alice/datekit");
 
 const requestId = RequestId.make("answer-0001");
 
-/** An answer, as a client offers it. */
 const args = { ask, base, head, project, requestId };
 
-/** What the platform answers when it takes the answer in. */
 const receipt = {
   ...args,
   outcome: Outcome.cases.Checking.make({ stage: "merge" }),
@@ -48,7 +46,6 @@ const sessions = MemorySessions.layer({
   "bob-token": Handle.make("bob"),
 });
 
-/** The platform where only `holder` holds the ask's claim. */
 const claimHeldBy = (holder: string) =>
   Layer.mergeAll(
     noProjects,
@@ -89,8 +86,6 @@ describe("the platform's MCP surface", () => {
     })
   );
 
-  // A stream has no tool form, and a write-only value must never pass
-  // through an agent's transcript.
   it.effect("lists the MCP-surfaced contracts only: no watch, no setEnv", () =>
     Effect.gen(function* () {
       const { fetch } = yield* served(Layer.mergeAll(noProjects, sessions));

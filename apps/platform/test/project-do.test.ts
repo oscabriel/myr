@@ -121,7 +121,6 @@ describe("a Project DO's shell", () => {
         expect(yield* Instances.use(({ made }) => made)).toStrictEqual(
           startedOnce
         );
-        // The replay never reached the Workflow: one start, not a second the binding refused.
         expect(yield* Instances.use(({ tries }) => tries)).toBe(1);
       }).pipe(Effect.provide(world))
   );
@@ -162,11 +161,9 @@ describe("a Project DO's shell", () => {
   );
 });
 
-/** A Workflow binding that is down: it neither makes nor finds an instance. */
 const refused = () => Promise.reject(new Error("Workflows are down"));
 
 describe("the Answer Workflow as AnswerRuns", () => {
-  /** A queue the Workflow adapter never touches: the instance reaches the DO itself. */
   const queue = untouchable<AnswerQueue>("AnswerQueue");
 
   it.effect("makes one instance for a request started twice", () =>

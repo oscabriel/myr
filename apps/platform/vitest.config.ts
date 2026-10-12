@@ -1,10 +1,9 @@
 import { preset } from "@repo/config/vitest";
 import { defineConfig, mergeConfig } from "vitest/config";
 
-// Worker modules import `cloudflare:workers`, which only workerd serves; in
-// Node it resolves to a shim. An alias resolves to a file, not a folder.
-// The OAuth provider imports it too, so vitest processes that package
-// instead of handing it to Node, and the alias reaches it.
+// Worker modules import `cloudflare:workers`, which only workerd serves; in Node it
+// resolves to a shim. The OAuth provider imports it too, so vitest processes that
+// package instead of handing it to Node.
 export default mergeConfig(
   preset,
   defineConfig({

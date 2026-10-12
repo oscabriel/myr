@@ -1,10 +1,3 @@
-/**
- * The platform's `/`: what this host serves, built from the request's
- * origin, the projects the front page lists and the host's own facts. A
- * browser gets HTML; an agent asking for Markdown or plain text gets the
- * text the web serves at `/llms.txt`. Open to a stale credential, as every
- * public path is.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { frontLlms } from "@repo/agent-kit/host-doc";
@@ -39,11 +32,6 @@ const projects: readonly ProjectListing[] = [
   },
 ];
 
-/**
- * The platform's projects where datekit's ledger stands sealed: its first
- * config declared sealed checks, which writes no `PostureChanged` row, so
- * the projection still lists it `open`. burrow was never made here.
- */
 const datekitSealed = Layer.succeed(
   Projects,
   Projects.of({
@@ -60,7 +48,6 @@ const datekitSealed = Layer.succeed(
   })
 );
 
-/** The platform's projects before any is made: each listed one keeps its listed posture. */
 const noneMade = Layer.succeed(
   Projects,
   Projects.of({
@@ -69,10 +56,6 @@ const noneMade = Layer.succeed(
   })
 );
 
-/**
- * The platform listing `listed`, on a host whose web app is `web`, with
- * `made` for its projects.
- */
 const platform = (
   listed: readonly ProjectListing[],
   web: Option.Option<string> = Option.some(webUrl),
@@ -91,7 +74,6 @@ const platform = (
     )
   );
 
-/** `/` as `headers` ask for it: its status, type and text. */
 const home = (
   listed: readonly ProjectListing[],
   init: RequestInit = {},

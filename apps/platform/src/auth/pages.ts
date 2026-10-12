@@ -1,14 +1,6 @@
-/**
- * The sign-in and sign-up pages: small server-rendered HTML that loads
- * nothing (no script, stylesheet, font or image), so the page's CSP can be
- * `default-src 'none'`. Every value that reaches the HTML is escaped; the
- * client's name and domain come from the client itself. Google sign-in
- * adds its two choices to the sign-in page when offered, and
- * its own page for a first sign-in's handle.
- */
+// Loads nothing (no script, stylesheet, font or image), so the page's CSP can be `default-src 'none'`.
 import { Brand } from "@repo/brand";
 
-/** What the person must see about who asks (MCP: the client, and where access goes). */
 export interface Asker {
   readonly clientDomain?: string | undefined;
   readonly clientName: string;
@@ -16,18 +8,15 @@ export interface Asker {
   readonly redirectIsLoopback: boolean;
 }
 
-/** The hidden fields a sign-in form carries back: the sealed request and its CSRF token. */
 export interface PendingForm {
   readonly csrf: string;
   readonly request: string;
 }
 
-/** What the sign-in page offers besides a password. */
 export interface Offers {
   readonly google: boolean;
 }
 
-/** The paths Google sign-in's forms and links reach (`google.ts` serves them). */
 export const GOOGLE_PATHS = {
   callback: "/oauth/google/callback",
   handle: "/oauth/google/handle",
@@ -35,7 +24,7 @@ export const GOOGLE_PATHS = {
   start: "/oauth/google/start",
 } as const;
 
-/** `text` safe inside HTML text and a quoted attribute (`&` first). */
+// `&` first.
 export const escapeHtml = (text: string) =>
   text
     .replaceAll("&", "&amp;")
@@ -44,13 +33,7 @@ export const escapeHtml = (text: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-/**
- * The web's look, as far as a page that loads nothing can take it: its
- * tokens as literal colours for both schemes (paper, ink, surface, muted,
- * rule, the input border at 3:1, refused for an error, waiting for a
- * warning), square controls with hairline borders, a 2 px ink focus ring.
- * The type is the system's sans, since no font may load here.
- */
+// The system's sans, since no font may load here.
 const STYLE = `
 :root{color-scheme:light dark;--paper:#f5f8fa;--ink:#14191f;--surface:#edf0f3;--muted:#595e65;--rule:#ced1d6;--input:#82868c;--refused:#b32322;--waiting:#875814;--selection:#175fa438}
 @media (prefers-color-scheme:dark){:root{--paper:#0e1114;--ink:#e9ebee;--surface:#171a1e;--muted:#a1a5ab;--rule:#32363b;--input:#6e7278;--refused:#f87e77;--waiting:#efba64;--selection:#79b6f438}}
@@ -90,10 +73,9 @@ ul{margin:0;padding-left:1.25rem}
 li{margin:0 0 8px}
 `;
 
-/** How wide a page reads: a form's one column, or a document's. */
 type Width = "form" | "document";
 
-/** A page titled `title` around `body`, which is HTML already escaped. */
+// `body` is HTML already escaped.
 export const page = (title: string, body: string, width: Width = "form") =>
   `<!doctype html>
 <html lang="en">
@@ -110,13 +92,8 @@ ${body}
 </html>
 `;
 
-/** A warning's mark: a triangle drawn in the line's colour, hidden from a screen reader. */
 const WARNING_MARK = `<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M8 1.75 14.75 14H1.25z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.25v3.5M8 11.75v.25" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
 
-/**
- * The consent, first under the title in its own ruled block: who asks,
- * where access goes, and the loopback warning when it applies.
- */
 const askerParagraphs = (asker: Asker) => {
   const name = `<strong>${escapeHtml(asker.clientName)}</strong>`;
 
@@ -145,11 +122,7 @@ const hiddenFields = (form: PendingForm) =>
   `<input type="hidden" name="request" value="${escapeHtml(form.request)}">
 <input type="hidden" name="csrf" value="${escapeHtml(form.csrf)}">`;
 
-/**
- * Google's two choices, when offered: signing in with Google (a link, so
- * no form posts to Google), and, beside the password form's own button,
- * signing in by password and then linking Google to the account.
- */
+// A link, so no form posts to Google.
 const googleChoices = (offers: Offers, form: PendingForm) =>
   offers.google
     ? {
@@ -159,7 +132,6 @@ const googleChoices = (offers: Offers, form: PendingForm) =>
       }
     : { link: "", start: "" };
 
-/** The sign-in form, posting back to `/authorize`, with a way to sign up instead. */
 export const signInPage = (
   asker: Asker,
   form: PendingForm,
@@ -187,12 +159,6 @@ ${google.link}
   );
 };
 
-/**
- * A first sign-in with Google: Google confirmed the person, and they choose
- * the handle the platform will know them by (sign-up's rules), posting to
- * Google sign-in's handle path. One who has a password account signs in
- * with it instead, and links Google from there.
- */
 export const pickHandlePage = (
   asker: Asker,
   form: PendingForm,
@@ -213,7 +179,6 @@ ${hiddenFields(form)}
 <p>Have an account with a password? <a href="${escapeHtml(signInHref)}">Sign in with it</a> and choose "Sign in and link Google".</p>`
   );
 
-/** The sign-up form, posting to `/signup`, with a way back to signing in. */
 export const signUpPage = (
   asker: Asker,
   form: PendingForm,
@@ -234,11 +199,6 @@ ${hiddenFields(form)}
 <p>Have an account? <a href="${escapeHtml(signInHref)}">Sign in</a>.</p>`
   );
 
-/**
- * A page with nothing to do but read why, and start again from the app. The
- * problem is not a refusal (a page expired, a client could not be read),
- * so it reads in ink, with one way onward.
- */
 export const problemPage = (message: string) =>
   page(
     "Sign-in problem",

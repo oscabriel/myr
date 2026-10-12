@@ -1,16 +1,3 @@
-/**
- * Ratchets and lint-to-zero asks as a decider and two contributors live
- * them, through the platform's own fetch handler with real git:
- * a project that declares a `no-explicit-any`
- * ratchet opens a lint-to-zero ask red first by its count, an answer that
- * drives the count to zero lands and lowers the baseline with no one asked,
- * an answer elsewhere that raises the count is refused `Weakened`, and a
- * reasoned escape waits for a decider, who lets it land or not.
- *
- * The Checker is scripted: each lane's result, and for a count lane the
- * linter's JSON it prints, in oxlint's own shape (`oxlintReport`), per
- * commit or tree.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { CheckAt } from "@repo/checks/check-runner";
@@ -44,21 +31,16 @@ const decodeRaw = AskId.make("decode-raw");
 
 const ratchet = RatchetName.make("no-explicit-any");
 
-/** The lane the ratchet's count runs in, named for the ratchet. */
 const ratchetLane = LaneName.make(ratchet);
 
-/** The lane a `lintToZero` ask's check runs in. */
 const lintToZero = LaneName.make("lintToZero");
 
-/** The lane a `redThenGreen` ask's check runs in. */
 const redThenGreen = LaneName.make("redThenGreen");
 
-/** The project's lint, which prints JSON. */
 const lint = "oxlint --format json";
 
 const rule = "typescript/no-explicit-any";
 
-/** Where the config folder's sdk is imported from, as a maintainer writes it. */
 const sdk = `${Brand.cliPackage}/rules`;
 
 const parsePath = "packages/parser/src/parse.ts";
@@ -67,13 +49,11 @@ const formatPath = "packages/format/src/format.ts";
 
 const codecPath = "packages/parser/src/codec.ts";
 
-/** Three explicit `any`s in parser, two in format: what main starts with. */
 const anyParse =
   "export const parse = (s: any): any => ({ year: Number(s as any) });\n";
 
 const anyFormat = "export const format = (d: any, f: any) => String(d);\n";
 
-/** The project as dora first pushes it: two packages, the config folder, the vouches. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
     `import { check, kinds, project } from "${sdk}";`,
@@ -96,7 +76,6 @@ const start = {
   [parsePath]: anyParse,
 };
 
-/** The lint-to-zero ask's one file: no explicit `any` left in parser. */
 const lintFiles = Array.make({
   content: [
     `import { kinds, territory } from "${sdk}";`,
@@ -112,7 +91,6 @@ const lintFiles = Array.make({
   path: RepoPath.make(`${Brand.configDir}/asks/${noAnyInParser}.ask.ts`),
 });
 
-/** A `fix` ask's files in `module`: its file, and its check, which asserts on `subject`. */
 const fixFiles = (
   ask: AskId,
   module: string,
@@ -166,7 +144,6 @@ const rawFiles = fixFiles(decodeRaw, "parser", "parser decodes raw input", {
   name: "decode",
 });
 
-/** One `typescript/no-explicit-any` finding, as oxlint 1.87 prints it. */
 const anyAt = (filename: string, line: number) => ({
   code: "typescript(no-explicit-any)",
   filename,
@@ -177,7 +154,6 @@ const anyAt = (filename: string, line: number) => ({
   url: "https://oxc.rs/docs/guide/usage/linter/rules/typescript/no-explicit-any.html",
 });
 
-/** What `oxlint --format json` prints for these findings. */
 const oxlintReport = (
   findings: readonly (readonly [path: string, line: number])[]
 ) =>
@@ -202,21 +178,17 @@ const formatOnly = [
   [formatPath, 1],
 ] as const;
 
-/** The lines git printed from the server's side band, less git's padding. */
 const remoteLines = (stderr: string) =>
   stderr
     .split("\n")
     .filter((line) => line.startsWith("remote: "))
     .map((line) => line.trimEnd());
 
-/** A person in a trailer: their handle and the address the platform gives them. */
 const credited = (handle: string) =>
   `${handle} <${handle}@users.${Brand.domain}>`;
 
-/** A baseline as the tests read it: `[ratchet, territory, count]`. */
 type Baseline = readonly [ratchet: string, territory: string, count: number];
 
-/** Each baseline, in name order. */
 const baselines = (world: CoreLoopWorld) =>
   Effect.map(world.ratchets(project), (rows) =>
     Array.sort(
@@ -231,13 +203,11 @@ const baselines = (world: CoreLoopWorld) =>
     )
   );
 
-/** The tree of `head` in a work tree: where an answer whose base is main is checked. */
 const treeOf = (git: GitClient, work: string, head: CommitSha) =>
   Effect.map(git.ok(work, "rev-parse", `${head}^{tree}`), (tree) =>
     CheckAt.cases.Tree.make({ tree: TreeSha.make(tree) })
   );
 
-/** The verdict note on `head` in the clone at `work`, read with plain git. */
 const noteOn = (git: GitClient, work: string, head: CommitSha) =>
   Effect.gen(function* () {
     const ref = `refs/notes/${Brand.slug}`;
@@ -257,7 +227,6 @@ const noteOn = (git: GitClient, work: string, head: CommitSha) =>
     ).pipe(Effect.orDie);
   });
 
-/** `as`'s answer, pushed: it claims `ask`, clones its fork and commits `files`. */
 const answer = (
   world: CoreLoopWorld,
   as: Someone,
@@ -277,7 +246,6 @@ const answer = (
     return { claim, head, pushed, tree, work };
   });
 
-/** The merged tree's lanes, scripted: the ratchet's count, and the ask's own check. */
 const scriptAnswer = (
   world: CoreLoopWorld,
   tree: CheckAt,
@@ -297,17 +265,11 @@ const scriptAnswer = (
     yield* world.print(tree, input.askLane, report);
   });
 
-/**
- * Steps 1 to 3: the project, its asks opened red first, alice's answer to
- * the lint-to-zero ask landed (pushed with a harness's audit username), and
- * bob's answer in format refused for what the merged tree counts in parser.
- */
 const ratchetStory = (world: CoreLoopWorld) =>
   Effect.gen(function* () {
     const dora = world.rpc("dora");
     const doraGit = world.git("dora");
 
-    // dora makes the project and pushes its first tree.
     yield* dora.initProject({ project });
 
     const home = yield* doraGit.clone(`${world.origin}/${project}.git`);
@@ -315,7 +277,6 @@ const ratchetStory = (world: CoreLoopWorld) =>
     yield* doraGit.commit(home, "Start burrow", start);
     yield* doraGit.push(home);
 
-    // 1. The lint-to-zero ask: twice on main the rule counts 3 in parser.
     const composedLint = CheckAt.cases.Commit.make({
       commit: yield* world.composed(project, lintFiles),
     });
@@ -331,7 +292,6 @@ const ratchetStory = (world: CoreLoopWorld) =>
 
     const afterOpening = yield* baselines(world);
 
-    // Two `fix` asks to answer later, each red first by its check.
     for (const [ask, files] of [
       [formatIso, isoFiles],
       [decodeRaw, rawFiles],
@@ -346,9 +306,6 @@ const ratchetStory = (world: CoreLoopWorld) =>
       yield* dora.openAsk({ ask, files, project });
     }
 
-    // 2. alice drives the count in parser to zero, through a harness that
-    // names itself in her credential helper's username. format still has
-    // its two, so the lint exits 1; the ask's check is its count in parser.
     const harnessGit = yield* world.gitWithUsername(
       "alice",
       "audit;harness=pi&model=kimi-k3"
@@ -376,8 +333,6 @@ const ratchetStory = (world: CoreLoopWorld) =>
       annotations.has("harness")
     );
 
-    // 3. bob answers format-iso in format; the lint of his merged tree
-    // counts one in parser again, over the baseline of zero.
     const bobGit = world.git("bob");
 
     const widened = yield* answer(world, "bob", bobGit, {
@@ -409,11 +364,6 @@ const ratchetStory = (world: CoreLoopWorld) =>
     };
   });
 
-/**
- * Step 4: alice answers decode-raw with a reasoned escape in parser, which
- * hides its `any` from the lint and raises parser's escapes; dora takes
- * the `Waiver` on Today with `choice`.
- */
 const escapeStory = (world: CoreLoopWorld, choice: Choice) =>
   Effect.gen(function* () {
     const aliceGit = world.git("alice");
@@ -463,11 +413,6 @@ const escapeStory = (world: CoreLoopWorld, choice: Choice) =>
     };
   });
 
-/**
- * alice answers decode-raw with an `any` the lint counts in parser and a
- * reasoned escape beside it, which explains the raise; dora accepts each
- * decision on Today, in turn.
- */
 const raiseStory = (world: CoreLoopWorld) =>
   Effect.gen(function* () {
     const raised = yield* answer(world, "alice", world.git("alice"), {
@@ -506,12 +451,6 @@ const raiseStory = (world: CoreLoopWorld) =>
     };
   });
 
-/**
- * alice answers decode-raw with a raise and a reasoned escape; dora accepts
- * the `Waiver` and declines the `RaiseRatchet`, so the answer is refused.
- * alice pushes again on the same claim: the same escape on the same line,
- * and no raise.
- */
 const againStory = (world: CoreLoopWorld) =>
   Effect.gen(function* () {
     const aliceGit = world.git("alice");
@@ -571,11 +510,6 @@ const againStory = (world: CoreLoopWorld) =>
     };
   });
 
-/**
- * alice's reasoned escape waits on a `Waiver` while bob's clean answer to
- * format-iso lands; dora then accepts it, alice's land finds main moved,
- * and her answer is merged and checked again on the new main.
- */
 const movedStory = (world: CoreLoopWorld, widened: { readonly work: string }) =>
   Effect.gen(function* () {
     const aliceGit = world.git("alice");
@@ -599,7 +533,6 @@ const movedStory = (world: CoreLoopWorld, widened: { readonly work: string }) =>
     });
     yield* world.settle();
 
-    // bob's answer, typed this time, lands while alice's waits.
     const typed = yield* bobGit.commit(widened.work, "Type format", {
       [formatPath]:
         "export const format = (d: Date) => d.toISOString().slice(0, 10);\n",
@@ -613,7 +546,6 @@ const movedStory = (world: CoreLoopWorld, widened: { readonly work: string }) =>
     });
     yield* world.settle();
 
-    // alice's answer merged onto the new main, as the Lander will merge it.
     yield* aliceGit.ok(
       escaped.work,
       "fetch",
@@ -702,8 +634,6 @@ describe("ratchets and lint-to-zero asks, through the platform's fetch handler w
           opened: "LintToZero",
         });
 
-        // 5. The harness's username is logged with the push, as audit
-        // metadata; the push is alice's, by her token.
         expect(
           seen.pushLog.map(({ annotations }) => ({
             harness: annotations.get("harness"),

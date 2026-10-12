@@ -1,14 +1,3 @@
-/**
- * One project's world for the Project DO's tests: the ports a Project DO
- * runs on, over memory adapters, with the DO's own `Alarms` and
- * `AnswerRuns` adapters over fakes of its storage and the `Answer`
- * Workflow binding, and shells over sqlite-node. The tests drive projects
- * only through the encoded boundary (`encodeCall` → shell → `decodeReply`).
- *
- * The world is the shape of `packages/project/test/world.ts`: the scripted
- * Checker, the rules evaluator that returns the scenario's policy, and
- * pushes made as an answerer's git would make them.
- */
 import { NodeServices } from "@effect/platform-node";
 import { SqliteClient } from "@effect/sql-sqlite-node";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
@@ -93,13 +82,11 @@ export const anyone = Anonymous.make({});
 
 export const redThenGreen = LaneName.make("redThenGreen");
 
-/** The project as alice first pushes it. */
 const start: Files = [
   ["package.json", '{ "name": "datekit", "workspaces": ["packages/*"] }\n'],
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
 ];
 
-/** `parse-iso`'s own files: its file in the config folder, and its check. */
 export const askFiles = () => {
   const ask = Option.getOrThrow(
     Array.findFirst(scenario.policy.asks, ({ id }) => id === parseIso)
@@ -124,7 +111,6 @@ export const askFiles = () => {
   );
 };
 
-/** Main once `parse-iso` opened, with its parser fixed: an answer in its territory. */
 export const fixedFiles: Files = [
   ...start.filter(([path]) => path !== "packages/parser/src/parse.ts"),
   ...askFiles().map(({ content, path }) => [path, content] as const),
@@ -134,11 +120,9 @@ export const fixedFiles: Files = [
   ],
 ];
 
-/** The fork a claim of `parse-iso` pushes to. */
 export const forkOf = (who: Person) =>
   RepoName.make(`${keyOf(project)}--${parseIso}--${who.handle}`);
 
-/** What the Checker answers, by `(tree or commit, lane)`; the test adds to it. */
 export class CheckScript extends Context.Service<
   CheckScript,
   {
@@ -150,7 +134,6 @@ export class CheckScript extends Context.Service<
   }
 >()("test/CheckScript") {}
 
-/** Commits made the way an answerer's git would make them, pushed to a repo's `main`. */
 export class Pusher extends Context.Service<
   Pusher,
   {
@@ -163,22 +146,15 @@ export class Pusher extends Context.Service<
   }
 >()("test/Pusher") {}
 
-/** Every alarm the DO's storage was asked to set, in epoch milliseconds, in order. */
 export class SetAlarms extends Context.Service<
   SetAlarms,
   { readonly all: Effect.Effect<readonly number[]> }
 >()("test/SetAlarms") {}
 
-/** How an `Answer` Workflow instance stands, as its `status()` reports it. */
 export type InstanceState = Awaited<
   ReturnType<Awaited<ReturnType<AnswerWorkflow["get"]>>["status"]>
 >["status"];
 
-/**
- * Every `Answer` Workflow instance made, in order, how many creates were
- * tried, and every restart asked for; `end` moves an instance to a state
- * the engine would (its run completed, errored or was terminated).
- */
 export class Instances extends Context.Service<
   Instances,
   {
@@ -194,7 +170,6 @@ export class Instances extends Context.Service<
   }
 >()("test/Instances") {}
 
-/** At any commit, the scenario's policy, holding the asks whose files the commit has. */
 const rules = Layer.effect(
   RulesEvaluator,
   Effect.gen(function* () {
@@ -266,7 +241,6 @@ const pusher = Layer.effect(
   })
 );
 
-/** The DO's storage, as far as its alarm goes: it keeps every time it is set to. */
 const alarms = Layer.unwrap(
   Effect.sync(() => {
     const set: number[] = [];
@@ -286,11 +260,6 @@ const alarms = Layer.unwrap(
   })
 );
 
-/**
- * The `Answer` Workflow binding: an instance per id, made once. Like the
- * real one, `create` refuses an id it has, `get` finds it, an instance runs
- * once made, and `restart` runs it again from its first step.
- */
 export const answerWorkflow = () => {
   const made = new Map<string, typeof AnswerParams.Encoded>();
   const states = new Map<string, InstanceState>();
@@ -351,11 +320,6 @@ const answers = Layer.unwrap(
   })
 );
 
-/**
- * Every port a Project DO's shell takes, over memory adapters and the DO's
- * own `Alarms` and `AnswerRuns` adapters, and what the tests read back.
- * Fresh each time it is built.
- */
 export const world = Layer.mergeAll(
   alarms,
   answers,
@@ -372,7 +336,6 @@ export const world = Layer.mergeAll(
 
 export type World = Layer.Success<typeof world>;
 
-/** A new SQLite file, removed with its folder when the test ends. */
 export const databaseFile = FileSystem.FileSystem.pipe(
   Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "project-do-" })),
   Effect.map((folder) => `${folder}/project.sqlite`),
@@ -380,11 +343,6 @@ export const databaseFile = FileSystem.FileSystem.pipe(
   Effect.provide(NodeServices.layer)
 );
 
-/**
- * A Project DO's shell over the SQLite at `filename`, on the world's ports,
- * named `name` as `idFromName` names a DO; `Option.none()` for a DO whose id
- * carries no name.
- */
 export const shellOver = (
   filename: string,
   name: Option.Option<ProjectName> = Option.some(project)
@@ -399,13 +357,11 @@ export const shellOver = (
     });
   });
 
-/** One method called on a project, as its own types. */
 export type Call = <M extends ProjectMethod>(
   method: M,
   args: ArgsOf<M>
 ) => Effect.Effect<SuccessOf<M>, ErrorOf<M>>;
 
-/** Calls on a project through its DO's boundary: encoded, answered by `shell`, decoded. */
 export const through =
   (shell: ProjectShell): Call =>
   (method, args) =>
@@ -414,10 +370,6 @@ export const through =
       Effect.flatMap((reply) => decodeReply(method, reply))
     );
 
-/**
- * The project made by alice, her first push recorded, and `parse-iso`
- * opened: its check fails twice the same way on main with its files.
- */
 export const opening = (call: Call) =>
   Effect.gen(function* () {
     yield* call("initProject", [alice, {}]);
@@ -443,7 +395,6 @@ export const opening = (call: Call) =>
     return yield* call("openAsk", [alice, { ask: parseIso, files }]);
   });
 
-/** Where `main` of `repo` stands now. */
 export const tipOf = (name: RepoName) =>
   Effect.gen(function* () {
     const refs = yield* (yield* RepoHost).refs(name).pipe(Effect.orDie);
@@ -453,7 +404,6 @@ export const tipOf = (name: RepoName) =>
     );
   });
 
-/** What a call came to: its value, its typed refusal, or `died`. */
 export const outcomeOf = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.map(
     Effect.exit(effect),
@@ -467,11 +417,6 @@ export const outcomeOf = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     })
   );
 
-/**
- * The `PROJECT` namespace in process: a name is one DO, and its stub runs a
- * shell of its own, over a SQLite of its own, on the world's ports and the
- * test's clock. `names` lists the DOs made, in order.
- */
 export const namespaceOf = inProcessNamespace((name) =>
   shellOver(":memory:", Option.some(name))
 );

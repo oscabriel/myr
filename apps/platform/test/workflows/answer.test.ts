@@ -74,7 +74,6 @@ const unit = LaneName.make("unit");
 
 const lint = LaneName.make("lint");
 
-/** One `advanceAnswer` call as it crosses the Durable Object's boundary. */
 const Advance = Schema.toCodecJson(
   Schema.Struct({
     command: ReportedCommand,
@@ -82,21 +81,17 @@ const Advance = Schema.toCodecJson(
   })
 );
 
-/** The program run for `answer`, over `steps`. */
 const run = (answer: Admitted, steps: Context.Context<StepRunner>) =>
   runAnswer({ project, requestId: answer.requestId }).pipe(
     Effect.provide(steps)
   );
 
-/** Steps over a fresh in-memory record, each name asked for logged. */
 const freshSteps = (options: { readonly twice?: boolean } = {}) =>
   Effect.flatMap(memoSteps(), (memo) => Layer.build(logged(memo, options)));
 
-/** Every step name `steps` was asked for, in order. */
 const namesOf = (steps: Context.Context<StepLog>) =>
   StepLog.use(({ names }) => names).pipe(Effect.provide(steps));
 
-/** The steps of one pass from merge to land, after the run's `load`. */
 const pass = (attempt: number) => [
   `merge#${attempt}`,
   `record:merge#${attempt}`,
@@ -107,14 +102,12 @@ const pass = (attempt: number) => [
   `record:land#${attempt}`,
 ];
 
-/** Every lane on `at` passes: the ask's check and every project lane. */
 const allGreen = (at: CheckAt) =>
   Effect.andThen(
     scriptProjectLanes(at, { result: "passed" }),
     Checker.use((script) => script.script(at, askLane, [{ result: "passed" }]))
   );
 
-/** `lane` fails on the merged tree, saying `signature`, and ends `onMain` on main. */
 const failsOnMerged = (
   answer: Admitted,
   lane: LaneName,
@@ -135,7 +128,6 @@ const failsOnMerged = (
     );
   });
 
-/** The Checker's jobs on `at`: their lanes, and the repo each ran in. */
 const jobsOn = (at: CheckAt) =>
   Checker.use(({ jobs }) =>
     Effect.map(jobs, (all) =>
@@ -145,7 +137,6 @@ const jobsOn = (at: CheckAt) =>
     )
   );
 
-/** The lands of `answer` the Lander was asked for. */
 const landsOf = (answer: Admitted) =>
   LanderCalls.use(({ jobs }) =>
     Effect.map(jobs, (all) =>
@@ -156,7 +147,6 @@ const landsOf = (answer: Admitted) =>
     )
   );
 
-/** What each `advanceAnswer` call reported, by tag. */
 const reportedTags = DoCalls.use(({ advances }) =>
   Effect.map(advances, (all) => all.map(({ command }) => command._tag))
 );
@@ -171,14 +161,8 @@ const parentsOf = (sha: CommitSha) =>
 
 const landedAt = (sha: LandedSha) => Outcome.cases.Landed.make({ sha });
 
-/** A clean answer, admitted, its lanes all green on the merged tree. */
 const cleanAnswer = Effect.tap(admitted(), (answer) => allGreen(answer.merged));
 
-/**
- * The world's projects, each answer's run handed on without its landing
- * message: a run that holds the landing slot, but whose land no step can
- * make.
- */
 const withoutMessage = Layer.effect(
   Projects,
   Effect.map(Projects, (inner) =>
@@ -248,8 +232,6 @@ describe(runAnswer, () => {
 
         const jobs = yield* Checker.use((script) => script.jobs);
 
-        // Each in the project's own setup, its run block (live on
-        // dev-oscabriel: a job without one is blocked).
         expect(
           jobs
             .filter(({ at }) => CheckAt.guards.Tree(at))
@@ -843,12 +825,6 @@ describe(failingPathsOf, () => {
   });
 });
 
-/**
- * A Workflow engine in memory, as `step.test.ts` fakes one: a step's first
- * run records what its body returns under its name, and a replay returns
- * the record without running the body. It keeps the name of every step
- * whose body ran.
- */
 const fakeEngine = () => {
   const recorded = new Map<string, Promise<Schema.Json>>();
   const ran: string[] = [];
@@ -871,17 +847,14 @@ const fakeEngine = () => {
     },
   };
 
-  /** What the engine recorded for `name`; `null` if no step of that name ran. */
   const record = (name: string) =>
     Effect.promise(() => recorded.get(name) ?? Promise.resolve(null));
 
   return { ran, record, steps };
 };
 
-/** Whether a value is plain JSON: no class instance, no `undefined`, no cycle. */
 const isJson = Schema.is(Schema.Json);
 
-/** The engine's event for one run of the Workflow. */
 const event = (payload: typeof AnswerParams.Encoded) => ({
   instanceId: payload.requestId,
   payload,
@@ -889,7 +862,6 @@ const event = (payload: typeof AnswerParams.Encoded) => ({
   workflowName: "answer-local",
 });
 
-/** The world's ports, as the Workflow's run takes them. */
 const portsOfWorld = Effect.map(
   Effect.context<CheckRunner | EvidenceStore | Lander | Projects | RepoHost>(),
   Layer.succeedContext
@@ -978,7 +950,6 @@ describe(Answer, () => {
         const engine = fakeEngine();
         const workflow = new Answer(untouchable("ctx"), fakeEnv());
 
-        // The fake env's Project DOs hold no project: the first step finds none.
         const exit = yield* Effect.exit(
           Effect.tryPromise(() =>
             workflow.run(

@@ -1,21 +1,3 @@
-/**
- * The only credentials a sandbox job carries, and the one way a job crosses
- * the `SANDBOX` service binding: the sandbox Worker has no
- * Artifacts binding, so each job takes a token the platform minted for it
- * alone, on one repo (tokens are per repo), with the narrowest scope
- * the job needs and a lifetime of minutes, revoked as soon as the job ends.
- * A token never appears in a result, a refusal or a log: it
- * crosses the binding in plain text, as the far side needs it, but decodes to
- * a `Redacted` on either side; refusals carry no free text (principle 3); and
- * what any failure log says, a failed revoke's included, is scrubbed of every
- * token the job carried.
- *
- * A job is encoded with the wire schemas both sides share, and its outcome
- * comes back as a JSON `Exit` decoded here (principle 2): a typed refusal
- * stays typed; anything else (a rejected call, an outcome that won't decode,
- * a defect on the far side) is `VerifierBlocked`, the gate's trouble and
- * never the answer's, with one error-level log line naming the method.
- */
 import { RepoHost } from "@repo/artifacts/repo-host";
 import type {
   RepoName,
@@ -35,15 +17,9 @@ import {
   Schema,
 } from "effect";
 
-/**
- * How long a job's token lives: enough for a cold container to start and
- * fetch, short enough that a token outliving its job is dead within
- * minutes (an expired token gets 403). Each is revoked when its job
- * ends, so this bounds only a revoke that failed.
- */
+// Each token is revoked when its job ends, so this bounds only a revoke that failed.
 export const jobTokenTtl = Duration.minutes(5);
 
-/** The sandbox entrypoint's methods: the one name every failure log carries. */
 export type SandboxMethod =
   | "bundleRules"
   | "check"
@@ -51,19 +27,14 @@ export type SandboxMethod =
   | "land"
   | "merge";
 
-/** One repo a job reaches, and what it may do there. */
 export interface RemoteNeed {
   readonly repo: RepoName;
   readonly scope: TokenScope;
 }
 
-/** The longest failure detail a log line keeps. */
 const DETAIL_LIMIT = 2000;
 
-/**
- * `text` without any token the job carried, cut to `DETAIL_LIMIT`: the far
- * side holds the tokens and may echo one in an error.
- */
+// The far side holds the tokens and may echo one in an error.
 const scrub = (text: string, remotes: readonly Remote[]) => {
   let scrubbed = text;
 
@@ -78,10 +49,6 @@ const scrub = (text: string, remotes: readonly Remote[]) => {
   return scrubbed.slice(0, DETAIL_LIMIT);
 };
 
-/**
- * The job could not run: one error-level log line, then `VerifierBlocked`,
- * which carries no free text; what went wrong goes in the annotations.
- */
 const blocked = (
   method: SandboxMethod,
   annotations: Readonly<Record<string, string>>
@@ -91,19 +58,12 @@ const blocked = (
     Effect.andThen(Effect.fail(new VerifierBlocked({})))
   );
 
-/** A repo the store does not know: the job cannot run. */
 const unknownRepo =
   (method: SandboxMethod) =>
   ({ name }: RepoNotFound) =>
     blocked(method, { failure: "repo not found", repo: name });
 
-/**
- * Mints a `need.scope` token on `need.repo` for one job, hands `use` its
- * remote, and revokes the token once `use` ends, however it ends. A revoke
- * that fails, or dies, is logged with the token scrubbed, never raised: the
- * token dies with its lifetime. A repo the store does not know is
- * `VerifierBlocked` for `method`.
- */
+// A failed revoke is logged with the token scrubbed, never raised: the token dies with its lifetime.
 export const withRemote = <A, E, R>(
   method: SandboxMethod,
   need: RemoteNeed,
@@ -141,28 +101,20 @@ export const withRemote = <A, E, R>(
     );
   });
 
-/** Why a job's outcome never arrived as a typed `Exit`. */
 class Unreached extends Data.TaggedError("Unreached")<{
   readonly failure: "rejected" | "undecodable" | "unencodable";
   readonly detail: string;
 }> {}
 
-/** One job for the sandbox: what to send, and how its wire and outcome are coded. */
 export interface SandboxJob<W, WI, A, E, X> {
   readonly method: SandboxMethod;
   readonly wire: Schema.Codec<W, WI>;
   readonly exit: Schema.Codec<Exit.Exit<A, E>, X>;
   readonly job: W;
-  /** Every remote `job` carries: their tokens are scrubbed from failure logs. */
   readonly remotes: readonly Remote[];
-  /** The binding's method, called with the encoded job. */
   readonly send: (encoded: WI) => Promise<X>;
 }
 
-/**
- * An outcome as the port gives it: the success, a typed refusal as itself,
- * and a defect or an interruption on the far side as `VerifierBlocked`.
- */
 const settle = <A, E>(
   method: SandboxMethod,
   remotes: readonly Remote[],
@@ -179,11 +131,6 @@ const settle = <A, E>(
         onSome: (refusal): Effect.Effect<never, E> => Effect.fail(refusal),
       });
 
-/**
- * Sends one job and settles its outcome into the Effect's channels; a job
- * whose outcome never arrived as an `Exit` is `VerifierBlocked`. Each
- * failure is logged once, at error level.
- */
 export const sandboxJob = <W, WI, A, E, X>(
   call: SandboxJob<W, WI, A, E, X>
 ): Effect.Effect<A, E | VerifierBlocked> =>

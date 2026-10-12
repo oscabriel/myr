@@ -1,18 +1,3 @@
-/**
- * datekit with a maintainers layer whose sealed suite has areas `export`
- * (two checks) and `parser` (one), over the Answer Workflow's world
- * (`../workflows/answer.fixtures.ts`): the project service sees fakes of
- * the two visibility ports (the cartridge's own are tested on their own),
- * the Checker answers held-back jobs from a script of failing areas, the
- * layer's repo lives in a `LayerRepos` of its own, and the cartridge's
- * landing guards (`src/visibility/held-back.ts`) are plugged in over them.
- *
- * The fakes keep to the ports' contracts: the visibility port pins every
- * claim to one suite, reads the suite's files for its job, counts failed
- * held-back runs per claim (the third is `AttemptsExhausted`) and gives
- * the trailer's value when every area passed; the env port keeps a value
- * `setEnv` stored, and scans with the leak scanner.
- */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
@@ -71,14 +56,12 @@ export const exportArea = AreaName.make("export");
 
 export const parserArea = AreaName.make("parser");
 
-/** One sealed check, as the layer holds it. */
 interface SealedFile {
   readonly area: AreaName;
   readonly path: RepoPath;
   readonly content: string;
 }
 
-/** The suite: two checks in `export`, one in `parser`. */
 export const sealedFiles: readonly SealedFile[] = [
   {
     area: exportArea,
@@ -99,18 +82,14 @@ export const sealedFiles: readonly SealedFile[] = [
   },
 ];
 
-/** The layer commit the suite is pinned at. */
 export const layerAt = CommitSha.make("e".repeat(40));
 
-/** The suite's root, as 612 publishes it. */
 export const suiteRoot = SuiteRoot.make(`sha256:${"3f".repeat(32)}`);
 
-/** The run block's `test` with each sealed check's path filled. */
 const testCommand = (path: RepoPath) => `bun test ${path}`;
 
 const encoder = new TextEncoder();
 
-/** The job `heldBackJob` gives for every pinned claim. */
 export const heldBackJob: HeldBackJob = {
   areas: [exportArea, parserArea],
   at: layerAt,
@@ -127,12 +106,10 @@ export const heldBackJob: HeldBackJob = {
   suite: suiteRoot,
 };
 
-/** How many failed held-back runs a claim may have before its area is spent. */
 const ATTEMPTS = 3;
 
 const isoWeek = "2026-W41";
 
-/** When a spent area opens again: the fake's week ends on its Monday. */
 export const resetsAt = DateTime.makeUnsafe("2026-10-12T00:00:00Z");
 
 const attemptsOn = (
@@ -149,31 +126,17 @@ const attemptsOn = (
     )
     .reduce((sum, row) => sum + row.count, 0);
 
-// ------------------------------------------------------------------ the fakes
-
-/** What a test changes in the fakes as it goes, and reads back. */
 export class Sealed extends Context.Service<
   Sealed,
   {
-    /** Whether the Checker cannot run the next held-back jobs at all. */
     readonly blocked: Ref.Ref<boolean>;
-    /** The areas whose held-back checks fail in the next held-back jobs. */
     readonly failing: Ref.Ref<ReadonlySet<AreaName>>;
-    /** Every held-back job the Checker was given, in order. */
     readonly jobs: Ref.Ref<readonly CheckJob[]>;
-    /** The layers' path set (its files), as stage 1 and the landing guards read it. */
     readonly layerPaths: Ref.Ref<ReadonlySet<RepoPath>>;
-    /** How often the visibility port judged a held-back run. */
     readonly judged: Effect.Effect<number>;
   }
 >()("test/Sealed") {}
 
-/**
- * The visibility port over the test's handle: one layer, `maintainers`,
- * read and written by the deciders (alice); every claim pinned to
- * `suiteRoot`; the suite's job; failed runs counted per claim in
- * `attempts` rows, the third one spent.
- */
 const visibilityOver = (
   sealed: Sealed["Service"],
   judged: { count: number }
@@ -244,13 +207,8 @@ const visibilityOver = (
       : new Set(),
 });
 
-/** What the fake env keeps of a value: the value itself, which only a fake may. */
 const KeptValue = Schema.Struct({ fake: Schema.String });
 
-/**
- * The env port: a decider's value kept as it was given (only a fake keeps
- * a value it could read back), and the leak scanner over every kept value.
- */
 const envPort: EnvPort = {
   ...noEnv,
   scan: (scanned, snapshot) =>
@@ -287,7 +245,6 @@ const envPort: EnvPort = {
     }),
 };
 
-/** The two ports' fakes, and the test's handle on them. */
 const fakes = Layer.effectContext(
   Effect.gen(function* () {
     const judged = { count: 0 };
@@ -309,7 +266,6 @@ const fakes = Layer.effectContext(
   })
 );
 
-/** One area's bits in a held-back job: one check fails in each failing area. */
 const bitsOf = (
   job: HeldBackJob,
   failing: ReadonlySet<AreaName>
@@ -325,10 +281,6 @@ const bitsOf = (
     };
   });
 
-/**
- * The world's Checker, with held-back jobs answered from the failing areas
- * and recorded; every other job goes to the scripted one.
- */
 const sealedChecker = Layer.effect(
   CheckRunner,
   Effect.gen(function* () {
@@ -361,7 +313,6 @@ const sealedChecker = Layer.effect(
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** The layer's repo, holding the suite on `main`, in a private host of its own. */
 const layerRepos = Layer.effect(
   LayerRepos,
   Effect.gen(function* () {
@@ -386,11 +337,6 @@ const layerRepos = Layer.effect(
   })
 ).pipe(Layer.provide(Layer.fresh(RepoHostMemory)));
 
-/**
- * The Answer Workflow's world with the visibility cartridge's parts
- * plugged in over it: the fakes, the layer's repo, the sealed Checker and
- * the cartridge's landing guards.
- */
 export const sealedWorld = (given: Policy) =>
   Layer.mergeAll(sealedChecker, LandingGuardsLive).pipe(
     Layer.provideMerge(worldWith(given)),

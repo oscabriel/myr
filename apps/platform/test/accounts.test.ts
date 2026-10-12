@@ -19,11 +19,6 @@ const second = PasswordHash.make("pbkdf2-sha256$100000$c2Vjb25k$c2Vjb25k");
 const find = (handle: string) =>
   Accounts.use((accounts) => accounts.find(Handle.make(handle)));
 
-/**
- * What every `Accounts` adapter must do, written against the port: `/memory`
- * and the D1 adapter (over sqlite-node, with the migration D1 applies) run
- * it on every `verify`.
- */
 const describeAccounts = (adapter: string, layer: Layer.Layer<Accounts>) => {
   describe(`Accounts over ${adapter}`, () => {
     it.effect("finds an account by its handle, in any case", () =>
@@ -103,7 +98,6 @@ const describeAccounts = (adapter: string, layer: Layer.Layer<Accounts>) => {
 
 describeAccounts("memory", Layer.fresh(AccountsMemory.layer));
 
-/** The accounts table, as `wrangler d1 migrations apply` makes it. */
 const migrated = Layer.effectDiscard(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -118,7 +112,6 @@ const migrated = Layer.effectDiscard(
   })
 ).pipe(Layer.orDie, Layer.provide(NodeServices.layer));
 
-/** A fresh in-memory database, migrated, each time the layer is built. */
 const database = migrated.pipe(
   Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
   Layer.orDie

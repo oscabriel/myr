@@ -1,10 +1,3 @@
-/**
- * The gateway reads a project's address as the web does (ADR 0032): the
- * full name, `<owner>/<name>` or `<host>/<account>/<name>`, with a fork's
- * parts after it, and the key a project kept from before owners. Each
- * reaches the repo the project's key names in the store; an address no
- * project can have reaches none.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Fetch } from "@repo/artifacts/fetch";
@@ -18,10 +11,8 @@ import { gatewayWorld, tokens } from "./gateway.fixtures.ts";
 
 const scenario = aProject({ name: ProjectName.make("oscabriel/datekit") });
 
-/** Bare repos in the store, by the names the platform keeps them under. */
 const STORED = ["datekit", "click", "datekit--fix-week--alice"] as const;
 
-/** A world whose store holds `STORED`, each an empty bare repo. */
 const withStored = Effect.gen(function* () {
   const world = yield* gatewayWorld([scenario]);
 
@@ -34,11 +25,6 @@ const withStored = Effect.gen(function* () {
   return world;
 });
 
-/**
- * The status of a clone's first request at `address`, as alice: a fork is
- * read only by its claimant, so the gateway asks anyone else to sign in
- * before it looks the repo up.
- */
 const statusAt = (origin: string, address: string) =>
   Fetch.use(({ fetch }) =>
     fetch(

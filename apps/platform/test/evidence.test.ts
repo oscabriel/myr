@@ -1,12 +1,3 @@
-/**
- * A failing lane's log, kept and read through the platform: the
- * Answer Workflow keeps the log of alice's failing `unit` lane in the
- * stage's evidence bucket (an R2 fake here, through `EvidenceStoreR2`, as
- * the Worker composes it), her refusal names only where it is kept, and
- * `evidence` over `/rpc` gives it to her and to dora, the project's
- * decider, and to nobody else. The world is the core loop's (`world.ts`):
- * the platform's own fetch handler with real git.
- */
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { CheckAt } from "@repo/checks/check-runner";
@@ -49,7 +40,6 @@ const unit = LaneName.make("unit");
 
 const sdk = `${Brand.cliPackage}/rules`;
 
-/** The project as dora first pushes it: its run block has a `unit` lane. */
 const start = {
   [`${Brand.configDir}/project.ts`]: [
     `import { kinds, project } from "${sdk}";`,
@@ -95,23 +85,17 @@ const askFiles = Array.make(
   }
 );
 
-/**
- * The log the platform keeps of a `unit` lane the Checker failed: what the
- * run said of the lane, since a scripted run has no output of its own.
- */
 const unitLog = [
   "unit: failed in 1 ms",
   "$ run unit",
   "unit: scripted failure",
 ].join("\n");
 
-/** One object as the fake bucket keeps it. */
 interface Kept {
   readonly text: string;
   readonly customMetadata: Readonly<Record<string, string>>;
 }
 
-/** The stage's evidence bucket in memory, in the shape of the Worker's `EVIDENCE` binding. */
 const fakeBucket = () => {
   const objects = new Map<string, Kept>();
 
@@ -133,11 +117,6 @@ const fakeBucket = () => {
   return { bucket, objects };
 };
 
-/**
- * dora makes datekit and opens parse-iso; alice claims it and answers in
- * scope, and on the merged tree her ask's check passes and `unit` fails,
- * while `unit` passes on main: the answer is refused `ChecksFailed`.
- */
 const refused = Effect.gen(function* () {
   const { bucket, objects } = fakeBucket();
   const world = yield* coreLoopWorld({ evidence: EvidenceStoreR2(bucket) });
@@ -199,11 +178,9 @@ const refused = Effect.gen(function* () {
   return { aliceGit, logRef, objects, pushed, verdict, work, world };
 });
 
-/** How a read ended, success or refusal, as JSON. */
 const json = <A, E>(read: Effect.Effect<A, E>) =>
   Effect.map(Effect.exit(read), (exit) => JSON.stringify(exit));
 
-/** Everything `who` can read over `/rpc` besides `evidence`, as JSON. */
 const everythingElse = (
   world: Effect.Success<typeof refused>["world"],
   who: Someone | "anonymous"
@@ -290,13 +267,10 @@ describe("a failing lane's log, through the platform", () => {
         const asked = (who: Someone | "anonymous", payload = ref) =>
           Effect.exit(world.rpc(who).evidence(payload));
 
-        // A name pointing at another project: a real one bob makes, and one
-        // nobody made, both read as that project unknown.
         yield* world
           .rpc("bob")
           .initProject({ project: ProjectName.make("bob/burrow") });
 
-        // A log's name carries its project's key (ADR 0032).
         const elsewhere = (other: string) => ({
           project,
           ref: logRef.replace(
@@ -338,7 +312,6 @@ describe("a failing lane's log, through the platform", () => {
           ),
         });
 
-        // A log over 256 KiB comes back as its last 256 KiB.
         const long = `${"x".repeat(300 * 1024)}\n${unitLog}`;
         const kept = objects.get(logRef);
 
@@ -363,7 +336,6 @@ describe("a failing lane's log, through the platform", () => {
       Effect.gen(function* () {
         const { aliceGit, pushed, work, world } = yield* refused;
 
-        // Read first: the refused answer is still alice's latest.
         const read = [
           ...(yield* everythingElse(world, "alice")),
           ...(yield* everythingElse(world, "bob")),
@@ -371,8 +343,6 @@ describe("a failing lane's log, through the platform", () => {
           ...(yield* everythingElse(world, "anonymous")),
         ];
 
-        // Then alice tries again: this push's remote: lines are printed
-        // while the refused answer's log is kept, unlike her first push's.
         yield* aliceGit.commit(work, "Read the year, trimmed", {
           "src/parse.ts":
             "export const parse = (iso: string) => ({ month: 0, year: Number(iso.slice(0, 4).trim()) });\n",
@@ -380,8 +350,6 @@ describe("a failing lane's log, through the platform", () => {
 
         const again = yield* aliceGit.push(work);
 
-        // The log whole, as JSON escapes it, and its one line no other
-        // record of the run holds: the failure's signature.
         const needles = [
           unitLog,
           JSON.stringify(unitLog).slice(1, -1),

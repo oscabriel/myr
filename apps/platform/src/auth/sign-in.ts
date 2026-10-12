@@ -1,19 +1,3 @@
-/**
- * The platform's own sign-in: a person signs up with a handle and a
- * password, or signs in with them, on `/authorize` and `/signup`, and the
- * OAuth client that sent them there (the CLI over a loopback redirect, an
- * MCP client) gets a code for a platform token whose props are only
- * `{ handle }`. The provider validates the request and issues the code;
- * these routes decide who the person is.
- *
- * A sign-in in progress travels in the form, sealed with `COOKIE_KEY`
- * (`state.ts`), and its CSRF token in a `__Host-` cookie. Sign-in never says
- * whether a handle exists; sign-up must say a handle is taken.
- *
- * Google sign-in (`google.ts`) is offered on the same page when
- * the platform has a Google OAuth client, and reuses these pages, rules and
- * the code's completion; this module knows of it only as `SignInOffers`.
- */
 import {
   AuthorizationError,
   CimdFetchError,
@@ -57,7 +41,6 @@ import {
 } from "./state.ts";
 import type { AuthRequest, PendingSignIn } from "./state.ts";
 
-/** Sign-in's secrets: `COOKIE_KEY` signs forms, `PASSWORD_PEPPER` peppers passwords. */
 export class SignInKeys extends Context.Service<
   SignInKeys,
   {
@@ -66,35 +49,21 @@ export class SignInKeys extends Context.Service<
   }
 >()("platform/SignInKeys") {}
 
-/**
- * What the sign-in page offers besides a password: Google's sign-in when
- * the platform has a Google OAuth client, named by the origin
- * its forms may then send a person on to (`form-action`).
- */
 export class SignInOffers extends Context.Service<
   SignInOffers,
   { readonly google: Option.Option<string> }
 >()("platform/SignInOffers") {}
 
-/**
- * The handles named sessions already hold: the operator's and each one in
- * `SESSION_TOKENS`. Nobody signs up as one, or an account
- * would call as that person.
- */
+// Nobody signs up as a handle a named session holds, or an account would call as that person.
 export class HeldHandles extends Context.Service<
   HeldHandles,
   { readonly handles: readonly Handle[] }
 >()("platform/HeldHandles") {}
 
-/** What the provider's env holds: only its store. */
 export interface OAuthEnv {
   readonly OAUTH_KV: OAuthStore["Service"];
 }
 
-/**
- * Per request: the authorization server for the origin the request reached
- * (its issuer and its one resource), and the Worker's context for it.
- */
 export class Authorization extends Context.Service<
   Authorization,
   {
@@ -104,26 +73,18 @@ export class Authorization extends Context.Service<
   }
 >()("platform/Authorization") {}
 
-/** The paths the provider answers itself: its metadata and its token endpoint. */
 export const AUTHORIZATION_SERVER_PATHS = [
   "/.well-known/oauth-authorization-server",
   "/token",
 ] as const;
 
-/** The paths sign-in's pages answer, and the CLI's client metadata document. */
 export const SIGN_IN_PATHS = [
   "/authorize",
   "/signup",
   CLI_CLIENT_PATH,
 ] as const;
 
-/**
- * Handles nobody may sign up with: the platform's own words, every word
- * the web serves its own pages at, since a handle is an owner and an owner
- * is the first segment of a project's address (ADR 0032), and every key a
- * project kept from before owners, whose address the web sends on to its
- * name (`/click/…` to `/github.com/pallets/click/…`).
- */
+// A handle is an owner, the first segment of a project's address, so it may not be a word the web serves pages at.
 const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   ...reservedProjectNames,
   ...legacyProjects.map(({ key }) => key),
@@ -137,15 +98,12 @@ const RESERVED_HANDLES: ReadonlySet<string> = new Set([
   "www",
 ]);
 
-/** An account's handle: protocol's `Handle`, at most 39 characters. */
 const AccountHandle = Handle.check(Schema.isMaxLength(39));
 
 const decodeHandle = Schema.decodeUnknownOption(AccountHandle);
 
-/** A password's length, in characters as a person counts them (graphemes), never its content. */
 const PasswordLength = { max: 256, min: 12 } as const;
 
-/** What a person reads on a page, each a plain sentence. */
 export const Says = {
   handleReserved: "That handle is reserved. Choose another.",
   handleSpelling:
@@ -160,15 +118,11 @@ export const Says = {
   wrong: "The handle or password is wrong.",
 } as const;
 
-/**
- * Verified against when no account has the handle, so a missing account
- * costs the same derivation as a wrong password and timing names nobody.
- */
+// Verified against when no account has the handle, so timing names nobody.
 const STAND_IN_HASH = PasswordHash.make(
   `pbkdf2-sha256$${PasswordPolicy.iterations}$${"A".repeat(22)}$${"A".repeat(43)}`
 );
 
-/** The cookie a sign-in form's CSRF token is kept in: this site's own requests only. */
 export const CSRF_COOKIE = "__Host-sign-in";
 
 export const csrfCookie = {
@@ -181,12 +135,7 @@ export const csrfCookie = {
 const BASE_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'";
 
-/**
- * Where a form's redirect may go: the redirect URI's origin, or only its
- * scheme when its host is an IPv6 literal (`http://[::1]:<port>`), which
- * CSP's host grammar cannot name. The provider allows only https, and http
- * on a loopback host.
- */
+// CSP's host grammar cannot name an IPv6 literal host, so only its scheme.
 const redirectSource = (redirectUri: string) =>
   Option.fromNullishOr(URL.parse(redirectUri)).pipe(
     Option.filter(({ origin }) => origin !== "null"),
@@ -195,12 +144,7 @@ const redirectSource = (redirectUri: string) =>
     )
   );
 
-/**
- * The page's CSP. A form's post is answered with a redirect to the client,
- * and browsers hold that redirect to `form-action` too, so a page with a
- * form also allows its (provider-validated) redirect URI, and any other
- * place its forms may send a person on to (`formActions`: Google's sign-in).
- */
+// Browsers hold a form post's redirect to `form-action` too, so the client's redirect URI is allowed.
 const contentSecurityPolicy = (
   redirectUri?: string,
   formActions: readonly string[] = []
@@ -213,7 +157,6 @@ const contentSecurityPolicy = (
     ...formActions,
   ].join(" ");
 
-/** An HTML page that loads nothing, cannot be framed and is never cached. */
 export const htmlPage = (
   body: string,
   status: number,
@@ -234,16 +177,10 @@ export const htmlPage = (
     status,
   });
 
-/** A provider call failed: a refusal to show the person, or a defect. */
 class ProviderFailed extends Data.TaggedError("ProviderFailed")<{
   readonly cause: unknown;
 }> {}
 
-/**
- * A provider call. Its request-validation failures become a page the
- * person reads (or the client's own error redirect, when the provider
- * validated it); anything else is a defect, a 500.
- */
 const provider = <A>(call: () => Promise<A>) =>
   Effect.tryPromise({
     catch: (cause) => new ProviderFailed({ cause }),
@@ -267,7 +204,6 @@ const provider = <A>(call: () => Promise<A>) =>
     })
   );
 
-/** The provider's helpers for this request's origin, over the store. */
 const oauthApi = Effect.gen(function* () {
   const { server } = yield* Authorization;
 
@@ -276,7 +212,7 @@ const oauthApi = Effect.gen(function* () {
   return server.getOAuthApi({ OAUTH_KV: store });
 });
 
-/** A sealed request in the provider's own type: an absent key stays absent, never `undefined`. */
+// An absent key stays absent, never `undefined`.
 const forProvider = (request: AuthRequest) => {
   const provided: ProviderAuthRequest = {
     clientId: request.clientId,
@@ -305,7 +241,6 @@ const forProvider = (request: AuthRequest) => {
   return provided;
 };
 
-/** Who asks, as the provider describes the client (its name may be the client's own claim). */
 export const askerOf = (request: AuthRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
@@ -324,7 +259,6 @@ export const askerOf = (request: AuthRequest) =>
     return asker;
   });
 
-/** Where signing in starts for `request`: `/authorize` with its own parameters. */
 export const authorizeHref = (request: AuthRequest) => {
   const query = new URLSearchParams({
     client_id: request.clientId,
@@ -351,12 +285,10 @@ export const authorizeHref = (request: AuthRequest) => {
 
 const encodeToken = Schema.encodeEffect(Schema.Uint8ArrayFromBase64Url);
 
-/** A fresh CSRF token each time it runs: 32 random bytes, base64url. */
 export const freshCsrf = Effect.sync(() =>
   crypto.getRandomValues(new Uint8Array(32))
 ).pipe(Effect.flatMap(encodeToken), Effect.orDie);
 
-/** What a sign-in or sign-up form posts. */
 const PostedForm = Schema.Struct({
   csrf: Schema.String,
   handle: Schema.String,
@@ -366,11 +298,6 @@ const PostedForm = Schema.Struct({
 
 type PostedForm = typeof PostedForm.Type;
 
-/**
- * The posted form and the sign-in it continues: sealed by this platform
- * with `COOKIE_KEY`, not expired, and its CSRF token the same in the seal,
- * the form and this browser's cookie. Anything else starts again.
- */
 const postedSignIn = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const { cookieKey } = yield* SignInKeys;
@@ -390,24 +317,18 @@ const postedSignIn = (request: HttpServerRequest.HttpServerRequest) =>
     return { form, pending };
   });
 
-/** The client's address, as Cloudflare saw it. */
 export const addressOf = (request: HttpServerRequest.HttpServerRequest) =>
   request.headers["cf-connecting-ip"] ?? "unknown";
 
 const graphemes = new Intl.Segmenter("en", { granularity: "grapheme" });
 
-/** Characters as a person counts them: graphemes, not UTF-16 units. */
 const lengthOf = (password: string) => [...graphemes.segment(password)].length;
 
 const passwordFits = (password: string) =>
   lengthOf(password) >= PasswordLength.min &&
   lengthOf(password) <= PasswordLength.max;
 
-/**
- * The provider records the grant and its code, and the browser goes back
- * to the client with it. The token's props carry only `{ handle }`; the
- * grant's user is the handle's key, so a grant is one account's in any case.
- */
+// The grant's user is the handle's key, so a grant is one account's in any case.
 export const completed = (handle: Handle, request: AuthRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
@@ -437,11 +358,6 @@ export const completed = (handle: Handle, request: AuthRequest) =>
     );
   });
 
-/**
- * The sign-in page for `request` with `form`, and the ways to sign in on
- * offer: Google's too, and its origin among the places the forms may send
- * a person on to, when the platform offers it.
- */
 const offeredSignIn = (
   request: AuthRequest,
   form: PendingForm,
@@ -461,11 +377,6 @@ const offeredSignIn = (
     );
   });
 
-/**
- * The sign-in form for `request`, afresh: a new CSRF token, sealed with the
- * request into the form and set as this browser's cookie, and why the
- * person is here again (`message`), if they are.
- */
 export const signInPageFor = (
   request: AuthRequest,
   status: number,
@@ -496,7 +407,6 @@ export const signInPageFor = (
     );
   });
 
-/** `GET /authorize`: the provider validates the client's request; the sign-in form. */
 const showSignIn = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const api = yield* oauthApi;
@@ -508,7 +418,6 @@ const showSignIn = (request: HttpServerRequest.HttpServerRequest) =>
     return yield* signInPageFor(parsed, 200);
   });
 
-/** The sign-in form again, with why it did not go through. */
 const signInAgain = (
   pending: PendingSignIn,
   form: PendingForm,
@@ -516,14 +425,7 @@ const signInAgain = (
   message: string
 ) => offeredSignIn(pending.request, form, status, message);
 
-/**
- * A posted sign-in form, by handle and password, then `signedIn` with the
- * person's handle and the sign-in it continues. The sixth attempt in a
- * minute for one handle, or from one address, is refused before any
- * password is checked; a wrong handle and a wrong password read the same,
- * and show the sign-in form again; a hash made with fewer iterations than
- * today's is replaced.
- */
+// A wrong handle and a wrong password read the same.
 export const byPassword = <E, R>(
   request: HttpServerRequest.HttpServerRequest,
   signedIn: (
@@ -588,11 +490,9 @@ export const byPassword = <E, R>(
     return yield* signedIn(account.value.handle, pending);
   });
 
-/** `POST /authorize`: signed in by handle and password, back to the client with a code. */
 const signIn = (request: HttpServerRequest.HttpServerRequest) =>
   byPassword(request, (handle, pending) => completed(handle, pending.request));
 
-/** `GET /signup?request=<sealed>`: the sign-up form for a sign-in in progress. */
 const showSignUp = Effect.gen(function* () {
   const { cookieKey } = yield* SignInKeys;
 
@@ -615,17 +515,11 @@ const showSignUp = Effect.gen(function* () {
   );
 });
 
-/** Why a sign-up did not go through: the page's status and its plain sentence. */
 export interface Refused {
   readonly message: string;
   readonly status: number;
 }
 
-/**
- * The handle a new account may take, or why it may not: its spelling, the
- * platform's reserved words, and the handles named sessions hold (taken,
- * like an account's). Sign-up and Google's first sign-in both use it.
- */
 export const chosenHandle = (
   handle: string,
   held: readonly Handle[]
@@ -645,7 +539,6 @@ export const chosenHandle = (
     },
   });
 
-/** The handle a sign-up may take, or why it may not: `chosenHandle`'s rules, and the password's length. */
 const signUpHandle = (
   form: PostedForm,
   held: readonly Handle[]
@@ -656,11 +549,6 @@ const signUpHandle = (
       : Result.fail({ message: Says.passwordLength, status: 400 })
   );
 
-/**
- * `POST /signup`: a new account, then signed in at once. Sign-ups are
- * limited per address like sign-ins; a taken handle, in any case, is said
- * to be taken, whether an account or a named session holds it.
- */
 const signUp = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const { pepper } = yield* SignInKeys;
@@ -713,7 +601,6 @@ const signUp = (request: HttpServerRequest.HttpServerRequest) =>
     return yield* completed(checked.success, pending.request);
   });
 
-/** `GET /oauth/cli`: the CLI's client metadata document, its URL its client id. */
 const cliClient = Effect.gen(function* () {
   const { origin } = yield* Authorization;
 
@@ -722,7 +609,6 @@ const cliClient = Effect.gen(function* () {
   });
 });
 
-/** Metadata and the token endpoint, as the provider answers them. */
 const authorizationServer = (request: HttpServerRequest.HttpServerRequest) =>
   Effect.gen(function* () {
     const { context, server } = yield* Authorization;
@@ -738,7 +624,6 @@ const authorizationServer = (request: HttpServerRequest.HttpServerRequest) =>
     return HttpServerResponse.fromWeb(response);
   });
 
-/** A failed sign-in: the client's own error redirect, or a page to start again from. */
 export const failedPage = (failed: SignInFailed) =>
   Effect.succeed(
     failed.redirectTo === undefined
@@ -749,7 +634,6 @@ export const failedPage = (failed: SignInFailed) =>
         })
   );
 
-/** What the routes run on, besides the request's own `Authorization`. */
 export type SignInServices =
   | Accounts
   | HeldHandles
@@ -758,10 +642,6 @@ export type SignInServices =
   | SignInKeys
   | SignInOffers;
 
-/**
- * Sign-in's routes, each run with the services taken once when the router
- * is built; `Authorization` comes with each request.
- */
 export const signInRoutes = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const services = Context.make(Accounts, yield* Accounts).pipe(
@@ -772,7 +652,6 @@ export const signInRoutes = HttpRouter.use((router) =>
       Context.add(SignInOffers, yield* SignInOffers)
     );
 
-    /** Adds a route, its failures shown as pages and the services provided. */
     const add = <R>(
       method: "*" | "GET" | "POST",
       path: HttpRouter.PathInput,

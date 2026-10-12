@@ -1,15 +1,3 @@
-/**
- * A fake Google for sign-in tests, behind the `Fetch` port: its discovery
- * document, its token endpoint and its keys (JWKS), signing ID tokens with
- * an RSA key the test made. A test plays Google's consent screen with
- * `consent`: it reads the authorization request the platform sent the
- * browser to, and answers with the callback URL Google would send it back
- * to, its code bound to the request's PKCE challenge and nonce.
- *
- * `googleWorld` is the sign-in Worker as `worker.ts` builds it, over the
- * fake env (Google's client set, unless a test says not), accounts and
- * links in memory and the fake Google, with a browser that keeps cookies.
- */
 import { Fetch } from "@repo/artifacts/fetch";
 import { untouchable } from "@repo/testkit/untouchable";
 import { Clock, Effect, Layer, Option, Ref, Schema } from "effect";
@@ -27,7 +15,6 @@ import { oauthProvider, signInSettings } from "../src/auth/provider.ts";
 import { decodeEnv } from "../src/platform.ts";
 import { fakeEnv } from "./fake-env.ts";
 
-/** The Google OAuth client every Google test signs in with (H4 makes the real one). */
 export const clientId = "419-test.apps.googleusercontent.com";
 
 export const clientSecret = "GOCSPX-a-test-client-secret";
@@ -36,13 +23,10 @@ export const tokenEndpoint = "https://oauth2.googleapis.com/token";
 
 export const jwksUri = "https://www.googleapis.com/oauth2/v3/certs";
 
-/** Google's two optional keys in the Worker's env (`.env.schema`). */
 export type GoogleKey = "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET";
 
-/** The Worker's env with Google's keys, which the generated `Env` leaves out (optional secrets). */
 export type GoogleEnv = Env & Readonly<Partial<Record<GoogleKey, string>>>;
 
-/** The fake env with the named halves of Google's client set (both by default). */
 export const googleEnv = (
   keys: readonly GoogleKey[] = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
 ): GoogleEnv => {
@@ -69,7 +53,6 @@ const isKeyPair = (key: CryptoKey | CryptoKeyPair): key is CryptoKeyPair =>
 const isJwk = (key: ArrayBuffer | JsonWebKey): key is JsonWebKey =>
   !(key instanceof ArrayBuffer);
 
-/** A fresh RS256 key pair, its public half as a JWK under `kid`. */
 const keyPair = (kid: string) =>
   Effect.gen(function* () {
     const pair = yield* Effect.promise(() =>
@@ -104,10 +87,6 @@ const keyPair = (kid: string) =>
 
 export type KeyPair = Effect.Success<ReturnType<typeof keyPair>>;
 
-/**
- * The ID token claims a test may change, beside the subject. An `azp` set
- * to `undefined` leaves the claim out (JSON drops it).
- */
 export interface Claims {
   readonly aud?: string | readonly string[];
   readonly azp?: string | undefined;
@@ -116,11 +95,6 @@ export interface Claims {
   readonly nonce?: string;
 }
 
-/**
- * How Google answers one code: the person (`sub`), and anything a test
- * changes about the ID token: its claims, the key it is signed with, or the
- * `kid` its header names.
- */
 export interface Consent {
   readonly claims?: Claims;
   readonly kid?: string;
@@ -128,7 +102,6 @@ export interface Consent {
   readonly sub: string;
 }
 
-/** What the platform asked Google for, as Google's consent screen reads it. */
 const AuthorizationRequest = Schema.Struct({
   client_id: Schema.String,
   code_challenge: Schema.String,
@@ -143,7 +116,6 @@ const AuthorizationRequest = Schema.Struct({
 const decodeAuthorizationRequest =
   Schema.decodeUnknownSync(AuthorizationRequest);
 
-/** The code exchange the platform posts to the token endpoint. */
 const CodeExchange = Schema.Struct({
   client_id: Schema.String,
   client_secret: Schema.String,
@@ -160,13 +132,11 @@ interface Grant {
   readonly request: typeof AuthorizationRequest.Type;
 }
 
-/** The S256 challenge of `verifier`. */
 const s256 = (verifier: string) =>
   Effect.promise(() => crypto.subtle.digest("SHA-256", utf8(verifier))).pipe(
     Effect.map((digest) => base64Url(new Uint8Array(digest)))
   );
 
-/** A fake Google for one test, and what it was asked. */
 export const fakeGoogle = Effect.gen(function* () {
   const signing = yield* keyPair("google-key-1");
 
@@ -178,7 +148,6 @@ export const fakeGoogle = Effect.gen(function* () {
 
   const exchanges = yield* Ref.make<readonly string[]>([]);
 
-  /** An ID token for `grant`, signed as `grant.consent` says. */
   const idToken = (grant: Grant) =>
     Effect.gen(function* () {
       const now = Math.floor((yield* Clock.currentTimeMillis) / 1000);
@@ -219,7 +188,6 @@ export const fakeGoogle = Effect.gen(function* () {
       return `${header}.${claims}.${base64Url(new Uint8Array(signature))}`;
     });
 
-  /** Google's token endpoint: the code, its client and its PKCE verifier, or `invalid_grant`. */
   const token = (request: Request) =>
     Effect.gen(function* () {
       const form = Object.fromEntries(
@@ -302,11 +270,6 @@ export const fakeGoogle = Effect.gen(function* () {
       }),
   });
 
-  /**
-   * Google's consent screen: the person `consent.sub` signs in for the
-   * authorization request at `location`, and Google sends the browser back
-   * to its redirect URI with a code and the request's `state`.
-   */
   const consent = (location: string, given: Consent) =>
     Effect.gen(function* () {
       const request = decodeAuthorizationRequest(
@@ -327,7 +290,6 @@ export const fakeGoogle = Effect.gen(function* () {
       return back;
     });
 
-  /** Google starts signing with a new key, and publishes it beside the old one. */
   const rotate = (kid: string) =>
     Effect.gen(function* () {
       const next = yield* keyPair(kid);
@@ -337,7 +299,6 @@ export const fakeGoogle = Effect.gen(function* () {
       return next;
     });
 
-  /** How many times a URL was fetched. */
   const timesFetched = (url: string) =>
     Ref.get(fetched).pipe(
       Effect.map((all) => all.filter((each) => each === url).length)
@@ -355,7 +316,6 @@ export const fakeGoogle = Effect.gen(function* () {
 
 export type FakeGoogle = Effect.Success<typeof fakeGoogle>;
 
-/** Where a request comes from, as a browser decides which cookies go with it. */
 export type Site = "cross-site" | "same-site";
 
 interface Kept {
@@ -363,12 +323,6 @@ interface Kept {
   readonly value: string;
 }
 
-/**
- * A browser for `handler`: it keeps the cookies responses set (dropping one
- * set with `Max-Age=0`) and sends them back, except that a `SameSite=Strict`
- * cookie stays home on a request from another site, as Google's redirect
- * back to the callback is.
- */
 const browserFor = (handler: (request: Request) => Promise<Response>) => {
   const jar = new Map<string, Kept>();
 
@@ -415,22 +369,13 @@ const browserFor = (handler: (request: Request) => Promise<Response>) => {
   };
 };
 
-/** A Worker's context the provider is handed and never needs. */
 const context = untouchable<ExecutionContext>("ExecutionContext");
 
-/** What the rest of the platform answers: only the auth routes are sign-in's. */
 const platformFetch = (request: Request) =>
   Promise.resolve(
     new Response(`platform: ${new URL(request.url).pathname}`, { status: 418 })
   );
 
-/**
- * The sign-in Worker with Google's client set (or not, `google: false`), and
- * `COOKIE_KEY` as the fake env has it unless a test names another. The
- * global `fetch` answers the CLI's client metadata document from the Worker
- * itself, as the public internet does on Cloudflare; Google is reached only
- * through the `Fetch` port.
- */
 export const googleWorld = (
   options: { readonly cookieKey?: string; readonly google?: boolean } = {}
 ) =>

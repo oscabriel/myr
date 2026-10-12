@@ -4,13 +4,8 @@ import { Effect, Layer, Option, Ref } from "effect";
 import { handleKey } from "../accounts.ts";
 import { Identities, IdentityTaken } from "../identities.ts";
 
-/** A link's key: the provider and the subject, as D1's primary key pairs them. */
 const keyOf = (provider: string, subject: string) => `${provider}\n${subject}`;
 
-/**
- * Links in memory, keyed like D1's table: by (provider, subject), each to a
- * handle's key. A fresh, empty store each time the layer is built.
- */
 export const IdentitiesMemory = {
   layer: Layer.effect(
     Identities,

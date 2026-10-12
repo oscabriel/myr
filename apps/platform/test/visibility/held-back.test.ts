@@ -1,14 +1,3 @@
-/**
- * The `Answer` Workflow judged by the sealed suite its claim was pinned to:
- * its held-back step, the landing
- * guards before any check, and the scans that keep a stored value out of
- * what leaves a run, over the Answer Workflow's world with the visibility
- * cartridge's parts plugged in (`held-back.fixtures.ts`).
- *
- * A stored value in an added file is quarantined as a refusal that names
- * nothing (`VerifierBlocked`) until the project service can open the
- * `SecretInTree` decision that should hold it for the deciders.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ObjectId, RepoHost, RepoNotFound } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -106,7 +95,6 @@ import {
   suiteRoot,
 } from "./held-back.fixtures.ts";
 
-/** The program run for `answer` over a fresh step record. */
 const run = (answer: Admitted) =>
   Effect.flatMap(memoSteps(), (steps) =>
     runAnswer({ project, requestId: answer.requestId }).pipe(
@@ -114,14 +102,12 @@ const run = (answer: Admitted) =>
     )
   );
 
-/** Every public lane on `at` passes: the ask's check and every project lane. */
 const allGreen = (at: CheckAt) =>
   Effect.andThen(
     scriptProjectLanes(at, { result: "passed" }),
     Checker.use((script) => script.script(at, askLane, [{ result: "passed" }]))
   );
 
-/** The held-back checks of `areas` fail from now on, one check in each. */
 const failing = (...areas: readonly (typeof exportArea)[]) =>
   Sealed.use(({ failing: next }) => Ref.set(next, new Set(areas)));
 
@@ -129,7 +115,6 @@ const decodeVerdict = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Verdict)
 );
 
-/** The verdict note on `commit` in `at`, read as plain git finds it. */
 const noteIn = (at: RepoName, commit: CommitSha) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -162,13 +147,8 @@ const noteIn = (at: RepoName, commit: CommitSha) =>
     );
   });
 
-/** The verdict note on `head` in bob's fork. */
 const noteOn = (head: CommitSha) => noteIn(bobFork, head);
 
-/**
- * bob's next answer on the same claim: `files` pushed on his fork's last
- * head, and submitted; its merged tree's public lanes all pass.
- */
 const answerAgain = (answer: Admitted, files: Files) =>
   Effect.gen(function* () {
     const head = yield* Pusher.use((each) =>
@@ -268,7 +248,6 @@ describe("the held-back step", () => {
 
         expect(outcomes).toStrictEqual([outcomes[0], outcomes[0], outcomes[0]]);
         expect(yield* Sealed.use(({ judged }) => judged)).toBe(1);
-        // The next answer on the claim is its second failure, not its third.
         expect(yield* run(second)).toStrictEqual(
           Outcome.cases.Refused.make({
             refusals: [
@@ -451,18 +430,15 @@ describe("the held-back step", () => {
             suite: suiteRoot,
           },
         ]);
-        // No layer repo, route or token: only the files, read by the platform.
         expect(JSON.stringify(jobs)).not.toContain(maintainers);
       }).pipe(Effect.provide(sealedWorld(policy)))
   );
 });
 
-/** A file in the ask's territory holding a sealed check's bytes, blob for blob. */
 const copied = RepoPath.make("packages/parser/src/copied.ts");
 
 const copiedContent = sealedFiles[0]?.content ?? "";
 
-/** Every Checker job on the merged tree `at`. */
 const jobsOn = (at: CheckAt) =>
   Checker.use(({ jobs }) =>
     Effect.map(jobs, (all) => all.filter((job) => shaOf(job.at) === shaOf(at)))
@@ -470,7 +446,6 @@ const jobsOn = (at: CheckAt) =>
 
 const encoder = new TextEncoder();
 
-/** The git id of a blob holding `text`. */
 const blobIdOf = (text: string) =>
   Effect.map(
     Effect.promise(() =>
@@ -487,10 +462,6 @@ const blobIdOf = (text: string) =>
       )
   );
 
-/**
- * The world's host, with each blob read from bob's fork going through
- * `read` (given the read the host would make), as the Workflow sees it.
- */
 const forkReads = (
   read: (
     id: ObjectId,
@@ -695,21 +666,15 @@ describe("the landing guards", () => {
   );
 });
 
-/** datekit's `SENTRY_AUTH_TOKEN`, as a decider stores it. */
 const sentry = EnvKey.make("SENTRY_AUTH_TOKEN");
 
 const token = "sntrys_0a1b2c3d4e5f6a7b8c9d";
 
-/** alice stores datekit's Sentry token: a write-only value. */
 const stored = (answer: Admitted) =>
   answer.api
     .setEnv(alice, { key: sentry, value: Redacted.make(token) })
     .pipe(Effect.orDie);
 
-/**
- * Everything the answerer reads of their answer, as text: its status, its
- * verdict, the note on its head, and the project's events.
- */
 const answererReads = (answer: Admitted) =>
   Effect.gen(function* () {
     const status = yield* answer.api.status(bob);
@@ -752,8 +717,6 @@ describe("a stored value where it must not be", () => {
         const outcome = yield* run(answer);
         const read = yield* answererReads(answer);
 
-        // Until the project can open the deciders' `SecretInTree` decision
-        // (and the answer waits, `AwaitingDecision`), a refusal naming nothing.
         expect(outcome).toStrictEqual(
           Outcome.cases.Refused.make({ refusals: [new VerifierBlocked({})] })
         );
@@ -831,7 +794,6 @@ describe("a stored value where it must not be", () => {
             ...policy,
             run: {
               ...policy.run,
-              // A decider's slip: the value in a lane's command, which every verdict quotes.
               checks: {
                 ...policy.run.checks,
                 [LaneName.make("unit")]: Command.make(
@@ -845,10 +807,8 @@ describe("a stored value where it must not be", () => {
   );
 });
 
-/** A fork the adapter clones from, in a store of its own. */
 const sandboxFork = RepoName.make("alice__datekit--parse-iso--bob");
 
-/** A held-back job, as the held-back step sends it: the suite alone. */
 const sealedJob: CheckJob = {
   at: CheckAt.cases.Tree.make({ tree: TreeSha.make("5".repeat(40)) }),
   heldBack: heldBackJob,
@@ -860,16 +820,11 @@ const sealedJob: CheckJob = {
   run: policy.run,
 };
 
-/** The bits a sandbox that ran `job`'s suite reports when every check passed. */
 const allPassed: readonly HeldBackResult[] = [
   { area: exportArea, passed: 2, suite: suiteRoot, total: 2 },
   { area: parserArea, passed: 1, suite: suiteRoot, total: 1 },
 ];
 
-/**
- * `CheckRunnerSandbox` over a sandbox that answers every job with
- * `heldBack` as its area bits, and keeps each wire it was sent, encoded.
- */
 const overSandbox = (heldBack: readonly HeldBackResult[]) =>
   Effect.gen(function* () {
     const sent: (typeof CheckWire.Encoded)[] = [];
@@ -958,14 +913,11 @@ describe("a held-back job through the sandbox", () => {
           readonly job: CheckJob;
           readonly bits: readonly HeldBackResult[];
         }[] = [
-          // An area left out.
           { bits: allPassed.slice(0, 1), job: sealedJob },
-          // Another suite's bits.
           {
             bits: allPassed.map((each) => ({ ...each, suite: otherSuite })),
             job: sealedJob,
           },
-          // More checks passed than the area has.
           {
             bits: allPassed.map((each) => ({
               ...each,
@@ -973,12 +925,10 @@ describe("a held-back job through the sandbox", () => {
             })),
             job: sealedJob,
           },
-          // A count that is not the area's.
           {
             bits: allPassed.map((each) => ({ ...each, total: each.total + 1 })),
             job: sealedJob,
           },
-          // Bits for a job that sent no suite.
           { bits: allPassed, job: Struct.omit(sealedJob, ["heldBack"]) },
         ];
 

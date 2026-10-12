@@ -1,20 +1,3 @@
-/**
- * The platform's `/`: a page saying what this host serves (clone URLs,
- * MCP, agent skills, RPC, sign-in, the CLI and its releases, drafting, the
- * web app), in HTML for a browser and in Markdown for an agent that asks
- * for `text/markdown` or `text/plain`. The Markdown is the web's
- * `/llms.txt` (`@repo/agent-kit/host-doc`), so both hosts say the same.
- *
- * Every URL is built from the request's origin, the one the client reached:
- * the platform is also the git remote, the MCP base and the CLI's URL, so
- * the page names them as the reader will type them. The projects are the
- * front page's, and nothing else: no layer and no fork is listed; each
- * one's posture is the one its own ledger stands at, as `listProjects`
- * answers it (`withStandingPosture`), so `/` and the web's `/llms.txt`
- * stay one text. Every value that reaches the HTML is escaped. Not a
- * redirect: the web app is a link, so the host stays discoverable at its
- * own address.
- */
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { frontLlms, MCP_PROTOCOL } from "@repo/agent-kit/host-doc";
 import { Brand } from "@repo/brand";
@@ -28,13 +11,10 @@ import { Effect, Option } from "effect";
 import { escapeHtml, page } from "./auth/pages.ts";
 import { HostInfo } from "./host-info.ts";
 
-/** A minute: the page changes only when a project is made. */
 const BRIEFLY = "public, max-age=60";
 
-/** The CLI's commands, as the platform's skill and the web's `llms.txt` list them. */
 const commands = commandDocs(Contracts);
 
-/** The media ranges of an `Accept` header, each its type and its quality. */
 const rangesOf = (accept: string) =>
   accept.split(",").map((range) => {
     const [type = "", ...params] = range.split(";").map((part) => part.trim());
@@ -52,7 +32,6 @@ const rangesOf = (accept: string) =>
     return { quality, type: type.toLowerCase() };
   });
 
-/** The highest quality `ranges` give any of `types` by name; 0 for none. */
 const qualityOf = (
   ranges: ReturnType<typeof rangesOf>,
   types: readonly string[]
@@ -62,11 +41,6 @@ const qualityOf = (
     ...ranges.filter(({ type }) => types.includes(type)).map((r) => r.quality)
   );
 
-/**
- * Whether the request asks for Markdown: it names `text/markdown` or
- * `text/plain` itself, at least as high as it names `text/html`. A
- * wildcard alone (`*\/*`, or no `Accept`) gets the page, as a browser does.
- */
 const wantsMarkdown = (request: Request) => {
   const ranges = rangesOf(request.headers.get("accept") ?? "");
   const markdown = qualityOf(ranges, ["text/markdown", "text/plain"]);
@@ -104,7 +78,6 @@ const projectsSection = (origin: string, projects: readonly ProjectListing[]) =>
         )
   );
 
-/** The page for a browser. */
 const homeHtml = (input: {
   readonly origin: string;
   readonly projects: readonly ProjectListing[];
@@ -154,12 +127,10 @@ const homeHtml = (input: {
       ),
       section("Health", `<p>${link(`${origin}/health`)}</p>`),
     ].join("\n"),
-    // Wider than sign-in's column, for clone and install lines.
     "document"
   );
 };
 
-/** `/` for `request`: Markdown for an agent that asks for it, else the page. */
 export const homeResponse = (
   request: Request
 ): Effect.Effect<Response, never, FrontPage | HostInfo | Projects> =>
