@@ -1,10 +1,3 @@
-/**
- * The sandbox Worker. Its default entrypoint is reached only through the
- * platform's `SANDBOX` service binding: each method takes a job's wire,
- * encoded, and returns the job's `Exit`, encoded as JSON, so both sides
- * decode with the schemas in `@repo/checks/check-runner/wire` and
- * `@repo/project/lander/wire`.
- */
 import type { CheckExit, CheckWire } from "@repo/checks/check-runner/wire";
 import type {
   BundleExit,
@@ -25,9 +18,7 @@ export { Checker } from "./checker.ts";
 
 export { Lander } from "./lander.ts";
 
-// The Checker's container reaches out only through these, and its Durable
-// Object finds them in `ctx.exports`, which holds a loopback for each export
-// of this module alone (outbound.ts, env-gateway.ts).
+// `ctx.exports` holds a loopback only for the main module's exports.
 export { CloneGateway, EgressGateway } from "./outbound.ts";
 
 export { EnvGateway } from "./env-gateway.ts";

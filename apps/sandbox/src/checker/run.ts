@@ -1,29 +1,6 @@
-/**
- * One check job, phase by phase, in one container that holds no credential:
- *
- * 1. clone: the job's tree, through the clone route, whose gateway adds the
- *    read token outside the container;
- * 2. the plan from `@repo/checks/phases`, keyed by the lockfiles just cloned:
- *    setup (or a snapshot of an earlier one) with egress to the registries
- *    and the run block's `setupEgress` only, the snapshot, egress off, the
- *    sealed suite's files when the job has one, the lanes and then each
- *    sealed check, the report.
- *
- * The container is destroyed however the job ends, and its logs are handed
- * to `CheckLogs` before that; the result carries none (a count lane's
- * stdout, in `outputs`, is a result, not a log). A job the Checker
- * cannot run to the end (a clone or a setup that fails, a sealed file it
- * cannot write) is `VerifierBlocked`: the gate's trouble, never the
- * answer's. A lane that fails or runs out of time is that lane's result.
- *
- * A sealed suite is written only after the
- * snapshot and with egress off, so no snapshot and no request carries it
- * out, and it reports one result per area (`@repo/checks/held-back-filter`).
- * From its first write on, nothing a command prints leaves the Checker: the
- * sealed checks' output is dropped, and so is that of the public lanes
- * that run beside the sealed files (a `bun test` with no path finds them
- * too), which report only how they ended.
- */
+// A sealed suite is written only after the snapshot and with egress off. From
+// its first write on, nothing a command prints leaves the Checker, the public
+// lanes' output included (a `bun test` with no path finds the sealed files).
 import { CheckAt, evidenceFrom } from "@repo/checks/check-runner";
 import type {
   CheckRun,
@@ -60,13 +37,9 @@ import {
 } from "./network.ts";
 import { Snapshots } from "./snapshots.ts";
 
-/** Where the job's tree is checked out, and every command runs. */
 export const REPO = "/workspace/repo";
 
-/**
- * The CA the container's outbound intercepts present: every HTTPS request
- * leaves through one, so every TLS client trusts this CA alone.
- */
+/** Every HTTPS request leaves through an intercept, so TLS clients trust its CA alone. */
 const CA = "/etc/cloudflare/certs/cloudflare-containers-ca.crt";
 
 const TRUST = {
@@ -79,10 +52,7 @@ const TRUST = {
   SSL_CERT_FILE: CA,
 };
 
-/**
- * The project's own bins first, as `npm run` puts them (an
- * ASSUMPTION), then the image's.
- */
+/** The project's own bins first, as `npm run` puts them. */
 const PATH = [
   `${REPO}/node_modules/.bin`,
   "/usr/local/sbin",
@@ -93,10 +63,7 @@ const PATH = [
   "/bin",
 ].join(":");
 
-/**
- * The whole environment every command sees: fixed, so two runs of one tree
- * see the same one, and holding nothing secret.
- */
+/** Fixed, so two runs of one tree see the same env. */
 const ENV = {
   ...TRUST,
   CI: "1",
@@ -111,13 +78,7 @@ const ENV = {
   PATH,
 };
 
-/**
- * The env every command of the project runs with (setup, the lanes, each
- * sealed check): each write-only value's placeholder (a process
- * env beats any resolver, so an unchanged `.env.schema` still loads), under
- * the Checker's own env, which no item's key displaces (an item named
- * `PATH` or `NODE_EXTRA_CA_CERTS` keeps the Checker's). Never a value.
- */
+/** Placeholders, never values; no item's key displaces the Checker's own env. */
 const commandEnv = (placeholders: readonly EnvPlaceholder[]) => ({
   ...Object.fromEntries(
     placeholders.map(({ key, placeholder }) => [key, placeholder])
@@ -125,7 +86,6 @@ const commandEnv = (placeholders: readonly EnvPlaceholder[]) => ({
   ...ENV,
 });
 
-/** The identity of the commit a checked tree is checked out as. */
 const GIT_ENV = {
   ...ENV,
   GIT_AUTHOR_DATE: "2026-10-06T12:00:00Z",
@@ -136,7 +96,6 @@ const GIT_ENV = {
   GIT_COMMITTER_NAME: "Checker",
 };
 
-/** The files whose contents decide what setup installs. */
 const LOCKFILES = [
   "bun.lock",
   "bun.lockb",
@@ -154,27 +113,20 @@ const LOCKFILES = [
 
 const CLONE_LIMIT = Duration.minutes(5);
 
-/** Making room for the sealed files is quick; it never waits on the network. */
 const ROOM_LIMIT = Duration.minutes(1);
 
 const SETUP_LIMIT = Duration.minutes(15);
 
-/**
- * A lane with no time limit of its own gets ten minutes, as `/local` gives;
- * so does each sealed check.
- */
 const LANE_LIMIT = Duration.minutes(10);
 
 const timedOut: RunExit = { code: -1, stderr: "", stdout: "", timedOut: true };
 
-/** Hosts a failed setup's output names: in URLs and in resolver errors. */
 const HOSTS_IN_OUTPUT = [
   /\bhttps?:\/\/(?<host>[a-z0-9.-]+)/giu,
   /\bgetaddrinfo \w+ (?<host>[a-z0-9.-]+)/giu,
   /\bresolve host:? (?<host>[a-z0-9.-]+)/giu,
 ];
 
-/** The hosts `text` names that `allowed` does not let out. */
 const refusedIn = (text: string, allowed: readonly string[]) => [
   ...new Set(
     HOSTS_IN_OUTPUT.flatMap((pattern) =>
@@ -207,20 +159,14 @@ export const blocked = (
     Effect.andThen(Effect.fail(new VerifierBlocked({})))
   );
 
-/**
- * A lane's run, as the lane's result, what it leaves for comparison, and,
- * for a count lane that ran to its end, what it printed.
- */
 interface LaneRan {
   readonly result: LaneResult;
   readonly evidence: Option.Option<LaneEvidence>;
   readonly output: Option.Option<LaneOutput>;
 }
 
-/** Every phase's log so far, handed to `CheckLogs` when the check ends. */
 type Kept = Ref.Ref<readonly PhaseLog[]>;
 
-/** Adds `log`'s text to the log of its phase and name, starting it if new. */
 const keep = (kept: Kept, log: PhaseLog) =>
   Ref.update(kept, (logs) =>
     logs.some(({ name, phase }) => phase === log.phase && name === log.name)
@@ -232,25 +178,16 @@ const keep = (kept: Kept, log: PhaseLog) =>
       : [...logs, log]
   );
 
-/** Where a command's output goes: into its phase's log, or nowhere. */
 type Recorder = (text: string) => Effect.Effect<void>;
 
-/** Into the log of `log`'s phase and name. */
 const keeping =
   (kept: Kept, log: Omit<PhaseLog, "text">): Recorder =>
   (text) =>
     keep(kept, { ...log, text });
 
-/** Nowhere: the command ran beside the sealed files. */
 const dropping: Recorder = () => Effect.void;
 
-/**
- * One command, to its end or `limit` (none when it ran out of time), its
- * output handed to `record`. At the limit the Checker stops waiting for
- * it; the process itself ends only when the container is destroyed (the
- * `Box` adapter aborts an `exec` that is still starting, not one already
- * running).
- */
+/** None when it ran out of time. */
 const exec = (
   record: Recorder,
   argv: readonly [string, ...string[]],
@@ -272,7 +209,6 @@ const exec = (
     )
   );
 
-/** One git command of the checkout, which must succeed: its output. */
 const git = (kept: Kept, ...args: readonly string[]) =>
   exec(
     keeping(kept, { name: "clone", phase: "clone" }),
@@ -300,12 +236,7 @@ const git = (kept: Kept, ...args: readonly string[]) =>
     )
   );
 
-/**
- * The job's tree as the work tree's HEAD, fetched from `url` (the clone
- * host, which holds no token) into an empty repo or the one a snapshot
- * brought back. `clean` keeps what setup installed (ignored files) and drops
- * anything else the tree does not hold.
- */
+/** `clean` keeps ignored files, which setup installed. */
 const checkout = (kept: Kept, url: string, at: CheckAt) =>
   Effect.gen(function* () {
     const fetch = (refspec: string) =>
@@ -340,19 +271,13 @@ const checkout = (kept: Kept, url: string, at: CheckAt) =>
     yield* git(kept, "-C", REPO, "clean", "-q", "-ffd");
   });
 
-/** What the phases share for one job. */
 interface Job {
   readonly wire: CheckWire;
   readonly kept: Kept;
-  /** The env the project's commands run with: placeholders, never values. */
   readonly env: Readonly<Record<string, string>>;
-  /** The URL the container clones from: the clone host, no token. */
   readonly url: string;
-  /** Whether setup was skipped for a snapshot of an earlier one. */
   readonly restored: Ref.Ref<boolean>;
-  /** Whether the work tree holds sealed files yet: from then on, no output is kept. */
   readonly sealed: Ref.Ref<boolean>;
-  /** How each sealed check ended, in the job's order. */
   readonly exits: Ref.Ref<readonly HeldBackExit[]>;
 }
 
@@ -360,13 +285,6 @@ interface Job {
 const snapshotKeyOf = ({ wire }: Job, key: string) =>
   `${wire.job.project}:${key}`;
 
-/**
- * Setup, or the snapshot of an earlier one: with a snapshot under `key`, the
- * container restarts from it and the job's tree is checked out again;
- * without one, `command` runs with egress to the registries and `egress`
- * only. A setup that fails is `VerifierBlocked`, and a host it was refused is
- * named in setup's log and in the log line.
- */
 const setup = (
   job: Job,
   command: string,
@@ -434,13 +352,7 @@ const setup = (
     });
   });
 
-/**
- * Keeps what setup installed for the next check of this project and
- * lockfile. Only a check of a commit in the project's own repo keeps one
- * (main, or main with a decider's ask files): an answer's tree may change
- * what setup does, so a check of one only ever restores. A snapshot that
- * fails to save leaves this check as it was.
- */
+/** Only the project's own commits save one: an answer's tree may change what setup does. */
 const snapshot = (job: Job, key: string) =>
   Effect.gen(function* () {
     const snapshots = yield* Snapshots;
@@ -470,15 +382,7 @@ const snapshot = (job: Job, key: string) =>
       );
   });
 
-/**
- * One lane, to its end or its time limit, as its result: how it ended,
- * classified (`checks.classifyRun`), never an error. A lane that runs out of
- * time, or that the container would not run, never ran to an end. A count
- * lane (`output: "stdout"`) that did hands back its stdout, which its count
- * is read from; any other lane's output stays in its log. A lane that runs
- * beside the sealed files keeps neither, nor its failure's signature: what
- * it printed may name or quote them.
- */
+/** A lane beside the sealed files keeps no output or failure signature: it may quote them. */
 const runLane = (job: Job, { command, lane }: PlannedLane) =>
   Effect.gen(function* () {
     const own = job.wire.job.lanes.find((each) => each.lane === lane);
@@ -537,23 +441,13 @@ const runLane = (job: Job, { command, lane }: PlannedLane) =>
     );
   });
 
-/**
- * Whether a sealed file's path stays inside the checked tree: relative,
- * with no empty, `.` or `..` segment.
- */
 const inTree = (path: string) =>
   !path.startsWith("/") &&
   path
     .split("/")
     .every((segment) => segment !== "" && segment !== "." && segment !== "..");
 
-/**
- * The shell script `roomFor` runs. Its arguments are folders, shallowest
- * first, then `--`, then files. A folder's place is cleared of anything
- * that is not a folder (a file, a link, a link to a folder) and the folder
- * made; a file's place is cleared of whatever stands there. Every path is
- * absolute, so none reads as `--`.
- */
+/** Arguments: folders, shallowest first, then `--`, then files; all absolute, so none reads as `--`. */
 const ROOM = [
   'while [ "$1" != -- ]; do',
   '  if [ -L "$1" ] || { [ -e "$1" ] && [ ! -d "$1" ]; }; then',
@@ -566,7 +460,6 @@ const ROOM = [
   'rm -rf -- "$@"',
 ].join("\n");
 
-/** Every folder `path` sits in under `root`, shallowest first. */
 const foldersAbove = (root: string, path: string) => {
   const folders = path.split("/").slice(0, -1);
 
@@ -575,15 +468,7 @@ const foldersAbove = (root: string, path: string) => {
   );
 };
 
-/**
- * The command that makes room under `root` for the sealed files at `paths`
- * (relative, inside the tree): each folder they sit in, made, and each
- * file's own place, empty. The answer's tree decides what stands there; a
- * file where a sealed folder goes, a folder where a sealed file goes, or a
- * link would fail the write, and a `VerifierBlocked` spends no attempt, so
- * it would tell the answer, for free, that a sealed path is there. What
- * the tree holds anywhere else stays, folders on the way included.
- */
+/** A failed write would tell the answer, for free, that a sealed path is there. */
 export const roomFor = (
   root: string,
   paths: readonly string[]
@@ -601,15 +486,7 @@ export const roomFor = (
 const unwritten = () =>
   blocked("the sealed files were not written", { phase: "WriteHeldBack" });
 
-/**
- * The sealed suite's files, written into the work tree after the snapshot
- * and with egress off (the plan's order), from the bytes the job carried:
- * the Checker holds no route to the layer. `Files.writeFile` makes no
- * folder, so room is made first (`roomFor`), whatever the answer's tree
- * holds there. A file that would land outside the tree, or that the
- * container cannot write, is `VerifierBlocked`; nothing logged names a
- * path, and no reason the container gave is logged, since it may name one.
- */
+/** No reason the container gave is logged, since it may name a sealed path. */
 const writeHeldBack = (job: Job, { files }: HeldBackPart) =>
   Effect.gen(function* () {
     if (!files.every(({ path }) => inTree(path))) {
@@ -646,13 +523,7 @@ const writeHeldBack = (job: Job, { files }: HeldBackPart) =>
     );
   });
 
-/**
- * One sealed check, to its end or the lane time limit: how it ended, and
- * nothing it printed. A check that runs out of time, or that the container
- * fails to run, did not pass, and says no more than a failure would: a
- * different answer would be one more bit about the suite, and one an
- * answer could ask for without spending an attempt.
- */
+/** A timeout reads as a plain failure: anything else is one more bit about the suite. */
 const runSealed = (job: Job, { area, command }: HeldBackCheck) =>
   exec(
     dropping,
@@ -675,11 +546,6 @@ const runSealed = (job: Job, { area, command }: HeldBackCheck) =>
     )
   );
 
-/**
- * Routes the job's `@proxy` hosts to the env gateway (`checker/env.ts`),
- * logging each host it leaves out with the reason. A host comes from the
- * project's own `.env.schema`, which is public; no value is logged.
- */
 const openEnvRoute = (wire: CheckWire) =>
   Effect.gen(function* () {
     const network = yield* Network;
@@ -699,13 +565,11 @@ const openEnvRoute = (wire: CheckWire) =>
     }
   });
 
-/** The phases, from the clone to the last lane, with the logs kept as they go. */
 const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
   Effect.gen(function* () {
     const network = yield* Network;
     const { clone } = wire;
 
-    // The job's sealed suite, if it has one.
     const heldBack = Option.fromNullishOr(wire.job.heldBack);
 
     const job: Job = {
@@ -738,8 +602,6 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
       run,
     });
 
-    // Setup looks its snapshot up under the key the plan's `Snapshot` keeps
-    // it under.
     const key = plan.find(Phase.$is("Snapshot"))?.key ?? lockfileHash;
 
     const ran = yield* Effect.forEach(plan, (phase) =>
@@ -747,15 +609,13 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
         Effect.annotateLogs({ phase: phase._tag }),
         Effect.andThen(
           Phase.$match(phase, {
-            // Off for every host but the env gateway's, which open here
-            // (the plan's "leaving only the platform's handlers").
+            // Off for every host but the env gateway's, which open here.
             EgressOff: () =>
               Effect.as(
                 Effect.andThen(network.allow([]), openEnvRoute(wire)),
                 []
               ),
             Report: () => Effect.succeed([]),
-            // The public lanes, then each sealed check, all with egress off.
             Run: ({ lanes }) =>
               Effect.tap(
                 Effect.forEach(lanes, (lane) => runLane(job, lane)),
@@ -772,7 +632,6 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
             Setup: ({ command, egress }) =>
               Effect.as(setup(job, command, egress, key), []),
             Snapshot: (saved) => Effect.as(snapshot(job, saved.key), []),
-            // The plan has this phase only for a job with a sealed suite.
             WriteHeldBack: () =>
               Option.match(heldBack, {
                 onNone: () => Effect.succeed([]),
@@ -794,13 +653,6 @@ const phases = (wire: CheckWire, run: RunBlock, kept: Kept) =>
     };
   });
 
-/**
- * One check job in one container: the phases, then the logs handed to
- * `CheckLogs` and the container destroyed, however the phases ended. The
- * result carries each lane's result and evidence, never a log, a count
- * lane's stdout (`outputs`), which the platform reads its count from, and
- * one result per sealed area.
- */
 export const check = (
   wire: CheckWire
 ): Effect.Effect<

@@ -83,15 +83,9 @@ const isShell = (call: Call, command: string) =>
   call.argv[1] === "-c" &&
   call.argv[2] === command;
 
-/** How many times setup's command ran. */
 const setups = (calls: readonly Call[]) =>
   calls.filter((call) => isShell(call, SETUP)).length;
 
-/**
- * The recording as phases, each run of calls for one phase read as one:
- * the clone's route and git commands, setup's snapshot lookup, network and
- * command, the snapshot, egress off, the lanes, the report, the destroy.
- */
 const phaseOf = Match.type<Call>().pipe(
   Match.discriminatorsExhaustive("kind")({
     allow: ({ hosts }): readonly string[] =>
@@ -161,8 +155,6 @@ describe("the Checker", () => {
           )
         );
 
-        // Setup ran while egress allowed the registries and the run block's
-        // own setup host, and nothing else.
         const setupAt = fake.calls.findIndex((call) => isShell(call, SETUP));
 
         const egress = fake.calls
@@ -174,7 +166,6 @@ describe("the Checker", () => {
           kind: "allow",
         });
 
-        // The lanes ran in the job's order, after egress went off.
         expect(
           fake.calls.flatMap((call) =>
             call.kind === "exec" && call.argv[0] === "sh" ? [call.argv[2]] : []
@@ -262,7 +253,6 @@ describe("the Checker", () => {
           )
         ).toStrictEqual(["evil.example"]);
 
-        // Nothing ran after setup, nothing was kept, and the box is gone.
         expect(phasesOf(fake.calls)).toStrictEqual([
           "clone",
           "setup",
@@ -312,7 +302,6 @@ describe("the Checker", () => {
               "week > parses ISO weeks: AssertionError: expected 52 to be 53",
           },
         ]);
-        // No raw log travels in the result.
         expect(JSON.stringify(ran)).not.toContain("Cannot find module");
       })
   );
@@ -366,7 +355,6 @@ describe("the Checker", () => {
           { lane: "no-explicit-any", stdout: printed },
         ]);
 
-        // The outcome crosses the binding with it.
         const crossed = yield* Schema.encodeEffect(CheckExit)(
           Exit.succeed(ran)
         ).pipe(Effect.flatMap(Schema.decodeEffect(CheckExit)));
@@ -417,8 +405,6 @@ describe("the Checker", () => {
           )
         ).toStrictEqual([true]);
 
-        // The restored workspace is checked out at this job's tree again
-        // before any lane runs.
         const restoredAt = second.calls.findIndex(
           (call) => call.kind === "restore"
         );
@@ -530,7 +516,6 @@ describe("the Checker", () => {
   );
 });
 
-/** The requests the Worker sends on, in place of the network, until the scope ends. */
 const outboundRecorded = Effect.acquireRelease(
   Effect.sync(() => {
     const sent: Request[] = [];
@@ -719,21 +704,14 @@ describe("the egress gateway", () => {
   );
 });
 
-/**
- * The sandbox's `CHECKER` namespace: each unique id gets a Checker over its
- * own fake container, and `snapshots:<project>` names an index kept in
- * `index`.
- */
 const checkerWorld = (options: {
   readonly withGateways: boolean;
-  /** Whether each Checker's container is running before its job; it is unless false. */
   readonly running?: boolean;
 }) => {
   const boxes: ReturnType<typeof fakeContainer>[] = [];
   const index = new Map<string, string>();
   const named: string[] = [];
 
-  /** A project's snapshot index, as Workers RPC hands one back. */
   const indexStub = untouchable<DurableObjectStub<Checker>>("index", {
     forgetSnapshot: (key) => {
       index.delete(key);
@@ -758,7 +736,6 @@ const checkerWorld = (options: {
     return indexStub;
   };
 
-  // A Checker reaches only its project's snapshot index through the env.
   const env: Env = {
     CHECKER: untouchable<Env["CHECKER"]>("CHECKER", { getByName: indexNamed }),
     LANDER: untouchable("LANDER"),
@@ -796,10 +773,6 @@ const checkerWorld = (options: {
 const encodedWire = () =>
   Schema.encodeEffect(CheckWire)(wireFor()).pipe(Effect.orDie);
 
-/**
- * Two jobs of one project through `runCheck`, one after the other, each in
- * a container that runs before it starts unless `running` is false.
- */
 const twoJobsIn = ({ running = true } = {}) =>
   Effect.gen(function* () {
     const world = checkerWorld({ running, withGateways: true });
@@ -858,7 +831,6 @@ describe(runCheck, () => {
           `${CLONE_HOST} → clone ${REMOTE} ${TOKEN}`,
           "* → egress []",
           "http:* → egress []",
-          // Setup reaches the registries and its own hosts, not the repo.
           `${CLONE_HOST} → egress [${setupHosts}]`,
           `* → egress [${setupHosts}]`,
           `http:* → egress [${setupHosts}]`,
@@ -910,10 +882,7 @@ describe(runCheck, () => {
         const { boxes } = yield* twoJobsIn({ running: false });
 
         // oxlint with JS plugins reserves 6 GiB of address space per
-        // thread, which Linux refuses on a smaller instance: on the
-        // runtime's default (`lite`, 256 MiB) burrow's lint lane aborted
-        // on main and on every answer, so each answer was VerifierBlocked
-        // (dev-oscabriel, 2026-10-08).
+        // thread, which Linux refuses on a smaller instance.
         const starts = boxes.flatMap(({ calls }) =>
           calls.flatMap((call) => (call.kind === "start" ? [call] : []))
         );

@@ -50,7 +50,6 @@ import {
 } from "./lander.fixtures.ts";
 import type { Files, World } from "./lander.fixtures.ts";
 
-/** The merge of bob's answer at `head` onto datekit's `main`. */
 const mergeWire = (
   repos: World,
   job: {
@@ -64,7 +63,6 @@ const mergeWire = (
   main: repos.remote(repos.canonical),
 });
 
-/** A land of bob's answer, merged again from `head`, onto datekit's `main`. */
 const landWire = (
   repos: World,
   job: {
@@ -88,7 +86,6 @@ const landWire = (
   main: repos.remote(repos.canonical),
 });
 
-/** A commit in a bare repo as git shows it: who made it, on what, and its message. */
 const commitIn = (repo: string, sha: string) =>
   Effect.gen(function* () {
     const shown = yield* gitOk(
@@ -113,14 +110,9 @@ const commitIn = (repo: string, sha: string) =>
 
 const decodeNote = Schema.decodeEffect(Schema.fromJsonString(Verdict));
 
-/** Whether a command is the push that moves canonical `main`. */
 const pushesMain = (argv: readonly string[]) =>
   argv.includes("push") && argv.at(-1)?.endsWith(":refs/heads/main") === true;
 
-/**
- * The Lander's container, where `first` runs just before git pushes `main`:
- * someone else moving main between the Lander's fetch and its push.
- */
 const beforeMainIsPushed =
   (first: Effect.Effect<void>) =>
   (inner: Box["Service"]): Box["Service"] => ({
@@ -131,7 +123,6 @@ const beforeMainIsPushed =
         : inner.exec(argv, options),
   });
 
-/** Someone else's commit on canonical `main`, as a push that moves it would leave it. */
 const movedBy = (repos: World, parent: CommitSha) =>
   Effect.gen(function* () {
     const other = yield* repos.commit(
@@ -145,13 +136,11 @@ const movedBy = (repos: World, parent: CommitSha) =>
     return other;
   });
 
-/** One command the Lander handed its container: what it ran, and with what env. */
 interface Handed {
   readonly argv: readonly string[];
   readonly env: Readonly<Record<string, string>>;
 }
 
-/** The Lander's container, keeping every command it is handed in `handed`. */
 const recording =
   (handed: Handed[]) =>
   (inner: Box["Service"]): Box["Service"] => ({
@@ -163,10 +152,6 @@ const recording =
       ),
   });
 
-/**
- * The Lander's container, where the push of the mirror ref is rejected, as
- * a receive-pack that refuses one ref would.
- */
 const mirrorRefused = (inner: Box["Service"]): Box["Service"] => ({
   ...inner,
   exec: (argv, options) =>
@@ -179,11 +164,7 @@ const mirrorRefused = (inner: Box["Service"]): Box["Service"] => ({
       : inner.exec(argv, options),
 });
 
-/**
- * The Lander's container, where Artifacts is busy with another push to the
- * repo when the Lander pushes `main`: one side-band error packet and no
- * report, as a probe of Artifacts recorded it.
- */
+/** A busy Artifacts answers one side-band error packet and no report. */
 const busyOnMain = (inner: Box["Service"]): Box["Service"] => ({
   ...inner,
   exec: (argv, options) =>
@@ -197,10 +178,6 @@ const busyOnMain = (inner: Box["Service"]): Box["Service"] => ({
       : inner.exec(argv, options),
 });
 
-/**
- * The Lander's container, where the remote refuses the push of `main` for a
- * reason of its own, and its message repeats the token it was sent.
- */
 const mainDeclined = (inner: Box["Service"]): Box["Service"] => ({
   ...inner,
   exec: (argv, options) =>
@@ -213,11 +190,6 @@ const mainDeclined = (inner: Box["Service"]): Box["Service"] => ({
       : inner.exec(argv, options),
 });
 
-/**
- * The Lander's container, where a command that reaches a remote fails and
- * prints everything git was handed, its header too: a git whose trace shows
- * the credential it sent.
- */
 const tracing = (inner: Box["Service"]): Box["Service"] => ({
   ...inner,
   exec: (argv, options = {}) =>
@@ -230,7 +202,6 @@ const tracing = (inner: Box["Service"]): Box["Service"] => ({
         }),
 });
 
-/** A logger keeping every line, with its annotations, as JSON. */
 const keeping = (lines: string[]) =>
   Logger.layer([
     Logger.make((options) => {
@@ -238,15 +209,10 @@ const keeping = (lines: string[]) =>
     }),
   ]);
 
-/** A module's default export, as `import()` of a file gives it. */
 interface Imported {
   readonly default: unknown;
 }
 
-/**
- * `modules` written under a temp folder at their paths, and the one at
- * `file` imported: how the rules evaluator's `/bun` adapter reads a bundle.
- */
 const importedFrom = (
   modules: Readonly<Record<string, string>>,
   file: string
@@ -268,10 +234,8 @@ const importedFrom = (
     return yield* Effect.promise((): Promise<Imported> => import(target));
   });
 
-// Both names a config folder imports the sdk by.
 const SDK_NAMES = [`"${Brand.cliPackage}/rules"`, '"@repo/sdk"'];
 
-/** A file's source with its imports of the sdk pointed at this repo's. */
 const pointedAtSdk = (source: string) => {
   let pointed = source;
 
@@ -282,7 +246,6 @@ const pointedAtSdk = (source: string) => {
   return pointed;
 };
 
-/** The config folder as committed, its imports of the sdk pointed at this repo's. */
 const asCommitted = (files: Files) =>
   Object.fromEntries(
     Object.entries(files).flatMap(([file, source]) =>
@@ -290,11 +253,9 @@ const asCommitted = (files: Files) =>
     )
   );
 
-/** A definition as data: what JSON keeps of it, as the evaluator reads it back. */
 const dataOf = ({ default: definition }: Imported) =>
   JSON.stringify(definition);
 
-/** What `admit` hears about a person who wants to claim (the sdk's `ClaimantFacts`). */
 interface Claimant {
   readonly handle: string;
   readonly kind: string;
@@ -303,15 +264,12 @@ interface Claimant {
   readonly vouched: boolean;
 }
 
-// Where the sdk keeps a definition's function-valued rules.
 const FUNCTIONS = Symbol.for("@repo/sdk/Functions");
 
-/** A function-valued `admit` rule, as the sdk keeps one. */
 type Admit = (facts: Claimant) => boolean;
 
 const isAdmit = (rule: unknown): rule is Admit => Predicate.isFunction(rule);
 
-/** The project's `admit` rule, where the sdk keeps it, called with `facts`. */
 const admits = ({ default: definition }: Imported, facts: Claimant) => {
   const functions = Predicate.hasProperty(definition, FUNCTIONS)
     ? definition[FUNCTIONS]
@@ -943,7 +901,6 @@ describe("the Lander's git", () => {
   });
 });
 
-/** The root manifest's catalog: the versions every workspace shares. */
 const RootManifest = Schema.fromJsonString(
   Schema.Struct({
     workspaces: Schema.Struct({
@@ -973,9 +930,8 @@ describe("the land image", () => {
       }).pipe(Effect.provide(TestServices))
   );
 
-  // Live on dev-oscabriel: the land image ended on debian's own
-  // `bash`, which exits at once with no stdin, so the container stopped and
-  // the first `exec` of every job was killed (exit 137).
+  // A bare `bash` entrypoint exits at once with no stdin, which stops the
+  // container and kills the first `exec` of every job (exit 137).
   it.effect.each(["check", "land"])(
     "keeps the %s container up until its Durable Object destroys it, since every command runs through exec",
     (image) =>
@@ -1078,7 +1034,6 @@ describe("the Lander's script, as data", () => {
   });
 });
 
-/** A merge whose remotes no command in these tests reaches. */
 const idleMerge = {
   fork: {
     token: Redacted.make(secret),
@@ -1233,8 +1188,6 @@ describe("the Lander's Durable Objects", () => {
         );
 
         expect(merged).toStrictEqual(Exit.fail(new VerifierBlocked({})));
-        // A whole vCPU (live on dev-oscabriel: on the default `lite`,
-        // 1/16 vCPU, one landing took 32 s and a config bundle 20 s).
         expect(started).toStrictEqual([
           { enableInternet: true, image: "land-image", instance: "standard-2" },
         ]);

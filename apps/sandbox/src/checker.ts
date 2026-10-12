@@ -1,13 +1,6 @@
-/**
- * The Checker: one container per check job, holding no credential, where an
- * answer's lanes run. Each job gets a Durable Object of
- * its own (a unique id), whose container is destroyed when the job ends; the
- * phases are `checker/run.ts`. The class name is frozen.
- *
- * One more Checker per project, named `snapshots:<project>`, never starts a
- * container: it keeps the ids of that project's setup snapshots, which every
- * check of the project shares.
- */
+// Each check job gets a Checker of its own (a unique id). A Checker named
+// `snapshots:<project>` never starts a container: it only keeps that
+// project's snapshot ids.
 import type { CheckRun } from "@repo/checks/check-runner";
 import { CheckExit, CheckWire } from "@repo/checks/check-runner/wire";
 import { keyOf } from "@repo/protocol/ids";
@@ -22,32 +15,18 @@ import { blocked, check } from "./checker/run.ts";
 import { hasGateways, SdkChecker } from "./checker/sdk.ts";
 import { answerJob } from "./job.ts";
 
-/** The run block's image a check runs in when it names none. */
 const DEFAULT_IMAGE = "checker:default";
 
-/** That image's name in `wrangler.jsonc`, built from `images/check.Dockerfile`. */
 const CHECK_IMAGE = "check";
 
-/**
- * The Checker's container size: two vCPUs and 8 GiB. oxlint with JS
- * plugins (burrow's lint lane) reserves about 6 GiB of address space per
- * thread for its fixed-size allocators (4 GiB aligned on 2 GiB), and Linux
- * refuses one reservation larger than the machine's memory: on the
- * runtime's default (`lite`, 256 MiB) the lane aborted on main and on every
- * answer, so each answer was `VerifierBlocked` (dev-oscabriel, 2026-10-08).
- * `standard-2`'s 6 GiB leaves no room for one. A restore from a snapshot
- * starts on it too.
- */
+/** oxlint's JS plugins reserve about 6 GiB of address space per thread; smaller sizes abort. */
 export const checkInstance = "standard-3";
 
-/** The Checker's Durable Object, which owns its container. */
 export class Checker extends DurableObject<Env> {
-  /** Runs one check job in this object's container, its outcome encoded. */
   check(wire: typeof CheckWire.Encoded): Promise<typeof CheckExit.Encoded> {
     return answerJob(CheckWire, CheckExit, (job) => this.#checked(job))(wire);
   }
 
-  /** The snapshot id kept under `key`, on a project's snapshot index. */
   snapshotOf(key: string): string | null {
     return this.ctx.storage.kv.get<string>(key) ?? null;
   }
@@ -122,13 +101,7 @@ export class Checker extends DurableObject<Env> {
   }
 }
 
-/**
- * What the Checker needs of the sandbox's env: a new Checker for each job,
- * and each project's snapshot index (a Checker that never starts a
- * container). `Env` has both; they are written out so the Checker reads them
- * as the plain promises Workers RPC returns, and a test stands Checkers in
- * without its stub types.
- */
+/** Written out so the Checker reads plain RPC promises and a test needs no stub types. */
 export interface Checkers {
   readonly CHECKER: {
     readonly newUniqueId: () => DurableObjectId;
@@ -145,11 +118,6 @@ export interface Checkers {
   };
 }
 
-/**
- * One check job from the platform, run in a Checker of its own, its outcome
- * encoded. A Checker that cannot be reached at all is `VerifierBlocked`, as
- * the job would have been.
- */
 export const runCheck = (
   env: Checkers,
   wire: typeof CheckWire.Encoded

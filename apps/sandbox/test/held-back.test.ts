@@ -58,10 +58,7 @@ const exportArea = AreaName.make("export");
 
 const parser = AreaName.make("parser");
 
-/**
- * The maintainers' sealed suite: two areas, three files. Each file names
- * its own test and carries a canary, so a leak of either is searchable.
- */
+/** Each file carries a canary, so a leak is searchable. */
 const SEALED = [
   {
     area: exportArea,
@@ -88,7 +85,6 @@ const SEALED = [
 
 const weekFile = SEALED.at(-1);
 
-/** What the parser's sealed check prints as it fails. */
 const PARSER_STDOUT = `(fail) parser > ${weekFile?.test}\n`;
 
 const PARSER_STDERR =
@@ -132,7 +128,6 @@ const wireFor = (
   },
 });
 
-/** The fake, with the parser's sealed check failing. */
 const parserFails = (options: FakeOptions = {}) =>
   fakeChecker({
     commands: new Map([
@@ -148,11 +143,6 @@ const sealedCommands: ReadonlySet<string> = new Set(
   SEALED.map(({ command }) => command)
 );
 
-/**
- * Whether `call` writes the sealed files or readies their place: a file
- * written, or a command that names a path in the work tree (no lane or
- * sealed check does; each runs in it).
- */
 const writesSealed = (call: Call) =>
   call.kind === "writeFile" ||
   (call.kind === "exec" && call.argv.some((arg) => arg.startsWith(`${REPO}/`)));
@@ -162,7 +152,6 @@ const shellOf = (call: Call) =>
     ? Option.fromUndefinedOr(call.argv[2])
     : Option.none();
 
-/** The recording as phases, each run of calls for one phase read as one. */
 const phaseOf = Match.type<Call>().pipe(
   Match.discriminatorsExhaustive("kind")({
     allow: ({ hosts }): readonly string[] =>
@@ -204,7 +193,6 @@ const phasesOf = (calls: readonly Call[]) =>
     .flatMap(phaseOf)
     .filter((phase, at, all) => at === 0 || all[at - 1] !== phase);
 
-/** Everything about the suite that must never leave the Checker. */
 const SECRETS = [
   ...SEALED.flatMap(({ path, test, text }) => [
     path,
@@ -218,17 +206,14 @@ const SECRETS = [
   "Week(54)",
 ];
 
-/** The secrets `text` holds. */
 const leakedIn = (text: string) =>
   SECRETS.filter((secret) => text.includes(secret));
 
-/** What leaves the Checker besides its result: the logs it hands over and its log lines. */
 const leftBy = (calls: readonly Call[]) =>
   JSON.stringify(
     calls.filter((call) => call.kind === "report" || call.kind === "log")
   );
 
-/** One job with the sealed suite, the parser's check failing: what the fakes saw, and the outcome. */
 const sealedJob = Effect.gen(function* () {
   const fake = parserFails();
 
@@ -246,7 +231,6 @@ const printedBeside = exited(1, {
 
 const LINT_COUNT = "oxlint --format json";
 
-/** Public lanes that print what they found: `unit`, and a count lane. */
 const printing = () =>
   fakeChecker({
     commands: new Map([
@@ -255,7 +239,6 @@ const printing = () =>
     ]),
   });
 
-/** The job's wire with a count lane after `unit`. */
 const withCountLane = (sealed: Option.Option<HeldBackPart>): CheckWire => {
   const base = wireFor(sealed);
 
@@ -275,7 +258,6 @@ const withCountLane = (sealed: Option.Option<HeldBackPart>): CheckWire => {
   };
 };
 
-/** The outcome as it crosses the service binding, as JSON. */
 const serialized = (outcome: Exit.Exit<CheckRun, VerifierBlocked>) =>
   Schema.encodeEffect(CheckExit)(outcome).pipe(
     Effect.map((encoded) => JSON.stringify(encoded))
@@ -301,7 +283,6 @@ describe("the Checker's held-back phase", () => {
           "destroy",
         ]);
 
-        // The order is the plan's, the sealed checks running in its `Run`.
         expect(
           phasesOf(calls)
             .slice(1, -1)
@@ -318,7 +299,6 @@ describe("the Checker's held-back phase", () => {
           )
         );
 
-        // Setup reached the registries and its own host, nothing else.
         expect(
           calls.find(
             (call) =>
@@ -438,7 +418,6 @@ describe("the Checker's held-back phase", () => {
           Effect.provide(fake.layer)
         );
 
-        // Only how each lane ended leaves.
         expect(
           ran.lanes.map(({ lane, result }) => ({ lane, result }))
         ).toStrictEqual([
@@ -673,7 +652,6 @@ describe("the Checker's held-back phase", () => {
   );
 
   it("takes the held-back job the platform reads from the layer as it is", () => {
-    // `ProjectApi.heldBackJob`'s job is the `CheckJob`'s held-back part.
     expectTypeOf<HeldBackJob>().toEqualTypeOf<HeldBackPart>();
   });
 

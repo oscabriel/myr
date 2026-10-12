@@ -1,10 +1,3 @@
-/**
- * The Checker's env: every `@sensitive` item reaches
- * the container as its placeholder, and a `@proxy` host's requests go
- * through the env gateway, which swaps the placeholder for the value only in
- * a run of landed code. Over the fake `Box` (`fake-box.ts`), and the gateway
- * itself with a fake upstream.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { CheckAt } from "@repo/checks/check-runner";
 import type { CheckJob } from "@repo/checks/check-runner";
@@ -49,7 +42,6 @@ const SENTRY = EnvKey.make("SENTRY_AUTH_TOKEN");
 
 const PLACEHOLDER = "__SENTRY_AUTH_TOKEN_PLACEHOLDER__";
 
-/** The write-only value a landed run's gateway swaps in: never in the container. */
 const VALUE = "sntrys_5f0c1d2e3b4a69788796a5b4c3d2e1f0";
 
 const sentryRule = {
@@ -77,7 +69,6 @@ const jobWith = (env: Partial<CheckJob> = {}): CheckWire => ({
   },
 });
 
-/** The env `sh -c <command>` ran with, for each run of `command`. */
 const envsOf = (calls: readonly Call[], command: string) =>
   calls.flatMap((call) =>
     call.kind === "exec" && call.argv[0] === "sh" && call.argv[2] === command
@@ -85,7 +76,6 @@ const envsOf = (calls: readonly Call[], command: string) =>
       : []
   );
 
-/** One job through the Checker over the fakes: what they saw. */
 const checked = (wire: CheckWire) =>
   Effect.gen(function* () {
     const fake = fakeChecker();
@@ -97,7 +87,6 @@ const checked = (wire: CheckWire) =>
     return { calls: fake.calls, outcome };
   });
 
-/** A job of landed code, carrying the value its gateway swaps in. */
 const landedJob = () =>
   jobWith({
     landed: true,
@@ -240,10 +229,6 @@ describe("the Checker's env", () => {
   );
 });
 
-/**
- * What the gateway sends on, in place of the network, until the scope
- * ends: each request, read, and the response `answer` gives for it.
- */
 const upstream = (answer: (request: Request) => Response) =>
   Effect.acquireRelease(
     Effect.sync(() => {
@@ -260,7 +245,6 @@ const upstream = (answer: (request: Request) => Response) =>
     () => Effect.sync(() => vi.unstubAllGlobals())
   );
 
-/** A gateway for one job: its rules, and the values only a landed job's carries. */
 const gatewayFor = (props: Partial<EnvGatewayProps> = {}) =>
   new EnvGateway(
     untouchable<ExecutionContext<EnvGatewayProps>>("ctx", {
@@ -281,7 +265,6 @@ const releaseRequest = () =>
     method: "POST",
   });
 
-/** What reached the upstream: method, URL, every header, and the body. */
 const readSent = (request: Request) =>
   Effect.promise(() => request.text()).pipe(
     Effect.map((body) => ({
@@ -502,10 +485,6 @@ describe("the env gateway", () => {
   );
 });
 
-/**
- * One job through a Checker Durable Object over a fake container (the
- * Container API as `fake-box.ts` records it): the calls it made.
- */
 const inContainer = (wire: CheckWire) =>
   Effect.gen(function* () {
     const box = fakeContainer();

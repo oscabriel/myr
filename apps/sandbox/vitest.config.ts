@@ -1,10 +1,8 @@
 import { preset } from "@repo/config/vitest";
 import { defineConfig, mergeConfig } from "vitest/config";
 
-// Worker modules import `cloudflare:workers`, which only workerd serves; in
-// Node it resolves to a shim. The Sandbox SDK imports it too, so vitest
-// bundles the SDK (`inline`) for the alias to reach it. An alias resolves to
-// a file, not a folder.
+// `cloudflare:workers` only exists in workerd; the SDK is inlined so the
+// alias reaches its import too.
 export default mergeConfig(
   preset,
   defineConfig({

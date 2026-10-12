@@ -1,21 +1,10 @@
-/**
- * `Box` over a Durable Object's own container (`ctx.container`), as the
- * Sandbox SDK 1.0 runs one: the Durable Object starts the container and runs
- * commands through the Container API (`exec`, then `output`); the SDK's
- * `Files` writes files through the `sandbox-shim` every image carries.
- */
 import { Files } from "@cloudflare/sandbox";
 import { Duration, Effect, Layer } from "effect";
 
 import { Box, BoxFailed } from "../box.ts";
 import type { ExecOptions } from "../box.ts";
 
-/**
- * Which image the container runs, whether it may reach the internet, and
- * its instance size (the runtime's default, `lite`, when absent: a
- * Durable Object's container takes its size when it starts, not from
- * `wrangler.jsonc`).
- */
+/** `instance` is set at start, not from `wrangler.jsonc`; absent means `lite`. */
 export interface ContainerStart {
   readonly image: string;
   readonly enableInternet: boolean;
@@ -24,7 +13,6 @@ export interface ContainerStart {
 
 const text = new TextDecoder();
 
-/** The container, started on first use if it is not running yet. */
 const started = (container: Container, start: ContainerStart) =>
   Effect.sync(() => {
     if (!container.running) {
@@ -42,7 +30,6 @@ const started = (container: Container, start: ContainerStart) =>
     return container;
   });
 
-/** The Container API's options for one command; `signal` stops it. */
 const execOptions = (options: ExecOptions, signal: AbortSignal) => {
   const exec: ContainerExecOptions = { signal };
 
@@ -62,7 +49,6 @@ const failed =
   (cause: unknown): BoxFailed =>
     new BoxFailed({ operation, reason: String(cause) });
 
-/** One command, run to its end, its output read as text. */
 const run = (
   container: Container,
   argv: readonly string[],
@@ -106,8 +92,6 @@ export const SdkBox = {
           Effect.flatMap(started(container, start), (running) => {
             const command = run(running, argv, options);
 
-            // Interrupting the command stops it: its signal while it starts,
-            // a kill once it runs.
             return options.timeoutMs === undefined
               ? command
               : Effect.timeoutOrElse(command, {

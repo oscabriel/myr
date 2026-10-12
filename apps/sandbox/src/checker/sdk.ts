@@ -1,25 +1,7 @@
-/**
- * `Network` and `Snapshots` over a Durable Object's own container, as the
- * Container API runs one (`ctx.container`; Sandbox SDK 1.0 leaves both to
- * it):
- *
- * - the network is the container's outbound intercepts. The container starts
- *   with the internet off, so a request leaves only through an intercept:
- *   the clone host goes to `CloneGateway`, each `@proxy` host of the job to
- *   `EgressGateway` until egress is off and to `EnvGateway` after, and every
- *   other host, HTTPS (`*`) and HTTP, to `EgressGateway`, whose props say
- *   what it lets out. A host is registered ahead of the catch-all, which
- *   takes every host registered after it (the Sandbox SDK's
- *   `DirectoryBackup.intercept`), so the job's `@proxy` hosts are reserved
- *   when the layer is built. Registering a target again replaces its handler
- *   in place, which is how the allow-list changes, how the clone route
- *   closes once setup starts, how egress goes off, and how the env route
- *   opens.
- * - a snapshot is a Container snapshot (public beta) of the whole root
- *   filesystem, its id kept in an index the project's checks share; a
- *   restore starts the container again from it, so the intercepts are
- *   registered again too (they last only as long as one container).
- */
+// The catch-all intercept takes every host registered after it, so the job's
+// `@proxy` hosts are reserved when the layer is built. Registering a target
+// again replaces its handler in place. Intercepts last one container, so a
+// restore registers them again.
 import {
   Context,
   Effect,
@@ -37,10 +19,6 @@ import { Network } from "./network.ts";
 import type { CloneRoute, EnvRoute } from "./network.ts";
 import { Snapshots } from "./snapshots.ts";
 
-/**
- * The outbound entrypoints' loopbacks: `ctx.exports` holds one per export of
- * the Worker's main module.
- */
 export interface Gateways {
   readonly CloneGateway: (options: { readonly props: CloneProps }) => Fetcher;
   readonly EgressGateway: (options: { readonly props: EgressProps }) => Fetcher;
@@ -49,7 +27,6 @@ export interface Gateways {
   }) => Fetcher;
 }
 
-/** Whether `ctx.exports` holds every gateway: `worker.ts` must export them. */
 export const hasGateways = (
   exports: Cloudflare.Exports
 ): exports is Cloudflare.Exports & Gateways =>
@@ -60,51 +37,31 @@ export const hasGateways = (
   Predicate.hasProperty(exports, "EnvGateway") &&
   Predicate.isFunction(exports.EnvGateway);
 
-/** Where snapshot ids are kept, by key, for every check of one project. */
 export interface SnapshotIndex {
   readonly find: (key: string) => Promise<string | null>;
   readonly keep: (key: string, id: string) => Promise<void>;
   readonly forget: (key: string) => Promise<void>;
 }
 
-/** What the container's intercepts say now. */
 interface Routes {
   readonly clone: Option.Option<CloneRoute>;
   readonly allow: readonly string[];
-  /**
-   * The clone is done: the first `allow` closes its route, so setup and the
-   * lanes reach the clone host only as a host they are refused.
-   */
   readonly cloned: boolean;
-  /**
-   * The job's `@proxy` hosts, registered ahead of the catch-all from the
-   * first install on: to the egress gateway, like any other host, until
-   * the env route opens.
-   */
   readonly proxied: readonly string[];
-  /** The env route, once open: its hosts go to the env gateway. */
   readonly env: Option.Option<EnvRoute>;
 }
 
-/** The name every setup snapshot carries; its index key tells them apart. */
 const SNAPSHOT_NAME = "check-setup";
 
-/** What a restored container runs while commands run beside it. */
 const IDLE = ["sleep", "infinity"];
 
 const failed = (reason: string) => (cause: unknown) =>
   new BoxFailed({ operation: "exec", reason: `${reason}: ${String(cause)}` });
 
-/**
- * One intercept registered. One that will not register leaves the network
- * other than the job needs, so it ends the job (a defect), never a lane's run.
- */
+/** A failed registration is a defect: the network would not be what the job needs. */
 const intercept = (register: () => Promise<void>) => Effect.promise(register);
 
-/**
- * The env gateway's props for `route`: plain data on the Worker's side,
- * the values opened from their redaction only here.
- */
+/** The values leave their redaction only here, on the Worker's side. */
 const envProps = ({ rules, values }: EnvRoute): EnvGatewayProps => ({
   rules,
   values: values.map(({ key, placeholder, value }) => ({
@@ -114,19 +71,12 @@ const envProps = ({ rules, values }: EnvRoute): EnvGatewayProps => ({
   })),
 });
 
-/** The hosts the env route has opened, and the gateway they go to. */
 interface Opened {
   readonly hosts: readonly string[];
   readonly to: Fetcher;
 }
 
-/**
- * Points the container's intercepts where `routes` says: the clone host to
- * the clone gateway (or, once the clone is done, to the egress gateway, which
- * refuses it), each `@proxy` host to the env gateway once its route is open
- * (to the egress gateway until then), and every other host, HTTPS and HTTP,
- * to an egress gateway allowing `allow`, in that order.
- */
+/** Registration order matters: named hosts before the catch-all. */
 const install = (
   container: Container,
   gateways: Gateways,
@@ -177,7 +127,6 @@ const install = (
     yield* intercept(() => container.interceptAllOutboundHttp(egress));
   });
 
-/** The restored container answers a command, or the snapshot is gone. */
 const probe = (container: Container) =>
   Effect.tryPromise({
     catch: failed("the restored container did not answer"),
@@ -199,14 +148,9 @@ const probe = (container: Container) =>
     )
   );
 
-/** How the Checker's container runs: the hosts its env route may open, and its size. */
 export interface CheckerStart {
-  /**
-   * Every host the job's env route may open (`checker/env.ts`): a host
-   * first registered after the catch-all would never be reached.
-   */
+  /** A host first registered after the catch-all would never be reached. */
   readonly proxied: readonly string[];
-  /** The instance a restore starts on: the one the job's `Box` starts. */
   readonly instance: NonNullable<ContainerStartupOptions["instance"]>;
 }
 
