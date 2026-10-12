@@ -8,14 +8,16 @@
  * on every stage, unless given). It only reads.
  */
 import { expect, test } from "@playwright/test";
+import { ProjectName } from "@repo/protocol/ids";
 import { Config, Effect, Option } from "effect";
 
 /** What the check reads of its env: where the web lives, and which project to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
     return {
-      project: yield* Config.NonEmptyString("WEB_PROJECT").pipe(
-        Config.withDefault("datekit")
+      // Read by the one parser: `datekit` and `oscabriel/datekit` alike.
+      project: yield* Config.schema(ProjectName, "WEB_PROJECT").pipe(
+        Config.withDefault(ProjectName.make("oscabriel/datekit"))
       ),
       web: Option.map(
         yield* Config.option(Config.NonEmptyString("WEB_URL")),
