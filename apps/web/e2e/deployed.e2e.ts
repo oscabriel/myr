@@ -17,6 +17,7 @@
  */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
+import { ProjectName } from "@repo/protocol/ids";
 import { Config, Effect, Option } from "effect";
 
 /**
@@ -40,11 +41,13 @@ const examples = {
 /** What the check reads of its env: where the web lives, and which ask to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
-    const project = yield* Config.NonEmptyString("WEB_PROJECT").pipe(
-      Config.withDefault("datekit")
+    // Read by the one parser: `burrow` and `oscabriel/burrow` alike.
+    const project = yield* Config.schema(ProjectName, "WEB_PROJECT").pipe(
+      Config.withDefault(ProjectName.make("oscabriel/datekit"))
     );
 
-    const example = project === "burrow" ? examples.burrow : examples.datekit;
+    const example =
+      project === "oscabriel/burrow" ? examples.burrow : examples.datekit;
 
     return {
       ask: yield* Config.NonEmptyString("WEB_ASK").pipe(

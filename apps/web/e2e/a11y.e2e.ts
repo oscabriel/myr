@@ -20,8 +20,8 @@
  * It runs only against `WEB_URL`, the web's dev world with its fixtures
  * (`VITE_DEV_FIXTURES=1 bun run dev -- --port <port>`): the pages it visits
  * are the fixture project's, and it signs in through the dev world's own
- * `/auth/dev`. `A11Y_PROJECT` names the fixture project (vellum unless
- * given). It only reads, but for the keys switch, kept in this browser.
+ * `/auth/dev`. `A11Y_PROJECT` names the fixture project by its full name
+ * (`oscabriel/vellum` unless given). It only reads, but for the keys switch, kept in this browser.
  */
 import { expect, test } from "@playwright/test";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
@@ -34,7 +34,7 @@ const settings = Effect.runSync(
   Effect.gen(function* () {
     return {
       project: yield* Config.NonEmptyString("A11Y_PROJECT").pipe(
-        Config.withDefault("vellum")
+        Config.withDefault("oscabriel/vellum")
       ),
       web: Option.map(
         yield* Config.option(Config.NonEmptyString("WEB_URL")),
@@ -75,8 +75,8 @@ const VISITS: readonly Visit[] = [
   { name: "today", path: "/today", signedIn: true },
   { name: "today, signed out", path: "/today" },
   { name: "project home", path: `/${project}` },
-  { name: "project home, examples", path: "/burrow" },
-  { name: "project home, no open asks", path: "/mossgate" },
+  { name: "project home, examples", path: "/oscabriel/burrow" },
+  { name: "project home, no open asks", path: "/lin-h/mossgate" },
   { name: "ask, open", path: `/${project}/asks/lint-heading-levels` },
   {
     name: "ask, held for newcomers",

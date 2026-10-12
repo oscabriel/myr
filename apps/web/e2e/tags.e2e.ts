@@ -6,19 +6,22 @@
  * `e2e/out/tags.png` for the shot list.
  *
  * It runs only against `WEB_URL` (a stage's web origin) and is skipped
- * without it. `WEB_TAGS_PROJECT` picks the project (changesets, which
- * `scripts/import-examples.ts` puts on a dev stage, unless given). It only
+ * without it. `WEB_TAGS_PROJECT` picks the project by its full name
+ * (`github.com/changesets/changesets`, which `scripts/import-examples.ts`
+ * puts on a dev stage, unless given). It only
  * reads.
  */
 import { expect, test } from "@playwright/test";
+import { ProjectName } from "@repo/protocol/ids";
 import { Config, Effect, Option } from "effect";
 
 /** What the check reads of its env: where the web lives, and which project to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
     return {
-      project: yield* Config.NonEmptyString("WEB_TAGS_PROJECT").pipe(
-        Config.withDefault("changesets")
+      // Read by the one parser: `changesets` and its full name alike.
+      project: yield* Config.schema(ProjectName, "WEB_TAGS_PROJECT").pipe(
+        Config.withDefault(ProjectName.make("github.com/changesets/changesets"))
       ),
       web: Option.map(
         yield* Config.option(Config.NonEmptyString("WEB_URL")),
@@ -122,12 +125,11 @@ test.describe("a monorepo's tags", () => {
           tags.first().locator("a").first().getAttribute("href")
         );
 
-        expect(tree).toMatch(
-          new RegExp(
-            `^/${project}/tree/${encodeURIComponent(`${PACKAGE}@`)}`,
-            "u"
+        expect(
+          tree?.startsWith(
+            `/${project}/tree/${encodeURIComponent(`${PACKAGE}@`)}`
           )
-        );
+        ).toBe(true);
 
         const opened = yield* awaited(() =>
           browser.goto(`${web}${tree ?? ""}`)

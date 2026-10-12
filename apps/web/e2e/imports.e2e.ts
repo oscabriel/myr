@@ -15,13 +15,16 @@
  * there.
  *
  * It runs only against `WEB_URL` (a dev stage's web origin) and is skipped
- * without it. `WEB_IMPORTS` narrows it to some projects (a comma list),
- * for a run while the imports go in one at a time. It only reads.
+ * without it. `WEB_IMPORTS` narrows it to some projects, a comma list of
+ * full names (`github.com/pallets/click`), for a run while the imports go
+ * in one at a time. Every address it visits or expects is the project's
+ * full name (ADR 0032). It only reads.
  */
 import { expect, test } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { Brand } from "@repo/brand";
-import { Config, Console, Effect, Option } from "effect";
+import { ProjectName } from "@repo/protocol/ids";
+import { Config, Console, Effect, Option, Schema } from "effect";
 
 /** One imported project: where its pages look, and what they must show. */
 interface Imported {
@@ -165,16 +168,36 @@ const settings = Effect.runSync(
   })
 );
 
-/** Those of `all` this run visits: `WEB_IMPORTS`' names, or all of them. */
+/**
+ * A project's full name, read by the one parser (ADR 0032): an import's
+ * key from before owners (`click`) reads as its source path
+ * (`github.com/pallets/click`), and a full name as itself.
+ */
+const nameOf = (spelled: string): ProjectName =>
+  Schema.decodeSync(ProjectName)(spelled);
+
+/** `text` as a regular expression matches it, literally. */
+const escaped = (text: string) =>
+  text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
+/** A project's address on the web: its full name. */
+const homeOf = (project: string) => `/${nameOf(project)}`;
+
+/**
+ * Those of `all` this run visits: `WEB_IMPORTS`' full names
+ * (`github.com/pallets/click`), or all of them.
+ */
 const visitedOf = <A extends { readonly project: string }>(
   all: readonly A[]
 ): readonly A[] =>
   Option.match(settings.only, {
     onNone: () => all,
     onSome: (names) => {
-      const named = new Set(names.split(",").map((name) => name.trim()));
+      const named = new Set(
+        names.split(",").map((name) => nameOf(name.trim()))
+      );
 
-      return all.filter(({ project }) => named.has(project));
+      return all.filter(({ project }) => named.has(nameOf(project)));
     },
   });
 
@@ -309,12 +332,14 @@ const loaded = (browser: Page, selector: string) =>
 const newestCommit = (browser: Page, project: string) =>
   Effect.gen(function* () {
     const response = yield* awaited(() =>
-      browser.goto(at(`/${project}/commits/main`))
+      browser.goto(at(`${homeOf(project)}/commits/main`))
     );
 
     expect(response?.status()).toBe(200);
 
-    const link = browser.locator(`a[href^="/${project}/commit/"]`).first();
+    const link = browser
+      .locator(`a[href^="${homeOf(project)}/commit/"]`)
+      .first();
 
     yield* awaited(() => expect(link).toBeVisible());
 
@@ -333,7 +358,7 @@ const newestCommit = (browser: Page, project: string) =>
 const homeWanted = (project: string, readme: string) => ({
   selectors: [
     "[data-readme]",
-    `section[aria-label="Take part"]:visible:has-text("/${project}.git")`,
+    `section[aria-label="Take part"]:visible:has-text("${homeOf(project)}.git")`,
   ],
   texts: [readme],
 });
@@ -349,7 +374,7 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
       visit(
         browser,
         project,
-        `/${project}`,
+        homeOf(project),
         "home",
         homeWanted(project, readme)
       )
@@ -361,13 +386,19 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
         ? timed(
             browser,
             project,
-            `/${project}/tree/main/${dir}`,
+            `${homeOf(project)}/tree/main/${dir}`,
             "tree",
             `[data-entry="${entry}"]`
           )
-        : visit(browser, project, `/${project}/tree/main/${dir}`, "tree", {
-            selectors: [`[data-entry="${entry}"]`],
-          })
+        : visit(
+            browser,
+            project,
+            `${homeOf(project)}/tree/main/${dir}`,
+            "tree",
+            {
+              selectors: [`[data-entry="${entry}"]`],
+            }
+          )
     ));
 
   test(`${project}'s ${file} opens at line 5`, ({ page: browser }) =>
@@ -376,7 +407,7 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
         yield* visit(
           browser,
           project,
-          `/${project}/blob/main/${file}#L5`,
+          `${homeOf(project)}/blob/main/${file}#L5`,
           "blob",
           {
             selectors: ['[data-toolbar="file"]'],
@@ -390,8 +421,8 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
 
   test(`${project}'s log groups its commits by day`, ({ page: browser }) =>
     Effect.runPromise(
-      visit(browser, project, `/${project}/commits/main`, "commits", {
-        selectors: [`a[href^="/${project}/commit/"]`, "[data-day]"],
+      visit(browser, project, `${homeOf(project)}/commits/main`, "commits", {
+        selectors: [`a[href^="${homeOf(project)}/commit/"]`, "[data-day]"],
         texts: ["Landings"],
       })
     ));
@@ -423,7 +454,7 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
 
   test(`${project}'s refs show main and its tags`, ({ page: browser }) =>
     Effect.runPromise(
-      visit(browser, project, `/${project}/refs`, "refs", {
+      visit(browser, project, `${homeOf(project)}/refs`, "refs", {
         selectors: ['[data-ref="main"]'],
         texts: ["Landed at", "Tags"],
       })
@@ -436,7 +467,7 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
       visit(
         browser,
         project,
-        `/${project}/people`,
+        `${homeOf(project)}/people`,
         "people",
         evaluated
           ? { selectors: ['[data-paths="**"]'] }
@@ -457,13 +488,19 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
         ? timed(
             browser,
             project,
-            `/${project}/why/main/${file}`,
+            `${homeOf(project)}/why/main/${file}`,
             "why",
             "[data-range]"
           )
-        : visit(browser, project, `/${project}/why/main/${file}`, "why", {
-            selectors: ["[data-range]"],
-          })
+        : visit(
+            browser,
+            project,
+            `${homeOf(project)}/why/main/${file}`,
+            "why",
+            {
+              selectors: ["[data-range]"],
+            }
+          )
     ));
 
   if (timedProject) {
@@ -474,9 +511,9 @@ const pages = ({ dir, entry, evaluated, file, project, readme }: Imported) => {
         timed(
           browser,
           project,
-          `/${project}/commits/main?path=${encodeURIComponent(file)}`,
+          `${homeOf(project)}/commits/main?path=${encodeURIComponent(file)}`,
           "commits-path",
-          `a[href^="/${project}/commit/"]`
+          `a[href^="${homeOf(project)}/commit/"]`
         )
       ));
   }
@@ -489,7 +526,7 @@ const knownPages = ({ file, project, readme }: Known) => {
       visit(
         browser,
         project,
-        `/${project}`,
+        homeOf(project),
         "home",
         homeWanted(project, readme)
       )
@@ -497,7 +534,7 @@ const knownPages = ({ file, project, readme }: Known) => {
 
   test(`${project}'s root lists ${file}`, ({ page: browser }) =>
     Effect.runPromise(
-      visit(browser, project, `/${project}/tree/main`, "tree", {
+      visit(browser, project, `${homeOf(project)}/tree/main`, "tree", {
         selectors: [`[data-entry="${file}"]`],
       })
     ));
@@ -508,7 +545,7 @@ const knownPages = ({ file, project, readme }: Known) => {
         yield* visit(
           browser,
           project,
-          `/${project}/blob/main/${file}#L5`,
+          `${homeOf(project)}/blob/main/${file}#L5`,
           "blob",
           {
             selectors: ['[data-toolbar="file"]'],
@@ -521,8 +558,8 @@ const knownPages = ({ file, project, readme }: Known) => {
 
   test(`${project}'s log groups its commits by day`, ({ page: browser }) =>
     Effect.runPromise(
-      visit(browser, project, `/${project}/commits/main`, "commits", {
-        selectors: [`a[href^="/${project}/commit/"]`, "[data-day]"],
+      visit(browser, project, `${homeOf(project)}/commits/main`, "commits", {
+        selectors: [`a[href^="${homeOf(project)}/commit/"]`, "[data-day]"],
       })
     ));
 
@@ -530,7 +567,7 @@ const knownPages = ({ file, project, readme }: Known) => {
     page: browser,
   }) =>
     Effect.runPromise(
-      visit(browser, project, `/${project}/why/main/${file}`, "why", {
+      visit(browser, project, `${homeOf(project)}/why/main/${file}`, "why", {
         selectors: ["[data-range]"],
       })
     ));
@@ -544,19 +581,31 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
       Effect.gen(function* () {
         // Annotated tags, listed peeled to their commits: a tag's tree opens.
         // The newest come first, a hundred a page: 1.0.0 is on the second.
-        yield* visit(browser, "anyhow", "/anyhow/refs?from=100", "refs-tags", {
-          selectors: ['[data-tag="1.0.0"]'],
-        });
+        yield* visit(
+          browser,
+          "anyhow",
+          `${homeOf("anyhow")}/refs?from=100`,
+          "refs-tags",
+          {
+            selectors: ['[data-tag="1.0.0"]'],
+          }
+        );
 
         const tagged = browser.locator('[data-tag="1.0.0"] a').first();
 
         expect(yield* awaited(() => tagged.getAttribute("href"))).toBe(
-          "/anyhow/tree/1.0.0"
+          `${homeOf("anyhow")}/tree/1.0.0`
         );
 
-        yield* visit(browser, "anyhow", "/anyhow/tree/1.0.0", "tag-tree", {
-          selectors: ['[data-entry="Cargo.toml"]'],
-        });
+        yield* visit(
+          browser,
+          "anyhow",
+          `${homeOf("anyhow")}/tree/1.0.0`,
+          "tag-tree",
+          {
+            selectors: ['[data-entry="Cargo.toml"]'],
+          }
+        );
       }),
   ],
   [
@@ -564,7 +613,7 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     (browser) =>
       Effect.gen(function* () {
         // The 78 KB README renders, its relative links pinned to a commit.
-        yield* visit(browser, "awesome", "/awesome", "readme-links", {
+        yield* visit(browser, "awesome", homeOf("awesome"), "readme-links", {
           texts: ["Contribution guide", "Front-End Development"],
         });
 
@@ -576,7 +625,10 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
         );
 
         expect(href).toMatch(
-          /^\/awesome\/blob\/[0-9a-f]{40}\/contributing\.md$/u
+          new RegExp(
+            `^${escaped(homeOf("awesome"))}/blob/[0-9a-f]{40}/contributing\\.md$`,
+            "u"
+          )
         );
       }),
   ],
@@ -588,7 +640,7 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
         yield* visit(
           browser,
           "changesets",
-          "/changesets/blob/main/packages/cli/src/commands/status/__tests__/status.test.ts",
+          `${homeOf("changesets")}/blob/main/packages/cli/src/commands/status/__tests__/status.test.ts`,
           "deep-file",
           { texts: ["Permalink"] }
         );
@@ -601,7 +653,9 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
           yield* visit(
             browser,
             "changesets",
-            from === 0 ? "/changesets/refs" : `/changesets/refs?from=${from}`,
+            from === 0
+              ? `${homeOf("changesets")}/refs`
+              : `${homeOf("changesets")}/refs?from=${from}`,
             "refs-scoped",
             { texts: ["Tags"] }
           );
@@ -621,7 +675,12 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
             .getAttribute("href")
         );
 
-        expect(href).toMatch(/^\/changesets\/tree\/%40changesets%2Fcli%40/u);
+        expect(href).toMatch(
+          new RegExp(
+            `^${escaped(homeOf("changesets"))}/tree/%40changesets%2Fcli%40`,
+            "u"
+          )
+        );
 
         yield* visit(browser, "changesets", href ?? "", "scoped-tag-tree", {
           selectors: ['[data-entry="packages"]'],
@@ -633,14 +692,20 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     (browser) =>
       Effect.gen(function* () {
         // Past the first 30 commits, by Older.
-        yield* visit(browser, "click", "/click/commits/main", "log-first", {
-          texts: ["Older"],
-        });
+        yield* visit(
+          browser,
+          "click",
+          `${homeOf("click")}/commits/main`,
+          "log-first",
+          {
+            texts: ["Older"],
+          }
+        );
         yield* awaited(() => browser.getByText("Older").first().click());
         yield* awaited(() => browser.waitForURL(/from=30/u));
         yield* awaited(() =>
           expect(
-            browser.locator('a[href^="/click/commit/"]').first()
+            browser.locator(`a[href^="${homeOf("click")}/commit/"]`).first()
           ).toBeVisible()
         );
         yield* whole(browser);
@@ -655,7 +720,7 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
         yield* visit(
           browser,
           "fuzzel",
-          "/fuzzel/tree/main/external",
+          `${homeOf("fuzzel")}/tree/main/external`,
           "submodule",
           {
             selectors: ['[data-entry="external/wlr-protocols"]'],
@@ -673,12 +738,11 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
     (browser) =>
       Effect.gen(function* () {
         // Lowercase `readme.md`, and its SVG logo shown through raw.
-        yield* visit(browser, "ky", "/ky", "readme-logo", {
+        yield* visit(browser, "ky", homeOf("ky"), "readme-logo", {
           selectors: ['[data-readme="readme.md"]'],
         });
 
-        const logo =
-          '[data-readme] img[src^="/ky/raw/"][src$="/media/logo.svg"]';
+        const logo = `[data-readme] img[src^="${homeOf("ky")}/raw/"][src$="/media/logo.svg"]`;
 
         yield* loaded(browser, logo);
       }),
@@ -691,7 +755,7 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
         yield* visit(
           browser,
           "stb",
-          "/stb/blob/main/tests/caveview/glext.h",
+          `${homeOf("stb")}/blob/main/tests/caveview/glext.h`,
           "large-file",
           { texts: ["glext.h"] }
         );
@@ -700,13 +764,13 @@ const specifics = new Map<string, (browser: Page) => Effect.Effect<void>>([
         yield* visit(
           browser,
           "stb",
-          "/stb/blob/main/data/easy_font_raw.png",
+          `${homeOf("stb")}/blob/main/data/easy_font_raw.png`,
           "png",
           {
-            selectors: ['img[src^="/stb/raw/"]'],
+            selectors: [`img[src^="${homeOf("stb")}/raw/"]`],
           }
         );
-        yield* loaded(browser, 'img[src^="/stb/raw/"]');
+        yield* loaded(browser, `img[src^="${homeOf("stb")}/raw/"]`);
       }),
   ],
 ]);
@@ -723,7 +787,7 @@ test.describe("the imported repos", () => {
   test.setTimeout(240_000);
 
   for (const imported of visited) {
-    test.describe(imported.project, () => {
+    test.describe(nameOf(imported.project), () => {
       pages(imported);
 
       const specific = specifics.get(imported.project);
@@ -737,7 +801,7 @@ test.describe("the imported repos", () => {
   }
 
   for (const imported of visitedOf(known)) {
-    test.describe(imported.project, () => {
+    test.describe(nameOf(imported.project), () => {
       knownPages(imported);
     });
   }

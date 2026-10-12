@@ -16,19 +16,21 @@
  */
 import { expect, test } from "@playwright/test";
 import { Brand } from "@repo/brand";
+import { ProjectName } from "@repo/protocol/ids";
 import { Config, Effect, Option } from "effect";
 
 /** What the check reads of its env: where the web lives, and which file to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
-    const project = yield* Config.NonEmptyString("WEB_PROJECT").pipe(
-      Config.withDefault("datekit")
+    // Read by the one parser: `burrow` and `oscabriel/burrow` alike.
+    const project = yield* Config.schema(ProjectName, "WEB_PROJECT").pipe(
+      Config.withDefault(ProjectName.make("oscabriel/datekit"))
     );
 
     return {
       path: yield* Config.NonEmptyString("WEB_WHY_PATH").pipe(
         Config.withDefault(
-          project === "burrow"
+          project === "oscabriel/burrow"
             ? `${Brand.configDir}/asks/drop-legacy-fetch.ask.ts`
             : "src/format.ts"
         )
