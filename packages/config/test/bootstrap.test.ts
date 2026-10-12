@@ -573,7 +573,7 @@ describe("what a failed bootstrap prints", () => {
         stage: "demo",
       }).message
     ).toBe(
-      "demo's platform lacks OPERATOR_TOKEN, COOKIE_KEY: set them by name (infra/stages.md)"
+      "demo's platform lacks OPERATOR_TOKEN, COOKIE_KEY: set them by name (.agents/ops/stages.md)"
     );
     expect(
       new CloudflareRefused({ route: "/workers/subdomain", status: 403 })

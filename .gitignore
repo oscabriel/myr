@@ -23,7 +23,7 @@ apps/web/src/routeTree.gen.ts
 # stay out of the public repo unless the user publishes a scrubbed copy. A
 # worktree holds only tracked files, so every agent reads them by absolute path
 # in the main checkout.
-.scratch/build/
+.agents/scratch/build/
 
 # The swarm's per-run scratch: each agent's clone, CLI shims, harness sessions
 # and config, and the run's `agents.json` summary. A live run records what it

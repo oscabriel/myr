@@ -69,7 +69,7 @@ const PRIVATE = [
   ["", "Users", ""].join("/"),
   ["plans", "gneiss", "run"].join("."),
   ["wanted", "explainer"].join("-"),
-  [".scratch", "build"].join("/"),
+  [".agents", "scratch", "build"].join("/"),
 ] as const;
 
 /** The roadmap lines a reader asks about, word for word. */

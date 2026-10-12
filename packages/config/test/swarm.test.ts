@@ -1464,7 +1464,7 @@ describe("a run", () => {
           Option.map(Result.getFailure(result), ({ reason }) => reason)
         ).toStrictEqual(
           Option.some(
-            'SESSION_TOKENS has no session for pell: add each to the stage\'s SESSION_TOKENS secret (infra/stages.md, "Secrets"), and to the env the swarm runs in, then run the swarm again'
+            'SESSION_TOKENS has no session for pell: add each to the stage\'s SESSION_TOKENS secret (.agents/ops/stages.md, "Secrets"), and to the env the swarm runs in, then run the swarm again'
           )
         );
         expect(spawned.map(({ args }) => args[1])).toStrictEqual(["asks"]);
