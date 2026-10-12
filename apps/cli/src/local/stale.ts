@@ -1,17 +1,4 @@
-/**
- * Stale generated files in a working copy: the project's
- * contribute skill (`.agents/skills/<key>-contribute/SKILL.md` and its
- * `.claude/skills/` copy) and the block in its AGENTS.md, regenerated here
- * with `@repo/agent-kit` from the policy at `main` and compared with what is
- * on disk. The platform lands them again whenever the config changes what
- * they say, so a copy that differs was generated for an older config, or
- * was edited by hand; `<cli> check` warns about each one and lists it.
- *
- * Read only: nothing here writes a file. A missing file is no copy, and
- * never stale; nor is an AGENTS.md with no block, whose text is all the
- * project's own. A skill copy without the platform's frontmatter is stale:
- * its path is the platform's, so the frontmatter was taken off (`isStale`).
- */
+// A skill copy without the platform's frontmatter is stale: its path is the platform's, so the frontmatter was taken off.
 import { agentsBlock, upsertAgentsBlock } from "@repo/agent-kit/agents-block";
 import { isStale } from "@repo/agent-kit/generated-file";
 import { projectSkill } from "@repo/agent-kit/project-skill";
@@ -19,20 +6,13 @@ import type { Policy } from "@repo/protocol/domain/policy";
 import type { LandedSha, ProjectName } from "@repo/protocol/ids";
 import { Effect, FileSystem, Option, Path } from "effect";
 
-/** A generated file on disk that is not what main's policy gives, and the landing its copy names. */
 export interface StaleCopy {
   readonly path: string;
-  /** The landing the copy says it came from; none for the AGENTS.md block, which names none, and for a skill copy without frontmatter. */
   readonly landed: Option.Option<LandedSha>;
 }
 
 const agentsFile = "AGENTS.md";
 
-/**
- * Every generated file in the working copy at `root` that differs from the
- * one `policy` (read at the landing `landed`) gives: the skill's copies by
- * their recorded hash (`isStale`), the AGENTS.md block by its text.
- */
 export const staleGenerated = (input: {
   readonly root: string;
   readonly project: ProjectName;

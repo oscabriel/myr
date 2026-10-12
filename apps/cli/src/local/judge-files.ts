@@ -1,15 +1,4 @@
-/**
- * The files the run-block finder and the judge closure are handed at one
- * commit of a repo on this machine, gathered as the platform gathers them at
- * a landing: `@repo/checks`' `judgeInputs` over the commit's listing, each
- * round's files read with one `git cat-file --batch`. `<cli> check` and the
- * harness hooks both read them here, so each judges by the closure the
- * gateway judges a push by.
- *
- * git runs read-only, outside any hook's repo and with no prompt
- * (`readOnlyGit`), and a git that fails reads as nothing: the closure is
- * then the defaults.
- */
+// A git that fails reads as nothing: the closure is then the defaults.
 import { judgeInputs } from "@repo/checks/judge";
 import type { JudgeInput } from "@repo/checks/judge";
 import { Array, Effect, Option, Stream } from "effect";
@@ -17,7 +6,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { readOnlyGit } from "./facts.ts";
 
-/** One blob of a commit, as `git ls-tree -r -l` lists it: its mode, path, id and size. */
 export interface ListedBlob {
   readonly mode: string;
   readonly path: string;
@@ -27,7 +15,6 @@ export interface ListedBlob {
 
 const decoder = new TextDecoder();
 
-/** Runs git in `root` to its end, `stdin` given: stdout as bytes, or none if it failed. */
 const gitBytes = (root: string, args: readonly string[], stdin?: string) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -58,7 +45,6 @@ const gitBytes = (root: string, args: readonly string[], stdin?: string) =>
 const ENTRY =
   /^(?<mode>\d+) blob (?<sha>[0-9a-f]+) +(?<size>\d+)\t(?<path>.+)$/su;
 
-/** Every blob of the commit `revision` names, by its path from the root; none when git can't read it. */
 export const blobsAt = (
   root: string,
   revision: string
@@ -103,10 +89,7 @@ export const blobsAt = (
     })
   );
 
-/**
- * `git cat-file --batch`'s output, split back into each object's bytes:
- * `<sha> <type> <size>\n<bytes>\n` per object, in the order asked.
- */
+/** Output is `<sha> <type> <size>\n<bytes>\n` per object, in the order asked. */
 const objectsIn = (output: Uint8Array): readonly Uint8Array[] => {
   const objects: Uint8Array[] = [];
   let at = 0;
@@ -136,10 +119,6 @@ const objectsIn = (output: Uint8Array): readonly Uint8Array[] => {
   return objects;
 };
 
-/**
- * The files the finder and the judge closure are handed, from a commit's
- * listing (`blobsAt`): every one, with the text of each some walk reads.
- */
 export const judgeFilesIn = (
   root: string,
   listing: readonly ListedBlob[]
@@ -180,7 +159,6 @@ export const judgeFilesIn = (
   });
 };
 
-/** The files the finder and the judge closure are handed at the commit `revision` names. */
 export const judgeFilesAt = (root: string, revision: string) =>
   Effect.flatMap(blobsAt(root, revision), (listing) =>
     judgeFilesIn(root, listing)

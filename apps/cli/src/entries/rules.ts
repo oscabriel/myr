@@ -1,10 +1,4 @@
-/**
- * The package's `./rules` export: the sdk a maintainer imports in the config
- * folder (`project.ts`, `asks/<id>.ask.ts`, `visibility.ts`; a layer's
- * `layer.ts`), inlined at build time so the published package names no
- * workspace package. It names every export of `@repo/sdk`;
- * `test/build.test.ts` fails when the two drift apart.
- */
+// Inlined at build time so the published package names no workspace package; `test/build.test.ts` fails when this drifts from `@repo/sdk`.
 export {
   type Admit,
   type AreaOf,

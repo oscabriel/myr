@@ -1,13 +1,3 @@
-/**
- * `init`: makes the repo the CLI stands in, or a public HTTPS repo, a
- * project on the platform. In a repo, it reads how the repo already sets up,
- * tests and lints (`@repo/checks/finder`), writes and commits a proposed
- * `<configDir>/project.ts` saying so, has the platform make the project
- * (`initProject`), adds the project as a remote, sets up git's credential
- * helper for its host, and pushes the first landing. With `--import`, the
- * platform copies the public repo once instead, and nothing here changes.
- * It acts only with `--yes`; `--dry-run` prints what it would do.
- */
 import { Brand } from "@repo/brand";
 import { findRunBlock } from "@repo/checks/finder";
 import type { RepoFile } from "@repo/checks/finder";
@@ -36,16 +26,12 @@ import { projectFile } from "./project-file.ts";
 
 const COMMAND = "init";
 
-/** The config file `init` proposes, from the repo's root. */
 const CONFIG = `${Brand.configDir}/project.ts`;
 
-/** The one commit `init` makes: the config file alone. */
 const SUBJECT = `Add ${CONFIG}: the run block ${Brand.cli} ${COMMAND} found`;
 
-/** What `--dry-run` shows where the platform's answer will go. */
 const PENDING = { origin: "<platform>", remote: "<remote>" } as const;
 
-/** `init`'s flags ask for something it can't do. A usage error: exit 2. */
 export class InitMisused extends Schema.TaggedError<InitMisused>()(
   "InitMisused",
   { reason: Schema.String }
@@ -57,7 +43,6 @@ export class InitMisused extends Schema.TaggedError<InitMisused>()(
   }
 }
 
-/** A git command `init` ran failed; git's own words say why. */
 export class GitFailed extends Schema.TaggedError<GitFailed>()("GitFailed", {
   argv: Schema.Array(Schema.String),
   stderr: Schema.String,
@@ -67,10 +52,8 @@ export class GitFailed extends Schema.TaggedError<GitFailed>()("GitFailed", {
   }
 }
 
-/** The payload `initProject` takes. */
 type Payload = typeof InitProject.payloadSchema.Type;
 
-/** What `init` would write, send and run: `--dry-run` prints it. */
 interface Plan {
   readonly files: readonly RepoFile[];
   readonly git: readonly (readonly string[])[];
@@ -125,7 +108,6 @@ type Input = Command.Command.Config.Infer<typeof flags>;
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** Runs `argv` in `cwd` to the end; a failing command is a result, not an error. */
 const run = (cwd: string, argv: readonly string[]) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -145,7 +127,6 @@ const run = (cwd: string, argv: readonly string[]) =>
     })
   );
 
-/** Runs `argv` in `cwd`, failing with git's own words when it fails. */
 const runOk = (cwd: string, argv: readonly string[]) =>
   run(cwd, argv).pipe(
     Effect.filterOrFail(
@@ -154,17 +135,11 @@ const runOk = (cwd: string, argv: readonly string[]) =>
     )
   );
 
-/** An argument as a shell reads it back: quoted only when it must be. */
 const shellWord = (word: string) =>
   /^[\w@%+=:,./-]+$/u.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
 
 const shown = (argv: readonly string[]) => argv.map(shellWord).join(" ");
 
-/**
- * The tracked files whose contents say how a repo sets up, tests and lints,
- * for the finder and the judge closure: every `package.json`, every
- * `tsconfig*.json`, CI workflows and hook configs.
- */
 const READ = [
   /(?:^|\/)package\.json$/u,
   /(?:^|\/)tsconfig[^/]*\.json$/u,
@@ -174,7 +149,6 @@ const READ = [
   /^\.pre-commit-config\.yaml$/u,
 ];
 
-/** Every tracked path, with contents for the files the finder reads. */
 const trackedFiles = (root: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -194,7 +168,6 @@ const trackedFiles = (root: string) =>
     );
   });
 
-/** The owner a bare name is given: the profile's handle, when `login` learned it. */
 const profileOwner = Effect.map(
   Effect.flatMap(Credentials, ({ current }) => current),
   (profile) =>
@@ -204,12 +177,6 @@ const profileOwner = Effect.map(
     )
 );
 
-/**
- * A name as a project's: `<owner>/<name>` as given, a bare word given under
- * the profile's handle, and with none given `fallback.short` under
- * `fallback.owner` (an import's source namespace), else under the
- * profile's handle. A usage error says how to name it otherwise.
- */
 const projectNamed = (
   given: Option.Option<string>,
   fallback: { readonly owner: Option.Option<string>; readonly short: string }
@@ -241,14 +208,12 @@ const HTTPS = /^https:\/\/\S+$/u;
 
 const pathnameOf = Option.liftThrowable((url: string) => new URL(url).pathname);
 
-/** The repo name an import URL ends in: `…/acme/widgets.git` → `widgets`. */
 const lastSegment = (url: string) =>
   Option.getOrElse(pathnameOf(url), () => "")
     .split("/")
     .findLast((segment) => segment !== "")
     ?.replace(/\.git$/u, "") ?? "";
 
-/** The project's remote and how to reach it: `git remote add|set-url`, the helper, the push. */
 const wiring = (input: {
   readonly hasRemote: boolean;
   readonly origin: Option.Option<string>;
@@ -269,20 +234,17 @@ const wiring = (input: {
   ...(input.push ? [["git", "push", Brand.slug, "HEAD:main"]] : []),
 ];
 
-/** The config file's commit: added, then committed alone. */
 const committing = (paths: readonly string[]) =>
   paths.flatMap((path) => [
     ["git", "add", "--", path],
     ["git", "commit", "--quiet", "--message", SUBJECT, "--", path],
   ]);
 
-/** Prints `refusal` once, as the CLI prints every refusal, and ends as `Reported` with its exit code. */
 const refuse = (json: boolean) => (refusal: Refusal) =>
   Output.use((output) =>
     endRefused(output, { command: COMMAND, json, refusals: [refusal] })
   );
 
-/** Asks the platform to make the project; a refusal is printed once. */
 const makeProject = (payload: Payload, json: boolean) =>
   Effect.gen(function* () {
     const client = yield* Client;
@@ -295,7 +257,6 @@ const makeProject = (payload: Payload, json: boolean) =>
     );
   });
 
-/** `--dry-run` prints the plan; without `--yes` nothing happens at all. */
 const approved = (input: Input, plan: Plan) =>
   Effect.gen(function* () {
     if (input.dryRun) {
@@ -313,7 +274,6 @@ const approved = (input: Input, plan: Plan) =>
     return true;
   });
 
-/** An import comes from a public `https://` URL, or not at all. */
 const httpsOnly = (url: string) =>
   HTTPS.test(url)
     ? Effect.void
@@ -323,7 +283,6 @@ const httpsOnly = (url: string) =>
         })
       );
 
-/** `--branch` says which branch to import, so it needs `--import`. */
 const importOnly = (branch: Option.Option<string>) =>
   Option.isNone(branch)
     ? Effect.void
@@ -334,13 +293,11 @@ const importOnly = (branch: Option.Option<string>) =>
         })
       );
 
-/** A reply as `--json` prints it: `landed` only when the platform gave one. */
 const withLanded = <A extends object>(
   data: A,
   landed: LandedSha | undefined
 ) => (landed === undefined ? data : { ...data, landed });
 
-/** Has the platform copy the repo at `url`, and says how to clone the project. */
 const imported = (input: Input, url: string, payload: Payload) =>
   Effect.gen(function* () {
     const output = yield* Output;
@@ -367,7 +324,6 @@ const imported = (input: Input, url: string, payload: Payload) =>
     });
   });
 
-/** `init --import <url>`: the platform copies a public repo; nothing here changes. */
 const importing = (input: Input, url: string) =>
   Effect.gen(function* () {
     yield* httpsOnly(url);
@@ -397,19 +353,14 @@ const importing = (input: Input, url: string) =>
     }
   });
 
-/** What `init` found in the repo it stands in, and so will do there. */
 interface Found {
-  /** The config file to commit: none when HEAD has one. */
   readonly commits: readonly string[];
-  /** Whether the repo already has a remote by the CLI's name. */
   readonly hasRemote: boolean;
   readonly payload: Payload;
   readonly root: string;
-  /** The config file to write: none when the work tree or HEAD has one. */
   readonly writes: readonly RepoFile[];
 }
 
-/** Writes and commits the config, makes the project, wires the remote and pushes. */
 const made = (input: Input, found: Found) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -479,14 +430,12 @@ const made = (input: Input, found: Found) =>
     });
   });
 
-/** `init` in a repo: propose the config, make the project, wire the remote, push. */
 const inRepo = (input: Input) =>
   Effect.gen(function* () {
     yield* importOnly(input.branch);
 
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    // The folder the CLI was started in: git and the spawner resolve it.
     const { root } = yield* repoContext(".");
 
     const project = yield* projectNamed(input.project, {
@@ -496,8 +445,7 @@ const inRepo = (input: Input) =>
 
     const inTree = yield* fs.exists(path.join(root, CONFIG));
 
-    // HEAD is what the push sends: a config only the work tree has (a run
-    // whose commit failed left it) is kept as it is, and committed.
+    // HEAD is what the push sends: a config only the work tree has is kept and committed.
     const atHead =
       (yield* run(root, ["git", "cat-file", "-e", `HEAD:${CONFIG}`]))
         .exitCode === 0;

@@ -1,9 +1,3 @@
-/**
- * The judge closure a hook session decides by: the closure `@repo/checks`
- * computes over the repo's files at the claim's base (the files the
- * platform reads, gathered by the same `judgeInputs`), plus the ask's own
- * files, which the gate's shape stage judges for every answer.
- */
 import { findRunBlock } from "@repo/checks/finder";
 import { judgeClosure } from "@repo/checks/judge";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -16,11 +10,6 @@ import type { ChildProcessSpawner } from "effect/process";
 
 import { judgeFilesAt } from "../local/judge-files.ts";
 
-/**
- * The closure with the ask's own files (its file in the config folder, and
- * a `redThenGreen` check's file), each anchored at the root: the gate's shape
- * stage judges them for every answer to the ask.
- */
 export const askJudge = (
   closure: Policy["judge"],
   ask: Ask
@@ -36,20 +25,10 @@ export const askJudge = (
   };
 };
 
-// ------------------------------------------------------------ at the base
 
 const decodeRun = Schema.decodeUnknownOption(RunBlock);
 
-/**
- * The judge closure at `base`, as `@repo/checks` computes it over the files
- * the platform reads there: every file of its tree, with the text of each
- * one the finder or the closure reads, gathered by the same `judgeInputs`
- * the platform and `<cli> check` gather through (none when git cannot read
- * `base`). The run block is the one the finder finds in those files, with
- * the claim's check command as its `test` when it finds none: the config
- * folder's own run block needs the config evaluated, which only
- * `<cli> check` does.
- */
+/** The config folder's run block needs the config evaluated, which only `<cli> check` does, so the claim's check command stands in. */
 export const judgeAt = (input: {
   readonly root: string;
   readonly base: string;

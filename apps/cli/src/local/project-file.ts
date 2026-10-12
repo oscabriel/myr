@@ -1,33 +1,19 @@
-/**
- * The config folder's `project.ts` that `init` proposes: the run block the
- * finder read from the repo's own files, each command with where it was
- * found, and nothing else, so every other setting takes its default. Pure:
- * the same commands always give the same text.
- */
 import { Brand } from "@repo/brand";
 import type { RunBlockEncoded } from "@repo/checks/finder";
 import { PATH_PLACEHOLDER } from "@repo/checks/kinds";
 
-/** A value in the run block: a command, or `setupEgress`'s hosts. */
 type Value = string | readonly string[];
 
-/** The run block's keys in the order the file writes them; `checks` last. */
 const KEYS = ["setup", "test", "doctor", "image", "setupEgress"] as const;
 
-/** A key as TypeScript writes it: bare when it is an identifier. */
 const keyOf = (name: string) =>
   /^[A-Za-z_$][\w$]*$/u.test(name) ? name : JSON.stringify(name);
 
-/** Text as one line of a `//` comment, whatever it holds. */
 const oneLine = (text: string) => text.replaceAll(/\s+/gu, " ").trim();
 
 const comment = (indent: string, text: string) =>
   `${indent}// ${oneLine(text)}`;
 
-/**
- * The finder's sources for one part of the run block: `setup from <path>`,
- * `setup inferred from <path>`, `checks.lint from <path>`.
- */
 const sourcesOf = (sources: readonly string[], part: string) =>
   sources.filter(
     (source) =>
@@ -35,7 +21,6 @@ const sourcesOf = (sources: readonly string[], part: string) =>
       source.startsWith(`${part} inferred from `)
   );
 
-/** The parts the run block holds, each with its value, in the file's order. */
 const partsOf = (run: Partial<RunBlockEncoded>) => [
   ...KEYS.flatMap((key) =>
     run[key] === undefined ? [] : [{ part: key, value: run[key] }]
@@ -46,7 +31,6 @@ const partsOf = (run: Partial<RunBlockEncoded>) => [
   })),
 ];
 
-/** Every source no written part names: what the finder skipped, and why. */
 const others = (
   sources: readonly string[],
   parts: readonly { readonly part: string }[]
@@ -58,7 +42,6 @@ const others = (
 const rules = (names: string) =>
   `import { ${names} } from "${Brand.cliPackage}/rules";`;
 
-/** A run block written out: each command under the comments naming its sources. */
 const explicit = (
   run: Partial<RunBlockEncoded>,
   sources: readonly string[]
@@ -98,11 +81,7 @@ const explicit = (
   ];
 };
 
-/**
- * No command that runs one test file: the file can't state a run block the
- * SDK accepts, so it keeps the platform's own finder, and lists in comments
- * what this one found.
- */
+/** With no command that runs one test file, the SDK accepts no run block, so the file keeps the platform's finder. */
 const fromCI = (run: Partial<RunBlockEncoded>, sources: readonly string[]) => {
   const parts = partsOf(run);
 
@@ -129,11 +108,6 @@ const fromCI = (run: Partial<RunBlockEncoded>, sources: readonly string[]) => {
   ];
 };
 
-/**
- * The proposed `<configDir>/project.ts` for a run block the finder found
- * and its sources (`findRunBlock` from `@repo/checks/finder`). It imports
- * the SDK from the published CLI's `/rules`, as a maintainer's repo does.
- */
 export const projectFile = (
   run: Partial<RunBlockEncoded>,
   sources: readonly string[]

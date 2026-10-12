@@ -1,13 +1,4 @@
-/**
- * Today on a terminal screen, drawn by OpenTUI's React renderer from the
- * state alone: whose Today it is and the budget; the decisions in the order
- * a decider takes them, from the one under the cursor on (those above it
- * counted), each with what it is about, when it expires (marked
- * when that is within the day), its default and its evidence; the newcomers
- * to welcome; what the last choice came to; and the keys the decision under
- * the cursor takes. Written with `createElement`, so the CLI's `.ts` build
- * needs no JSX.
- */
+// Written with `createElement`, so the CLI's `.ts` build needs no JSX.
 import { TextAttributes } from "@opentui/core";
 import { createElement } from "@opentui/react";
 import type { BoxProps, TextProps } from "@opentui/react";
@@ -21,10 +12,8 @@ import type { DecideCall, TodayViewState } from "./today.ts";
 
 const short = (sha: string) => sha.slice(0, 7);
 
-/** A ref as people say it: `main` for `refs/heads/main`. */
 const refWords = (ref: string) => ref.replace(/^refs\/heads\//u, "");
 
-/** What a decision is about, in a few words. */
 const about = DecisionSubject.match({
   Finish: ({ ask, head }) => `finish the answer to ${ask} at ${short(head)}`,
   OpenProposal: ({ proposal }) => `open the ask ${proposal} proposes`,
@@ -42,7 +31,6 @@ const about = DecisionSubject.match({
     `allow ${marker} at ${at.path}:${at.line} ("${reason}")`,
 });
 
-/** An expiry as a decider reads it: weekday, date and time, in UTC. */
 const byWhen = (at: DateTime.Utc) =>
   `${DateTime.formatUtc(at, {
     day: "numeric",
@@ -60,11 +48,7 @@ const plural = (count: number, one: string, many: string) =>
 const capitalized = (word: string) =>
   `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`;
 
-/**
- * Boxes and lines keep their own height: on a terminal shorter than Today
- * the screen is cut at its foot, never squeezed into rows drawn over each
- * other.
- */
+/** Boxes keep their own height: a short terminal cuts the screen at its foot rather than drawing rows over each other. */
 const box = (props: BoxProps, ...children: readonly JSX.Element[]) =>
   createElement("box", { flexShrink: 0, ...props }, ...children);
 
@@ -73,7 +57,6 @@ const line = (content: string, props: TextProps = {}) =>
 
 const muted = { attributes: TextAttributes.DIM } as const satisfies TextProps;
 
-/** One fact's value as a row holds it: its first line, and how many follow. */
 const firstLine = (value: string) => {
   const [first = "", ...rest] = value.split("\n");
 
@@ -126,11 +109,7 @@ const Entry = ({
     )
   );
 
-/**
- * The decisions from the one under the cursor on, those above it only
- * counted: whatever the terminal's height, the decision a key would take is
- * drawn just below the budget, never cut off at the foot of the screen.
- */
+/** Decisions above the cursor are only counted, so the one a key would take is never cut off at the foot. */
 const Decisions = ({ state }: { readonly state: TodayViewState }) => {
   const ordered = inOrder(state.today);
   const isSoon = soonIn(state.today);
@@ -166,11 +145,9 @@ const Newcomers = ({ state }: { readonly state: TodayViewState }) =>
     ? box({})
     : line(`Newcomers to welcome: ${state.today.newcomers.join(", ")}`);
 
-/** The question a choice other than the default waits on. */
 const question = (call: DecideCall, fallback: Choice) =>
   `${capitalized(call.choice)} ${placeOf(call.project, call.decision)}? Its default is ${fallback}. y to send it, n to keep it open.`;
 
-/** The keys the decision under the cursor takes, or the confirmation waiting. */
 const Keys = ({ state }: { readonly state: TodayViewState }) => {
   const here = current(state);
 
@@ -196,7 +173,6 @@ const Keys = ({ state }: { readonly state: TodayViewState }) => {
   );
 };
 
-/** The whole screen for one state. */
 export const TodayView = ({
   state,
 }: {

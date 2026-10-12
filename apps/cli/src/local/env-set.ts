@@ -1,11 +1,4 @@
-/**
- * `<cli> env set <KEY>`: stores a write-only value for a project's
- * `@sensitive` env item. The value arrives on stdin (or, for a person at a
- * terminal, through a prompt that shows nothing typed) and leaves only as
- * the `setEnv` payload's `Redacted`: it is never an argument, never printed,
- * logged, hashed or measured, and nothing reads it back. The reply says who
- * set which key, and when.
- */
+// The value is never an argument, never printed, logged, hashed or measured, and nothing reads it back.
 import { Brand } from "@repo/brand";
 import { Client, SetEnv } from "@repo/protocol/contracts";
 import { EnvKey, ProjectName } from "@repo/protocol/ids";
@@ -30,15 +23,10 @@ const command = "env set";
 
 const encodeSet = Schema.encodeEffect(SetEnv.successSchema);
 
-/** How a value is piped in, for the person who tried another way. */
 const pipeHint = (key: string) =>
   `printf '%s\\n' "$VALUE" | ${Brand.cli} ${command} ${key} --yes`;
 
-/**
- * The value from a person at a terminal, through a prompt that shows nothing
- * typed (not even a mask, which would tell its length). An agent or a
- * script must never be prompted, so it is told to pipe the value instead.
- */
+/** Shows nothing typed, not even a mask, which would tell its length. An agent or script is never prompted. */
 const prompted = (key: EnvKey, mode: Mode) =>
   mode === "human"
     ? Prompt.run(
@@ -50,10 +38,6 @@ const prompted = (key: EnvKey, mode: Mode) =>
         `${Brand.cli} never prompts an agent or a script, so pipe the value of ${key} on stdin: ${pipeHint(key)}`
       );
 
-/**
- * The value from stdin, less one trailing newline; a terminal on stdin means
- * nobody piped it, so a person is prompted and anyone else told to pipe it.
- */
 const readValue = (key: EnvKey, mode: Mode) =>
   Effect.gen(function* () {
     const stdio = yield* Stdio.Stdio;
@@ -72,7 +56,6 @@ const readValue = (key: EnvKey, mode: Mode) =>
       : value;
   });
 
-/** The project named, or the one the repo's platform remote names. */
 const projectFor = (named: Option.Option<ProjectName>) =>
   Effect.gen(function* () {
     if (Option.isSome(named)) {
@@ -89,11 +72,7 @@ const projectFor = (named: Option.Option<ProjectName>) =>
     return yield* projectOf(named, context);
   });
 
-/**
- * Every spelling of a flag `env set` takes: its own, and effect/cli's
- * built-in ones. A boolean's `--no-` form counts as its own spelling. A test
- * holds this list to the flags `env set --help` names.
- */
+/** A test holds this list to the flags `env set --help` names. */
 const spellings: ReadonlySet<string> = new Set([
   "--acknowledge-short",
   "--completions",
@@ -109,7 +88,6 @@ const spellings: ReadonlySet<string> = new Set([
   "-v",
 ]);
 
-/** A word that reads as a flag, but as none `env set` takes. */
 const strangeFlag = (word: string) => {
   const [flag = word] = word.split("=", 1);
 
@@ -120,14 +98,7 @@ const strangeFlag = (word: string) => {
   );
 };
 
-/**
- * Refuses `<cli> env set` with a word that reads as a flag it does not take,
- * before effect/cli parses the words. The parser would print such a word
- * back (`-abc` a letter per error), or act on a `-h` or `-v` inside it, and
- * a value typed there by mistake must never show, so the line repeats none
- * of it. `program` runs this first. Words after `--` reach the command,
- * which refuses them as `not-the-value`.
- */
+/** effect/cli would print a stray flag back (or act on a `-h` inside it), so a value typed there must be refused before parsing. */
 export const refuseStrangeFlags = (
   argv: readonly string[]
 ): Effect.Effect<void, UsageError> => {

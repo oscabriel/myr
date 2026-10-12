@@ -1,9 +1,3 @@
-/**
- * The CLI's surfaces: every contract served on the CLI as a command, merged
- * with the hand-written ones by the words that reach them; `schema`, which
- * prints a command's payload as JSON Schema; and `mcp`, the contracts as
- * tools over stdio. The only place the CLI's projections are built.
- */
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { platformSkill } from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
@@ -44,17 +38,11 @@ import { repoContext } from "./repo-context.ts";
 import { today } from "./tui/command.ts";
 import { cliVersion } from "./version.ts";
 
-/** The folder the CLI stands in: the process's own, unless a test says otherwise. */
 export const WorkingDirectory = Context.Reference<string>(
   "cli/WorkingDirectory",
   { defaultValue: () => "." }
 );
 
-/**
- * The project a command is about when `--project` is left out: the one the
- * repo the CLI stands in belongs to, by its remote's name (a project's own
- * repo, a claim's fork or a working fork). None outside a platform's repo.
- */
 export const fromRepoContext: Defaults<ChildProcessSpawner.ChildProcessSpawner> =
   {
     fields: { project: "the project of the repo you stand in" },
@@ -71,21 +59,14 @@ export const fromRepoContext: Defaults<ChildProcessSpawner.ChildProcessSpawner> 
     }),
   };
 
-/** A command, and the words after the CLI's name that reach it. */
 export interface CommandEntry {
   readonly path: readonly [string, ...string[]];
   readonly command: Command.Command.Any;
 }
 
-/**
- * Contracts that a hand-written command wraps: `init` creates the project
- * after its local work, `env set` reads the value from stdin so it never
- * passes through an argument list or a transcript, and `today` takes
- * `--tui`, which opens Today full-screen for a person at a terminal.
- */
+/** `env set` reads the value from stdin so it never passes through an argument list or a transcript. */
 const wrapped = ["initProject", "setEnv", "today"];
 
-/** Every contract served on the CLI, but those wrapped, as a command. */
 const projected = toCommands(Contracts, Effect.service(Client), {
   defaults: fromRepoContext,
   exclude: wrapped,
@@ -94,17 +75,10 @@ const projected = toCommands(Contracts, Effect.service(Client), {
   views,
 });
 
-/** What a group of commands that is no command itself is for, by its word. */
 const groups = new Map([
   ["env", "Read a project's env shape, or set a write-only value."],
 ]);
 
-/**
- * Entries as a tree: one command per first word, the rest of each path
- * beneath it. A word that is a command and starts longer paths (`ask`, and
- * `ask open`) is a command with subcommands; a word that only starts them
- * (`env`) is a group.
- */
 export const merge = (
   all: readonly CommandEntry[]
 ): readonly Command.Command.Any[] => {
@@ -134,10 +108,8 @@ export const merge = (
   });
 };
 
-/** A command's words, as `schema` and its errors print them. */
 const spoken = (words: readonly string[]) => words.join(" ");
 
-/** `schema` was asked for a command that takes no payload, or none at all. */
 export class UnknownCommand extends Schema.TaggedError<UnknownCommand>()(
   "UnknownCommand",
   { words: Schema.String }
@@ -147,10 +119,6 @@ export class UnknownCommand extends Schema.TaggedError<UnknownCommand>()(
   }
 }
 
-/**
- * Every contract served on the CLI, by its command's words, wrapped ones
- * included: `schema env set` describes the payload `env set` sends.
- */
 const byWords = new Map(
   [...Contracts.requests.values()].flatMap((rpc) =>
     Context.get(rpc.annotations, Surfaces).includes("cli")
@@ -159,7 +127,6 @@ const byWords = new Map(
   )
 );
 
-/** Whether a field's value is write-only: a `Redacted` on the decoded side. */
 const isWriteOnly = (ast: SchemaAST.AST) =>
   SchemaAST.resolveAt<{ readonly id?: unknown }>("representation")(
     SchemaAST.toType(ast)
@@ -170,11 +137,6 @@ const WRITE_ONLY =
 
 const decodeJson = Schema.decodeUnknownEffect(Schema.Json);
 
-/**
- * A contract's payload as one JSON Schema document (the root as JSON
- * encodes it, as `Schema.toJsonSchemaDocument` does), with every
- * write-only field marked `writeOnly` and described as such.
- */
 export const payloadJsonSchema = (rpc: CommandRpc) => {
   const payload = rpc.payloadSchema;
 
@@ -214,7 +176,6 @@ export const payloadJsonSchema = (rpc: CommandRpc) => {
   return decodeJson(document).pipe(Effect.orDie);
 };
 
-/** `schema <command…>`: the payload a command sends, as JSON Schema. */
 export const schema = Command.make(
   "schema",
   {
@@ -254,7 +215,6 @@ export const schema = Command.make(
   )
 );
 
-/** Every command the CLI has, projected or hand-written, by its path. */
 export const entries: readonly CommandEntry[] = [
   ...projected,
   ...local,
@@ -262,17 +222,13 @@ export const entries: readonly CommandEntry[] = [
   { command: today, path: ["today"] },
 ];
 
-/** Any command in the tree: what it may fail with, and what it needs. */
 type Every =
   | (typeof projected)[number]["command"]
   | (typeof local)[number]["command"]
   | typeof schema
   | typeof today;
 
-/**
- * A command at the top of the tree. Merging erases each command's own type,
- * so the tree states what all of them together may fail with and need.
- */
+/** Merging erases each command's own type, so the tree states the union. */
 export type TreeCommand = Command.Command<
   string,
   never,
@@ -281,23 +237,12 @@ export type TreeCommand = Command.Command<
   Command.Services<Every>
 >;
 
-/** The CLI's commands at the top, merged by path. */
 export const commands: readonly TreeCommand[] = merge(entries);
 
 const projection = toToolkit(surfaced("mcp"), Effect.service(Client));
 
-/**
- * The platform's skill, made from agent-kit's command list, the one the
- * platform's prompt and the web's `llms.txt` read, so they say the same.
- */
 const skill = skillIn(platformSkill({ commands: commandDocs(Contracts) }));
 
-/**
- * The MCP-surfaced contracts as tools over stdio, beside each ask's brief
- * and the projects as resources and `made` as the prompt `contribute`, in
- * every protocol a harness may speak: the stateless 2026-07-28 one, and the
- * four session-based ones before it. Calls go through the `Client`.
- */
 const server = (made: Skill) =>
   Layer.mergeAll(
     McpServer.toolkit(projection.toolkit).pipe(
@@ -321,12 +266,7 @@ const server = (made: Skill) =>
     )
   );
 
-/**
- * `mcp`: serve the contracts to a harness that spawned this process. The
- * skill is made before the server reads stdin: the server starts reading
- * as soon as it is built, so a prompt made while it builds could miss a
- * client's first `prompts/get`.
- */
+/** The skill is made before the server is built: it reads stdin at once and could miss a first `prompts/get`. */
 export const mcp = Command.make("mcp", {}, () =>
   Effect.flatMap(skill, (made) => Layer.launch(server(made)))
 ).pipe(

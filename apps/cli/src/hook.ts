@@ -1,16 +1,4 @@
-/**
- * `<cli> hook <event> --json`: the one command behind every harness hook in
- * Claude Code's format (Claude Code itself, and Cursor and Copilot CLI, which
- * read it). It reads the harness's JSON on stdin, gathers the session's facts
- * once (cached per session), asks `decideHook`, and prints the decision as
- * the one JSON document on stdout.
- *
- * Hooks are early feedback; the gateway is the authority. So the hook fails
- * open: without a claim, without the platform, with input it cannot read, or
- * on any failure of its own, it prints `{}` (go on), says why on stderr, and
- * exits 0. Only a wrong event name, a mistake in the hook's own config, is a
- * usage error (exit 2).
- */
+// The gateway is the authority, so the hook fails open: on anything it cannot judge it prints `{}` and exits 0.
 import { HookEvent } from "@repo/agent-kit/hook-events";
 import { Brand } from "@repo/brand";
 import {
@@ -38,10 +26,6 @@ import { Output } from "./output.ts";
 
 const EVENTS = HookEvent.literals.join(", ");
 
-/**
- * The hook was called with an event it does not answer: its config is
- * wrong. A usage error: `program` prints its one line and exits 2.
- */
 export class HookUsage extends Schema.TaggedError<HookUsage>()("HookUsage", {
   event: Schema.String,
 }) {
@@ -55,12 +39,10 @@ export class HookUsage extends Schema.TaggedError<HookUsage>()("HookUsage", {
 
 const decodeEvent = Schema.decodeUnknownOption(HookEvent);
 
-/** The whole of stdin, as text. */
 const stdinText = Effect.flatMap(Stdio.Stdio, ({ stdin }) =>
   stdin.pipe(Stream.decodeText(), Stream.mkString)
 );
 
-/** The PushCheck the caller provided, or this CLI run again as a child. */
 const pushCheck = Effect.flatMap(
   Effect.serviceOption(PushCheck),
   Option.match({
@@ -69,14 +51,7 @@ const pushCheck = Effect.flatMap(
   })
 );
 
-/**
- * The session's facts: kept from an earlier event, else gathered and kept.
- * A claim, once found, holds for the session, so `pre-tool-use` never asks
- * the platform again. Without one, `session-start` and `stop` look again
- * (once a turn), so a claim the agent takes mid-session is found at the end
- * of that turn; `pre-tool-use` never does, so an edit never waits on the
- * network.
- */
+/** `pre-tool-use` never asks the platform, so an edit never waits on the network. */
 const sessionFacts = (event: HookEvent, input: HookInput) =>
   Effect.gen(function* () {
     const kept = yield* loadSession(input.session_id);
@@ -99,7 +74,6 @@ const sessionFacts = (event: HookEvent, input: HookInput) =>
     return gathered;
   });
 
-/** Stop asks the local check, from the claim's base; nothing else does, and only with a claim. */
 const refusalsFor = (event: HookEvent, state: SessionState) => {
   const { claim } = state;
 
@@ -108,7 +82,6 @@ const refusalsFor = (event: HookEvent, state: SessionState) => {
     : Effect.succeed([]);
 };
 
-/** Answers one event: the decision's JSON, with its note on stderr. */
 const answer = (event: HookEvent, input: HookInput) =>
   Effect.gen(function* () {
     const output = yield* Output;
@@ -157,11 +130,9 @@ const answer = (event: HookEvent, input: HookInput) =>
     return decision.output;
   });
 
-/** The answer on stdout: one line of JSON, or indented for a person. */
 const print = (json: boolean, output: HookOutput) =>
   Console.log(json ? JSON.stringify(output) : JSON.stringify(output, null, 2));
 
-/** Says why the hook allows, on stderr, and lets the harness go on. */
 const failOpen = (json: boolean, why: string) =>
   Effect.andThen(
     Output.use((output) => output.note(`hook: ${why}; allowing`)),

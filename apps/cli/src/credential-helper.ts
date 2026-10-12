@@ -1,14 +1,4 @@
-/**
- * git's credential helper: `git-credential-<slug>`, which `login` names in
- * git's config for the platform's url (`gitHelperConfig`). git asks it for a
- * password after a 401 that names Basic; it answers from the stored profile
- * for that host, and never prompts, opens a terminal, or reads past the
- * blank line that ends git's request.
- *
- * The username it hands back carries the harness behind the push as audit
- * metadata (`@repo/protocol/audit`), never identity: the token in the
- * password slot is the only identity the platform reads.
- */
+// The username carries the harness as audit metadata, never identity: the token is the only identity the platform reads.
 import { Brand } from "@repo/brand";
 import { auditUser, detectHarness } from "@repo/protocol/audit";
 import {
@@ -25,7 +15,6 @@ import { Argument, Command } from "effect/cli";
 import { Credentials } from "./credentials.ts";
 import { Output } from "./output.ts";
 
-/** What git asks a helper to do. */
 export type Operation = "get" | "store" | "erase";
 
 const operations = [
@@ -34,19 +23,11 @@ const operations = [
   "erase",
 ] as const satisfies readonly Operation[];
 
-/** The env, by name: what `detectHarness` reads. */
 export type Env = Readonly<Record<string, string | undefined>>;
 
-/**
- * The most indices the walk reads under one name. The config provider tells
- * an all-numeric level only its largest index, so a name like
- * `RUN_4294967294` would have the walk count to four billion on every git
- * call; names with an index past this are not read. No harness marker ends
- * in a number, and the binary's git child gets the process env whole.
- */
+/** The config provider reports only an all-numeric level's largest index, so a name like `RUN_4294967294` would make the walk count to four billion. */
 const INDEX_LIMIT = 1024;
 
-/** The env-name parts below `path` and their values, from the CLI's config provider. */
 const namesBelow = (
   provider: ConfigProvider.ConfigProvider,
   path: ConfigProvider.Path
@@ -83,11 +64,6 @@ const namesBelow = (
     )
   );
 
-/**
- * The env as the CLI sees it, every name with its value: read through the
- * config provider (the process env when nothing else is given), so a test's
- * env is the one a command sees and passes on.
- */
 export const currentEnv: Effect.Effect<Readonly<Record<string, string>>> =
   Effect.gen(function* () {
     const provider = yield* ConfigProvider.ConfigProvider;
@@ -95,7 +71,6 @@ export const currentEnv: Effect.Effect<Readonly<Record<string, string>>> =
     return Object.fromEntries(yield* namesBelow(provider, []));
   });
 
-/** git's request: its `key=value` lines, up to the blank line that ends it. */
 const requestOf = (input: string) => {
   const fields = new Map<string, string>();
 
@@ -114,20 +89,16 @@ const requestOf = (input: string) => {
   return fields;
 };
 
-/** The env names the CLI reads, spelled from the brand: `<SLUG>_PROFILE`. */
 const SLUG = Brand.slug.toUpperCase();
 
-/** `url`'s scheme without its colon, and its `host[:port]` in lowercase, if it is a URL. */
 const placeOf = Option.liftThrowable((url: string) => {
   const { host, protocol } = new URL(url);
 
   return { host: host.toLowerCase(), scheme: protocol.replace(/:$/u, "") };
 });
 
-/** A value git's credential protocol can carry: one line, no NUL. */
 const fitsOneLine = (value: string) => !/[\n\r\0]/u.test(value);
 
-/** What the helper prints: for git on stdout, and maybe a line for a person on stderr. */
 interface Answer {
   readonly stdout: string;
   readonly note: Option.Option<string>;
@@ -135,15 +106,7 @@ interface Answer {
 
 const silent: Answer = { note: Option.none(), stdout: "" };
 
-/**
- * The helper's answer to `op` with git's `input`. `get` answers only for a
- * host a profile is on, over that profile's scheme. Under `<SLUG>_PROFILE`
- * only that profile may answer: it names the person git acts for, so the
- * helper never hands over another person's token for the same host. With no
- * login for the profile in use, it also says, once, how to log in. `store`
- * and `erase` do nothing: the stored token changes only through `login`
- * and `logout`.
- */
+/** Under `<SLUG>_PROFILE` only that profile may answer, so another person's token for the same host is never handed over. */
 const answer = (op: Operation, input: string, env: Env) =>
   Effect.gen(function* () {
     if (op !== "get") {
@@ -200,10 +163,6 @@ const answer = (op: Operation, input: string, env: Env) =>
       : silent;
   });
 
-/**
- * What the helper prints on stdout for `op`, given git's `input` and the
- * env it runs in: `username=<audit>\npassword=<token>\n`, or nothing.
- */
 export const credentialHelper = (
   op: Operation,
   input: string,
@@ -211,10 +170,6 @@ export const credentialHelper = (
 ): Effect.Effect<string, never, Credentials> =>
   Effect.map(answer(op, input, env), ({ stdout }) => stdout);
 
-/**
- * git's request from stdin: the lines up to the first blank one, read no
- * further, or up to the end if git closes stdin first.
- */
 const readRequest = Effect.gen(function* () {
   const { stdin } = yield* Stdio.Stdio;
 
@@ -229,7 +184,6 @@ const readRequest = Effect.gen(function* () {
   return `${lines.join("\n")}\n\n`;
 });
 
-/** `<cli> credential <get|store|erase>`: what `git-credential-<slug>` runs. */
 export const credential = Command.make(
   "credential",
   {

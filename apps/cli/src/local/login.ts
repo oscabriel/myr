@@ -1,16 +1,4 @@
-/**
- * `login` and `logout`. A person logs in once, through the browser (PKCE
- * against the platform's own OAuth server) or with a token piped to
- * `--token-stdin`; the CLI checks the token with the platform, keeps it as
- * a profile (`Credentials`), and names `git-credential-<slug>` in git's
- * global config for the platform's url, so plain `git clone`, `fetch` and
- * `push` work with no token in a url and no prompt. Profiles let one
- * machine act for several people (`<SLUG>_PROFILE=<name>`).
- *
- * The token stays `Redacted` from stdin or `/token` to the credentials
- * file; it is written out only in the `Authorization` header that checks
- * it, and later in the helper's `password=` line.
- */
+// The token stays `Redacted`; it is written out only in the `Authorization` header that checks it and the helper's `password=` line.
 import { BunHttpServer } from "@effect/platform-bun";
 import { Brand } from "@repo/brand";
 import { detectHarness } from "@repo/protocol/audit";
@@ -45,28 +33,15 @@ import { Credentials, gitHelperConfig } from "../credentials.ts";
 import type { Profile } from "../credentials.ts";
 import { Output } from "../output.ts";
 
-/** The env names the CLI reads, spelled from the brand: `<SLUG>_URL`. */
 const SLUG = Brand.slug.toUpperCase();
 
-/** The address the loopback server binds: this machine only. */
 const LOOPBACK = "127.0.0.1";
 
-/** How long `login` waits for the browser to come back. */
 const SIGN_IN_WAIT = "5 minutes";
 
-/**
- * The CLI's OAuth client id on a platform: the URL of the Client ID
- * Metadata Document the platform serves for it
- * (`apps/platform/src/auth/cli-client.ts`). It asks for no scope.
- */
 const clientIdOf = (origin: string) => `${origin}/oauth/cli`;
 
-// --- The host seams: each has a default the binary runs on, and tests swap it.
 
-/**
- * Where `login` hears the browser come back: an HTTP server on one address,
- * for one scope. The binary listens with Bun.
- */
 export const Loopback = Context.Reference<{
   readonly listen: (address: {
     readonly hostname: string;
@@ -82,11 +57,6 @@ export const Loopback = Context.Reference<{
   }),
 });
 
-/**
- * A client of the platform at `url` that presents `token` as its bearer:
- * what `login` checks a token with before it keeps it. The binary's calls
- * go over HTTP to `<url>/rpc`.
- */
 export const PlatformClient = Context.Reference<{
   readonly connect: (profile: {
     readonly token: Redacted.Redacted;
@@ -110,7 +80,6 @@ export const PlatformClient = Context.Reference<{
   }),
 });
 
-/** Opens `url` with the first of `commands` that runs; none running is fine. */
 const openWith = (url: string, commands: readonly string[]) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -132,10 +101,6 @@ const openWith = (url: string, commands: readonly string[]) =>
     }
   });
 
-/**
- * The person's browser. The binary asks the desktop's opener (`xdg-open`,
- * else macOS's `open`); the URL is printed either way.
- */
 export const Browser = Context.Reference<{
   readonly open: (
     url: string
@@ -146,9 +111,7 @@ export const Browser = Context.Reference<{
   }),
 });
 
-// --- Failures.
 
-/** `login` was run in a way that cannot work; the message says what to run. */
 export class LoginUsage extends Schema.TaggedError<LoginUsage>()("LoginUsage", {
   reason: Schema.String,
 }) {
@@ -157,7 +120,6 @@ export class LoginUsage extends Schema.TaggedError<LoginUsage>()("LoginUsage", {
   }
 }
 
-/** The platform, or the sign-in, said no; nothing was stored. */
 export class LoginRefused extends Schema.TaggedError<LoginRefused>()(
   "LoginRefused",
   { reason: Schema.String }
@@ -167,7 +129,6 @@ export class LoginRefused extends Schema.TaggedError<LoginRefused>()(
   }
 }
 
-/** git would not take a config line; the message names it, to run by hand. */
 export class GitConfigFailed extends Schema.TaggedError<GitConfigFailed>()(
   "GitConfigFailed",
   { command: Schema.String }
@@ -177,7 +138,6 @@ export class GitConfigFailed extends Schema.TaggedError<GitConfigFailed>()(
   }
 }
 
-// --- Shared parts.
 
 const flags = {
   json: Flag.Boolean("json").pipe(
@@ -192,13 +152,11 @@ const flags = {
   ),
 };
 
-/** The profile a command acts on: the flag, else `<SLUG>_PROFILE`, else `default`. */
 const profileName = (
   flag: Option.Option<string>,
   env: Readonly<Record<string, string>>
 ) => Option.getOrElse(flag, () => env[`${SLUG}_PROFILE`] ?? "default");
 
-/** An argv list as a person would type it in a shell. */
 const typed = (argv: readonly string[]) =>
   argv
     .map((arg) => {
@@ -212,7 +170,6 @@ const typed = (argv: readonly string[]) =>
     })
     .join(" ");
 
-/** Runs one `git config` argv list; `allowed` are the exit codes that mean done. */
 const runGit = (
   argv: readonly string[],
   env: Readonly<Record<string, string>>,
@@ -241,10 +198,9 @@ const runGit = (
 
 const asUrl = Option.liftThrowable((text: string) => new URL(text));
 
-/** Hosts that are this machine, where plain http keeps a token local. */
+/** Hosts where plain http keeps a token on this machine. */
 const THIS_MACHINE = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-/** `given`'s origin, if it is a platform url: https, or http on this machine. */
 const originOf = (given: string) =>
   Option.match(
     Option.filter(
@@ -264,12 +220,7 @@ const originOf = (given: string) =>
     }
   );
 
-/**
- * The platform to log in to: `--url`, else `<SLUG>_URL`, else the profile's
- * own. `Credentials` reads back only the current profile, so another
- * profile named by `--profile` needs `--url`: it is never logged in to the
- * current profile's platform by default.
- */
+/** `Credentials` reads back only the current profile, so another profile needs `--url`. */
 const platformOf = (
   flag: Option.Option<string>,
   profile: Option.Option<string>,
@@ -300,9 +251,7 @@ const platformOf = (
     });
   });
 
-// --- The token, by one of two ways.
 
-/** The token piped to `--token-stdin`: its first line, read no further. */
 const tokenFromStdin = Effect.gen(function* () {
   const { stdin } = yield* Stdio.Stdio;
 
@@ -327,14 +276,12 @@ const tokenFromStdin = Effect.gen(function* () {
 
 const encodeBase64Url = Schema.encodeEffect(Schema.Uint8ArrayFromBase64Url);
 
-/** `size` bytes from WebCrypto's `getRandomValues`, in base64url. */
 const randomText = (size: number) =>
   Effect.sync(() => crypto.getRandomValues(new Uint8Array(size))).pipe(
     Effect.flatMap(encodeBase64Url),
     Effect.orDie
   );
 
-/** The S256 code challenge for `verifier`: `BASE64URL(SHA256(verifier))`. */
 const challengeOf = (verifier: string) =>
   Effect.promise(() =>
     crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))
@@ -343,11 +290,6 @@ const challengeOf = (verifier: string) =>
     Effect.orDie
   );
 
-/**
- * A server on 127.0.0.1 at a port the system picks, for this scope, that
- * takes the browser's one return to `/callback`: its `redirect_uri`, and
- * the query the browser brought back.
- */
 const loopback = Effect.gen(function* () {
   const { listen } = yield* Loopback;
   const server = yield* listen({ hostname: LOOPBACK, port: 0 });
@@ -387,7 +329,6 @@ const loopback = Effect.gen(function* () {
   };
 });
 
-/** What `/token` answers a good code with. */
 const TokenResponse = Schema.Struct({
   access_token: Schema.RedactedFromValue(Schema.NonEmptyString),
   token_type: Schema.String,
@@ -395,7 +336,6 @@ const TokenResponse = Schema.Struct({
 
 const decodeTokenResponse = Schema.decodeUnknownEffect(TokenResponse);
 
-/** Trades the code for an access token at `<url>/token`, showing the verifier. */
 const exchange = (input: {
   readonly code: string;
   readonly redirectUri: string;
@@ -439,12 +379,6 @@ const exchange = (input: {
   );
 };
 
-/**
- * The token from a browser sign-in: PKCE (S256) against the platform's
- * `/authorize`, its code at the loopback server, then `/token`. The URL is
- * always printed; the browser opens only when `opens`. Waits at most five
- * minutes for the browser, then stops with a usage error.
- */
 const tokenFromBrowser = (url: string, opens: boolean) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -506,7 +440,6 @@ const tokenFromBrowser = (url: string, opens: boolean) =>
     })
   );
 
-/** Asks the platform at `url` who `token` is; a refusal or no answer stores nothing. */
 const verify = (url: string, token: Redacted.Redacted) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -523,7 +456,6 @@ const verify = (url: string, token: Redacted.Redacted) =>
     )
   );
 
-/** Whether `login` may open a browser: only for a person at a terminal. */
 const mayOpenBrowser = (env: Readonly<Record<string, string>>) =>
   Effect.gen(function* () {
     const { mode } = yield* Output;
@@ -537,7 +469,6 @@ const mayOpenBrowser = (env: Readonly<Record<string, string>>) =>
     );
   });
 
-/** The lines of a view: a sentence, then each command on its own line. */
 const viewOf = (said: string, commands: readonly (readonly string[])[]) => {
   const lines = commands.map((argv) => typed(argv));
 
@@ -629,7 +560,7 @@ export const login = Command.make(
   )
 );
 
-/** The `git config --global` lines that undo `gitHelperConfig(url)`; exit 5 means already gone. */
+/** Exit 5 means the line is already gone. */
 const gitHelperUnset = (url: string): readonly (readonly string[])[] => [
   ["git", "config", "--global", "--unset-all", `credential.${url}.helper`],
   ["git", "config", "--global", "--unset-all", `credential.${url}.useHttpPath`],
@@ -637,7 +568,6 @@ const gitHelperUnset = (url: string): readonly (readonly string[])[] => [
 
 const HELPER_KEY = /^credential\.(?<url>.+)\.helper$/u;
 
-/** The urls whose git config names this CLI's helper. */
 const helperUrls = (env: Readonly<Record<string, string>>) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;

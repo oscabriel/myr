@@ -1,17 +1,4 @@
-/**
- * `<cli> check`: the gate's answer for HEAD before it is pushed. It runs the
- * gate's own stages 0 and 1 (`@repo/gate`'s `pushStages`) over the facts a
- * push of HEAD to the claim's fork would give the gateway (`localFacts`),
- * under the policy at `main` (`localPolicy`), and prints the same refusals,
- * tag for tag; then it runs the ask's check and the project's lanes on
- * HEAD's tree, in a temp clone, through `CheckRunner` `/local`, and counts
- * the project's ratchets on HEAD and on its base (`ratchets.ts`), refusing
- * a raised count with the platform's `Weakened{ratchet}`.
- *
- * Nothing here writes to the repo, its config or its refs, and `--offline`
- * calls no platform: the parse stage then judges a live claim made up for
- * the person checking, and says so on stderr.
- */
+// Writes nothing to the repo, its config or its refs; `--offline` calls no platform.
 import { Brand } from "@repo/brand";
 import {
   CheckAt,
@@ -83,25 +70,17 @@ import type { StaleCopy } from "./stale.ts";
 
 const COMMAND = "check";
 
-/** A generated file in the working copy that main's config no longer gives (`stale.ts`). */
 const Stale = Schema.Struct({
-  /** The landing the copy says it came from, when it names one. */
   landed: Schema.optionalKey(LandedSha),
   path: Schema.String,
 });
 
-/**
- * What `check --json` prints on success: the ask, the diff it judged, each
- * lane, each ratchet's count on the base and on HEAD when it counted any,
- * and the generated files that are out of date, when any are.
- */
 const Checked = Schema.Struct({
   ask: AskId,
   base: CommitSha,
   head: CommitSha,
   lanes: Schema.Array(LaneResult),
   ratchets: Schema.optionalKey(Schema.NonEmptyArray(RatchetMove)),
-  /** The last stage that ran: `shape` with `--shape-only`, else `checks`. */
   stage: Schema.Literals(["shape", "checks"]),
   stale: Schema.optionalKey(Schema.NonEmptyArray(Stale)),
 });
@@ -112,22 +91,18 @@ const encodeChecked = Schema.encodeEffect(Checked);
 
 const isRefusal = Schema.is(Refusal);
 
-/** The handle a check stands in for when nobody is signed in and no fork names one. */
 const SOMEONE = Handle.make("you");
 
 const asHandle = Schema.decodeOption(Handle);
 
-/** A claim that holds the fork open: `live`, or `warned` and not yet lapsed. */
 const isLive = (claim: ClaimView) =>
   claim.state === "live" || claim.state === "warned";
 
-/** Prints `text` on stderr, then ends the command: it has said why. */
 const stop = (text: string) =>
   Output.use((output) =>
     Effect.andThen(output.note(text), Effect.fail(new Reported()))
   );
 
-/** Prints `refusals` the way every command does, then ends the command with their exit code. */
 const refuse = (
   json: boolean,
   refusals: Array.NonEmptyReadonlyArray<Refusal>
@@ -136,18 +111,12 @@ const refuse = (
     endRefused(output, { command: COMMAND, json, refusals })
   );
 
-/**
- * What a stale copy is told: which file, the landing it names, why it can
- * differ (an older config or a hand edit; the copy alone can't say which),
- * and how to get a current one.
- */
 const staleNote = ({ landed, path }: StaleCopy) =>
   `${path} differs from what main's config gives${Option.match(landed, {
     onNone: () => "",
     onSome: (sha) => ` (it says it was generated at ${sha})`,
   })}: it was generated for an older config, or edited by hand. The platform regenerates it whenever the config changes; pull main for the current copy instead of editing it.`;
 
-/** The stale copies as `--json` lists them: absent when there are none. */
 const staleField = (stale: readonly StaleCopy[]) =>
   Array.match(stale, {
     onEmpty: () => ({}),
@@ -161,7 +130,6 @@ const staleField = (stale: readonly StaleCopy[]) =>
     }),
   });
 
-/** The signed-in profile's handle, when `login` learned one. */
 const signedInHandle = Effect.flatMap(
   Effect.serviceOption(Credentials),
   Option.match({
@@ -173,7 +141,6 @@ const signedInHandle = Effect.flatMap(
   })
 );
 
-/** The project and ask a check is for: the flags', else the remote's. */
 const subjectOf = (
   context: RepoContext,
   flags: {
@@ -220,7 +187,6 @@ const subjectOf = (
     return { ask: inferred.value, project: project.value };
   });
 
-/** The caller's claims in `project`, as the platform's `status` lists them. */
 const claimsOn = (project: ProjectName, json: boolean) =>
   Effect.gen(function* () {
     const client = yield* Client;
@@ -239,12 +205,7 @@ const claimsOn = (project: ProjectName, json: boolean) =>
     );
   });
 
-/**
- * Where the diff starts: `--base` when given; else the live claim's base,
- * which is what the gateway diffs a push to the claim's fork from (so an
- * answer committed on the clone's own main is still seen), when this repo
- * holds that commit; else `main`.
- */
+/** The gateway diffs a fork push from the claim's base, so an answer committed on the clone's own main is still seen. */
 const baseOf = (
   root: string,
   given: Option.Option<string>,
@@ -275,15 +236,10 @@ const baseOf = (
     return "main";
   });
 
-/**
- * A live claim on `ask` by `claimant`, as the platform would hold one just
- * made: the parse stage's stand-in when the check runs offline.
- */
 const syntheticClaim = (input: {
   readonly ask: Ask;
   readonly claimant: Handle;
   readonly fork: RepoName;
-  /** The platform the repo's remote reaches, which serves the fork. */
   readonly origin: Option.Option<string>;
   readonly policy: Policy;
 }) =>
@@ -303,7 +259,6 @@ const syntheticClaim = (input: {
       ),
       openedAt: now,
       project: ask.project,
-      // The fork's address: the project's name, then the fork's parts.
       remote: Option.match(input.origin, {
         onNone: () => `${address}.git`,
         onSome: (origin) => `${origin}/${address}.git`,
@@ -316,11 +271,6 @@ const syntheticClaim = (input: {
     };
   });
 
-/**
- * The lanes an answer's checks run: the ask's own check, then every project
- * lane. A `lintToZero` ask's lane hands back what its lint printed, since
- * its count, not its exit code, judges it.
- */
 const lanesOf = (policy: Policy, ask: Ask): readonly CheckLane[] => [
   ...Option.toArray(
     Option.map(
@@ -336,14 +286,7 @@ const lanesOf = (policy: Policy, ask: Ask): readonly CheckLane[] => [
   ),
 ];
 
-/**
- * The run with a `lintToZero` ask's lane as its count decides it, as the
- * platform's Answer Workflow does (`countedAskLane` in
- * `apps/platform/src/workflows/answer/lanes.ts`): passed at zero findings
- * of its rule in its territory, failed above (its evidence says how many),
- * a load error when its lint printed no count. A lane that never got going
- * stays as it ran.
- */
+/** Mirrors the platform's `countedAskLane` (`apps/platform/src/workflows/answer/lanes.ts`). */
 const countedAskLane = (
   policy: Policy,
   ask: Ask,
@@ -410,16 +353,9 @@ const countedAskLane = (
   );
 };
 
-/** The last lines of a setup's output, for the note that says why it failed. */
 const TAIL = 4000;
 
-/**
- * HEAD's tree in a temp clone the scope removes: it borrows the repo's
- * objects (`--shared`), so nothing is copied or written back, runs no hook,
- * and gets the run block's `setup` (the Checker's install step) before any
- * lane runs. Setup's output goes to stderr only when it fails, so `--json`
- * stdout stays one document.
- */
+/** Setup's output goes to stderr only when it fails, so `--json` stdout stays one document. */
 const checkoutOf = (input: {
   readonly root: string;
   readonly setup: Option.Option<string>;
@@ -510,11 +446,9 @@ const checkoutOf = (input: {
       )
   );
 
-/** A ratchet's count on the base and on HEAD, as a line says it. */
 const moveText = ({ after, before, ratchet, territory }: RatchetMove) =>
   `${ratchet} in ${territory}: ${before} on the base, ${after} here`;
 
-/** The run as a person reads it: each lane and how it ended, then each ratchet's count. */
 const viewOf = (checked: Checked) => {
   const moves = checked.ratchets ?? [];
 
@@ -541,7 +475,6 @@ const viewOf = (checked: Checked) => {
   };
 };
 
-/** The counts as `--json` lists them: absent when there are none. */
 const ratchetsField = (moves: readonly RatchetMove[]) =>
   Array.match(moves, {
     onEmpty: () => ({}),
@@ -618,8 +551,6 @@ export const check = Command.make(
         Array.findFirst(held, (each) => each.ask === askId)
       );
 
-      // Who pushes: the signed-in person, else the claimant the platform
-      // names, else the person the fork is named for.
       const handle = Option.getOrElse(
         Option.firstSomeOf([
           yield* signedInHandle,
@@ -650,7 +581,6 @@ export const check = Command.make(
         )
       );
 
-      // Copies of the generated agent files main's config no longer gives.
       const stale = yield* staleGenerated({
         landed: policy.at,
         policy,
@@ -668,7 +598,6 @@ export const check = Command.make(
         return yield* refuse(json, [new UnknownAsk({ ask: askId })]);
       }
 
-      // The claim's fork, named as the platform names it: by the project's key.
       const fork = claimForkName(project, askId, handle);
 
       const facts = yield* localFacts({
@@ -733,8 +662,6 @@ export const check = Command.make(
         });
       }
 
-      // Only what the checkout uses: the runner's own scope, not this
-      // command's, keeps each job's temp clone.
       const services = Context.make(
         ChildProcessSpawner.ChildProcessSpawner,
         yield* ChildProcessSpawner.ChildProcessSpawner
@@ -805,8 +732,6 @@ export const check = Command.make(
         }
       }
 
-      // The ratchets, counted on the base and on HEAD as the platform's
-      // cheap stage counts them, unless `--lane` asked for lanes alone.
       const declared = Array.isReadonlyArrayNonEmpty(policy.ratchets);
       const counting = declared && flags.lane.length === 0;
 

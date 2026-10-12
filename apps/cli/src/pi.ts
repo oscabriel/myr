@@ -1,10 +1,4 @@
-/**
- * The pi adapter: what `pi install npm:<package>` loads, at user level,
- * through the published package's `"pi"` key (`dist/pi.js`), never from a
- * project's `.pi/extensions/` (a stranger's repo runs no code in your
- * harness). It is thin: three pi events, each answered by the one hook
- * policy behind `<cli> hook` (`./hook/decide.ts`), through `PiDeps`.
- */
+// Loaded at user level through the package's "pi" key, never from a project's `.pi/extensions/`: a stranger's repo runs no code in your harness.
 import type {
   AgentBeforeSettleEvent,
   AgentBeforeSettleEventResult,
@@ -51,7 +45,6 @@ import { loadSession, saveSession } from "./hook/session.ts";
 import type { SessionState } from "./hook/session.ts";
 import { RemoteClient } from "./remote.ts";
 
-/** The policy could not answer; the adapter allows, and says why. */
 export class HookFailed extends Schema.TaggedError<HookFailed>()("HookFailed", {
   reason: Schema.String,
 }) {
@@ -60,41 +53,32 @@ export class HookFailed extends Schema.TaggedError<HookFailed>()("HookFailed", {
   }
 }
 
-/** One pi session: its id, and the folder its agent runs in. */
 export interface PiSession {
   readonly cwd: string;
   readonly id: string;
 }
 
-/** A tool call the policy judges before it runs, read from pi's own. */
 export type GuardedCall =
-  /** pi's `edit` or `write`: the file it is about to change, as the tool names it. */
   | { readonly _tag: "Write"; readonly file: string }
-  /** pi's `bash`, running `git push`. */
   | { readonly _tag: "Push" };
 
 export const GuardedCall = Data.taggedEnum<GuardedCall>();
 
-/** Where the session's answer stands when its agent is about to stop. */
 export type SettleVerdict =
   | { readonly _tag: "Landed" }
   | { readonly _tag: "Waiting" }
   | {
       readonly _tag: "Refused";
       readonly refusals: Array.NonEmptyReadonlyArray<Refusal>;
-      /** Whether the agent can act on them now (the policy's call). */
       readonly actionable: boolean;
     };
 
 export const SettleVerdict = Data.taggedEnum<SettleVerdict>();
 
-/** The boundary to the hook policy: what the adapter asks it, per session. */
 export interface PiDeps {
-  /** The claim's brief for the session's repo; none without a claim. */
   readonly brief: (
     session: PiSession
   ) => Effect.Effect<Option.Option<string>, HookFailed>;
-  /** What the gate would refuse of the call; none when it would pass. */
   readonly guardTool: (
     session: PiSession,
     call: GuardedCall
@@ -107,7 +91,6 @@ export interface PiDeps {
   ) => Effect.Effect<SettleVerdict, HookFailed>;
 }
 
-/** What the adapter reads of a handler's context. */
 export type PiContext = Pick<ExtensionContext, "cwd"> & {
   readonly sessionManager: Pick<
     ExtensionContext["sessionManager"],
@@ -116,7 +99,6 @@ export type PiContext = Pick<ExtensionContext, "cwd"> & {
   readonly ui?: Pick<ExtensionUIContext, "notify">;
 };
 
-/** The adapter's handlers, by pi event, as pi 1.0.3 types each event. */
 export interface PiHandlers {
   readonly agent_before_settle: (
     event: AgentBeforeSettleEvent,
@@ -132,7 +114,6 @@ export interface PiHandlers {
   ) => Promise<ToolCallEventResult | undefined>;
 }
 
-/** The part of pi's `ExtensionAPI` the adapter uses: `on`, for three events. */
 export interface PiEvents {
   readonly on: {
     (
@@ -148,20 +129,13 @@ export interface PiEvents {
 }
 
 export interface PiOptions {
-  /**
-   * The most times one session is sent back to work: the hook policy's
-   * `MAX_HOLDS` (3) unless given. pi has no cap of its own.
-   */
   readonly maxContinuations?: number;
 }
 
-/** The custom type of the brief pi shows before the agent starts. */
 const BRIEF = `${Brand.slug}-brief`;
 
-/** The custom type of the verdict a settle sends the agent back with. */
 const VERDICT = `${Brand.slug}-verdict`;
 
-/** What the agent reads when it is sent back: why, then the gateway's own text. */
 const verdictEntry = (
   refusals: Array.NonEmptyReadonlyArray<Refusal>
 ): CustomMessageEntryDraft => ({
@@ -174,30 +148,18 @@ const verdictEntry = (
   type: "custom_message",
 });
 
-/** pi's `edit` and `write` name the file they change as `path`. */
 const decodeFile = Schema.decodeUnknownOption(
   Schema.Struct({ path: Schema.String })
 );
 
-/** pi's `bash` runs `command`. */
 const decodeCommand = Schema.decodeUnknownOption(
   Schema.Struct({ command: Schema.String })
 );
 
-/**
- * git running `push`, wherever it starts in the command line and after any
- * of git's own options: `git push`, `cd a && git push`, `git -C dir push`.
- * A false match only runs the preflight, which blocks nothing a real push
- * would not be refused.
- */
+/** Matches a push after any git options; a false match only runs the preflight. */
 const GIT_PUSH =
   /(?:^|[\s;&|(`])git(?:\s+-[Cc]\s+\S+|\s+-\S+)*\s+push(?![\w-])/u;
 
-/**
- * The call the policy judges, read from pi's tool call at the boundary:
- * `edit` and `write` change a file, and `bash` may push. Every other call
- * runs unjudged. The adapter never changes a call, only blocks one.
- */
 const guardedCall = (event: ToolCallEvent): Option.Option<GuardedCall> =>
   Match.value(event.toolName).pipe(
     Match.when(Match.is("edit", "write"), () =>
@@ -213,17 +175,9 @@ const guardedCall = (event: ToolCallEvent): Option.Option<GuardedCall> =>
     Match.orElse(() => Option.none())
   );
 
-/**
- * The refusals retrying cannot help: the ones the agent must fix. A
- * retryable refusal is a wait (the repo was busy), as the stop hook reads it.
- */
 const fixable = (refusals: readonly Refusal[]) =>
   refusals.filter((refusal) => !refusal.retryable);
 
-/**
- * pi's block for what the gate would refuse that retrying cannot help, with
- * the gateway's own text; a retryable refusal is a wait, never a block.
- */
 const blockFor = (
   refusals: Option.Option<Array.NonEmptyReadonlyArray<Refusal>>
 ): Option.Option<ToolCallEventResult> => {
@@ -234,33 +188,21 @@ const blockFor = (
     : Option.none();
 };
 
-/**
- * What a verdict tells the agent to act on: the refusals it can fix, as the
- * stop hook's hold names them, or every refusal when the policy holds on
- * retryable ones alone.
- */
 const toActOn = (refusals: Array.NonEmptyReadonlyArray<Refusal>) =>
   Array.match(fixable(refusals), {
     onEmpty: () => refusals,
     onNonEmpty: (final) => final,
   });
 
-/** The session a handler runs in. */
 const sessionOf = (ctx: PiContext): PiSession => ({
   cwd: ctx.cwd,
   id: ctx.sessionManager.getSessionId(),
 });
 
-/** A failure's first line, for the note. */
 const firstLine = (cause: Cause.Cause<unknown>) =>
   String(Cause.squash(cause)).split("\n")[0] ?? "unknown failure";
 
-/**
- * Runs one handler's reply for pi, which awaits a promise. The gate stays
- * the authority, so a policy that fails, or any defect, lets pi go on as it
- * would without the adapter (a `tool_call` handler that rejects would block
- * the tool), and says why through `ctx.ui.notify` when pi gives one.
- */
+/** A rejecting `tool_call` handler would block the tool, so a failing policy or defect lets pi go on. */
 const reply = <A>(
   ctx: PiContext,
   event: keyof PiHandlers,
@@ -283,11 +225,6 @@ const reply = <A>(
     )
   );
 
-/**
- * The adapter over `deps`: registers its three handlers on `pi`, and no
- * other event or tool. Each pi load counts its own continuations, by
- * session, so no state outlives the extension.
- */
 export const piAdapter =
   (deps: PiDeps, options: PiOptions = {}) =>
   (pi: PiEvents): void => {
@@ -295,8 +232,7 @@ export const piAdapter =
     const continued = new Map<string, number>();
     const briefed = new Set<string>();
 
-    // pi starts the agent on every prompt; the brief stays in the session,
-    // so each session gets it once, at its first prompt with a claim.
+    // pi starts the agent on every prompt; each session gets the brief once.
     pi.on("before_agent_start", (_event, ctx) => {
       const session = sessionOf(ctx);
 
@@ -334,12 +270,8 @@ export const piAdapter =
       )
     );
 
-    // Only a verdict the agent can act on sends it back, at most `most`
-    // times a session, and only a run that completed: a run the person
-    // stopped, or one that failed, stays stopped. Otherwise the policy is
-    // not even asked. `event.context.canContinue` is no guide: pi computes
-    // it before this handler's entry, and a run that ends on the agent's own
-    // reply reads false until the verdict is appended.
+    // Only a completed run with an actionable verdict is sent back, at most `most` times.
+      // `event.context.canContinue` is no guide: pi computes it before this handler's entry.
     pi.on("agent_before_settle", (event, ctx) => {
       const session = sessionOf(ctx);
       const used = continued.get(session.id) ?? 0;
@@ -368,15 +300,7 @@ export const piAdapter =
     });
   };
 
-// ------------------------------------------------------------ live
 
-/**
- * The session's facts, kept in the hook's own session file under pi's
- * session id: gathered once, and again by the brief and the settle
- * (`look`) while they hold no claim, so a claim taken mid-session is found
- * at the next prompt or stop, and a tool call never waits on the platform.
- * As `<cli> hook` keeps them (its `sessionFacts`).
- */
 const factsOf = (session: PiSession, look: boolean) =>
   Effect.gen(function* () {
     const kept = yield* loadSession(session.id);
@@ -393,10 +317,7 @@ const factsOf = (session: PiSession, look: boolean) =>
     return gathered;
   });
 
-/**
- * What the policy decides over. Holds are 0: the adapter counts pi's
- * continuations itself, so the policy only says whether a stop would hold.
- */
+/** Holds are 0: the adapter counts pi's continuations itself. */
 const hookFacts = (
   state: SessionState,
   refusals: readonly Refusal[]
@@ -408,18 +329,12 @@ const hookFacts = (
   root: state.root,
 });
 
-/** The policy's input for `event`, in the hook format it reads. */
 const hookInput = (event: HookEvent, session: PiSession): HookInput => ({
   cwd: session.cwd,
   hook_event_name: claudeEventOf[event],
   session_id: session.id,
 });
 
-/**
- * What `<cli> check --shape-only` refuses of the work as it stands, from the
- * claim's base, by the policy's own `PushCheck`; nothing is asked without a
- * claim.
- */
 const localCheck = ({ claim, root }: SessionState) =>
   claim === undefined
     ? Effect.succeed<readonly Refusal[]>([])
@@ -427,7 +342,6 @@ const localCheck = ({ claim, root }: SessionState) =>
         check.run(root, claim.base)
       );
 
-/** What the hook policy runs on. */
 export type PolicyServices =
   | ChildProcessSpawner.ChildProcessSpawner
   | Client
@@ -435,7 +349,6 @@ export type PolicyServices =
   | Path.Path
   | PushCheck;
 
-/** The hook policy, in process, as `PiDeps`, over `services`. */
 export const policyDeps = (services: Layer.Layer<PolicyServices>): PiDeps => ({
   brief: (session) =>
     Effect.gen(function* () {
@@ -468,8 +381,6 @@ export const policyDeps = (services: Layer.Layer<PolicyServices>): PiDeps => ({
           ),
           Effect.provide(services)
         ),
-      // An edit is judged as the hook's pre-tool-use judges one, from the
-      // kept facts alone: no check runs and the platform is never asked.
       Write: ({ file }) =>
         Effect.map(factsOf(session, false), (state) =>
           Array.match(
@@ -504,7 +415,6 @@ export const policyDeps = (services: Layer.Layer<PolicyServices>): PiDeps => ({
         hookFacts(state, refusals)
       );
 
-      // The policy holds a stop on a refusal the agent can fix.
       return SettleVerdict.Refused({
         actionable: "decision" in output,
         refusals,
@@ -515,12 +425,6 @@ export const policyDeps = (services: Layer.Layer<PolicyServices>): PiDeps => ({
     ),
 });
 
-/**
- * The policy's services in pi's process: the stored credentials and the
- * platform over HTTP, and the local check run as the CLI on `PATH` (the
- * same package's bin, where git finds its credential helper too). Node's
- * own file system, paths and processes, which Bun's layers are.
- */
 const LiveServices = Layer.mergeAll(
   RemoteClient.pipe(Layer.provide(CredentialsFile)),
   pushCheckWith([Brand.cli])
@@ -529,8 +433,6 @@ const LiveServices = Layer.mergeAll(
   Layer.provideMerge(Layer.mergeAll(BunFileSystem.layer, BunPath.layer))
 );
 
-/** The hook policy as pi's process runs it. */
 export const livePiDeps = policyDeps(LiveServices);
 
-/** What `pi install npm:<package>` loads: the adapter over the live policy. */
 export default piAdapter(livePiDeps) satisfies ExtensionFactory;

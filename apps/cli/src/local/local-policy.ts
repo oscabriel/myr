@@ -1,19 +1,4 @@
-/**
- * The policy a local `check` judges by: the config folder at the landed SHA,
- * which locally is `main` (or `--base`), never the answer's own tree (ADR
- * 0005), so editing the rules on HEAD changes nothing here, as it changes
- * nothing on the platform.
- *
- * It is evaluated the way the platform evaluates it: a TypeScript folder
- * bundled with the sdk inlined and run by `@repo/rules`' `/bun` adapter (the
- * Lander's `bundleRules` and the `/worker` evaluator, here on this machine),
- * else its `policy.json` through `/json`, else the defaults; then finished
- * with `@repo/checks`' finder and judge closure, from the same facts the
- * platform reads at a landing (`@repo/project`'s `evaluationFacts`): every
- * file at the commit, with the text of each one the finder or the closure
- * reads (`@repo/checks`' `judgeInputs`, through `judge-files.ts`), the
- * workspaces the root manifest names, and the vouch file.
- */
+// The policy comes from the config at `main` (or `--base`), never the answer's own tree, as on the platform.
 import { Brand } from "@repo/brand";
 import { findRunBlock } from "@repo/checks/finder";
 import { judgeClosure } from "@repo/checks/judge";
@@ -50,17 +35,11 @@ import { commitOf, runGit } from "./facts.ts";
 import { blobsAt, judgeFilesIn } from "./judge-files.ts";
 import type { ListedBlob } from "./judge-files.ts";
 
-/** A file of the config folder, as committed. */
 export interface ConfigFile {
   readonly path: string;
   readonly content: string;
 }
 
-/**
- * Turns the config folder's files into the bundle the rules evaluator runs:
- * its project module and ask files as self-contained modules, the sdk
- * inlined, and its other files as committed.
- */
 export class ConfigBundler extends Context.Service<
   ConfigBundler,
   {
@@ -70,15 +49,13 @@ export class ConfigBundler extends Context.Service<
   }
 >()("cli/ConfigBundler") {}
 
-/** The project module's path: it names the folder, as the platform's bundles do. */
 const configEntry = `${Brand.configDir}/project.ts`;
 
-// Code, which a bundle carries only inlined: as the Lander reads the folder.
+// Code, which a bundle carries only inlined.
 const SCRIPT = /\.[cm]?[jt]sx?$/u;
 
 const ASK_FILE = /\.ask\.[cm]?[jt]s$/u;
 
-/** The modules the evaluator imports, each bundled on its own: the project module and every ask. */
 const entriesOf = (paths: readonly string[]) =>
   paths.filter(
     (path) =>
@@ -86,21 +63,11 @@ const entriesOf = (paths: readonly string[]) =>
       (path.startsWith(`${Brand.configDir}/asks/`) && ASK_FILE.test(path))
   );
 
-/** Where bun writes an entry's bundle: its path, as JavaScript. */
 const bundledAs = (entry: string) => entry.replace(/\.[^./]*$/u, ".js");
 
 const loadFailed = (detail: string) =>
   new RulesFailed({ detail, reason: "load" });
 
-/**
- * The config folder bundled by `bun build`, as the Lander bundles it at a
- * landing: both names of the sdk (the workspace one and the published
- * `<cli package>/rules`) resolve to this CLI's own copy, any other bare
- * import to the packages beside it, macros are off, and code the entries
- * share goes to chunks in the folder. Bun and the sdk come from
- * `ConfigRuntime`: `bun` on the `PATH` from source, the binary itself once
- * compiled.
- */
 export const ConfigBundlerBun: Layer.Layer<
   ConfigBundler,
   never,
@@ -111,7 +78,6 @@ export const ConfigBundlerBun: Layer.Layer<
     const path = yield* Path.Path;
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
 
-    /** Writes `content` at `file` under `root`, refusing a path that leaves it. */
     const writeUnder = (root: string, file: string, content: string) => {
       const target = path.join(root, file);
       const relative = path.relative(root, target);
@@ -274,11 +240,9 @@ export const ConfigBundlerBun: Layer.Layer<
   })
 );
 
-/** What the policy is evaluated for, which the repo cannot say. */
 export interface PolicyAbout {
-  /** The project the asks belong to. */
   readonly project: ProjectName;
-  /** Who `owners` names; locally, the person checking, as no stage of a push reads it. */
+  /** Locally, the person checking: no stage of a push reads it. */
   readonly initializer: Handle;
 }
 
@@ -286,19 +250,12 @@ export interface PolicyAbout {
 // config folder, never a link or a submodule.
 const FILE_MODES: ReadonlySet<string> = new Set(["100644", "100755"]);
 
-/** A blob's text. */
 const textOf = (root: string, file: ListedBlob) =>
   Effect.map(runGit(root, ["cat-file", "blob", file.sha]), ({ stdout }) => ({
     content: stdout,
     path: RepoPath.make(file.path),
   }));
 
-/**
- * The facts the platform evaluates the config folder over, read at `sha`:
- * `ci` and the workspaces as `@repo/checks` gathers and reads them for the
- * platform too (`judgeFilesIn`, `workspacesIn`), the vouch file, and the
- * commit's own clock and seed.
- */
 const factsAt = (input: {
   readonly root: string;
   readonly sha: CommitSha;
@@ -349,19 +306,10 @@ const factsAt = (input: {
     });
   });
 
-/** The finishers the platform passes the rules evaluator: `@repo/checks`' own. */
 const finishers = Layer.succeed(Finishers)({ findRunBlock, judgeClosure });
 
-/** Where a policy that names none keeps its vouch file. */
 const defaultVouchFile = `${Brand.configDir}/vouched.td`;
 
-/**
- * The policy at `base` in the repo at `root`, never HEAD's: the config
- * folder's TypeScript (bundled by `ConfigBundler`, run by the `/bun`
- * evaluator), else its `policy.json` (`/json`), else the defaults (no
- * folder), finished with `@repo/checks`' finder and judge closure. A policy
- * that keeps its vouch file elsewhere is read again with that file.
- */
 export const localPolicy = (
   root: string,
   base: string,
