@@ -59,23 +59,16 @@ const requestId = RequestId.make("request-fix-parser-1");
 // When the landing in the first land test is made, by the TestClock.
 const landingTime = "2026-10-07T12:30:00Z";
 
-/** The Lander over a fresh memory store, with the store itself for the test to read. */
 const world = Layer.provideMerge(LanderIsogit, RepoHostMemory);
 
-/** The refs whose pushes the store refuses as busy; the test sets them as it goes. */
 class BusyRefs extends Context.Service<
   BusyRefs,
   Ref.Ref<ReadonlySet<RefName>>
 >()("test/BusyRefs") {}
 
-/** From now on, the store refuses every push of one of `refs` as busy. */
 const busy = (...refs: readonly RefName[]) =>
   BusyRefs.use((busyRefs) => Ref.set(busyRefs, new Set(refs)));
 
-/**
- * The Lander over a fresh memory store that refuses as busy any push of a
- * ref in `BusyRefs` (none at first), with the store for the test to read.
- */
 const busyWorld = Layer.provideMerge(
   LanderIsogit,
   Layer.effect(
@@ -106,17 +99,11 @@ const busyWorld = Layer.provideMerge(
   )
 );
 
-/** git's id for a blob holding `text`. */
 const blobOf = (text: string) =>
   Effect.promise(() => hashBlob({ object: text })).pipe(
     Effect.map(({ oid }) => BlobSha.make(oid))
   );
 
-/**
- * Canonical `demo` with `files` on main, and alice's claim fork of it. The
- * test builds commits in its own client and pushes them with plain
- * compare-and-swaps, as git would.
- */
 const project = (files: Files) =>
   Effect.gen(function* () {
     const repos = yield* RepoHost;
@@ -129,7 +116,6 @@ const project = (files: Files) =>
     ]);
     yield* repos.fork(demo, fork);
 
-    /** A commit of `files` on `parent`, pushed to `repo`'s main. */
     const advance = (
       repo: RepoName,
       parent: CommitSha,
@@ -146,7 +132,6 @@ const project = (files: Files) =>
         return sha;
       });
 
-    /** The tree git makes of `next`, built in the client and never pushed. */
     const treeOf = (next: Files) =>
       Effect.gen(function* () {
         const sha = yield* client.commit("Expected", next);
@@ -158,10 +143,6 @@ const project = (files: Files) =>
         return TreeSha.make(commit.tree);
       });
 
-    /**
-     * The id git gives a platform commit of `tree` on `parent` by `author`,
-     * made at `iso`: written in the client and never pushed.
-     */
     const platformCommitOf = (input: {
       readonly tree: TreeSha;
       readonly parent: CommitSha;
@@ -197,7 +178,6 @@ const project = (files: Files) =>
     return { advance, base, platformCommitOf, treeOf };
   });
 
-/** The tip of `main`, as the platform last landed it. */
 const landed = (sha: CommitSha) => LandedSha.make(sha);
 
 const checkedAt = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
@@ -229,7 +209,6 @@ const message = formatLanding({
   subject: "Fix the parser",
 });
 
-/** The note on `target` in `repo`'s notes, as plain git finds it. */
 const noteOn = (repo: RepoName, target: CommitSha) =>
   Effect.gen(function* () {
     const repos = yield* RepoHost;
@@ -259,10 +238,6 @@ const start: Files = [
   ["src/b.ts", "b1\n"],
 ];
 
-/**
- * main changed `src/b.ts` since the fork; alice's head changed `src/a.ts`
- * and added `docs/guide.md`.
- */
 const diverged = Effect.gen(function* () {
   const { advance, base, platformCommitOf, treeOf } = yield* project(start);
 
@@ -287,7 +262,6 @@ const diverged = Effect.gen(function* () {
   };
 });
 
-/** A land of alice's merged answer onto `main`. */
 const landOf = (input: {
   readonly main: LandedSha;
   readonly base: CommitSha;
@@ -468,7 +442,6 @@ describe("the isomorphic-git Lander", () => {
             ],
             tree: merged.tree,
           });
-          // The whole commit, its time from the Clock included.
           expect(result.sha).toBe(
             yield* platformCommitOf({
               author: alice,

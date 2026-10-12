@@ -1,9 +1,3 @@
-/**
- * A project adopted from a public repo, whatever its default branch, and
- * adopted again by a retry when the first import died after Artifacts made
- * the repo; and each adoption, an import's or a first push's, heard once
- * as a landing.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
@@ -32,10 +26,6 @@ const bob = Person.make({ handle: Handle.make("bob") });
 
 const mainRef = RefName.make("refs/heads/main");
 
-/**
- * The project's row as an import written before sources were kept left it
- * (ADR 0031): the same row without `importedFrom`.
- */
 const forgetSource = ProjectStore.use((store) =>
   Effect.flatMap(store.load(), ({ project: row }) =>
     Option.match(row, {
@@ -48,10 +38,6 @@ const forgetSource = ProjectStore.use((store) =>
 
 const masterRef = RefName.make("refs/heads/master");
 
-/**
- * A public remote `upstream` whose only branch is `master`, as anyhow's
- * and stb's are; the world reads `https://example.com/upstream.git` as it.
- */
 const upstreamOnMaster = Effect.gen(function* () {
   const host = yield* RepoHost;
   const upstream = RepoName.make("upstream");
@@ -72,7 +58,6 @@ const upstreamOnMaster = Effect.gen(function* () {
   return { tip, url: "https://example.com/upstream.git" };
 });
 
-/** What the project holds after its imports: its head, its row, and its repo's refs. */
 const settled = Effect.gen(function* () {
   const api = yield* projectService(project);
   const snapshot = yield* ProjectStore.use((store) => store.load());
@@ -85,13 +70,7 @@ const settled = Effect.gen(function* () {
   };
 });
 
-/**
- * The world's `RepoHost`, standing in for the binding past its wait: until
- * the import is copied, a read of the imported repo dies as the binding's
- * does when Artifacts still answers `IMPORT_IN_PROGRESS` (the binding's
- * own half is `packages/artifacts/test/binding.test.ts`). The first read
- * after an import dies; every later one works.
- */
+/** Reads of the imported repo die once, as the binding does while Artifacts answers `IMPORT_IN_PROGRESS`. */
 const stillCopying = Effect.gen(function* () {
   const host = yield* RepoHost;
   const copying = yield* Ref.make(false);

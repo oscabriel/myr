@@ -1,9 +1,3 @@
-/**
- * Admission of held-back checks, pure: a layer
- * push's plan (each changed area's checks green on main three times, and
- * red on each known-bad tree the layer's manifest names, every check
- * citing a clause) and the judgement of the runs' area bits.
- */
 import { describe, expect, it } from "@effect/vitest";
 import type { HeldBackResult } from "@repo/protocol/domain/answer";
 import { RunBlock } from "@repo/protocol/domain/run";
@@ -70,15 +64,12 @@ const head = CommitSha.make("1".repeat(40));
 
 const main = LandedSha.make("2".repeat(40));
 
-/** A known-bad commit in the layer: export without its escaping. */
 const unescaped = CommitSha.make("3".repeat(40));
 
-/** A second one, the parser reading weeks wrong. */
 const misread = CommitSha.make("4".repeat(40));
 
 const suite = SuiteRoot.make(`sha256:${"5".repeat(64)}`);
 
-/** datekit's sealed checks: areas `export` and `parser`, admitted after 3 green runs on main and 1 known-bad caught. */
 const policy = Schema.decodeSync(SealedChecks)({
   admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },
   areas: { export: "src/export/**", parser: "src/parser/**" },
@@ -97,7 +88,6 @@ const run = Schema.decodeSync(RunBlock)({
 
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
-/** One held-back check: its file, its area, its author, its blob and bytes. */
 const check = (input: {
   readonly area: string;
   readonly author: string;
@@ -129,7 +119,6 @@ const csvQuote = check({
   path: "checks/held-back/export/csv-quote.test.ts",
 });
 
-/** A manifest listing `checks`, each citing a clause of datekit's README. */
 const manifestOf = (
   checks: readonly ReturnType<typeof check>[],
   knownBad: readonly CommitSha[] = []
@@ -149,7 +138,6 @@ const manifestOf = (
     layer: maintainers,
   });
 
-/** What a layer commit holds, by path: each check's blob and bytes. */
 const filesOf = (checks: readonly ReturnType<typeof check>[]) =>
   new Map(
     checks.map(({ blob, content, path }) => [
@@ -158,16 +146,13 @@ const filesOf = (checks: readonly ReturnType<typeof check>[]) =>
     ])
   );
 
-/** Each check's blob at the landed head, by path. */
 const blobsOf = (checks: readonly ReturnType<typeof check>[]) =>
   new Map(checks.map(({ blob, path }) => [path, BlobSha.make(blob)]));
 
-/** The public file a known-bad commit breaks, laid over main for its run. */
 const badSvg = { content: utf8("export const svg = (t) => t;\n") };
 
 const badWeek = { content: utf8("export const week = () => 0;\n") };
 
-/** The push that adds two `export` checks to a layer that held the `parser` one. */
 const twoExportChecks = {
   files: filesOf([isoWeek, svgTitle, csvQuote]),
   head,
@@ -183,7 +168,6 @@ const twoExportChecks = {
   suite,
 };
 
-/** A job of `checks` in `area`, with `overlay` written first. */
 const jobOf = (
   area: AreaName,
   checks: readonly ReturnType<typeof check>[],
@@ -214,14 +198,12 @@ const jobOf = (
   suite,
 });
 
-/** The run's label: its area, and main's attempt or the known-bad tree. */
 const label = (each: AdmissionRun) =>
   AdmissionRun.match(each, {
     OnKnownBad: ({ area, tree }) => `${area} on ${tree}`,
     OnMain: ({ area, attempt }) => `${area} on main #${attempt}`,
   });
 
-/** A plan's runs, by label. */
 const areasRun = (plan: ReturnType<typeof planAdmission>) =>
   Result.map(plan, ({ runs }) => runs.map(label));
 
@@ -229,7 +211,6 @@ describe("a layer push's admission plan", () => {
   it("runs a layer push's changed area on main three times and on each known-bad tree, and leaves an unchanged area alone", () => {
     const plan = planAdmission(twoExportChecks);
 
-    // The area's checks, sorted by path.
     const exportJob = jobOf(exportArea, [csvQuote, svgTitle]);
 
     expect(plan).toStrictEqual(
@@ -297,7 +278,6 @@ describe("a layer push's admission plan", () => {
       previous: Option.none(),
     });
 
-    // The rubric changed beside the checks; the checks are the landed ones.
     const unchanged = planAdmission({
       ...twoExportChecks,
       landed: blobsOf([isoWeek, svgTitle, csvQuote]),
@@ -320,7 +300,6 @@ describe("a layer push's admission plan", () => {
   });
 
   it("runs every check of a changed area on main, but only its new or rewritten checks on a known-bad tree", () => {
-    // `export` held svg-title; the push adds csv-quote beside it.
     const plan = planAdmission({
       ...twoExportChecks,
       landed: blobsOf([isoWeek, svgTitle]),
@@ -364,10 +343,8 @@ describe("a layer push's admission plan", () => {
   });
 });
 
-/** The plan of `twoExportChecks`: three runs on main, one on `unescaped`. */
 const planned = Result.getOrThrow(planAdmission(twoExportChecks));
 
-/** What the Checker reported for `area` in one run: `passed` of its two checks. */
 const bits = (area: AreaName, passed: number): HeldBackResult => ({
   area,
   passed,
@@ -375,7 +352,6 @@ const bits = (area: AreaName, passed: number): HeldBackResult => ({
   total: 2,
 });
 
-/** Each planned run reported: on main, `export` passing as `onMain` says, in turn; on the known-bad tree, `export` passing `onBad` of 2. */
 const reported = (onMain: readonly number[], onBad: number) =>
   planned.runs.map((each, index) => ({
     areas: [
@@ -463,9 +439,6 @@ describe("an admission's judgement", () => {
   });
 });
 
-// ------------------------------------- through the project service (the cartridge's world)
-
-/** datekit's config with admission on: a new check passes main 3 times and catches a known-bad tree. */
 const admitting = {
   ...datekitVisibility,
   checks: {
@@ -476,14 +449,12 @@ const admitting = {
 
 const parseIso = AskId.make("parse-iso");
 
-/** The suite once the `parser` check is rewritten. */
 const secondSuite: readonly SealedFile[] = firstSuite.map((each) =>
   each.area === "parser"
     ? { ...each, content: 'it("reads ordinal dates", () => {});\n' }
     : each
 );
 
-/** `checks` as a layer commit holds them, its manifest naming `knownBad` and leaving `uncited` without a clause. */
 const layerWith = (
   checks: readonly SealedFile[],
   knownBad: readonly CommitSha[],
@@ -514,7 +485,6 @@ const layerWith = (
     ] as const;
   });
 
-/** ines-v pushes `files` to the maintainers layer on `parent`, and the project hears it. */
 const pushed = (
   api: ProjectApi,
   parent: Option.Option<CommitSha>,
@@ -533,7 +503,6 @@ const pushed = (
     return pushedHead;
   });
 
-/** A known-bad commit in the layer, beside its checks: export without its escaping. */
 const knownBadCommit = LayerPusher.use((pusher) =>
   pusher.push(
     Option.none(),
@@ -542,7 +511,6 @@ const knownBadCommit = LayerPusher.use((pusher) =>
   )
 );
 
-/** Each planned run reported, the area's two-check bits as `bitOf` says. */
 const reportOf = (
   plan: AdmissionPlan,
   bitOf: (run: AdmissionRun) => number
@@ -559,11 +527,9 @@ const reportOf = (
     run: each,
   }));
 
-/** Green on main, red on the known-bad tree: every area admitted. */
 const admissible = (each: AdmissionRun) =>
   AdmissionRun.guards.OnMain(each) ? 2 : 1;
 
-/** The project's rows as its store keeps them. */
 const stored = ProjectStore.use((store) => store.load());
 
 const layerRow = Effect.map(stored, ({ layers }) =>
@@ -573,7 +539,6 @@ const layerRow = Effect.map(stored, ({ layers }) =>
 const fromHex = (hex: string) =>
   Uint8Array.from(hex.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16));
 
-/** A git blob id, as git computes it. */
 const gitBlobId = (content: string) =>
   Effect.promise(() =>
     crypto.subtle.digest(
@@ -592,7 +557,6 @@ const gitBlobId = (content: string) =>
     )
   );
 
-/** Each area's commitment over `checks` under the salt the layer's row keeps. */
 const rootsUnderStoredSalt = (checks: readonly SealedFile[]) =>
   Effect.gen(function* () {
     const row = yield* layerRow;
@@ -608,7 +572,6 @@ const rootsUnderStoredSalt = (checks: readonly SealedFile[]) =>
     return yield* areaRoots(fromHex(row.saltRef ?? ""), files);
   });
 
-/** The admitted first suite: pushed beside its known-bad commit, every run as `admissible` says. */
 const admittedFirst = Effect.gen(function* () {
   const { api } = yield* sealedByInes;
 
@@ -704,7 +667,6 @@ describe("admission through the project service", () => {
           yield* api.admissionPlan({ head: second, layer: maintainers })
         );
 
-        // The rewritten parser check fails its second run on main.
         yield* api.recordAdmission({
           head: second,
           layer: maintainers,
@@ -732,7 +694,6 @@ describe("admission through the project service", () => {
             second,
             Option.getOrThrow(Arr.head(before.layers)).suiteRoot,
           ],
-          // Only the changed area runs.
           runs: [
             "parser on main #1",
             "parser on main #2",

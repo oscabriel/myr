@@ -10,7 +10,6 @@ import { meets, recordOf } from "../../src/attention/record.ts";
 
 const now = at("2026-10-07T12:00:00Z");
 
-/** `datekit`, with an ask in `packages/parser` and one in `packages/format`. */
 const scenario = aProject({ now, people: ["bob"] }).pipe(
   withAsk({ id: "parse-iso", territory: "packages/parser" }),
   withAsk({ id: "parse-week", territory: "packages/parser" }),
@@ -25,7 +24,6 @@ const alice = Handle.make("alice");
 
 const bob = Handle.make("bob");
 
-/** A landing `days` before `now`, by `author`, answering `ask` (none: a decider's own landing). */
 const landing = (
   seed: string,
   options: {
@@ -49,7 +47,6 @@ const landing = (
     : { ...view, ask: AskId.make(options.ask) };
 };
 
-/** Alice's record as it stands at `now` under the default window (30 days, 365 days). */
 const recordAt = (
   landings: readonly LandingView[],
   reverted: readonly LandingView[] = []

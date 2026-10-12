@@ -25,13 +25,10 @@ const parent = LandedSha.make("1".repeat(40));
 
 const landed = LandedSha.make("2".repeat(40));
 
-/** The policy before the landing: lint and types. */
 const before: Policy = { ...scenario.policy, at: parent };
 
-/** The same policy at the landing, read again there: nothing it says changed. */
 const unchanged: Policy = { ...scenario.policy, at: landed };
 
-/** The policy at the landing, with a unit lane added to the run block. */
 const withUnit: Policy = {
   ...unchanged,
   run: Schema.decodeSync(RunBlock)({
@@ -48,11 +45,6 @@ const skill = `.agents/skills/${project}-contribute/SKILL.md`;
 
 const claudeSkill = `.claude/skills/${project}-contribute/SKILL.md`;
 
-/**
- * A generator as `@repo/agent-kit` is one, in miniature: the skill, twice,
- * naming the landing and the run block's lanes, and AGENTS.md with only the
- * text between its markers written over (appended when there are none).
- */
 const generate: Generate = ({ landed: at, policy, read }) =>
   Effect.gen(function* () {
     const lanes = Object.entries(policy.run.checks)
@@ -77,7 +69,6 @@ const generate: Generate = ({ landed: at, policy, read }) =>
     ];
   });
 
-/** The project's own AGENTS.md, with a block the platform wrote before. */
 const ownAgents = [
   "# Datekit",
   "",
@@ -91,7 +82,6 @@ const ownAgents = [
   "",
 ].join("\n");
 
-/** A tree that holds `files` and nothing else. */
 const treeOf =
   (files: Readonly<Record<string, string>>) =>
   (path: string): Effect.Effect<Option.Option<string>> =>
@@ -99,7 +89,6 @@ const treeOf =
 
 const at = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
-/** alice's own landing from her working fork, which changed the config. */
 const aliceLands: LandingView = {
   assisted: [],
   author: alice,
@@ -110,7 +99,6 @@ const aliceLands: LandingView = {
   sha: landed,
 };
 
-/** The first adoption: the initializer's first push, crediting no one. */
 const firstPush: LandingView = {
   assisted: [],
   author: alice,
@@ -140,7 +128,6 @@ const followUp = (input: {
 
 const subjectOf = (message: string) => message.split("\n")[0] ?? "";
 
-/** Whom the follow-up of `landing`, after the run block changed, credits. */
 const creditOf = (landing: LandingView) =>
   Effect.map(
     followUp({ after: withUnit, before: Option.some(before), landing }),

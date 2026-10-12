@@ -1,10 +1,3 @@
-/**
- * The project list and a person's credits over D1, on sqlite-node with the
- * platform's D1 migrations applied from their files: projects' outbox rows
- * go in through `ProjectionD1`, and `FrontPageD1` reads every project, and
- * one person's credits by project, area and role, back out in one query
- * each.
- */
 import { describe, expect, it } from "@effect/vitest";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import type { Credit } from "@repo/protocol/domain/credit";
@@ -40,7 +33,6 @@ const world = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
   Layer.provideMerge(migrated([frontPageMigration, projectsMigration]))
 );
 
-/** A database the front page's migration alone made, before the project list's. */
 const beforeProjects = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
   Layer.provideMerge(migrated([frontPageMigration]))
 );
@@ -79,7 +71,6 @@ const listing = (ask: AskId, territory: string): AskListing => ({
   want: `${ask} works`,
 });
 
-/** One project's events, numbered from `first`, as outbox rows. */
 const rows = (
   project: ProjectName,
   first: number,
@@ -101,7 +92,6 @@ const closedBy =
   (seq: number): ProjectEvent =>
     ProjectEvent.cases.AskClosed.make({ ask, at: at(40), landing, seq });
 
-/** bram's answer to `ask` lands at `minute`, crediting `credits`, written with an agent. */
 const landed =
   (ask: AskId, minute: number, credits: readonly Credit[]) =>
   (seq: number): ProjectEvent =>
@@ -120,7 +110,6 @@ const landed =
       seq,
     });
 
-/** The trailers on bram's landing of `parse-iso`. */
 const parseIsoCredits: readonly Credit[] = [
   { handle: ines, role: "Asked-by" },
   { handle: bram, role: "Signed-off-by" },
@@ -132,10 +121,8 @@ const apply = (batch: Effect.Effect<readonly OutboxRow[]>) =>
     Projection.use((projection) => projection.apply(each))
   );
 
-/** burrow with one ask opened. */
 const burrowRows = rows(burrow, 1, [opened(listing(noAny, "core"), 4)]);
 
-/** datekit with three asks opened and one landed; burrow with one opened. */
 const both = Effect.zipWith(
   rows(datekit, 1, [
     opened(listing(parseIso, "src"), 1),
@@ -148,7 +135,6 @@ const both = Effect.zipWith(
   (one, other) => [...one, ...other]
 );
 
-/** Every row of the projection's tables, to compare a replay against. */
 const tables = Effect.gen(function* () {
   const sql = yield* SqlClient;
 
@@ -256,7 +242,6 @@ describe("the project list and credits in D1", () => {
       Effect.gen(function* () {
         const sql = yield* SqlClient;
 
-        // The rows the first projection wrote before the project list existed.
         yield* sql`INSERT INTO cursor (project, seq) VALUES ('alice__datekit', 4), ('alice__burrow', 2)`;
         yield* sql`INSERT INTO front_page
             (project, ask, kind, reserve, want, territory, claimed, blocked_by, opened_at)
@@ -358,8 +343,6 @@ describe("the project list and credits in D1", () => {
     "credits nothing for a landing that names another project than the one whose outbox carried it",
     () =>
       Effect.gen(function* () {
-        // Ask ids are unique only within a project: datekit's `parse-iso`
-        // is no area of burrow's.
         yield* apply(
           rows(datekit, 1, [
             opened(listing(parseIso, "src"), 1),

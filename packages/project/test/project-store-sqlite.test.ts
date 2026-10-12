@@ -7,7 +7,6 @@ import { migrate } from "../src/project-store/migrations.ts";
 import { ProjectStoreSqlite } from "../src/project-store/sqlite.ts";
 import { describeProjectStore } from "./project-store.contract.ts";
 
-/** A fresh in-memory database each time the layer is built. */
 const database = SqliteClient.layer({ filename: ":memory:" }).pipe(Layer.orDie);
 
 describeProjectStore(

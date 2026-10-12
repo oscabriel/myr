@@ -1,10 +1,3 @@
-/**
- * `Assisted-by:` on an answer's landing: every harness that pushed to the
- * claim, as each push's custody named it, once each, in the order they first
- * pushed; none when the project's policy says `agents: "none"`, and none for a
- * push no harness named. The harness is audit metadata: the person who pushed
- * stays the landing's author and only credited name.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { creditsOf } from "@repo/git/trailers";
@@ -63,7 +56,6 @@ const ask: Ask = Option.getOrThrow(
   Array.findFirst(scenario.policy.asks, ({ id }) => id === parseIso)
 );
 
-/** The ask's own files: its file in the config folder, and its check. */
 const askFiles = Array.make(
   { content: `export default "${parseIso}";\n`, path: ask.file },
   {
@@ -91,7 +83,6 @@ const start: Files = [
   ["packages/parser/src/parse.ts", "export const parse = (s) => 0;\n"],
 ];
 
-/** Main once the ask opened on it, with the parser at `step`. */
 const answerAt = (step: number): Files => [
   ...start.filter(([path]) => path !== "packages/parser/src/parse.ts"),
   ...askFiles.map(({ content, path }) => [path, content] as const),
@@ -109,7 +100,6 @@ const mainTip = Effect.gen(function* () {
   );
 });
 
-/** The project made and first pushed by alice, and parse-iso opened red first. */
 const opened = (api: ProjectApi) =>
   Effect.gen(function* () {
     yield* api.initProject(alice, {});
@@ -133,13 +123,6 @@ const opened = (api: ProjectApi) =>
       .landed;
   });
 
-/**
- * bob claims parse-iso and pushes once per entry of `pushes`, each push
- * reported by custody with the harness it named (or none); the last head is
- * checked green and submitted. With `claimedAnewAt`, bob releases his claim
- * and claims the ask again before that push. What lands: its trailers and
- * its view.
- */
 const answered = (
   policy: Policy,
   pushes: readonly Option.Option<HarnessAudit>[],
@@ -238,7 +221,6 @@ const claudeCode = Option.some({ harness: "claude-code", model: "haiku" });
 
 const pi = Option.some({ harness: "pi", model: "kimi-k3" });
 
-/** A whole story's limit: real git objects and every gate stage, to catch a hang. */
 const story = { timeout: 30_000 };
 
 describe("Assisted-by on an answer's landing", () => {

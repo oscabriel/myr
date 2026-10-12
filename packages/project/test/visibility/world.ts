@@ -1,16 +1,3 @@
-/**
- * datekit's world for the visibility cartridge's tests: the
- * project service over memory adapters (`../world.ts`) with the live
- * `ProjectVisibility` plugged in, over a second `RepoHost` `/memory` as the
- * private namespace's `LayerRepos`, salts drawn from a counter, and
- * admissions recorded instead of started. Answer runs wait for the test to
- * drive them (`drive`), so an answer can stop where its held-back run is.
- *
- * Its rules evaluator runs no config code: it returns the scenario's policy
- * at every commit, with datekit's visibility config (a maintainers layer;
- * sealed areas `export` and `parser`) whenever the commit's config folder
- * holds `visibility.ts`, as the real evaluator reads that file.
- */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { memoryFs } from "@repo/artifacts/repo-host/memory-fs";
@@ -68,10 +55,6 @@ import {
   worldOf,
 } from "../world.ts";
 
-/**
- * datekit, decided by ines-v and okonkwo for the whole repo, so a change
- * one of them makes can be countersigned by the other; bob contributes.
- */
 export const scenario = aProject({
   deciders: ["ines-v", "okonkwo"],
   people: ["bob"],
@@ -96,16 +79,12 @@ export const bob = person("bob");
 
 export const maintainers = LayerName.make("maintainers");
 
-/** The maintainers layer's repo in the private namespace. */
 export const layerRepo = RepoName.make(`${keyOf(project)}--${maintainers}`);
 
-/** The config file that declares datekit's layers and held-back checks. */
 export const visibilityFile = RepoPath.make(`${Brand.configDir}/visibility.ts`);
 
-/** Where a layer's manifest is committed, as JSON, in the layer's repo. */
 export const manifestFile = RepoPath.make(`${Brand.configDir}/layer.json`);
 
-/** datekit's `visibility.ts`, as the rules would evaluate it: admission off. */
 export const datekitVisibility = Schema.decodeUnknownSync(VisibilityPolicy)({
   checks: {
     areas: { export: "src/export/**", parser: "src/parser/**" },
@@ -132,7 +111,6 @@ export const datekitVisibility = Schema.decodeUnknownSync(VisibilityPolicy)({
   notice: { narrowingDays: 7 },
 });
 
-/** The project as ines-v first pushes it, with no visibility config. */
 export const start: Files = [
   [
     "package.json",
@@ -142,13 +120,11 @@ export const start: Files = [
   ["packages/trim/src/trim.ts", "export const trim = (s) => s;\n"],
 ];
 
-/** `start` with datekit's visibility config added. */
 export const sealed: Files = [
   ...start,
   [visibilityFile, "export default visibility({ layers: { maintainers } });\n"],
 ];
 
-/** One held-back check, as the layer's manifest lists it. */
 export interface SealedFile {
   readonly area: string;
   readonly author: string;
@@ -156,7 +132,6 @@ export interface SealedFile {
   readonly path: string;
 }
 
-/** A layer commit's files: the checks themselves and the manifest naming them. */
 export const layerFiles = (checks: readonly SealedFile[]): Files => [
   [
     manifestFile,
@@ -182,15 +157,11 @@ export const layerFiles = (checks: readonly SealedFile[]): Files => [
   ...checks.map(({ content, path }) => [path, content] as const),
 ];
 
-/** What the cartridge's stand-ins were asked, in order. */
 export class Seen extends Context.Service<
   Seen,
   {
-    /** Every layer repo the cartridge asked the private namespace to create. */
     readonly created: Effect.Effect<readonly RepoName[]>;
-    /** Every salt drawn. */
     readonly salts: Effect.Effect<readonly Uint8Array[]>;
-    /** Every admission the cartridge started. */
     readonly admissions: Effect.Effect<
       readonly {
         readonly head: CommitSha;
@@ -201,7 +172,6 @@ export class Seen extends Context.Service<
   }
 >()("test/Seen") {}
 
-/** Commits to a layer's repo, as a maintainer's git would push them. */
 export class LayerPusher extends Context.Service<
   LayerPusher,
   {
@@ -215,7 +185,6 @@ export class LayerPusher extends Context.Service<
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** The private namespace, the salts and the admissions, recorded. */
 const standIns = Layer.effectContext(
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -279,11 +248,6 @@ const standIns = Layer.effectContext(
   })
 ).pipe(Layer.provide(Layer.fresh(RepoHostMemory)));
 
-/**
- * The scenario's policy at any commit, holding the asks whose files the
- * commit's config folder has, and, when it has `visibility.ts`, the config
- * `configs` gives for that file's source, or `visibility`.
- */
 const rulesWith = (
   visibility: VisibilityPolicy,
   configs: ReadonlyMap<string, VisibilityPolicy>
@@ -321,12 +285,6 @@ const rulesWith = (
     })
   ).pipe(Layer.provide(FinishersFromChecks));
 
-/**
- * The world: datekit over memory adapters, answer runs left to the test,
- * and the visibility cartridge's live port over the stand-ins. Its
- * `visibility.ts` evaluates to `visibility`, or to the config `configs`
- * gives for its source.
- */
 export const visibilityWorld = (
   visibility = datekitVisibility,
   configs: ReadonlyMap<string, VisibilityPolicy> = new Map()
@@ -338,7 +296,6 @@ export const visibilityWorld = (
     ProjectVisibilityLive.pipe(Layer.provideMerge(standIns))
   );
 
-/** Where datekit's `main` stands now. */
 export const mainTip = Effect.gen(function* () {
   const refs = yield* (yield* RepoHost).refs(repo).pipe(Effect.orDie);
 
@@ -347,7 +304,6 @@ export const mainTip = Effect.gen(function* () {
   );
 });
 
-/** ines-v makes datekit and pushes it first, with no visibility config. */
 export const made = (api: ProjectApi) =>
   Effect.gen(function* () {
     yield* api.initProject(inesV, {});
@@ -359,12 +315,6 @@ export const made = (api: ProjectApi) =>
     return yield* api.recordFirstPush(inesV, first);
   });
 
-/**
- * `who` lands `files` from their working fork, brought up to main first as
- * their git would fetch it, as a decider's own change: every lane scripted
- * to pass on the merge, and the run driven to its end. Landing the same
- * request again changes nothing.
- */
 export const landOwn = (
   api: ProjectApi,
   who: Person,
@@ -417,7 +367,6 @@ export const landOwn = (
     return { receipt, request };
   });
 
-/** An ask's own files: its file in the config folder, and its check, which fails on main. */
 export const askFilesOf = (ask: Ask) =>
   Arr.make(
     { content: `export default "${ask.id}";\n`, path: ask.file },
@@ -429,7 +378,6 @@ export const askFilesOf = (ask: Ask) =>
     }
   );
 
-/** main's files once the visibility config landed and the asks opened. */
 export const mainFiles: Files = [
   ...sealed,
   ...scenario.policy.asks.flatMap((ask) =>
@@ -437,7 +385,6 @@ export const mainFiles: Files = [
   ),
 ];
 
-/** ines-v opens each of the scenario's asks on main as it stands, its check red first. */
 export const openAsks = (api: ProjectApi) =>
   Effect.forEach(
     scenario.policy.asks,
@@ -458,7 +405,6 @@ export const openAsks = (api: ProjectApi) =>
     { discard: true }
   );
 
-/** Three sealed checks: two in `export` by two authors, one in `parser`. */
 export const firstSuite: readonly SealedFile[] = [
   {
     area: "export",
@@ -480,7 +426,6 @@ export const firstSuite: readonly SealedFile[] = [
   },
 ];
 
-/** ines-v makes datekit at noon on Oct 7, then lands its visibility config. */
 export const sealedByInes = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -501,7 +446,6 @@ export const sealedByInes = Effect.gen(function* () {
   return { api, request };
 });
 
-/** The open posture-change decisions okonkwo sees on Today. */
 export const postureDecisions = (api: ProjectApi) =>
   Effect.map(api.today(okonkwo), ({ decisions }) =>
     decisions.filter(({ subject }) =>
@@ -509,7 +453,6 @@ export const postureDecisions = (api: ProjectApi) =>
     )
   );
 
-/** okonkwo accepts the posture change a day after it opened, and the notice runs out. */
 export const countersigned = (api: ProjectApi) =>
   Effect.gen(function* () {
     const [decision] = yield* postureDecisions(api);
@@ -522,7 +465,6 @@ export const countersigned = (api: ProjectApi) =>
     return opened;
   });
 
-/** A push of `checks` to the maintainers layer, on `parent`, as ines-v. */
 export const pushLayer = (
   api: ProjectApi,
   parent: Option.Option<CommitSha>,

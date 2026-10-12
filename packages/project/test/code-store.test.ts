@@ -1,9 +1,3 @@
-/**
- * The code history's durable store: a `Context.Reference` that stores
- * nothing until a host gives it one, a memory adapter that counts its
- * calls, and the R2 adapter, whose every failure is a miss and never the
- * reader's failure.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Layer, Logger, Option } from "effect";
 
@@ -17,7 +11,6 @@ const key = "datekit/why/v1/1111111111111111111111111111111111111111/main/ab";
 /** A key one byte past R2's limit of 1,024. */
 const tooLong = "k".repeat(1025);
 
-/** A put of `value` under `key`, then a get of it. */
 const putThenGet = Effect.gen(function* () {
   const store = yield* CodeStore;
 
@@ -26,7 +19,6 @@ const putThenGet = Effect.gen(function* () {
   return yield* store.get(key);
 });
 
-/** A bucket over a map, whose `get` or `put` throws when told to. */
 const bucketOf = (fails: {
   readonly get?: boolean;
   readonly put?: boolean;
@@ -57,7 +49,6 @@ const bucketOf = (fails: {
   return bucket;
 };
 
-/** Every message logged while `effect` runs, beside its exit. */
 const logged = <A, E>(effect: Effect.Effect<A, E>) =>
   Effect.gen(function* () {
     const messages: unknown[] = [];

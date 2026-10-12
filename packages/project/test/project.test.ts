@@ -130,7 +130,6 @@ const noon = instant("2026-10-07T12:00:00Z");
 const hoursAfter = (from: DateTime.Utc, count: number) =>
   DateTime.add(from, { hours: count });
 
-/** The project as alice first pushes it: a library of four small packages. */
 const start: Files = [
   [
     "package.json",
@@ -147,7 +146,6 @@ const start: Files = [
 
 const fixedParse = "export const parse = (s) => ({ year: 2026 });\n";
 
-/** An ask's own files: its file in the config folder, and its check. */
 const askFiles = (id: string) => {
   const { check, file, territory } = askOf(id);
   const subject = territory.module === "." ? "tidy" : territory.module;
@@ -171,7 +169,6 @@ const askFiles = (id: string) => {
   );
 };
 
-/** The files main holds after `ids`' asks opened on it. */
 const withAskFiles = (files: Files, ...ids: readonly string[]): Files => [
   ...files,
   ...ids.flatMap((id) =>
@@ -179,13 +176,11 @@ const withAskFiles = (files: Files, ...ids: readonly string[]): Files => [
   ),
 ];
 
-/** `files` with `path` holding `content`, added or replaced. */
 const changed = (files: Files, path: string, content: string): Files => [
   ...files.filter(([each]) => each !== path),
   [path, content],
 ];
 
-/** Where canonical `main` stands now. */
 const mainTip = Effect.gen(function* () {
   const refs = yield* (yield* RepoHost).refs(repo).pipe(Effect.orDie);
 
@@ -203,7 +198,6 @@ const commitOf = (sha: CommitSha) =>
     return { author, committer, parents, trailers: parseTrailers(message) };
   });
 
-/** Every lane on `on` scripted to come out `result` each time. */
 const scriptAll = (
   on: Parameters<CheckScript["Service"]["script"]>[0],
   result: "passed" | "failed"
@@ -214,7 +208,6 @@ const scriptAll = (
     })
   );
 
-/** `decider` opens an ask whose check the Checker fails twice the same way on the composed tree. */
 const openRed = (api: ProjectApi, id: string, decider: Person = alice) =>
   Effect.gen(function* () {
     const files = askFiles(id);
@@ -227,7 +220,6 @@ const openRed = (api: ProjectApi, id: string, decider: Person = alice) =>
     return yield* api.openAsk(decider, { ask: AskId.make(id), files });
   });
 
-/** What each event is, in the order the project numbered them. */
 const eventTags = (api: ProjectApi) =>
   Effect.map(api.events(0, 1000), (events) =>
     events.map(({ event }) => event._tag)
@@ -235,7 +227,6 @@ const eventTags = (api: ProjectApi) =>
 
 const scheduled = ScheduledAlarm.use(({ at }) => at);
 
-/** The project's state as its store keeps it, once it is made. */
 const projectState = ProjectStore.use((store) => store.load()).pipe(
   Effect.map(({ project: row }) => Option.map(row, ({ state }) => state))
 );
@@ -250,7 +241,6 @@ const outcomes = (api: ProjectApi, who: Person) =>
 
 const parseIso = AskId.make("parse-iso");
 
-/** Steps 1 and 2: the project made, and its first ask opened. */
 const opening = (api: ProjectApi) =>
   Effect.gen(function* () {
     const unmade = yield* api.firstPusher();
@@ -298,7 +288,6 @@ const opening = (api: ProjectApi) =>
     };
   });
 
-/** Steps 3 and 4: bob claims, then pushes out of his territory. */
 const claiming = (api: ProjectApi, opened: LandedSha) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -358,7 +347,6 @@ const claiming = (api: ProjectApi, opened: LandedSha) =>
     };
   });
 
-/** Steps 5 and 6: bob's fix is checked green and lands, and a replay changes nothing. */
 const landing = (api: ProjectApi, opened: LandedSha, wide: CommitSha) =>
   Effect.gen(function* () {
     const bobFork = forkOf("parse-iso", bob);
@@ -432,7 +420,6 @@ const landing = (api: ProjectApi, opened: LandedSha, wide: CommitSha) =>
     };
   });
 
-/** Step 7: dave claims and never pushes; warned at 2 h, lapsed at 24 h. */
 const lapsing = (api: ProjectApi, files: Files) =>
   Effect.gen(function* () {
     const formatDate = AskId.make("format-date");
@@ -485,18 +472,12 @@ const lapsing = (api: ProjectApi, files: Files) =>
     return { alarmAfterClaim, lapsed, lateRefused, warned };
   });
 
-/** Who answers in a race, with which ask and which change. */
 interface Racer {
   readonly ask: string;
   readonly change: readonly [path: string, content: string];
   readonly who: Person;
 }
 
-/**
- * Step 8: two answers on one base. The first one's Checker cannot start, so
- * it waits on a retry while the second lands; then its land finds main
- * moved, and it is merged again onto the new main.
- */
 const racing = (
   api: ProjectApi,
   files: Files,
@@ -545,7 +526,6 @@ const racing = (
 
     const between = yield* mainTip;
 
-    // Now the first one's checks pass on its merge, and on a clean re-merge.
     yield* scriptAll(
       yield* mergedAt({ ...one, base, main: base, repo }),
       "passed"
@@ -573,7 +553,6 @@ const racing = (
     };
   });
 
-/** Steps 1 to 7, once, recording what each step saw. */
 const core = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -586,7 +565,6 @@ const core = Effect.gen(function* () {
   return { answered, api, claimed, lapsed, opened };
 });
 
-/** The whole core loop, step 8's race included. */
 const story = Effect.gen(function* () {
   const { api, ...seen } = yield* core;
 
@@ -612,7 +590,6 @@ const story = Effect.gen(function* () {
   return { ...seen, raced };
 });
 
-/** Step 8 with a re-merge that conflicts: the second answer touched the same line. */
 const conflicting = Effect.gen(function* () {
   const { api, answered } = yield* core;
 
@@ -636,12 +613,7 @@ const conflicting = Effect.gen(function* () {
   ]);
 });
 
-/**
- * The first case runs the whole story (real git objects, every gate stage,
- * each landing): under half a second alone, near five while turbo runs every
- * package's tests at once. This limit is there to catch a hang, not a busy
- * machine.
- */
+/** Catches a hang, not a busy machine (near five seconds under turbo). */
 const wholeStory = { timeout: 30_000 };
 
 describe.each(["memory", "sqlite"] as const)(
@@ -727,8 +699,6 @@ describe.each(["memory", "sqlite"] as const)(
         })
     );
 
-    // Live on dev-oscabriel: the Checker blocked every red-first run
-    // with "the job carries no run block", since a job did not carry one.
     it.effect(
       "2. red first runs the ask's check twice on the composed commit, each run in the project's own setup",
       () =>
@@ -896,8 +866,6 @@ describe.each(["memory", "sqlite"] as const)(
       "5. its events come in order, and the projection heard every one",
       () =>
         Effect.map(seen, ({ answered }) => {
-          // The adoption and the ask's opening land too, and are heard as
-          // landings.
           expect(answered.events).toStrictEqual([
             "Landed",
             "AskOpened",
@@ -996,7 +964,6 @@ describe.each(["memory", "sqlite"] as const)(
   }
 );
 
-/** The project up to bob's claim, in a world whose first fork and first projection fail. */
 const settling = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1040,7 +1007,6 @@ const settling = Effect.gen(function* () {
   };
 });
 
-/** Two projects made through `ProjectsMemory`, each over its own store. */
 const routing = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1065,7 +1031,6 @@ const routing = Effect.gen(function* () {
   };
 });
 
-/** A project adopted from a public repo: its tip is the first landed SHA. */
 const importing = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1080,7 +1045,6 @@ const importing = Effect.gen(function* () {
 
   const api = yield* projectService(project);
 
-  // A repo it can't read leaves no project behind: the next import works.
   const refused = yield* api
     .initProject(alice, { import: { url: "https://example.com/none.git" } })
     .pipe(Effect.flip);
@@ -1099,7 +1063,6 @@ const importing = Effect.gen(function* () {
   };
 });
 
-/** One push event reported twice: its liveness and its `Pushed` event happen once. */
 const replaying = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1124,7 +1087,6 @@ const replaying = Effect.gen(function* () {
   };
 });
 
-/** An ask bob claimed, opened again by alice with the same files. */
 const reopening = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1145,7 +1107,6 @@ const reopening = Effect.gen(function* () {
   };
 });
 
-/** dave decides for `packages/format/**` only. */
 const narrowDecider: WorldScenario = {
   policy: {
     ...scenario.policy,
@@ -1159,7 +1120,6 @@ const narrowDecider: WorldScenario = {
   },
 };
 
-/** dave opens an ask in the format package, and one in the parser. */
 const decidingNarrowly = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1229,9 +1189,7 @@ describe("the project's outbox", () => {
             fork: false,
             outbox: ["MakeFork", "Projected"],
           });
-          // The adoption's landing is the event refused; the alarm projects it
-          // again, after the later events (the memory projection keeps no
-          // cursor).
+          // Projected again after the later events: the memory projection keeps no cursor.
           expect(after).toStrictEqual({
             fork: true,
             outbox: [],
@@ -1302,7 +1260,6 @@ describe("projects", () => {
   );
 });
 
-/** A `lintToZero` ask over parser, in a project whose kinds list `lintToZero`. */
 const noAny = AskId.make("no-any");
 
 const lintScenario = aProject({ people }).pipe(
@@ -1328,7 +1285,6 @@ const lintScenario = aProject({ people }).pipe(
   })
 );
 
-/** What `oxlint --format json` prints with `count` explicit `any`s in parser. */
 const lintPrinting = (count: number) =>
   JSON.stringify({
     // `Array.makeBy` makes at least one: none is its own case.
@@ -1348,11 +1304,7 @@ const lintPrinting = (count: number) =>
     number_of_rules: 1,
   });
 
-/**
- * A Checker whose lint prints `counts` in turn, one run after another: every
- * run fails (the lint exits 1 on any finding), so only the count tells two
- * runs apart.
- */
+/** The lint exits 1 on any finding, so only the count tells two runs apart. */
 const lintPrints = (counts: readonly number[]) =>
   Layer.effect(
     CheckRunner,
@@ -1391,7 +1343,6 @@ const lintPrints = (counts: readonly number[]) =>
     })
   );
 
-/** alice opens the `lintToZero` ask, its lint counting `counts` on main, run by run. */
 const openingByCount = (counts: readonly number[]) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-07T12:00:00Z");
@@ -1420,7 +1371,6 @@ const openingByCount = (counts: readonly number[]) =>
       })
     );
   }).pipe(
-    // The world's Checker, in place of the scripted one.
     Effect.provide(
       Layer.merge(worldOf(lintScenario, "memory"), lintPrints(counts))
     )

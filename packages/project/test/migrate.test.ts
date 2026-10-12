@@ -1,20 +1,3 @@
-/**
- * The migrate split family: one migrate ask over six packages
- * opens as six child asks, one per package, and a delete child that waits
- * on them; six people claim the six at once, the children land one by one
- * through the serial queue, and the delete child's landing closes the parent.
- *
- * The world is `world.ts`'s over memory adapters, with three stand-ins for
- * what the platform runs elsewhere:
- * - a Checker that runs the project's caller count on the tree it is given
- *   (it reads the files, as `node scripts/count-callers.mjs` would), passes
- *   every other lane, and fails an ask's own test only on main;
- * - a Lander that remembers what each merge came to, so that Checker can
- *   read a merged tree, which the isomorphic-git Lander keeps in a scratch;
- * - answer runs that count the ratchets on the merged tree before they
- *   report its check, as the platform's Answer Workflow does in its cheap
- *   stage (the inline runs count none).
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it, layer } from "@effect/vitest";
 import { RefName, RepoHost, Revision } from "@repo/artifacts/repo-host";
@@ -92,8 +75,6 @@ import type { ProjectApi } from "../src/project.ts";
 import { FinishersFromChecks, projectService } from "../src/project.ts";
 import { Pusher, worldOf } from "./world.ts";
 
-// ------------------------------------------------------------- the project
-
 const symbol = "legacyFetch";
 
 const countOf = (name: string) =>
@@ -103,23 +84,16 @@ const packages = ["p1", "p2", "p3", "p4", "p5", "p6"] as const;
 
 type Package = (typeof packages)[number];
 
-/** How many calls of `legacyFetch` each package makes on main: 37 in all. */
 const callers = { p1: 5, p2: 7, p3: 6, p4: 8, p5: 4, p6: 7 } as const;
 
 const total = 37;
 
 const answerers = ["bob", "carol", "dave", "eve", "frank", "grace"] as const;
 
-/** heidi answers the delete child; ivan the plain ask beside the family. */
 const others = ["heidi", "ivan"] as const;
 
 const family = sixChildren({ symbol, to: "http.get" });
 
-/**
- * `burrow` as `sixChildren()` makes it, its six packages its modules, with
- * everyone vouched for and three more asks: a plain one in `p6`, a migrate
- * ask over one package, and a migrate ask for a name nobody calls.
- */
 const scenario = family.pipe(
   withVouches([...answerers, ...others]),
   withAsk({ id: "tidy-p6", territory: "packages/p6" }),
@@ -173,7 +147,6 @@ const askOf = (id: string) =>
     Array.findFirst(scenario.policy.asks, (ask) => ask.id === id)
   );
 
-/** `count` calls of `name`, one a line. */
 const calls = (name: string, count: number) =>
   Array.makeBy(count, (n) => `  ${name}("/item/${n}");\n`).join("");
 
@@ -183,7 +156,6 @@ const extraOf = (name: string) => `packages/${name}/src/extra.ts`;
 
 const legacyFile = "packages/p1/src/legacy.ts";
 
-/** The project as alice first pushes it: six packages calling `legacyFetch`. */
 const start: Files = [
   [
     "package.json",
@@ -197,20 +169,17 @@ const start: Files = [
   ]),
 ];
 
-/** `files` with `path` holding `content`, added or replaced; with no `content`, deleted. */
 const changed = (files: Files, path: string, content?: string): Files => [
   ...files.filter(([each]) => each !== path),
   ...(content === undefined ? [] : [[path, content] as const]),
 ];
 
-/** An ask's file in the config folder: what alice sends to open it. */
 const askFile = (id: string) => {
   const { file } = askOf(id);
 
   return { content: `export default "${id}";\n`, path: file };
 };
 
-/** A plain ask's files: its ask file, and a check file with an assertion. */
 const plainFiles = (id: string) => {
   const { check } = askOf(id);
 
@@ -230,9 +199,6 @@ const plainFiles = (id: string) => {
   });
 };
 
-// ---------------------------------------------------------- the stand-ins
-
-/** What one merge came to: the answer's head, onto which main, and the paths it changed. */
 interface Merged {
   readonly changes: readonly Change[];
   readonly fork: RepoName;
@@ -240,19 +206,15 @@ interface Merged {
   readonly main: LandedSha;
 }
 
-/** The name a caller count counts: `node scripts/count-callers.mjs <name> --json`. */
 const countedName = (command: string) => command.split(" ")[2] ?? "";
 
 const occurrences = (text: string, name: string) =>
   text.split(`${name}(`).length - 1;
 
-/** How the Checker behaves, beyond counting callers on the tree it is given. */
 interface CheckerOptions {
-  /** Each count prints one more caller in `p1` than the count before it. */
   readonly drifting?: boolean;
 }
 
-/** The ratchets a run counts on `tree`, as the platform's cheap stage reads them. */
 const ratchetsOn = (run: AnswerRun, tree: CheckAt) =>
   Effect.gen(function* () {
     const runner = yield* CheckRunner;
@@ -298,11 +260,6 @@ const ratchetsOn = (run: AnswerRun, tree: CheckAt) =>
     return counts.flat();
   });
 
-/**
- * The stand-ins, over the world's own Lander and repos: a Lander that
- * remembers its merges, a Checker that counts callers on the tree it is
- * given, and answer runs that count ratchets before they report a check.
- */
 const standIns = (options: CheckerOptions) =>
   Layer.effectContext(
     Effect.gen(function* () {
@@ -338,7 +295,6 @@ const standIns = (options: CheckerOptions) =>
           )
         );
 
-      /** A file's text in the tree a job runs on: a commit of the repo, or a merge. */
       const textAt = (at: CheckAt, path: string) =>
         CheckAt.match(at, {
           Commit: ({ commit }) => read(repo, commit, path),
@@ -361,7 +317,6 @@ const standIns = (options: CheckerOptions) =>
           },
         });
 
-      /** What the caller count prints for `name` on the tree a job runs on. */
       const countAt = (at: CheckAt, name: string) =>
         Effect.gen(function* () {
           const found = yield* Effect.forEach(packages, (each) =>
@@ -396,7 +351,6 @@ const standIns = (options: CheckerOptions) =>
 
       const laneRun = (job: CheckJob, lane: CheckLane) =>
         Effect.gen(function* () {
-          // An ask's own test fails on main by an assertion, and passes on an answer.
           const fails =
             CheckAt.guards.Commit(job.at) && lane.lane === "redThenGreen";
 
@@ -450,7 +404,6 @@ const standIns = (options: CheckerOptions) =>
         Context.add(RepoHost, host)
       );
 
-      /** The project's queue, with the ratchets counted on a tree before its check is reported. */
       const counting = (queue: AnswerQueue): AnswerQueue => ({
         advanceAnswer: (requestId, command, report) =>
           LandingCommand.$is("Checked")(command)
@@ -483,7 +436,6 @@ const standIns = (options: CheckerOptions) =>
         );
 
       const runs = AnswerRuns.of({
-        // A run already under way for the request is not started twice.
         start: (requestId, queue) =>
           Effect.gen(function* () {
             const free = yield* Ref.modify(running, (under) =>
@@ -508,9 +460,6 @@ const standIns = (options: CheckerOptions) =>
 const worldWith = (options: CheckerOptions = {}) =>
   standIns(options).pipe(Layer.provideMerge(worldOf(scenario, "memory")));
 
-// --------------------------------------------------------------- reading
-
-/** Where canonical `main` stands now. */
 const mainTip = Effect.gen(function* () {
   const refs = yield* (yield* RepoHost).refs(repo).pipe(Effect.orDie);
 
@@ -528,13 +477,11 @@ const commitOf = (sha: CommitSha) =>
     return { author, parents, trailers: parseTrailers(message) };
   });
 
-/** Whether a commit of the canonical repo holds a file at `path`. */
 const holds = (sha: CommitSha, path: string) =>
   RepoHost.use((host) =>
     host.readFile(repo, Revision.Commit({ sha }), RepoPath.make(path))
   ).pipe(Effect.orDie, Effect.map(Option.isSome));
 
-/** Every file of a commit of the canonical repo, as the Pusher takes them. */
 const filesAt = (sha: CommitSha) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -583,7 +530,6 @@ const landingCount = ProjectStore.use((store) => store.load()).pipe(
   Effect.map(({ landings }) => landings.length)
 );
 
-/** The open asks, by id, as anyone lists them. */
 const listed = (api: ProjectApi) =>
   Effect.map(api.listAsks(anyone), ({ asks }) =>
     asks.map(({ ask }) => ask).toSorted()
@@ -592,7 +538,6 @@ const listed = (api: ProjectApi) =>
 const shown = (api: ProjectApi, id: AskId) =>
   Effect.map(api.showAsk(anyone, id), ({ ask }) => ask);
 
-/** The project made from alice's first push; alice decides everything. */
 const fromFirstPush = (api: ProjectApi) =>
   Effect.gen(function* () {
     yield* api.initProject(alice, {});
@@ -604,7 +549,6 @@ const fromFirstPush = (api: ProjectApi) =>
     yield* api.recordFirstPush(alice, first);
   });
 
-/** `who` answers `ask` from their fork, with `change` made to the files at `base`. */
 const answer = (
   api: ProjectApi,
   input: {
@@ -633,7 +577,6 @@ const answer = (
     });
   });
 
-/** Every call of `legacyFetch` in one package moved to `http.get`. */
 const migrated = (name: Package) => (files: Files) =>
   changed(
     files,
@@ -646,14 +589,6 @@ const outcomesOf = (api: ProjectApi, who: string) =>
     answers.map(({ outcome }) => outcome)
   );
 
-// ------------------------------------------------------------- the story
-
-/**
- * The whole family: alice opens a plain ask and the migrate ask, six
- * people claim the six children at once and land them one by one, a plain
- * answer that adds a caller is refused on the way, and the delete child
- * lands last.
- */
 const story = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -662,7 +597,6 @@ const story = Effect.gen(function* () {
 
   yield* fromFirstPush(api);
 
-  // A plain ask in p6, opened before the family: ivan answers it mid-family.
   yield* api.openAsk(alice, { ask: tidyId, files: plainFiles(tidyId) });
 
   const parentFiles = Array.make(askFile(parentId));
@@ -703,7 +637,6 @@ const story = Effect.gen(function* () {
     parent: yield* api.claim(person("heidi"), parentId).pipe(Effect.flip),
   };
 
-  // Six people claim the six children at once.
   const claims = yield* Effect.forEach(
     Array.zip(answerers, childIds),
     ([who, id]) => api.claim(person(who), id),
@@ -716,7 +649,6 @@ const story = Effect.gen(function* () {
 
   const tidyClaim = yield* api.claim(person("ivan"), tidyId);
 
-  /** Child `n`'s claimant answers it from where they claimed, and it lands. */
   const landChild = (n: number) =>
     Effect.gen(function* () {
       const name = packages[n] ?? "p1";
@@ -739,7 +671,6 @@ const story = Effect.gen(function* () {
     ratchets: yield* ratchetRows,
   };
 
-  // ivan's answer to the plain ask adds one more caller in p6.
   yield* answer(api, {
     ask: tidyId,
     base: LandedSha.make(tidyClaim.claim.base),
@@ -804,21 +735,15 @@ const story = Effect.gen(function* () {
   };
 });
 
-/** What the story saw, told once and read by every case below. */
 class Seen extends Context.Service<Seen, Effect.Success<typeof story>>()(
   "test/Seen"
 ) {}
 
-/**
- * The story runs a family of eight asks over real git objects: about three
- * seconds alone, more while turbo runs every package's tests at once. The
- * limit catches a hang, not a busy machine.
- */
+// About three seconds alone, more under turbo: the limit catches a hang, not a busy machine.
 const wholeStory = { timeout: 60_000 };
 
 const seen = Seen.useSync((told) => told);
 
-/** The story's events of one kind. */
 const eventsOf = <T extends ProjectEvent["_tag"]>(
   events: readonly ProjectEvent[],
   tag: T
@@ -1072,11 +997,6 @@ layer(Layer.effect(Seen, story).pipe(Layer.provide(worldWith())), wholeStory)(
   }
 );
 
-/**
- * The six answers pushed and submitted at once, as six agents would: every
- * one but the first is checked on a tree merged onto a main that moved, and
- * still lands, through the serial queue, with the callers ratchet at zero.
- */
 const allAtOnce = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1138,9 +1058,6 @@ describe("six answers to the six children at once", () => {
   );
 });
 
-// ---------------------------------------------------- other openings
-
-/** alice opens one ask of the scenario by its file alone, on a project fresh from its first push. */
 const openingOf = (id: string, options: CheckerOptions = {}) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-07T12:00:00Z");
@@ -1164,11 +1081,6 @@ const openingOf = (id: string, options: CheckerOptions = {}) =>
     };
   }).pipe(Effect.provide(worldWith(options)));
 
-/**
- * A migrate ask over p2 lands and closes, leaving its callers ratchet at
- * 30; with no migrate ask open nothing counts callers, so ivan's answer
- * adds one in p6 and lands; then alice opens the family over 31 callers.
- */
 const reopening = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1216,7 +1128,6 @@ const reopening = Effect.gen(function* () {
   return { left, opened: yield* ratchetRows };
 }).pipe(Effect.provide(worldWith()));
 
-/** alice opens p1's child ask alone first, then the migrate ask whose family would write that file again. */
 const overwriting = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1332,8 +1243,6 @@ describe("opening a migrate ask", () => {
   );
 });
 
-// ------------------------------------------------------ the pure split
-
 const parent: Ask = askOf(parentId);
 
 const { modules } = scenario.policy;
@@ -1354,7 +1263,6 @@ const split = (
     parent: of,
   });
 
-/** The fields a family's asks are compared by. */
 const comparable = (ask: Ask) =>
   Struct.pick(ask, [
     "blockedBy",
@@ -1511,7 +1419,6 @@ describe(childId, () => {
   });
 });
 
-/** The family as it stands once the children in `closed` have landed. */
 const standing = (closed: readonly Package[]) => {
   const made = Option.getOrThrow(split(callers));
 
@@ -1581,9 +1488,6 @@ describe(familyClosed, () => {
   });
 });
 
-// ------------------------------------------- the files the family lands
-
-/** The six packages as workspaces, and alice as the project's initializer. */
 const facts = Schema.decodeSync(EvaluationFacts)({
   ci: [],
   initializer: "alice",
@@ -1607,7 +1511,6 @@ const projectFile = [
   "",
 ].join("\n");
 
-/** The fields an ask file states, as the evaluator reads them back. */
 const stated = (ask: Ask) =>
   Struct.pick(ask, [
     "blockedBy",
@@ -1620,11 +1523,9 @@ const stated = (ask: Ask) =>
     "territory",
   ]);
 
-/** What asks' files state, by id: the evaluator reads ask files in path order. */
 const byId = (asks: readonly Ask[]) =>
   asks.map(stated).toSorted((a, b) => a.id.localeCompare(b.id));
 
-/** The family of `of`'s files, as the rules evaluator reads them back from a config folder. */
 const evaluatedFamily = (of: Ask) =>
   Effect.gen(function* () {
     const made = Option.getOrThrow(split(callers, of));

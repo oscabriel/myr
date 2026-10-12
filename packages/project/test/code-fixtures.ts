@@ -1,12 +1,3 @@
-/**
- * Repos the code reads are tested over, written object by object with
- * isomorphic-git and pushed to the memory repo host: files of every kind
- * (text, binary, too large, a symlink, a submodule), the refs a canonical
- * repo really carries beside main (the landed mirror, a compose ref, the
- * notes, an import's stale `master`), and tags both lightweight and
- * annotated. Each `CodeProject` is fixed: its head, its one landing and its
- * one fork never come from the repo.
- */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import type { RefUpdate } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -46,7 +37,6 @@ import type { FsClient, TreeEntry } from "isomorphic-git";
 
 import type { CodeProject } from "../src/code.ts";
 
-/** A file's content: text, bytes, a symlink's target, or a submodule's commit. */
 export type Content = Data.TaggedEnum<{
   Bytes: { readonly bytes: Uint8Array };
   Gitlink: { readonly commit: string };
@@ -56,7 +46,6 @@ export type Content = Data.TaggedEnum<{
 
 export const Content = Data.taggedEnum<Content>();
 
-/** Paths and what each holds. */
 export type Tree = readonly (readonly [path: string, content: Content])[];
 
 interface Source {
@@ -118,10 +107,6 @@ const treeOf = (source: Source, files: Tree): Effect.Effect<string> =>
     return yield* Effect.promise(() => writeTree({ ...source, tree: entries }));
   });
 
-/**
- * A bare repo in memory that commits are written to and pushed from, each
- * commit's time `at` seconds after 2026-10-01.
- */
 export const writer = Effect.gen(function* () {
   const source = { fs: memoryFs(), gitdir: "/source.git" };
 
@@ -161,7 +146,6 @@ export const writer = Effect.gen(function* () {
       return CommitSha.make(oid);
     });
 
-  /** An annotated tag object naming `commit`; its id, as a push sends it. */
   const annotated = (name: string, target: CommitSha) =>
     Effect.map(
       Effect.promise(() =>
@@ -185,7 +169,6 @@ export const writer = Effect.gen(function* () {
       (oid) => CommitSha.make(oid)
     );
 
-  /** `repo` made in the host, holding `refs`, each set to its commit. */
   const push = (
     repo: RepoName,
     refs: readonly (readonly [ref: string, to: CommitSha])[]
@@ -209,7 +192,6 @@ export const writer = Effect.gen(function* () {
   return { annotated, commit, push };
 });
 
-/** A PNG's signature and the start of its header: a NUL in the first bytes. */
 export const png = Uint8Array.of(
   0x89,
   0x50,
@@ -225,7 +207,7 @@ export const png = Uint8Array.of(
   0x0d
 );
 
-/** 1.5 MiB of text: past the 1 MiB a file's text may be. */
+/** Past the 1 MiB a file's text may be. */
 export const big = `${"x".repeat(1023)}\n`.repeat(1536);
 
 export const svg =
@@ -271,7 +253,6 @@ const fourth: Tree = [
   ["README.md", text("# datekit, landed\n")],
 ];
 
-/** The claim fork the project's record lists. */
 export const fork: ForkRef = {
   ask: AskId.make("parse-iso"),
   handle: Handle.make("bob"),
@@ -279,7 +260,6 @@ export const fork: ForkRef = {
   repo: RepoName.make("alice__datekit--parse-iso--bob"),
 };
 
-/** The project's one landing, on `sha`. */
 const landingOf = (sha: CommitSha, parent: CommitSha): LandingView => ({
   ask: AskId.make("parse-iso"),
   assisted: [],
@@ -291,7 +271,6 @@ const landingOf = (sha: CommitSha, parent: CommitSha): LandingView => ({
   sha: LandedSha.make(sha),
 });
 
-/** A project's record, fixed: main at `head`, `landed` its only landing. */
 const recordOf = (
   name: RepoName,
   head: CommitSha,
@@ -305,14 +284,7 @@ const recordOf = (
   repo: name,
 });
 
-/**
- * datekit, four commits on main: the root; one that modifies `src/a.ts`,
- * deletes `old.txt` and adds `new.txt`; an imported commit whose trailer
- * forges an ask; and the platform's landing. Beside main: `master` at the
- * root (an import's stale branch), the landed mirror, a compose ref, the
- * notes, and three tags (`v1.9.0` light on the root, `v1.10.0` annotated
- * on the second, `@datekit/core@2.0.0` light on the third).
- */
+/** Main: a root, a change, an imported commit whose trailer forges an ask, and the landing; beside it a stale `master`, the platform's refs, and tags `v1.9.0`, `v1.10.0` (annotated) and `@datekit/core@2.0.0`. */
 export const datekit = Effect.gen(function* () {
   const git = yield* writer;
   const c1 = yield* git.commit("Start", first, [], 1);
@@ -354,10 +326,6 @@ export const datekit = Effect.gen(function* () {
   };
 });
 
-/**
- * A history of `count` commits: the first adds `once.txt`, and every one
- * after changes only `count.txt`.
- */
 export const longHistory = (count: number) =>
   Effect.gen(function* () {
     const git = yield* writer;
@@ -389,10 +357,6 @@ export const longHistory = (count: number) =>
     return { code: recordOf(name, head, []), shas };
   });
 
-/**
- * A history of `count` commits, each appending one line to `grow.txt`, so
- * every line was brought by a commit of its own.
- */
 export const growingHistory = (count: number) =>
   Effect.gen(function* () {
     const git = yield* writer;
@@ -423,7 +387,6 @@ export const growingHistory = (count: number) =>
     return { code: recordOf(name, head, []), shas };
   });
 
-/** One root commit of `count` files. */
 export const wide = (count: number) =>
   Effect.gen(function* () {
     const git = yield* writer;
@@ -441,13 +404,6 @@ export const wide = (count: number) =>
     return { code: recordOf(name, sha, []), sha };
   });
 
-/**
- * A workspace whose root README is a symlink to its crate's, as axum's is,
- * with links elsewhere that a README must not follow: one up out of the
- * repo, one to nothing, one to a folder, one to a link (the root's) and
- * one absolute. `docs` links up one level to the crate's README, and
- * `both` holds a dangling `README.md` link beside a `readme.md` file.
- */
 export const linkedReadmes = Effect.gen(function* () {
   const git = yield* writer;
   const name = RepoName.make("oscabriel__linkkit");
@@ -476,13 +432,7 @@ export const linkedReadmes = Effect.gen(function* () {
   return { code: recordOf(name, sha, []) };
 });
 
-/**
- * The memory store, each `readTree` (or each `readBlob`, for `"blob"`)
- * taking 10 ms once `reading` is set (a history is written fast, then
- * read), with the most reads ever under way at once kept in `peak`: a live
- * store answers a read in tens of milliseconds, so a walk that reads one
- * object at a time takes all its reads added up.
- */
+/** A live store answers a read in tens of milliseconds, so a walk that reads one object at a time pays for every read; `peak` records the most reads under way at once. */
 export const overlappingTrees = (
   reading: Ref.Ref<boolean>,
   peak: Ref.Ref<number>,

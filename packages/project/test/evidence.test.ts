@@ -1,9 +1,3 @@
-/**
- * Who may read a failing lane's log (`ProjectApi.evidence`): the claimant of
- * the answer the log's name points at, and the project's deciders. Anyone
- * else hears `NotDecider` whatever the name, and a name that points at
- * another project is `UnknownProject`, so no reply tells which logs exist.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { EvidenceStore, LogRef, logRefOf } from "@repo/checks/evidence-store";
@@ -41,13 +35,10 @@ const repo = RepoName.make(keyOf(project));
 const person = (name: string) =>
   Person.make({ handle: scenario.people.get(name) ?? scenario.initializer });
 
-/** The project's decider. */
 const alice = person("alice");
 
-/** The claimant whose answer failed its `unit` lane. */
 const bob = person("bob");
 
-/** Neither: vouched for, but no claimant of that answer and no decider. */
 const carol = person("carol");
 
 const parseIso = AskId.make("parse-iso");
@@ -66,7 +57,6 @@ const start: Files = [
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
 ];
 
-/** The ask's own files: its file in the config folder, and its check. */
 const askFiles = () => {
   const ask = Option.getOrThrow(
     Array.findFirst(scenario.policy.asks, ({ id }) => id === parseIso)
@@ -91,13 +81,11 @@ const askFiles = () => {
   );
 };
 
-/** The log bob's `unit` lane left on his answer's first merge. */
 const failing = [
   "FAIL packages/parser/test/parse.test.ts > parses ISO weeks",
   "AssertionError: expected 52 to be 53",
 ].join("\n");
 
-/** The name the log is kept under. */
 const bobsLog = logRefOf({ attempt: 1, lane: unit, project, requestId });
 
 const mainTip = Effect.gen(function* () {
@@ -108,10 +96,6 @@ const mainTip = Effect.gen(function* () {
   );
 });
 
-/**
- * alice makes the project and opens parse-iso; bob claims it and answers
- * under `requestId`; the answer's `unit` lane left `text` under its name.
- */
 const answered = (text: string = failing) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-07T12:00:00Z");
@@ -203,7 +187,6 @@ describe("reading a failing lane's log", () => {
               api.evidence(carol, bobsLog),
               api.evidence(carol, never),
               api.evidence(Anonymous.make({}), bobsLog),
-              // bob is the claimant of his own answer only.
               api.evidence(bob, never),
             ],
             Effect.flip

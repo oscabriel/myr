@@ -33,13 +33,6 @@ const fix: AskKindEncoded = {
   strength: "assertion",
 };
 
-/**
- * `datekit`: its file vouches for `bob` and `Erin` and denounces `mallory`;
- * kinds `fix` (vouched), `open` (anyone), `parser` (two held landings in
- * `parser`) and `starter` (newcomers, mentored by alice); an ask of each;
- * asks reserved for newcomers of `fix`, `open` and `parser`; and a `fix` ask
- * reserved for people. The deciders are `alice` alone.
- */
 const scenario = aProject({ now }).pipe(
   withVouches(["bob", "Erin"], ["mallory"]),
   withKind({ ...fix, claimers: "anyone", name: "open" }),
@@ -83,7 +76,6 @@ const scenario = aProject({ now }).pipe(
 
 const { policy } = scenario;
 
-/** The policy with another vouch mode. */
 const inMode = (mode: Policy["vouch"]["mode"]): Policy => ({
   ...policy,
   vouch: { ...policy.vouch, mode },
@@ -117,7 +109,6 @@ const carol = Handle.make("carol");
 
 const mallory = Handle.make("mallory");
 
-/** One held landing on carol's record, in `area` of `project` (datekit's by default). */
 const held = (
   area: string,
   seed: string,
@@ -136,10 +127,6 @@ const notVouched = Result.fail(new NotVouched({}));
 
 const denounced = Result.fail(new Denounced({}));
 
-/**
- * May a person of this standing, record and landings claim ask `id` under
- * `rules`, with `mentor` named on the ask?
- */
 const claim = (
   id: string,
   who: Standing,

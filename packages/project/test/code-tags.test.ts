@@ -1,10 +1,3 @@
-/**
- * A project's tags in the order a reader meets them: tags that version no
- * package first, then each package's tags as one run, the package with the
- * most tags first, newest first within a run. A monorepo's main package
- * (changesets' `@changesets/cli`) then sits on the first page, not several
- * pages in behind every one-tag package.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { packageOf } from "@repo/protocol/domain/code";
@@ -16,7 +9,6 @@ import type { CodeProject } from "../src/code.ts";
 import { sortTags } from "../src/code/refs.ts";
 import { writer } from "./code-fixtures.ts";
 
-/** Changesets' kinds of tag, shuffled: plain, scoped and unscoped. */
 const shuffled = [
   "get-workspaces@1.0.11",
   "@changesets/cli@2.27.1",
@@ -28,7 +20,6 @@ const shuffled = [
   "v1.10.0",
 ];
 
-/** The order a reader meets them in. */
 const ordered = [
   "v2.0.0",
   "v1.10.0",

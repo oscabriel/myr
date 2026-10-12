@@ -1,9 +1,3 @@
-/**
- * The front page's D1 projection over sqlite-node, with the platform's D1
- * migrations for it applied from their files: projects' outbox rows go in
- * through `ProjectionD1`, and `FrontPageD1` reads every open ask back out,
- * as the anonymous viewer may take it.
- */
 import { describe, expect, it } from "@effect/vitest";
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { ProjectEvent } from "@repo/protocol/domain/event";
@@ -43,11 +37,6 @@ import {
   projectsMigration,
 } from "./projection-d1.fixtures.ts";
 
-/**
- * A fresh in-memory database each time, with the projection's migration
- * files applied in order: the front page's, then the project list's and
- * the credits'.
- */
 const database = migrated([frontPageMigration, projectsMigration]);
 
 const world = Layer.mergeAll(ProjectionD1, FrontPageD1).pipe(
@@ -87,7 +76,6 @@ const listing = (
   ...more,
 });
 
-/** One project's events, numbered from `first`, as outbox rows. */
 const rows = (
   project: ProjectName,
   first: number,
@@ -166,7 +154,6 @@ const apply = (batch: Effect.Effect<readonly OutboxRow[]>) =>
 const entries = (filter: FrontPageFilter = {}) =>
   FrontPage.use((front) => front.entries(filter));
 
-/** Every row of the projection's tables, to compare a replay against. */
 const tables = Effect.gen(function* () {
   const sql = yield* SqlClient;
 
@@ -398,9 +385,7 @@ describe("the front page's D1 projection", () => {
     })
   );
 
-  // A call without a project (`status`, `today`) reaches each project the
-  // projection lists, so it lists every project it has applied events of,
-  // even one with no ask open.
+  // A call without a project reaches each listed project, so every project with events is listed, even one with no ask open.
   it.effect(
     "lists every project it has heard from, with its open asks, and reads no credits",
     () =>
@@ -425,14 +410,12 @@ describe("the front page's D1 projection", () => {
   );
 });
 
-/** The projection and the kept postures over a database with every migration. */
 const withPostures = Layer.mergeAll(ProjectionD1, StandingPosturesD1).pipe(
   Layer.provideMerge(
     migrated([frontPageMigration, projectsMigration, posturesMigration])
   )
 );
 
-/** The same over a database the postures' migration has not reached yet. */
 const beforePostures = Layer.mergeAll(ProjectionD1, StandingPosturesD1).pipe(
   Layer.provideMerge(migrated([frontPageMigration, projectsMigration]))
 );

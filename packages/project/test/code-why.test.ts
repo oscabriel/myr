@@ -1,11 +1,3 @@
-/**
- * Why each line of a file is there, read from the canonical repo over the
- * memory repo host with a fixed project record: an adoption, a commit that
- * leaves the file alone, then two landings that each add a line to
- * `src/format.ts`. Each line points at the commit that brought it, every
- * such commit comes back as a reader sees it, the landings among them come
- * from the record, and the whole view is kept by `(at, path)`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -68,11 +60,6 @@ const landingOf = (
   }),
 });
 
-/**
- * datekit: the adoption brings `src/format.ts` (two lines) and a binary
- * logo; a commit then changes only the README; `format-iso` inserts a line
- * between the two; `format-week` appends one.
- */
 const history = Effect.gen(function* () {
   const git = yield* writer;
 
@@ -158,10 +145,6 @@ const history = Effect.gen(function* () {
   return { adopted, asked, code, iso, landings, readme, week };
 });
 
-/**
- * The memory store, with each blob `readBlob` is asked for, and each file
- * `readFile` reads whole at a commit, counted in `reads`.
- */
 const countedBy = (reads: Ref.Ref<readonly string[]>) =>
   Layer.effect(
     RepoHost,

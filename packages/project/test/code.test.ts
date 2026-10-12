@@ -1,11 +1,3 @@
-/**
- * A project's code as readers browse it, read from its canonical repo over
- * the memory repo host, with main, the landings and the forks taken from a
- * fixed project record: refs without the platform's internals, folders and
- * their READMEs, revisions that resolve only to main, a commit or a tag,
- * files within their caps, the first-parent log with its landings, a
- * commit's changes, and reads by object id kept once read.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -65,10 +57,7 @@ const path = (text: string) => Option.some(RepoPath.make(text));
 
 const page = { at: main, from: 0, limit: 30, path: Option.none() };
 
-/**
- * A history of hundreds of commits, written and pushed in memory: well
- * under a second alone, many times that beside every other package's tests.
- */
+// Hundreds of commits in memory: under a second alone, much longer beside other packages' tests.
 const long = { timeout: 30_000 };
 
 describe("a project's refs", () => {
@@ -522,8 +511,7 @@ describe("a path's log, read live", () => {
           expect(commits.map(({ sha }) => sha)).toStrictEqual([shas[0]]);
         }).pipe(Effect.provide(overlappingTrees(reading, peak, "file")));
 
-        // 64 commits, the file read whole in each: one at a time a live
-        // store took a minute for 200; `READS_AT_ONCE` commits at once now.
+        // 64 commits, the file read whole in each, `READS_AT_ONCE` at a time.
         expect(yield* Ref.get(peak)).toBeGreaterThanOrEqual(32);
         expect(yield* Ref.get(peak)).toBeLessThanOrEqual(READS_AT_ONCE);
       }),
@@ -615,11 +603,6 @@ describe("a commit", () => {
 /** 150 KiB of text: fourteen of them run past a diff's 2 MiB of text. */
 const sizable = (name: string) => `${name.padEnd(1023, "y")}\n`.repeat(150);
 
-/**
- * One commit modifying twenty files, `f00.txt` to `f19.txt`, each from a
- * line to 150 KiB but `f14.txt`, which stays small: thirteen fit the text
- * budget, `f13.txt` runs past it, and every file after it is a path only.
- */
 const twentyFiles = Effect.gen(function* () {
   const git = yield* writer;
   const name = RepoName.make("twentykit");
@@ -715,7 +698,6 @@ describe("a commit's texts, read live", () => {
   );
 });
 
-/** The memory store, with each blob `readBlob` is asked for counted in `reads`. */
 const blobsCountedBy = (reads: Ref.Ref<number>) =>
   Layer.effect(
     RepoHost,
@@ -732,7 +714,6 @@ const blobsCountedBy = (reads: Ref.Ref<number>) =>
     })
   ).pipe(Layer.provide(RepoHostMemory));
 
-/** What the store keeps under a key, as a diff, if it holds one that decodes. */
 const keptUnder = (key: string) =>
   Effect.map(
     Effect.flatMap(Effect.service(CodeStore), (store) => store.get(key)),
@@ -821,7 +802,6 @@ describe("a commit kept by its id", () => {
   );
 });
 
-/** The memory store, with each tree id `readTree` is asked for counted in `reads`. */
 const countedBy = (reads: Ref.Ref<readonly string[]>) =>
   Layer.effect(
     RepoHost,
@@ -892,10 +872,8 @@ describe("reads by object id", () => {
     "never make a caller wait on a read another caller left unfinished",
     () =>
       Effect.gen(function* () {
-        // A Worker whose client goes away is cancelled where it stands: its
-        // fibers are never interrupted, so a read it began never ends. The
-        // isolate's next request for that key must read for itself (on
-        // dev-oscabriel each such request hung, answering 1101).
+        // A Worker whose client goes away is cancelled without interrupting its
+        // fibers, so a read it began never ends: the next request must read for itself.
         const cache = yield* CodeCache;
 
         yield* Effect.forkDetach(

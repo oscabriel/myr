@@ -1,8 +1,3 @@
-/**
- * The four small reads the code browser and the people page take from a
- * project's record: where main has landed, which commits are landings,
- * which forks exist, and the policy as anyone may read it.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -75,7 +70,6 @@ const askFiles = Array.make(
   }
 );
 
-/** A commit that is no landing: imported history, say. */
 const imported = CommitSha.make("b".repeat(40));
 
 const read = Effect.gen(function* () {
@@ -151,11 +145,8 @@ describe("a project's reads for its code and its people", () => {
     "say where main landed, which commits are landings, the forks and the public policy",
     () =>
       Effect.map(read.pipe(Effect.provide(world)), (got) => {
-        // Before the first landing there is no policy, and nothing to say why.
         expect(got.before).toStrictEqual({ forks: [], head: {}, policy: {} });
         expect(got.after.head).toStrictEqual({ landed: got.landed });
-        // The ask's opening landed on the adoption; the other commit is none.
-        // An opening names the ask it opened, and answers none.
         expect(
           got.after.landings.map(({ ask, opened, parent, sha }) => ({
             ask,
@@ -185,7 +176,6 @@ describe("a project's reads for its code and its people", () => {
           Option.fromUndefinedOr(got.after.policy.policy)
         );
 
-        // It evaluated, so there is nothing to say why not.
         expect({
           deciders: policy.deciders,
           hidden: ["asks", "functions", "visibility"].filter(
@@ -201,14 +191,9 @@ describe("a project's reads for its code and its people", () => {
   );
 });
 
-/** A commit SHA made of one digit, for rows written straight to the store. */
 const shaOf = (digit: string) => LandedSha.make(digit.repeat(40));
 
-/**
- * Rows as an older build wrote them: landings with no `opened`, beside the
- * asks they opened. `p` opens a migrate family (the parent `migrate-p`, its
- * step `migrate-p-1`), `a` lands an answer to `parse-iso`.
- */
+/** Rows as an older build wrote them: landings with no `opened`. */
 const olderRows = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -272,7 +257,6 @@ describe("an opening's landing", () => {
   );
 });
 
-/** A rules evaluator whose every config folder fails to evaluate. */
 const failingRules = Layer.succeed(
   RulesEvaluator,
   RulesEvaluator.of({
@@ -284,7 +268,6 @@ const failingRules = Layer.succeed(
   })
 );
 
-/** The policy after a first push of `files`, with every evaluation failing. */
 const unevaluatedAfter = (files: Files) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-07T12:00:00Z");

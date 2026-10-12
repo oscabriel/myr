@@ -1,10 +1,3 @@
-/**
- * Who moved the paths a merge conflicts in, over the memory repo host: for
- * each path, the newest commit on main since the answer's base that changed
- * it, named by its landing in the project's record. A change at or before
- * the base is never named, nor a commit the record holds no landing for,
- * and a repo the walk cannot read names nobody.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import type { LandingView } from "@repo/protocol/domain/landing";
@@ -42,10 +35,8 @@ const alice = Handle.make("alice");
 
 const dora = Handle.make("dora");
 
-/** A version of each of the five files, in order. */
 type Versions = readonly [number, number, number, number, number];
 
-/** The five files, each holding the version `versions` gives it. */
 const files = (versions: Versions): Tree =>
   [a, b, c, d, e].map((path, at) => [
     path,
@@ -66,15 +57,9 @@ const landingOf = (
   sha: LandedSha.make(sha),
 });
 
-/**
- * Main's history: `c` changes at the base itself; since then a landing
- * that answered an ask changes `a` twice, a decider's own landing `d`, an
- * opening `e`, and a commit the record holds no landing for changes `b`.
- */
 const history = Effect.gen(function* () {
   const { commit, push } = yield* writer;
 
-  // Each commit on the one before, `at` seconds after the first.
   const on = (
     parent: CommitSha,
     message: string,

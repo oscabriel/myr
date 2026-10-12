@@ -43,11 +43,6 @@ import {
 } from "../src/landing.ts";
 import type { PendingDecision, Step } from "../src/landing.ts";
 
-// The model drives one answer request through generated histories of what
-// the service could tell it: port answers, decisions, the queue's go, and
-// commands delivered again, right away or long after. It keeps its own record
-// of what happened, and after every step checks the lifecycle against it.
-
 const hex = (n: number) => n.toString(16).padStart(40, "0");
 
 const opened = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
@@ -116,15 +111,8 @@ const fresh = [
   "Blocked",
 ] as const;
 
-/** The longest history the model runs. */
 const longest = 60;
 
-/**
- * One move of a history. Half drive the request the way a service would (the
- * answer its state waits for); the rest say any command, repeat the last one,
- * or replay an earlier one. `pick` chooses among variants, and `back` which
- * earlier command a replay delivers again, from anywhere in the history.
- */
 const Move = Schema.Struct({
   back: Schema.Int.check(
     Schema.isBetween({ maximum: longest - 1, minimum: 0 })
@@ -201,7 +189,6 @@ const mainOf = ({ state, step }: Context) =>
     onSome: ({ main }) => main,
   });
 
-// `pick` 7 makes a report about something the request is not at.
 const reportedMain = (context: Context) =>
   context.pick === 7 ? strangerAt(context.step) : mainOf(context);
 
@@ -211,8 +198,6 @@ const attemptOf = ({ pick, state }: Context) =>
     onSome: ({ attempt }) => attempt,
   }) + (pick === 7 ? 1 : 0);
 
-// What the checks report, by `pick`: clean under each finish rule, refused,
-// waiting on decisions, or about a tree the request is not at.
 const checked = ({ pick, state, step }: Context) => {
   const tree = Option.getOrElse(checkingTree(state), () => treeAt(step));
   const clean = { decisions: [], finish: "never" as const, refusals: [], tree };
@@ -287,8 +272,6 @@ const commands = {
   (context: Context) => LandingCommand
 >;
 
-// While landing, main moves under it for `pick` 0 to 2, the repo is busy
-// for 7, and otherwise the landing is on main.
 const landingReport = (context: Context) => {
   if (context.pick < 3) {
     return commands.MainMoved({ ...context, pick: 0 });
@@ -299,7 +282,6 @@ const landingReport = (context: Context) => {
     : commands.LandedOk(context);
 };
 
-/** The answer a service would give the state next. */
 const drive = (context: Context): LandingCommand => {
   const { pick } = context;
 
@@ -319,36 +301,23 @@ const drive = (context: Context): LandingCommand => {
   });
 };
 
-/** What the model remembers of a history so far. */
 interface Model {
-  /** Commands that changed the state or asked for an effect. */
   readonly applied: readonly LandingCommand[];
-  /** The tree the checks passed since the latest merge. */
   readonly cleared: Option.Option<TreeSha>;
-  /** Who the landing must credit: the request's credits, then each finish and accepted decision. */
   readonly credits: readonly Credit[];
   readonly delivered: readonly LandingCommand[];
-  /** A finish was given. */
   readonly finished: boolean;
-  /** The latest checks asked for a finish. */
   readonly finishOwed: boolean;
-  /** The main the latest `Land` effect lands on. */
   readonly landingOn: Option.Option<LandedSha>;
-  /** What the latest merge made. */
   readonly merged: Option.Option<{
     readonly main: LandedSha;
     readonly tree: TreeSha;
   }>;
-  /** The main the latest `Merge` effect merges onto. */
   readonly merging: Option.Option<LandedSha>;
-  /** Main moved during landing, and no `Merge` followed yet. */
   readonly moved: boolean;
-  /** How often main moved under a landing. */
   readonly remerges: number;
-  /** How many retries the ports asked for. */
   readonly retries: number;
   readonly state: LandingState;
-  /** The decisions the latest checks asked for, less those accepted since. */
   readonly waiting: readonly DecisionId[];
 }
 
@@ -406,11 +375,6 @@ const credited = (
     ? credits
     : [...credits, { handle, role }];
 
-/**
- * Whether the request's state waits for this command, as the model sees it:
- * the main it merges onto or lands on, the tree it checks, the attempt it is
- * at, a decision it waits on. Exactly these commands may take effect.
- */
 const awaited = (model: Model, command: LandingCommand) => {
   const is = (tags: readonly LandingState["_tag"][]) =>
     LandingState.isAnyOf(tags)(model.state);
@@ -439,7 +403,6 @@ const awaited = (model: Model, command: LandingCommand) => {
   });
 };
 
-/** Whether an awaited command must refuse the answer. */
 const refuses = LandingCommand.$match({
   Blocked: () => false,
   Busy: () => false,
@@ -454,7 +417,6 @@ const refuses = LandingCommand.$match({
   Wait: () => false,
 });
 
-/** The model after a step: what it learned from the command and the effects. */
 const advance = (model: Model, command: LandingCommand, step: Step): Model => {
   const merge = Array.findLast(step.effects, LandingEffect.$is("Merge"));
   const land = Array.findLast(step.effects, LandingEffect.$is("Land"));
@@ -517,7 +479,6 @@ const advance = (model: Model, command: LandingCommand, step: Step): Model => {
   };
 };
 
-/** Every invariant one step must keep; the first one broken, if any. */
 const broken = (
   model: Model,
   command: LandingCommand,
@@ -629,13 +590,11 @@ const broken = (
 
 const describeCommand = (command: LandingCommand) => JSON.stringify(command);
 
-/** A history's end, and every state it passed through. */
 interface Run {
   readonly model: Model;
   readonly visited: ReadonlySet<LandingState["_tag"]>;
 }
 
-/** Runs a history; fails with the first broken invariant and where it broke. */
 const run = (moves: readonly Move[]): Result.Result<Run, string> => {
   const visited = new Set<LandingState["_tag"]>(["Queued"]);
   let model = begin;
@@ -668,12 +627,8 @@ const holds = (moves: readonly Move[]) =>
     onSuccess: () => Effect.succeed(true),
   });
 
-/**
- * Generated histories are CPU work alone: under a second on an idle machine,
- * several seconds while turbo runs every package's tests at once (the CLI's
- * build test compiles binaries beside them). This limit is there to catch a
- * hang, not a busy machine.
- */
+// Catches a hang, not a busy machine: under turbo's full test run this takes
+// several seconds.
 const generated = { timeout: 30_000 };
 
 describe("the landing lifecycle over generated histories", generated, () => {
@@ -689,9 +644,7 @@ describe("the landing lifecycle over generated histories", generated, () => {
     })
   );
 
-  // A model test whose histories never land proves nothing: they must reach
-  // every state, land after main moved under a landing, and run out of
-  // re-merges.
+  // A model test whose histories never land proves nothing.
   it.effect("reaches every state, re-merges and runs out of re-merges", () =>
     Effect.gen(function* () {
       const sample = yield* Arbitrary.sampleEffect(histories, {
@@ -739,7 +692,6 @@ const requestIds = [
   RequestId.make("push-0003"),
 ] as const;
 
-/** The queue as the model keeps it: who is landing, and who waits, in order. */
 interface Line {
   readonly landing: Option.Option<RequestId>;
   readonly waiting: readonly RequestId[];

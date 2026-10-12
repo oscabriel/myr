@@ -57,10 +57,6 @@ import { CheckScript, composedAt, mergedAt, Pusher, worldOf } from "./world.ts";
 
 const people = ["bob", "carol", "dave", "erin", "eve", "frank"];
 
-/**
- * datekit, whose deciders are alice alone (`**`). Everyone but dave is
- * vouched for. `format-date` is a `polish` ask, whose kind needs a finish.
- */
 const scenario = aProject({ people }).pipe(
   withVouches(["bob", "carol", "erin", "eve", "frank"]),
   withKind({
@@ -90,7 +86,6 @@ const person = (name: string) =>
 
 const alice = person("alice");
 
-/** alice, as a sign-in provider that capitalizes handles names her. */
 const aliceSignedIn = Person.make({ handle: Handle.make("Alice") });
 
 const bob = person("bob");
@@ -122,7 +117,6 @@ const noon = instant("2026-10-07T12:00:00Z");
 const daysAfter = (from: DateTime.Utc, count: number) =>
   DateTime.add(from, { days: count });
 
-/** The project as alice first pushes it. */
 const start: Files = [
   [
     "package.json",
@@ -137,7 +131,6 @@ const start: Files = [
   ["packages/trim/src/trim.ts", "export const trim = (s) => s;\n"],
 ];
 
-/** An ask's own files: its file in the config folder, and its check. */
 const askFiles = (id: string) => {
   const { check, file, territory } = askOf(id);
 
@@ -162,7 +155,6 @@ const askFiles = (id: string) => {
   );
 };
 
-/** Where a canonical `main` stands now. */
 const tipOf = (name: RepoName) =>
   Effect.gen(function* () {
     const refs = yield* (yield* RepoHost).refs(name).pipe(Effect.orDie);
@@ -172,10 +164,8 @@ const tipOf = (name: RepoName) =>
     );
   });
 
-/** Where datekit's `main` stands now. */
 const mainTip = tipOf(repo);
 
-/** A commit's author, committer, parents and trailers. */
 const commitOf = (sha: CommitSha) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -187,10 +177,8 @@ const commitOf = (sha: CommitSha) =>
 
 const scheduled = ScheduledAlarm.use(({ at }) => at);
 
-/** The project's rows as its store keeps them. */
 const stored = ProjectStore.use((store) => store.load());
 
-/** alice makes a project's first landing: `files`, pushed to its empty repo. */
 const made = (api: ProjectApi, on: RepoName, files: Files = start) =>
   Effect.gen(function* () {
     yield* api.initProject(alice, {});
@@ -204,14 +192,12 @@ const made = (api: ProjectApi, on: RepoName, files: Files = start) =>
     return api;
   });
 
-/** alice makes datekit and pushes its first commit. */
 const begun = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
   return yield* made(yield* projectService(project), repo);
 });
 
-/** The check of an ask with these files, scripted to fail twice on main as it now stands. */
 const redOnMain = (
   files: Array.NonEmptyReadonlyArray<{
     readonly content: string;
@@ -227,7 +213,6 @@ const redOnMain = (
     );
   });
 
-/** alice opens `id`, its check scripted red twice on main. */
 const openRed = (api: ProjectApi, id: string, on: RepoName = repo) =>
   Effect.gen(function* () {
     const files = askFiles(id);
@@ -239,13 +224,11 @@ const openRed = (api: ProjectApi, id: string, on: RepoName = repo) =>
 
 const lanes = [redThenGreen, LaneName.make("lint"), LaneName.make("types")];
 
-/** `files` with `path` holding `content`, added or replaced. */
 const changed = (files: Files, path: string, content: string): Files => [
   ...files.filter(([each]) => each !== path),
   [path, content],
 ];
 
-/** The files main holds after `ids`' asks opened on it. */
 const withAskFiles = (files: Files, ...ids: readonly string[]): Files => [
   ...files,
   ...ids.flatMap((id) =>
@@ -253,10 +236,6 @@ const withAskFiles = (files: Files, ...ids: readonly string[]): Files => [
   ),
 ];
 
-/**
- * `who` claims `id` and answers it with `change` on main as it stands, every
- * lane scripted to pass on the merge: what reaches the answer's checks.
- */
 const answered = (
   api: ProjectApi,
   input: {
@@ -311,7 +290,6 @@ const answered = (
 
 const firstDecision = DecisionId.make("dec-000001");
 
-/** carol proposes `trim-input` with its files; alice accepts it. */
 const proposing = (api: ProjectApi) =>
   Effect.gen(function* () {
     const files = askFiles("trim-input");
@@ -362,7 +340,6 @@ const proposing = (api: ProjectApi) =>
     };
   });
 
-/** carol's proposal, left alone for its fourteen days. */
 const expiring = (api: ProjectApi) =>
   Effect.gen(function* () {
     yield* api.proposeAsk(carol, { want: "Trim tabs too" });
@@ -384,10 +361,6 @@ const expiring = (api: ProjectApi) =>
     };
   });
 
-/**
- * carol proposes `trim-input`, and alice accepts it while the Checker cannot
- * run its check; then again, once it can.
- */
 const acceptingBlocked = (api: ProjectApi) =>
   Effect.gen(function* () {
     const files = askFiles("trim-input");
@@ -425,7 +398,6 @@ const acceptingBlocked = (api: ProjectApi) =>
     };
   });
 
-/** datekit, where alice decides the packages and frank the config folder only. */
 const splitDeciders = {
   policy: {
     ...scenario.policy,
@@ -439,7 +411,6 @@ const splitDeciders = {
   },
 };
 
-/** carol proposes `trim-input` in the packages; who is asked to decide it. */
 const askedToDecide = Effect.gen(function* () {
   const api = yield* begun;
 
@@ -610,7 +581,6 @@ describe("a proposal", () => {
   );
 });
 
-/** bob's answer to the `polish` ask `format-date`, finished by alice. */
 const finishing = (api: ProjectApi) =>
   Effect.gen(function* () {
     yield* openRed(api, "format-date");
@@ -662,10 +632,6 @@ const finishing = (api: ProjectApi) =>
     };
   });
 
-/**
- * bob's answer to `format-date`, which alice finishes with a commit of her
- * own on top; first with one that touches its check, which she may not.
- */
 const finishingOnTop = (api: ProjectApi) =>
   Effect.gen(function* () {
     yield* openRed(api, "format-date");
@@ -841,7 +807,6 @@ describe("a finish", () => {
   );
 });
 
-/** alice makes her working fork, and lands a change of her own from it. */
 const landingOwn = (api: ProjectApi) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -1016,11 +981,6 @@ describe("a decider's own change", () => {
   );
 });
 
-/**
- * The world, with a rules evaluator that also reads the vouch file at the
- * commit it evaluates, as the real one does (`finishPolicy`): its
- * lines join the scenario's.
- */
 const vouchingWorld = Layer.effect(
   RulesEvaluator,
   Effect.gen(function* () {
@@ -1042,7 +1002,6 @@ const vouchingWorld = Layer.effect(
   })
 ).pipe(Layer.provideMerge(worldOf(scenario, "memory")));
 
-/** The vouch file on main. */
 const vouchFileNow = Effect.gen(function* () {
   const host = yield* RepoHost;
   const at = yield* mainTip;
@@ -1058,7 +1017,6 @@ const vouchFileNow = Effect.gen(function* () {
   return Option.map(bytes, (read) => new TextDecoder().decode(read));
 });
 
-/** alice vouches for dave, who could not claim before, and denounces erin. */
 const vouching = (api: ProjectApi) =>
   Effect.gen(function* () {
     yield* openRed(api, "lex-tokens");
@@ -1150,7 +1108,6 @@ describe("a vouch", () => {
   );
 });
 
-/** Six proposals an hour apart, from three people, and alice taking the first. */
 const filling = (api: ProjectApi) =>
   Effect.gen(function* () {
     const proposers = [carol, eve, frank, carol, eve, frank];
@@ -1254,7 +1211,6 @@ describe("Today", () => {
 
 const burrow = ProjectName.make("alice/burrow");
 
-/** One landing's credit in the parser module. */
 const row = (name: ProjectName, role: "Asked-by" | "Signed-off-by") => ({
   area: "parser",
   count: 1,
@@ -1262,7 +1218,6 @@ const row = (name: ProjectName, role: "Asked-by" | "Signed-off-by") => ({
   role,
 });
 
-/** bob answers `parse-iso` in datekit, and carol in burrow, both made through `Projects`. */
 const crediting = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -1302,8 +1257,7 @@ const crediting = Effect.gen(function* () {
   };
 });
 
-// Assisted-by never reaches a credit row (the `creditsByArea` test, and
-// `CreditSummary`'s role type); no answer here carries an agent trailer.
+// Assisted-by never reaches a credit row; no answer here carries an agent trailer.
 describe("credits", () => {
   it.effect("count a person's roles by project and area across projects", () =>
     Effect.map(
@@ -1325,7 +1279,6 @@ describe("credits", () => {
   );
 });
 
-/** A commit pushed straight onto canonical main, past the platform. */
 const strayOnto = (first: CommitSha) =>
   Pusher.use((pusher) =>
     pusher.push(
@@ -1340,7 +1293,6 @@ const strayOnto = (first: CommitSha) =>
     )
   );
 
-/** canonical main's move as OnPush reports it to the project: from nobody the platform knows. */
 const reported = (
   api: ProjectApi,
   eventId: string,
@@ -1355,11 +1307,6 @@ const reported = (
     repo,
   });
 
-/**
- * Canonical main's moves as OnPush reports them: the initializer's first
- * push, an ask's landing, then a push the platform did not make, twice
- * under one event id.
- */
 const strayReported = Effect.gen(function* () {
   const api = yield* begun;
   const first = yield* mainTip;
@@ -1394,10 +1341,6 @@ const strayReported = Effect.gen(function* () {
   };
 });
 
-/**
- * A push to canonical main the platform did not make, reported by OnPush,
- * which opens the decision, then decided by alice.
- */
 const strayDecided = (choice: "accept" | "decline") =>
   Effect.gen(function* () {
     const api = yield* begun;
@@ -1433,7 +1376,6 @@ const strayDecided = (choice: "accept" | "decline") =>
     };
   });
 
-/** canonical main deleted past the platform, as OnPush reports it, then decided by alice. */
 const deletedDecided = (choice: "accept" | "decline") =>
   Effect.gen(function* () {
     const api = yield* begun;

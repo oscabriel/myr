@@ -1,15 +1,3 @@
-/**
- * One project's whole world over memory adapters, for the service's scenario
- * test (and the shape the platform's core-loop test copies): `RepoHostMemory`,
- * the isomorphic-git `Lander` over it, a scripted `CheckRunnerMemory`, a
- * `RulesEvaluator` that returns the scenario's policy, `AlarmsMemory`,
- * `AnswerRunsInline`, `ProjectionMemory`, and the project store in memory or on
- * SQLite (sqlite-node).
- *
- * The test drives only the service's methods; this file holds what stands
- * in for the outside world: pushes into forks as git would make them, and
- * the scripts the Checker follows.
- */
 import { SqliteClient } from "@effect/sql-sqlite-node";
 import { ForkInProgress, RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -47,16 +35,10 @@ import { ProjectionMemory } from "../src/projection/memory.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** Where the project's store keeps its rows. */
 export type StoreKind = "memory" | "sqlite";
 
-/** What a world reads from a scenario: the policy its rules evaluator returns. */
 export type WorldScenario = Pick<Scenario, "policy">;
 
-/**
- * What the Checker answers, by `(tree or commit, lane)`: the test adds to
- * it as it learns the trees an answer will be checked on.
- */
 export class CheckScript extends Context.Service<
   CheckScript,
   {
@@ -65,25 +47,18 @@ export class CheckScript extends Context.Service<
       lane: LaneName,
       results: readonly LaneOutcome[]
     ) => Effect.Effect<void>;
-    /** Every job the Checker was given, in order. */
     readonly jobs: Effect.Effect<readonly CheckJob[]>;
   }
 >()("test/CheckScript") {}
 
-/** Every landed commit the rules evaluator was asked about, in order. */
 export class Evaluated extends Context.Service<
   Evaluated,
   { readonly shas: Effect.Effect<readonly LandedSha[]> }
 >()("test/Evaluated") {}
 
-/** Commits made the way an answerer's git would make them, pushed to a repo's `main`. */
 export class Pusher extends Context.Service<
   Pusher,
   {
-    /**
-     * A commit of the whole tree `files` on `parent` (or a first commit),
-     * pushed to `repo`'s main with a compare-and-swap from `parent`.
-     */
     readonly push: (
       repo: RepoName,
       parent: Option.Option<CommitSha>,
@@ -93,7 +68,6 @@ export class Pusher extends Context.Service<
   }
 >()("test/Pusher") {}
 
-/** The store's layer of one kind, fresh each time it is built. */
 const storeOf = (kind: StoreKind): Layer.Layer<ProjectStore> =>
   kind === "memory"
     ? ProjectStoreMemory
@@ -103,11 +77,6 @@ const storeOf = (kind: StoreKind): Layer.Layer<ProjectStore> =>
         )
       );
 
-/**
- * A `RulesEvaluator` that evaluates nothing: at any commit it returns the
- * scenario's policy at that commit, holding the scenario's asks whose files
- * the commit's config folder has, and the judge closure `checks` derives.
- */
 const rulesOf = (scenario: WorldScenario) =>
   Layer.effectContext(
     Effect.gen(function* () {
@@ -202,16 +171,10 @@ const pusher = Layer.effect(
   })
 );
 
-/** What fails in a world before it works. */
 export interface Faults {
-  /** The first fork and the first projection fail; every later one works. */
   readonly failOnce?: boolean;
 }
 
-/**
- * `RepoHostMemory`, where a public remote `https://example.com/<name>.git`
- * is the store's own repo `<name>`, so a test can import one.
- */
 const hostOf = (base: Layer.Layer<RepoHost>) =>
   Layer.effect(
     RepoHost,
@@ -229,7 +192,6 @@ const hostOf = (base: Layer.Layer<RepoHost>) =>
     })
   ).pipe(Layer.provide(base));
 
-/** `RepoHostMemory`, whose first fork is still in progress. */
 const flakyHost = Layer.effect(
   RepoHost,
   Effect.gen(function* () {
@@ -248,7 +210,6 @@ const flakyHost = Layer.effect(
   })
 ).pipe(Layer.provide(RepoHostMemory));
 
-/** `ProjectionMemory`, whose first apply is refused. */
 const flakyProjection = Layer.effectContext(
   Effect.gen(function* () {
     const kept = yield* Layer.build(ProjectionMemory);
@@ -270,17 +231,11 @@ const flakyProjection = Layer.effectContext(
   })
 );
 
-/** Every service the scenario test reads besides the project's ports. */
 const fixtures = (scenario: WorldScenario) =>
   Layer.mergeAll(scriptOf, rulesOf(scenario), pusher).pipe(
     Layer.provideMerge(FinishersFromChecks)
   );
 
-/**
- * The scenario's world: every port the project service needs, and what the
- * test reads back (the store, the alarm, the projection, the repos), built
- * fresh for each test.
- */
 export const worldOf = (
   scenario: WorldScenario,
   store: StoreKind,
@@ -299,7 +254,6 @@ export const worldOf = (
     )
   );
 
-/** The commit an ask's files compose onto main as, where its check runs red first. */
 export const composedAt = (
   repo: RepoName,
   main: LandedSha,
@@ -313,7 +267,6 @@ export const composedAt = (
     ({ commit }) => CheckAt.cases.Commit.make({ commit })
   ).pipe(Effect.orDie);
 
-/** The tree an answer merges onto main as, where its checks run. */
 export const mergedAt = (input: {
   readonly repo: RepoName;
   readonly main: LandedSha;
@@ -326,7 +279,6 @@ export const mergedAt = (input: {
     ({ tree }): CheckAt => CheckAt.cases.Tree.make({ tree })
   ).pipe(Effect.orDie);
 
-/** The tree an answer merges onto main as, or none when the merge conflicts. */
 export const cleanMergeAt = (input: {
   readonly repo: RepoName;
   readonly main: LandedSha;
