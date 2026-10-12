@@ -49,7 +49,7 @@ export const gitHere = (platformUrl: string) => [
         "A claim's fork",
         code("<owner>/<name>--<ask>--<handle>"),
         "Signed-in people",
-        "Its claimant while the claim is live, and a decider who finishes the answer",
+        "Its claimant while the claim is live, and a maintainer who finishes the answer",
       ],
       [
         "A working fork",
@@ -94,14 +94,14 @@ const eventLines = {
   AskClosed: "An ask closed, with the landing that answered it.",
   AskOpened: "A new ask opened.",
   Claimed: "Someone claimed an ask.",
-  Decided: "A decider took a decision.",
+  Decided: "A maintainer took a decision.",
   Judged: "An answer was checked, with the outcome its verdict holds.",
   Landed:
     "A landing reached `main`, a project's adoption (its first push or its import) among them.",
   Lapsed: "A claim lapsed: no push for too long.",
   LedgerAppended: "The project's public ledger gained an entry.",
   ProposalDrafted:
-    "A proposal's draft settled: ready for a decider, or failed.",
+    "A proposal's draft settled: ready for a maintainer, or failed.",
   ProposalOpened: "A proposal opened.",
   Pushed: "A claimant pushed to their fork.",
   Released: "A claim was released.",

@@ -307,7 +307,7 @@ const keptFresh = (): Kept => ({
 
 describe("a write-only value over the platform", () => {
   it.effect(
-    "is set by a decider over /rpc, refused to anyone else, sealed in the DO, and shown to anyone as who and when",
+    "is set by a maintainer over /rpc, refused to anyone else, sealed in the DO, and shown to anyone as who and when",
     () =>
       Effect.gen(function* () {
         const { refused, set, shown, stored } =

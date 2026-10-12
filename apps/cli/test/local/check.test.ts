@@ -710,7 +710,7 @@ describe(`${Brand.cli} check`, () => {
   );
 
   it.live(
-    "lets a raise a reasoned escape explains wait on a decider, as the platform does, and says so",
+    "lets a raise a reasoned escape explains wait on a maintainer, as the platform does, and says so",
     () =>
       Effect.gen(function* () {
         const repo = yield* aCheckRepo;
@@ -751,7 +751,7 @@ describe(`${Brand.cli} check`, () => {
           ok: true,
         });
         expect(printed.err.join("\n")).toContain(
-          `The ratchet ${ratchet} in a: 2 on the base, 3 here: a reasoned escape you add there asks a decider to raise it`
+          `The ratchet ${ratchet} in a: 2 on the base, 3 here: a reasoned escape you add there asks a maintainer to raise it`
         );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );

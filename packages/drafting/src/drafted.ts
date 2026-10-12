@@ -41,7 +41,7 @@ export const DraftedAsk = Schema.Struct({
   id: AskId,
   kind: Schema.Literal("fix"),
   outOfScope: Schema.optionalKey(Schema.Array(Text)),
-  /** Shown to the decider as evidence; never landed. */
+  /** Shown to the maintainer as evidence; never landed. */
   rationale: Schema.String.check(Schema.isMaxLength(4000)),
   territory: Schema.NonEmptyArray(TreePath),
   test: Schema.Struct({

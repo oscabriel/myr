@@ -115,7 +115,7 @@ npx skills add https://web-test.example.workers.dev
 | Claims one person holds at once, in a project | 3 by default |
 | Open proposals one person holds, in a project | 2 by default; 0 turns proposals off |
 | A claim without a push | Warned after 2 hours, lapses after 1 day, by default |
-| Decisions a decider takes a day | 5 by default |
+| Decisions a maintainer takes a day | 5 by default |
 | A decision nobody takes | 2 weeks by default, then it takes its default |
 | Claims, proposals and drafts across the platform, per person | A set number a minute; past it, CapReached says when to try again |
 

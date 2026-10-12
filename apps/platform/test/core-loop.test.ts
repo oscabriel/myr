@@ -466,7 +466,7 @@ describe("the core loop, through the platform's fetch handler with real git", ()
   );
 
   it.live(
-    "a want proposed with a draft runs in process, goes to the decider with its red-first evidence, and opens on accept with Assisted-by beside the people's credits",
+    "a want proposed with a draft runs in process, goes to the maintainer with its red-first evidence, and opens on accept with Assisted-by beside the people's credits",
     () =>
       Effect.gen(function* () {
         const drafted: DraftedAsk = {

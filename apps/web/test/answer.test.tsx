@@ -179,7 +179,7 @@ describe("the answer page", () => {
     ]);
   });
 
-  it("reads the decider and held-back stages as not needed for a landing that needed neither", () => {
+  it("reads the maintainer and held-back stages as not needed for a landing that needed neither", () => {
     const markup = markupOf(
       page({ landing: plainLanding, verdict: landedAt("human", false) })
     );
@@ -193,7 +193,7 @@ describe("the answer page", () => {
     ).toContain("not needed");
   });
 
-  it("reads them passed for a landing a decider finished and held-back checks judged", () => {
+  it("reads them passed for a landing a maintainer finished and held-back checks judged", () => {
     const markup = markupOf(
       page({ landing: decidedLanding, verdict: landedAt("human", true) })
     );

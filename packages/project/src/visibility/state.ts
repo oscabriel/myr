@@ -179,7 +179,7 @@ const rowFor = (
     () => ({ name: layer, repo: repoFor(project, layer) })
   );
 
-/** Excludes those who landed it, so a second decider countersigns; when nobody else decides, the deciders as they are. */
+/** Excludes those who landed it, so a second maintainer countersigns; when nobody else decides, the maintainers as they are. */
 const narrowingDecision = (input: {
   readonly after: Policy;
   readonly from: Posture;

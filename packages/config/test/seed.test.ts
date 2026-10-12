@@ -275,7 +275,7 @@ describe(runSeed, () => {
 
 describe("runSeed, when a person has no session", () => {
   it.live(
-    "stops before its first step, naming the decider the platform has no session for",
+    "stops before its first step, naming the maintainer the platform has no session for",
     () =>
       Effect.gen(function* () {
         const plan = yield* planSeed("examples/burrow");

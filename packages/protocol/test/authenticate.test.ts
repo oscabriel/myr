@@ -74,7 +74,7 @@ describe("the server side of Authenticated", () => {
     })
   );
 
-  it.effect("refuses a decider's contract without a credential", () =>
+  it.effect("refuses a maintainer's contract without a credential", () =>
     Effect.gen(function* () {
       const { client } = yield* served;
 

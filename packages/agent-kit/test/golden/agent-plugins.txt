@@ -65,7 +65,7 @@ Instead of landing an answer, the platform answers with refusals. Git prints the
 | `Denounced` | no | 77 | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
 | `OutOfScope` | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
 | `TouchedJudge` | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
-| `Weakened` | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet. |
+| `Weakened` | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a maintainer to weigh, but one a maintainer declined stays out; never raise a ratchet. |
 | `PrivatePathInPublicTree` | no | 65 | `__CLI__ check` | Take the held-back paths it names out of your answer. |
 | `ReachedInternals` | no | 65 | `__CLI__ check` | Import the other module only through its public files. |
 | `StaleBase` | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve. |

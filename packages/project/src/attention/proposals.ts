@@ -221,7 +221,7 @@ const settledLines = (result: DraftResult): readonly Evidence[] =>
     ],
   });
 
-// A failed round keeps the last ready round's files, so a decider can still
+// A failed round keeps the last ready round's files, so a maintainer can still
 // accept that draft.
 const settledProposal = (
   proposal: Proposal,

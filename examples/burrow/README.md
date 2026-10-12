@@ -34,7 +34,7 @@ bun run debt         # escape directives, against debt.baseline.json
 
 ## Contributing
 
-Work is offered as asks, each with a check that says when it is done. The project's process lives in `.myr/`: `project.ts` (deciders, ask kinds, the module-state ratchet), `vouched.td` (who may claim), and the open asks in `asks/`. `okafor` and `lin-h` decide for every path.
+Work is offered as asks, each with a check that says when it is done. The project's process lives in `.myr/`: `project.ts` (maintainers, ask kinds, the module-state ratchet), `vouched.td` (who may claim), and the open asks in `asks/`. `okafor` and `lin-h` decide for every path.
 
 ## License
 

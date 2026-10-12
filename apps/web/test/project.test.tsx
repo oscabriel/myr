@@ -381,7 +381,7 @@ describe(ProjectView, () => {
           )?.[0] ?? "";
 
         expect(textIn(rule)).toBe(
-          "Gate: 7 stages · deciders set for 1 path · 7 sealed checks in 1 area · last landed 1 d ago"
+          "Gate: 7 stages · maintainers set for 1 path · 7 sealed checks in 1 area · last landed 1 d ago"
         );
         expect(rule).toContain('href="/oscabriel/datekit/ledger"');
         expect(inspectorOf(markup)).not.toContain("data-posture=");
@@ -409,7 +409,7 @@ describe(ProjectView, () => {
         expect(
           missingFrom(text, [
             "How a change lands here",
-            "Parse · Shape · Merge · Cheap · Checks · Held-back · Decider",
+            "Parse · Shape · Merge · Cheap · Checks · Held-back · Maintainer",
             "export: 7 sealed checks",
           ])
         ).toStrictEqual([]);

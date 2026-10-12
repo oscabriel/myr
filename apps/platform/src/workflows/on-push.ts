@@ -56,7 +56,7 @@ class LooksStray extends Data.TaggedError("LooksStray") {}
 
 // The platform pushes `main` before its DO records the landing, and the event can
 // arrive in between: a stray verdict on the platform's own landing would ask the
-// deciders to revert it.
+// maintainers to revert it.
 const strayGrace: StepRetry = {
   backoff: "exponential",
   delayMs: 15_000,

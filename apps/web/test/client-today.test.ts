@@ -26,7 +26,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
     })
   );
 
-  it.live("shows the decider their Today, with the seed's decisions", () =>
+  it.live("shows the maintainer their Today, with the seed's decisions", () =>
     Effect.gen(function* () {
       const today = yield* settled(registryAs(DECIDER), todayAtom);
 
@@ -59,7 +59,7 @@ describe("Today, through the web's atoms", seededWorld, () => {
   // The page's atoms live in a registry of the page's own (`SeededAtoms`),
   // the rail's in the root's: a decision taken on the page refetches both.
   it.live(
-    "closes a decision the decider declines, and Today refetches without it, on the page and in the rail",
+    "closes a decision the maintainer declines, and Today refetches without it, on the page and in the rail",
     () =>
       Effect.gen(function* () {
         const registry = registryAs(DECIDER);

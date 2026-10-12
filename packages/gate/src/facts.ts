@@ -71,12 +71,12 @@ export interface PushFacts {
   /**
    * The lines a push removes, by their 1-based number in the old file, so a
    * removed escape offsets an added one. Absent, a push removes none, which
-   * only errs toward asking a decider.
+   * only errs toward asking a maintainer.
    */
   readonly removedLines?: ReadonlyMap<RepoPath, readonly AddedLine[]>;
   /**
    * Each territory's count of reasoned escapes on main, by its escape
-   * ratchet, when the caller keeps it apart from the baseline: a decider's
+   * ratchet, when the caller keeps it apart from the baseline: a maintainer's
    * accepted `Waiver` raises the baseline before the answer lands, so the
    * answer, checked again, is within it. Absent, the baseline stands for it.
    */

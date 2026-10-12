@@ -95,7 +95,7 @@ describe(OutcomeView, () => {
     ],
     [
       Outcome.cases.AwaitingFinish.make({ decider: handle("okonkwo") }),
-      "waiting for a decider's finish",
+      "waiting for a maintainer's finish",
       "okonkwo",
     ],
     [
@@ -223,7 +223,7 @@ describe(StageStrip, () => {
 });
 
 describe("each stage's state", () => {
-  it("marks the decider and held-back stages of a landing that needed neither as not needed", () => {
+  it("marks the maintainer and held-back stages of a landing that needed neither as not needed", () => {
     expect(
       stageStates("human", landed, { decided: false, heldBack: false })
     ).toStrictEqual([

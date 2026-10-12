@@ -118,13 +118,13 @@ export const changeSection = (policy: Policy) => {
       ? []
       : [
           "",
-          `Never add a marker that turns a check off: ${weakening.markers.map(code).join(", ")}. One without a reason is refused with \`Weakened\`; one with a reason waits for a decider.`,
+          `Never add a marker that turns a check off: ${weakening.markers.map(code).join(", ")}. One without a reason is refused with \`Weakened\`; one with a reason waits for a maintainer.`,
         ]),
     ...(ratchets.length === 0
       ? []
       : [
           "",
-          "Ratchets only go down: an answer that raises one is refused with `Weakened`, and only a decider raises one.",
+          "Ratchets only go down: an answer that raises one is refused with `Weakened`, and only a maintainer raises one.",
           "",
           ...ratchetLines(ratchets),
         ]),
@@ -185,9 +185,9 @@ const claimerText = (rule: ClaimRule, vouchFile: string) => {
 const finishText = {
   never: "none: a passing answer lands as it is.",
   optional:
-    "a decider may add commits of their own to a passing answer before it lands, credited `Finished-by`.",
+    "a maintainer may add commits of their own to a passing answer before it lands, credited `Finished-by`.",
   required:
-    "a passing answer waits for a decider's commits on top before it lands, credited `Finished-by`.",
+    "a passing answer waits for a maintainer's commits on top before it lands, credited `Finished-by`.",
 } as const satisfies Record<AskKind["finish"], string>;
 
 const kindLines = (kind: AskKind, policy: Policy) => [
@@ -212,7 +212,7 @@ export const kindsSection = (policy: Policy) =>
     : [
         "## Ask kinds",
         "",
-        `Each ask is of one kind, which says how its check judges an answer, who may claim it and whether a decider finishes it; ${cli("ask", "<ask>")} names it.`,
+        `Each ask is of one kind, which says how its check judges an answer, who may claim it and whether a maintainer finishes it; ${cli("ask", "<ask>")} names it.`,
         "",
         ...Arr.sort(
           policy.kinds,

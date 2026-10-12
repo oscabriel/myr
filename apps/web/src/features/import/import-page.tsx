@@ -12,7 +12,7 @@ export const ImportFacts = () => (
           The platform clones the repo once, over HTTPS. Later pushes to the
           source do not follow it.
         </li>
-        <li>You become the project&apos;s decider.</li>
+        <li>You become the project&apos;s maintainer.</li>
         <li>
           A repo with no config folder takes its checks from its CI and its test
           command.

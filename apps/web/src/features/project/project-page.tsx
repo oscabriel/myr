@@ -334,7 +334,7 @@ const RuleSentence = ({
     `Gate: ${plural(StageName.literals.length, "stage", "stages")}`,
     deciders === undefined || deciders.length === 0
       ? undefined
-      : `deciders set for ${plural(deciders.length, "path", "paths")}`,
+      : `maintainers set for ${plural(deciders.length, "path", "paths")}`,
     sealed,
     landedAt === undefined ? (
       "nothing landed yet"
@@ -418,7 +418,7 @@ const AsksSection = ({
     list = (
       <EmptyState
         command={`${Brand.cli} ask open <ask> --files <files>`}
-        title="No open asks. A decider opens one from an ask file."
+        title="No open asks. A maintainer opens one from an ask file."
       />
     );
   } else {

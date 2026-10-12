@@ -349,7 +349,7 @@ describe("home, read on the server with the reader's session", () => {
   );
 
   it.live(
-    "gives a decider the decisions waiting for them, each linking its page, and Today",
+    "gives a maintainer the decisions waiting for them, each linking its page, and Today",
     () =>
       Effect.gen(function* () {
         const markup = yield* pageFrom(yield* readHome);

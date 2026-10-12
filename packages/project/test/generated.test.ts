@@ -136,7 +136,7 @@ const creditOf = (landing: LandingView) =>
 
 describe(generatedFollowUp, () => {
   it.effect(
-    "follows a landing that changed the run block with the regenerated files alone, credited to its decider",
+    "follows a landing that changed the run block with the regenerated files alone, credited to its maintainer",
     () =>
       Effect.gen(function* () {
         const made = yield* followUp({

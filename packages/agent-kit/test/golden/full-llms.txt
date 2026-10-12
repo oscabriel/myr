@@ -68,7 +68,7 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | `Denounced` | Push and claim | no | 77 | `__CLI__ status` | The project's vouch file denounces you: it takes no claims or proposals from you. |
 | `OutOfScope` | Shape | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they are outside the ask's territory. |
 | `TouchedJudge` | Shape | no | 65 | `__CLI__ check` | Undo your changes to the paths it names: they decide what the checks do. |
-| `Weakened` | Shape | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a decider to weigh, but one a decider declined stays out; never raise a ratchet. |
+| `Weakened` | Shape | no | 65 | `__CLI__ check` | Take the marker out; a marker without a reason may get one after ` -- ` for a maintainer to weigh, but one a maintainer declined stays out; never raise a ratchet. |
 | `PrivatePathInPublicTree` | Shape | no | 65 | `__CLI__ check` | Take the held-back paths it names out of your answer. |
 | `ReachedInternals` | Shape | no | 65 | `__CLI__ check` | Import the other module only through its public files. |
 | `StaleBase` | Merge | yes | 75 | `git pull --rebase` | Main moved: rebase onto it, resolve the conflicts it names, and push again. `movedBy` names the landing that last changed each conflicting path, with its `author` and `ask`: keep that change as you resolve. |
@@ -84,8 +84,8 @@ Every refusal the platform gives, in every group of its closed union. Each has a
 | `LayerContentInPublicTree` | Maintainers only | no | 65 | `__CLI__ check` | Take the paths it names out: their files stay private and never enter a public tree. |
 | `SecretInOutput` | Maintainers only | no | 65 | `__CLI__ check` | Take the write-only value of `item` out of the output or the tree (`where`), then check again. |
 | `UnstatedRequirement` | Maintainers only | no | 65 | `__CLI__ check` | State in public what the area's held-back check holds, or take the check out of the suite. |
-| `PostureChange` | Decision | no | 65 | `__CLI__ today` | A decider declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions. |
-| `NotDecider` | Decision | no | 77 | `__CLI__ status` | Only one of the project's deciders may do this: ask one of them. |
+| `PostureChange` | Decision | no | 65 | `__CLI__ today` | A maintainer declined the posture change it names (`from`, `to`): take out what changes the posture; `next` lists the decisions. |
+| `NotDecider` | Decision | no | 77 | `__CLI__ status` | Only one of the project's maintainers may do this: ask one of them. |
 | `DecisionClosed` | Decision | no | 66 | `__CLI__ today` | Nothing to decide: it was taken already, or expired to its default. |
 | `ProposalClosed` | Decision | no | 66 | `__CLI__ today` | Nothing more is drafted for it: the proposal was accepted, declined or expired. |
 | `DraftInProgress` | Decision | yes | 75 | `__CLI__ proposal <proposal>` | Wait: the platform is drafting this proposal's ask already, and `next` shows when it settles. |
@@ -125,7 +125,7 @@ Git reaches each repo at `https://platform-test.example.workers.dev/<repo>.git` 
 | Repo | Name | Who reads it | Who pushes to it |
 | --- | --- | --- | --- |
 | The project's | `<owner>/<name>` | Anyone | No one: `main` moves only by a landing (the project's first push is its initializer's) |
-| A claim's fork | `<owner>/<name>--<ask>--<handle>` | Signed-in people | Its claimant while the claim is live, and a decider who finishes the answer |
+| A claim's fork | `<owner>/<name>--<ask>--<handle>` | Signed-in people | Its claimant while the claim is live, and a maintainer who finishes the answer |
 | A working fork | `<owner>/<name>--me--<handle>` | Signed-in people | Its owner |
 
 A fork's name spells the handle in lowercase. A fork takes branches only: push your answer with `git push __SLUG__ HEAD:main`. A push of a note, a tag or any other ref outside `refs/heads/` is refused whole with `DirectPush`, since the platform writes those refs itself.
@@ -160,12 +160,12 @@ A project's page follows its events as they happen (the `watch` contract). Each 
 - `AskClosed`: An ask closed, with the landing that answered it.
 - `AskOpened`: A new ask opened.
 - `Claimed`: Someone claimed an ask.
-- `Decided`: A decider took a decision.
+- `Decided`: A maintainer took a decision.
 - `Judged`: An answer was checked, with the outcome its verdict holds.
 - `Landed`: A landing reached `main`, a project's adoption (its first push or its import) among them.
 - `Lapsed`: A claim lapsed: no push for too long.
 - `LedgerAppended`: The project's public ledger gained an entry.
-- `ProposalDrafted`: A proposal's draft settled: ready for a decider, or failed.
+- `ProposalDrafted`: A proposal's draft settled: ready for a maintainer, or failed.
 - `ProposalOpened`: A proposal opened.
 - `Pushed`: A claimant pushed to their fork.
 - `Released`: A claim was released.

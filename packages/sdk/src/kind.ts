@@ -58,12 +58,12 @@ export interface KindDefinition<
   ) => CheckSpecInput<Capitalize<K>>;
   readonly checkKind: K;
   readonly claimers?: typeof ClaimRule.Encoded;
-  /** Whether a decider's finish is never offered, optional, or required before landing. */
+  /** Whether a maintainer's finish is never offered, optional, or required before landing. */
   readonly finish?: AskKindInput["finish"];
   readonly name: string;
   /** Answers can't be undone by a later answer: judge changes, dependency changes. */
   readonly oneWay?: boolean;
-  /** Whether a proposal for an ask of this kind opens without a decider. */
+  /** Whether a proposal for an ask of this kind opens without a maintainer. */
   readonly opensAlone?: OpensAlone;
   /** How many claims an ask takes at once; 1 is exclusive. */
   readonly race?: number;
@@ -187,7 +187,7 @@ const path = { path: Schema.NonEmptyString };
 
 /** The ask kinds a project gets without declaring any; list the ones it uses in `project({ kinds })`. */
 export const kinds = {
-  /** Changes what judges answers (a check, lint or CI file): one-way, and a decider finishes every answer. */
+  /** Changes what judges answers (a check, lint or CI file): one-way, and a maintainer finishes every answer. */
   changeJudge: kind({
     args: path,
     check: (args) => check.redThenGreen(args.path),

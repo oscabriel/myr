@@ -45,7 +45,7 @@ describe(escapeRatchet, () => {
 });
 
 describe(escapeDecisions, () => {
-  it("asks a decider about a reasoned escape in a territory with none yet", () => {
+  it("asks a maintainer about a reasoned escape in a territory with none yet", () => {
     expect(
       escapeDecisions(testFacts({ addedLines: addedLines([week, 4, cast]) }))
     ).toStrictEqual([
@@ -68,7 +68,7 @@ describe(escapeDecisions, () => {
   });
 
   it("asks nothing when the baseline already covers the territory's escapes after the push", () => {
-    // A decider accepted a waiver for this answer: the baseline rose to 3
+    // A maintainer accepted a waiver for this answer: the baseline rose to 3
     // while main still holds 2, so the answer, checked again, is within it.
     expect(
       escapeDecisions(

@@ -225,7 +225,7 @@ const askRow = (landing: LandingView): Row => {
   }
 
   return landing.opened === undefined
-    ? { label: "Ask", value: "none (a decider's own landing)" }
+    ? { label: "Ask", value: "none (a maintainer's own landing)" }
     : { code: true, label: "Opened", value: landing.opened };
 };
 

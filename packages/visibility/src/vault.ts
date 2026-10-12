@@ -1,11 +1,11 @@
-// Nobody reads a write-only value back, the decider and the platform's
+// Nobody reads a write-only value back, the maintainer and the platform's
 // contracts included.
 import type { EnvKey } from "@repo/protocol/ids";
 import { ValueTooShort } from "@repo/protocol/refusal";
 import { Context, Effect, Redacted, Schema } from "effect";
 
 /**
- * The shortest value stored without the decider acknowledging it
+ * The shortest value stored without the maintainer acknowledging it
  * (varlock's own threshold): masking cannot protect a shorter one, and it may
  * be guessed.
  */

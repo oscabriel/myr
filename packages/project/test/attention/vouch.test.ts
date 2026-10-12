@@ -435,12 +435,12 @@ describe("who may propose", () => {
   });
 });
 
-describe("a decider's standing", () => {
-  it("is vouched with no line in the file: deciders are the members who vouch", () => {
+describe("a maintainer's standing", () => {
+  it("is vouched with no line in the file: maintainers are the members who vouch", () => {
     expect(standing(policy, [], alice)).toBe("vouched");
   });
 
-  it("is vouched for a decider of any paths, not only of everything", () => {
+  it("is vouched for a maintainer of any paths, not only of everything", () => {
     const priya = Handle.make("priya");
 
     const narrow: Policy = {

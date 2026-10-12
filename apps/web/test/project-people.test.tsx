@@ -226,7 +226,12 @@ describe("a project's policy page", () => {
       /<(?:p|div|ul|ol|li|dl)\b/u
     );
 
-    for (const repeated of ["Readers", "Writers", "Audience", "the deciders"]) {
+    for (const repeated of [
+      "Readers",
+      "Writers",
+      "Audience",
+      "the maintainers",
+    ]) {
       expect(markup).not.toContain(repeated);
     }
   });

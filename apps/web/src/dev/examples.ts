@@ -375,7 +375,7 @@ const library: Files = new Map([
   [
     `${dir}/vouched.td`,
     [
-      "# The people datekit's deciders vouch for.",
+      "# The people datekit's maintainers vouch for.",
       datekitPeople.contributor,
       "",
     ].join("\n"),
@@ -593,7 +593,7 @@ const monorepo: Files = new Map([
       weakening: { markers: [".skip(", ".only(", ".todo("] },
     }),
   ],
-  [`${dir}/vouched.td`, "# The people burrow's deciders vouch for.\n"],
+  [`${dir}/vouched.td`, "# The people burrow's maintainers vouch for.\n"],
 ]);
 
 export const burrow = {

@@ -709,7 +709,7 @@ describe("the isomorphic-git Lander", () => {
     );
 
     it.effect(
-      "lands a decider's composed files as the platform commit that opens an ask",
+      "lands a maintainer's composed files as the platform commit that opens an ask",
       () =>
         Effect.gen(function* () {
           const lander = yield* Lander;
@@ -793,7 +793,7 @@ describe("the isomorphic-git Lander", () => {
 
   describe("compose", () => {
     it.effect(
-      "adds a decider's files to main's tree on a scratch ref, and leaves main alone",
+      "adds a maintainer's files to main's tree on a scratch ref, and leaves main alone",
       () =>
         Effect.gen(function* () {
           const lander = yield* Lander;

@@ -351,7 +351,7 @@ export const vellumFiles: Files = new Map([
   [
     `${dir}/vouched.td`,
     [
-      "# The people vellum's deciders vouch for.",
+      "# The people vellum's maintainers vouch for.",
       people.bram,
       people.okafor,
       people.lin,

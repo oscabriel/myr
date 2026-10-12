@@ -106,7 +106,7 @@ const Deciders = ({
 }: {
   readonly deciders: PublicPolicy["deciders"];
 }) => (
-  <Region id="deciders" title="Deciders by path">
+  <Region id="deciders" title="Maintainers by path">
     <ul className="border-rule flex flex-col border-t">
       {deciders.map(({ handles, paths }) => (
         <li
@@ -214,7 +214,7 @@ const Limits = ({ policy }: { readonly policy: PublicPolicy }) => {
           </Num>
         </Definition>
         <Definition term="Budget">
-          <Num>{`${plural(budget.decisionsPerDay, "decision", "decisions")} a day per decider; an undecided one takes its default after ${plural(budget.expireDays, "day", "days")}`}</Num>
+          <Num>{`${plural(budget.decisionsPerDay, "decision", "decisions")} a day per maintainer; an undecided one takes its default after ${plural(budget.expireDays, "day", "days")}`}</Num>
         </Definition>
         <Definition term="Claim timing">
           <Num>{`warned after ${spanOf(claims.warnAfterMs)} without a push; lapses after ${spanOf(claims.lapseAfterMs)}`}</Num>
@@ -360,7 +360,7 @@ const Pending = ({
           }
         </p>
         <p className="text-ui max-w-[70ch]">
-          {"To make it evaluate, a decider lands a "}
+          {"To make it evaluate, a maintainer lands a "}
           <Code>{PROJECT_FILE}</Code>
           {
             " that names the test command. In a clone, this prints the file the CLI proposes from the repo's own files; add the test command to it, commit it, and land it as the facts say."
@@ -410,7 +410,7 @@ const lines = (command: string, flags: readonly string[]) =>
 const ChangeFacts = ({ project }: { readonly project: ProjectName }) => (
   <FactBlock label="How to change these">
     <p className="text-ui">
-      {`Land a change to ${CONFIG_DIR}: open an ask for it, or, as a decider, land your own from a clone.`}
+      {`Land a change to ${CONFIG_DIR}: open an ask for it, or, as a maintainer, land your own from a clone.`}
     </p>
     <Step
       command={lines(`${Brand.cli} ask open <ask>`, [
@@ -429,7 +429,7 @@ const ChangeFacts = ({ project }: { readonly project: ProjectName }) => (
         "--requestId land-$(git rev-parse HEAD)",
         "--yes",
       ])}
-      label="Or land your own, as a decider"
+      label="Or land your own, as a maintainer"
     />
   </FactBlock>
 );

@@ -126,11 +126,11 @@ describe(ProposalView, () => {
     expect(markup).not.toMatch(DRAFT_AGAIN);
   });
 
-  it("once ready, says it waits for a decider, in the waiting role", () => {
+  it("once ready, says it waits for a maintainer, in the waiting role", () => {
     const markup = view(ready);
 
     expect(markup).toMatch(/data-tone="waiting"/u);
-    expect(plainText(markup)).toContain("Ready , waits for a decider");
+    expect(plainText(markup)).toContain("Ready , waits for a maintainer");
   });
 
   it("reads the draft as a guide, in its order: the ask file, the check, red first", () => {
@@ -201,7 +201,7 @@ describe(ProposalView, () => {
     expect(markup).not.toContain("data-refusal=");
   });
 
-  it("failed after a ready round, still shows that round's files as a draft a decider can accept", () => {
+  it("failed after a ready round, still shows that round's files as a draft a maintainer can accept", () => {
     const kept = withDraft(
       ready,
       DraftState.cases.Failed.make({
@@ -220,7 +220,7 @@ describe(ProposalView, () => {
     expect(plainText(view(ready))).not.toContain("An earlier round");
   });
 
-  it("offers Draft again only to the proposer or a decider", () => {
+  it("offers Draft again only to the proposer or a maintainer", () => {
     const markup = markupOf(
       <ProposalView
         decision={Option.none()}
@@ -267,7 +267,7 @@ describe("a failed call on the proposal page", () => {
       'href="/auth/signin?return=%2Foscabriel%2Fdatekit%2Fproposals%2Fprop-000007"'
     );
     expect(plainText(markup)).toContain("Sign in");
-    expect(plainText(markup)).not.toContain("Today is a decider's page");
+    expect(plainText(markup)).not.toContain("Today is a maintainer's page");
   });
 
   it("refused, shows the refusal", () => {

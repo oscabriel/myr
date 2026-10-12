@@ -242,7 +242,7 @@ describe("an answer on its way to main", () => {
     });
   });
 
-  it("waits for a decider's finish when its kind requires one", () => {
+  it("waits for a maintainer's finish when its kind requires one", () => {
     const step = transition(
       checking,
       LandingCommand.Checked({ ...clean, finish: "required" }),
@@ -424,7 +424,7 @@ describe("a finish", () => {
     credits: [...request.credits, { handle: alice, role: "Finished-by" }],
   });
 
-  it("lands the answer and credits the decider who gave it", () => {
+  it("lands the answer and credits the maintainer who gave it", () => {
     expect(
       transition(waiting, LandingCommand.Finished({ by: alice }), now)
     ).toStrictEqual({
@@ -474,7 +474,7 @@ describe("a decision the answer waits on", () => {
       tree,
     });
 
-  it("lands the answer once accepted, and credits the decider who accepted it", () => {
+  it("lands the answer once accepted, and credits the maintainer who accepted it", () => {
     expect(
       transition(
         waiting(raise),
@@ -502,7 +502,7 @@ describe("a decision the answer waits on", () => {
     });
   });
 
-  it("waits on the next decision, then on a required finish, crediting its decider once", () => {
+  it("waits on the next decision, then on a required finish, crediting its maintainer once", () => {
     const both = AwaitingDecision.make({
       ...underway,
       decisions: [
@@ -683,7 +683,7 @@ describe("a landing the store keeps", () => {
     }),
     AwaitingFinish.make({ ...underway, tree }),
     landing,
-    // A decider's own landing answers no ask.
+    // A maintainer's own landing answers no ask.
     Landed.make({
       request: Request.make({ ...request, ask: Option.none() }),
       sha: landed,

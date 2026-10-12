@@ -29,7 +29,7 @@ export const MANIFEST_PATH = "/manifest.webmanifest";
 
 export const webManifest = () => ({
   background_color: themeColors.light,
-  description: `Open asks, answers and a decider's Today on ${Brand.name}.`,
+  description: `Open asks, answers and a maintainer's Today on ${Brand.name}.`,
   display: "standalone",
   icons,
   id: "/today",

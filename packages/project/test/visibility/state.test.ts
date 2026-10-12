@@ -136,7 +136,7 @@ describe("a landing that adds the visibility config", () => {
   );
 
   it.effect(
-    "narrows the posture only once a second decider accepts and the notice has run",
+    "narrows the posture only once a second maintainer accepts and the notice has run",
     () =>
       Effect.gen(function* () {
         const { api } = yield* sealedByInes;
@@ -545,7 +545,7 @@ const withPersonal = {
 
 describe("the maintainers layer", () => {
   it.effect(
-    "is reached by the deciders alone, and every path it holds is kept out of public trees",
+    "is reached by the maintainers alone, and every path it holds is kept out of public trees",
     () =>
       Effect.gen(function* () {
         const { api } = yield* sealedByInes;

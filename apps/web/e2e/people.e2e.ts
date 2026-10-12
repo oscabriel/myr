@@ -28,7 +28,7 @@ test.describe("the deployed policy page", () => {
     "WEB_URL is not set: point it at a deployed web's origin to run this check"
   );
 
-  test(`${project}'s policy page shows its deciders and the commit they are read at`, ({
+  test(`${project}'s policy page shows its maintainers and the commit they are read at`, ({
     page: browser,
   }) =>
     Effect.runPromise(
@@ -49,7 +49,7 @@ test.describe("the deployed policy page", () => {
 
         yield* Effect.promise(() =>
           expect(
-            browser.getByRole("heading", { name: "Deciders by path" })
+            browser.getByRole("heading", { name: "Maintainers by path" })
           ).toBeVisible()
         );
 

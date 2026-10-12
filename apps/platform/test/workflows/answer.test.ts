@@ -603,7 +603,7 @@ describe(runAnswer, () => {
   );
 
   it.effect(
-    "an answer a decider must finish stops once checked, and lands nothing",
+    "an answer a maintainer must finish stops once checked, and lands nothing",
     () =>
       Effect.gen(function* () {
         const answer = yield* cleanAnswer;
@@ -626,7 +626,7 @@ describe(runAnswer, () => {
   );
 
   it.effect(
-    "a decider's finish starts the answer's run again, and a fresh run lands it, finished",
+    "a maintainer's finish starts the answer's run again, and a fresh run lands it, finished",
     () =>
       Effect.gen(function* () {
         const answer = yield* cleanAnswer;

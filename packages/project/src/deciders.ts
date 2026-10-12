@@ -905,7 +905,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
         writes.proposals.set(settled.id, settled);
         emitted(writes, moved.value.effects);
 
-        // The drafted files may lie under other deciders than the want did.
+        // The drafted files may lie under other maintainers than the want did.
         const decidedBy = decidersOn(
           live.policy,
           pathsOf(live.policy, settled.files, territory),
@@ -1699,7 +1699,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
 
         const { landed: main, policy } = live.value;
 
-        // The decider as the policy spells them, as `decide` and Today do:
+        // The maintainer as the policy spells them, as `decide` and Today do:
         // the budget row and the credit name one person however they sign in.
         const by = Option.getOrElse(
           asDecider(policy, caller.handle),
@@ -1939,7 +1939,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           return yield* new NotDecider({});
         }
 
-        // Stages 0–1, minus the touched-judge refusal: a decider may change the judge where they decide.
+        // Stages 0–1, minus the touched-judge refusal: a maintainer may change the judge where they decide.
         const gate = yield* runGate(pushStages, facts);
 
         const refusals = Option.match(gate, {

@@ -501,7 +501,7 @@ describe("a proposal with a draft", () => {
   );
 
   it.effect(
-    "accepted once ready, lands its ask asked by its proposer, decided by the decider, and assisted by the drafter",
+    "accepted once ready, lands its ask asked by its proposer, decided by the maintainer, and assisted by the drafter",
     () =>
       Effect.gen(function* () {
         const { api } = yield* proposed;
@@ -570,7 +570,7 @@ describe("a proposal with a draft", () => {
   );
 
   it.effect(
-    "drafted again is refused while drafting, for someone neither proposer nor decider, once closed, and past three rounds",
+    "drafted again is refused while drafting, for someone neither proposer nor maintainer, once closed, and past three rounds",
     () =>
       Effect.gen(function* () {
         const { api } = yield* proposed;
@@ -652,7 +652,7 @@ describe("a proposal with a draft", () => {
       }).pipe(Effect.provide(world))
   );
   it.effect(
-    "drafted again into files another decider decides, puts the open decision to them too",
+    "drafted again into files another maintainer decides, puts the open decision to them too",
     () =>
       Effect.gen(function* () {
         yield* advanceTo("2026-10-08T12:00:00Z");

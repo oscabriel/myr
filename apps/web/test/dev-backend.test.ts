@@ -369,7 +369,7 @@ const drafted = inFreshWorld((as) =>
 
 describe("a draft in the dev world", seededWorlds, () => {
   it.live(
-    "is drafted as it is proposed, red first on the scripted Checker, and its decision joins the decider's Today",
+    "is drafted as it is proposed, red first on the scripted Checker, and its decision joins the maintainer's Today",
     () =>
       Effect.gen(function* () {
         const { after, before, proposed, shown } = yield* drafted;

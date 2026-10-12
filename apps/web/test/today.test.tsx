@@ -376,7 +376,7 @@ describe(TodayView, () => {
     const markup = markupOf(viewOf(TodayRead.cases.SignedOut.make({})));
     const text = textIn(markup);
 
-    expect(text).toContain("Today is a decider's page");
+    expect(text).toContain("Today is a maintainer's page");
     expect(markup).toMatch(
       /<a[^>]*href="\/auth\/signin[^"]*"[^>]*>Sign in<\/a>/u
     );
@@ -384,7 +384,7 @@ describe(TodayView, () => {
     expect(markup).not.toContain("data-decision");
   });
 
-  it("shows a DecisionClosed refusal the decider's choice came back with", () => {
+  it("shows a DecisionClosed refusal the maintainer's choice came back with", () => {
     const closed = new DecisionClosed({ decision: stray.id });
 
     const markup = markupOf(
@@ -565,7 +565,7 @@ const pageFrom = (encoded: typeof TodayPageData.Encoded) => {
 
 describe("Today, read on the server with the reader's session", () => {
   it.live(
-    "renders a decider's Today from the fixtures: the budget sentence, the sections and what waits",
+    "renders a maintainer's Today from the fixtures: the budget sentence, the sections and what waits",
     () =>
       Effect.gen(function* () {
         const markup = pageFrom(yield* readToday({ project: vellum }));
@@ -595,7 +595,7 @@ describe("Today, read on the server with the reader's session", () => {
       Effect.gen(function* () {
         const markup = pageFrom(yield* readToday({}));
 
-        expect(textIn(markup)).toContain("Today is a decider's page");
+        expect(textIn(markup)).toContain("Today is a maintainer's page");
         expect(textIn(markup)).toContain(`${Brand.cli} today`);
         expect(markup).not.toContain("data-decision");
       }).pipe(Effect.provide(fixturesClient()), Effect.scoped),

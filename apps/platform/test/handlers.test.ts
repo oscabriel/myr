@@ -385,7 +385,7 @@ describe("calls that name no project", () => {
   );
 
   it.effect(
-    "give a decider one Today across their projects, and anyone else none",
+    "give a maintainer one Today across their projects, and anyone else none",
     () =>
       Effect.gen(function* () {
         yield* made;
@@ -747,7 +747,7 @@ describe("each call", () => {
 
 describe("making a project", () => {
   it.effect(
-    "starts it empty with its maker as its decider, at the platform's git URL, once",
+    "starts it empty with its maker as its maintainer, at the platform's git URL, once",
     () =>
       Effect.gen(function* () {
         yield* advanceTo("2026-10-07T12:00:00Z");

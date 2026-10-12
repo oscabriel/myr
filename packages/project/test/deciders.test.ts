@@ -436,7 +436,7 @@ describe("a proposal", () => {
   const seen = Effect.flatMap(begun, proposing).pipe(Effect.provide(world));
 
   it.effect(
-    "is a decision on Today for its deciders, with a default, expiring in fourteen days, and held to a cap",
+    "is a decision on Today for its maintainers, with a default, expiring in fourteen days, and held to a cap",
     () =>
       Effect.map(seen, (run) => {
         expect(run.proposed.proposal).toStrictEqual({
@@ -474,7 +474,7 @@ describe("a proposal", () => {
   );
 
   it.effect(
-    "accepted, opens its ask red first, asked by its proposer and decided by the decider",
+    "accepted, opens its ask red first, asked by its proposer and decided by the maintainer",
     () =>
       Effect.map(seen, (run) => {
         expect(run.accepted.decision.decided).toStrictEqual({
@@ -508,7 +508,7 @@ describe("a proposal", () => {
       })
   );
 
-  it.effect("decided once, is closed, and only its deciders decide it", () =>
+  it.effect("decided once, is closed, and only its maintainers decide it", () =>
     Effect.map(seen, (run) => {
       expect(run.again).toStrictEqual(
         new DecisionClosed({ decision: firstDecision })
@@ -540,7 +540,7 @@ describe("a proposal", () => {
   );
 
   it.effect(
-    "is put to the deciders of its territory, not to those of the config folder its ask file sits in",
+    "is put to the maintainers of its territory, not to those of the config folder its ask file sits in",
     () =>
       Effect.map(
         askedToDecide.pipe(Effect.provide(worldOf(splitDeciders, "memory"))),
@@ -728,7 +728,7 @@ describe("a finish", () => {
     Effect.provide(worldOf(scenario, "memory"))
   );
 
-  it.effect("is a decider's, on an answer that waits on one", () =>
+  it.effect("is a maintainer's, on an answer that waits on one", () =>
     Effect.map(seen, (run) => {
       expect(run.waiting).toStrictEqual([
         Outcome.cases.AwaitingFinish.make({}),
@@ -746,7 +746,7 @@ describe("a finish", () => {
   );
 
   it.effect(
-    "with the decider's commits on top, checks them again from the merge and lands them, the answerer still its author",
+    "with the maintainer's commits on top, checks them again from the merge and lands them, the answerer still its author",
     () =>
       Effect.map(
         Effect.flatMap(begun, finishingOnTop).pipe(
@@ -782,7 +782,7 @@ describe("a finish", () => {
   );
 
   it.effect(
-    "lands the answer credited Finished-by, once however often it is sent, and counts in the decider's budget, however her sign-in cases her handle",
+    "lands the answer credited Finished-by, once however often it is sent, and counts in the maintainer's budget, however her sign-in cases her handle",
     () =>
       Effect.map(seen, (run) => {
         expect([run.settled, run.again.outcome]).toStrictEqual([
@@ -898,7 +898,7 @@ const landingOwn = (api: ProjectApi) =>
     };
   });
 
-describe("a decider's own change", () => {
+describe("a maintainer's own change", () => {
   const seen = Effect.flatMap(begun, landingOwn).pipe(
     Effect.provide(worldOf(scenario, "memory"))
   );
@@ -919,7 +919,7 @@ describe("a decider's own change", () => {
   );
 
   it.effect(
-    "passes the same stages and checks, and lands once as a platform commit its decider authors",
+    "passes the same stages and checks, and lands once as a platform commit its maintainer authors",
     () =>
       Effect.map(seen, (run) => {
         expect(run.bobLands).toStrictEqual(new NotDecider({}));
@@ -956,7 +956,7 @@ describe("a decider's own change", () => {
   );
 
   it.effect(
-    "checks its merged tree in the decider's working fork, where the Lander's merge leaves it",
+    "checks its merged tree in the maintainer's working fork, where the Lander's merge leaves it",
     () =>
       Effect.map(seen, (run) => {
         expect(
@@ -1071,7 +1071,7 @@ describe("a vouch", () => {
   );
 
   it.effect(
-    "is a decider's platform landing of the vouch file, with the person added",
+    "is a maintainer's platform landing of the vouch file, with the person added",
     () =>
       Effect.map(seen, (run) => {
         expect(run.bobVouches).toStrictEqual(new NotDecider({}));
@@ -1156,7 +1156,7 @@ const decisionIds = (from: number, to: number) =>
 
 describe("Today", () => {
   it.effect(
-    "shows a decider at most the budget's decisions, soonest to expire first, and counts the rest as overflow",
+    "shows a maintainer at most the budget's decisions, soonest to expire first, and counts the rest as overflow",
     () =>
       Effect.map(
         Effect.flatMap(begun, (api) =>
@@ -1188,24 +1188,26 @@ describe("Today", () => {
       )
   );
 
-  it.effect("holds a flag on an open ask as a proposal for its deciders", () =>
-    Effect.map(
-      Effect.flatMap(begun, (api) =>
-        Effect.andThen(openRed(api, "parse-iso"), filling(api))
-      ).pipe(Effect.provide(worldOf(scenario, "memory"))),
-      (seen) => {
-        expect(seen.flag.proposal).toMatchObject({
-          files: [],
-          flags: AskId.make("parse-iso"),
-          proposer: carol.handle,
-          state: "open",
-          want: "Its check reads the wall clock",
-        });
-        expect(seen.flagUnknown).toStrictEqual(
-          new UnknownAsk({ ask: AskId.make("no-such-ask") })
-        );
-      }
-    )
+  it.effect(
+    "holds a flag on an open ask as a proposal for its maintainers",
+    () =>
+      Effect.map(
+        Effect.flatMap(begun, (api) =>
+          Effect.andThen(openRed(api, "parse-iso"), filling(api))
+        ).pipe(Effect.provide(worldOf(scenario, "memory"))),
+        (seen) => {
+          expect(seen.flag.proposal).toMatchObject({
+            files: [],
+            flags: AskId.make("parse-iso"),
+            proposer: carol.handle,
+            state: "open",
+            want: "Its check reads the wall clock",
+          });
+          expect(seen.flagUnknown).toStrictEqual(
+            new UnknownAsk({ ask: AskId.make("no-such-ask") })
+          );
+        }
+      )
   );
 });
 
@@ -1403,7 +1405,7 @@ const deletedDecided = (choice: "accept" | "decline") =>
 
 describe("a stray push", () => {
   it.effect.each(["accept", "decline"] as const)(
-    "that deleted main is put to the deciders, and decided %s moves neither main nor the landed SHA",
+    "that deleted main is put to the maintainers, and decided %s moves neither main nor the landed SHA",
     (choice) =>
       Effect.map(
         deletedDecided(choice).pipe(

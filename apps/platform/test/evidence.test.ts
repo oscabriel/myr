@@ -258,7 +258,7 @@ describe("a failing lane's log, through the platform", () => {
   );
 
   it.live(
-    "gives the log to the answer's claimant and to a decider, and refuses everyone else",
+    "gives the log to the answer's claimant and to a maintainer, and refuses everyone else",
     () =>
       Effect.gen(function* () {
         const { logRef, objects, world } = yield* refused;

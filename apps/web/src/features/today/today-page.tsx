@@ -55,7 +55,7 @@ const budgetShort = (budget: Today["budget"]) =>
   `${counted(Math.max(0, budget.total - budget.used))} left today`;
 
 const WHAT_TODAY_IS =
-  "Today is a decider's page: the decisions you owe your projects each day, each with its evidence and a safe default if you leave it.";
+  "Today is a maintainer's page: the decisions you owe your projects each day, each with its evidence and a safe default if you leave it.";
 
 interface Listed {
   readonly decision: Decision;

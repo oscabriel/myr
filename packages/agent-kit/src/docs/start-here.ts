@@ -16,7 +16,7 @@ export const startHere: DocSource = {
     "",
     "## How a change reaches `main`",
     "",
-    `1. A decider opens an ask. It opens only once its check fails on \`main\` twice the same way, by an assertion.`,
+    `1. A maintainer opens an ask. It opens only once its check fails on \`main\` twice the same way, by an assertion.`,
     `2. A contributor claims it with ${cli("claim <ask> --project <owner>/<name>")} and gets a fork of their own. A claim is exclusive and expires unless they push.`,
     "3. They work in plain git, with any editor or agent, and push to the fork through the platform.",
     "4. The push is checked against the claim, the territory and the files that decide what the checks do, and refused in `git push`'s own output if it strays.",

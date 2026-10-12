@@ -132,7 +132,7 @@ describe("the rendered ask file", () => {
           written.get("add-months-clamp")
         );
 
-        // A draft never names a mentor or a reserve: a decider sets those.
+        // A draft never names a mentor or a reserve: a maintainer sets those.
         const ordinal = written.get("format-ordinal");
 
         expect(ordinal?.mentor).toBe("okonkwo");

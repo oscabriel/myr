@@ -43,7 +43,7 @@ export type Change = typeof Change.Type;
 
 export const Request = Schema.Struct({
   answerer: Handle,
-  /** Absent for a decider's own landing. */
+  /** Absent for a maintainer's own landing. */
   ask: Schema.OptionFromOptionalKey(AskId),
   assisted: Schema.Array(AgentTrailer),
   base: CommitSha,

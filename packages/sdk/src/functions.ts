@@ -26,7 +26,7 @@ export const ProposalFacts = Schema.Struct({
 export type ProposalFacts = typeof ProposalFacts.Type;
 
 /**
- * Whether a proposal opens its ask on its own, without a decider. Write one
+ * Whether a proposal opens its ask on its own, without a maintainer. Write one
  * only when the kind's data can't say it: `(p) => p.record >= 3`.
  */
 export type OpensAlone = (proposal: ProposalFacts) => boolean;

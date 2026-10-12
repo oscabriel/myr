@@ -233,7 +233,7 @@ export const agentLimits = (): readonly Limit[] => {
       value: `Warned after ${span(claims.warnAfterMs)}, lapses after ${span(claims.lapseAfterMs)}, by default`,
     },
     {
-      limit: "Decisions a decider takes a day",
+      limit: "Decisions a maintainer takes a day",
       value: `${budget.decisionsPerDay} by default`,
     },
     {

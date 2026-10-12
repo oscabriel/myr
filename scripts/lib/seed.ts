@@ -428,9 +428,9 @@ export const planSeed = (dir: string) =>
       Option.fromNullishOr(WHOLE_TREE_DECIDER.exec(config)?.groups?.handle)
     ).pipe(
       Effect.mapError(() =>
-        failed(`${folder}/${PROJECT_FILE} names no decider for "**"`)
+        failed(`${folder}/${PROJECT_FILE} names no maintainer for "**"`)
       ),
-      Effect.flatMap(decoded(Handle, "the decider"))
+      Effect.flatMap(decoded(Handle, "the maintainer"))
     );
 
     const ratchets = [...config.matchAll(RATCHET)].flatMap(
