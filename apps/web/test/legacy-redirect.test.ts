@@ -80,6 +80,34 @@ describe("an old or miscased project address", () => {
   });
 });
 
+const onWww = (path: string, method = "GET") =>
+  Option.map(
+    canonicalAddress(
+      new Request(`https://www.web-test.example${path}`, { method })
+    ),
+    (response) => [response.status, response.headers.get("location")]
+  );
+
+describe("an address on a www. host", () => {
+  it("is a 301 to the bare host, the path and the query kept", () => {
+    expect(onWww("/")).toStrictEqual(
+      Option.some([301, "https://web-test.example/"])
+    );
+    expect(onWww("/oscabriel/datekit/tree/main?x=1")).toStrictEqual(
+      Option.some([
+        301,
+        "https://web-test.example/oscabriel/datekit/tree/main?x=1",
+      ])
+    );
+  });
+
+  it("is a 308 for a request that is not a read, so it keeps its method", () => {
+    expect(onWww("/oscabriel/datekit", "POST")).toStrictEqual(
+      Option.some([308, "https://web-test.example/oscabriel/datekit"])
+    );
+  });
+});
+
 describe("an address that needs no redirect", () => {
   it("goes on to the pages: a canonical name, a source path, and a word no project has", () => {
     expect(movedTo("/oscabriel/datekit/tree/main")).toStrictEqual(

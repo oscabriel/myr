@@ -464,7 +464,7 @@ describe("a deploy to prod", () => {
           "apps/sandbox$ wrangler deploy --env prod",
           `apps/platform$ varlock-wrangler deploy --env prod --domain ${git} --var PUBLIC_WEB_URL:https://${Brand.domain}`,
           "apps/web$ bun run build",
-          `apps/web$ wrangler deploy --env prod --domain ${Brand.domain} --var PUBLIC_PLATFORM_URL:https://${git}`,
+          `apps/web$ wrangler deploy --env prod --domain ${Brand.domain} --domain www.${Brand.domain} --var PUBLIC_PLATFORM_URL:https://${git}`,
           ".$ bun run bootstrap --stage prod --check-triggers",
           ".$ bun scripts/smoke.ts --stage prod",
         ]);

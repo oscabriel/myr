@@ -32,6 +32,8 @@ export const publicStages: ReadonlySet<string> = new Set<Stage>([
 export interface Hosts {
   readonly platform: string;
   readonly web: string;
+  // More Custom Domains on the web's Worker, each answered with a 301 to `web`.
+  readonly webAliases: readonly string[];
 }
 
 // A stage served on the brand's own domain, as Workers Custom Domains. The
@@ -44,7 +46,11 @@ export const URL_FROM_DEPLOY = "https://from-infra-deploy.invalid";
 
 export const customHosts = (stage: Stage): Option.Option<Hosts> =>
   stage === "prod"
-    ? Option.some({ platform: `git.${Brand.domain}`, web: Brand.domain })
+    ? Option.some({
+        platform: `git.${Brand.domain}`,
+        web: Brand.domain,
+        webAliases: [`www.${Brand.domain}`],
+      })
     : Option.none();
 
 export interface Resources {

@@ -82,12 +82,31 @@ const movedTo = (location: string) =>
 
 const withoutGit = (spelled: string) => spelled.replace(/\.git$/iu, "");
 
-export const canonicalAddress = (request: Request): Option.Option<Response> => {
-  if (request.method !== "GET" && request.method !== "HEAD") {
+// The web answers at its bare host only: a `www.` host is the same page there, and a write keeps its method with a 308.
+const bareHost = (url: URL, isRead: boolean): Option.Option<Response> => {
+  if (!url.hostname.startsWith("www.")) {
     return Option.none();
   }
 
+  const bare = new URL(url);
+  bare.hostname = url.hostname.slice("www.".length);
+
+  return Option.some(
+    isRead
+      ? movedTo(bare.href)
+      : new Response(null, { headers: { location: bare.href }, status: 308 })
+  );
+};
+
+export const canonicalAddress = (request: Request): Option.Option<Response> => {
   const url = new URL(request.url);
+  const isRead = request.method === "GET" || request.method === "HEAD";
+  const onBareHost = bareHost(url, isRead);
+
+  if (Option.isSome(onBareHost) || !isRead) {
+    return onBareHost;
+  }
+
   const segments = segmentsOf(url.pathname);
   const [first] = segments;
 

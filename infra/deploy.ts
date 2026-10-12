@@ -67,7 +67,7 @@ const bin = (app: string, name: string) => `${app}/node_modules/.bin/${name}`;
 const hostArgs = (stage: Stage) =>
   Option.match(customHosts(stage), {
     onNone: () => ({ platform: [], web: [] }),
-    onSome: ({ platform, web }) => ({
+    onSome: ({ platform, web, webAliases }) => ({
       platform: [
         "--domain",
         platform,
@@ -75,8 +75,7 @@ const hostArgs = (stage: Stage) =>
         `PUBLIC_WEB_URL:https://${web}`,
       ],
       web: [
-        "--domain",
-        web,
+        ...[web, ...webAliases].flatMap((host) => ["--domain", host]),
         "--var",
         `PUBLIC_PLATFORM_URL:https://${platform}`,
       ],
