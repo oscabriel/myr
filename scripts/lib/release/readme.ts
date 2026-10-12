@@ -1,13 +1,7 @@
-/**
- * The npm package's own README: how to install the CLI, start
- * it and use its sdk, every name from `Brand`. The repo's README is about
- * the platform; this one is what npm and pi show for the package.
- */
 import type { Brand } from "@repo/brand";
 
 const fence = (lines: readonly string[]) => ["```sh", ...lines, "```"];
 
-/** The package's README for `version`. */
 export const packageReadme = (input: {
   readonly brand: typeof Brand;
   readonly version: string;

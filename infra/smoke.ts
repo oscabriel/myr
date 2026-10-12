@@ -1,45 +1,3 @@
-/**
- * smoke's probes: read-only requests to a live stage's platform and web, each
- * of which a misbehaving public surface fails. Every probe runs, whatever the
- * others did, so one run names every surface that broke; each one is timed.
- *
- * 1. `health`: `GET /health` answers `200 {ok: true, stage}`, and names the
- *    stage smoke was pointed at, when it was told one;
- * 2. `oauth-metadata`: `GET /.well-known/oauth-protected-resource` answers
- *    200 with RFC 9728's metadata, which names its `resource`;
- * 3. `mcp-needs-credential`: `POST /mcp` without a credential answers 401;
- * 4. `anonymous-unknown-project`: an anonymous `/rpc` `listAsks` for a project
- *    that doesn't exist answers 200 with a typed `UnknownProject` refusal;
- * 5. `missing-repo-404`: git's `info/refs` for a repo that doesn't exist
- *    answers 404;
- * 6. `platform-root`: the platform's `GET /` answers 200 with a page that
- *    names its MCP endpoint (`/mcp`) and the CLI's `install.sh`;
- * 7. `web-front-page`: the web's `GET /` answers 200 with HTML;
- * 8. `web-llms-txt`: the web's `GET /llms.txt` answers 200 with Markdown,
- *    which it builds from the platform's project list, so only a web that
- *    reaches the platform through its service binding passes;
- * 9. `web-project-llms-txt`: a seeded example's `llms.txt` on the web
- *    answers 200 with Markdown;
- * 10. `web-ask-md`: one of the seeded example's asks as Markdown answers 200;
- * 11. `web-agent-skills`: the web's `/.well-known/agent-skills/index.json`
- *    answers 200 with JSON.
- *
- * The web's probes run when smoke knows where the web lives: bootstrap's
- * workers.dev record, or `--web-url`. 9 and 10 need the seeded example,
- * which a stage holds only once it is seeded, after its first deploy (and
- * that deploy's smoke): when the platform refuses the example as unknown,
- * each is skipped with a warning line. The agent surfaces among them
- * (`agentProbes`, 8 to 11) are what an agent reads first, so each is timed
- * against `AGENT_BUDGET_MS`: one over it is a warning line, never a failure,
- * since a cold isolate's first answer is slower than the rest.
- *
- * A probe the platform answers with its own failure (a server error, or an
- * RPC defect) asks again for up to `settling`, as a fresh deploy gives
- * those for its first seconds; any other wrong answer fails it at once.
- *
- * `scripts/smoke.ts` is the command; this module holds the probes, since
- * `infra/` may use `effect/http` (tsconfig.base.json's overrides).
- */
 import { UnknownProject } from "@repo/protocol/refusal";
 import {
   Console,
@@ -62,7 +20,6 @@ import {
 } from "./stages.ts";
 import type { Stage } from "./stages.ts";
 
-/** The platform's probes, in the order smoke runs them. */
 export const platformProbes = [
   "health",
   "oauth-metadata",
@@ -72,7 +29,6 @@ export const platformProbes = [
   "platform-root",
 ] as const;
 
-/** The web's probes, run after the platform's when smoke has the web's origin. */
 export const webProbes = [
   "web-front-page",
   "web-llms-txt",
@@ -81,19 +37,15 @@ export const webProbes = [
   "web-agent-skills",
 ] as const;
 
-/** How long an agent surface may take to answer before smoke warns: 500 ms. */
 export const AGENT_BUDGET_MS = 500;
 
-/** An example every seeded stage holds, by its name, and one of its asks. */
 const SEEDED = { ask: "format-ordinal", project: "oscabriel/datekit" } as const;
 
-/** The probes that read the seeded example, skipped on a stage that does not hold it. */
 export const seededProbes: ReadonlySet<Probe> = new Set([
   "web-project-llms-txt",
   "web-ask-md",
 ]);
 
-/** The agent surfaces on the web smoke reads, each by its path and the media type it answers with. */
 export const agentProbes = [
   { contentType: "text/markdown", path: "/llms.txt", probe: "web-llms-txt" },
   {
@@ -117,31 +69,21 @@ export const agentProbes = [
   readonly probe: (typeof webProbes)[number];
 }[];
 
-/** Every probe, in the order smoke runs them. */
 export const probes = [...platformProbes, ...webProbes] as const;
 
 export const Probe = Schema.Literals(probes);
 
 export type Probe = typeof Probe.Type;
 
-/** A project no stage holds, by a name one could have: smoke asks for it and expects to be refused. */
 const MISSING = "oscabriel/no-such-project";
 
-/** How long one probe waits for an answer: a cold Worker included. */
 const PATIENCE = Duration.seconds(30);
 
-/**
- * How long a probe keeps asking a platform that answers with a server error
- * or a defect, as a fresh deploy does for its first seconds (the first
- * smoke after the first deploy got a 500 from `/health` and a defect from
- * the first Project DO call; a run seconds later passed).
- */
+// A fresh deploy answers with server errors or defects for its first seconds.
 const SETTLING = Duration.seconds(30);
 
-/** How long a probe waits between two asks while the platform settles. */
 const ASK_AGAIN = Duration.seconds(1);
 
-/** One or more probes failed: each, and why. */
 export class SmokeFailed extends Schema.TaggedError<SmokeFailed>()(
   "SmokeFailed",
   {
@@ -158,10 +100,6 @@ export class SmokeFailed extends Schema.TaggedError<SmokeFailed>()(
   }
 }
 
-/**
- * A passing run: the stage `/health` named, how long each probe took
- * (against its budget, when it has one), and a line for each probe over it.
- */
 export interface SmokeReport {
   readonly origin: string;
   readonly stage: string;
@@ -173,25 +111,17 @@ export interface SmokeReport {
   readonly warnings: readonly string[];
 }
 
-/**
- * Why one probe failed, in a line a person reads. A transient miss is the
- * platform's own failure (a server error, a defect), which a fresh deploy
- * may give for its first seconds, so the probe asks again; any other answer
- * is the platform's word, and fails the probe at once.
- */
 class Missed extends Schema.TaggedError<Missed>()("Missed", {
   reason: Schema.String,
   transient: Schema.optionalKey(Schema.Boolean),
 }) {}
 
-/** The parts of a response a probe judges. */
 interface Answer {
   readonly contentType: string;
   readonly status: number;
   readonly text: string;
 }
 
-/** `request` sent to `origin`, as a probe sees its answer. */
 const send = (
   label: string,
   request: HttpClientRequest.HttpClientRequest
@@ -223,21 +153,11 @@ const send = (
     })
   );
 
-/** A server error: the Worker's own failure, which a fresh deploy gives for its first seconds. */
 const serverError = (status: number) => status >= 500;
 
-/**
- * A server error, or a 404 from a hostname that is not serving yet: a
- * Worker's first deploy to workers.dev answers 404 for its first seconds
- * (once, smoke ran 4 s after the web's first deploy and got 404 twice), and
- * a deploy that adds a route can still be answered by the version before it
- * (a demo deploy that added `/`: it answered 404 once as the upload finished). The
- * web's probes and `platform-root` read a 404 so; the platform's
- * `missing-repo-404` expects one.
- */
+// A fresh workers.dev deploy, or one adding a route, answers 404 for its first seconds.
 const notServingYet = (status: number) => status >= 500 || status === 404;
 
-/** `answer`, when its status is `expected`; `transient` says which others to ask again. */
 const statusIs =
   (label: string, expected: number, transient = serverError) =>
   (answer: Answer) =>
@@ -250,7 +170,6 @@ const statusIs =
           })
         );
 
-/** A failure of any kind, as the miss `reason` names. */
 const missing =
   (reason: string) =>
   <A, E, R>(self: Effect.Effect<A, E, R>) =>
@@ -262,7 +181,6 @@ const decodeHealth = Schema.decodeUnknownEffect(
   )
 );
 
-/** `/health`: the Worker is up, and serves the stage it was told to. */
 const health = (origin: string, expected: Option.Option<Stage>) =>
   Effect.gen(function* () {
     const label = "GET /health";
@@ -289,7 +207,6 @@ const health = (origin: string, expected: Option.Option<Stage>) =>
     });
   });
 
-/** RFC 9728: the protected resource's metadata names the resource. */
 const decodeResourceMetadata = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Struct({ resource: Schema.NonEmptyString }))
 );
@@ -309,7 +226,6 @@ const oauthMetadata = (origin: string) =>
     );
   });
 
-/** MCP stays closed to anyone without a credential. */
 const mcpNeedsCredential = (origin: string) => {
   const label = "POST /mcp without a credential";
 
@@ -324,7 +240,6 @@ const mcpNeedsCredential = (origin: string) => {
   ).pipe(Effect.flatMap(statusIs(label, 401)), Effect.asVoid);
 };
 
-/** One call as effect/rpc's HTTP protocol with JSON serialization sends it. */
 const RpcRequest = Schema.TaggedStruct("Request", {
   headers: Schema.Array(Schema.Tuple([Schema.String, Schema.String])),
   id: Schema.String,
@@ -332,7 +247,6 @@ const RpcRequest = Schema.TaggedStruct("Request", {
   tag: Schema.Literal("listAsks"),
 });
 
-/** The one reply smoke accepts: the call failed with `UnknownProject`. */
 const decodeRefused = Schema.decodeUnknownEffect(
   Schema.fromJsonString(
     Schema.Tuple([
@@ -347,14 +261,12 @@ const decodeRefused = Schema.decodeUnknownEffect(
   )
 );
 
-/** A reply whose call died in the platform: its own failure, not an answer. */
 const decodeDefect = Schema.decodeUnknownOption(
   Schema.fromJsonString(
     Schema.Tuple([Schema.TaggedStruct("Defect", { defect: Schema.Unknown })])
   )
 );
 
-/** An anonymous `/rpc` `listAsks` of `project`, as the platform answers it. */
 const listAsks = (origin: string, project: string, label: string) =>
   send(
     label,
@@ -368,7 +280,6 @@ const listAsks = (origin: string, project: string, label: string) =>
     ])
   );
 
-/** A read anyone may make, refused for a project that doesn't exist. */
 const anonymousUnknownProject = (origin: string) =>
   Effect.gen(function* () {
     const label = "POST /rpc listAsks";
@@ -401,11 +312,7 @@ const anonymousUnknownProject = (origin: string) =>
         );
   });
 
-/**
- * Whether the platform at `origin` holds the seeded example: false only
- * when it refuses the example as an unknown project; any other answer
- * leaves the example's probes to say what is wrong.
- */
+// False only on an UnknownProject refusal; any other answer leaves the probes to report it.
 const holdsSeeded = (origin: string) =>
   listAsks(origin, SEEDED.project, `POST /rpc listAsks ${SEEDED.project}`).pipe(
     Effect.flatMap(({ text }) => Effect.option(decodeRefused(text))),
@@ -418,7 +325,6 @@ const holdsSeeded = (origin: string) =>
     Effect.orElseSucceed(() => true)
   );
 
-/** git's discovery for a repo that doesn't exist. */
 const missingRepo = (origin: string) => {
   const route = `/${MISSING}.git/info/refs`;
   const label = `GET ${route}`;
@@ -429,7 +335,6 @@ const missingRepo = (origin: string) => {
   ).pipe(Effect.flatMap(statusIs(label, 404)), Effect.asVoid);
 };
 
-/** The platform's own `/`: a page naming its MCP endpoint and the CLI's installer. */
 const platformRoot = (origin: string) => {
   const label = "GET /";
 
@@ -447,7 +352,6 @@ const platformRoot = (origin: string) => {
   );
 };
 
-/** `answer`, when its content type is `wanted` (by its media type alone). */
 const typeIs =
   (label: string, wanted: string, said: string) => (answer: Answer) =>
     answer.contentType.split(";")[0]?.trim() === wanted
@@ -458,7 +362,6 @@ const typeIs =
           })
         );
 
-/** The web's front page renders: a page a browser shows, not an error's JSON. */
 const webFrontPage = (web: string) => {
   const label = "GET / on the web";
 
@@ -469,7 +372,6 @@ const webFrontPage = (web: string) => {
   );
 };
 
-/** An agent surface on the web: 200, with the media type it answers with. */
 const agentSurface = (
   web: string,
   { contentType, path }: (typeof agentProbes)[number]
@@ -482,10 +384,7 @@ const agentSurface = (
   );
 };
 
-/**
- * The web's `/llms.txt`: Markdown that opens with its title. The web answers
- * 503 when the platform does not, so a 200 is the service binding working.
- */
+// The web answers 503 when the platform does not, so a 200 proves the service binding.
 const webLlmsTxt = (web: string, probe: (typeof agentProbes)[number]) => {
   const label = "GET /llms.txt on the web";
 
@@ -500,11 +399,6 @@ const webLlmsTxt = (web: string, probe: (typeof agentProbes)[number]) => {
   );
 };
 
-/**
- * One probe's run: how long it took, and whether it held. A transient miss
- * is asked again, every `ASK_AGAIN`, for `settling` at most; the probe fails
- * with its last miss.
- */
 const timed = <A>(
   probe: Probe,
   run: Effect.Effect<A, Missed, HttpClient.HttpClient>,
@@ -527,12 +421,6 @@ const timed = <A>(
     }))
   );
 
-/**
- * Runs every probe against the platform at `origin`, and with `web` the
- * web's probes against that origin; with `stage`, `/health` must name it.
- * `settling` bounds how long a probe asks again while a Worker answers with
- * its own failure (30 s unless given).
- */
 export const smoke = (
   origin: string,
   options: {
@@ -631,7 +519,6 @@ export const smoke = (
     };
   });
 
-/** Neither `--url` nor bootstrap's record says where the stage lives. */
 export class NoOrigin extends Schema.TaggedError<NoOrigin>()("NoOrigin", {
   file: Schema.String,
   stage: Schema.String,
@@ -641,7 +528,6 @@ export class NoOrigin extends Schema.TaggedError<NoOrigin>()("NoOrigin", {
   }
 }
 
-/** Where a stage's platform lives, and its web when smoke can know it. */
 interface Origins {
   readonly platform: string;
   readonly web: Option.Option<string>;
@@ -649,11 +535,6 @@ interface Origins {
 
 const trimmed = (origin: string) => origin.replace(/\/+$/u, "");
 
-/**
- * Where `stage`'s platform and web live: `--url` (and `--web-url`), or
- * bootstrap's workers.dev record. A platform given by `--url` has no web
- * unless `--web-url` names it.
- */
 const originsOf = (argv: readonly string[], stage: Stage) =>
   Effect.gen(function* () {
     const given = flagValue(argv, "--url");
@@ -674,10 +555,6 @@ const originsOf = (argv: readonly string[], stage: Stage) =>
     } satisfies Origins;
   });
 
-/**
- * `bun scripts/smoke.ts --stage <s> [--url <origin>] [--web-url <origin>]`:
- * smoke-tests the stage, printing each probe's time, or each failure and why.
- */
 export const main = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const stage = yield* stageOf(argv);

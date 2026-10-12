@@ -1,30 +1,3 @@
-/**
- * swarm: six fictional contributors, on four harnesses, each answer one child
- * of a project's split family on a stage: it plans them, prepares each
- * one's workspace and runs their harnesses.
- *
- *   bun scripts/swarm.ts --stage dev-oscabriel --project oscabriel/burrow --dry-run
- *   bunx varlock run --path apps/platform/ -- bun scripts/swarm.ts --stage dev-oscabriel
- *
- * `--dry-run` reads the project's open asks anonymously and prints the plan:
- * who answers which ask, on which territory, and the command that would
- * start their harness. It claims nothing, starts nothing and needs no token.
- *
- * Without it, each contributor claims their ask as themselves (their token
- * from `SESSION_TOKENS`, a JSON object from token to handle, as the
- * platform's own), reads the ask's page, gets a workspace with a clone of
- * the claim's fork, and is handed to the run loop, six at once. The
- * run's summary goes to `<swarm>/<run>/agents.json` (`SwarmDir`: the state
- * home's `<slug>/swarm/`, outside every checkout), and each claim's fork to
- * the throwaway ledger (`infra/created.ts`). Tokens reach a contributor's
- * processes only through their env, and no line or JSON this prints holds
- * one. Flags: `lib/swarm/args.ts`.
- *
- * `--view herdr` (for the video) runs from a herdr pane: each
- * harness runs interactively in a pane of its own, with a counter pane of
- * claims, pushes and landings (`lib/swarm/views/herdr.ts`). The loop and
- * its outcomes are the same.
- */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { AskListing } from "@repo/protocol/domain/ask";
 import { ClaimView } from "@repo/protocol/domain/claim";
@@ -87,10 +60,8 @@ import type { Ran } from "./lib/swarm/workspace.ts";
 
 const failed = (reason: string) => new SwarmFailed({ reason });
 
-/** The env var that holds the stage's people: a JSON object from token to handle. */
 const SESSIONS_VARIABLE = "SESSION_TOKENS";
 
-/** Where the platform lives: `--url`, or the workers.dev subdomain bootstrap recorded. */
 const originOf = (options: SwarmOptions) =>
   Option.match(options.url, {
     onNone: () =>
@@ -106,17 +77,14 @@ const originOf = (options: SwarmOptions) =>
     onSome: Effect.succeed,
   });
 
-/** One CLI command, run from this repo's source with Bun. */
 const cli = (
   args: readonly string[],
   env: Readonly<Record<string, string | undefined>>
 ) => run({ args: [cliEntry, ...args], command: "bun", env });
 
-/** A refusal list in one line: `NotVouched, AskFull`. */
 const tagsOf = (refusals: readonly Refusal[]) =>
   refusals.map(({ _tag }) => _tag).join(", ");
 
-/** The CLI refused the command: its refusals, for the run's summary. */
 class Refused extends Schema.TaggedError<Refused>()("Refused", {
   reason: Schema.String,
   tags: Schema.Array(Schema.String),
@@ -126,11 +94,6 @@ class Refused extends Schema.TaggedError<Refused>()("Refused", {
   }
 }
 
-/**
- * What one CLI command printed under `--json`, decoded as its envelope: its
- * data, or `Refused` with its refusals. Output that is no envelope fails
- * with what the command printed, `scrub`bed of any secret.
- */
 const envelopeOf =
   <A, I>(
     data: Schema.Codec<A, I>,
@@ -167,7 +130,6 @@ const isRefused = Schema.is(Refused);
 
 const Listed = Schema.Struct({ asks: Schema.Array(AskListing) });
 
-/** The project's open asks, read anonymously: no token, and no stored login of the user's. */
 const listAsks = (origin: string, project: ProjectName) =>
   Effect.gen(function* () {
     const home = `${yield* SwarmDir}/anonymous`;
@@ -185,7 +147,6 @@ const listAsks = (origin: string, project: ProjectName) =>
     return listed.asks;
   });
 
-/** The plan as the terminal shows it: one row per contributor, ending in the command that starts them. */
 const planLines = (
   plan: SwarmPlan,
   origin: string,
@@ -236,7 +197,6 @@ const planLines = (
   ];
 };
 
-/** A run's name: when it started, to the second, in UTC (`20261008-154500`). */
 const runName = Effect.map(DateTime.now, (now) =>
   DateTime.formatIso(now)
     .slice(0, 19)
@@ -244,7 +204,6 @@ const runName = Effect.map(DateTime.now, (now) =>
     .replace("T", "-")
 );
 
-/** The commit of this repo the swarm runs from. */
 const headCommit = Effect.gen(function* () {
   const root = yield* repoRoot;
 
@@ -263,10 +222,7 @@ const decodeSessions = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Record(Schema.String, Handle))
 );
 
-/**
- * Each contributor's token, by handle, from `SESSION_TOKENS`; a missing
- * person fails before anything is claimed, naming them and never a token.
- */
+/** A missing person fails before anything is claimed, naming them and never a token. */
 const tokensFor = (handles: readonly Handle[]) =>
   Effect.gen(function* () {
     const raw = yield* Config.String(SESSIONS_VARIABLE).pipe(
@@ -304,7 +260,6 @@ const tokensFor = (handles: readonly Handle[]) =>
         );
   });
 
-/** Records a claim's fork in the throwaway ledger, once. */
 const recordFork = (stage: Stage, claim: ClaimView) =>
   Effect.gen(function* () {
     const namespace = resources(stage).projects;
@@ -337,12 +292,6 @@ const Shown = Schema.Struct({
   brief: Schema.NonEmptyString,
 });
 
-/**
- * One contributor, from claim to the run loop: claims their ask as
- * themselves, reads its page, makes their workspace and hands it to
- * `runAgent`. A step that fails ends their run as `failed`, with any
- * refusals the claim met; it never stops the others.
- */
 const contributorRun = (input: {
   readonly assignment: Assignment;
   readonly options: SwarmOptions;
@@ -441,7 +390,6 @@ const contributorRun = (input: {
     });
   });
 
-/** One contributor's run as the summary prints it. */
 const runLine = ({
   ask,
   attempts,
@@ -463,11 +411,6 @@ const printJson = <S extends Schema.Top>(schema: S, value: S["Type"]) =>
     Console.log
   ).pipe(Effect.orDie);
 
-/**
- * `bun scripts/swarm.ts …`: plans the run from the project's open asks; with
- * `--dry-run`, prints the plan (or, with `--json`, the `SwarmPlan`) and
- * stops. Otherwise runs every contributor at once and writes the summary.
- */
 export const main = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const options = yield* optionsOf(argv);

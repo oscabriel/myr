@@ -1,29 +1,3 @@
-/**
- * The seed's core: what to put on a platform for one example
- * project, read from the example's tracked files, and putting it there.
- *
- * A plan (`planSeed`) is the library as it was before anyone asked (every
- * tracked file but the asks, the checks they name and the layers), the
- * decider its config names for the whole tree, each ask with the files it
- * opens with, and each layer the example keeps under `layers/<layer>/`
- * with its known-bad trees. Only what git tracks ships, so an
- * ignored file, and above all a closed env file, never leaves the machine.
- *
- * A run (`runSeed`) makes the project and pushes main's first commit as the
- * platform's operator (the initializer decides until the config
- * names deciders), through the gateway's first-push admission, then
- * opens each ask as the decider, so each is red first on the platform's own
- * Checker. Last, as the decider, it pushes each layer
- * to the repo the platform made for it in the private namespace, through
- * the gateway, never to the public tree. A step already done is
- * reported `already` and left alone, so a second run changes nothing.
- *
- * A platform is a `SeedTarget`: a stage (`stageTarget`) or the Node world
- * served by a process of its own (`worldTarget`), each reached over HTTP
- * and git the same way (`platformTarget`). Tokens live in `Redacted`
- * values and reach git only through its child's env: the seed never prints,
- * logs or writes one.
- */
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import type { AskListing } from "@repo/protocol/domain/ask";
@@ -65,10 +39,6 @@ import { RpcClient, RpcSerialization } from "effect/rpc";
 
 import { repoRoot } from "../../infra/stages.ts";
 
-/**
- * The seed could not go on; `reason` says why and what to do. When the
- * platform refused a step, `refusals` holds what it said.
- */
 export class SeedFailed extends Schema.TaggedError<SeedFailed>()("SeedFailed", {
   reason: Schema.String,
   refusals: Schema.optionalKey(Schema.NonEmptyArray(Refusal)),
@@ -78,125 +48,79 @@ export class SeedFailed extends Schema.TaggedError<SeedFailed>()("SeedFailed", {
   }
 }
 
-/** One file of a seeded tree, as its bytes. */
 export interface SeedFile {
   readonly path: RepoPath;
   readonly content: Uint8Array;
 }
 
-/** One file an ask opens with, as text (the `openAsk` contract's `ConfigFile`). */
 export interface AskFile {
   readonly path: RepoPath;
   readonly content: string;
 }
 
-/** One ask the seed opens: its id, its kind's name, and the files it opens with. */
 export interface AskStep {
   readonly id: AskId;
   readonly kind: string;
-  /** The ask's file, then the check file it names, if it names one. */
   readonly files: Array.NonEmptyReadonlyArray<AskFile>;
 }
 
 /**
- * A known-bad tree for a layer's admission: main's first tree
- * with one change that breaks an area, made a commit of its own (no
- * parent, the decider's, at the seed's fixed dates), so it is the same
- * commit on every platform and the layer's manifest can name it.
+ * A parentless commit at the seed's fixed dates, so it is the same commit on
+ * every platform and the layer's manifest can name it.
  */
 export interface KnownBadStep {
-  /** Its branch in the layer repo: `known-bad/<area>`. */
   readonly branch: string;
-  /** The commit it comes to, which the layer's manifest names in `knownBad`. */
   readonly commit: CommitSha;
-  /** What the change breaks: the words before its patch's diff. */
   readonly message: string;
-  /** main's first tree, with the change applied. */
   readonly files: Array.NonEmptyReadonlyArray<SeedFile>;
 }
 
-/**
- * One layer the seed pushes to the private namespace, once main has landed
- * and declared it: its repo's tree, at the same root-relative paths as
- * main's, and the known-bad trees its admission runs on.
- */
 export interface LayerStep {
   readonly layer: LayerName;
-  /** Its repo in the private namespace: `<project>--<layer>`. */
   readonly repo: RepoName;
-  /** Every file under the example's `layers/<layer>/`, at its path there. */
   readonly files: Array.NonEmptyReadonlyArray<SeedFile>;
-  /** One per `known-bad/<area>.patch` in the layer, by area. */
   readonly knownBad: readonly KnownBadStep[];
 }
 
-/** What the seed puts on a platform for one example project. */
 export interface SeedPlan {
   readonly project: ProjectName;
-  /** Who opens the asks: the first decider the config names for the whole tree. */
   readonly decider: Handle;
-  /** main's first commit: the library before anyone asked. */
   readonly initFiles: Array.NonEmptyReadonlyArray<SeedFile>;
   readonly asks: readonly AskStep[];
-  /** The ratchets the config declares, in place once main has landed. */
   readonly ratchets: readonly string[];
-  /** The layers the example keeps beside its public tree, pushed by the decider. */
   readonly layers: readonly LayerStep[];
-  /**
-   * The example this plan copies under another name (`seed --as`), when it
-   * is a copy: a copy is made fresh, so a name some project has is refused.
-   */
   readonly copyOf?: ProjectName;
 }
 
-/** Where the asks live in an example: the config folder's `asks/`. */
 const ASKS = `${Brand.configDir}/asks/`;
 
-/**
- * Where an example keeps its layers: `layers/<layer>/`, each the tree of
- * that layer's repo. Nothing under it enters the public tree.
- */
+/** Nothing under it enters the public tree. */
 const LAYERS = "layers/";
 
-/** A known-bad change a layer keeps: `known-bad/<area>.patch`. */
 const KNOWN_BAD = /^known-bad\/(?<area>[^/]+)\.patch$/u;
 
-/** A layer's manifest in the JSON form the platform reads. */
 const MANIFEST_FILE = `${Brand.configDir}/layer.json`;
 
-// Where a patch's diff starts; the words before it say what it breaks.
 const DIFF_START = /^(?:diff --git |--- )/mu;
 
-/** The config file that names the deciders and the ratchets. */
 const PROJECT_FILE = `${Brand.configDir}/project.ts`;
 
-/** An ask's file: `asks/<id>.ask.ts`, directly in the asks folder. */
 const ASK_FILE = /^(?<id>[^/]+)\.ask\.ts$/u;
 
-/**
- * The files whose values stay on each machine (AGENTS.md "Env"). The seed
- * refuses an example that tracks one rather than read it.
- */
+/** Env files whose values stay on each machine: an example that tracks one is refused, never read. */
 const CLOSED_ENV = /^\.env(?:\.local|\.[^/]+\.local)?$/u;
 
-// An ask file calls its kind's builder: `kinds.fix.ask({ … })`.
 const KIND = /\bkinds\.(?<kind>\w+)\.ask\(/u;
 
-// An ask file names its check file as the `path` its kind takes
-// (`kinds.fix.ask({ path: "test/asks/<id>.test.ts", … })`), which the kind
-// makes the ask's `RedThenGreen.path`. A kind that counts (`migrate`) names
-// none.
+// The check file is the `path` the ask's kind takes; a kind that counts (`migrate`) names none.
 const CHECK_PATH = /\bpath:\s*"(?<path>[^"]+)"/u;
 
-// The deciders for the whole tree: `deciders: { "**": ["ines-v", …] }`.
 const WHOLE_TREE_DECIDER = /"\*\*"\s*:\s*\[\s*"(?<handle>[^"]+)"/u;
 
-// Each ratchet the config declares: `"<name>": check.ratchet.count(…)`.
 const RATCHET = /"(?<name>[^"]+)"\s*:\s*check\.ratchet\./gu;
 
 const failed = (reason: string) => new SeedFailed({ reason });
 
-/** `raw` decoded by `schema`, or the seed fails saying what it was. */
 const decoded =
   <S extends Schema.Codec<unknown, string>>(schema: S, what: string) =>
   (raw: string) =>
@@ -204,7 +128,6 @@ const decoded =
       Effect.mapError(() => failed(`${what} ${JSON.stringify(raw)} is not one`))
     );
 
-/** The paths git tracks under `dir`, relative to it, in git's order. */
 const trackedIn = (root: string, dir: string) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -225,17 +148,12 @@ const trackedIn = (root: string, dir: string) =>
       .map((path) => path.slice(dir.length + 1));
   });
 
-/** One file of the example as text, or the seed fails naming it. */
 const textOf = (fs: FileSystem.FileSystem, at: string, path: string) =>
   fs
     .readFileString(at)
     .pipe(Effect.mapError(() => failed(`can't read ${path}`)));
 
-/**
- * git's env for a commit by `handle`: fixed dates, so the same files make
- * the same commit on every machine; no git config from this machine (no
- * hooks, no signing); English messages.
- */
+// Fixed dates and no machine config, so the same files make the same commit everywhere.
 const authorEnv = (handle: Handle) => ({
   GIT_AUTHOR_DATE: "2026-10-06T12:00:00Z",
   GIT_AUTHOR_EMAIL: `${handle}@example.com`,
@@ -249,14 +167,9 @@ const authorEnv = (handle: Handle) => ({
   LC_ALL: "C",
 });
 
-/** All a byte stream says, as text. */
 const streamText = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/**
- * git with `args` in `cwd` under `env`, after the `-c` settings in
- * `settings`: how it ended, and what it printed.
- */
 const runGit = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   cwd: string,
@@ -287,7 +200,6 @@ const runGit = (
     )
   );
 
-/** What git printed, when it ended well; else the seed fails with what it said. */
 const okOutput =
   (args: readonly string[]) =>
   ({ code, stderr, stdout }: Effect.Success<ReturnType<typeof runGit>>) =>
@@ -297,7 +209,6 @@ const okOutput =
           failed(`git ${args.join(" ")} exited ${code}: ${stderr.trim()}`)
         );
 
-/** `files` written under `dir`, each at its path. */
 const writeTree = (
   fs: FileSystem.FileSystem,
   path: Path.Path,
@@ -316,19 +227,11 @@ const writeTree = (
     { discard: true }
   );
 
-/**
- * A known-bad tree made a commit on this machine, in a folder of its own:
- * main's first files, the patch applied, committed as `decider` at the
- * seed's fixed dates with the patch's words as its message. The same files
- * and patch make the same commit wherever the seed runs.
- */
 const knownBadOf = (input: {
   readonly area: string;
   readonly decider: Handle;
   readonly initFiles: SeedPlan["initFiles"];
-  /** The patch, as a path on this machine. */
   readonly patch: string;
-  /** The patch, as its layer names it. */
   readonly named: string;
 }) =>
   Effect.scoped(
@@ -389,7 +292,6 @@ const knownBadOf = (input: {
     })
   );
 
-/** A layer's repo in the private namespace: `<project's key>--<layer>`. */
 const layerRepo = (project: ProjectName, layer: LayerName) =>
   RepoName.make(`${keyOf(project)}--${layer}`);
 
@@ -397,12 +299,6 @@ const decodeManifest = Schema.decodeEffect(
   Schema.fromJsonString(LayerManifest)
 );
 
-/**
- * The layers an example keeps under `layers/`, each with its files and its
- * known-bad trees. A layer whose manifest names other known-bad commits
- * than its patches make is refused, so the manifest the seed pushes names
- * commits the layer repo holds.
- */
 const layersOf = (input: {
   readonly decider: Handle;
   readonly folder: string;
@@ -475,7 +371,6 @@ const layersOf = (input: {
             )
           );
 
-          // By area, as the patches are named; compared in any order.
           const made = knownBad.map(({ commit }) => commit);
 
           if (manifest.layer !== layer) {
@@ -503,10 +398,6 @@ const layersOf = (input: {
     );
   });
 
-/**
- * The plan for the example at `dir` (relative to the repo root, as
- * `examples/datekit`): the project is named for its folder.
- */
 export const planSeed = (dir: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -599,7 +490,7 @@ export const planSeed = (dir: string) =>
       asks.flatMap(({ files }) => files.map((file) => String(file.path)))
     );
 
-    // A layer's files never enter the public tree (principle 7).
+    // A layer's files never enter the public tree.
     const initPaths = tracked.filter(
       (file) =>
         !file.startsWith(ASKS) && !file.startsWith(LAYERS) && !held.has(file)
@@ -634,12 +525,6 @@ export const planSeed = (dir: string) =>
     } satisfies SeedPlan;
   });
 
-/**
- * `plan` as a fresh copy named `as` (`seed --as`): the project, and each
- * layer's repo, which is named for it, take the new name; the files, the
- * asks and the decider stay the example's. A copy of a copy is still a copy
- * of the example.
- */
 export const renameSeedPlan = (plan: SeedPlan, as: ProjectName): SeedPlan => ({
   ...plan,
   copyOf: plan.copyOf ?? plan.project,
@@ -650,17 +535,12 @@ export const renameSeedPlan = (plan: SeedPlan, as: ProjectName): SeedPlan => ({
   project: as,
 });
 
-/** Whether a run did a step, or found it done before. */
 export const StepResult = Schema.Literals(["done", "already"]);
 
 export type StepResult = typeof StepResult.Type;
 
 const step = { result: StepResult, target: Schema.String };
 
-/**
- * One step of a seed: making the project (`Init`), pushing main's first
- * commit (`Push`), opening an ask (`OpenAsk`), pushing a layer (`Layer`).
- */
 export const SeedStep = Schema.TaggedUnion({
   Init: step,
   Layer: step,
@@ -670,37 +550,22 @@ export const SeedStep = Schema.TaggedUnion({
 
 export type SeedStep = typeof SeedStep.Type;
 
-/** What a platform gives the seed: a world, or a stage. */
 export class SeedTarget extends Context.Service<
   SeedTarget,
   {
-    /** Who makes each project and pushes its first commit. */
     readonly operator: Handle;
-    /** The contracts as `handle` calls them; fails when the platform has no session for them. */
     readonly clientFor: (handle: Handle) => Layer.Layer<Client, SeedFailed>;
-    /** Fails naming each of `handles` the platform has no session for. */
     readonly requireSessions: (
       handles: readonly Handle[]
     ) => Effect.Effect<void, SeedFailed>;
-    /** Every ref of a project's canonical repo, by name, as git lists them. */
     readonly refsOf: (
       project: ProjectName
     ) => Effect.Effect<ReadonlyMap<string, CommitSha>, SeedFailed>;
-    /**
-     * A fresh repo holding `files` in one commit, pushed as `as` to the
-     * project's main at the gateway, which admits only its initializer's
-     * first push; gives the commit.
-     */
     readonly pushInitial: (
       project: ProjectName,
       files: SeedPlan["initFiles"],
       as: Handle
     ) => Effect.Effect<CommitSha, SeedFailed>;
-    /**
-     * Every ref of `repo` as `as` lists them through the gateway, by name;
-     * none when the gateway serves no such repo (a layer's, before the
-     * platform has made it). Fails when `as` may not read it.
-     */
     readonly refsAt: (
       repo: RepoName,
       as: Handle
@@ -708,17 +573,11 @@ export class SeedTarget extends Context.Service<
       Option.Option<ReadonlyMap<string, CommitSha>>,
       SeedFailed
     >;
-    /** Every file's path at `ref` of `repo`, as `as` fetches it. */
     readonly pathsAt: (
       repo: RepoName,
       ref: string,
       as: Handle
     ) => Effect.Effect<readonly RepoPath[], SeedFailed>;
-    /**
-     * A commit of `files` with no parent, made as `as` with `message` at the
-     * seed's fixed dates, pushed to `ref` of `repo` through the gateway;
-     * gives the commit.
-     */
     readonly pushCommit: (input: {
       readonly repo: RepoName;
       readonly ref: string;
@@ -733,16 +592,11 @@ const isRefusal = Schema.is(Refusal);
 
 const isProjectExists = Schema.is(ProjectExists);
 
-/** What a call to the platform fails with: a refusal, or the transport's own error. */
 interface CallFailure {
   readonly _tag: string;
   readonly message: string;
 }
 
-/**
- * A call that failed: a refusal, said as `explain` says it everywhere, or
- * a platform that didn't answer.
- */
 const failedCall = (call: string) => (error: CallFailure) =>
   isRefusal(error)
     ? new SeedFailed({
@@ -753,14 +607,8 @@ const failedCall = (call: string) => (error: CallFailure) =>
       })
     : failed(`${call} got no answer from the platform: ${error.message}`);
 
-/** main, as git names it. */
 export const MAIN_REF = "refs/heads/main";
 
-/**
- * Whether the platform has a session for the operator and for every plan's
- * decider: fails naming everyone it has none for, so a seed never stops
- * half-way for want of one.
- */
 export const ready = (
   plans: readonly SeedPlan[]
 ): Effect.Effect<void, SeedFailed, SeedTarget> =>
@@ -771,16 +619,12 @@ export const ready = (
     ])
   );
 
-/** What a platform holds for one seeded project. */
 export interface SeededProject {
   readonly project: ProjectName;
-  /** Its asks that are not closed, as anyone lists them. */
   readonly asks: readonly AskListing[];
-  /** Every ref of its canonical repo, by name, sorted: main, the landed mirror, notes, the commits checks ran on. */
   readonly refs: readonly (readonly [string, CommitSha])[];
 }
 
-/** What the platform holds now for each project of `plans`, read as each one's decider. */
 export const seeded = (
   plans: readonly SeedPlan[]
 ): Effect.Effect<readonly SeededProject[], SeedFailed, SeedTarget> =>
@@ -807,21 +651,13 @@ export const seeded = (
     )
   );
 
-/** How often, and how many times, the seed asks again for a layer's repo. */
 const LAYER_WAIT = { every: Duration.seconds(1), times: 30 } as const;
 
-/** The platform has not made a layer's repo yet. */
 class NotMadeYet extends Schema.TaggedError<NotMadeYet>()("NotMadeYet", {
   repo: RepoName,
 }) {}
 
-/**
- * Pushes one layer to its repo in the private namespace, as the decider,
- * once the platform has made it (a landing that declares the layer makes
- * it): first each known-bad commit to its branch, so admission finds
- * every commit the manifest names, then the layer's files to main,
- * which proposes its checks. A layer whose main is there is left alone.
- */
+// Known-bad commits go first, so admission finds every commit the manifest names.
 const seedLayer = (
   layer: LayerStep,
   decider: Handle
@@ -893,11 +729,7 @@ const seedLayer = (
     return reported("done");
   });
 
-/**
- * `runSeed`, with `made` run once the platform has made the project and
- * before anything else is put on it: `seed --as` writes a copy to the
- * throwaway ledger there, so a run that fails later still leaves it there.
- */
+/** `made` runs as soon as the project exists, so a run that fails later still records it. */
 export const runSeedWith = <R>(
   plan: SeedPlan,
   made: (plan: SeedPlan) => Effect.Effect<void, SeedFailed, R>
@@ -977,35 +809,18 @@ export const runSeedWith = <R>(
     })
   );
 
-/**
- * Seeds one project: makes it and pushes main's first commit as the
- * operator, then opens each ask and pushes each layer as the decider. Both
- * sessions are checked before the first step, so a missing one stops the
- * seed before it starts.
- *
- * A copy (`renameSeedPlan`) is made fresh: a name some project has is
- * refused with its `ProjectExists`, before anything is pushed.
- */
 export const runSeed = (
   plan: SeedPlan
 ): Effect.Effect<readonly SeedStep[], SeedFailed, SeedTarget> =>
   runSeedWith(plan, () => Effect.void);
 
-// ------------------------------------------------------------ the platform
-
-/** A platform the seed reaches over HTTP and git. */
 export interface Platform {
-  /** Where it serves `/rpc` and git: `https://platform-dev-….workers.dev`. */
   readonly origin: string;
-  /** Who makes each project and pushes its first commit. */
   readonly operator: Handle;
-  /** Each person's token, by handle. Never printed. */
   readonly tokens: ReadonlyMap<Handle, Redacted.Redacted>;
-  /** Where a missing person's token goes, for the message that names them. */
   readonly sessionsFrom: string;
 }
 
-/** The refs `git ls-remote` lists, one a line: `<sha>\t<ref>`. */
 const refsIn = (listed: string) =>
   Effect.map(
     Effect.forEach(
@@ -1024,23 +839,19 @@ const refsIn = (listed: string) =>
     (refs): ReadonlyMap<string, CommitSha> => new Map(refs)
   );
 
-// What git says of a repo the server doesn't serve.
 const NOT_SERVED = /\bnot found\b|\b404\b/u;
 
-/** The env var that hands git a token: in git's own env, never in its argv. */
+// The token reaches git through its env, never its argv.
 const TOKEN_VAR = "SEED_GIT_TOKEN";
 
-/** git's credential helper for one person: their handle, and the token from git's env. */
 const helperFor = (handle: Handle) =>
   `!f() { test "$1" = get || exit 0; echo username=${handle}; echo "password=$${TOKEN_VAR}"; }; f`;
 
-/** git's env as `handle`: `authorEnv`'s, and their token for the helper. */
 const gitEnv = (handle: Handle, token: Redacted.Redacted) => ({
   ...authorEnv(handle),
   [TOKEN_VAR]: Redacted.value(token),
 });
 
-/** The contracts over HTTP at `origin`'s `/rpc`, with `token` as the bearer. */
 const clientAt = (
   origin: string,
   token: Redacted.Redacted
@@ -1057,10 +868,6 @@ const clientAt = (
     Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson])
   );
 
-/**
- * The seed's target over a platform at an origin: the contracts over
- * `/rpc` and git through the gateway, each as a person with their token.
- */
 export const platformTarget = (
   platform: Platform
 ): Layer.Layer<
@@ -1075,8 +882,6 @@ export const platformTarget = (
       const path = yield* Path.Path;
       const { origin } = platform;
 
-      // A repo is reached at its project's name, its fork's or layer's
-      // parts after it (`oscabriel/datekit--maintainers`).
       const remoteOf = (repo: ProjectName | RepoName) =>
         repo.includes("/")
           ? `${origin}/${repo}.git`
@@ -1103,10 +908,6 @@ export const platformTarget = (
           : Effect.void;
       };
 
-      /**
-       * git as `as`, in `cwd`, with their token for its credential helper
-       * and no other helper: how it ended, and what it printed.
-       */
       const gitAs = (as: Handle, cwd: string, args: readonly string[]) =>
         Effect.flatMap(
           Effect.fromOption(tokenOf(as)).pipe(
@@ -1121,12 +922,10 @@ export const platformTarget = (
             ])
         );
 
-      /** git as `as` that must succeed; its output. */
       const gitOk = (as: Handle, cwd: string, args: readonly string[]) =>
         Effect.flatMap(gitAs(as, cwd, args), okOutput(args));
 
-      // An empty folder of the seed's own, removed with the scope: git run
-      // there reads no repo's config, as `gitEnv` keeps the machine's out.
+      // An empty folder, so git reads no repo's config.
       const scratch = fs
         .makeTempDirectoryScoped({ prefix: "seed-" })
         .pipe(Effect.mapError(() => failed("can't make a temporary folder")));
@@ -1186,7 +985,6 @@ export const platformTarget = (
           })
         );
 
-      /** A commit of `files` with no parent, made as `as` and pushed to `ref` of `repo`. */
       const pushCommit = (input: {
         readonly repo: ProjectName | RepoName;
         readonly ref: string;
@@ -1224,8 +1022,7 @@ export const platformTarget = (
           })
         );
 
-      // git ends a message with one newline whether given one or not, so
-      // main's first commit is the one this made before layers had a step.
+      // git ends a message with one newline whether given one or not.
       const pushInitial = (
         project: ProjectName,
         files: SeedPlan["initFiles"],
@@ -1256,35 +1053,20 @@ export const platformTarget = (
     })
   );
 
-// --------------------------------------------------------------- the world
-
-/** The file that serves the Node world as a process, from the repo root. */
 const SERVE_WORLD = "apps/platform/test/serve-world.ts";
 
-/** How long the world has to start serving. */
 const WORLD_START = Duration.seconds(60);
 
-/** The line the world prints once it serves. */
 const decodeServing = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Struct({ origin: Schema.String }))
 );
 
-/**
- * The world's operator: a session of the world's own, under the handle the
- * stages' operator has (`OPERATOR_HANDLE`), so the examples are made in the
- * namespace they have on a stage (`oscabriel/datekit`).
- */
+/** The stages' operator handle, so the examples get the namespace they have on a stage. */
 export const worldOperator = Handle.make("oscabriel");
 
-/** A token for `handle` in a world on this machine: no secret, never leaves it. */
 const worldToken = (handle: Handle) =>
   Redacted.make(`${handle.toLowerCase()}-seed-world-token-0123456789abcdef`);
 
-/**
- * The Node world (`apps/platform/test/world.ts`) served by a process of its
- * own for as long as the scope lasts, with a session for each person in
- * `sessions`; gives where it serves.
- */
 export const servedWorld = (sessions: ReadonlyMap<Handle, Redacted.Redacted>) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -1313,8 +1095,7 @@ export const servedWorld = (sessions: ReadonlyMap<Handle, Redacted.Redacted>) =>
         )
       );
 
-    // Both streams are read to their end, so the world never blocks on a
-    // full pipe; the last of what it said on stderr is kept for a failure.
+    // Both streams are drained so the world never blocks on a full pipe.
     const said = yield* Ref.make("");
     const serving = yield* Deferred.make<string>();
 
@@ -1361,10 +1142,6 @@ export const servedWorld = (sessions: ReadonlyMap<Handle, Redacted.Redacted>) =>
     );
   });
 
-/**
- * The seed's target over the Node world, served for as long as the layer
- * lasts, where the operator and each of `people` have a session.
- */
 export const worldTarget = (
   people: readonly Handle[]
 ): Layer.Layer<
@@ -1389,13 +1166,8 @@ export const worldTarget = (
     })
   );
 
-// --------------------------------------------------------------- a stage
-
-/** Where a stage's tokens come from: the env vars that hold them. */
 export interface StageTokens {
-  /** A JSON object from token to handle, as the platform's `SESSION_TOKENS` is. */
   readonly sessions: string;
-  /** The operator's token, as the platform's `OPERATOR_TOKEN` is. */
   readonly operator: string;
 }
 
@@ -1403,13 +1175,6 @@ const decodeSessions = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Record(Schema.String, Handle))
 );
 
-/**
- * The seed's target over a deployed stage at `origin`. Every token comes
- * from the env (`bunx varlock run --path apps/platform/ -- …`), and none is
- * ever printed, not even in a failure: the operator's from `tokens.operator`,
- * everyone else's from `tokens.sessions`. The operator's handle is whoever
- * the platform says their token names (`status`).
- */
 export const stageTarget = (
   origin: string,
   tokens: StageTokens

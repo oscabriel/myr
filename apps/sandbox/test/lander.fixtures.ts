@@ -46,24 +46,16 @@ export const requestId = RequestId.make("push-parse-iso-1");
 /** The token every remote carries: no command line, result or log may show it. */
 export const secret = "art_v1_0123456789abcdef0123456789abcdef01234567";
 
-/** A path in this repo, from the sandbox's test folder. */
 export const inRepo = (path: string) =>
   new URL(`../../../${path}`, import.meta.url).pathname;
 
-/**
- * The sdk a config folder's imports resolve to: this repo's own, where the
- * image keeps its copy under `/opt/sdk` (its entry, and the packages its own
- * imports resolve in).
- */
 export const sdk = {
   entry: inRepo("packages/sdk/src/index.ts"),
   modules: inRepo("packages/sdk/node_modules"),
 };
 
-/** What a file holds after a commit, or `null` for a file the commit deletes. */
 export type Files = Readonly<Record<string, string | null>>;
 
-/** The message of a landing that credits dora as asker and bob as answerer. */
 export const message = formatLanding({
   assisted: [],
   credits: [
@@ -95,18 +87,15 @@ export const verdictOn = (input: {
     verifier: "platform",
   });
 
-/** Every ref of a bare repo, with what it points at. */
 const refsOf = (repo: string) =>
   gitOk(repo, "for-each-ref", "--format=%(refname) %(objectname)");
 
-/** What a bare repo holds: its refs, and how many objects. */
 const stateOf = (repo: string) =>
   Effect.all({
     objects: gitOk(repo, "count-objects", "-v"),
     refs: refsOf(repo),
   });
 
-/** One revision's id in a bare repo, or `None` when it has none. */
 const revision = (repo: string, rev: string) =>
   Effect.map(
     git(repo, "rev-parse", "--verify", "--quiet", rev),
@@ -114,15 +103,8 @@ const revision = (repo: string, rev: string) =>
       exitCode === 0 ? Option.some(stdout.trim()) : Option.none()
   );
 
-/** A repo's remote as a job carries it: its URL, and a token for it. */
 const remote = (url: string) => ({ token: Redacted.make(secret), url });
 
-/**
- * Two bare repos on disk, canonical and the claim's fork, and a working
- * clone the test makes commits in and pushes from, as people would. The
- * Lander under test works in its own folder (`layout.work`) and reaches the
- * repos only through the remotes it is handed.
- */
 export const world = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -137,7 +119,6 @@ export const world = Effect.gen(function* () {
   yield* gitOk(root, "init", "--quiet", "-b", "main", clone);
   yield* fs.makeDirectory(work);
 
-  /** A commit of `files` over `parent` (or over nothing), made in the clone. */
   const commit = (
     parent: CommitSha | undefined,
     files: Files,
@@ -165,17 +146,14 @@ export const world = Effect.gen(function* () {
       return CommitSha.make(yield* gitOk(clone, "rev-parse", "HEAD"));
     });
 
-  /** Sets `ref` in the bare repo `repo` to `sha`, as a person's push would. */
   const push = (repo: string, sha: CommitSha, ref = "refs/heads/main") =>
     gitOk(clone, "push", "--quiet", "--force", repo, `${sha}:${ref}`);
 
-  /** A blob's id at `file` in `at`, read in the clone. */
   const blobAt = (at: CommitSha, file: string) =>
     Effect.map(gitOk(clone, "rev-parse", `${at}:${file}`), (blob) =>
       BlobSha.make(blob)
     );
 
-  /** The tree git's own merge of `theirs` into `ours` makes, in the clone. */
   const mergedTree = (ours: CommitSha, theirs: CommitSha) =>
     Effect.gen(function* () {
       yield* gitOk(clone, "checkout", "--quiet", "--detach", ours);
@@ -257,14 +235,8 @@ export const diverged = (repos: World) =>
     return { base, clash, head, main: LandedSha.make(main) };
   });
 
-/** The mirror ref a landing moves, after main. */
 export const landedRefName = `${Brand.refsPrefix}landed`;
 
-/**
- * The Lander's container, as local processes working in `work`: the sdk is
- * this repo's, and the file naming its version (which the image writes when
- * it is built) is written beside `work`.
- */
 export const layout = (work: string) =>
   Layer.effect(
     Layout,
@@ -283,7 +255,6 @@ export const layout = (work: string) =>
     }).pipe(Effect.orDie)
   ).pipe(Layer.provide(NodeServices.layer));
 
-/** The Lander's container over local processes, its `Box` changed by `wrap` when a test needs to. */
 export const box = (
   work: string,
   wrap: (inner: Box["Service"]) => Box["Service"] = (inner) => inner
@@ -295,16 +266,9 @@ export const box = (
 
 export const TestServices = NodeServices.layer;
 
-/** A file's path in the config folder. */
 export const config = (file: string) => `${Brand.configDir}/${file}`;
 
-/**
- * A config folder as maintainers write one: the project module (importing
- * the sdk by its published name, and a helper beside it), an ask file
- * (importing the sdk by its workspace name), the ask's check, which imports
- * a test runner the Lander never has, the visibility module, and the vouch
- * file.
- */
+/** The ask's check imports a test runner the Lander never has. */
 export const configFolder = {
   [config("asks/parse-iso.ask.ts")]: [
     'import { kinds, territory } from "@repo/sdk";',
@@ -350,7 +314,6 @@ export const configFolder = {
   [config("vouched.td")]: "dora\nbob\n",
 } satisfies Files;
 
-/** datekit's first commit with `files` beside its code, on canonical `main`. */
 export const startedWith = (repos: World, files: Files) =>
   Effect.gen(function* () {
     const at = yield* repos.commit(undefined, { ...start, ...files }, "Start");
@@ -360,7 +323,6 @@ export const startedWith = (repos: World, files: Files) =>
     return LandedSha.make(at);
   });
 
-/** A bundle of datekit's config folder at `at`. */
 export const bundleWire = (repos: World, at: LandedSha) => ({
   job: { at, repo: project },
   main: repos.remote(repos.canonical),

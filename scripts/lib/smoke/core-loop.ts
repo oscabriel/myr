@@ -1,18 +1,3 @@
-/**
- * The core loop's steps, as smoke's `--loop` takes them on a platform:
- * each one through the CLI (this repo's, run
- * from source with Bun) or git, as a person would, with the person's
- * platform token only in their processes' env, and git's credential helper
- * the CLI itself.
- *
- * The project is a fixture made here: one source file, a config folder that
- * runs `bun test {path}` and vouches for the answerer, and one ask whose
- * check fails on main by an assertion. The answer reaches outside the ask's
- * territory first (the README), then puts the README back.
- *
- * Every step fails with `LoopFailed`, naming the step and what went wrong in
- * words a person reads, never a token.
- */
 import { Brand } from "@repo/brand";
 import { AnswerView } from "@repo/protocol/domain/answer";
 import { Ask } from "@repo/protocol/domain/ask";
@@ -46,7 +31,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { cliEntry, personEnv } from "../swarm/workspace.ts";
 
-/** The loop's steps, in the order it takes them. */
 export const LoopStep = Schema.Literals([
   "people",
   "init",
@@ -63,7 +47,7 @@ export const LoopStep = Schema.Literals([
 
 export type LoopStep = typeof LoopStep.Type;
 
-/** A step of the loop went wrong: which, and why. Never holds a token. */
+// Never holds a token.
 export class LoopFailed extends Schema.TaggedError<LoopFailed>()("LoopFailed", {
   reason: Schema.String,
   step: LoopStep,
@@ -73,24 +57,17 @@ export class LoopFailed extends Schema.TaggedError<LoopFailed>()("LoopFailed", {
   }
 }
 
-// ------------------------------------------------------------ the fixture
-
-/** Where the config folder's sdk is imported from, as a maintainer writes it. */
 const sdk = `${Brand.cliPackage}/rules`;
 
-/** The ask the loop opens and answers. */
 export const ASK = AskId.make("parse-year");
 
-/** The one file the ask's territory holds. */
 const SOURCE = "src/parse.ts";
 
-/** The ask's check: the file its kind runs. */
 const CHECK = `test/${ASK}.test.ts`;
 
 const README =
   "A throwaway project smoke's core loop makes, answers and lands.\n";
 
-/** The project as its decider first pushes it, the answerer vouched for. */
 const startFiles = (answerer: Handle) => ({
   [`${Brand.configDir}/project.ts`]: [
     `import { kinds, project } from "${sdk}";`,
@@ -107,7 +84,6 @@ const startFiles = (answerer: Handle) => ({
   [SOURCE]: "export const parse = (iso: string) => ({ iso, year: 0 });\n",
 });
 
-/** The ask's own files: its file in the config folder, and its check, which asserts. */
 const askFiles = [
   {
     content: [
@@ -137,37 +113,28 @@ const askFiles = [
   },
 ] as const;
 
-/** The answer: the year, read. */
 const yearRead =
   "export const parse = (iso: string) => ({ iso, year: Number(iso.slice(0, 4)) });\n";
 
-// --------------------------------------------------------------- processes
-
-/** How a process ended, and what it printed. */
 interface Ran {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
 }
 
-/** The longest one command may take: a cold Checker runs an ask's check twice. */
+// A cold Checker runs an ask's check twice.
 const PATIENCE = Duration.minutes(10);
 
-/** One person the loop acts as. */
 export interface LoopPerson {
   readonly handle: Handle;
-  /** Their folder: the CLI's config, their gitconfig, git's credential helper. */
   readonly home: string;
-  /** The env their CLI and git run in: their token, the platform, their gitconfig. */
   readonly env: Readonly<Record<string, string | undefined>>;
-  /** Their token, blanked out of anything the loop says. */
   readonly token: Redacted.Redacted;
 }
 
 const failed = (step: LoopStep, reason: string) =>
   new LoopFailed({ reason, step });
 
-/** `text` with each of `tokens` blanked out. */
 const scrubbed = (text: string, tokens: readonly Redacted.Redacted[]) => {
   let clean = text;
 
@@ -178,11 +145,9 @@ const scrubbed = (text: string, tokens: readonly Redacted.Redacted[]) => {
   return clean;
 };
 
-/** All a byte stream says, as text. */
 const textOf = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** `command args` in `cwd` as `person`: how it ended, and what it printed. */
 const run = (
   step: LoopStep,
   person: Pick<LoopPerson, "env" | "token">,
@@ -229,7 +194,6 @@ const run = (
     })
   );
 
-/** git as `person` in `cwd`, which must succeed; what it printed. */
 const gitOk = (
   step: LoopStep,
   person: LoopPerson,
@@ -250,12 +214,6 @@ const gitOk = (
         )
   );
 
-/**
- * One CLI command as `person`, with `--json`: its data, decoded by `data`.
- * A refusal fails the step with what the platform said, as `explain` says
- * it everywhere; output that is no envelope fails it with what the command
- * printed.
- */
 const cli = <A, I>(
   step: LoopStep,
   person: Pick<LoopPerson, "env" | "token">,
@@ -300,12 +258,6 @@ const cli = <A, I>(
         );
   });
 
-// ----------------------------------------------------------------- people
-
-/**
- * git's credential helper for a person: this repo's CLI from source, as
- * `git-credential-<slug>`, which hands git the token in the env.
- */
 const helperShim = [
   "#!/bin/sh",
   `# ${Brand.gitCredentialHelper} for smoke's core loop: this repo's CLI from source, under Bun.`,
@@ -313,19 +265,11 @@ const helperShim = [
   "",
 ].join("\n");
 
-/** A shim runs for everyone; only its owner writes it. */
 const SHIM_MODE = 0o755;
 
-/** A person's folder holds the CLI's config: owner only. */
 const HOME_MODE = 0o700;
 
-/**
- * A person at `home` on the platform at `origin`, holding `token`: their
- * folder, with git's credential helper on `PATH` and a gitconfig of their
- * own (their name, and the helper for the platform), so nothing of this
- * machine's git or CLI config answers instead. Their handle is whoever the
- * platform says the token names (`status`).
- */
+// A gitconfig of their own, so nothing of this machine's git or CLI config answers instead.
 export const personAt = (input: {
   readonly home: string;
   readonly origin: string;
@@ -409,9 +353,6 @@ export const personAt = (input: {
     return { env, handle, home, token };
   });
 
-// ------------------------------------------------------------------ steps
-
-/** `files` written under `dir`, each at its path. */
 const writeFiles = (
   step: LoopStep,
   dir: string,
@@ -437,7 +378,6 @@ const writeFiles = (
     )
   );
 
-/** `files` written in the work tree at `cwd` and committed as `person`; the commit. */
 const commit = (
   step: LoopStep,
   person: LoopPerson,
@@ -464,11 +404,6 @@ const Listed = Schema.Struct({
   projects: Schema.Array(Schema.Struct({ project: ProjectName })),
 });
 
-/**
- * Whether `project` is free on the platform, as `person` lists every
- * project (`<cli> projects`): a taken name fails the step, before
- * anything is made.
- */
 export const projectIsFree = (person: LoopPerson, project: ProjectName) =>
   Effect.flatMap(cli("init", person, ["projects"], Listed), ({ projects }) =>
     projects.some((listed) => listed.project === project)
@@ -486,11 +421,6 @@ const Inited = Schema.Struct({
   remote: Schema.NonEmptyString,
 });
 
-/**
- * Makes `project` from the fixture, as `decider`: a repo of its first files
- * at `dir`, then `<cli> init`, which makes the project, wires its remote
- * and pushes main's first commit.
- */
 export const initProject = (input: {
   readonly decider: LoopPerson;
   readonly answerer: Handle;
@@ -532,7 +462,6 @@ export const initProject = (input: {
 
 const Opened = Schema.Struct({ ask: Ask, landed: LandedSha });
 
-/** Opens the fixture's ask as `decider`: its check fails on main twice the same way first. */
 export const openAsk = (decider: LoopPerson, project: ProjectName) =>
   cli(
     "open-ask",
@@ -552,7 +481,6 @@ export const openAsk = (decider: LoopPerson, project: ProjectName) =>
 
 const Claimed = Schema.Struct({ claim: ClaimView });
 
-/** Claims the fixture's ask as `answerer`: their fork, and where it lives. */
 export const claimAsk = (answerer: LoopPerson, project: ProjectName) =>
   Effect.map(
     cli("claim", answerer, ["claim", ASK, "--project", project], Claimed),
@@ -563,18 +491,11 @@ export const claimAsk = (answerer: LoopPerson, project: ProjectName) =>
 // it: `remote: OutOfScope: …`.
 const REFUSAL_LINE = /^remote: (?<tag>[A-Z][A-Za-z]+): /gmu;
 
-/** The refusals' tags git printed from the platform, in order. */
 export const refusalTags = (stderr: string): readonly string[] =>
   [...stderr.matchAll(REFUSAL_LINE)].flatMap(({ groups }) =>
     groups?.tag === undefined ? [] : [groups.tag]
   );
 
-/**
- * Clones the claim's fork as `answerer` into `dir`, and pushes an answer
- * that reaches outside the ask's territory (the README besides the source):
- * git must refuse it, `OutOfScope` among the platform's words. Gives every
- * refusal git printed.
- */
 export const pushOutOfScope = (input: {
   readonly answerer: LoopPerson;
   readonly claim: ClaimView;
@@ -616,7 +537,6 @@ export const pushOutOfScope = (input: {
         );
   });
 
-/** Puts the README back and pushes again: the answer is taken, and checked. */
 export const pushAnswer = (answerer: LoopPerson, dir: string) =>
   Effect.gen(function* () {
     const head = yield* commit(
@@ -650,19 +570,16 @@ export const pushAnswer = (answerer: LoopPerson, dir: string) =>
 
 const Status = Schema.Struct({ answers: Schema.Array(AnswerView) });
 
-/** The answer's outcome is not in yet: the gate is still at it. */
 class StillChecking extends Schema.TaggedError<StillChecking>()(
   "StillChecking",
   {}
 ) {}
 
-/** How the loop waits for a landing: how often it asks, and for how long. */
 export interface Patience {
   readonly every: Duration.Duration;
   readonly within: Duration.Duration;
 }
 
-/** What an outcome other than a landing says, in a line. */
 const outcomeLine = (outcome: Outcome) =>
   Outcome.match(outcome, {
     AwaitingDecision: ({ decision }) => `waits on the decision ${decision}`,
@@ -676,10 +593,6 @@ const outcomeLine = (outcome: Outcome) =>
     WaitingOnParent: ({ ask }) => `waits for its parent ask ${ask} to land`,
   });
 
-/**
- * Asks `<cli> status` as `answerer` until the answer at `head` is past the
- * gate: its landing, or the step fails with how it ended instead.
- */
 export const awaitLanding = (input: {
   readonly answerer: LoopPerson;
   readonly project: ProjectName;
@@ -731,17 +644,12 @@ export const awaitLanding = (input: {
         );
   });
 
-/** What the landing commit on main says of itself. */
 export interface LandingRead {
   readonly author: string;
   readonly committer: string;
   readonly trailers: readonly string[];
 }
 
-/**
- * Reads the landing on the project's main, from the answerer's clone: main
- * is at `landed`, and the commit's author, committer and trailers.
- */
 export const readLanding = (input: {
   readonly answerer: LoopPerson;
   readonly dir: string;
@@ -783,19 +691,13 @@ export const readLanding = (input: {
     return { author, committer, trailers } satisfies LandingRead;
   });
 
-/** Where verdicts live as git notes (`@repo/git/notes`'s `notesRef`). */
+// `@repo/git/notes`' `notesRef`.
 const NOTES = `refs/notes/${Brand.slug}`;
 
-/** How long the loop waits for the verdict note, which follows the verdict. */
 const NOTE_WAIT = { every: Duration.seconds(1), times: 30 } as const;
 
-/** The verdict note is not on the answer's head yet. */
 class NoNoteYet extends Schema.TaggedError<NoNoteYet>()("NoNoteYet", {}) {}
 
-/**
- * Reads the verdict note on the answer's `head` in the fork, with plain
- * git, as the answerer: fetch the notes ref, then `git notes show`.
- */
 export const readVerdictNote = (input: {
   readonly answerer: LoopPerson;
   readonly dir: string;
@@ -839,9 +741,6 @@ export const readVerdictNote = (input: {
     )
   );
 
-// ------------------------------------------------------------------ drafts
-
-/** What the loop's draft proposal wants: a reader of ordinal dates beside `parse`. */
 const DRAFT_WANT =
   "src/parse.ts exports parseOrdinal, which reads an ordinal date such as 2026-280.";
 
@@ -849,7 +748,6 @@ const Proposed = Schema.Struct({ proposal: Proposal });
 
 const Shown = Schema.Struct({ proposal: Proposal });
 
-/** Proposes the draft's want as `proposer`, with `--draft`: the proposal, drafting. */
 export const proposeDraft = (proposer: LoopPerson, project: ProjectName) =>
   Effect.map(
     cli(
@@ -861,22 +759,16 @@ export const proposeDraft = (proposer: LoopPerson, project: ProjectName) =>
     ({ proposal }) => proposal.id
   );
 
-/** The draft is still being drafted. */
 class StillDrafting extends Schema.TaggedError<StillDrafting>()(
   "StillDrafting",
   {}
 ) {}
 
-/** A draft that went red first: the model that drafted it, and its attempts. */
 export interface DraftReady {
   readonly model: string;
   readonly attempts: number;
 }
 
-/**
- * Asks `<cli> proposal <id>` as `reader` until the draft is settled: ready,
- * or the step fails with the last refusal a failed draft names.
- */
 export const awaitDraft = (input: {
   readonly reader: LoopPerson;
   readonly project: ProjectName;
@@ -886,7 +778,6 @@ export const awaitDraft = (input: {
   Effect.gen(function* () {
     const { project, proposal, reader } = input;
 
-    /** Where the draft stands: settled, or still drafting, which is asked again. */
     const settled = (
       shown: Proposal
     ): Effect.Effect<DraftState, LoopFailed | StillDrafting> =>
@@ -943,13 +834,6 @@ const TodayIs = Schema.Struct({ decisions: Schema.Array(Decision) });
 
 const Decided = Schema.Struct({ decision: Decision });
 
-/**
- * Accepts the drafted proposal as `decider`, from their Today, and reads
- * the landing that opened its ask on main, fetched from the platform at
- * `origin` into the repo at `dir`: its
- * trailers, which must disclose the drafter (`Assisted-by:`) and credit
- * `proposer` as its asker.
- */
 export const acceptDraft = (input: {
   readonly decider: LoopPerson;
   readonly proposer: Handle;

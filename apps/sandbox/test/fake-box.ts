@@ -1,9 +1,3 @@
-/**
- * The Checker's capabilities as fakes that record every call, in order, in
- * one list: the container (`Box`), its network, its snapshots, where its logs
- * go, and the Worker's own log lines. A test scripts what each command prints
- * and reads back what the Checker did, phase by phase.
- */
 import { untouchable } from "@repo/testkit/untouchable";
 import { Effect, Layer, Logger, Redacted, References } from "effect";
 
@@ -16,19 +10,13 @@ import { Snapshots } from "../src/checker/snapshots.ts";
 import type { EnvGatewayProps } from "../src/env-gateway.ts";
 import type { CloneProps, EgressProps } from "../src/outbound.ts";
 
-/** What the container could reach at one moment. */
 export type Reach = "clone route" | readonly string[];
 
-/** One thing the Checker did, as the fakes saw it. */
 export type Call =
   | {
       readonly kind: "exec";
       readonly argv: readonly string[];
       readonly options: ExecOptions;
-      /**
-       * What the network let out as the command started: the clone route
-       * alone before the first `allow`, then the hosts that `allow` named.
-       */
       readonly network: Reach;
     }
   | { readonly kind: "writeFile"; readonly path: string; readonly text: string }
@@ -56,7 +44,6 @@ export type Call =
       readonly annotations: Readonly<Record<string, string>>;
     };
 
-/** What a command left, for a script. */
 export const exited = (
   exitCode: number,
   output: { readonly stdout?: string; readonly stderr?: string } = {}
@@ -68,28 +55,19 @@ export const exited = (
   });
 
 export interface FakeOptions {
-  /**
-   * What `sh -c <command>` does, by command (setup and lanes). A command not
-   * listed exits 0 and prints nothing.
-   */
+  /** A command not listed exits 0 and prints nothing. */
   readonly commands?: ReadonlyMap<string, Effect.Effect<Executed, BoxFailed>>;
-  /** What `git ls-tree` prints: the lockfiles at the checked-out tree. */
   readonly lockfiles?: string;
-  /** Snapshot keys kept so far, shared by the jobs a test runs. */
   readonly snapshots?: Set<string>;
-  /** What writing a file does, by path; every write succeeds when absent. */
   readonly writeFile?: (path: string) => Effect.Effect<void, BoxFailed>;
 }
 
-/** A lockfile listing, as `git ls-tree HEAD -- <names>` prints one. */
 export const LOCKFILES =
   "100644 blob 8f2c1d0e9b7a6c5d4e3f2a1b0c9d8e7f6a5b4c3d\tbun.lock\n";
 
-/** The command `sh -c <command>` runs, or none for any other argv. */
 const shellCommandOf = (argv: readonly string[]) =>
   argv[0] === "sh" && argv[1] === "-c" ? argv[2] : undefined;
 
-/** The fakes for one job, and the list their calls go to. */
 export const fakeChecker = (options: FakeOptions = {}) => {
   const calls: Call[] = [];
   const kept = options.snapshots ?? new Set<string>();
@@ -206,7 +184,6 @@ export const fakeChecker = (options: FakeOptions = {}) => {
         ),
         kind: "log",
         level: logLevel,
-        // A log line's message is its arguments, one string here.
         message: String(message),
       });
     }),
@@ -218,7 +195,6 @@ export const fakeChecker = (options: FakeOptions = {}) => {
   };
 };
 
-/** One thing done to a Durable Object's container, as the Container API saw it. */
 export type ContainerCall =
   | {
       readonly kind: "exec";
@@ -229,7 +205,6 @@ export type ContainerCall =
   | {
       readonly kind: "start";
       readonly from: string;
-      /** The instance size the start named, when it named one. */
       readonly instance?: ContainerStartupOptions["instance"];
     }
   | { readonly kind: "snapshot" }
@@ -244,14 +219,6 @@ const bytes = (text: string) => {
   return buffer;
 };
 
-/**
- * A container as the Container API shows a Durable Object one, running
- * unless `running` says otherwise (a stopped one is started before each
- * command): it records each call, prints a lockfile listing for `git
- * ls-tree`, and exits 0 with no output for every other command. Its
- * outbound intercepts record which gateway, with which props, took each
- * target.
- */
 export const fakeContainer = ({ running = true } = {}) => {
   const calls: ContainerCall[] = [];
   const gateways = new Map<Fetcher, string>();
@@ -322,7 +289,6 @@ export const fakeContainer = ({ running = true } = {}) => {
     },
   });
 
-  /** The loopbacks `ctx.exports` holds for the Worker's outbound gateways. */
   const exports = {
     CloneGateway: ({ props }: { readonly props: CloneProps }) =>
       gateway(`clone ${props.remote} ${props.token}`),

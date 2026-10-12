@@ -1,19 +1,13 @@
-/**
- * Just enough JSONC for `wrangler.jsonc`: read it as JSON, and find where
- * each value sits so one value can be rewritten in place, leaving every
- * comment, comma and line as it was.
- */
+// Just enough JSONC to rewrite one `wrangler.jsonc` value in place, leaving
+// every comment, comma and line as it was.
 
-/** A value's place in the text: `[start, end)`. */
 export interface Span {
   readonly start: number;
   readonly end: number;
 }
 
-/** A path into a JSON value: object keys and array indexes. */
 export type JsonPath = readonly (string | number)[];
 
-/** One key for a path, for a `Map`. */
 export const pathKey = (path: JsonPath) => JSON.stringify(path);
 
 const blankRange = (chars: string[], from: number, to: number) => {
@@ -24,7 +18,6 @@ const blankRange = (chars: string[], from: number, to: number) => {
   }
 };
 
-/** The offset just past the string literal that opens at `start`. */
 const stringEnd = (text: string, start: number) => {
   let at = start + 1;
 
@@ -35,7 +28,6 @@ const stringEnd = (text: string, start: number) => {
   return at + 1;
 };
 
-/** Where the comment at `at` ends, or `at` when none starts there. */
 const commentEnd = (text: string, at: number) => {
   if (text.startsWith("//", at)) {
     const end = text.indexOf("\n", at);
@@ -52,14 +44,10 @@ const commentEnd = (text: string, at: number) => {
   return at;
 };
 
-/** Whether only whitespace stands between `at` and a closing bracket. */
 const closesNext = (text: string, at: number) =>
   /^\s*[\]}]/u.test(text.slice(at + 1));
 
-/**
- * `text` with every comment and trailing comma turned to spaces: plain JSON
- * whose offsets are the original's.
- */
+// Comments and trailing commas become spaces, so offsets stay the original's.
 export const blankJsonc = (text: string): string => {
   // UTF-16 units, so every offset is a `slice` offset.
   const chars = text.split("");
@@ -98,7 +86,6 @@ export const blankJsonc = (text: string): string => {
   return chars.join("");
 };
 
-/** A cursor over plain JSON that records each value's span by its path. */
 interface Reader {
   readonly json: string;
   readonly spans: Map<string, Span>;
@@ -119,7 +106,6 @@ const readString = (reader: Reader) => {
   return reader.json.slice(start, reader.at);
 };
 
-/** Reads the members of an object or array, after its opening bracket. */
 const readMembers = (
   reader: Reader,
   close: "}" | "]",
@@ -170,7 +156,6 @@ const readValue = (reader: Reader, path: JsonPath): void => {
   reader.spans.set(pathKey(path), { end: reader.at, start });
 };
 
-/** Where every value in `json` (plain JSON, as `blankJsonc` makes it) sits, by path. */
 export const valueSpans = (json: string): ReadonlyMap<string, Span> => {
   const reader: Reader = { at: 0, json, spans: new Map() };
 

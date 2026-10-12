@@ -1,11 +1,3 @@
-/**
- * One contributor's workspace: `<swarm>/<run>/<handle>/` (`SwarmDir`, outside
- * the checkout), with their clone of
- * the claim's fork, a `bin/` that puts this repo's CLI (and git's credential
- * helper) on `PATH`, their own config folder, and the env their harness runs
- * in. The person's platform token reaches the harness only through that env,
- * as `<SLUG>_TOKEN`, never in a file, an argv or a URL.
- */
 import { Brand } from "@repo/brand";
 import type { ClaimView } from "@repo/protocol/domain/claim";
 import {
@@ -24,7 +16,6 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { runDir } from "./results.ts";
 import type { Contributor } from "./roster.ts";
 
-/** The swarm could not do a step; the reason says which, and never holds a token. */
 export class SwarmFailed extends Schema.TaggedError<SwarmFailed>()(
   "SwarmFailed",
   { reason: Schema.String }
@@ -34,39 +25,28 @@ export class SwarmFailed extends Schema.TaggedError<SwarmFailed>()(
   }
 }
 
-/** Where one contributor works, and the env their harness runs in. */
 export interface AgentWorkspace {
-  /** `<swarm>/<run>/<handle>`. */
   readonly dir: string;
-  /** Their clone of the claim's fork: the harness's working directory. */
   readonly clone: string;
   readonly env: Readonly<Record<string, string>>;
-  /** The env names whose values are secret: never logged, never printed. */
   readonly redacted: readonly string[];
 }
 
-/** The env names the CLI reads, spelled from the brand (`apps/cli/src/credentials.ts`). */
 const SLUG = Brand.slug.toUpperCase();
 
-/** The person's platform token: the only identity the CLI and git present. */
 export const TOKEN_VARIABLE = `${SLUG}_TOKEN`;
 
-/** The platform the CLI calls, with the token or, without one, as anyone. */
 export const URL_VARIABLE = `${SLUG}_URL`;
 
-/** The profile the CLI would read instead of the env's token. */
 const PROFILE_VARIABLE = `${SLUG}_PROFILE`;
 
-/** The CLI's process entry in this repo, run from source with Bun. */
 export const cliEntry = decodeURIComponent(
   new URL("../../../apps/cli/src/bin.ts", import.meta.url).pathname
 );
 
-/** A one-word shell argument: `'…'`, with any `'` inside closed and escaped. */
 export const shellQuoted = (word: string) =>
   /^[\w./:@%+=,-]+$/u.test(word) ? word : `'${word.replaceAll("'", `'\\''`)}'`;
 
-/** A shim in `bin/`: a shell script that runs the CLI from source with `args` first. */
 const shim = (what: string, args: readonly string[]) =>
   [
     "#!/bin/sh",
@@ -75,17 +55,11 @@ const shim = (what: string, args: readonly string[]) =>
     "",
   ].join("\n");
 
-/** Owner, group and everyone may run a shim; only the owner writes it. */
 const SHIM_MODE = 0o755;
 
-/** The workspace's config folder holds the CLI's credentials: owner only. */
 const CONFIG_MODE = 0o700;
 
-/**
- * The env a CLI call runs in as a person: their token and the platform, and
- * a config folder of their own, so no stored profile of the user's answers
- * instead.
- */
+// A config folder of their own, so no stored profile answers instead.
 export const personEnv = (input: {
   readonly configHome: string;
   readonly platformUrl: string;
@@ -96,10 +70,6 @@ export const personEnv = (input: {
   XDG_CONFIG_HOME: input.configHome,
 });
 
-/**
- * The env a CLI call runs in as anyone: the platform, a config folder that
- * holds no profile, and no token or profile from the shell the swarm runs in.
- */
 export const anonymousEnv = (input: {
   readonly configHome: string;
   readonly platformUrl: string;
@@ -110,7 +80,6 @@ export const anonymousEnv = (input: {
   XDG_CONFIG_HOME: input.configHome,
 });
 
-/** `text` with every secret value of `env` (the names in `redacted`) blanked out. */
 export const scrubbed = (
   text: string,
   workspace: Pick<AgentWorkspace, "env" | "redacted">
@@ -128,18 +97,15 @@ export const scrubbed = (
   return clean;
 };
 
-/** All a byte stream says, as text. */
 const streamText = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** How a process ended, and what it printed. */
 export interface Ran {
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
 }
 
-/** `command args` in `cwd` with `env` over the swarm's own: how it ended, and what it printed. */
 export const run = (input: {
   readonly command: string;
   readonly args: readonly string[];
@@ -173,12 +139,8 @@ export const run = (input: {
   );
 
 /**
- * How long a clone waits for the claim's fork: one try every `ForkWait`
- * (2 s unless a test says otherwise) after the first, `FORK_TRIES` more at
- * most, so about a minute. A claim returns before its outbox has made the
- * fork, and an Artifacts fork that failed under load is made again only at
- * the Project's next alarm, with backoff. Found live: one of six
- * claims made at once was cloned too soon.
+ * A claim returns before its outbox has made the fork, and a failed fork is
+ * made again only at the Project's next alarm, so a clone retries.
  */
 export const ForkWait = Context.Reference<Duration.Duration>("swarm/ForkWait", {
   defaultValue: () => Duration.seconds(2),
@@ -186,27 +148,15 @@ export const ForkWait = Context.Reference<Duration.Duration>("swarm/ForkWait", {
 
 export const FORK_TRIES = 30;
 
-/** git's words when the gateway answers 404: the repo is not there (yet). */
 const NOT_FOUND = /^fatal: repository '.*' not found$/mu;
 
-/** A clone that failed only because the fork is not made yet. */
 const forkNotMadeYet = (ran: Ran) =>
   ran.code !== 0 && NOT_FOUND.test(ran.stderr);
 
 /**
- * Makes one contributor's workspace for their claim, below `<swarm>/<run>/`:
- *
- * - `bin/<cli>` and `bin/git-credential-<slug>`, shims that run this repo's
- *   CLI from source (the helper as `<cli> credential`), first on `PATH`;
- * - `config/`, the CLI's `XDG_CONFIG_HOME`, so neither the CLI nor git's
- *   helper reads the user's own login (HOME stays the user's: the
- *   harnesses' own sign-ins live there);
- * - `clone/`, the claim's fork, cloned with the helper in its config for
- *   the platform (after an empty helper that drops any other, as `login`
- *   sets it globally), and the person as its author; while the fork is not
- *   made yet, the clone is tried again (`ForkWait`, `FORK_TRIES`);
- * - the env: `PATH`, git's non-interactive settings, `XDG_CONFIG_HOME`, and
- *   the person's token and platform as `<SLUG>_TOKEN` and `<SLUG>_URL`.
+ * `XDG_CONFIG_HOME` is the workspace's so no stored login is read, but HOME
+ * stays, since the harnesses' own sign-ins live there. The clone's helper
+ * follows an empty one that drops any global helper.
  */
 export const prepareWorkspace = (input: {
   readonly run: string;

@@ -1,28 +1,17 @@
-/**
- * Claude Code, headless: `claude -p` with stream JSON, every tool allowed
- * (`--permission-mode bypassPermissions`: no one is there to approve), no
- * MCP server (`--strict-mcp-config` with no `--mcp-config`: else the user's
- * own servers and claude.ai connectors load, with the user's accounts
- * behind them), and `--resume <id>` to continue the same session. The
- * `system`/`init` line names the session; the `result` line closes the run
- * with its usage.
- *
- * Amp's `--stream-json` is "Claude Code-compatible", so `streamJsonEvents`
- * reads both.
- */
+// `--strict-mcp-config` with no `--mcp-config`: else the machine's own MCP servers
+// and claude.ai connectors load, with their accounts behind them. Amp's
+// `--stream-json` is Claude Code-compatible, so `streamJsonEvents` reads both.
 import { Option, Schema } from "effect";
 
 import { HarnessEvent, lineAs, Tokens } from "./event.ts";
 import type { HarnessDriver } from "./event.ts";
 
-/** The `system`/`init` line: the session's id. */
 const Init = Schema.Struct({
   session_id: Schema.NonEmptyString,
   subtype: Schema.Literal("init"),
   type: Schema.Literal("system"),
 });
 
-/** A model response's usage, as Anthropic's API reports it. */
 const ApiUsage = Schema.Struct({
   cache_creation_input_tokens: Schema.optionalKey(Schema.NullOr(Tokens)),
   cache_read_input_tokens: Schema.optionalKey(Schema.NullOr(Tokens)),
@@ -30,7 +19,6 @@ const ApiUsage = Schema.Struct({
   output_tokens: Tokens,
 });
 
-/** One assistant message, with its stop reason and usage (Amp prints usage here). */
 const Assistant = Schema.Struct({
   message: Schema.Struct({
     stop_reason: Schema.optionalKey(Schema.NullOr(Schema.String)),
@@ -39,9 +27,7 @@ const Assistant = Schema.Struct({
   type: Schema.Literal("assistant"),
 });
 
-/** The `result` line: the run is over (`subtype` says how), with its usage (Claude Code). */
 const Result = Schema.Struct({
-  /** Whether the run failed; `subtype` then says how (`error_during_execution`). */
   is_error: Schema.optionalKey(Schema.Boolean),
   subtype: Schema.NonEmptyString,
   type: Schema.Literal("result"),
@@ -54,7 +40,7 @@ const assistantOf = lineAs(Assistant);
 
 const resultOf = lineAs(Result);
 
-/** Tokens in and out, counting cached input as input. */
+// Cached input counts as input.
 const usageOf = (
   usage: typeof ApiUsage.Type,
   stopReason: Option.Option<string>
@@ -68,12 +54,8 @@ const usageOf = (
     stopReason,
   });
 
-/**
- * What one line of Claude Code-style stream JSON says. Usage is read where
- * the harness totals it: the `result` line (Claude Code, whose assistant
- * lines repeat what the result sums) or each assistant message (Amp, whose
- * result carries none).
- */
+// Claude Code totals usage on the `result` line (its assistant lines repeat it);
+// Amp reports it only on each assistant message.
 export const streamJsonEvents =
   (usageFrom: "result" | "assistant") =>
   (line: string): readonly HarnessEvent[] => {
@@ -107,7 +89,6 @@ export const streamJsonEvents =
     });
   };
 
-/** The flags every run shares: print mode, stream JSON, no one to ask, no MCP, the model. */
 const headless = (model: string) => [
   "-p",
   "--output-format",

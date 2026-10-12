@@ -23,16 +23,11 @@ const remote = (name: string) => ({
   url: `https://artifacts.invalid/${name}.git`,
 });
 
-/** The sandbox's entrypoint as the platform's service binding reaches it. */
 const sandbox = new Sandbox(untouchable("ctx"), fakeEnv());
 
-/** A stub's outcome: a typed failure, not a defect. */
 const failureOf = Exit.findErrorOption;
 
 describe("the sandbox Worker's main module", () => {
-  // Live on dev-oscabriel: `ctx.exports` holds a loopback only for an
-  // export of the main module, and every check was blocked with "worker.ts
-  // does not export the outbound gateways".
   it("exports the Checker's outbound gateways, so ctx.exports holds them", () => {
     expect({
       CloneGateway: ExportedClone,

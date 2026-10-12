@@ -1,27 +1,3 @@
-/**
- * What each step of a release does on this machine, over the
- * plan `scripts/lib/release.ts` makes:
- *
- * - `tsdown`: the CLI's `bun run build` in `apps/cli`, with both targets
- *   (`dist/`, and `dist/bin/<target>/` per target), stamped with the
- *   release's version (what `--version` prints);
- * - `manifest`: the npm package, staged in `apps/cli/release/npm/`: the
- *   build's `dist/*.js` and `*.d.ts`, the generated `package.json`, its
- *   README and the repo's licence;
- * - `copySkills`: the platform's skill (`@repo/agent-kit`'s
- *   `platformSkill` over `commandDocs(Contracts)`) into its `skills/`;
- * - `compile`: each target's binary, copied to `apps/cli/release/<slug>-<target>`;
- * - `installScript` and `checksums`: `apps/cli/release/install.sh` and
- *   `SHA256SUMS`;
- * - `upload`: the version's files into the stage's `releases-<stage>`
- *   bucket with Wrangler's own login, then `releases/manifest.json` last;
- * - `publish`: `npm publish` of the staged package, which the plan allows
- *   only when a person runs it (H2).
- *
- * The package is staged beside the binaries rather than in `dist/`: its
- * manifest names `./dist/…` and `./skills` from the package's root, and
- * `dist/bin/` holds the binaries, which npm must not ship.
- */
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { platformSkill } from "@repo/agent-kit/platform";
 import { Brand } from "@repo/brand";
@@ -62,7 +38,6 @@ import {
 import type { ReleaseAsset, ReleaseStep } from "../release.ts";
 import { packageReadme } from "./readme.ts";
 
-/** A step could not finish; nothing after it ran. */
 export class ReleaseFailed extends Schema.TaggedError<ReleaseFailed>()(
   "ReleaseFailed",
   { reason: Schema.String, step: Schema.String }
@@ -72,16 +47,12 @@ export class ReleaseFailed extends Schema.TaggedError<ReleaseFailed>()(
   }
 }
 
-/** Where a release reads and writes, from the repo root. */
 export interface Layout {
   readonly root: string;
-  /** `apps/cli`, where the CLI's build runs. */
   readonly cli: string;
-  /** `apps/cli/dist`, the CLI's build. */
   readonly dist: string;
-  /** `apps/cli/release`: the binaries, the install script and the checksums. */
   readonly release: string;
-  /** `apps/cli/release/npm`: the npm package, as `npm publish` takes it. */
+  /** Staged outside `dist/`, whose `bin/` holds the binaries npm must not ship. */
   readonly npm: string;
 }
 
@@ -99,23 +70,18 @@ export const layoutOf = (root: string) =>
     };
   });
 
-/** One release: its version, and the origin its install script fetches from. */
 export interface Release {
   readonly version: string;
-  /** The platform's public origin, without a trailing `/`. */
   readonly origin: string;
-  /** The stage an upload goes to. */
   readonly stage: Option.Option<Stage>;
 }
 
-/** The command a person runs from the repo root to publish the staged package. */
 export const publishCommand = (layout: Layout, path: Path.Path) =>
   `npm publish ${path.relative(layout.root, layout.npm)} --access public`;
 
 const failed = (step: ReleaseStep, reason: string) =>
   new ReleaseFailed({ reason, step });
 
-/** Runs `command` in `cwd` with this terminal's output; any exit but 0 fails `step`. */
 const run = (
   step: ReleaseStep,
   command: string,
@@ -141,7 +107,6 @@ const run = (
     Effect.asVoid
   );
 
-/** What the release reads of a package manifest. */
 const PackageJson = Schema.fromJsonString(
   Schema.Struct({
     dependencies: Schema.optionalKey(
@@ -164,7 +129,6 @@ const readPackage = (step: ReleaseStep, file: string) =>
     Effect.mapError(({ message }) => failed(step, `${file}: ${message}`))
   );
 
-/** The files of the build the npm package ships: `dist/*.js` and `dist/*.d.ts`. */
 const builtFiles = (layout: Layout) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -183,7 +147,6 @@ const builtFiles = (layout: Layout) =>
     return Arr.sort(files, Order.String);
   });
 
-/** `manifest`: the npm package, staged afresh from the build. */
 const stagePackage = (layout: Layout, release: Release) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -263,7 +226,6 @@ const stagePackage = (layout: Layout, release: Release) =>
     return manifest;
   });
 
-/** `copySkills`: the platform's skill, as the platform and the CLI's MCP prompt serve it. */
 const writeSkills = (layout: Layout) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -280,7 +242,6 @@ const writeSkills = (layout: Layout) =>
     );
   });
 
-/** `compile`: each target's binary, as the release folder and the platform name it. */
 const collectBinaries = (layout: Layout) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -318,13 +279,11 @@ const collectBinaries = (layout: Layout) =>
     );
   });
 
-/** The files a release serves under its version: each binary, and the install script. */
 const releasedFiles = [
   ...targets.map((target) => binaryName(Brand, target)),
   "install.sh",
 ];
 
-/** A file's sha256, as `sha256sum` prints it, and its size. */
 const assetOf = (file: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -340,7 +299,6 @@ const assetOf = (file: string) =>
     } satisfies ReleaseAsset;
   });
 
-/** Each released file in the release folder, by name. */
 const assetsIn = (layout: Layout) =>
   Effect.flatMap(Path.Path, (path) =>
     Effect.forEach(releasedFiles, (name) =>
@@ -351,7 +309,6 @@ const assetsIn = (layout: Layout) =>
     )
   ).pipe(Effect.map((entries) => Object.fromEntries(entries)));
 
-/** `checksums`: `SHA256SUMS` beside the files it lists. */
 const writeChecksums = (layout: Layout) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -370,11 +327,9 @@ const contentTypes = new Map([
   ["manifest.json", "application/json"],
 ]);
 
-/** A binary is bytes; the install script and the manifest are text. */
 const contentTypeOf = (file: string) =>
   contentTypes.get(file) ?? "application/octet-stream";
 
-/** Wrangler's own bin, pinned in `apps/platform`, as bootstrap runs it. */
 const wranglerOf = (layout: Layout, path: Path.Path) =>
   path.join(
     layout.root,
@@ -385,11 +340,7 @@ const wranglerOf = (layout: Layout, path: Path.Path) =>
     "wrangler"
   );
 
-/**
- * Runs Wrangler in `cwd` with its own login (never the read-mostly infra
- * token; `infra/.env.schema`), and gives its exit code and everything it
- * printed.
- */
+// Wrangler's own login, never the read-mostly infra token.
 const wrangler = (layout: Layout, cwd: string, args: readonly string[]) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -419,10 +370,8 @@ const wrangler = (layout: Layout, cwd: string, args: readonly string[]) =>
     )
   );
 
-/** What Wrangler prints when a bucket holds no object under a key. */
 const NO_SUCH_KEY = "The specified key does not exist";
 
-/** The manifest the stage's bucket holds, if it holds one. */
 const previousManifest = (layout: Layout, bucket: string, scratch: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -464,7 +413,6 @@ const previousManifest = (layout: Layout, bucket: string, scratch: string) =>
     );
   });
 
-/** `upload`: the version's files into the stage's own bucket, and the manifest last. */
 const upload = (layout: Layout, release: Release) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -535,7 +483,6 @@ const upload = (layout: Layout, release: Release) =>
     return manifest;
   }).pipe(Effect.scoped);
 
-/** The paths the staged package's manifest names that it lacks. */
 export const missingFromPackage = (layout: Layout, version: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -548,11 +495,6 @@ export const missingFromPackage = (layout: Layout, version: string) =>
     );
   });
 
-/**
- * The staged package is whole and of this release's version, so what
- * `npm publish` ships is what this release built: checked before the
- * publish runs, and before an agent hands its command to a person (H2).
- */
 export const publishable = (layout: Layout, release: Release) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -577,7 +519,6 @@ export const publishable = (layout: Layout, release: Release) =>
     );
   });
 
-/** `publish`: `npm publish` of the staged package, once it is `publishable`. */
 const publish = (layout: Layout, release: Release) =>
   Effect.andThen(
     publishable(layout, release),
@@ -589,7 +530,6 @@ const publish = (layout: Layout, release: Release) =>
     )
   );
 
-/** `installScript`: the install script for this version, fetching from the release's origin. */
 const writeInstallScript = (layout: Layout, release: Release) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -609,7 +549,6 @@ const writeInstallScript = (layout: Layout, release: Release) =>
     yield* fs.chmod(path.join(layout.release, "install.sh"), 0o755);
   });
 
-/** One step, run. */
 export const runStep = (step: ReleaseStep, layout: Layout, release: Release) =>
   Match.value(step).pipe(
     Match.when("tsdown", () =>

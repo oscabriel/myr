@@ -1,19 +1,7 @@
-/**
- * What infra reads from one of our own Workers' `.env.schema` files: each
- * item's name, and whether it must have a value. Never a value: the schema
- * holds none for a secret, and the files that do (`.env`, `.env.local`) stay
- * closed (AGENTS.md "Boundaries: Env").
- *
- * The rules are @env-spec's, as far as our schemas use them: decorators sit in
- * `#` comment lines, the header's end at `# ---`; an item's own comments
- * directly precede its `NAME=` line; `@required` and `@optional` decide, and
- * otherwise the header's `@defaultRequired` does (`infer`: required when the
- * schema gives a value). A conditional `@required=forEnv(…)` counts as
- * optional here. ASSUMPTION: a schema with no `@defaultRequired` infers, as
- * every schema in this repo says outright.
- */
+// Each item's name and whether it is required, never a value. Follows
+// @env-spec as far as our schemas use it: a conditional `@required=forEnv(…)`
+// counts as optional, and a missing `@defaultRequired` means `infer`.
 
-/** One item of a `.env.schema`. */
 export interface SchemaItem {
   readonly name: string;
   readonly required: boolean;
@@ -21,7 +9,6 @@ export interface SchemaItem {
 
 const ITEM = /^(?<name>[A-Za-z_]\w*)=(?<value>.*)$/u;
 
-/** The `@` decorators in one comment line. */
 const decoratorsOf = (line: string) =>
   line
     .replace(/^#/u, "")
@@ -57,7 +44,6 @@ const isRequired = (
   return fallback === "infer" ? value.trim() !== "" : fallback === "true";
 };
 
-/** Every item `text` declares, in order. */
 export const schemaItems = (text: string): readonly SchemaItem[] => {
   const lines = text.split(/\r?\n/u).map((line) => line.trim());
   const divider = lines.findIndex((line) => /^#\s*-{3,}$/u.test(line));

@@ -1,38 +1,22 @@
-/**
- * pi, headless: print mode with JSON events (`-p --mode json`), sessions
- * kept in the workspace (`--session-dir`) under an id the swarm picks
- * (`--session-id`, which opens the session or creates it), so a resume is
- * the same command with a new prompt. pi asks no approvals, so it needs no
- * permission flag. `--no-mcp` keeps pi's built-in MCP off, so the user's
- * own servers (`~/.pi/agent/mcp.json`, with the user's accounts behind
- * them) never reach a contributor. The adapter's contributor loads the
- * CLI's pi adapter with `-e`, on the start and on every resume.
- *
- * The header line names the session; `agent_settled` says pi will not
- * continue on its own. JSON mode exits 0 when the provider fails, so the
- * stop reason comes from each assistant `message_end` (`stopReason`), never
- * from the exit code.
- */
+// `--no-mcp` keeps the machine's own MCP servers away from a contributor. JSON mode
+// exits 0 when the provider fails, so the stop reason comes from each
+// `message_end`, never the exit code.
 import { Option, Schema } from "effect";
 
 import { HarnessEvent, lineAs, sessionDirOf, Tokens } from "./event.ts";
 import type { HarnessDriver } from "./event.ts";
 
-/** The CLI's pi adapter in this repo, loaded with `-e`. */
 export const piAdapter = decodeURIComponent(
   new URL("../../../../apps/cli/src/pi.ts", import.meta.url).pathname
 );
 
-/** The session header, JSON mode's first line. */
 const Header = Schema.Struct({
   id: Schema.NonEmptyString,
   type: Schema.Literal("session"),
 });
 
-/** An assistant message, finished: why it stopped, and its usage. */
 const MessageEnd = Schema.Struct({
   message: Schema.Struct({
-    /** Set when the response failed (`stopReason` `error` or `aborted`). */
     errorMessage: Schema.optionalKey(Schema.String),
     role: Schema.Literal("assistant"),
     stopReason: Schema.optionalKey(Schema.String),
@@ -95,7 +79,6 @@ const parse = (line: string): readonly HarnessEvent[] => {
     : [];
 };
 
-/** The flags every run shares: print mode, JSON events, no MCP, the session, the model, the adapter. */
 const headless = (input: {
   readonly sessionDir: string;
   readonly session: string;

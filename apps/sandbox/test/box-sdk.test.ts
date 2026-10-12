@@ -16,11 +16,6 @@ const bytes = (text: string) => {
   return buffer;
 };
 
-/**
- * A Durable Object's container as the Container API shows it: it records
- * what starts it and each command it runs, and every command prints
- * `git version 2.47.3`.
- */
 const fakeContainer = (running: boolean) => {
   const started: ContainerStartupOptions[] = [];
   const commands: { argv: string[]; options: ContainerExecOptions }[] = [];
@@ -53,7 +48,6 @@ const fakeContainer = (running: boolean) => {
 
 const start = { enableInternet: false, image: "check" };
 
-/** A running container whose one command never ends until it is killed. */
 const hungContainer = () => {
   const killed: (number | undefined)[] = [];
 

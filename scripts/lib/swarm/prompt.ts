@@ -1,15 +1,9 @@
-/**
- * The brief each contributor's harness starts with. It is zero-install: it
- * says only what a contributor gets from the ask's page and the project's
- * AGENTS.md (where their clone is, make the check pass, push, read the
- * verdict with `<cli> status`), and nothing about how the platform judges
- * an answer.
- */
+// Zero-install: only what a contributor gets from the ask's page and the project's
+// AGENTS.md, and nothing about how the platform judges an answer.
 import { Brand } from "@repo/brand";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
 import { Option } from "effect";
 
-/** The brief for one contributor's ask: the ask's page between what to do. */
 export const brief = (input: {
   readonly ask: AskId;
   readonly project: ProjectName;

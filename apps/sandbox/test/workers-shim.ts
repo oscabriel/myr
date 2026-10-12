@@ -1,10 +1,3 @@
-/**
- * `cloudflare:workers` for tests in Node. `vitest.config.ts` aliases the
- * module here, for this Worker's modules and the Sandbox SDK's: config
- * aliasing, not module mocking. Each class keeps what its constructor is
- * given and does nothing else; `env` is a fake whose bindings throw when
- * touched (`fake-env.ts`).
- */
 import { fakeEnv } from "./fake-env.ts";
 
 export class DurableObject<E = Env> {

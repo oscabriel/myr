@@ -1,12 +1,3 @@
-/**
- * The import run's real target, backfill and web: a platform over `/rpc` as
- * the operator, git's `ls-remote` anonymously through the gateway, the tag
- * backfill through `@repo/artifacts`' REST adapter with the ops
- * credentials, as `infra/teardown.ts` reaches Artifacts, and the warm
- * reads through the stage's web, anonymously. No token is ever printed:
- * the operator's goes only into the `Authorization` header of `/rpc`
- * calls, and the backfill's write token only into git's env.
- */
 import { Fetch, FetchFailed } from "@repo/artifacts/fetch";
 import { RepoHost, RepoName } from "@repo/artifacts/repo-host";
 import { RepoHostRest } from "@repo/artifacts/repo-host/rest";
@@ -55,7 +46,6 @@ const failed = (reason: string) => new ImportExamplesFailed({ reason });
 
 const isRefusal = Schema.is(Refusal);
 
-/** A call the platform refused, said as `explain` says it; or one it never answered. */
 const failedCall =
   (call: string) =>
   (error: { readonly _tag: string; readonly message: string }) =>
@@ -67,7 +57,6 @@ const failedCall =
         )
       : failed(`${call} got no answer from the platform: ${error.message}`);
 
-/** git's env for a run of its own: no machine config, no prompt. */
 const GIT_ENV = {
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1",
@@ -78,10 +67,6 @@ const GIT_ENV = {
 const streamText = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/**
- * `command` run to its end; what it printed when it ended well. A failure
- * says what git said, with every secret of the command's env cut out.
- */
 const runCommand = (
   spawner: ChildProcessSpawner.ChildProcessSpawner["Service"],
   command: Command
@@ -139,7 +124,6 @@ const runCommand = (
     })
   );
 
-/** The refs `git ls-remote` lists, counted: branches, and tags without their peeled lines. */
 const countsOf = (listed: string) => {
   const refs = listed
     .split("\n")
@@ -154,7 +138,6 @@ const countsOf = (listed: string) => {
   };
 };
 
-/** The contracts over HTTP at `origin`'s `/rpc`, with `token` as the bearer. */
 const clientAt = (
   origin: string,
   token: Redacted.Redacted
@@ -171,7 +154,6 @@ const clientAt = (
     Layer.provide([FetchHttpClient.layer, RpcSerialization.layerJson])
   );
 
-/** The platform at `origin`, reached as the operator with `token`. */
 export const platformTarget = (input: {
   readonly origin: string;
   readonly token: Redacted.Redacted;
@@ -205,18 +187,12 @@ export const platformTarget = (input: {
     })
   ).pipe(Layer.provide(clientAt(input.origin, input.token)));
 
-/** How long one warm read may take: a cold why on a long history takes seconds. */
+// A cold why on a long history takes seconds.
 const WARM_READ_TIMEOUT = Duration.seconds(90);
 
-/** `duration` in seconds, to a tenth. */
 const secondsOf = (duration: Duration.Duration) =>
   `${(Duration.toMillis(duration) / 1000).toFixed(1)} s`;
 
-/**
- * The web at `web`, read anonymously, page by page, each body read to its
- * end so the server finishes what it draws; the README's path asked of the
- * platform at `origin` (`readTree`, a public read).
- */
 export const webWarmer = (input: {
   readonly origin: string;
   readonly token: Redacted.Redacted;
@@ -259,17 +235,11 @@ export const webWarmer = (input: {
     Layer.provide(FetchHttpClient.layer)
   );
 
-/** No web to warm through: the Node world serves the platform alone. */
 export const noWarmer = Layer.succeed(
   Warmer,
   Warmer.of({ warm: () => Effect.succeed([]) })
 );
 
-/**
- * A deployed dev stage at `url`, or at the workers.dev origin bootstrap
- * recorded, as the operator: `OPERATOR_TOKEN` from the env
- * (`bunx varlock run --path apps/platform/ -- …`), never printed.
- */
 export const stageTarget = (
   stage: Stage,
   url: string | undefined,
@@ -323,12 +293,11 @@ export const stageTarget = (
     })
   );
 
-/** The operator's token in the Node world: no secret, never leaves this machine. */
+// No secret: the Node world never leaves this machine.
 const worldToken = Redacted.make(
   "operator-import-world-token-0123456789abcdef"
 );
 
-/** The Node world, served for as long as the layer lasts, with the operator's session. */
 export const worldTarget: Layer.Layer<
   ImportTarget | Warmer,
   ImportExamplesFailed,
@@ -349,7 +318,6 @@ export const worldTarget: Layer.Layer<
   )
 );
 
-/** The `Fetch` port over the runtime's own fetch, as effect/http finds it. */
 const RuntimeFetch = Layer.effect(
   Fetch,
   Effect.gen(function* () {
@@ -369,17 +337,8 @@ const RuntimeFetch = Layer.effect(
   })
 );
 
-/** How long the backfill's write token lives: one backfill, at most. */
 const TOKEN_TTL = Duration.minutes(10);
 
-/**
- * The backfill on `stage`: its public namespace's repos through
- * `RepoHostRest`, with the ops credentials (`CLOUDFLARE_ACCOUNT_ID`,
- * `CLOUDFLARE_API_TOKEN`, from `bunx varlock run --path infra/ -- …`).
- * Each backfill mints a write token on the canonical repo for at most ten
- * minutes, fetches the source's tags into a temporary bare repo, pushes
- * `refs/tags/*` only, and revokes the token, whatever came of the push.
- */
 export const restBackfill = (
   stage: Stage
 ): Layer.Layer<

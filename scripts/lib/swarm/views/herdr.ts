@@ -1,23 +1,7 @@
 /**
- * The herdr view (`--view herdr`): for the video, each
- * contributor's harness runs interactively in a herdr pane of its own, six
- * tiled over a counter strip, and every prompt (the brief, each refusal,
- * the nudge) is typed into that pane's session through herdr's CLI. The
- * verdict loop is the headless one: outcomes still come only from the
- * contributor's `<cli> status --json`, never from pane text.
- *
- * herdr is driven as a process (`herdr …`, read from `herdr --help` and
- * `herdr agent --help` on herdr 0.9.3), never through an SDK. It runs in the
- * herdr session the swarm itself runs in (`herdr --session demo`), so the
- * panes open where the person recording is looking. Pane text is read for
- * one thing only: to recognise a question a harness asks at startup, before
- * it takes its brief (`STARTUP_QUESTIONS`). Where an answer stands comes
- * from status alone.
- *
- * Unlike a headless harness, an agent in a pane outlives its run: a run that
- * times out (or a swarm that is stopped) leaves it working in its pane,
- * claim and all, until the person closes the workspace the swarm names
- * (`herdr workspace close <id>`).
+ * Outcomes come only from `<cli> status --json`; pane text is read only to
+ * answer a harness's startup questions. An agent in a pane outlives its run
+ * until its herdr workspace is closed.
  */
 import type { ProjectName } from "@repo/protocol/ids";
 import {
@@ -44,13 +28,8 @@ import { followCounter, lastHeld } from "./counter.ts";
 import { nothingHeard, Turn } from "./headless.ts";
 import type { Attempted, SwarmView } from "./headless.ts";
 
-/** The counter's pane, below the contributors'. */
 export const COUNTER = "counter";
 
-/**
- * One pane the layout makes: the pane `from` (already made) is split toward
- * `direction`, keeping `ratio` of its space, and the new pane is `slot`.
- */
 export interface Split {
   readonly slot: string;
   readonly from: string;
@@ -58,18 +37,10 @@ export interface Split {
   readonly ratio: number;
 }
 
-/** The share of the window the contributors keep above the counter strip. */
 const ABOVE_COUNTER = 0.85;
 
-/** `ratio` to three places, as herdr reads it. */
 const share = (ratio: number) => Math.round(ratio * 1000) / 1000;
 
-/**
- * The panes for `handles`, as splits of the first one's pane (the
- * workspace's own): a counter strip along the bottom, then up to three
- * contributors to a row, two rows at most, each split keeping the share
- * that leaves every pane of a row the same width. Pure.
- */
 export const herdrLayout = (handles: readonly string[]): readonly Split[] => {
   const [first] = handles;
 
@@ -111,10 +82,8 @@ export const herdrLayout = (handles: readonly string[]): readonly Split[] => {
   return [counter, ...secondRow, ...columns];
 };
 
-/** How long herdr waits for a harness to be ready for input when it starts one. */
 const START_TIMEOUT_MS = 120_000;
 
-/** `herdr agent start …`: the harness `kind`, named `handle`, in `pane`, with its own flags after `--`. Pure. */
 export const herdrStart = (input: {
   readonly handle: string;
   readonly kind: string;
@@ -134,12 +103,7 @@ export const herdrStart = (input: {
   ...input.argv,
 ];
 
-/**
- * `herdr agent prompt …`: `text` typed into the agent's session, then a
- * wait until it settles. `--wait` alone matches `idle`, `done` and
- * `blocked`: a turn that ends `idle` (seen on Claude Code) would never
- * match `--until done --until blocked`. Pure.
- */
+// `--wait` alone also matches `idle`, which a turn can end in; `--until done --until blocked` would hang.
 export const herdrPrompt = (input: {
   readonly handle: string;
   readonly text: string;
@@ -151,12 +115,6 @@ export const herdrPrompt = (input: {
   "--wait",
 ];
 
-/**
- * What only a headless run needs, per harness: the switches and the flags
- * (with their values) the driver's start passes for print mode and JSON
- * output, or for a prompt given on the command line. An interactive
- * session gets its prompt from herdr instead.
- */
 const HEADLESS_ONLY = {
   amp: {
     switches: ["--stream-json", "--no-archive-after-execute"],
@@ -173,10 +131,9 @@ const HEADLESS_ONLY = {
   >
 >;
 
-/** Stands for the brief in a driver's argv, so the brief can be taken out. */
+// Marks the brief in a driver's argv so it can be taken out.
 const BRIEF = "\u0000brief";
 
-/** How a harness starts interactively: herdr's kind, its flags, and env it needs. */
 export interface Launch {
   readonly kind: string;
   readonly argv: readonly string[];
@@ -184,13 +141,8 @@ export interface Launch {
 }
 
 /**
- * How `contributor`'s harness starts interactively in a pane: herdr's kind
- * (the harness's executable, which herdr knows by the same name), and the
- * driver's own start flags less `HEADLESS_ONLY` and the brief, so the
- * settings that keep a contributor's session safe (every tool allowed, no
- * MCP server of the user's, the workspace's sessions) are the headless
- * run's. OpenCode's interface takes its model from inline config in the
- * env. Pure.
+ * Reuses the headless driver's start flags (less `HEADLESS_ONLY` and the
+ * brief), so the settings that keep a session safe are the same.
  */
 export const interactiveLaunch = (input: {
   readonly contributor: Contributor;
@@ -234,7 +186,6 @@ export const interactiveLaunch = (input: {
   };
 };
 
-/** herdr refused a command: its error's code, and what it said. */
 class HerdrRefused extends Schema.TaggedError<HerdrRefused>()("HerdrRefused", {
   code: Schema.String,
   said: Schema.String,
@@ -247,7 +198,6 @@ class HerdrRefused extends Schema.TaggedError<HerdrRefused>()("HerdrRefused", {
 
 const isRefused = Schema.is(HerdrRefused);
 
-/** What herdr prints on stderr when it refuses a command. */
 const decodeRefusal = Schema.decodeUnknownOption(
   Schema.fromJsonString(
     Schema.Struct({
@@ -256,10 +206,6 @@ const decodeRefusal = Schema.decodeUnknownOption(
   )
 );
 
-/**
- * `herdr …` with the swarm's env, in the herdr session the swarm runs in:
- * what it printed, or `HerdrRefused` with herdr's own error code.
- */
 const herdr = (args: readonly string[]) =>
   Effect.flatMap(run({ args, command: "herdr", env: {} }), (ran) => {
     if (ran.code === 0) {
@@ -282,7 +228,6 @@ const herdr = (args: readonly string[]) =>
     );
   });
 
-/** Ends a step on herdr's refusal, saying which. */
 const orFailed = <A, R>(
   effect: Effect.Effect<A, HerdrRefused | SwarmFailed, R>
 ): Effect.Effect<A, SwarmFailed, R> =>
@@ -292,7 +237,6 @@ const orFailed = <A, R>(
     )
   );
 
-/** `printed` decoded as `schema`, or why herdr's answer was not what the step needs. */
 const answerOf =
   <A, I>(schema: Schema.Codec<A, I>, what: string) =>
   (printed: string) =>
@@ -307,7 +251,6 @@ const answerOf =
 
 const PaneId = Schema.Struct({ pane_id: Schema.NonEmptyString });
 
-/** `workspace create`: the workspace, and its first pane. */
 const WorkspaceMade = Schema.Struct({
   result: Schema.Struct({
     root_pane: PaneId,
@@ -315,10 +258,8 @@ const WorkspaceMade = Schema.Struct({
   }),
 });
 
-/** `pane split`: the new pane. */
 const PaneMade = Schema.Struct({ result: Schema.Struct({ pane: PaneId }) });
 
-/** An agent as herdr sees it: `idle`, `working`, `blocked`, `done` or `unknown`. */
 const AgentSeen = Schema.Struct({
   result: Schema.Struct({
     agent: Schema.Struct({
@@ -328,26 +269,14 @@ const AgentSeen = Schema.Struct({
   }),
 });
 
-/** A question a harness asks before it takes a prompt, and the keys that answer it as the swarm decides. */
 interface StartupQuestion {
-  /** Words only that question shows, in herdr's detection text. */
   readonly asks: string;
   readonly keys: readonly string[];
 }
 
 /**
- * The questions each harness asks when it starts in a new folder (seen on
- * Claude Code 2.1.293 and 2.1.294; OpenCode 2.0.7, Amp 0.0.1789750518 and
- * pi 1.1.0 asked none):
- *
- * - Claude Code asks whether to trust the folder, "No, exit" first: the
- *   clone is the swarm's own, so it answers yes;
- * - then whether to import the CLAUDE.md files above the clone (a
- *   checkout's, when a test or a person puts the swarm's folder in one),
- *   "No" first: it keeps the default, since they are not the contributor's
- *   project.
- *
- * Any other question is left for the person at the panes.
+ * Claude Code trusts the clone (it is the swarm's own) and declines CLAUDE.md
+ * files above it. Any other question is left for the person at the panes.
  */
 const STARTUP_QUESTIONS = {
   amp: [],
@@ -359,10 +288,8 @@ const STARTUP_QUESTIONS = {
   pi: [],
 } as const satisfies Readonly<Record<Harness, readonly StartupQuestion[]>>;
 
-/** How long a harness gets to be ready for its brief once herdr says it is blocked at startup. */
 const STARTUP_WAIT = Duration.minutes(3);
 
-/** Whether herdr sees the agent ready for a prompt. */
 const readyIn = (printed: string) =>
   Effect.map(
     answerOf(AgentSeen, "agent get")(printed),
@@ -371,12 +298,6 @@ const readyIn = (printed: string) =>
       (agent.agent_status === "idle" || agent.agent_status === "done")
   );
 
-/**
- * A harness blocked at startup: each question it is known to ask is
- * answered once, as `STARTUP_QUESTIONS` says, until herdr sees it ready.
- * A question the table doesn't know waits for the person at the panes,
- * until `STARTUP_WAIT` ends the run.
- */
 const pastStartup = (input: {
   readonly handle: string;
   readonly harness: Harness;
@@ -432,10 +353,8 @@ const pastStartup = (input: {
     );
   });
 
-/** Names whose values the pane keeps from its own terminal, not the swarm's. */
 const PANE_OWNS = ["TERM", "COLORTERM"];
 
-/** herdr's names in a pane: its integrations report each agent's state with them. */
 const HERDR_NAMES = [
   "HERDR_BIN_PATH",
   "HERDR_ENV",
@@ -446,12 +365,8 @@ const HERDR_NAMES = [
 ];
 
 /**
- * The script a contributor's pane runs once: it clears the pane's env to
- * its terminal and herdr's own names, reads the harness's env from the
- * swarm through `fifo` (a pipe, so no token is ever in a file, an argv or
- * on the screen), and leaves a shell without rc files (no user setup
- * between the contributor and their env) in their clone, where herdr
- * starts their harness. Pure.
+ * The env arrives through a pipe, so no token is ever in a file, an argv or
+ * on screen; the shell skips rc files so no user setup sits in between.
  */
 export const paneShell = (input: {
   readonly fifo: string;
@@ -474,28 +389,18 @@ export const paneShell = (input: {
     "",
   ].join("\n");
 
-/** `env` as the lines a shell sources, less what the pane owns. Pure. */
 const envLines = (env: Readonly<Record<string, string>>) =>
   Object.entries(env)
     .filter(([name]) => !PANE_OWNS.includes(name))
     .map(([name, value]) => `${name}=${shellQuoted(value)}\n`)
     .join("");
 
-/** How long a pane gets to read its env from the pipe. */
 const ENV_READ_WAIT = Duration.seconds(30);
 
-/** How many times a pane whose shell is still starting is asked again, a second apart. */
 const BUSY_RETRIES = 10;
 
-/** A pane script runs only as its owner. */
 const SCRIPT_MODE = 0o700;
 
-/**
- * Readies `pane` for `contributor` and starts their harness in it: the
- * pane runs `paneShell`, reads `env` (with the launch's own) from a pipe,
- * and herdr starts the harness with its interactive flags, getting past
- * the startup questions it knows. herdr's answer goes to `log`.
- */
 const startIn = (input: {
   readonly contributor: Contributor;
   readonly env: Readonly<Record<string, string>>;
@@ -585,7 +490,6 @@ const startIn = (input: {
     return yield* input.log(started);
   });
 
-/** What an attempt heard from herdr's answer to its prompt (or its refusal of it). */
 const promptHeard = (input: {
   readonly name: string;
   readonly pane: string;
@@ -628,12 +532,6 @@ const promptHeard = (input: {
       ),
   });
 
-/**
- * The herdr view over `panes` (each contributor's pane, by handle): an
- * attempt starts the harness in its pane on the brief, or types the
- * continuation's prompt into the same session, and waits until herdr sees
- * it settle. The session a resume names is the agent's herdr name.
- */
 export const herdrView = (panes: ReadonlyMap<string, string>): SwarmView => ({
   attempt: ({ contributor, env, file, onSession, turn, workspace }) =>
     Effect.gen(function* () {
@@ -694,21 +592,12 @@ export const herdrView = (panes: ReadonlyMap<string, string>): SwarmView => ({
     }),
 });
 
-/** A pane's title: who works in it, and on which harness. */
 const titleOf = ({
   handle,
   harness,
 }: Pick<Contributor, "handle" | "harness">) => `${handle} · ${harness}`;
 
-/**
- * Opens the herdr view for `contributors`, in the herdr session the swarm
- * runs in: a workspace of its own (focused, for the person recording), one
- * pane per contributor laid out by `herdrLayout`, and a counter pane that
- * shows `counterFile`, which a fiber in the run's scope keeps writing from
- * the project's `watch`. Outside a herdr pane it refuses: herdr's skill
- * says not to drive a session from outside it. It refuses too when it can't
- * read where the project stands (`lastHeld`), before any pane is made.
- */
+// Refuses outside a herdr pane: herdr says not to drive a session from outside it.
 export const openHerdrView = (input: {
   readonly contributors: readonly Pick<Contributor, "handle" | "harness">[];
   readonly project: ProjectName;
@@ -742,8 +631,6 @@ export const openHerdrView = (input: {
       });
     }
 
-    // Where the counter starts, read before any pane or claim: a run that
-    // can't say where the project stands stops here.
     const from = yield* lastHeld(input.origin, input.project);
     const root = (yield* repoRoot).replace(/\/$/u, "");
     const counterFile = `${input.runDir}/counter.log`;

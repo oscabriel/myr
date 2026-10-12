@@ -1,8 +1,4 @@
-/**
- * brand:check: fails when any file git would commit spells the product's name
- * outside `packages/brand` and prose. Files come from git, so ignored files
- * (the closed `.env*` values among them) are never opened.
- */
+// Files come from git, so ignored files (the closed `.env*` values among them) are never opened.
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { findLeaks } from "@repo/brand/leaks";
 import { Console, Data, Effect, FileSystem, pipe } from "effect";

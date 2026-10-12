@@ -1,12 +1,6 @@
-/**
- * The Lander's jobs, run through the `Box` port: each runs `script.ts`'s
- * git steps in the container and reads what git printed. A step that
- * reaches a remote gets that remote's token as an `http.extraHeader`
- * through `GIT_CONFIG_*` env, never in its URL or on its command line. A
- * step that fails blocks the job with `VerifierBlocked`, which carries no
- * text (principle 3): git's stderr goes beside it, as a log annotation,
- * trimmed and with every token taken out.
- */
+// A remote's token reaches git as an `http.extraHeader` through `GIT_CONFIG_*`
+// env, never in a URL or on a command line. git's stderr is logged with every
+// token taken out, never put in the refusal.
 import { Brand } from "@repo/brand";
 import { notesRef } from "@repo/git/notes";
 import { authorLine, committerLine, parseTrailers } from "@repo/git/trailers";
@@ -84,25 +78,16 @@ import {
 } from "./script.ts";
 import type { GitStep, RemoteName, Signature } from "./script.ts";
 
-/** Where the Lander's container keeps things, and finds its tools. */
 export interface LanderLayout {
-  /** The folder its repos and scratch files live in. */
   readonly work: string;
-  /**
-   * The image's copy of the sdk, which a config folder's imports of the sdk
-   * resolve to: its entry module, the packages its own imports resolve in
-   * (`effect` among them), and a file naming its version.
-   */
   readonly sdk: {
     readonly entry: string;
     readonly modules: string;
     readonly version: string;
   };
-  /** Where commands are looked up. */
   readonly path: string;
 }
 
-/** The land image's layout (`images/land.Dockerfile`); tests point it at a temp folder. */
 export const Layout = Context.Reference<LanderLayout>("sandbox/lander/Layout", {
   defaultValue: () => ({
     path: "/usr/local/bin:/usr/bin:/bin",
@@ -115,7 +100,6 @@ export const Layout = Context.Reference<LanderLayout>("sandbox/lander/Layout", {
   }),
 });
 
-/** The tokens a job carries, by the remote each opens. */
 type Tokens = Partial<Record<RemoteName, Redacted.Redacted>>;
 
 // The modes git stores a file's bytes under, plain or executable: a file a
@@ -130,7 +114,6 @@ const REMOTE_MS = 120_000;
 
 const LOCAL_MS = 30_000;
 
-/** `text` with every token taken out, and only its end kept. */
 const scrubbed = (text: string, tokens: Tokens) => {
   let kept = text;
 
@@ -145,28 +128,21 @@ const scrubbed = (text: string, tokens: Tokens) => {
   return kept.trim().slice(-STDERR_KEPT);
 };
 
-/** git's subcommand in a step, for logs: the first argument after its options. */
 const subcommandOf = (step: GitStep) =>
   step.argv.find(
     (argument, index) =>
       index > 0 && !argument.startsWith("-") && step.argv[index - 1] !== "-c"
   ) ?? "git";
 
-/**
- * The job is blocked at `step` (a git subcommand, or the Box operation); what
- * went wrong goes to the log, token-free, never into the refusal.
- */
 const blockedBy = (step: string, why: string, tokens: Tokens) =>
   Effect.logWarning("a Lander step failed").pipe(
     Effect.annotateLogs({ step, why: scrubbed(why, tokens) }),
     Effect.andThen(Effect.fail(new VerifierBlocked({})))
   );
 
-/** Everything a command printed, for a log: its exit, then stdout and stderr. */
 const printed = (ran: Executed) =>
   `exit ${ran.exitCode}: ${ran.stdout}\n${ran.stderr}`;
 
-/** git's env for every step: no config but the step's own, no prompt, English. */
 const baseEnv = (layout: LanderLayout) => ({
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1",
@@ -176,29 +152,21 @@ const baseEnv = (layout: LanderLayout) => ({
   PATH: layout.path,
 });
 
-/** The header that carries a remote's token, as git reads config from env. */
 const header = (token: Redacted.Redacted) => ({
   GIT_CONFIG_COUNT: "1",
   GIT_CONFIG_KEY_0: "http.extraHeader",
   GIT_CONFIG_VALUE_0: `Authorization: Bearer ${Redacted.value(token)}`,
 });
 
-/** How one job runs its steps, and how it says one blocked it. */
 interface Steps {
-  /**
-   * Runs a step in the work folder, with the token of the remote it reaches.
-   * A step expected to succeed that does not blocks the job; the others hand
-   * back what git printed for the caller to read.
-   */
+  /** A step expected to succeed that does not blocks the job. */
   readonly run: (step: GitStep) => Effect.Effect<Executed, VerifierBlocked>;
-  /** Blocks the job at `step`, logging `why` with the job's tokens taken out. */
   readonly blocked: (
     step: GitStep,
     why: string
   ) => Effect.Effect<never, VerifierBlocked>;
 }
 
-/** The steps of one job, which carries `tokens`. */
 const runner = (tokens: Tokens) => {
   const blocked = (step: GitStep, why: string) =>
     blockedBy(subcommandOf(step), why, tokens);
@@ -253,14 +221,9 @@ const seconds = Effect.map(Clock.currentTimeMillis, (millis) =>
 
 const signed = (who: GitIdentity, at: number): Signature => ({ ...who, at });
 
-/** A scratch file the job writes, in the work folder. */
 const scratch = (name: string) =>
   Effect.map(Layout, ({ work }) => `${work}/scratch/${name}`);
 
-/**
- * The Lander's copy of the job's repo, and the scratch folders its files go
- * in, made if they are missing.
- */
 const prepared = (job: Job) =>
   Effect.gen(function* () {
     const { work } = yield* Layout;
@@ -269,7 +232,6 @@ const prepared = (job: Job) =>
     yield* job.run(initCopy(job.repo));
   });
 
-/** `text` written to `file` in the container; a file it would not take blocks the job. */
 const writtenAt = (file: string, text: string) =>
   Box.use((box) => box.writeFile(file, new TextEncoder().encode(text))).pipe(
     Effect.catchTag("BoxFailed", ({ reason }) =>
@@ -277,7 +239,6 @@ const writtenAt = (file: string, text: string) =>
     )
   );
 
-/** Writes `text` to a scratch file for git to read: a message, a note. */
 const written = (name: string, text: string) =>
   Effect.gen(function* () {
     const file = yield* scratch(name);
@@ -287,19 +248,16 @@ const written = (name: string, text: string) =>
     return file;
   });
 
-/** What one job runs its steps with: its canonical repo, that repo's URL, and its steps. */
 interface Job extends Steps {
   readonly repo: RepoName;
   readonly url: string;
 }
 
-/** `rev` in the Lander's copy, if it names something there. */
 const resolved = ({ repo, run }: Job, rev: string) =>
   Effect.map(run(revParse(repo, rev)), ({ exitCode, stdout }) =>
     exitCode === 0 ? Option.some(stdout.trim()) : Option.none()
   );
 
-/** `rev`'s id in the Lander's copy, which a step before made sure is there. */
 const idOf = (job: Job, rev: string) =>
   resolved(job, rev).pipe(
     Effect.flatMap(
@@ -311,7 +269,6 @@ const idOf = (job: Job, rev: string) =>
     )
   );
 
-/** A commit of `tree` on `parents`, written to the copy: its id. */
 const committed = (
   job: Job,
   commit: {
@@ -338,12 +295,7 @@ const committed = (
     return CommitSha.make(ran.stdout.trim());
   });
 
-/**
- * The merged tree as a commit on `main` and the head, pushed to the fork's
- * `mergeRef(tree)`, where a Checker's fetch of the fork's refs finds it.
- * It is dated at the epoch, so merging the same sides again
- * makes the same commit, and pushing it again changes nothing.
- */
+/** Dated at the epoch, so merging the same sides again makes the same commit. */
 const keptForChecks = (
   job: Job,
   sides: {
@@ -378,11 +330,6 @@ const keptForChecks = (
       : yield* job.blocked(push, printed(ran));
   });
 
-/**
- * The answer's head merged onto canonical `main` with its base as the merge
- * base: the merged tree and the answer's changes, or `StaleBase` with the
- * paths that conflict. Nothing is pushed.
- */
 export const merge = (wire: typeof MergeWire.Type) =>
   Effect.gen(function* () {
     const { job } = wire;
@@ -425,17 +372,12 @@ export const merge = (wire: typeof MergeWire.Type) =>
     return { changes, tree: merged.tree };
   });
 
-/** A path's folders and file name; one that cannot name a file is a defect upstream. */
 const placed = ({ path }: { readonly path: string }) =>
   path.split("/").every((segment) => !["", ".", "..", ".git"].includes(segment))
     ? Effect.void
     : Effect.die(`${path} cannot name a file in a repo`);
 
-/**
- * `main` with `files` added, written to the copy: the new root. A file
- * keeps the mode of the file it replaces; a path where a folder, a symlink
- * or a submodule stands blocks the job.
- */
+/** A file keeps the mode of the file it replaces. */
 const composed = (
   job: Job,
   main: string,
@@ -487,7 +429,6 @@ const composed = (
     );
   });
 
-/** The tree a land rebuilds, written to the copy where it is new. */
 const rebuilt = (
   job: Job,
   wire: typeof LandWire.Type
@@ -526,27 +467,18 @@ const rebuilt = (
     }
   );
 
-/** The mirror of canonical `main` (ADR 0005). */
 const landedRef = `${Brand.refsPrefix}landed`;
 
-/** Where the copy keeps canonical's notes ref. */
 const notesCopyOf = notesRef.replace("refs/notes/", `${notesCopy}/`);
 
 const encodeNote = Schema.encodeEffect(Schema.fromJsonString(Verdict));
 
-/** Whether the notes commit `notes` (in the copy) holds a note on `landing`. */
 const holdsNote = (job: Job, notes: string, landing: CommitSha) =>
   Effect.map(
     job.run(objectType(job.repo, `${notes}:${landing}`)),
     ({ exitCode }) => exitCode === 0
   );
 
-/**
- * The verdict written as the landing's note, unless it is there already:
- * the content `@repo/git/notes`' `noteCommit` writes (one JSON blob named by
- * the landing, fanout-free, the platform's commit on the earlier notes),
- * pushed alone. It gives the notes commit that holds the note.
- */
 const note = (job: Job, landing: CommitSha, verdict: Verdict, at: number) =>
   Effect.gen(function* () {
     const parent = yield* resolved(job, notesCopyOf);
@@ -592,10 +524,8 @@ const note = (job: Job, landing: CommitSha, verdict: Verdict, at: number) =>
       : yield* job.blocked(step, printed(ran));
   });
 
-/** A piece of bookkeeping a landing may leave pending. */
 type Bookkeeping = (typeof Landed.Type)["pending"][number];
 
-/** One piece of bookkeeping: `None` once written, its name when it was not. */
 const attempt = <A, E, R>(item: Bookkeeping, write: Effect.Effect<A, E, R>) =>
   write.pipe(
     Effect.as(Option.none<Bookkeeping>()),
@@ -607,13 +537,7 @@ const attempt = <A, E, R>(item: Bookkeeping, write: Effect.Effect<A, E, R>) =>
     )
   );
 
-/**
- * What follows a landing on `main`, each in its own push: the
- * mirror ref, while the landing is still main's tip (a later landing's own
- * mirror supersedes it), then the verdict note. Neither fails the landing;
- * what was not written comes back pending, and landing the same job again
- * writes it.
- */
+/** Neither fails the landing: what was not written comes back pending, and landing again writes it. */
 const settle = (
   job: Job,
   wire: typeof LandWire.Type,
@@ -653,7 +577,6 @@ const requestIdOf = (text: string) =>
   parseTrailers(text).find(({ key }) => key.toLowerCase() === "request-id")
     ?.value;
 
-/** The base a stale land names: the answer's own, or the main it was built on. */
 const baseOf = (wire: typeof LandWire.Type) =>
   Rebuild.match(wire.job.rebuild, {
     Compose: () => wire.job.main,
@@ -661,12 +584,7 @@ const baseOf = (wire: typeof LandWire.Type) =>
     Merge: ({ base }) => base,
   });
 
-/**
- * A land that found `main` at `tip`, not where the job left it: an earlier
- * land of the same request (a child of the job's `main` carrying its
- * `Request-Id`, within 16 first parents of the tip) gets its missing
- * bookkeeping written; anything else is `StaleBase`.
- */
+/** An earlier land of the same `Request-Id` gets its missing bookkeeping written; anything else is `StaleBase`. */
 const moved = (job: Job, wire: typeof LandWire.Type, tip: string) =>
   Effect.gen(function* () {
     const history = readLog(
@@ -693,12 +611,7 @@ const moved = (job: Job, wire: typeof LandWire.Type, tip: string) =>
     });
   });
 
-/**
- * One commit on canonical `main` whose parent is the job's `main` and whose
- * tree is the job's `tree`, rebuilt here; the answerer its author and the
- * platform its committer. It is pushed without force, so a `main` that
- * moved refuses it; then the mirror ref and the verdict note, each alone.
- */
+/** Pushed without force, so a `main` that moved refuses it. */
 export const land = (wire: typeof LandWire.Type) =>
   Effect.gen(function* () {
     const { job: landing } = wire;
@@ -768,15 +681,8 @@ export const land = (wire: typeof LandWire.Type) =>
     return yield* job.blocked(script.main, printed(ran));
   });
 
-// What a composed commit says: the platform made it, for a check, off main.
 const COMPOSE_MESSAGE = "Compose files onto main for a check\n";
 
-/**
- * `main` with a decider's files added, committed by the platform on `main`
- * and pushed to `${Brand.refsPrefix}compose/<tree>`, where a Checker fetches
- * it by id. `main` never moves. Composed before onto the same `main`, it is
- * the commit already there.
- */
 export const compose = (wire: typeof ComposeWire.Type) =>
   Effect.gen(function* () {
     const job: Job = {
@@ -834,14 +740,12 @@ export const compose = (wire: typeof ComposeWire.Type) =>
     return { commit, tree };
   });
 
-/** Whether `rev` names a commit in the Lander's copy. */
 const hasCommit = (job: Job, rev: string) =>
   Effect.map(
     job.run(objectType(job.repo, `${rev}^{commit}`)),
     ({ exitCode }) => exitCode === 0
   );
 
-/** `commit` in the Lander's copy, fetched by its id if fetching main did not bring it. */
 const present = (job: Job, commit: string) =>
   Effect.gen(function* () {
     if (!(yield* hasCommit(job, commit))) {
@@ -856,13 +760,7 @@ const present = (job: Job, commit: string) =>
         );
   });
 
-/**
- * The entries of a config folder bundled by bun in the work folder: the
- * folder's files checked out from the copy (no repo config, no hooks; files
- * only, never a symlink), the sdk's two names pointed at the image's copy
- * and its packages beside it, then bun's output read back, each entry at its
- * own path and each shared chunk at the path bun gave it.
- */
+/** Files only, never a symlink, and no repo config or hooks. */
 const built = (
   job: Job,
   files: readonly {
@@ -915,14 +813,7 @@ const built = (
     );
   });
 
-/**
- * The config folder at `at`, for the rules evaluator: its project module,
- * visibility module and ask files each bundled by bun into plain ES modules
- * with the sdk and `effect` inlined (shared code in chunks beside them), its
- * other files (`policy.json`, the vouch file) as committed, and the version
- * of the sdk the image carries. A folder that is missing gives no modules:
- * the project runs on the defaults. Nothing in the folder runs here.
- */
+/** Nothing in the folder runs here. A missing folder gives no modules: the defaults apply. */
 export const bundleRules = (wire: typeof BundleWire.Type) =>
   Effect.gen(function* () {
     const { sdk } = yield* Layout;

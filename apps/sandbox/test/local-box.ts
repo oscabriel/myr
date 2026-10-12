@@ -13,14 +13,6 @@ const failed =
   (cause: { readonly message: string }) =>
     new BoxFailed({ operation, reason: cause.message });
 
-/**
- * `Box` over local processes, for tests: the Lander's git script runs here
- * as it runs in its container, against bare repos on disk. A command gets
- * only the env it is given (no variable of this machine's leaks in, so a
- * command that needs `PATH` is handed one), no stdin, and its time limit.
- * A file is written as the Sandbox SDK's `Files` writes one: into a folder
- * that must already be there.
- */
 export const LocalBox: Layer.Layer<Box> = Layer.effect(
   Box,
   Effect.gen(function* () {

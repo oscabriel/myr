@@ -1,30 +1,3 @@
-/**
- * release: builds the CLI into its npm package and two single-file
- * binaries, uploads a release to a stage's own release storage, and
- * publishes the package only when a person runs it.
- *
- *   bun run release -- --build [--version <semver>] [--stage <s> | --origin <url>]
- *   bun run release -- --upload --stage dev-oscabriel|demo --version <semver>
- *   bun run release -- --publish --version <semver>
- *
- * `--build` runs the CLI's build with both targets, stages the npm package in
- * `apps/cli/release/npm/` (its `package.json` generated from `Brand`, the
- * platform's skill, a README and the licence), copies the binaries to
- * `apps/cli/release/<slug>-<target>`, and writes `install.sh` and
- * `SHA256SUMS` beside them. The install script fetches from `--origin`, or
- * the stage's platform origin, or the local platform (`wrangler dev`).
- *
- * `--upload --stage <s>` puts the version's files into the stage's
- * `releases-<stage>` bucket with Wrangler's own login, and
- * `releases/manifest.json` last; the platform then serves `<origin>/install.sh`
- * and `<origin>/releases/…`. Nothing goes to GitHub.
- *
- * `--publish` runs `npm publish` only when a person runs it: under any
- * agent's env (`@repo/protocol/audit`'s table) the run still does every
- * other step it names, checks the staged package as a publish would, prints
- * the command for a person to run, and exits 0 (H2). The release's core
- * lives in `lib/release.ts`, its steps in `lib/release/steps.ts`.
- */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
   Console,
@@ -57,7 +30,6 @@ import {
 } from "./lib/release/steps.ts";
 import type { Layout, Release } from "./lib/release/steps.ts";
 
-/** The flags the command takes; any other is a typo, refused. */
 const FLAGS = new Set([
   "--build",
   "--origin",
@@ -70,19 +42,13 @@ const FLAGS = new Set([
 const USAGE =
   "bun run release -- [--build] [--upload --stage <dev-…|demo>] [--publish] [--version <semver>] [--origin <url>]";
 
-/**
- * The release stopped, and it has said why in one line: what failed and
- * what to do (a step's failure, a refusal of the flags or the plan). The
- * runtime then exits 1 without printing it again.
- */
+// Already said in one line, so the runtime exits 1 without printing it again.
 class Reported extends Schema.TaggedError<Reported>()("Reported", {}) {
   override readonly [Runtime.errorReported] = false;
 }
 
-/** The local platform, as `wrangler dev` serves it. */
 const LOCAL_ORIGIN = "http://localhost:8787";
 
-/** What `bun run release` was asked to do. */
 interface Options {
   readonly build: boolean;
   readonly upload: boolean;
@@ -92,7 +58,6 @@ interface Options {
   readonly origin?: string;
 }
 
-/** The command's flags, read; an unknown flag or no step at all is refused. */
 const optionsOf = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const unknown = argv.filter(
@@ -134,7 +99,6 @@ const optionsOf = (argv: readonly string[]) =>
     return options;
   });
 
-/** The stage's platform origin, on the workers.dev subdomain bootstrap recorded. */
 const stageOrigin = (root: string, stage: Stage) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -156,7 +120,6 @@ const stageOrigin = (root: string, stage: Stage) =>
     return platformOrigin(stage, subdomain);
   });
 
-/** Sizes of the release folder's files, and the staged package's files, for the record. */
 const report = (layout: Layout, version: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -195,11 +158,7 @@ const report = (layout: Layout, version: string) =>
     }
   });
 
-/**
- * Under an agent, the publish is a person's (H2): once the staged package
- * is whole and of this version, say what they run, and end well, since the
- * agent has done all it may.
- */
+// Under an agent, the publish is a person's: say what they run, and end well.
 const handOver = (
   layout: Layout,
   release: Release,

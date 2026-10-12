@@ -1,35 +1,8 @@
-/**
- * deploy: `bun run deploy -- --stage dev-<user>|demo`. The one way a stage
- * is deployed (AGENTS.md principle 11, ADR 0002):
- *
- * 1. `bun run verify`: a red gate stops everything after it;
- * 2. `sandbox`, with Wrangler: the platform's `SANDBOX` binding names it;
- * 3. `platform`, with `varlock-wrangler`, which resolves
- *    `apps/platform/.env.schema` and syncs its secrets with the Worker;
- * 4. `web`, built for the stage and deployed with Wrangler, once `apps/web`
- *    exists;
- * 5. the push-event trigger, read back and compared (`bootstrap.ts
- *    --check-triggers`, with the infra token from `varlock run`);
- * 6. `scripts/smoke.ts` against the live stage;
- * 7. the redirect URI a Google OAuth client registers for the stage (H4),
- *    printed for a person to copy; Google sign-in stays off without one.
- *
- * While a take is being recorded (`infra/.recording`, which
- * `bun infra/recording.ts on` writes), it refuses every deploy with
- * `RecordingInProgress` before it reads a flag or spawns anything; only
- * `bun infra/recording.ts off` lifts that. Without `--stage`, or with a stage
- * `stages.ts` doesn't declare, it refuses before it spawns anything. It takes no other flag: verify always runs.
- * Every command runs with `WRANGLER_SEND_METRICS=false`; Wrangler deploys
- * with its own login, never the read-mostly infra token.
- *
- * `STAGE_SECRETS_FILE` names a dotenv file outside the repo whose values the
- * platform's deploy carries as its environment, which varlock reads before any
- * `.env` file: a stage's generated secrets, on every stage. Only the items `apps/platform/.env.schema` declares are passed,
- * to that one step, and no value is ever printed.
- *
- * Each step runs with its own folder's `node_modules/.bin` first on `PATH`,
- * since `varlock-wrangler` starts `wrangler` by name.
- */
+// Usage: bun run deploy -- --stage <stage>
+// Runs verify, deploys sandbox, platform and web, checks the push trigger, then
+// smoke. Refused while `infra/.recording` exists, before any flag is read.
+// `STAGE_SECRETS_FILE` passes only the items `apps/platform/.env.schema`
+// declares, to the platform step alone; no value is ever printed.
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
   Config,
@@ -60,7 +33,6 @@ export { RecordingInProgress } from "./recording.ts";
 
 export { NoStage, UnknownStage } from "./stages.ts";
 
-/** A step exited non-zero; nothing after it ran. */
 export class StepFailed extends Schema.TaggedError<StepFailed>()("StepFailed", {
   exitCode: Schema.Int,
   step: Schema.String,
@@ -70,7 +42,6 @@ export class StepFailed extends Schema.TaggedError<StepFailed>()("StepFailed", {
   }
 }
 
-/** `STAGE_SECRETS_FILE` names a file that can't be read. */
 export class SecretsFileUnreadable extends Schema.TaggedError<SecretsFileUnreadable>()(
   "SecretsFileUnreadable",
   { file: Schema.String }
@@ -80,7 +51,6 @@ export class SecretsFileUnreadable extends Schema.TaggedError<SecretsFileUnreada
   }
 }
 
-/** One command of the deploy, run from `cwd` (relative to the repo root). */
 interface Step {
   readonly name: string;
   readonly command: string;
@@ -89,10 +59,8 @@ interface Step {
   readonly env?: Readonly<Record<string, string>>;
 }
 
-/** Wrangler's own bin in an app, so each app deploys with its pinned version. */
 const bin = (app: string, name: string) => `${app}/node_modules/.bin/${name}`;
 
-/** Every step a deploy of `stage` runs, in order. */
 const stepsOf = (
   stage: Stage,
   options: {
@@ -114,11 +82,9 @@ const stepsOf = (
     env: options.platformEnv,
     name: "platform",
   },
-  // The web builds with the Cloudflare Vite plugin, which takes the stage
-  // from CLOUDFLARE_ENV and writes that stage's deploy config under `dist/`;
-  // Wrangler deploys that build, and refuses an --env other than the one it
-  // was built for. NODE_ENV keeps a shell's own value
-  // from making it a development build, whose `#backend` is the dev world.
+  // The Vite plugin takes the stage from CLOUDFLARE_ENV and writes its deploy
+  // config under `dist/`, so Wrangler gets no --env. NODE_ENV stops a shell's
+  // own value from making a development build, whose `#backend` is the dev world.
   ...(options.web
     ? [
         {
@@ -150,10 +116,6 @@ const stepsOf = (
   },
 ];
 
-/**
- * The values `STAGE_SECRETS_FILE` holds for the items the platform's
- * `.env.schema` declares: none when it isn't set.
- */
 const platformSecrets = (root: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -191,7 +153,6 @@ const platformSecrets = (root: string) =>
     return Object.fromEntries(values.flatMap(Option.toArray));
   });
 
-/** Runs one step from the repo root, failing when it exits non-zero. */
 const runStep = (root: string, stage: Stage, step: Step) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -237,21 +198,13 @@ const runStep = (root: string, stage: Stage, step: Step) =>
       : Effect.fail(new StepFailed({ exitCode, step: step.name }));
   });
 
-/**
- * Google's redirect back to the platform, as `apps/platform/src/auth/pages.ts`
- * routes it (infra imports no app).
- */
+// Mirrors `apps/platform/src/auth/pages.ts`: infra imports no app.
 const GOOGLE_CALLBACK = "/oauth/google/callback";
 
 const decodeWorkersDev = Schema.decodeUnknownEffect(
   Schema.fromJsonString(WorkersDev)
 );
 
-/**
- * The line naming the redirect URI a Google OAuth client registers for
- * `stage` (H4): the platform's workers.dev origin from bootstrap's
- * record, or how to get one when bootstrap hasn't run.
- */
 const googleRedirectLine = (root: string, stage: Stage) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -269,10 +222,6 @@ const googleRedirectLine = (root: string, stage: Stage) =>
     });
   });
 
-/**
- * Deploys the stage `argv`'s `--stage` names, then smoke-tests it; refused
- * outright while a take is being recorded.
- */
 export const deploy = (
   argv: readonly string[]
 ): Effect.Effect<
