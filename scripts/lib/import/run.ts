@@ -1,15 +1,3 @@
-/**
- * The import run: reads the flags, asks the platform what it lists, imports
- * the rest of the examples one at a time, prints each one's heads and tags,
- * records each new import on a stage in the ledger as kept, warms each new
- * import by reading its pages once through the web, with `--tags`
- * backfills the tags of an import that came without them, and with
- * `--warm` warms the examples the platform listed already.
- *
- * The platform, the backfill and the web are services (`ImportTarget`,
- * `TagBackfill`, `Warmer`), so a test runs the whole run over fakes;
- * `live.ts` holds the real ones.
- */
 import { ProjectName } from "@repo/protocol/ids";
 import type { ProjectKey } from "@repo/protocol/ids";
 import { ProjectExists } from "@repo/protocol/refusal";
@@ -38,7 +26,6 @@ import { flagValue, resources, Stage, stageOf } from "../../../infra/stages.ts";
 import { examples, planImports } from "./plan.ts";
 import type { ImportExample } from "./plan.ts";
 
-/** Why the run stopped, said for a person; never a token. */
 export class ImportExamplesFailed extends Schema.TaggedError<ImportExamplesFailed>()(
   "ImportExamplesFailed",
   { reason: Schema.String }
@@ -50,7 +37,6 @@ export class ImportExamplesFailed extends Schema.TaggedError<ImportExamplesFaile
 
 const failed = (reason: string) => new ImportExamplesFailed({ reason });
 
-/** Where the imports go: a dev stage, or the Node world on this machine. */
 export const ImportWhere = Schema.TaggedUnion({
   Stage: { stage: Stage, url: Schema.optionalKey(Schema.String) },
   World: {},
@@ -58,38 +44,27 @@ export const ImportWhere = Schema.TaggedUnion({
 
 export type ImportWhere = typeof ImportWhere.Type;
 
-/** What `bun scripts/import-examples.ts` was asked to do. */
 export interface ImportOptions {
   readonly where: ImportWhere;
-  /** The one example to import, when not all. */
   readonly only: Option.Option<ProjectName>;
-  /** Print the plan, import and record nothing. */
   readonly dryRun: boolean;
-  /** Backfill the tags of an import that has none. */
   readonly tags: boolean;
-  /** Keep the source of each earlier import on its record (ADR 0031). */
   readonly sources: boolean;
-  /** Warm the examples the platform lists already, as well as each new import. */
   readonly warm: boolean;
-  /** The web's origin to warm through, when the stage's own can't be known. */
   readonly web: Option.Option<string>;
 }
 
-/** The platform the imports go to, as the operator. */
 export class ImportTarget extends Context.Service<
   ImportTarget,
   {
-    /** Where it is, said for a person: `dev-oscabriel (https://…)`. */
     readonly label: string;
     readonly listProjects: Effect.Effect<
       ReadonlySet<ProjectName>,
       ImportExamplesFailed
     >;
-    /** One `initProject` importing `example`: main's first landed SHA. */
     readonly initProject: (
       example: ImportExample
     ) => Effect.Effect<{ readonly landed?: string }, ImportExamplesFailed>;
-    /** How many branches and tags the project's repo serves, anonymously. */
     readonly counts: (
       project: ProjectName
     ) => Effect.Effect<
@@ -99,11 +74,7 @@ export class ImportTarget extends Context.Service<
   }
 >()("scripts/ImportTarget") {}
 
-/**
- * Pushes an import's tags from its source to its canonical repo: the one
- * write that skips the gateway, tags only, by the operator. How many tags
- * it pushed.
- */
+/** The one write that skips the gateway: tags only, by the operator. */
 export class TagBackfill extends Context.Service<
   TagBackfill,
   {
@@ -113,19 +84,13 @@ export class TagBackfill extends Context.Service<
   }
 >()("scripts/TagBackfill") {}
 
-/** One page read to warm an import: where, whether it answered, and what it said. */
 export interface WarmRead {
   readonly path: string;
   readonly ok: boolean;
-  /** Its status and time, or why it failed; said for a person. */
   readonly said: string;
 }
 
-/**
- * Reads an import's pages once through the web, anonymously, so its first
- * reader finds why and its history kept. A read that fails is reported in
- * what it gives back, never as a failure: warming is a courtesy.
- */
+// A failed read is reported, never a failure: warming is a courtesy.
 export class Warmer extends Context.Service<
   Warmer,
   {
@@ -136,12 +101,9 @@ export class Warmer extends Context.Service<
 const isProjectExists = Schema.is(ProjectExists);
 
 /**
- * One import's `initProject`, asked again 30 s apart, up to three more
- * times, while it got no answer (`answered` false): a large import can
- * outlast the edge's request timeout, and the platform adopts the repo the
- * first call left. A refusal is never asked again. `ProjectExists` after a
- * call that got no answer is that call's project, made after its answer
- * was lost: this run's import, its landed SHA not known here.
+ * A large import can outlast the edge's request timeout; the platform adopts
+ * the repo the first call left, so a call with no answer is asked again. A
+ * `ProjectExists` after such a call is that call's own project.
  */
 export const initUntilAnswered = <A extends { readonly landed?: string }, E>(
   call: Effect.Effect<A, E>,
@@ -172,7 +134,6 @@ export const initUntilAnswered = <A extends { readonly landed?: string }, E>(
 const USAGE =
   "bun scripts/import-examples.ts --world node | --stage <stage> [--url <origin>] [--web <origin>] [--only <project>] [--tags] [--sources] [--warm] [--dry-run]";
 
-/** The flags the command takes; any other is a typo, refused. */
 const FLAGS = new Set([
   "--dry-run",
   "--only",
@@ -187,7 +148,6 @@ const FLAGS = new Set([
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
-/** The command's flags, read; a typo or a stage the table does not declare is refused before anything runs. */
 export const optionsOf = (
   argv: readonly string[]
 ): Effect.Effect<ImportOptions, ImportExamplesFailed> =>
@@ -269,10 +229,6 @@ export const optionsOf = (
     };
   });
 
-/**
- * The ledger's line for an import's repo, in the stage's public namespace,
- * by its key: the repo's name, as the platform keeps it.
- */
 const repoLine = (
   stage: Stage,
   key: ProjectKey,
@@ -286,7 +242,6 @@ const repoLine = (
   stage,
 });
 
-/** The ledger's two lines for a new import on `stage`: its project, and its repo, by its key. */
 const importLines = (
   stage: Stage,
   key: ProjectKey,
@@ -299,23 +254,17 @@ const importLines = (
 const ledgerFailed = ({ message }: PlatformError.PlatformError) =>
   failed(`the ledger (${ledgerPath}): ${message}`);
 
-/** Appends `entries` to the ledger. */
 const record = (entries: readonly Created[]) =>
   Effect.forEach(entries, recordCreated, { discard: true }).pipe(
     Effect.mapError(ledgerFailed)
   );
 
-/** The stage the run records on, if it runs on one. */
 const stageOfWhere = (where: ImportWhere) =>
   ImportWhere.match(where, {
     Stage: ({ stage }) => Option.some(stage),
     World: () => Option.none<Stage>(),
   });
 
-/**
- * `--tags` on one import: its tags pushed from its source when its repo
- * serves none, the ledger told, and a line printed.
- */
 const backfillOne = (
   example: ImportExample,
   tagCount: number,
@@ -340,7 +289,6 @@ const backfillOne = (
     );
   });
 
-/** One project warmed, and a line saying how it went. */
 const warmOne = (project: ProjectName) =>
   Effect.gen(function* () {
     const reads = yield* Warmer.use((warmer) => warmer.warm(project));
@@ -356,11 +304,7 @@ const warmOne = (project: ProjectName) =>
     );
   });
 
-/**
- * The projects the ledger records as imports on `stage`: an import the
- * platform does not list (one adopted before adoptions were heard) is
- * still this stage's, never imported again.
- */
+// An import the ledger records but the platform does not list is still never imported again.
 const recordedImports = (stage: Option.Option<Stage>) =>
   Effect.gen(function* () {
     if (Option.isNone(stage)) {
@@ -388,11 +332,7 @@ const recordedImports = (stage: Option.Option<Stage>) =>
     );
   });
 
-/**
- * `--sources` on one earlier import: `initProject` asked again with the
- * same source, which the platform takes as the source to keep (ADR 0031)
- * and answers as the import did; a refusal is printed, never fatal.
- */
+// A repeated `initProject` with the same source makes the platform keep that source.
 const sourceOne = (example: ImportExample) =>
   Effect.gen(function* () {
     const target = yield* ImportTarget;
@@ -405,7 +345,6 @@ const sourceOne = (example: ImportExample) =>
     yield* Console.log(`  ${example.name}: ${outcome}`);
   });
 
-/** The run itself, over a target, a backfill and a web. */
 const run = (options: ImportOptions) =>
   Effect.gen(function* () {
     const target = yield* ImportTarget;
@@ -418,8 +357,6 @@ const run = (options: ImportOptions) =>
     const plan = planImports(examples, known, options.only);
     const skipped = asked.filter(({ name }) => known.has(name));
 
-    // The earlier imports `--tags` and `--sources` go back over: on a
-    // stage, those the ledger records; in the Node world, every one listed.
     const earlier = skipped.filter(
       ({ name }) => Option.isNone(stage) || recorded.has(name)
     );
@@ -470,8 +407,7 @@ const run = (options: ImportOptions) =>
           const made = yield* target.initProject(example);
           const at = yield* DateTime.now;
 
-          // Recorded as soon as the platform made it, before anything else
-          // can fail.
+          // Recorded before anything else can fail.
           yield* Option.match(stage, {
             onNone: () => Effect.void,
             onSome: (on) => record(importLines(on, example.key, at)),
@@ -492,8 +428,6 @@ const run = (options: ImportOptions) =>
       { discard: true }
     );
 
-    // An import from an earlier run that this run skipped is backfilled
-    // too, if the ledger holds it as an import of this stage.
     if (options.tags && Option.isSome(stage)) {
       yield* Effect.forEach(
         earlier,
@@ -522,11 +456,6 @@ const run = (options: ImportOptions) =>
     );
   });
 
-/**
- * `bun scripts/import-examples.ts …`: reads the flags (a bad one refused
- * before anything is built or called), then runs over the target, backfill
- * and web `layersOf` gives for them.
- */
 export const importExamples = <E, R>(
   argv: readonly string[],
   layersOf: (

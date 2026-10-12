@@ -1,34 +1,3 @@
-/**
- * seed: puts both fictional example projects on a platform, ready for the
- * demo, and changes nothing when run again.
- *
- *   bun scripts/seed.ts --world node
- *   bunx varlock run --path apps/platform/ -- bun scripts/seed.ts --stage dev-<user>
- *
- * `--world node` serves the Node world on this machine for the run
- * (`apps/platform/test/serve-world.ts`). `--stage <s>` seeds a deployed
- * stage at `--url`, or at the workers.dev origin bootstrap recorded, with
- * tokens only from the env: `SESSION_TOKENS` (token to handle, as the
- * platform's own; `--tokens-env` names another) and `OPERATOR_TOKEN`
- * (`--operator-env`). `--stage demo` also needs `--yes`: the user records
- * on it (H7). `--only <project>` seeds one example; `--json`
- * prints the versioned envelope.
- *
- * `--only <example> --as <name>` seeds a fresh copy of that example under
- * another project name (`--only burrow --as burrow-swarm-2`, which is the
- * operator's `oscabriel/burrow-swarm-2`), so a live run can take a family
- * nobody has touched while the example itself stays fresh for the
- * recording. A name some project has is refused. A copy on a stage
- * is written to the throwaway ledger (`infra/created.ts`, by `seed`) as soon
- * as the platform has made it, with its repo and each layer's repo.
- *
- * Each project is made, and main's first commit pushed, as the operator;
- * each ask is opened as the decider the project's config names, red first
- * on the platform's own Checker; then each layer the example keeps under
- * `layers/` (datekit's maintainers layer) is pushed by that decider to its
- * repo in the private namespace. It prints one line per step, one per
- * project, and a summary. The seed's core lives in `lib/seed.ts`.
- */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Envelope } from "@repo/protocol/envelope";
 import { Handle, keyOf, ProjectName } from "@repo/protocol/ids";
@@ -69,14 +38,11 @@ import {
 } from "./lib/seed.ts";
 import type { SeededProject, SeedPlan } from "./lib/seed.ts";
 
-/** The examples the seed knows, in the order it seeds them. */
 export const EXAMPLES = ["examples/datekit", "examples/burrow"] as const;
 
-/** Where a seed goes: the Node world on this machine, or a deployed stage. */
 export const SeedWhere = Schema.TaggedUnion({
   Stage: {
     stage: Stage,
-    /** The env vars that hold the stage's tokens. */
     tokens: Schema.Struct({ operator: Schema.String, sessions: Schema.String }),
     url: Schema.optionalKey(Schema.String),
   },
@@ -85,18 +51,13 @@ export const SeedWhere = Schema.TaggedUnion({
 
 export type SeedWhere = typeof SeedWhere.Type;
 
-/** What `bun scripts/seed.ts` was asked to do. */
 export interface SeedOptions {
   readonly where: SeedWhere;
-  /** The one project to seed, when not both. */
   readonly only?: string;
-  /** The name to seed `only`'s example under, as a fresh copy (`--as`). */
   readonly as?: ProjectName;
-  /** Print the versioned envelope instead of lines. */
   readonly json: boolean;
 }
 
-/** The flags the command takes; any other is a typo, refused. */
 const FLAGS = new Set([
   "--as",
   "--json",
@@ -114,10 +75,8 @@ const USAGE =
 
 const failed = (reason: string) => new SeedFailed({ reason });
 
-/** The stage `--stage` names, its tokens' env vars, and where it lives if `--url` says. */
 const stageFrom = (argv: readonly string[]) =>
   Effect.gen(function* () {
-    // infra's own reading of `--stage`, and its words when it names none.
     const stage = yield* stageOf(argv).pipe(
       Effect.mapError(({ message }) => failed(message))
     );
@@ -150,12 +109,6 @@ const stageFrom = (argv: readonly string[]) =>
     });
   });
 
-/**
- * `--as`'s name, for a copy of the example `--only` names: a project name,
- * and not the example's own. A bare word is the operator's
- * (`burrow-swarm-2` is `oscabriel/burrow-swarm-2`): the operator makes the
- * copy, and makes projects only in their own namespace.
- */
 const copyName = (name: string, only: Option.Option<string>) =>
   Effect.gen(function* () {
     if (Option.isNone(only)) {
@@ -183,7 +136,6 @@ const copyName = (name: string, only: Option.Option<string>) =>
       : copy;
   });
 
-/** The command's flags, read; a seed of `demo` needs `--yes` (H7: the user records on it). */
 export const optionsOf = (
   argv: readonly string[]
 ): Effect.Effect<SeedOptions, SeedFailed> =>
@@ -239,16 +191,10 @@ export const optionsOf = (
     };
   });
 
-/**
- * Writes a copy on `stage` to the throwaway ledger, by the seed: the
- * project, its repo in the public namespace, and each layer's repo in the
- * private one, which the platform makes when main lands declaring it.
- */
 export const recordCopy = (stage: Stage, plan: SeedPlan, at: DateTime.Utc) => {
   const { layers, projects } = resources(stage);
   const by = "seed";
-  // The ledger names what the platform keeps: the project's key, which is
-  // its Durable Object's id and its repo's name.
+  // The project's key is both its Durable Object's id and its repo's name.
   const key = keyOf(plan.project);
 
   const entries: readonly Created[] = [
@@ -269,7 +215,6 @@ export const recordCopy = (stage: Stage, plan: SeedPlan, at: DateTime.Utc) => {
   );
 };
 
-/** What `--json` prints for one seeded project. */
 const SeededSummary = Schema.Struct({
   asks: Schema.Array(Schema.String),
   decider: Handle,
@@ -280,7 +225,6 @@ const SeededSummary = Schema.Struct({
 
 type SeededSummary = typeof SeededSummary.Type;
 
-/** What `--json` prints: the versioned envelope over the steps and each project. */
 export const SeedEnvelope = Envelope(
   Schema.Struct({
     projects: Schema.Array(SeededSummary),
@@ -294,7 +238,6 @@ const printEnvelope = (envelope: typeof SeedEnvelope.Type) =>
     Console.log
   ).pipe(Effect.orDie);
 
-/** Where a stage's platform lives: `--url`, or the workers.dev subdomain bootstrap recorded. */
 const stageOrigin = (where: (typeof SeedWhere.cases.Stage)["Type"]) =>
   Effect.gen(function* () {
     if (where.url !== undefined) {
@@ -313,7 +256,6 @@ const stageOrigin = (where: (typeof SeedWhere.cases.Stage)["Type"]) =>
     return platformOrigin(where.stage, subdomain);
   });
 
-/** Where the seed goes, said for a person, and the target there. */
 const targetFor = (where: SeedWhere, plans: readonly SeedPlan[]) =>
   SeedWhere.match(where, {
     Stage: (stage) =>
@@ -328,11 +270,9 @@ const targetFor = (where: SeedWhere, plans: readonly SeedPlan[]) =>
       }),
   });
 
-/** One step as the command prints it: `OpenAsk datekit/format-ordinal: done`. */
 export const stepLine = ({ _tag, result, target }: SeedStep) =>
   `${_tag} ${target}: ${result}`;
 
-/** One project as the summary prints it. */
 const projectLine = ({
   asks,
   decider,
@@ -347,7 +287,6 @@ const projectLine = ({
     ...ratchets.map((name) => `ratchet ${name}`),
   ].join(", ");
 
-/** What a plan's project holds now, for the summary. */
 const summaryOf = (
   plan: SeedPlan,
   held: SeededProject | undefined
@@ -364,12 +303,6 @@ const summaryOf = (
   return landed === undefined ? summary : { ...summary, main: landed };
 };
 
-/**
- * `bun scripts/seed.ts …`: plans each example, seeds it on the world or the
- * stage, then prints one line per step, one per project and a summary (or,
- * with `--json`, the versioned envelope). A refusal under `--json` prints
- * the envelope with it, and the command still fails.
- */
 export const main = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const options = yield* optionsOf(argv);
@@ -397,7 +330,6 @@ export const main = (argv: readonly string[]) =>
     const say = (line: string) =>
       options.json ? Effect.void : Console.log(line);
 
-    // A copy on a stage goes to the throwaway ledger once it is made.
     const made = (plan: SeedPlan) =>
       SeedWhere.match(options.where, {
         Stage: ({ stage }) =>

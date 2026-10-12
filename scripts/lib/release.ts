@@ -1,8 +1,3 @@
-/**
- * The release's core: what the CLI's npm package says of
- * itself, which steps a release runs, and what it hands the platform's own
- * release storage. Pure; `scripts/release.ts` runs it.
- */
 import type { Brand } from "@repo/brand";
 import { detectHarness } from "@repo/protocol/audit";
 import { Array as Arr, Option, Order, Predicate, Result, Schema } from "effect";
@@ -11,49 +6,32 @@ import { ReleaseManifest } from "../../apps/platform/src/releases.ts";
 import { declaredStage, NoStage, UnknownStage } from "../../infra/stages.ts";
 import { installScriptFor } from "./release/install-script.ts";
 
-// --- What a release builds for -----------------------------------------------
-
-/** The machines a release builds a binary for, as Bun names them. */
 export type Target = "bun-linux-x64" | "bun-darwin-arm64";
 
 export const targets: readonly Target[] = ["bun-linux-x64", "bun-darwin-arm64"];
 
-/** A target as the CLI's build and the platform name it, without Bun's prefix: `linux-x64`. */
 export const machineOf = (target: Target) => target.replace(/^bun-/u, "");
 
-/** A target's binary, as the release folder and the platform name it: `<slug>-linux-x64`. */
 export const binaryName = (brand: typeof Brand, target: Target) =>
   `${brand.slug}-${machineOf(target)}`;
 
-// --- The npm package's dependencies ------------------------------------------
-
 /**
- * A module statement as rolldown writes one, at the start of a line: an
- * `import … from "x"` or `export … from "x"`, over any number of lines, or a
- * side-effect `import "x"`. Prose and inline strings are not read, but a
- * template literal's line can start with `import` (`dist/bin.js` holds one:
- * the rules' `/bun` main imports `./job.json`). Such a line naming a
- * package is read as an import, which fails the pin loudly (`Unpinned`)
- * rather than letting an import slip through unpinned.
+ * A module statement as rolldown writes one, at the start of a line. A
+ * template literal's line that starts with `import` and names a package is
+ * read as an import too, which fails the pin loudly rather than slip through.
  */
 const STATEMENT =
   /^(?:import|export)\b[^;"'`]*?\bfrom\s*["'](?<from>[^"']+)["']|^import\s*["'](?<bare>[^"']+)["']/gmu;
 
-/** The package a bare specifier names: `@scope/name` or `name`, without a subpath. */
 const packageOf = (specifier: string) =>
   specifier
     .split("/")
     .slice(0, specifier.startsWith("@") ? 2 : 1)
     .join("/");
 
-/** Whether `specifier` names a package, not a file or a runtime built-in. */
 const isPackage = (specifier: string) => !/^(?:\.|\/|node:)/u.test(specifier);
 
-/**
- * The packages a built module imports statically, by package name, sorted.
- * A package tsdown keeps external is imported this way; one reached only by
- * a dynamic `import()` would not be listed (none is today).
- */
+/** Static imports only: a package reached only by a dynamic `import()` is not listed. */
 export const importedPackages = (source: string): readonly string[] =>
   Arr.sort(
     Arr.dedupe(
@@ -66,22 +44,13 @@ export const importedPackages = (source: string): readonly string[] =>
     Order.String
   );
 
-/**
- * pi, the harness the package plugs into: a host package, so an optional
- * peer and never bundled or depended on.
- */
+/** The host the package plugs into: an optional peer, never bundled or depended on. */
 const PI_HOST = "@earendil-works/pi-coding-agent";
 
-/**
- * Packages the build imports that can't be pinned for npm: the CLI's
- * manifest doesn't declare them, they are workspace packages (tsdown inlines
- * those, so one left is a build fault), or their catalog has no version.
- */
 export class Unpinned extends Schema.TaggedError<Unpinned>()("Unpinned", {
   packages: Schema.Array(Schema.String),
 }) {}
 
-/** The version a declared specifier pins, with `catalog:` read from the catalog. */
 const pinOf = (
   specifier: string | undefined,
   catalogued: string | undefined
@@ -93,13 +62,6 @@ const pinOf = (
     : version;
 };
 
-/**
- * The published package's `dependencies`: each package the build imports,
- * at the version the CLI's manifest (`declared`) pins, `catalog:` resolved
- * from the workspace's catalog. pi is left out: the adapter imports it from
- * the host that loads it, an optional peer. Every other one is pinned, or
- * none is returned.
- */
 export const pinnedDependencies = (input: {
   readonly imported: readonly string[];
   readonly declared: Readonly<Record<string, string>>;
@@ -132,18 +94,13 @@ export const pinnedDependencies = (input: {
       );
 };
 
-// --- The npm package's manifest ----------------------------------------------
-
-/** The command line, under Node or Bun: the CLI's npm build. */
 const BIN = "./dist/bin.js";
 
-/** A library entry: its code, and the types tsgo declared for it. */
 interface LibraryEntry {
   readonly types: string;
   readonly default: string;
 }
 
-/** The npm package's manifest, as `npm publish` reads it. */
 export interface PublishManifest {
   readonly bin: Readonly<Record<string, string>>;
   readonly dependencies: Readonly<Record<string, string>>;
@@ -166,7 +123,6 @@ export interface PublishManifest {
   readonly version: string;
 }
 
-/** A library entry of the CLI's build, by the name it is published under. */
 const library = (name: "protocol" | "rules"): LibraryEntry =>
   // oxlint-disable-next-line sort-keys -- Node matches export conditions in key order and needs "default" last; TypeScript reads "types" only before it
   ({
@@ -175,13 +131,8 @@ const library = (name: "protocol" | "rules"): LibraryEntry =>
   });
 
 /**
- * The npm package's manifest for `version`. Every name comes from `brand`:
- * the package, and one bin for each name the one entry answers to (as git's
- * credential helper, it reads its own name; `apps/cli/src/bin.ts`).
- * `dependencies` are the packages the build imports, pinned
- * (`pinnedDependencies`). The `pi` key and the `pi-package` keyword make it
- * a pi package (`pi install npm:<package>`): pi loads the adapter at
- * `dist/pi.js` and the platform's skill under `skills/`.
+ * Both bins point at one entry, which reads its own name to act as git's
+ * credential helper. The `pi` key and `pi-package` keyword make it a pi package.
  */
 export const publishManifest = (
   brand: typeof Brand,
@@ -210,16 +161,9 @@ export const publishManifest = (
   version: input.version,
 });
 
-/** A path in the package, as the manifest writes it, from the package's root. */
 const fromRoot = (file: string) =>
   file.replace(/^\.\//u, "").replace(/\/$/u, "");
 
-/**
- * Every path the npm package's manifest points at (its bins, exports, pi's
- * extension and skills folder, and the README and licence it ships), from
- * the package's root, sorted: a staged package missing any of them is not
- * published.
- */
 export const namedFiles = (manifest: PublishManifest): readonly string[] =>
   Arr.sort(
     Arr.dedupe(
@@ -236,9 +180,6 @@ export const namedFiles = (manifest: PublishManifest): readonly string[] =>
     Order.String
   );
 
-// --- The plan ----------------------------------------------------------------
-
-/** One step of a release, in the order a release runs them. */
 export type ReleaseStep =
   | "tsdown"
   | "manifest"
@@ -249,17 +190,12 @@ export type ReleaseStep =
   | "upload"
   | "publish";
 
-/** `npm publish` runs only when a person runs the release (H2). */
 export class PublishNeedsAPerson extends Schema.TaggedError<PublishNeedsAPerson>()(
   "PublishNeedsAPerson",
   { markers: Schema.Array(Schema.String) }
 ) {}
 
-/**
- * The env names that say an agent runs this process: each one that alone
- * makes `@repo/protocol/audit`'s `detectHarness` name a harness (it
- * keeps that table once; this reads it, never copies it), sorted.
- */
+// Reads `detectHarness`'s table rather than copying it.
 export const agentMarkers = (
   env: Readonly<Record<string, string | undefined>>
 ): readonly string[] =>
@@ -270,7 +206,6 @@ export const agentMarkers = (
     Order.String
   );
 
-/** What a build makes: the CLI's build, then the package and the binaries beside it. */
 const BUILD: readonly ReleaseStep[] = [
   "tsdown",
   "manifest",
@@ -278,10 +213,8 @@ const BUILD: readonly ReleaseStep[] = [
   "compile",
 ];
 
-/** What a build or an upload ends with: the install script for its origin, and the digests. */
 const RELEASE_FILES: readonly ReleaseStep[] = ["installScript", "checksums"];
 
-/** What `bun run release` was asked to do, and the env it runs in. */
 export interface ReleaseFlags {
   readonly build: boolean;
   readonly upload: boolean;
@@ -290,14 +223,6 @@ export interface ReleaseFlags {
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
-/**
- * The steps `flags` name, in order: `build` (the CLI's build with both
- * targets, the npm package and the binaries), the install script and the
- * checksums, `upload` to the stage's own release storage, and `publish`
- * last. An upload names a stage the repo declares (`dev-oscabriel` or
- * `demo`); a stage given to a build only says whose origin the install
- * script fetches from, and is checked the same way.
- */
 const stepsOf = (
   flags: ReleaseFlags
 ): Result.Result<readonly ReleaseStep[], NoStage | UnknownStage> => {
@@ -317,11 +242,6 @@ const stepsOf = (
   ]);
 };
 
-/**
- * The steps a release runs, in order (`stepsOf`). Under any agent's env, a
- * plan that publishes is refused (H2); `releaseRun` says what the script
- * then does instead.
- */
 export const releasePlan = (
   flags: ReleaseFlags
 ): Result.Result<
@@ -335,19 +255,14 @@ export const releasePlan = (
     : stepsOf(flags);
 };
 
-/** One run of `bun run release`: the steps it runs, and who it hands the publish to. */
 export interface ReleaseRun {
   readonly steps: readonly ReleaseStep[];
-  /** The agent markers that refused the publish (H2); none when a person runs it. */
   readonly handOver: readonly string[];
 }
 
 /**
- * What the script runs for `flags`. A person's run is the plan. Under an
- * agent, a run that publishes still runs every other step it names, so a
- * `--build --publish` builds, and hands the publish to a person in place
- * of running it: the script checks the staged package and prints the
- * command (H2), rather than ending well with nothing done.
+ * Under an agent, a run that publishes still runs every other step it names
+ * and hands the publish to a person instead of running it.
  */
 export const releaseRun = (
   flags: ReleaseFlags
@@ -360,12 +275,6 @@ export const releaseRun = (
   );
 };
 
-// --- The version -------------------------------------------------------------
-
-/**
- * An upload or a publish names its `--version`, and it is one the platform
- * serves: semver, never `latest` (`given` is the one that isn't).
- */
 export class VersionNeeded extends Schema.TaggedError<VersionNeeded>()(
   "VersionNeeded",
   { given: Schema.optionalKey(Schema.String) }
@@ -377,10 +286,6 @@ export class VersionNeeded extends Schema.TaggedError<VersionNeeded>()(
   }
 }
 
-/**
- * Whether the platform serves `version`: its manifest decodes with it as
- * the latest release (the platform's schema holds the one rule for a version).
- */
 const served = (version: string) =>
   Option.isSome(
     Schema.decodeOption(ReleaseManifest)({
@@ -389,18 +294,8 @@ const served = (version: string) =>
     })
   );
 
-/**
- * What a build that neither uploads nor publishes is stamped with. The
- * build stamps the release's version into the CLI (`apps/cli/build.ts`'s
- * `--version`, which the `tsdown` step passes), and a run no build stamped
- * reports this too (`apps/cli/src/version.ts`).
- */
 const UNRELEASED = "0.0.0";
 
-/**
- * The release's version: `version` as given, which an upload or a publish
- * must name, and which must be one the platform serves.
- */
 export const releaseVersion = (input: {
   readonly version?: string;
   readonly upload: boolean;
@@ -417,9 +312,6 @@ export const releaseVersion = (input: {
     : Result.fail(new VersionNeeded({ given: input.version }));
 };
 
-// --- The platform's release storage ------------------------------------------
-
-/** One file of a release, as the manifest lists it. */
 export interface ReleaseAsset {
   readonly sha256: string;
   readonly bytes: number;
@@ -427,12 +319,6 @@ export interface ReleaseAsset {
 
 export { ReleaseManifest } from "../../apps/platform/src/releases.ts";
 
-/**
- * `releases/manifest.json` once `version` is released with `assets`: every
- * version `previous` lists, kept, and `version`, now latest. It is the shape
- * the platform decodes and serves from (`ReleaseManifest`, the one
- * schema both sides use).
- */
 export const releaseManifest = (input: {
   readonly version: string;
   readonly previous: ReleaseManifest | undefined;
@@ -445,11 +331,6 @@ export const releaseManifest = (input: {
   },
 });
 
-/**
- * `version` is already released with other bytes. The platform serves a
- * version's files as immutable, so a client may keep the old ones for good:
- * a changed release needs a new `--version`.
- */
 export class VersionReleased extends Schema.TaggedError<VersionReleased>()(
   "VersionReleased",
   { version: Schema.String }
@@ -459,7 +340,6 @@ export class VersionReleased extends Schema.TaggedError<VersionReleased>()(
   }
 }
 
-/** Two releases hold the same files, by name, size and digest. */
 const sameAssets = (
   one: Readonly<Record<string, ReleaseAsset>>,
   other: Readonly<Record<string, ReleaseAsset>>
@@ -470,10 +350,6 @@ const sameAssets = (
       other[name]?.bytes === bytes && other[name]?.sha256 === sha256
   );
 
-/**
- * Whether `assets` may be released as `version`: it is new, or it is
- * released already with exactly these files (an upload run again).
- */
 export const unreleased = (input: {
   readonly version: string;
   readonly previous: ReleaseManifest | undefined;
@@ -486,18 +362,11 @@ export const unreleased = (input: {
     : Result.fail(new VersionReleased({ version: input.version }));
 };
 
-/** Where the manifest is kept: every release file is under `releases/`. */
 export const MANIFEST_KEY = "releases/manifest.json";
 
-/** Files by name, sorted (`Order.String`), as both sides list them. */
 const byName = <A>(record: Readonly<Record<string, A>>) =>
   Arr.sortWith(Object.entries(record), ([name]) => name, Order.String);
 
-/**
- * `SHA256SUMS`: one `<sha256>  <name>` line per file, sorted by name, as
- * `sha256sum` prints them and as the platform makes the one it serves from
- * the manifest.
- */
 export const checksumsFile = (
   assets: Readonly<Record<string, ReleaseAsset>>
 ): string =>
@@ -505,11 +374,7 @@ export const checksumsFile = (
     .map(([name, { sha256 }]) => `${sha256}  ${name}\n`)
     .join("");
 
-/**
- * What an upload puts where, in order: every file of `version` under
- * `releases/<version>/`, sorted, and `releases/manifest.json` last, so the
- * manifest never names a file the bucket lacks.
- */
+// The manifest goes last, so it never names a file the bucket lacks.
 export const uploads = (input: {
   readonly version: string;
   readonly files: readonly string[];
@@ -521,14 +386,6 @@ export const uploads = (input: {
   { file: "manifest.json", key: MANIFEST_KEY },
 ];
 
-// --- The install script ------------------------------------------------------
-
-/**
- * `curl -fsSL <origin>/install.sh | sh` for `version`, whose files the
- * platform serves at `baseUrl` (`<origin>/releases/<version>`):
- * the binary for the machine, checked against `SHA256SUMS` before it is
- * installed as `brand.cli`, with `brand.gitCredentialHelper` linked to it.
- */
 export const installScript = (input: {
   readonly brand: typeof Brand;
   readonly version: string;
