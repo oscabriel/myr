@@ -59,9 +59,9 @@ const NAMED_CHECKS = [
 ] as const;
 
 /**
- * What a public README never holds: a home folder, or the private plan's
- * host or folder. Each is joined at run time, so this file spells none of
- * them for a search to find.
+ * What a public README never holds: a home folder, the private plan's host,
+ * or a pointer into the maintainer's gitignored working docs. Each is joined
+ * at run time, so this file spells none of them for a search to find.
  */
 const PRIVATE = [
   ["~", ""].join("/"),
@@ -69,7 +69,9 @@ const PRIVATE = [
   ["", "Users", ""].join("/"),
   ["plans", "gneiss", "run"].join("."),
   ["wanted", "explainer"].join("-"),
-  [".agents", "scratch", "build"].join("/"),
+  ...["adr", "demo", "ops", "workflow", "scratch", "README"].map((folder) =>
+    [".agents", folder].join("/")
+  ),
 ] as const;
 
 /** The roadmap lines a reader asks about, word for word. */

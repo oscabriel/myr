@@ -1,7 +1,7 @@
 /**
  * Scenarios: the nudges the swarm adds to some contributors' briefs, so a
- * recorded take shows the refusals the video's beat names (1:30–2:15;
- * `.agents/demo/swarm-scenario.md` documents them). `plain` nudges nobody. Every
+ * recorded take shows the refusals the video's beat names (1:30–2:15).
+ * `plain` nudges nobody. Every
  * nudge is printed in the plan: staging is never hidden.
  */
 import { Option, Schema } from "effect";
