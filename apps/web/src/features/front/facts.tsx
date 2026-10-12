@@ -1,14 +1,3 @@
-/**
- * The facts a list of asks shows beside it: with nothing selected on the
- * front page, where to start and every project with its posture; with an
- * ask selected (the front page and a project's home alike), that ask's
- * state, how to take it, where it may change things, its family and its
- * project's posture, and the way to its page.
- *
- * Only what the list read is needed to draw them; what the full ask adds
- * (its territory's paths, its check, its mentor) fills in once the browser
- * has read it, in a block of the same size.
- */
 import { installCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
@@ -33,7 +22,6 @@ import { StatusLine } from "../shared/status-line.tsx";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-/** One numbered step: what it does, then its command. */
 export const Step = ({
   command,
   label,
@@ -47,7 +35,6 @@ export const Step = ({
   </div>
 );
 
-/** A link onward, at a block's foot. */
 export const Onward = ({
   children,
   to,
@@ -64,7 +51,7 @@ export const Onward = ({
   </AppLink>
 );
 
-/** Where an agent reads the same thing: a server route, so a plain link. */
+/** A server route, so a plain link. */
 export const ForAgents = ({ href }: { readonly href: string }) => (
   <p className="text-ui text-muted-foreground border-rule border-t pt-3 first:border-t-0">
     For agents:{" "}
@@ -74,7 +61,6 @@ export const ForAgents = ({ href }: { readonly href: string }) => (
   </p>
 );
 
-/** The three ways in from the front page: the CLI, the asks it lists, a claim. */
 export const StartHere = ({ webUrl }: { readonly webUrl: string }) => (
   <FactBlock label="Take an ask">
     <Step command={installCommand(webUrl)} label="Install the command line" />
@@ -87,14 +73,9 @@ export const StartHere = ({ webUrl }: { readonly webUrl: string }) => (
   </FactBlock>
 );
 
-/** A count and its noun: "1 open ask", "7 open asks". */
 export const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/**
- * Every project the platform lists, by its open asks; bars until the list
- * arrives. Each project's posture is its group header's to say, once.
- */
 export const ProjectsFacts = ({
   projects,
 }: {
@@ -126,7 +107,6 @@ export const ProjectsFacts = ({
     </FactBlock>
   );
 
-/** Who may take an ask, from what its listing says (the full ask adds the mentor). */
 const whoMayTake = (
   listing: AskListing,
   project: ProjectName,
@@ -143,24 +123,17 @@ const whoMayTake = (
     : `Anyone vouched in ${project}, or with a record in its area`;
 };
 
-/** A family the selected ask belongs to, as the page knows it. */
 export interface SelectedFamily {
   readonly parent: Ask;
   readonly finale: AskId;
   readonly states: ReadonlyMap<AskId, AskProgress>;
 }
 
-/** The selected ask's project posture, in the platform's words. */
 export interface SelectedPosture {
   readonly label: string;
   readonly posture: Posture;
 }
 
-/**
- * The selected ask: its state, how to take it (the claim numbered first),
- * where it may change things and what judges it, its family, its project's
- * posture, and its page.
- */
 export const SelectedAskFacts = ({
   family,
   full,
@@ -173,9 +146,7 @@ export const SelectedAskFacts = ({
 }: {
   readonly listing: AskListing;
   readonly project: ProjectName;
-  /** Whether the viewer may take it (the front page knows); open and unheld when not known. */
   readonly takeable: boolean;
-  /** The full ask, once the browser has read it. */
   readonly full: Ask | undefined;
   readonly progress: AskProgress | undefined;
   readonly family: SelectedFamily | undefined;

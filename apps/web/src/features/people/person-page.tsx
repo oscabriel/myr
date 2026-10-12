@@ -1,10 +1,6 @@
 /**
- * A person's page: their credit, read from the trailers on landed commits,
- * grouped by project and then by area, each area one sentence of the roles
- * they hold there ("Answered and asked in datekit/src"), linked to the
- * project's landings. Credit gates nothing and ranks no one (GLOSSARY.md
- * "Credit", "Record"): the read counts landings per role, and the page
- * draws none of those counts, orders by name, and adds nothing up.
+ * Credit gates nothing and ranks no one: the page draws none of the read's
+ * counts, orders by name, and adds nothing up.
  */
 import { CreditRole } from "@repo/protocol/domain/credit";
 import type { CreditSummary } from "@repo/protocol/domain/record";
@@ -19,19 +15,16 @@ import { MetaCode, MetaLine, Row, RowGroup } from "../shared/row.tsx";
 import { projectSections } from "../shared/shell/sections.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 
-/** One area of a project: each role a person holds there. */
 export interface AreaCredit {
   readonly area: string;
   readonly roles: readonly CreditRole[];
 }
 
-/** One project: the areas a person is credited in. */
 export interface ProjectCredit {
   readonly areas: readonly AreaCredit[];
   readonly project: ProjectName;
 }
 
-/** Each role as the sentence says it, in the past: the trailer names what they did. */
 const ROLE_WORD = {
   "Advised-by": "advised",
   "Asked-by": "asked",
@@ -42,10 +35,6 @@ const ROLE_WORD = {
   "Signed-off-by": "answered",
 } as const satisfies Record<CreditRole, string>;
 
-/**
- * The order a sentence names roles in: the answer first (it is the work
- * the landing is), then the trailers' own order.
- */
 const SENTENCE_ORDER: readonly CreditRole[] = [
   "Signed-off-by",
   ...CreditRole.literals.filter((role) => role !== "Signed-off-by"),
@@ -55,20 +44,14 @@ const bySentence = Order.mapInput(Order.Number, (role: CreditRole) =>
   SENTENCE_ORDER.indexOf(role)
 );
 
-/** Words joined as a sentence lists them: `a`, `a and b`, `a, b and c`. */
 const listed = (words: readonly string[]) =>
   words.length < 2
     ? words.join("")
     : `${words.slice(0, -1).join(", ")} and ${words.at(-1) ?? ""}`;
 
-/** Where an area sits, in words: "the whole project" for its root. */
 const whereOf = (project: string, area: string) =>
   area === "." || area === "" ? "the whole project" : `${project}/${area}`;
 
-/**
- * An area's roles as one sentence: "Answered and asked in datekit/src",
- * "Decided in the whole project".
- */
 export const areaSentence = (
   project: string,
   area: string,
@@ -83,7 +66,6 @@ export const areaSentence = (
   return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)}`;
 };
 
-/** `rows` grouped by `key`, the groups in the order their keys sort. */
 const groupBy = <A,>(
   rows: readonly A[],
   key: (row: A) => string
@@ -92,7 +74,6 @@ const groupBy = <A,>(
     .toSorted(([one], [other]) => one.localeCompare(other))
     .map(([, group]) => group);
 
-/** A person's credit by project, then by area (each by name), each area's roles once each. */
 export const creditsByProject = (
   credits: readonly CreditSummary[]
 ): readonly ProjectCredit[] =>
@@ -109,7 +90,6 @@ export const creditsByProject = (
     project: Array.headNonEmpty(inProject).project,
   }));
 
-/** The project's landings, where an area's credits are the trailers. */
 const landingsOf = (project: ProjectName) =>
   projectSections(project).find(({ tab }) => tab === "landings")?.to ??
   projectPath(project);
@@ -176,7 +156,6 @@ export const PersonView = ({
   );
 };
 
-/** The page for an address whose last part cannot be a handle. */
 export const NoSuchPersonView = () => (
   <PageShell title="No such person">
     <EmptyState

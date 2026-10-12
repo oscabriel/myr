@@ -1,11 +1,3 @@
-/**
- * The For agents page's reference sections, set like a man page: the
- * CLI's synopsis, the endpoints, the limits and the refusals. Every word
- * that is not a heading comes from `@repo/agent-kit` (`synopsis`,
- * `agentEndpoints`, `agentLimits`) or the refusal union itself, so the
- * page and `/agents.md` say the same. Mono only for what a terminal takes:
- * commands, addresses and tags.
- */
 import type {
   Endpoint,
   Limit,
@@ -15,11 +7,9 @@ import { groups } from "@repo/protocol/refusal";
 import { Fragment } from "react";
 import type { ReactNode } from "react";
 
-/** A link in running text: the rule colour's underline, ink on hover. */
 export const LINK =
   "decoration-rule underline underline-offset-[0.2em] hover:decoration-current";
 
-/** One section of the reference: its heading at Title size, in the sans, then its body. */
 export const ReferenceSection = ({
   children,
   id,
@@ -38,10 +28,6 @@ export const ReferenceSection = ({
   </section>
 );
 
-/**
- * A usage line that wraps only between its words, never inside a flag
- * (`[--json]` stays whole), so a phone reads it as typed.
- */
 const Usage = ({ usage }: { readonly usage: string }) => (
   <code className="text-mono font-mono">
     {usage.split(" ").map((word, index) => (
@@ -53,7 +39,6 @@ const Usage = ({ usage }: { readonly usage: string }) => (
   </code>
 );
 
-/** Every command as typed, each over what it does, set close like a man page's synopsis. */
 export const Synopsis = ({
   lines,
 }: {
@@ -69,7 +54,6 @@ export const Synopsis = ({
   </ul>
 );
 
-/** Each address an agent reads, one line each, linked where a browser can open it. */
 export const Endpoints = ({
   endpoints,
 }: {
@@ -89,7 +73,6 @@ export const Endpoints = ({
           key={url}
         >
           {readable ? (
-            // A server's own text, not a page of the app.
             <a className={`${LINK} w-fit max-w-full`} href={url}>
               {address}
             </a>
@@ -103,7 +86,6 @@ export const Endpoints = ({
   </ul>
 );
 
-/** The limits, as a plain table. */
 export const Limits = ({ limits }: { readonly limits: readonly Limit[] }) => (
   <table className="text-ui w-full max-w-[48rem] border-collapse text-left">
     <thead>
@@ -130,14 +112,12 @@ export const Limits = ({ limits }: { readonly limits: readonly Limit[] }) => (
 );
 
 /**
- * Where `/llms-full.txt` lists a refusal: a text fragment on its table row
- * (`` `Tag` | Group ``), which nothing else in the file reads. A dash ends
- * a fragment's word, so it is escaped as well.
+ * A text fragment on the refusal's row in `/llms-full.txt` (`` `Tag` | Group
+ * ``). A dash ends a fragment's word, so it is escaped as well.
  */
 const rowOf = (tag: string, group: string) =>
   `/llms-full.txt#:~:text=${encodeURIComponent(`\`${tag}\` | ${group}`).replaceAll("-", "%2D")}`;
 
-/** Every refusal of the union, by group, each tag linked to its row. */
 export const Refusals = () => (
   <>
     <p className="text-ui text-muted-foreground max-w-[70ch]">

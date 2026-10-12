@@ -1,12 +1,3 @@
-/**
- * One drafted file, drawn by `@pierre/diffs`: the ask file or its check,
- * highlighted by Shiki's JavaScript engine (never its WASM one). Nothing is
- * selectable or anchored here: a page may hold several of these, and the
- * file's own page is the place for `#L` anchors.
- *
- * The library and Shiki's grammars are megabytes, so only the browser
- * loads this module (`client-file.tsx`); the Worker never bundles it.
- */
 import { File } from "@pierre/diffs/react";
 import type { FileOptions } from "@pierre/diffs/react";
 import { useMemo } from "react";
@@ -23,7 +14,6 @@ export interface DraftedFileProps {
 
 const options: FileOptions<undefined, undefined> = {
   ...diffsOptions,
-  // The page names the file in its own heading above the code.
   disableFileHeader: true,
   overflow: "scroll",
 };

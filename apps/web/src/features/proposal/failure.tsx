@@ -1,11 +1,3 @@
-/**
- * A call the propose, proposal or decision pages sent, failed. A session
- * that ended (or never began) asks the reader to sign in and come back to
- * the same address, so the form, the proposal or the decision is where
- * they left it; a refusal reads as the platform gave it, through
- * `RefusalView`; anything else is the platform not answering, in ink,
- * never as a refusal.
- */
 import { Unauthenticated } from "@repo/protocol/principal";
 import { Refusal } from "@repo/protocol/refusal";
 import { Cause, Option, Schema } from "effect";
@@ -25,9 +17,7 @@ export const ProposalFailure = ({
   here,
 }: {
   readonly cause: Cause.Cause<unknown>;
-  /** What the reader was doing, as "Sign in to …" ends: `propose it`. */
   readonly doing: string;
-  /** The page's own address (`hereOf`), where sign-in comes back to. */
   readonly here: string;
 }) => {
   const error = Cause.findErrorOption(cause);

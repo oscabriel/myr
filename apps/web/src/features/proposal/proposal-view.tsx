@@ -1,23 +1,3 @@
-/**
- * One proposal, as its proposer and its deciders follow it. The title is
- * its want; under it, where the platform's draft stands in the outcome's
- * words: drafting (the checking role), ready and waiting for a decider (the
- * waiting role), or a failed round, drawn by `RefusalView` when the round
- * failed with a refusal the page can draw whole, else as an ink line. Then
- * the draft read as a guide, in the order it was made: the ask file (its
- * want, territory and kind as rows, its source behind a disclosure), the
- * check (its source), and red first (the run that failed twice the same
- * way, its assertion once).
- *
- * "Let the platform's agent draft it" (or "Draft again"), with a note for
- * the agent, is the proposer's or a decider's while the proposal is open
- * and not drafting; a decider also gets the way to the decision that would
- * open the ask. The inspector holds who proposed it, when it expires, the
- * decision, and the draft's round.
- *
- * Nothing here edits the drafted files: a member proposes again, or a
- * decider sends the draft back with a note.
- */
 import { Brand } from "@repo/brand";
 import type { ConfigFile } from "@repo/protocol/domain/common";
 import { DraftState } from "@repo/protocol/domain/proposal";
@@ -45,16 +25,13 @@ import { When } from "../shared/time.tsx";
 import { DraftedCode } from "./client-file.tsx";
 
 /**
- * How many attempts a draft round makes before it fails: the platform's
- * `DRAFT_ROUNDS` (`@repo/project/draft-runs`), which the web's production
- * code does not import; `test/proposal.test.tsx` holds the two equal.
+ * The platform's `DRAFT_ROUNDS`, which the web's production code does not
+ * import; `test/proposal.test.tsx` holds the two equal.
  */
 export const DRAFT_ATTEMPTS = 3;
 
-/** The longest note `draftAsk` takes. */
 const NOTE_LIMIT = 2000;
 
-/** Where a proposal stands in one word: its draft's while it is open, else its own. */
 export const standing = (proposal: Proposal) =>
   proposal.state === "open" && proposal.draft !== undefined
     ? proposal.draft._tag
@@ -64,17 +41,14 @@ const draftingNow = DraftState.isAnyOf(["Drafting"]);
 
 const failedNow = DraftState.isAnyOf(["Failed"]);
 
-/** Whether the platform's agent is drafting the proposal's ask right now. */
 export const isDrafting = (proposal: Proposal) =>
   proposal.draft !== undefined && draftingNow(proposal.draft);
 
-/** Every refusal of the union, to find one by the tag a failed draft kept. */
 const refusalKinds = groups.flatMap(({ members }) => [...members]);
 
 /**
- * The refusal a failed round ended with, when its tag alone makes one: a
- * draft keeps only the tag, so a refusal that needs fields of its own
- * cannot be drawn whole, and is said in words instead.
+ * A draft keeps only the tag, so a refusal that needs fields of its own cannot
+ * be drawn whole.
  */
 export const refusalOfTag = (tag: string): Option.Option<Refusal> =>
   Arr.findFirst(refusalKinds, (kind) => kind.identifier === tag).pipe(
@@ -85,11 +59,9 @@ export const refusalOfTag = (tag: string): Option.Option<Refusal> =>
     )
   );
 
-/** Whether a drafted file is the ask file: under the config folder, or named as one. */
 const isAskFile = ({ path }: ConfigFile) =>
   path.startsWith(`${Brand.configDir}/`) || path.endsWith(".ask.ts");
 
-/** The draft's files in the order it made them: the ask file, the check, then what the check reads. */
 const filesInOrder = (files: readonly ConfigFile[]) => {
   const askFile = files.find(isAskFile);
   const rest = files.filter((file) => file !== askFile);
@@ -99,7 +71,6 @@ const filesInOrder = (files: readonly ConfigFile[]) => {
   return { askFile, checks, others };
 };
 
-/** The kind an ask file names (`kinds.fix`), when it names one plainly. */
 const kindIn = (source: string) =>
   /\bkinds\.(?<kind>[A-Za-z]+)/u.exec(source)?.groups?.kind;
 
@@ -133,7 +104,6 @@ const Row = ({
   </div>
 );
 
-/** The ask file: what it states, then its source behind a disclosure. */
 const AskFileStep = ({
   file,
   proposal,
@@ -177,7 +147,6 @@ const AskFileStep = ({
   );
 };
 
-/** Red first: the run that failed twice the same way on main, its assertion once. */
 const RedFirst = ({ draft }: { readonly draft: DraftState }) =>
   DraftState.match(draft, {
     Drafting: () => null,
@@ -201,7 +170,6 @@ const RedFirst = ({ draft }: { readonly draft: DraftState }) =>
     ),
   });
 
-/** A round that failed: the refusal whole when the page can draw it, else in words, in ink. */
 const FailedRound = ({ draft }: { readonly draft: DraftState }) =>
   DraftState.match(draft, {
     Drafting: () => null,
@@ -234,7 +202,6 @@ const FailedRound = ({ draft }: { readonly draft: DraftState }) =>
     Ready: () => null,
   });
 
-/** "Draft again", with a note the agent reads. */
 const Redraft = ({
   again,
   busy,
@@ -294,7 +261,6 @@ const Redraft = ({
   );
 };
 
-/** The way to the open decision that would open the ask. */
 const DecisionLink = ({
   decision,
   project,
@@ -312,7 +278,6 @@ const DecisionLink = ({
   </AppLink>
 );
 
-/** The draft's round, in a line: its number and where it stands. */
 const roundLine = (draft: DraftState) =>
   DraftState.match(draft, {
     Drafting: ({ round }) => `Round ${round}, drafting now`,
@@ -322,7 +287,6 @@ const roundLine = (draft: DraftState) =>
       `Round ${round} ready after ${attempts} of ${DRAFT_ATTEMPTS} attempts`,
   });
 
-/** The inspector's facts: who proposed it, when it expires, its decision, the draft's round. */
 const ProposalFacts = ({
   decision,
   now,
@@ -374,7 +338,6 @@ const ProposalFacts = ({
   </>
 );
 
-/** Where the proposal stands, under its title: the status line, or a failed round; then what drafting means and its note. */
 const ProposalStatus = ({ proposal }: { readonly proposal: Proposal }) => {
   const { draft } = proposal;
   const drafting = draft !== undefined && draftingNow(draft);
@@ -411,7 +374,6 @@ const ProposalStatus = ({ proposal }: { readonly proposal: Proposal }) => {
   );
 };
 
-/** The draft as a guide, in the order it was made; a want alone says so. */
 const DraftGuide = ({
   files,
   proposal,
@@ -467,16 +429,11 @@ export const ProposalView = ({
 }: {
   readonly project: ProjectName;
   readonly proposal: Proposal;
-  /** The files the proposal holds (the ask file and its check), as `showProposal` read them. */
   readonly files: readonly ConfigFile[];
-  /** The open decision on the proposal, when the reader's Today holds it. */
   readonly decision: Option.Option<DecisionId>;
-  /** Whether the reader is its proposer or one of the project's deciders. */
   readonly mayRedraft: boolean;
   readonly onRedraft?: (note: string | undefined) => void;
-  /** Whether a "Draft again" is on its way: the button waits. */
   readonly busy?: boolean;
-  /** What the last "Draft again" came back with, when it was refused. */
   readonly children?: ReactNode;
   readonly now?: DateTime.Utc;
 }): ReactNode => {

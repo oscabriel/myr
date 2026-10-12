@@ -1,13 +1,4 @@
 import type { Evidence as Fact } from "@repo/protocol/domain/common";
-// A decision's evidence, typed by what it is about: the commits a stray
-// push moved between (each a link to its page), the proposal's draft and
-// files, a ratchet's before and after, a waiver's marker at its line, a
-// posture's from and to beside the ledger, the hosts a proxy may now reach,
-// the item a stored value matched, the person a vouch admits, the answer a
-// finish lands. Then whatever else the platform put on it, as label and
-// value, the diff and the fork left to the finish.
-//
-// Every value that is code is mono; every link is the router's.
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import type { Posture } from "@repo/protocol/posture";
@@ -29,19 +20,16 @@ const LINK = "decoration-rule underline hover:decoration-current";
 const CODE = "text-mono font-mono [overflow-wrap:anywhere]";
 
 /**
- * Whether an evidence line holds a file: its label is a path (one word with
- * a slash or a dot, as the ask file under the config folder, or a check
- * at the root, `offset.test.ts`), where every other label is words.
+ * A label that is a path: one word with a slash or a dot, where every other
+ * label is words.
  */
 const isFileFact = ({ label }: Fact) => /^\S*[./]\S*$/u.test(label);
 
 const opensAsk = DecisionSubject.isAnyOf(["OpenProposal"]);
 
-/** The files an `OpenProposal` decision holds, shown as code; none for any other subject. */
 export const filesOf = (decision: Decision): readonly Fact[] =>
   opensAsk(decision.subject) ? decision.evidence.filter(isFileFact) : [];
 
-/** One fact: its label over (or beside) its value. */
 const FactRow = ({
   children,
   label,
@@ -50,8 +38,7 @@ const FactRow = ({
   readonly label: string;
 }) => (
   <div className="contents">
-    {/* Sentence case, as every label on the page: the platform names some
-        evidence in lower case ("answer"); the text stays the platform's. */}
+    {/* Sentence case: the platform names some evidence in lower case. */}
     <dt className="text-label text-muted-foreground pt-0.5 first-letter:uppercase">
       {label}
     </dt>
@@ -62,14 +49,11 @@ const FactRow = ({
 );
 
 const FactList = ({ children }: { readonly children: ReactNode }) => (
-  // Label beside value where the evidence has the width (main), label over
-  // value where it has not (the inspector, a phone).
   <dl className="grid grid-cols-1 gap-x-4 gap-y-1.5 @lg:grid-cols-[minmax(7rem,auto)_1fr]">
     {children}
   </dl>
 );
 
-/** A link to a page of the web, with its mark. */
 const PageLink = ({
   children,
   icon: Icon,
@@ -88,7 +72,6 @@ const PageLink = ({
   </AppLink>
 );
 
-/** A posture as a mark and its name, in its role. */
 const PostureWord = ({ posture }: { readonly posture: Posture }) => (
   <span className="inline-flex items-center gap-1.5">
     <Mark look={POSTURE_MARKS[posture]} size="sm" />
@@ -96,7 +79,6 @@ const PostureWord = ({ posture }: { readonly posture: Posture }) => (
   </span>
 );
 
-/** From one value to another, the arrow hidden from a screen reader, which hears "to". */
 const FromTo = ({
   from,
   to,
@@ -132,7 +114,6 @@ const CommitLink = ({
   </AppLink>
 );
 
-/** The facts each subject carries in its own fields, typed. */
 const SubjectFacts = ({ decision }: { readonly decision: Decision }) =>
   DecisionSubject.match(decision.subject, {
     Finish: ({ ask, head }) => (
@@ -263,10 +244,8 @@ const SubjectFacts = ({ decision }: { readonly decision: Decision }) =>
     ),
   });
 
-/** A whole commit id in running evidence. */
 const WHOLE_SHA = /\b[0-9a-f]{40}\b/u;
 
-/** `text` with each whole commit id cut to its first seven, whole in its title. */
 const ShortShas = ({ text }: { readonly text: string }) =>
   text.split(/(?<sha>\b[0-9a-f]{40}\b)/u).map((part, index) =>
     WHOLE_SHA.test(part) ? (
@@ -278,8 +257,6 @@ const ShortShas = ({ text }: { readonly text: string }) =>
     )
   );
 
-// The labels the subject's own facts already say (a waiver's escape, a
-// ratchet's count), or the finish draws.
 const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
   PATCH_LABEL,
   FORK_LABEL,
@@ -287,7 +264,6 @@ const SHOWN_ELSEWHERE: ReadonlySet<string> = new Set([
   "ratchet",
 ]);
 
-/** The rest of what the platform put on the decision, as label and value. */
 const OtherFacts = ({
   decision,
   files,
@@ -304,8 +280,6 @@ const OtherFacts = ({
       {facts.map(({ href, label, value }) => (
         <FactRow
           key={`${label}:${value}`}
-          // Who pushed the answer, at which head: the subject's own row
-          // is already the answer.
           label={label === "answer" ? "Pushed by" : label}
         >
           {href === undefined ? (
@@ -321,7 +295,6 @@ const OtherFacts = ({
   );
 };
 
-/** The way from a `Finish` decision to its answer's diff, with how many files it changes. */
 export const FinishLink = ({
   decision,
   files,
@@ -338,13 +311,11 @@ export const FinishLink = ({
   </PageLink>
 );
 
-/** A decision's evidence: its subject's facts, the rest, and a proposal's files as code. */
 export const DecisionEvidence = ({
   decision,
   heading = "h4",
 }: {
   readonly decision: Decision;
-  /** The heading level a proposal's file paths take. */
   readonly heading?: "h3" | "h4";
 }) => {
   const files = filesOf(decision);

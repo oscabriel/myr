@@ -1,26 +1,3 @@
-/**
- * Today: a decider's day of decisions, not diffs, held to a budget said in
- * one sentence. The decisions sit in sections: those due within the day,
- * then the rest within the budget by expiry, then how many wait for
- * tomorrow (their ids are not in the read, so they have no rows). Below
- * them, the newcomers to welcome and a sample of landings that needed
- * nobody.
- *
- * Each row says its subject in plain words (the link to its page), its
- * project, kind and id, and when it expires over its default. From the
- * shell's width a row selects into the inspector, which holds the whole
- * decision: its evidence, a note, and its choices, each with what it does.
- * Below it a row opens in place, one at a time, its choices kept in sight
- * above the bottom bar while it is open.
- *
- * A choice taken leaves its row where it was, reading what it did; the
- * budget sentence moves with the next read. There is no toast.
- *
- * A failure reads as what it is: a refusal (`NotDecider` for a person who
- * decides nothing) through `RefusalView`, a missing sign-in as what Today
- * is and how to sign in, and an unreachable platform as that, never as an
- * empty day.
- */
 import { Brand } from "@repo/brand";
 import type { Decision, Today } from "@repo/protocol/domain/decision";
 import type { LandingView } from "@repo/protocol/domain/landing";
@@ -71,35 +48,28 @@ export {
 
 const counted = (count: number) => (count === 0 ? "none" : String(count));
 
-/** The day's budget, in one sentence: decisions taken and left, and the finishes apart. */
 export const budgetSentence = (budget: Today["budget"]) =>
   `Decisions: ${budget.used} taken, ${counted(Math.max(0, budget.total - budget.used))} left today. Finishes are counted apart: ${counted(budget.finishes)} taken.`;
 
-/** The budget for the context bar: what is left. */
 const budgetShort = (budget: Today["budget"]) =>
   `${counted(Math.max(0, budget.total - budget.used))} left today`;
 
-/** What Today is, for someone it does not hold decisions for yet. */
 const WHAT_TODAY_IS =
   "Today is a decider's page: the decisions you owe your projects each day, each with its evidence and a safe default if you leave it.";
 
-/** A decision on the page: listed, and whether it is due within the day. */
 interface Listed {
   readonly decision: Decision;
   readonly soon: boolean;
 }
 
-/** The choice a row's decision was taken with, when the decider took it here. */
 const choiceOf = (decision: Decision) => decision.decided?.choice;
 
-/** Its expiry over its default, at the row's end; muted when it is not due within the day. */
 const openState = (listed: Listed, now: DateTime.Utc) => ({
   mark: listed.soon ? ("waiting" as const) : ("notYet" as const),
   time: `default: ${listed.decision.default}`,
   word: distanceInWords(listed.decision.expiresAt, now),
 });
 
-/** The way to open a row in place, below the shell's width. */
 const OpenHere = ({
   decision,
   onToggle,
@@ -133,11 +103,9 @@ interface RowsProps {
   readonly open: string | undefined;
   readonly onOpen: (key: string | undefined) => void;
   readonly selected: string | undefined;
-  /** The decisions taken while the page was open, to stamp once. */
   readonly stamped: ReadonlySet<string>;
 }
 
-/** One decision's row: its subject, where it stands, and (below the shell's width) the whole of it in place. */
 const DecisionRow = ({
   listed,
   props,
@@ -242,7 +210,6 @@ const Section = ({
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/** The decisions, due today then within the budget, each section only when it holds one. */
 const DecisionSections = ({
   listed,
   props,
@@ -287,7 +254,6 @@ const DecisionSections = ({
   );
 };
 
-/** How many wait beyond the budget, as a sentence: their ids are not in the read. */
 const Tomorrow = ({ overflow }: { readonly overflow: number }) =>
   overflow === 0 ? null : (
     <Section name="Waits for tomorrow">
@@ -358,7 +324,6 @@ const Unattended = ({
     </Section>
   );
 
-/** The decision the inspector holds, whole. */
 const SelectedFacts = ({
   busy,
   listed,
@@ -407,7 +372,6 @@ const SelectedFacts = ({
   </>
 );
 
-/** Signed out: what Today is, the way in, and the command. */
 const SignedOutNotice = ({ here }: { readonly here: string }) => (
   <div className="flex max-w-[70ch] flex-col items-start gap-3">
     <p className="text-body">{WHAT_TODAY_IS}</p>
@@ -424,7 +388,6 @@ const SignedOutNotice = ({ here }: { readonly here: string }) => (
   </div>
 );
 
-/** What a choice that failed came back with: the refusal, or why there is none. */
 const DecidedFailure = ({
   decided,
 }: {
@@ -444,17 +407,12 @@ const DecidedFailure = ({
   });
 };
 
-/** The page around a Today with no decisions to list: the reason, said whole. */
 const Unlisted = ({ children }: { readonly children: ReactNode }) => (
   <Workspace crumbs={[{ label: "Today" }]} title="Today" variant="list">
     {children}
   </Workspace>
 );
 
-/**
- * The decisions on the page: Today's, and any the decider took here that
- * the next read no longer lists, each where it was.
- */
 const listedOf = (
   today: Today,
   taken: ReadonlyMap<string, Listed>
@@ -483,7 +441,6 @@ const listedOf = (
   );
 };
 
-/** `kept` with `decision`, taken, where it was listed. */
 const withTaken = (
   kept: ReadonlyMap<string, Listed>,
   decision: Decision,
@@ -497,7 +454,6 @@ const withTaken = (
   ]);
 };
 
-/** The decision a choice just came back with, when it was taken. */
 const takenNow = (
   decided: AsyncResult.AsyncResult<{ readonly decision: Decision }, unknown>
 ): Option.Option<Decision> =>
@@ -529,8 +485,7 @@ const ListedToday = ({
   const soon = expiringSoon(today);
   const fresh = takenNow(decided);
 
-  // A choice taken stays on the page after the next read leaves it out:
-  // kept as soon as it comes back, while this render draws it already.
+  // A choice taken stays on the page after the next read leaves it out.
   if (
     Option.isSome(fresh) &&
     kept.get(decisionKey(fresh.value))?.decision.decided === undefined
@@ -574,15 +529,11 @@ const ListedToday = ({
     onOpen: setOpen,
     onSelect,
     open,
-    // A row is drawn selected only when the address names it; with none
-    // named the inspector holds the first, and no row looks chosen.
     selected,
     stamped,
   };
 
   return (
-    // Below the shell's width a row opens in place, so the inspector's
-    // copy of the selected decision is not drawn in main as well.
     <div className="contents [&_[data-facts=inline]]:hidden">
       <Workspace
         count={budgetShort(today.budget)}
@@ -643,12 +594,10 @@ export const TodayView = ({
   readonly read: TodayRead;
   readonly now: DateTime.Utc;
   readonly onDecide: (input: DecideInput) => void;
-  /** The decider's last choice, as `decide` answered it. */
   readonly decided?: AsyncResult.AsyncResult<
     { readonly decision: Decision },
     unknown
   >;
-  /** The decision the inspector holds (`project/id`); the first listed when none. */
   readonly selected?: string | undefined;
   readonly onSelect?: ((key: string) => void) | undefined;
 }) =>

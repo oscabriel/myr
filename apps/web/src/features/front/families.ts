@@ -1,34 +1,21 @@
-// Which listed asks form a family, read from the names a migrate ask's split
-// gives its members: the platform opens a child per module as
-// `<parent>-<module>` and a delete child as `<parent>-delete`, and the
-// parent waits on all of them. A listing names no parent (the full ask does,
-// one read away), so a family is read from what the list holds: an ask that
-// waits on an ask named after it is a family's parent, and its members are
-// the listed asks it waits on, and its delete child.
-//
-// An ask that waits on another not named after it (one fix after another)
-// is no family: it stays a row of its own that reads as waiting.
+// A listing names no parent, so a family is read from names: a split opens
+// `<parent>-<module>` children and a `<parent>-delete` child, and the parent
+// waits on all of them.
 import type { AskListing } from "@repo/protocol/domain/ask";
 import { AskId } from "@repo/protocol/ids";
 
-/** One family, as a list holds it. */
 export interface ListedFamily {
   readonly parent: AskId;
-  /** Its members the list holds, in the list's order: the children still open, and the delete child. */
   readonly members: readonly AskId[];
-  /** The delete child, which waits on every other child. */
   readonly finale: AskId;
 }
 
-/** The delete child a split gives `parent`. */
 export const finaleOf = (parent: AskId): AskId =>
   AskId.make(`${parent}-delete`);
 
-/** Whether `parent` waits on an ask named after it, as a split names its members. */
 const isParent = ({ ask, blockedBy }: AskListing) =>
   blockedBy.some((blocker) => blocker.startsWith(`${ask}-`));
 
-/** Every family among `listings`, each at its parent's place in the list. */
 export const familiesIn = (
   listings: readonly AskListing[]
 ): readonly ListedFamily[] =>
@@ -51,7 +38,6 @@ export const familiesIn = (
     ];
   });
 
-/** A list's item: an ask of its own, or a family drawn as one row. */
 export type Arranged<L extends AskListing = AskListing> =
   | { readonly kind: "ask"; readonly listing: L }
   | {
@@ -61,11 +47,6 @@ export type Arranged<L extends AskListing = AskListing> =
       readonly finale: AskId;
     };
 
-/**
- * `listings` as a list draws them: each family at its parent's place, its
- * members taken out of the list (they are drawn under the parent's fan),
- * every other ask where it was.
- */
 export const arrange = <L extends AskListing>(
   listings: readonly L[]
 ): readonly Arranged<L>[] => {
@@ -97,9 +78,6 @@ export const arrange = <L extends AskListing>(
   });
 };
 
-// The listings with each ask's blockers cut to those still listed: an ask
-// that landed has left the list, and nothing waits on it any more (as the
-// front page's entries name only what they still wait on).
 export const stillWaiting = <L extends AskListing>(listings: readonly L[]) => {
   const listed = new Set(listings.map(({ ask }) => ask));
 

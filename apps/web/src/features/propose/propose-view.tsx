@@ -1,17 +1,3 @@
-/**
- * The propose form: a signed-in member writes a want, may name the
- * territory it belongs to (one of the project's top folders), and lets the
- * platform's agent draft the ask file and its failing check from it,
- * checked by default. A line from the why page (`?about&line&at`) starts the
- * want with where it points. The inspector says what makes a good want and
- * gives the same proposal as a command. Props in, markup out: the route
- * reads who is signed in and the project's paths, sends the payload, and
- * goes to the proposal once it is made.
- *
- * Only the want, the territory and the draft box: the files are the
- * agent's to write, or a person's through `propose --files` in the CLI.
- * Propose waits until there is a want, and says so on itself.
- */
 import { Brand } from "@repo/brand";
 import type { ProposeAsk } from "@repo/protocol/contracts";
 import type { CommitSha, ProjectName, RepoPath } from "@repo/protocol/ids";
@@ -31,10 +17,8 @@ import { FactBlock } from "../shared/facts.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { ClientTerritorySelect } from "./client-territory.tsx";
 
-/** What `proposeAsk` takes, from its one schema. */
 export type ProposePayload = typeof ProposeAsk.payloadSchema.Type;
 
-/** A line a why page points at: the file, the line and the commit it was read at. */
 export interface About {
   readonly path: RepoPath;
   readonly line: number;
@@ -42,9 +26,8 @@ export interface About {
 }
 
 /**
- * The form's fields as `proposeAsk`'s payload: the want trimmed, the
- * territory when one is named, and `draft: true` only when the box is
- * checked (the contract takes no `draft: false`).
+ * `draft: true` only when the box is checked: the contract takes no `draft:
+ * false`.
  */
 export const proposalPayload = (form: {
   readonly project: ProjectName;
@@ -62,14 +45,9 @@ export const proposalPayload = (form: {
   return form.draft ? { ...named, draft: true } : named;
 };
 
-/** How a want about one line starts: `In \`src/format.ts\` line 12 at 4c2e6a8: `. */
 export const wantAbout = ({ at, line, path }: About) =>
   `In \`${path}\` line ${line} at ${at.slice(0, 7)}: `;
 
-/**
- * The form's address for `project`, at the line a why page names when it
- * names one: where the project page links, and where sign-in comes back to.
- */
 export const proposeFormPath = (
   project: ProjectName,
   about: Option.Option<About> = Option.none()
@@ -80,16 +58,13 @@ export const proposeFormPath = (
       `/${project}/proposals/new?${new URLSearchParams({ about: path, at, line: String(line) }).toString()}`,
   });
 
-/** The value the territory takes when the agent chooses it. */
 const AGENT_CHOOSES = "";
 
-/** The territories the form offers: the agent's choice first, then each top folder. */
 export const territoryChoices = (modules: readonly RepoPath[]) => [
   { label: "Let the agent choose", value: AGENT_CHOOSES },
   ...modules.map((module) => ({ label: module, value: module })),
 ];
 
-/** What Propose says: why it waits, or what it does. */
 const proposeWords = (written: boolean, busy: boolean) => {
   if (!written) {
     return "Write the want first";
@@ -98,7 +73,6 @@ const proposeWords = (written: boolean, busy: boolean) => {
   return busy ? "Proposing" : "Propose";
 };
 
-/** The proposal as a command, for a reader in a terminal. */
 const PROPOSE_COMMAND = `${Brand.cli} propose --draft "<want>"`;
 
 const SignInFirst = ({
@@ -138,7 +112,6 @@ const SignInFirst = ({
   </section>
 );
 
-/** What makes a good want, and the same proposal from a terminal. */
 const GoodWant = () => (
   <>
     <FactBlock label="A good want">
@@ -257,8 +230,6 @@ const Form = ({
       {children}
 
       <Button
-        // Waiting for a want, it says so at full strength, dashed like any
-        // field still to fill, rather than sitting grey.
         className={`tablet:h-9 tablet:w-fit h-11 w-full min-w-28 px-4 ${written ? "" : "text-muted-foreground border-dashed disabled:opacity-100"}`}
         data-written={written}
         disabled={busy || !written}
@@ -272,7 +243,6 @@ const Form = ({
   );
 };
 
-/** The form, the way to sign in, or the wait while the browser learns who is signed in. */
 const ProposeBody = ({
   about,
   busy,
@@ -327,20 +297,13 @@ export const ProposeView = ({
 }: {
   readonly project: ProjectName;
   readonly signedIn: boolean;
-  /** Whether the browser is still learning who is signed in. */
   readonly checking?: boolean;
   readonly about: Option.Option<About>;
-  /** The project's top folders, each a territory to choose. */
   readonly modules: readonly RepoPath[];
-  /** Sends the payload; the route goes to the proposal once it is made. */
   readonly onPropose?: (payload: ProposePayload) => void;
-  /** Whether a proposal is on its way: the button waits. */
   readonly busy?: boolean;
-  /** What the last proposal came back with, when it was refused. */
   readonly children?: ReactNode;
 }): ReactNode => (
-  // Below the shell's width the form comes first, and what makes a good
-  // want follows it, rather than standing between the reader and the form.
   <div className="contents [&_[data-facts=inline]]:hidden">
     <Workspace
       crumbs={[

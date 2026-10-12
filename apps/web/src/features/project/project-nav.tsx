@@ -1,14 +1,3 @@
-/**
- * A project's section row: Asks, Code, Landings, Refs, Policy, Ledger and
- * Env shape, one line under the page's head where the rail is not drawn
- * (below 1120 px; from there the rail lists them). The line scrolls
- * sideways inside itself and never wraps, so it never pushes the page
- * sideways. The page being read is marked `aria-current` and underlined in
- * ink; a page under none of them (a proposal) marks none.
- *
- * Its links are the router's (`AppLink`), so moving between sections never
- * reloads the page.
- */
 import type { ProjectName } from "@repo/protocol/ids";
 import type { ReactNode } from "react";
 

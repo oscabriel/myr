@@ -1,27 +1,4 @@
-/**
- * A `Finish` decision's page: the one page where a decider reads an
- * answer's diff, laid out as the code browser is. The changed files sit in
- * the rail (territory first, then tests, then the rest); the diff fills
- * main, file by file under sticky headers, each with a "Mark read" button,
- * and a refusal from an earlier round sits under the line it pointed at.
- * The want, the verdict, the choices and the three lines that finish it
- * from a clone sit in the inspector from 1440 px; below that, the choices
- * stay in a bar at the foot of the diff. On a phone the page reads the
- * want, the verdict and the choices first, then the diff one file at a
- * time.
- *
- * The read marks are this browser's alone (`read-marks.ts`). A head pushed
- * to the answer while the page is open says so above the diff, and the
- * diff stays as it was until the reader reloads it.
- *
- * What the page reads from the decision's evidence: `patch`, the answer's
- * unified diff, and `fork`, the name of the answer's fork
- * (`<key>--<ask>--<handle>`), where a finish fetches the head and pushes
- * its commits. Without a patch the page shows the lines and no diff;
- * without a fork it names the fork by the claim fork's pattern and leaves
- * the answerer's handle for the decider to fill in. The web never calls
- * `finish` itself.
- */
+/** The web never calls `finish` itself. */
 import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -70,7 +47,6 @@ export type { FinishDecision } from "./patch.ts";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-/** Where the answer's head lives: its fork's git URL on the platform. */
 const remoteOf = (decision: FinishDecision, platformUrl: string) =>
   Arr.findFirst(decision.evidence, ({ label }) => label === FORK_LABEL).pipe(
     Option.map(
@@ -82,7 +58,6 @@ const remoteOf = (decision: FinishDecision, platformUrl: string) =>
     )
   );
 
-/** The three lines that take the answer's head into a clone, put the decider's commits on it, and finish it. */
 export const finishLines = (
   decision: FinishDecision,
   platformUrl: string,
@@ -108,7 +83,6 @@ export const finishLines = (
   ] as const;
 };
 
-/** The three finish lines, numbered, each under what it does. */
 const FinishLines = ({
   decision,
   platformUrl,
@@ -135,7 +109,6 @@ const FinishLines = ({
   </FactBlock>
 );
 
-/** What the ask wants, in one paragraph, and the way to it. */
 const WantFacts = ({ ask }: { readonly ask: Ask }) => (
   <FactBlock label="The ask wants">
     <p className="text-want font-normal" data-said="">
@@ -147,7 +120,6 @@ const WantFacts = ({ ask }: { readonly ask: Ask }) => (
   </FactBlock>
 );
 
-/** The verdict on the head: its line, and the gate's stages in a strip. */
 const VerdictFacts = ({ verdict }: { readonly verdict: Verdict }) => (
   <FactBlock label={`Verdict at ${shortSha(verdict.head)}`}>
     <div className="flex flex-col gap-2" data-outcome={verdict.outcome._tag}>
@@ -173,13 +145,9 @@ export interface FinishViewProps {
   readonly onDecide: (input: DecideInput) => void;
   readonly busy?: boolean;
   readonly soon?: boolean;
-  /** The diff's files, territory first (`patchFiles`); none without a patch. */
   readonly files: readonly PatchFile[];
-  /** Refusals from the answer's rounds that point into its files. */
   readonly placed?: readonly PlacedRefusal[];
-  /** The head last pushed to the answer, when it is not the one decided on. */
   readonly newerHead?: CommitSha | undefined;
-  /** The files this reader marked read. */
   readonly read?: ReadonlySet<string>;
   readonly onMark?: (file: MarkedFile, read: boolean) => void;
   readonly split?: boolean;
@@ -187,13 +155,9 @@ export interface FinishViewProps {
   readonly folded?: ReadonlySet<string> | undefined;
   readonly onFold?: (path: string, folded: boolean) => void;
   readonly onFoldAll?: (folded: boolean) => void;
-  /** Draw the diff in the browser over the plain text (the page does; a test reads the plain text). */
   readonly draw?: boolean;
-  /** The Files button, below the shell's width. */
   readonly filesButton?: ReactNode;
-  /** Settle the record's mark: the choice was taken while the page was open. */
   readonly stamp?: boolean;
-  /** What the reader's last choice came back with, when it failed. */
   readonly failure?: ReactNode;
 }
 
@@ -201,10 +165,8 @@ const NO_FILES: ReadonlySet<string> = new Set();
 
 const NO_REFUSALS: readonly PlacedRefusal[] = [];
 
-/** No whole files: a decision's diff comes parsed from its patch. */
 const NO_CHANGED: readonly ChangedFile[] = [];
 
-/** A file's state in its header: a refusal pointed into it, or this reader read it. */
 const slotOf = (
   path: string,
   header: ReactNode,
@@ -218,7 +180,6 @@ const slotOf = (
   return read.has(path) ? { header, path, status: "read" } : { header, path };
 };
 
-/** The refusals among `placed`, as notes under their lines. */
 const refusalNotes = (placed: readonly PlacedRefusal[]): readonly LineNote[] =>
   placed.map((each) => ({
     line: each.line,
@@ -226,7 +187,6 @@ const refusalNotes = (placed: readonly PlacedRefusal[]): readonly LineNote[] =>
     path: each.path,
   }));
 
-/** A head pushed after the one the decision names: said above the diff, never swapped in. */
 const NewerHead = ({ head }: { readonly head: CommitSha }) => (
   <output
     className={`border-rule bg-surface flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-2 ${GUTTER}`}
@@ -250,10 +210,6 @@ const NewerHead = ({ head }: { readonly head: CommitSha }) => (
   </output>
 );
 
-/**
- * The choices kept at the foot of the diff below 1440 px, where the
- * inspector is a sheet; once taken, the choice's record in their place.
- */
 const DecisionBar = ({
   busy,
   decision,
@@ -304,7 +260,6 @@ const DecisionBar = ({
   </section>
 );
 
-/** A choice that came back failed: said where the reader looks next, and politely. */
 const Failure = ({
   children,
   className = "",
@@ -317,7 +272,6 @@ const Failure = ({
   </div>
 );
 
-/** On a phone: the diff one file at a time, with the way to the next and the one before. */
 const OneFileAtATime = ({
   files,
   notes,
@@ -392,7 +346,6 @@ const OneFileAtATime = ({
   );
 };
 
-/** The diff from a tablet's width: plain from the server, drawn over in the browser, the choices at its foot. */
 const WideDiff = ({
   busy,
   decision,
@@ -494,7 +447,6 @@ const WideDiff = ({
   );
 };
 
-/** On a phone: the want, the verdict and the choices first, then the diff a file at a time. */
 const PhoneFinish = ({
   ask,
   busy,
@@ -570,7 +522,6 @@ const PhoneFinish = ({
   </div>
 );
 
-/** The inspector's facts: the want, the verdict, the decision, the lines that finish it, the diff's stats. */
 const FinishFacts = ({
   ask,
   busy,

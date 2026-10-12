@@ -1,10 +1,7 @@
 /**
- * A posture in the words GLOSSARY.md gives it ("Posture"). The project list
- * and the front page carry only the literal; the fuller label the platform
- * computes from a project's visibility config ("Open · sealed checks in
- * parser") is the ledger's. Until a listing carries that
- * label, each posture reads as its own name, never as a claim about what is
- * sealed.
+ * The project list carries only the literal; until it carries the platform's
+ * full label, each posture reads as its own name, never as a claim about what
+ * is sealed.
  */
 import type { Posture } from "@repo/protocol/posture";
 
@@ -18,11 +15,6 @@ const labels = {
 
 export const postureLabel = (posture: Posture): string => labels[posture];
 
-/**
- * A posture in its short form: the one the rail and a project's head both
- * say, so a project reads the same in both places (the platform's full
- * label is its title).
- */
 const words = {
   open: "Open",
   openCore: "Open core",

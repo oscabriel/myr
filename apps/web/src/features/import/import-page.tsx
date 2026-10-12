@@ -1,16 +1,9 @@
-/**
- * `/import`: the import form under the page's head, and beside it what an
- * import does and the same import as a command. A URL in the address
- * (`?url=`) fills the form. Props in, markup out: the route reads who is
- * signed in, sends the payload and goes to the project once it is made.
- */
 import { CommandLine } from "../shared/command.tsx";
 import { FactBlock } from "../shared/facts.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { ImportForm, importCommand } from "./import-form.tsx";
 import type { Importer } from "./import-form.tsx";
 
-/** What an import does, and the same import from a terminal. */
 export const ImportFacts = () => (
   <>
     <FactBlock label="What an import does">
@@ -37,13 +30,9 @@ export const ImportView = ({
   here,
   ...importer
 }: Importer & {
-  /** The URL the address carries, to fill the form with. */
   readonly url?: string | undefined;
-  /** The page's own address, where sign-in comes back to. */
   readonly here: string;
 }) => (
-  // Below the shell's width the form comes first, and what an import does
-  // follows it, rather than standing between the reader and the form.
   <div className="contents [&_[data-facts=inline]]:hidden">
     <Workspace
       crumbs={[{ label: "Import a repo" }]}
@@ -55,7 +44,6 @@ export const ImportView = ({
       <ImportForm
         {...importer}
         here={here}
-        // The name follows the URL until the person types one.
         prefill={url === "" ? undefined : { url }}
       />
       <div className="shell:hidden border-rule flex flex-col border-t pt-4">

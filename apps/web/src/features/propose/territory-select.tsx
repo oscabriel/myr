@@ -1,10 +1,3 @@
-/**
- * The territory a proposal names, chosen with the kit's select: the agent's
- * choice first, then each of the project's top folders in mono. Drawn in
- * the browser only (`client-territory.tsx`): Base UI's select, its
- * positioning and its scroll lock are the browser's to run, and the Worker
- * bundles none of them.
- */
 import {
   Select,
   SelectContent,
@@ -14,7 +7,6 @@ import {
 } from "../../components/ui/select.tsx";
 
 export interface TerritorySelectProps {
-  /** What the select offers, the agent's choice (`""`) first. */
   readonly choices: readonly {
     readonly label: string;
     readonly value: string;
@@ -24,7 +16,6 @@ export interface TerritorySelectProps {
   readonly value: string;
 }
 
-/** The trigger's look, shared with the server's stand-in for it. */
 export const TRIGGER =
   "tablet:text-ui tablet:h-9 h-11 w-full max-w-xs text-base";
 

@@ -1,16 +1,11 @@
 /**
- * The web app manifest, so Today installs on a phone. No file
- * spells the name: `vite.config.ts` writes this into the client output as
- * `manifest.webmanifest` at each build, from `Brand.name`. The colours are
- * the paper's (`features/shared/theme.ts`); the icons are the files under
- * `public/icons/`, drawn from `icon.svg`, with the mark inside the maskable
- * safe zone, so one drawing serves both purposes.
+ * `vite.config.ts` writes this into the client output as `manifest.webmanifest`
+ * at each build, so no file spells the name.
  */
 import { Brand } from "@repo/brand";
 
 import { themeColors } from "../shared/theme.ts";
 
-/** Each raster icon, by its size in pixels. */
 const rasters = [192, 512] as const;
 
 const icons = [
@@ -30,10 +25,8 @@ const icons = [
   },
 ];
 
-/** Where the manifest is served, as the root route's `<link rel="manifest">` names it. */
 export const MANIFEST_PATH = "/manifest.webmanifest";
 
-/** The manifest, as JSON a browser reads. */
 export const webManifest = () => ({
   background_color: themeColors.light,
   description: `Open asks, answers and a decider's Today on ${Brand.name}.`,
@@ -48,6 +41,5 @@ export const webManifest = () => ({
   theme_color: themeColors.light,
 });
 
-/** The manifest's text, as the build writes it. */
 export const webManifestText = () =>
   `${JSON.stringify(webManifest(), null, 2)}\n`;

@@ -1,14 +1,6 @@
 /**
- * What a decision's page reads, in a module with no view of its own: a
- * route's loader runs before its page's view loads, so the route reaches
- * these without carrying the page.
- *
- * The decision comes from the reader's Today in its project alone, read
- * with their own session: someone who decides nothing there gets why, and
- * no evidence. Beside it, what it concerns, each read on its own (one that
- * fails is left out): the ask, the proposal, the project's posture; for a
- * finish, the verdict on its head and, from the project's events, where
- * the answer's earlier rounds were refused and whether a newer head came.
+ * Kept apart from the page's view: a route's loader runs before the view loads,
+ * so the route reaches this without carrying the page.
  */
 import { Client } from "@repo/protocol/contracts";
 import { Verdict } from "@repo/protocol/domain/answer";
@@ -27,7 +19,6 @@ import { DateTime, Effect, Exit, Option, Schema, Stream } from "effect";
 import { askStates } from "../shared/ask-progress.ts";
 import { findDecision, readOfCause, TodayRead } from "../today/read.ts";
 
-/** A refusal from an answer's round that points at a line, as the page's loader sends it. */
 export const Placed = Schema.Struct({
   line: Schema.Int,
   path: Schema.String,
@@ -35,24 +26,17 @@ export const Placed = Schema.Struct({
   round: Schema.Int,
 });
 
-/** What the page read for its reader: the decision and what it concerns, or why there is none. */
 export const DecisionRead = Schema.TaggedUnion({
   Found: {
-    /** The ask it concerns, when it concerns one. */
     ask: Schema.optionalKey(Ask),
     decision: Decision,
-    /** A head pushed to the answer after the one a finish names. */
     newerHead: Schema.optionalKey(CommitSha),
-    /** Refusals from the answer's rounds that point at a line. */
     placed: Schema.Array(Placed),
-    /** The project's posture, for a posture change. */
     posture: Schema.optionalKey(
       Schema.Struct({ label: Schema.String, posture: Posture })
     ),
-    /** The proposal it would open, for an `OpenProposal`. */
     proposal: Schema.optionalKey(Proposal),
     soon: Schema.Boolean,
-    /** The verdict on a finish's head. */
     verdict: Schema.optionalKey(Verdict),
   },
   NotOnToday: {},
@@ -65,7 +49,6 @@ export type DecisionRead = typeof DecisionRead.Type;
 
 export type FoundDecision = Extract<DecisionRead, { readonly _tag: "Found" }>;
 
-/** What a decision's loader sends: whose page, what it read, and when. */
 export const DecisionPageData = Schema.Struct({
   decision: DecisionId,
   now: Schema.DateTimeUtcFromString,
@@ -75,11 +58,9 @@ export const DecisionPageData = Schema.Struct({
 
 export type DecisionPageData = typeof DecisionPageData.Type;
 
-/** The refusals among an outcome, when it refused. */
 const refusalsOf = (outcome: Outcome): readonly Refusal[] =>
   Outcome.guards.Refused(outcome) ? outcome.refusals : [];
 
-/** Every refusal of an ask's rounds that points at a line, with the round it came from. */
 const placedIn = (events: readonly ProjectEvent[], ask: AskId) =>
   (askStates(events).get(ask)?.rounds ?? []).flatMap(({ outcome }, index) =>
     refusalsOf(outcome).flatMap((refusal) =>
@@ -96,7 +77,6 @@ const placedIn = (events: readonly ProjectEvent[], ask: AskId) =>
     )
   );
 
-/** The head last pushed to `ask`, when it is not `head`. */
 export const newerThan = (
   events: readonly ProjectEvent[],
   ask: AskId,
@@ -107,7 +87,6 @@ export const newerThan = (
   return last === undefined || last === head ? undefined : last;
 };
 
-/** The ask a subject concerns, when it concerns one. */
 const askOf = DecisionSubject.match({
   Finish: ({ ask }) => Option.some(ask),
   OpenProposal: () => Option.none(),
@@ -120,7 +99,6 @@ const askOf = DecisionSubject.match({
   Waiver: ({ ask }) => Option.some(ask),
 });
 
-/** What a decision concerns, each read on its own: one that fails is left out. */
 const concerning = (decision: Decision, soon: boolean) =>
   Effect.gen(function* () {
     const client = yield* Client;
@@ -166,8 +144,6 @@ const concerning = (decision: Decision, soon: boolean) =>
         ),
     });
 
-    // A finish's rounds, from the project's events: where earlier rounds
-    // were refused, and whether a newer head was pushed.
     const events = Option.isSome(finish)
       ? yield* Stream.runCollect(client.watch({ project, since: 0 })).pipe(
           Effect.map((all): readonly ProjectEvent[] => all),
@@ -209,7 +185,6 @@ const concerning = (decision: Decision, soon: boolean) =>
     });
   });
 
-/** The decision for its page, and what it concerns, read with the reader's session. */
 export const readDecision = (params: {
   readonly project: string;
   readonly decision: string;

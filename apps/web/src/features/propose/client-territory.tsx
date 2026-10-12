@@ -1,23 +1,17 @@
 /**
- * The territory select, drawn in the browser only. The server renders its
- * stand-in: the trigger as it will look, holding the choice in sight and
- * in the form (a hidden input), never a native `<select>`; after
- * hydration the browser loads the kit's select over it.
- * `import.meta.env.SSR` is `true` in the Worker's build, so the dynamic
- * import below is dead code there and the Worker bundles none of it.
+ * `import.meta.env.SSR` is `true` in the Worker's build, so the dynamic import
+ * below is dead code there and the Worker bundles none of it.
  */
 import { ClientOnly } from "@tanstack/react-router";
 import { ChevronDown } from "lucide-react";
 import { lazy, Suspense } from "react";
 
-// A type-only import is erased, so the server bundles nothing of it.
 import type { TerritorySelectProps } from "./territory-select.tsx";
 
 const SelectLater = import.meta.env.SSR
   ? undefined
   : lazy(() => import("./territory-select.tsx"));
 
-/** The select's place before it is drawn: its trigger, showing the choice. */
 const StandIn = ({ choices, labelledBy, value }: TerritorySelectProps) => (
   <>
     <button

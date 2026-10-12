@@ -1,11 +1,3 @@
-/**
- * A signed-in reader's own page: their work (each claim, its ask's want and
- * where its answer stands, with the command that runs next); the decisions
- * waiting for them when they decide somewhere; the open asks they may take;
- * and the way to their record. No score and no count of credit (DESIGN.md).
- * Signed out, it says what the page is and how to sign in. A view: what the
- * server read, and the instant, in; markup out.
- */
 import { Brand } from "@repo/brand";
 import type { Today } from "@repo/protocol/domain/decision";
 import type { FrontPageEntry } from "@repo/protocol/domain/front-page";
@@ -56,27 +48,20 @@ import {
 } from "./read.ts";
 import type { Work } from "./read.ts";
 
-/** What the page is, said to a reader who is not signed in. */
 const WHAT_HOME_IS =
   "Home is your own page: the asks you hold and where each answer stands, the decisions waiting for you, and the asks you may take next.";
 
-/** The decisions the page lists; the rest are on Today. */
 const DECISIONS_SHOWN = 5;
 
 const LINK =
   "decoration-rule hover:decoration-foreground font-medium underline underline-offset-4";
 
-/** A block's empty state, under its header like its rows would be. */
 const Empty = (props: Parameters<typeof EmptyState>[0]) => (
   <li className="pt-3">
     <EmptyState {...props} />
   </li>
 );
 
-/**
- * What runs next on a claim: a refusal's own `next`, or, while the claim
- * runs with nothing refused, its local check before a push.
- */
 const nextOf = ({ answer, claim }: Work) => {
   if (answer !== undefined) {
     return Outcome.guards.Refused(answer.outcome)
@@ -257,7 +242,6 @@ const DecisionsGroup = ({
   </RowGroup>
 );
 
-/** A decider's waiting decisions, or that none waits. */
 const Waiting = ({ today }: { readonly today: Today }) => {
   const waiting = today.decisions.length + today.overflow;
 
@@ -275,7 +259,6 @@ const Waiting = ({ today }: { readonly today: Today }) => {
   );
 };
 
-/** The decisions block: a decider's waiting decisions; nothing for anyone else. */
 const DecisionsBlock = ({ decisions }: { readonly decisions: Decisions }) =>
   Decisions.match(decisions, {
     Decides: ({ today }) => <Waiting today={today} />,
@@ -308,12 +291,10 @@ const EVERY_ASK = (
   </AppLink>
 );
 
-/** The asks block's empty state: none to take, or none came. */
 const NoAsks = ({ title }: { readonly title: string }) => (
   <Empty command={`${Brand.cli} front`} onward={EVERY_ASK} title={title} />
 );
 
-/** The asks the reader may take, or why none shows. */
 const AskList = ({ asks }: { readonly asks: Takeable }) =>
   Takeable.match(asks, {
     Listed: ({ asks: listed }) =>
@@ -337,7 +318,6 @@ const AsksBlock = ({ asks }: { readonly asks: Takeable }) => (
   </RowGroup>
 );
 
-/** Who is signed in, the way to their record, and the way to import a repo. */
 const Record = ({ handle }: { readonly handle: Handle }) => (
   <>
     Signed in as <HandleLink handle={handle} />.{" "}
@@ -372,7 +352,6 @@ const SignedIn = ({
   </Workspace>
 );
 
-/** Signed out: what the page is, the way in, and the command. */
 const SignedOut = () => (
   <Workspace crumbs={[{ label: "Home" }]} title="Home">
     <div className="flex max-w-[70ch] flex-col items-start gap-3">

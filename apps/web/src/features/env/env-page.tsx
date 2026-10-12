@@ -1,20 +1,6 @@
 /**
- * A project's env shape: every item its committed `.env.schema` declares,
- * parsed at the landed commit and never resolved (ADR 0009). The status
- * line counts the items and says who set the sensitive ones. Sensitive
- * items come first, each saying on its own line that it is sensitive and
- * who set its value and when (or that nobody has); then every item's type,
- * whether it is required, its `@proxy` hosts, tags, docs and description.
- * The inspector says where the schema was read and how a value is set.
- *
- * Never a value, and nothing that would take or show one: a value is set
- * only from a terminal (`setEnv` is RPC and CLI alone), so the page shows
- * that command line instead of a form. The placeholder unlanded code sees
- * is not shown either: it is not a value, but it reads like one.
- *
- * Props in, markup out: the route reads the env shape
- * (`src/client/env.ts`) and hands it here. (Lint keeps "shape" out of code
- * names, so the prop is the env schema's view: `schema`.)
+ * Never a value, and nothing that would take or show one: `setEnv` is RPC and
+ * CLI alone. Lint keeps "shape" out of code names, so the prop is `schema`.
  */
 import { Brand } from "@repo/brand";
 import type { EnvItem, EnvSchemaView } from "@repo/protocol/domain/env";
@@ -35,7 +21,6 @@ import { AppLink } from "../shared/link.tsx";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { distanceInWords, When } from "../shared/time.tsx";
 
-/** Where varlock, whose `.env.schema` format this is, documents it. */
 const VARLOCK = "https://varlock.dev";
 
 const LINK = "decoration-rule underline hover:decoration-current";
@@ -49,12 +34,6 @@ const Code = ({ children }: { readonly children: ReactNode }) => (
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/**
- * When the env shape was read, at the latest: `now`, or the newest time a
- * value was set if that is later. The page keeps the `now` it was served
- * with while it reads the env shape again as values are set, and a value
- * that was set is never set in the future.
- */
 const readAt = (schema: EnvSchemaView, now: DateTime.Utc) => {
   let latest = now;
 
@@ -67,13 +46,11 @@ const readAt = (schema: EnvSchemaView, now: DateTime.Utc) => {
   return latest;
 };
 
-/** The items, sensitive ones first; each kind in the schema's own order. */
 const sensitiveFirst = (items: readonly EnvItem[]) => [
   ...items.filter(({ sensitive }) => sensitive),
   ...items.filter(({ sensitive }) => !sensitive),
 ];
 
-/** The newest value set among `items`, if any was. */
 const newestSet = (items: readonly EnvItem[]) => {
   let newest: EnvItem["value"];
 
@@ -90,10 +67,6 @@ const newestSet = (items: readonly EnvItem[]) => {
   return newest;
 };
 
-/**
- * The sensitive items in words: "1 sensitive, set by ines-v 1 d ago",
- * "1 sensitive, not set", "3 sensitive: 2 set, latest by ines-v 1 d ago".
- */
 const sensitiveWords = (items: readonly EnvItem[], now: DateTime.Utc) => {
   const sensitive = items.filter((item) => item.sensitive);
   const set = sensitive.filter(({ value }) => value !== undefined);
@@ -114,7 +87,6 @@ const sensitiveWords = (items: readonly EnvItem[], now: DateTime.Utc) => {
     : `${sensitive.length} sensitive: ${set.length} set, latest ${by}`;
 };
 
-/** Whether `docs` is a web address, so a link to it can go nowhere else. */
 const isWebAddress = (docs: string) => /^https?:\/\//iu.test(docs);
 
 const requiredWords = (required: EnvItem["required"]) => {
@@ -125,7 +97,6 @@ const requiredWords = (required: EnvItem["required"]) => {
   return required ? "yes" : "no";
 };
 
-/** The proxy's hosts, then what it is limited to: "sentry.io, only /api/**". */
 const Proxy = ({
   proxy,
 }: {
@@ -160,7 +131,6 @@ const Docs = ({ docs }: { readonly docs: string }) =>
     <span className="[overflow-wrap:anywhere]">{docs}</span>
   );
 
-/** Who set a write-only value and when, or that nobody has; never the value. */
 const Value = ({
   now,
   value,
@@ -177,7 +147,6 @@ const Value = ({
     </span>
   );
 
-/** The item's line: its key, then, for a sensitive one, the lock, the word and who set it. */
 const ItemLine = ({
   item,
   now,
@@ -256,7 +225,6 @@ const ItemRow = ({
   </li>
 );
 
-/** The caption that credits the format: "env shape: varlock's .env.schema format". */
 const Caption = () => (
   <>
     env shape:{" "}
@@ -266,7 +234,6 @@ const Caption = () => (
   </>
 );
 
-/** One fact of where the schema was read, its label beside it. */
 const Read = ({
   children,
   term,
@@ -282,7 +249,6 @@ const Read = ({
   </div>
 );
 
-/** How a decider sets a value: from a terminal, never here. */
 const SetValueFacts = ({ project }: { readonly project: ProjectName }) => (
   <FactBlock label="Set a value">
     <p className="text-ui text-muted-foreground">
@@ -295,7 +261,6 @@ const SetValueFacts = ({ project }: { readonly project: ProjectName }) => (
   </FactBlock>
 );
 
-/** The project's posture, once the list of projects has brought it. */
 const PostureOf = ({
   posture,
   project,
@@ -357,7 +322,6 @@ export const EnvView = ({
   schema,
 }: {
   readonly now: DateTime.Utc;
-  /** The project's posture, from the list of projects; it may come after the page. */
   readonly posture?: Posture | undefined;
   readonly schema: EnvSchemaView;
 }) => {
@@ -389,11 +353,6 @@ export const EnvView = ({
   );
 };
 
-/**
- * A project whose main has not landed yet: there is no landed
- * `.env.schema` to read, so there is no env shape, which is not the same as
- * no project.
- */
 export const NothingLanded = ({
   project,
 }: {

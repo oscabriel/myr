@@ -1,8 +1,3 @@
-/**
- * A finish's changed files below the shell's width, as a sheet from the
- * left, loaded on the first press of Files (`finish-rail.tsx`). Choosing a
- * file moves the diff to it, and the sheet closes.
- */
 import { Option } from "effect";
 
 import { Sheet, SheetContent } from "../../components/ui/sheet.tsx";
@@ -23,7 +18,6 @@ const FinishFilesSheet = ({
           <div
             className="flex h-full min-h-0 flex-col"
             onClick={(event) => {
-              // A file chosen moves the diff to it: the sheet has done its work.
               if (
                 event.target instanceof Element &&
                 event.target.closest("a") !== null

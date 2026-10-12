@@ -1,12 +1,3 @@
-/**
- * A finish's changed files, for the rail (`finish-rail.tsx`, which loads
- * this in the browser) and, below the shell's width, a sheet behind a
- * Files button in the diff's toolbar: territory first, each with its
- * change, its counts, this reader's read mark and the refused cross.
- *
- * Both read the page's own loader data (its match), so the list and the
- * diff come from one read, and the read marks from one store.
- */
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import { useLocation, useMatch } from "@tanstack/react-router";
 import { Option, Schema } from "effect";
@@ -21,7 +12,6 @@ import { marksKey, useReadMarks } from "./read-marks.ts";
 
 const decode = Schema.decodeUnknownOption(DecisionPageData);
 
-/** The finish on the page, its files in order; none for any other page. */
 export const useFinish = () => {
   const data: unknown = useMatch({
     from: "/$owner/$project/decisions/$decision",
@@ -61,7 +51,6 @@ export const useFinish = () => {
 
 export type Finish = Option.Option.Value<ReturnType<typeof useFinish>>;
 
-/** The finish's files, with this reader's marks and the file the diff stands at. */
 export const FinishFiles = ({ finish }: { readonly finish: Finish }) => {
   const marked = useMemo(
     () =>
@@ -100,7 +89,6 @@ export const FinishFiles = ({ finish }: { readonly finish: Finish }) => {
   );
 };
 
-/** The finish's changed files, in the rail's slot. */
 export const FinishRailFiles = () =>
   Option.match(useFinish(), {
     onNone: () => null,

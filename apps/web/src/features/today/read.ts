@@ -1,15 +1,3 @@
-/**
- * What Today's page reads, in a module with no view of its own: a route's
- * loader runs before its page's view loads, so the route reaches these
- * without carrying the page.
- *
- * - `TodayRead`: the reader's Today, or why there is none (a refusal, no
- *   session, no answer from the platform), as the loader sends it.
- * - `readToday`: that read, made with whatever `Client` the caller gives
- *   (the server's, carrying the reader's own session).
- * - The order a decider takes decisions in: due within the day first, then
- *   by expiry.
- */
 import { Client } from "@repo/protocol/contracts";
 import { Today } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
@@ -29,7 +17,6 @@ import {
 
 import { decisionKey } from "../decision/subject.ts";
 
-/** What the page read for its reader: their Today, or why there is none. */
 export const TodayRead = Schema.TaggedUnion({
   Read: { today: Today },
   Refused: { refusal: Refusal },
@@ -39,7 +26,6 @@ export const TodayRead = Schema.TaggedUnion({
 
 export type TodayRead = typeof TodayRead.Type;
 
-/** What Today's loader sends: the read, and the instant it was made. */
 export const TodayPageData = Schema.Struct({
   now: Schema.DateTimeUtcFromString,
   read: TodayRead,
@@ -51,11 +37,9 @@ const isRefusal = Schema.is(Refusal);
 
 const isUnauthenticated = Schema.is(Unauthenticated);
 
-/** Whether a read failed because its reader is not signed in. */
 export const isSignedOut = (cause: Cause.Cause<unknown>) =>
   Option.exists(Cause.findErrorOption(cause), isUnauthenticated);
 
-/** A failed read of Today, as the page says it. */
 export const readOfCause = (cause: Cause.Cause<unknown>): TodayRead => {
   const error = Cause.findErrorOption(cause);
 
@@ -68,7 +52,6 @@ export const readOfCause = (cause: Cause.Cause<unknown>): TodayRead => {
     : TodayRead.cases.Unreachable.make({});
 };
 
-/** Soonest to expire first, then oldest, then by project and id: one order every time. */
 export const expiryOrder: Order.Order<Decision> = Order.combineAll([
   Order.mapInput(DateTime.Order, ({ expiresAt }: Decision) => expiresAt),
   Order.mapInput(DateTime.Order, ({ openedAt }: Decision) => openedAt),
@@ -77,11 +60,9 @@ export const expiryOrder: Order.Order<Decision> = Order.combineAll([
 ]);
 
 /**
- * The decisions `today.expiringSoon` names. Ids are minted per project, so a
- * Today across projects may hold two decisions with one id; where an id is
- * named `n` times, the `n` of its decisions that expire first are the ones
- * meant (a decision that expires within the day expires before any that
- * does not).
+ * Ids are minted per project, so a Today across projects may hold two decisions
+ * with one id; where an id is named `n` times, the `n` of its decisions that
+ * expire first are the ones meant.
  */
 export const expiringSoon = (today: Today): ReadonlySet<string> => {
   const named = Arr.groupBy(today.expiringSoon, (id) => id);
@@ -97,7 +78,6 @@ export const expiringSoon = (today: Today): ReadonlySet<string> => {
   );
 };
 
-/** Today's decisions in the order a decider takes them: expiring soon first, then by expiry. */
 export const orderDecisions = (today: Today): readonly Decision[] => {
   const soon = expiringSoon(today);
 
@@ -113,7 +93,6 @@ export const orderDecisions = (today: Today): readonly Decision[] => {
   );
 };
 
-/** Where one decision stands on Today: listed (and whether it expires soon), or not there. */
 export const findDecision = (
   today: Today,
   project: ProjectName,
@@ -132,7 +111,6 @@ export const findDecision = (
   );
 };
 
-/** The reader's Today, or why there is none, encoded for the page. */
 export const readToday = ({ project }: { readonly project?: ProjectName }) =>
   Effect.gen(function* () {
     const client = yield* Client;
