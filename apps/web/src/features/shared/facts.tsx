@@ -1,14 +1,3 @@
-/**
- * The inspector's fact blocks: the typed facts of the thing in hand, each
- * under a label, in a fixed order per page. A block holds no box; a value
- * that is code is mono and wraps anywhere; a long SHA or root is shortened
- * (`7fbe4b2`, `sha256:7fbe4b…`), its whole value in its title and on copy.
- * Blocks never repeat the page's prose: they hold the facts it refers to.
- *
- * The blocks every page shares are here (State, Take it, Claim, Gate,
- * Posture, Held back, Family, Territory and check, Credit,
- * Provenance); a block only one page has is that page's own.
- */
 import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -43,13 +32,11 @@ import { StatusLine, readStatus, stageNames } from "./status-line.tsx";
 import type { StatusSubject } from "./status-line.tsx";
 import { When } from "./time.tsx";
 
-/** A block's frame: a hairline above every block but the first. */
 const BLOCK =
   "@container border-rule flex min-w-0 flex-col gap-2.5 border-t py-3 first:border-t-0 first:pt-0";
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-/** One block: its label, then its facts. */
 export const FactBlock = ({
   children,
   label,
@@ -63,11 +50,6 @@ export const FactBlock = ({
   </section>
 );
 
-/**
- * A long hash as a person reads it: a 40- or 64-hex SHA to its first
- * seven, an `algorithm:hex` root to the algorithm and six; anything else as
- * it is.
- */
 export const shortValue = (value: string) => {
   if (/^[0-9a-f]{40,64}$/u.test(value)) {
     return shortSha(value);
@@ -83,20 +65,17 @@ export const shortValue = (value: string) => {
     : `${algorithm}:${hex.slice(0, 6)}…`;
 };
 
-/** A value that is code: shortened, whole in its title. */
 export const CodeValue = ({ value }: { readonly value: string }) => (
   <code className="text-mono font-mono [overflow-wrap:anywhere]" title={value}>
     {shortValue(value)}
   </code>
 );
 
-/** The status line whole, and the command that runs next, numbered first. */
 export const StateFacts = ({
   command,
   subject,
 }: {
   readonly subject: StatusSubject;
-  /** What runs next; a refusal's own `next` when left out. */
   readonly command?: string;
 }) => {
   const next = command ?? readStatus(subject).next;
@@ -109,7 +88,6 @@ export const StateFacts = ({
   );
 };
 
-/** One numbered step: what it does, then its command. */
 const Step = ({
   command,
   label,
@@ -123,7 +101,6 @@ const Step = ({
   </div>
 );
 
-/** Who may take an ask, in a sentence. */
 const whoMayTake = (ask: Ask) => {
   if (ask.reserve === "newcomers") {
     return ask.mentor === undefined
@@ -136,13 +113,11 @@ const whoMayTake = (ask: Ask) => {
     : `Anyone vouched in ${ask.project}, or with a record in its area`;
 };
 
-/** Who may take an open ask, then the three commands that start an answer. */
 export const TakeItFacts = ({
   ask,
   platformUrl,
 }: {
   readonly ask: Ask;
-  /** Where the project is cloned from. */
   readonly platformUrl: string;
 }) => (
   <FactBlock label="Take it">
@@ -159,7 +134,6 @@ export const TakeItFacts = ({
   </FactBlock>
 );
 
-/** Who holds a claim, in words: the viewer, someone, or nobody. */
 const Holder = ({
   claimant,
   yours,
@@ -180,10 +154,7 @@ const Holder = ({
   );
 };
 
-/**
- * Who holds a claim and when they last pushed. No read carries a claim's
- * deadline, so none is shown.
- */
+/** No read carries a claim's deadline, so none is shown. */
 export const ClaimFacts = ({
   claimant,
   lastPush,
@@ -193,7 +164,6 @@ export const ClaimFacts = ({
   readonly claimant?: Handle;
   readonly lastPush?: AskProgress["lastPush"];
   readonly now: DateTime.Utc;
-  /** Who is reading, to tell the claimant it is theirs. */
   readonly viewer?: Handle;
 }) => {
   const yours = claimant !== undefined && claimant === viewer;
@@ -219,7 +189,6 @@ export const ClaimFacts = ({
   );
 };
 
-/** What each stage runs, in one line. */
 const runs = Match.type<StageName>().pipe(
   Match.when(
     "parse",
@@ -250,7 +219,6 @@ const runs = Match.type<StageName>().pipe(
   Match.exhaustive
 );
 
-/** Each stage's state as a mark and a word. */
 const stageMarks = {
   current: { mark: "now", word: "now" },
   passed: { mark: "passed", word: "passed" },
@@ -262,11 +230,6 @@ const stageMarks = {
   { readonly mark: StateMark; readonly word: string }
 >;
 
-/**
- * The gate. On a project: the seven stages in the order of their cost, on
- * one line, and what each runs behind a disclosure. On an answer: each
- * stage's state, the one it stands at marked as the current step.
- */
 export const GateFacts = (
   props:
     | { readonly outcome?: undefined }
@@ -349,7 +312,6 @@ export const GateFacts = (
   );
 };
 
-/** What each posture means, in one line. */
 const glosses = {
   open: "Everything it ships is public.",
   openCore: "Some files it ships are kept in a layer, with no date to open.",
@@ -360,7 +322,6 @@ const glosses = {
   sourceAvailable: "Its licence is not an open-source one.",
 } as const satisfies Record<Posture, string>;
 
-/** A project's posture as the platform labels it, what it means, and its ledger. */
 export const PostureFacts = ({
   label,
   posture,
@@ -379,13 +340,11 @@ export const PostureFacts = ({
   </FactBlock>
 );
 
-/** What a project holds back: one sealed line per area, or that nothing is. */
 export const HeldBackFacts = ({
   areas,
 }: {
   readonly areas: readonly {
     readonly area: AreaName;
-    /** What the area holds, in words: "7 sealed checks". */
     readonly detail: string;
   }[];
 }) => (
@@ -415,14 +374,12 @@ export const HeldBackFacts = ({
   </FactBlock>
 );
 
-/** The family a member belongs to, drawn top to bottom. */
 export const FamilyFacts = (props: Parameters<typeof FamilyTree>[0]) => (
   <FactBlock label="Family">
     <FamilyTree {...props} />
   </FactBlock>
 );
 
-/** The folder a territory's first path names, when it names one plainly. */
 const folderOf = (ask: Ask) => {
   const [first] = ask.territory.paths;
   const folder = first.replace(/\/\*\*$|\/\*$|^\*\*$/u, "");
@@ -430,11 +387,6 @@ const folderOf = (ask: Ask) => {
   return /[*?[{]/u.test(folder) ? undefined : folder;
 };
 
-/**
- * A territory: a module by name, linked to its folder when its first path
- * names one plainly; the whole project when it covers every path; or, in
- * a repo of one package, the paths themselves.
- */
 const TerritoryLine = ({ ask }: { readonly ask: Ask }) => {
   const folder = folderOf(ask);
   const { module, paths } = ask.territory;
@@ -467,7 +419,6 @@ const TerritoryLine = ({ ask }: { readonly ask: Ask }) => {
   );
 };
 
-/** What judges an answer, by the check's kind. */
 const CheckLine = ({ ask }: { readonly ask: Ask }) =>
   CheckSpec.match(ask.check, {
     LintToZero: ({ rule }) => (
@@ -511,7 +462,6 @@ const CheckLine = ({ ask }: { readonly ask: Ask }) =>
     ),
   });
 
-/** Where an answer may change things, and what judges it. */
 export const TerritoryFacts = ({ ask }: { readonly ask: Ask }) => (
   <FactBlock label="Territory and check">
     <TerritoryLine ask={ask} />
@@ -519,7 +469,6 @@ export const TerritoryFacts = ({ ask }: { readonly ask: Ask }) => (
   </FactBlock>
 );
 
-/** A landing's credit as the commit carries it, the agents apart. */
 export const CreditFacts = (props: {
   readonly assisted: readonly AgentTrailer[];
   readonly credits: readonly Credit[];
@@ -534,15 +483,12 @@ export const CreditFacts = (props: {
   </div>
 );
 
-/** One fact of provenance: its label, its whole value, and how it reads. */
 export interface ProvenanceEntry {
   readonly label: string;
   readonly value: string;
-  /** How it reads, when not as its shortened value (a time). */
   readonly shown?: ReactNode;
 }
 
-/** What a verdict judged: the commits, the tree, the patch, the check, who judged it and when. */
 export const verdictProvenance = (
   verdict: Verdict,
   now: DateTime.Utc
@@ -560,7 +506,6 @@ export const verdictProvenance = (
   },
 ];
 
-/** Where a landing comes from: its author, its parent, and the request that landed it. */
 export const landingProvenance = (
   landing: LandingView
 ): readonly ProvenanceEntry[] => [
@@ -576,10 +521,6 @@ export const landingProvenance = (
     : [{ label: "Request-Id", value: landing.requestId }]),
 ];
 
-/**
- * The plumbing, last: each value shortened, whole in its title and on
- * copy. Below the shell's width it starts folded.
- */
 export const ProvenanceFacts = ({
   entries,
 }: {
@@ -609,8 +550,6 @@ export const ProvenanceFacts = ({
       </button>
       <dl className={`${open ? "flex" : "shell:flex hidden"} flex-col gap-1.5`}>
         {entries.map(({ label, shown, value }) => (
-          // A label over its value, as every block is: never a key and
-          // value grid.
           <div
             className="flex min-w-0 flex-col"
             data-provenance={label}
@@ -624,8 +563,6 @@ export const ProvenanceFacts = ({
               {shown === undefined ? (
                 <CopyAction command={value} label={`Copy ${label}`} />
               ) : (
-                // A time reads as words, its exact instant in its own
-                // title: nothing here to paste into a terminal.
                 <span aria-hidden="true" className="size-8 shrink-0" />
               )}
             </dd>

@@ -1,24 +1,14 @@
-/**
- * What a decider's diff marks under one of its lines: a refusal that
- * pointed there (in the rubric, its lines as `explain` printed them, the
- * round it came from), or a marker that waits on a decision (in ochre, the
- * marker and its reason). Compact, one block under the line, the same in
- * the server's plain diff and in the browser's drawing.
- */
 import type { Refusal } from "@repo/protocol/refusal";
 import { explain } from "@repo/protocol/render";
 import { Hourglass, OctagonX, RotateCcw } from "lucide-react";
 
-/** A refusal placed in a diff: its file and line, and the round it came from. */
 export interface PlacedRefusal {
   readonly refusal: Refusal;
   readonly path: string;
   readonly line: number;
-  /** The round it refused, counting from 1. */
   readonly round: number;
 }
 
-/** A refusal under its line, as git printed it. */
 export const RefusalNote = ({ placed }: { readonly placed: PlacedRefusal }) => {
   const [first = "", ...rest] = explain([placed.refusal]).filter(
     (line) => !line.startsWith("  at: ")
@@ -58,7 +48,6 @@ export const RefusalNote = ({ placed }: { readonly placed: PlacedRefusal }) => {
   );
 };
 
-/** A marker that waits on a decider, under its line. */
 export const MarkerNote = ({
   marker,
   reason,

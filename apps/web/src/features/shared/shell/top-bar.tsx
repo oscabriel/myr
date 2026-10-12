@@ -1,11 +1,3 @@
-/**
- * The top bar, below the shell's width, where the rail is not drawn. On a
- * tablet (48 px): Menu (the rail as a sheet), the wordmark, the current
- * project as a switcher, and the session at the end. On a phone (44 px):
- * Back to the page above on a subject page (an ask, an answer, a commit),
- * else the wordmark, then the project's switcher; the bottom bar holds the
- * rest.
- */
 import { useLocation } from "@tanstack/react-router";
 import { ChevronLeft, ChevronsUpDown, Menu } from "lucide-react";
 
@@ -16,7 +8,6 @@ import { useCurrentProject, useShell } from "./context.ts";
 import { Wordmark } from "./rail.tsx";
 import { crumbsFor } from "./sections.ts";
 
-/** The page above a subject page (its crumb before last), when the address is one. */
 const parentOf = (pathname: string) => {
   const crumbs = crumbsFor(pathname);
   const parent = crumbs.at(-2);

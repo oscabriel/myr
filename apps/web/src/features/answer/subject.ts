@@ -1,19 +1,3 @@
-/**
- * What an ask's page and its answer's page read beside their subject, and
- * the plain readings over it:
- *
- * - the project's events (`watch`, replayed from the first), kept to the
- *   ones about the asks the page draws: the ask, what it waits on, and its
- *   family. The fold over them (`askStates`) says who holds each ask, its
- *   rounds and whether it landed, with no contract of its own;
- * - a family member's parent (`showAsk`), whose stored children count the
- *   family, since a listing drops the ones that landed;
- * - what a verdict holds, so the gate's strip draws a stage the answer
- *   never needed as not needed.
- *
- * A read beside the subject that fails leaves its part out; it never fails
- * the page.
- */
 import { Client } from "@repo/protocol/contracts";
 import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -27,7 +11,6 @@ import { lastSeq } from "../shared/ask-progress.ts";
 import type { AskProgress, Round } from "../shared/ask-progress.ts";
 import type { StageHolds } from "../shared/outcome.tsx";
 
-/** The ask an event is about: one, or none. */
 const askOf = (event: ProjectEvent): readonly AskId[] =>
   ProjectEvent.match(event, {
     AskClosed: ({ ask }) => [ask],
@@ -45,25 +28,19 @@ const askOf = (event: ProjectEvent): readonly AskId[] =>
     Warned: ({ ask }) => [ask],
   });
 
-/** The events about `asks`, in the order given. */
 export const eventsAbout = (
   events: readonly ProjectEvent[],
   asks: ReadonlySet<AskId>
 ): readonly ProjectEvent[] =>
   events.filter((event) => askOf(event).some((about) => asks.has(about)));
 
-/**
- * The delete child among a family parent's stored children: the one named
- * for the parent, as the platform names it when it splits a migrate ask.
- */
+/** The platform names a split's delete child after its parent. */
 export const deleteChildOf = (parent: Ask): AskId | undefined =>
   parent.blockedBy.find((child) => child === `${parent.id}-delete`);
 
-/** The parent of the family `ask` is in: the one read for it, or the ask itself when it heads one. */
 export const familyHead = (ask: Ask, parent: Ask | undefined) =>
   parent ?? (deleteChildOf(ask) === undefined ? undefined : ask);
 
-/** Every ask whose events the page needs: the ask, what it waits on, and its family. */
 export const asksAround = (
   ask: Ask,
   parent: Ask | undefined
@@ -74,7 +51,6 @@ export const asksAround = (
     ...(parent === undefined ? [] : [parent.id, ...parent.blockedBy]),
   ]);
 
-/** The project's events from the first; none when they cannot be read. */
 export const readEvents = (project: ProjectName) =>
   Effect.gen(function* () {
     const client = yield* Client;
@@ -86,7 +62,6 @@ export const readEvents = (project: ProjectName) =>
     return events;
   });
 
-/** The parent ask of a family member; none for an ask in no family, or one the platform no longer finds. */
 export const readParent = (ask: Ask) =>
   Effect.gen(function* () {
     if (ask.parent === undefined) {
@@ -103,7 +78,6 @@ export const readParent = (ask: Ask) =>
       );
   });
 
-/** What a page carries of the events: those about its asks, and the last number of all of them. */
 export const keptEvents = (
   events: readonly ProjectEvent[],
   ask: Ask,
@@ -113,14 +87,8 @@ export const keptEvents = (
   lastSeq: lastSeq(events),
 });
 
-/** Whether an outcome waited on a person: a decision, or a decider's finish. */
 const waitedOnPerson = Outcome.isAnyOf(["AwaitingDecision", "AwaitingFinish"]);
 
-/**
- * What a verdict holds beyond its stage: whether a decider took part (the
- * landing's `Decided-by`, or a round of the same answer that waited on one)
- * and whether held-back checks judged it.
- */
 export const holdsOf = (
   verdict: Verdict,
   landing: LandingView | undefined,
@@ -134,7 +102,6 @@ export const holdsOf = (
   heldBack: verdict.heldBack.length > 0,
 });
 
-/** Which round the answer at `head` is, of how many: the last round judged at that head. */
 export const roundOf = (
   rounds: readonly Round[],
   head: CommitSha
@@ -145,10 +112,9 @@ export const roundOf = (
 };
 
 /**
- * Each round with the last word on it: a round's own event says what the
- * gate said when it judged the push (often that it was still checking),
- * so the verdict on that head, and the landing that closed the ask, speak
- * for it once they came.
+ * A round's own event says what the gate said when it judged the push (often
+ * still checking), so the verdict on that head, and the landing that closed the
+ * ask, speak for it once they came.
  */
 export const roundsAsTheyStand = (
   progress: AskProgress | undefined,

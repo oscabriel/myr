@@ -1,8 +1,6 @@
 /**
- * The way to the propose form, for signed-in members only. Who is signed in
- * is the browser's to learn (`whoAtom`), after the first paint, so the
- * server renders no link and the browser adds it, as the header's session
- * slot does (`features/auth/session-slot.tsx`).
+ * Who is signed in is the browser's to learn, after the first paint, so the
+ * server renders no link and the browser adds it.
  */
 import { useAtomValue } from "@effect/atom-react";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -24,7 +22,6 @@ export const ProposeLink = ({ project }: { readonly project: ProjectName }) => (
   </a>
 );
 
-/** `ProposeLink` once the browser knows someone is signed in; nothing before or otherwise. */
 export const SignedInProposeLink = ({
   project,
 }: {

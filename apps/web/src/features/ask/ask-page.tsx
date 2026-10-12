@@ -1,21 +1,3 @@
-/**
- * An ask, as a person reads it: the want as the title, then where it
- * stands in one line (open to take, claimed by someone, refused at a
- * stage, landed), whose move that is and what runs next. Below, the brief,
- * the check (the spec: its source inline), and every answer judged so far,
- * one row each. The inspector holds the typed facts: its state, how to
- * take it or who holds it, its territory and check, its family, and its
- * project's posture.
- *
- * A family member says what it waits on in the family's terms ("waiting
- * for 4 of 6 children to land") and draws the family as a fan; once every
- * sibling has landed, the delete child reads open to take. Who holds an
- * ask and its rounds come from the project's events (`askStates`), with
- * no contract of their own.
- *
- * Agents read the same ask as Markdown (`markdown.ts`); the page shows the
- * brief exactly as they read it, and links the Markdown.
- */
 import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -62,10 +44,8 @@ import { When } from "../shared/time.tsx";
 import { Region } from "./fields.tsx";
 import { markdownPath } from "./markdown.ts";
 
-/** The check's file, as the page read it: enough to draw its source. */
 export interface CheckSource {
   readonly path: string;
-  /** The blob's id: the drawing's cache key. */
   readonly sha: string;
   readonly text: string;
 }
@@ -74,21 +54,17 @@ const LINK = "decoration-rule underline hover:decoration-current";
 
 const NONE: ReadonlyMap<AskId, AskProgress> = new Map();
 
-/** How many lines of the check show before the reader asks for the whole. */
 const CHECK_LINES = 30;
 
-/** The page's trail: the project, its asks, then the ask. */
 export const askCrumbs = (ask: Ask): readonly Crumb[] => [
   { label: ask.project, to: `/${ask.project}` },
   { label: "Asks", to: `/${ask.project}` },
   { label: ask.id, mono: true },
 ];
 
-/** The command that claims an ask, run in a clone of its project. */
 export const claimCommand = (ask: Ask) =>
   `${Brand.cli} claim ${ask.id} --project ${ask.project}`;
 
-/** What judges an answer, by the check's kind, in words; its file linked when it has one. */
 const CheckSummary = ({ ask }: { readonly ask: Ask }) =>
   CheckSpec.match(ask.check, {
     LintToZero: ({ rule, territory }) => (
@@ -136,11 +112,6 @@ const CheckSummary = ({ ask }: { readonly ask: Ask }) =>
     ),
   });
 
-/**
- * The check's source, drawn as the code browser draws a file: its first
- * thirty lines until the reader asks for the whole, the server's plain
- * lines first and the highlighted drawing in place of them.
- */
 const CheckFile = ({ source }: { readonly source: CheckSource }) => {
   const [whole, setWhole] = useState(false);
   const lines = linesOf(source.text);
@@ -160,7 +131,6 @@ const CheckFile = ({ source }: { readonly source: CheckSource }) => {
         </span>
       </figcaption>
       <ClientFile
-        // Each cut of the file is its own drawing.
         fallback={<NumberedLines text={shown} />}
         key={whole ? "whole" : "head"}
         path={source.path}
@@ -211,7 +181,6 @@ const BriefList = ({ items }: { readonly items: readonly string[] }) => (
   </ul>
 );
 
-/** The brief's sections, as prose; the want is the page's title. */
 const Brief = ({ ask }: { readonly ask: Ask }) => {
   const { context, current, outOfScope, terms } = ask.brief;
 
@@ -247,7 +216,6 @@ const Brief = ({ ask }: { readonly ask: Ask }) => {
   );
 };
 
-/** Every answer judged, one row each, oldest first, each linking its verdict. */
 const Answers = ({
   ask,
   now,
@@ -291,7 +259,6 @@ const Answers = ({
   </Region>
 );
 
-/** The asks an ask outside a family still waits on, each linked. */
 const WaitsOn = ({
   asks,
   project,
@@ -323,11 +290,6 @@ const WaitsOn = ({
   </p>
 );
 
-/**
- * What a family's parent waits on, in the fan's terms: how many of its
- * children have yet to land, then the delete step; never a list of ids
- * (the fan draws each child).
- */
 const FamilyWaits = ({
   finale,
   parent,
@@ -374,26 +336,17 @@ const FamilyWaits = ({
 
 export interface AskViewProps {
   readonly ask: Ask;
-  /** The brief as the platform renders it for an agent, in Markdown. */
   readonly brief: string;
   readonly now: DateTime.Utc;
-  /** Where the project is cloned from. */
   readonly platformUrl: string;
-  /** Where each ask stands, from the project's events (`askStates`). */
   readonly states?: ReadonlyMap<AskId, AskProgress>;
-  /** The family's parent, when the ask is a member of one. */
   readonly parent?: Ask | undefined;
-  /** The verdict on its latest answer, to say at which stage a refusal came. */
   readonly verdict?: Verdict | undefined;
-  /** The check's source, when it is a file the page could read. */
   readonly check?: CheckSource | undefined;
-  /** The project's posture, once the list of projects has it. */
   readonly posture?: Posture | undefined;
-  /** Who is reading, to tell the claimant the claim is theirs. */
   readonly viewer?: Handle | undefined;
 }
 
-/** Where the ask stands, as its status line reads it. */
 const subjectOf = (
   ask: Ask,
   states: ReadonlyMap<AskId, AskProgress>,
@@ -412,7 +365,6 @@ const subjectOf = (
     };
   }
 
-  // A refusal says at which stage it came, which only the verdict holds.
   const lastRound = progress?.rounds.at(-1);
 
   if (
@@ -443,7 +395,6 @@ const subjectOf = (
   };
 };
 
-/** Where an ask stands for its page: what it still waits on, whether it can be taken, and its family. */
 const standing = (
   ask: Ask,
   states: ReadonlyMap<AskId, AskProgress>,
@@ -465,8 +416,6 @@ const standing = (
     progress,
     remaining,
     takeable: ask.state === "open" && remaining.length === 0,
-    // A family member says what it waits on in the family's terms, and a
-    // wait the latest outcome already names needs no second line.
     waitsOn:
       ask.parent === undefined &&
       remaining.length > 0 &&
@@ -474,7 +423,6 @@ const standing = (
   };
 };
 
-/** The ask's facts: its state, how to take it or who holds it, its territory and check, its family, its project's posture. */
 const AskFacts = ({
   ask,
   now,
@@ -541,7 +489,6 @@ const AskFacts = ({
   );
 };
 
-/** The line under the title: the kind, who asked (and mentors), and when it opened. */
 const AskMeta = ({
   ask,
   now,
@@ -567,7 +514,6 @@ const AskMeta = ({
   />
 );
 
-/** The Markdown an agent reads, shown whole on demand, and its own address. */
 const ForAgents = ({
   ask,
   brief,
@@ -656,7 +602,6 @@ export const AskView = ({
             <WaitsOn asks={remaining} project={ask.project} />
           ) : null}
           {family === undefined ? null : (
-            // Below the shell's width the family sits under the head, as a fan.
             <div className="shell:hidden mt-4">
               <FamilyStrip
                 expanded={false}

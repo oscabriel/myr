@@ -1,13 +1,3 @@
-/**
- * One folder of a project at a revision. The tree in the rail is the
- * navigation; main lists the folder once, as rows: each entry's name (a
- * folder first, as `readTree` orders them), what last changed it (the ask
- * its landing answered, or the commit's subject) and how long ago, then
- * the folder's README below on the page's prose.
- *
- * What last changed each entry arrives after the page (`last`): its
- * column holds its place until then, so nothing moves.
- */
 import type {
   CodeEntry,
   CommitView,
@@ -29,7 +19,6 @@ import { askOf } from "../why/rows.ts";
 import { FileHeader } from "./file-header.tsx";
 import { blobHref, commitsHref, treeHref } from "./paths.ts";
 
-/** Each kind of entry: its mark and the word a screen reader says for it. */
 const kinds = Match.type<CodeEntry["type"]>().pipe(
   Match.when("tree", () => ({ icon: Folder, word: "Folder" })),
   Match.when("blob", () => ({ icon: File, word: "File" })),
@@ -41,7 +30,6 @@ const kinds = Match.type<CodeEntry["type"]>().pipe(
   readonly word: string;
 };
 
-/** Where an entry's row links: a folder's page or a file's; a submodule's commit lives elsewhere. */
 const entryHref = (project: ProjectName, rev: string, entry: CodeEntry) =>
   Match.value(entry.type).pipe(
     Match.when("tree", () => Option.some(treeHref(project, rev, entry.path))),
@@ -49,7 +37,6 @@ const entryHref = (project: ProjectName, rev: string, entry: CodeEntry) =>
     Match.orElse(() => Option.some(blobHref(project, rev, entry.path)))
   );
 
-/** What last changed an entry, in a few words: the ask its landing answered or opened, or the commit's subject. */
 const changeWords = (commit: CommitView) => {
   const linked =
     commit.landing === undefined
@@ -66,7 +53,6 @@ const changeWords = (commit: CommitView) => {
 const LINK =
   "text-foreground no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ring focus-visible:after:outline-solid";
 
-/** One entry, one 40 px row: its mark, its name, what last changed it, and when. */
 const EntryRow = ({
   entry,
   last,
@@ -118,7 +104,6 @@ const EntryRow = ({
   );
 };
 
-/** A folder's entries as rows, each linking its page at `rev` (a project's home lists its root so). */
 export const EntriesTable = ({
   entries,
   project,
@@ -139,14 +124,10 @@ export interface TreeViewProps {
   readonly listing: TreeListing;
   readonly project: ProjectName;
   readonly rev: string;
-  /** The folder's README, read; absent when it has none. */
   readonly readme?: FileView | undefined;
-  /** What last changed each entry, by path, once read. */
   readonly last?: ReadonlyMap<string, CommitView>;
   readonly now: DateTime.Utc;
-  /** The Files button, below the shell's width. */
   readonly files?: ReactNode;
-  /** A notice above the folder (the refusal a missing path landed here with). */
   readonly notice?: ReactNode;
 }
 

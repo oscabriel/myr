@@ -1,15 +1,3 @@
-/**
- * Who put lines there, in one line, ask and answer first and the commit
- * second: "format-ordinal · answered by bram · 9b1c3e5 · 3 d ago". An
- * ask's opening reads "opened format-ordinal · by ines-v · …"; a decider's
- * own landing "landed by okonkwo · …"; a commit the project adopted, its
- * subject and author, "before adoption". Each part is a link: the ask, the
- * answer, the commit. No credit count and no colour by age: neither is a
- * state.
- *
- * Used by a why group's band, and by a file's facts for the landing that
- * last touched it.
- */
 import type { CommitView } from "@repo/protocol/domain/code";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -28,7 +16,6 @@ const LINK = "decoration-rule underline hover:decoration-current";
 
 const CODE_LINK = `text-mono font-mono ${LINK}`;
 
-/** Parts parted by a muted ` · `. */
 const Parted = ({ parts }: { readonly parts: readonly ReactElement[] }) =>
   parts.map((part, index) => (
     <Fragment key={String(part.key)}>
@@ -41,7 +28,6 @@ const Parted = ({ parts }: { readonly parts: readonly ReactElement[] }) =>
     </Fragment>
   ));
 
-/** What the landing did, ask first: answered, opened, or landed by a decider. */
 const landingParts = (
   landing: LandingView,
   project: ProjectName
@@ -86,7 +72,6 @@ const landingParts = (
   ];
 };
 
-/** A commit the project adopted: its subject, its author, and that it came before adoption. */
 const adoptedParts = (
   commit: CommitView | undefined
 ): readonly ReactElement[] => {
@@ -103,7 +88,6 @@ const adoptedParts = (
   ];
 };
 
-/** The line for a commit, and its landing when the platform landed it. */
 export const LandingWords = ({
   commit,
   landing,
@@ -112,7 +96,6 @@ export const LandingWords = ({
   sha,
 }: {
   readonly project: ProjectName;
-  /** The commit's id (all a line has when the walk did not return the commit). */
   readonly sha: string;
   readonly commit: Option.Option<CommitView>;
   readonly landing: Option.Option<LandingView>;

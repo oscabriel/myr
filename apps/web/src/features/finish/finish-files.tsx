@@ -1,11 +1,3 @@
-/**
- * A finish's changed files as a list the rail (or, below the shell's
- * width, a sheet) holds: the ask's territory first, then tests, then the
- * rest, each a row with its change as a letter (A, M or D, in the diff's
- * tints), its path, its `+n −m`, whether this reader marked it read (a
- * muted check, the word for a screen reader) and whether a refusal pointed
- * into it (the refused cross). Choosing one scrolls the diff to it.
- */
 import { Check, OctagonX } from "lucide-react";
 
 import { diffAnchor } from "../code/paths.ts";
@@ -25,7 +17,6 @@ const PART_NAMES = {
   tests: "Tests",
 } as const satisfies Record<Part, string>;
 
-/** A path as two parts: its name first, then its folder, muted, which gives way first. */
 const PathWords = ({ path }: { readonly path: string }) => {
   const slash = path.lastIndexOf("/");
 
@@ -49,11 +40,9 @@ export const FinishFileList = ({
   refused,
 }: {
   readonly files: readonly PatchFile[];
-  /** The page's own address, which each row adds its file's anchor to. */
   readonly href: string;
   readonly read: ReadonlySet<string>;
   readonly refused: ReadonlySet<string>;
-  /** The file the diff stands at. */
   readonly current?: string | undefined;
 }) => (
   <nav

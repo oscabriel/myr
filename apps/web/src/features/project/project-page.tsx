@@ -1,13 +1,3 @@
-/**
- * A project's home, which is its list of asks: its name, its posture and
- * when it last landed; its open asks, a family drawn as a fan with its
- * children listed; then its README. Beside them, how a change lands here:
- * the posture, the gate, who decides, what is held back, the commands that
- * take part, and the last landings; or the selected ask's facts, one Escape
- * from them. Props in, markup out: the route reads the asks, the ledger,
- * the events, the policy and the code on the server and keeps them live in
- * the browser, and hands them here.
- */
 import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported-note";
 import { Brand } from "@repo/brand";
 import type { Ask, AskListing } from "@repo/protocol/domain/ask";
@@ -54,33 +44,24 @@ import { postureLabel, postureWord } from "./posture-label.ts";
 import { ProjectNav } from "./project-nav.tsx";
 import { ReadmeSection } from "./readme-section.tsx";
 
-/** A project's code as its home reads it: the root folder at main, and its README. */
 export interface ProjectCode {
   readonly readme?: FileView | undefined;
   readonly root: TreeListing;
 }
 
-/** Who decides for which paths, as the project's policy says. */
 export interface Deciders {
   readonly handles: readonly Handle[];
   readonly paths: Glob;
 }
 
-/** One area a layer holds checks in, and how many. */
 export interface HeldBackArea {
   readonly area: AreaName;
-  /** How many sealed checks it holds. */
   readonly checks: number;
   readonly detail: string;
 }
 
-/** An entry that says nothing about an area's count. */
 const noCount = (): readonly (readonly [AreaName, number])[] => [];
 
-/**
- * What a project holds back, from its ledger: each sealed area and how many
- * checks it holds, as the latest count or commitment says.
- */
 export const heldBackOf = (ledger: Ledger): readonly HeldBackArea[] => {
   const checks = new Map(
     ledger.entries
@@ -110,15 +91,13 @@ export const heldBackOf = (ledger: Ledger): readonly HeldBackArea[] => {
 };
 
 /**
- * The project as its home knows it: its name, its open asks, when it last
- * landed, and its posture once its own ledger has said it. Until then the
- * page says no posture, never one it was not told.
+ * Until its own ledger has said it, the page says no posture, never one it was
+ * not told.
  */
 export type HomeListing = Omit<ProjectListing, "posture"> & {
   readonly posture?: Posture | undefined;
 };
 
-/** The project for its home, from what was read: the posture only from its own ledger. */
 export const homeListing = ({
   asks,
   ledger,
@@ -133,48 +112,31 @@ export const homeListing = ({
   project,
 });
 
-/** A posture known, in the platform's words. */
 interface KnownPosture {
   readonly label: string;
   readonly posture: Posture;
 }
 
 export interface ProjectViewProps {
-  /** The open asks; none while they are read, and none when they could not be. */
   readonly asks: readonly AskListing[] | undefined;
-  /** Whether the asks could not be read: the platform did not answer. */
   readonly unreachable?: boolean;
-  /** The project's landings, newest first. */
   readonly landings: readonly LandingView[];
-  /** The project: its posture (once its ledger is read), when it last landed, its open asks. */
   readonly listing: HomeListing;
-  /** When it last landed, as its events say, over what the listing says. */
   readonly lastLanded?: DateTime.Utc | undefined;
-  /** Its posture in the platform's words, from its own ledger. */
   readonly postureLabel?: string | undefined;
-  /** What it holds back, from its ledger; none while it is read. */
   readonly heldBack?: readonly HeldBackArea[] | undefined;
-  /** Who decides for which paths; none while the policy is read or when it has none. */
   readonly deciders?: readonly Deciders[] | undefined;
-  /** Where it was imported from; none for a project that started empty, or while the policy is read. */
   readonly importedFrom?: ImportSource | undefined;
   readonly now: DateTime.Utc;
   readonly platformUrl: string;
-  /** The root folder at main and its README, once read. */
   readonly code?: ProjectCode | undefined;
-  /** Each family's parent in full, which counts its children. */
   readonly parents?: readonly Ask[];
-  /** Where each ask stands, from the project's events. */
   readonly states?: ReadonlyMap<AskId, AskProgress>;
-  /** The children that landed while the page was open. */
   readonly stamps?: ReadonlySet<AskId>;
-  /** The selected ask in full, once the browser has read it. */
   readonly selectedAsk?: Ask | undefined;
-  /** Whether someone is signed in, who may propose an ask. */
   readonly signedIn?: boolean;
 }
 
-/** Who decides, one line per set of paths, at most three, then the policy. */
 const WhoDecides = ({
   deciders,
   project,
@@ -212,7 +174,6 @@ const WhoDecides = ({
   );
 };
 
-/** Where an imported project came from: its source, the branch adopted, and what a copy is. */
 const ImportedFrom = ({ source }: { readonly source: ImportSource }) => (
   <FactBlock label="Imported from">
     <p className="text-ui">
@@ -236,7 +197,6 @@ const ImportedFrom = ({ source }: { readonly source: ImportSource }) => (
   </FactBlock>
 );
 
-/** The four commands that take part, in the order a newcomer runs them. */
 const TakePart = ({
   platformUrl,
   project,
@@ -265,10 +225,8 @@ const TakePart = ({
 );
 
 /**
- * The last landings. Before the project's main first lands, the push that
- * lands it is its initializer's; after it, the replay may still hold no
- * landing event, since adopting main is not one: say so, never "nothing
- * landed".
+ * Adopting main is not a landing event, so the replay may hold no landing:
+ * never say "nothing landed".
  */
 const RecentLandings = ({
   landedAt,
@@ -310,7 +268,6 @@ const RecentLandings = ({
   return <FactBlock label="Recent landings">{shown}</FactBlock>;
 };
 
-/** How a change lands here: the facts with nothing selected; the posture is the head's to say. */
 const HowItLands = ({
   deciders,
   heldBack,
@@ -349,12 +306,6 @@ const HowItLands = ({
   </>
 );
 
-/**
- * How a change lands here, in one sentence built only from typed facts:
- * the gate, the paths deciders are set for, what is held back (the ledger
- * linked from it), and when it last landed. The one place the project's
- * own pages state it; the inspector carries the same as facts.
- */
 const RuleSentence = ({
   deciders,
   heldBack,
@@ -401,7 +352,6 @@ const RuleSentence = ({
   );
 };
 
-/** The project line: its posture and its open asks; its README's first sentence; then its one rule sentence. */
 const ProjectLine = ({
   count,
   lede,
@@ -415,8 +365,7 @@ const ProjectLine = ({
 }) => (
   <div className="flex flex-col gap-3">
     <p className="text-ui text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
-      {/* The posture in the short form the rail says, the platform's own
-          label its title; its dot after it, so a line never opens on one. */}
+      {/* Its dot after it, so a line never opens on one. */}
       {posture === undefined ? null : (
         <span className="flex items-center gap-x-2">
           <PostureBadge
@@ -438,7 +387,6 @@ const ProjectLine = ({
   </div>
 );
 
-/** The asks' place on the page, as far as they have been read. */
 const AsksSection = ({
   asks,
   now,
@@ -504,7 +452,6 @@ const AsksSection = ({
   );
 };
 
-/** Whichever facts the inspector shows: how a change lands here, or the selected ask's. */
 const PageFacts = ({
   landedAt,
   picked,
@@ -557,13 +504,11 @@ const PageFacts = ({
   );
 };
 
-/** A list's count at the context bar's end: "7 open asks, 6 open to take". */
 const countOf = (open: readonly AskListing[]) =>
   `${plural(open.length, "open ask", "open asks")}, ${
     open.filter(openToTake).length
   } open to take`;
 
-/** The page, with the selection the list keeps (or none, outside a router). */
 const ProjectPanes = ({
   props,
   select,
@@ -672,11 +617,6 @@ const Selectable = ({ props }: { readonly props: ProjectViewProps }) => {
   return <ProjectPanes props={props} select={select} selected={selected} />;
 };
 
-/**
- * The project's home. Inside the router its list selects (`?ask=`) and `j`
- * and `k` walk it; a view rendered alone draws the same page with nothing
- * selected.
- */
 export const ProjectView = (given: ProjectViewProps) => {
   const props = {
     ...given,

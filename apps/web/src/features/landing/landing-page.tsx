@@ -1,10 +1,3 @@
-/**
- * The landing: what the platform is, said once, and the way to the open
- * asks first. Its evidence is the screen `git push` prints when the gate
- * refuses, set as git sets it, not a picture of one. Every sentence on it is
- * the README's or the glossary's. A view: the platform's address, the web's
- * own and the projects in; markup out.
- */
 import { installCommand } from "@repo/agent-kit/install";
 import { Brand } from "@repo/brand";
 import type { ReactNode } from "react";
@@ -29,24 +22,18 @@ import { LandingProjects } from "./projects.ts";
 import { pushTranscript } from "./transcript.ts";
 import { LEDE, WHAT_IT_IS } from "./words.ts";
 
-/** A link in a plain row (the top, the foot): ink, underlined only on hover. */
 const ROW_LINK = "no-underline hover:underline";
 
-/** The primary action: an ink button that is a link. */
 const PRIMARY = buttonVariants({ className: "no-underline" });
 
-/** Where an agent's reference is. */
 const AGENTS_PATH = "/agents";
 
-/** Text git prints or takes, inside a sentence. */
 const Code = ({ children }: { readonly children: ReactNode }) => (
   <code className={ID}>{children}</code>
 );
 
-/** The branch's name, as git takes it. */
 const MAIN = "main";
 
-/** The lede, its one branch name set as git takes it. */
 const Lede = () => {
   const [before, after] = LEDE.split(MAIN);
 
@@ -59,7 +46,6 @@ const Lede = () => {
   );
 };
 
-/** One part of the page under its name, parted from the last by a hairline. */
 const Part = ({
   children,
   id,
@@ -80,13 +66,11 @@ const Part = ({
   </section>
 );
 
-/** A noun a contributor meets, and what GLOSSARY.md says it is. */
 interface Noun {
   readonly noun: string;
   readonly means: ReactNode;
 }
 
-/** The four nouns, in the glossary's words. */
 const NOUNS: readonly Noun[] = [
   {
     means: (
@@ -114,7 +98,6 @@ const NOUNS: readonly Noun[] = [
   },
 ];
 
-/** The core loop, in the README's six lines. */
 const LOOP: readonly ReactNode[] = [
   <>
     A decider opens an ask; <Code>{`${Brand.cli} ask open`}</Code> lands it only
@@ -140,13 +123,11 @@ const LOOP: readonly ReactNode[] = [
   </>,
 ];
 
-/** One thing a platform can do that a setting cannot: the README's lead, and its words. */
 interface Power {
   readonly lead: string;
   readonly says: ReactNode;
 }
 
-/** What a platform can do that a setting on a code host cannot, in the README's words. */
 const POWERS: readonly Power[] = [
   {
     lead: "Judge with checks the answer cannot touch.",
@@ -189,7 +170,6 @@ const POWERS: readonly Power[] = [
   },
 ];
 
-/** The wordmark and the ways in, as a plain row. */
 const Top = () => (
   <header className="border-rule flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b py-4">
     <AppLink className="text-want font-semibold no-underline" to="/">
@@ -212,7 +192,6 @@ const Top = () => (
   </header>
 );
 
-/** A line of the screen, with the refusal's tag in the refused colour wherever git names it. */
 const Printed = ({
   tag,
   text,
@@ -238,7 +217,6 @@ const Printed = ({
   );
 };
 
-/** The push, and what git prints back when the gate refuses it. */
 const Transcript = ({ platformUrl }: { readonly platformUrl: string }) => {
   const { command, lines, tag } = pushTranscript(platformUrl);
 
@@ -269,7 +247,6 @@ const Transcript = ({ platformUrl }: { readonly platformUrl: string }) => {
   );
 };
 
-/** The projects on the platform, each with its posture, or that the list did not come. */
 const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
   LandingProjects.match(projects, {
     Listed: ({ projects: listed }) => (
@@ -294,7 +271,6 @@ const Projects = ({ projects }: { readonly projects: LandingProjects }) =>
     Unreachable: () => <UnreachableNotice />,
   });
 
-/** The landing, as everyone reads it. */
 export const LandingView = ({
   platformUrl,
   projects,

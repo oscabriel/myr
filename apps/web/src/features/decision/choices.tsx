@@ -1,14 +1,3 @@
-/**
- * A decider's choices on one decision: one button per choice its subject
- * allows, each taken with one tap (there is no confirm and no undo, as the
- * platform has none), and under each, in a muted line, what the platform
- * then does. The default (what happens if nobody decides) is the outline
- * button, with the word "default" beside its name.
- *
- * Once taken, the record replaces the buttons: who chose what, when, the
- * note, and what it did, in the landed role only for a choice that made
- * something happen.
- */
 import type { Choice, Decision } from "@repo/protocol/domain/decision";
 import type { DateTime } from "effect";
 import { Option } from "effect";
@@ -29,13 +18,11 @@ import {
   tookEffect,
 } from "./subject.ts";
 
-/** Why a choice waits, and whether it waits on something that will come. */
 export interface Held {
   readonly reason: string;
   readonly waiting: boolean;
 }
 
-/** How the choices sit: two to a row (main, a phone's open row), or one under another (the inspector). */
 export type ChoicesLayout = "grid" | "stack";
 
 const LAYOUTS = {
@@ -51,9 +38,7 @@ export const Choices = ({
   onChoose,
 }: {
   readonly decision: Decision;
-  /** A choice on its way: every button waits. */
   readonly busy: boolean;
-  /** Why Accept waits, when it does (a proposal whose draft is not read yet). */
   readonly held?: Option.Option<Held>;
   readonly layout?: ChoicesLayout;
   readonly onChoose: (choice: Choice) => void;
@@ -113,7 +98,6 @@ export const Choices = ({
   );
 };
 
-/** A choice taken, in one line: its word in its role, then what it did. */
 export const TakenLine = ({
   choice,
   decision,
@@ -121,7 +105,6 @@ export const TakenLine = ({
 }: {
   readonly decision: Decision;
   readonly choice: Choice;
-  /** Settle the mark once: the decider took it while the page was open. */
   readonly stamp?: boolean;
 }) => {
   const effect = tookEffect(decision, choice);
@@ -148,7 +131,6 @@ export const TakenLine = ({
   );
 };
 
-/** The record of a taken decision: the line, then who, when and the note. */
 export const DecisionRecord = ({
   decided,
   decision,
@@ -177,10 +159,8 @@ export const DecisionRecord = ({
   </section>
 );
 
-// Choices kept in sight while their decision is: on a phone, a bar fixed
-// above the bottom bar (a bar that only stuck would stay below the screen
-// while its decision starts low on the page), with main keeping room for
-// it at its foot (`styles.css`); from a tablet's width, where they sit.
+// Fixed, not sticky, on a phone: a bar that only stuck would stay below the
+// screen while its decision starts low on the page.
 export const stuckAboveBar = (node: ReactNode) => (
   <div
     className="border-rule bg-background tablet:static tablet:border-t-0 tablet:p-0 fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[6] border-t px-4 py-2"

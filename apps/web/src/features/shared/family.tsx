@@ -1,22 +1,3 @@
-/**
- * A family as a fan: a parent ask split into sibling children, one per
- * module, and a delete child that waits for all of them. The children are
- * siblings, so they are drawn side by side on one bus, never as a ladder,
- * with an arrow to the delete child at the end.
- *
- * - `FamilyStrip` is a parent row's third line: each child's mark and its
- *   short name, the arrow to the delete child, "n of N landed", and a
- *   button that lists the children as rows beneath. N is the children the
- *   parent stores, never the listing's remaining blockers (a listing drops
- *   the ones that landed).
- * - `FamilyTree` is the vertical form, for the inspector and the top of a
- *   member's page: the parent, its children on a left bus, then the delete
- *   child, the member being read marked.
- *
- * A child that lands while the page is open settles with the stamp, once
- * (the caller's `stamps`, from `stampsFrom`); the count changes with no
- * motion of its own, and with reduced motion nothing moves.
- */
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { AskId, ProjectName } from "@repo/protocol/ids";
 import { ArrowRight, ChevronDown } from "lucide-react";
@@ -30,7 +11,6 @@ import { StateMarkIcon } from "./marks.tsx";
 import type { StateMark } from "./marks.tsx";
 import { askPath } from "./paths.ts";
 
-/** Each child's state in the words its node is read by. */
 const words = {
   checking: "checking",
   claimed: "claimed",
@@ -40,18 +20,11 @@ const words = {
   waiting: "waiting",
 } as const satisfies Record<Mark, string>;
 
-/** The fold's marks are named as the marks are. */
 const markFor = (mark: Mark): StateMark => mark;
 
-/** The words of `id` after `prefix` and its dash, or `id` when it does not start so. */
 const after = (id: string, prefix: string) =>
   id.startsWith(`${prefix}-`) ? id.slice(prefix.length + 1) : id;
 
-/**
- * Each child's short name: its id after the parent's, and after any word
- * every sibling shares ("drop-legacy-fetch-burrow-auth" reads "auth" when
- * every child is a burrow module).
- */
 export const shortNames = (
   parent: AskId,
   children: readonly AskId[]
@@ -76,7 +49,6 @@ export const shortNames = (
   );
 };
 
-/** A family's children (the delete child apart), their marks and what the delete child waits on. */
 const familyOf = (
   parent: Ask,
   states: ReadonlyMap<AskId, AskProgress>,
@@ -102,13 +74,11 @@ const familyOf = (
   };
 };
 
-/** Where the delete child stands: its mark, and its state in words. */
 interface FinaleState {
   readonly mark: StateMark;
   readonly words: string;
 }
 
-/** The delete child's state: it waits until every child lands, then opens, then lands. */
 const finaleOf = (
   finale: AskId,
   states: ReadonlyMap<AskId, AskProgress>,
@@ -133,7 +103,6 @@ const finaleOf = (
 const NODE =
   "text-label relative z-10 inline-flex min-w-0 items-center gap-1 no-underline hover:underline decoration-rule";
 
-/** A row's third line: the fan, the count, and the children as rows on demand. */
 export const FamilyStrip = ({
   expanded,
   finale,
@@ -145,14 +114,10 @@ export const FamilyStrip = ({
 }: {
   readonly parent: Ask;
   readonly states: ReadonlyMap<AskId, AskProgress>;
-  /** The delete child, when the family has one. */
   readonly finale?: AskId;
-  /** Children that landed while the page was open. */
   readonly stamps: ReadonlySet<AskId>;
   readonly project: ProjectName;
-  /** Whether the children start listed as rows. */
   readonly expanded: boolean;
-  /** Each child's want, when the page has it, for the listed rows. */
   readonly wants?: ReadonlyMap<AskId, string>;
 }) => {
   const [open, setOpen] = useState(expanded);
@@ -241,8 +206,7 @@ export const FamilyStrip = ({
           </span>
         </button>
       </div>
-      {/* Folded, the rows stay in the page, hidden: each open child's
-          claim command is text an agent reading the page still finds. */}
+      {/* Folded, the rows stay in the page: each open child's claim command is text an agent still finds. */}
       <ul
         className="border-rule mt-1 ml-[0.4375rem] flex flex-col border-l pl-3"
         hidden={!open}
@@ -289,7 +253,6 @@ export const FamilyStrip = ({
   );
 };
 
-/** One member in the vertical form: its mark, its name, its state's word; the member being read filled. */
 const Member = ({
   current,
   label,
@@ -321,7 +284,6 @@ const Member = ({
   </AppLink>
 );
 
-/** The family read top to bottom: the parent, its children on a bus, then the delete child. */
 export const FamilyTree = ({
   current,
   finale,
@@ -332,14 +294,12 @@ export const FamilyTree = ({
   readonly parent: Ask;
   readonly states: ReadonlyMap<AskId, AskProgress>;
   readonly finale?: AskId;
-  /** The member whose page this is. */
   readonly current?: AskId;
   readonly project: ProjectName;
 }) => {
   const family = familyOf(parent, states, finale);
   const progress = markOf(states.get(parent.id));
 
-  // An open parent waits while anything it waits on has not landed.
   const own =
     progress === "open" &&
     parent.blockedBy.some((ask) => states.get(ask)?.landed === undefined)

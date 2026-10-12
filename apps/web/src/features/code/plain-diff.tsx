@@ -1,20 +1,6 @@
 /**
- * A commit's diff as plain text: what the server sends, and what a reader
- * sees until the browser has drawn the highlighted diff over it. It holds
- * the hunks the drawing holds (`diff-model.ts` parses both texts with the
- * drawing's own parser) and takes Pierre's measures: a 44 px file header,
- * 13 px code on 20 px lines, line numbers in a gutter of at least three
- * figures with two before and one after, a sign in the first of two
- * leading columns, unchanged runs as 32 px "N unmodified lines" bars. So
- * the highlighting arrives in place and nothing moves. The first files the
- * server highlights (`prerenderedPaths`, ADR 0027) are its drawing instead
- * of plain lines, under the same header.
- *
- * Each file is a disclosure whose summary is its header: folded, only the
- * header shows (an added or deleted file past 80 lines starts folded).
- * Additions and deletions take the diff's own tints, never the landed or
- * refused colour; a unified diff marks each line `+` or `-`, a split one
- * marks the side with a bar.
+ * Holds the hunks the drawing holds and takes Pierre's measures, so the
+ * highlighting arrives in place and nothing moves.
  */
 import type { ChangedFile } from "@repo/protocol/domain/code";
 import { Option } from "effect";
@@ -29,10 +15,8 @@ import { diffAnchor } from "./paths.ts";
 import { diffDrawing } from "./prerender.ts";
 import { ServerCode } from "./server-code.tsx";
 
-/** One numbered line: its text, and which side it is on. */
 type Line = Extract<PlainRow, { readonly number: number }>;
 
-/** A line's ground and its number's colour, by what it is. */
 const TONES = {
   addition: {
     line: "bg-diff-add-bg",
@@ -48,14 +32,11 @@ const TONES = {
   { readonly line: string; readonly number: string }
 >;
 
-/** Each line's sign in a unified diff, the mark that reads without colour. */
 const SIGNS = { addition: "+", context: " ", deletion: "-" } as const;
 
-/** Pierre's gutter: at least three figures, two before them and one after, then a 2 px gap. */
 const GUTTER =
   "border-background min-w-[calc(6ch+2px)] border-r-2 pr-[1ch] pl-[2ch] text-right tabular-nums select-none";
 
-/** An unchanged run between hunks: a 32 px bar saying how many lines it skips. */
 const Separator = ({
   lines,
   span,
@@ -72,7 +53,6 @@ const Separator = ({
   </div>
 );
 
-/** One line of a unified diff: its number, then its sign and text. */
 const UnifiedLine = ({ line }: { readonly line: Line }) => (
   <>
     <span className={`${GUTTER} ${TONES[line.kind].number}`}>
@@ -91,7 +71,6 @@ const UnifiedLine = ({ line }: { readonly line: Line }) => (
   </>
 );
 
-/** One side of a split diff's row: its number with the side's bar, then its text; empty when the side has none. */
 const SplitSide = ({ line }: { readonly line: Line | undefined }) =>
   line === undefined ? (
     <>
@@ -123,7 +102,6 @@ const SplitSide = ({ line }: { readonly line: Line | undefined }) =>
     </>
   );
 
-/** A file's lines, unified: one grid of gutter and code, scrolling sideways in itself. */
 const UnifiedBody = ({ rows }: { readonly rows: readonly PlainRow[] }) => (
   <div className="overflow-x-auto pb-2">
     <code className="grid min-w-full grid-cols-[min-content_1fr]">
@@ -138,7 +116,6 @@ const UnifiedBody = ({ rows }: { readonly rows: readonly PlainRow[] }) => (
   </div>
 );
 
-/** A file's lines, split: old on the left, new on the right, row beside row. */
 const SplitBody = ({ rows }: { readonly rows: readonly SplitRow[] }) => (
   <div className="overflow-x-auto pb-2">
     <code className="grid min-w-full grid-cols-[min-content_1fr_min-content_1fr]">
@@ -156,7 +133,6 @@ const SplitBody = ({ rows }: { readonly rows: readonly SplitRow[] }) => (
   </div>
 );
 
-/** What a file changed, in counts: `+n −m`, each in its tint, with words for a screen reader. */
 export const ChangeCounts = ({
   additions,
   deletions,
@@ -164,7 +140,6 @@ export const ChangeCounts = ({
 }: {
   readonly additions: number;
   readonly deletions: number;
-  /** As a diff's file header prints them: a hyphen, and no count of nothing. */
   readonly header?: boolean;
 }) => (
   <span className="text-mono flex shrink-0 items-center gap-[1ch] font-mono tabular-nums">
@@ -184,18 +159,12 @@ export const ChangeCounts = ({
   </span>
 );
 
-/** Why a file has no lines to show: binary, or its text not sent. */
 const Unshown = ({ file }: { readonly file: ChangedFile }) => (
   <p className="text-ui text-muted-foreground px-4 pb-3 font-sans">
     {file.binary ? "A binary file" : "Its text is not shown"}, {file.status}.
   </p>
 );
 
-/**
- * A file's lines, unified or split; why it has none when it has none. A
- * file the server highlighted (unified, `prerenderedPaths`) is its drawing,
- * and the plain lines only where the document did not bring it.
- */
 const FileBody = ({
   file,
   prerendered,
@@ -226,7 +195,6 @@ const FileBody = ({
   );
 };
 
-/** Each kind of change as the drawing's header marks it, in the diff's tints. */
 const CHANGE_MARKS = {
   added: { icon: SquarePlus, tone: "text-diff-add-sign" },
   deleted: { icon: SquareMinus, tone: "text-diff-del-sign" },
@@ -236,17 +204,11 @@ const CHANGE_MARKS = {
   { readonly icon: LucideIcon; readonly tone: string }
 >;
 
-/**
- * A file's header as the drawing draws it: the fold's chevron, the mark of
- * its change (with its word for a screen reader), its path, then its
- * counts and anything the page adds.
- */
 export const FileHeaderLine = ({
   end,
   file,
 }: {
   readonly file: DrawnFile;
-  /** Anything a page puts at the header's end (a "Mark read" button). */
   readonly end?: ReactNode;
 }) => {
   const { icon: Icon, tone } = CHANGE_MARKS[file.file.status];
@@ -281,23 +243,13 @@ export const FileHeaderLine = ({
 
 export interface PlainDiffProps {
   readonly files: readonly ChangedFile[];
-  /** Old and new side by side; unified when absent. */
   readonly split?: boolean;
-  /** The files folded now; each file's own default (`folded`) when absent. */
   readonly folded?: ReadonlySet<string> | undefined;
-  /** A header's fold was pressed. */
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;
-  /** `files` already parsed (`drawnFiles`), so a page parses each once. */
   readonly drawn?: readonly DrawnFile[] | undefined;
-  /** The paths the server sends highlighted (`prerenderedPaths`); none when absent. */
   readonly prerendered?: ReadonlySet<string> | undefined;
 }
 
-/**
- * The diff of `files`, plain, in the order a tree lists them. Server
- * markup: one `section[data-file]` per file, its header sticky at the top
- * of the pane that scrolls it.
- */
 export const PlainDiff = ({
   drawn: parsed,
   files,

@@ -1,9 +1,3 @@
-/**
- * The inspector's "This file": the path, the file in words (lines, size,
- * language), the landing that last touched it (ask and answer first, the
- * commit second), and where to take it: raw, a permalink, a copy, its
- * history. A file's page and its why page show the same block.
- */
 import type { CommitView, FileView } from "@repo/protocol/domain/code";
 import type { ProjectName } from "@repo/protocol/ids";
 import { Option } from "effect";
@@ -27,9 +21,7 @@ export const FileFacts = ({
   rev,
 }: {
   readonly file: FileView;
-  /** Which page shows the block: its permalink keeps the reader there. */
   readonly mode?: "code" | "why";
-  /** The commit that last changed the file, with its landing; none when the read found none. */
   readonly last?: CommitView | undefined;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;

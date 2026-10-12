@@ -1,16 +1,12 @@
 /**
- * A project's posture, as the honest label the platform computes from its
- * visibility config. The posture literal rides as `data-posture`, so tests
- * and styles key on it; the words are the label, never rewritten here.
- * It is a state badge: a lock in the sealed role when something is kept
- * sealed, then the label.
+ * The posture literal rides as `data-posture`, so tests and styles key on it;
+ * the words are the platform's label, never rewritten here.
  */
 import type { Posture } from "@repo/protocol/posture";
 
 import { POSTURE_MARKS } from "./mark-look.ts";
 import { StateBadge } from "./state-badge.tsx";
 
-/** The label's colour: sealed when something is kept sealed, ink when nothing is, muted for a licence that is not open. */
 const wordTone = {
   open: "text-foreground",
   openCore: "text-sealed",
@@ -26,7 +22,6 @@ export const PostureBadge = ({
 }: {
   readonly label: string;
   readonly posture: Posture;
-  /** The platform's full label, when the badge says a short form. */
   readonly title?: string | undefined;
 }) => (
   <StateBadge

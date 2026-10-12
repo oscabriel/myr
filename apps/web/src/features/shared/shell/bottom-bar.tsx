@@ -1,10 +1,3 @@
-/**
- * The phone's bottom bar, fixed above the home indicator: Home, Asks,
- * Today, Projects (the switcher, as a sheet) and More (Docs, For agents, the project's
- * sections, the keys and the session), each a mark over its word. The
- * current page's item is ink at 600 with a rule on its top edge; the rest
- * are muted.
- */
 import { CalendarCheck, Ellipsis, Folders, House, List } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 

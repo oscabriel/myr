@@ -1,19 +1,3 @@
-/**
- * One page's panes: main (the context bar, the page's head, its toolbar and
- * its content) and, when the page has typed facts, the inspector, both
- * rendered in one pass on the server. Every page renders one `Workspace`.
- *
- * From the shell's width main scrolls on its own and the inspector is a
- * column of its own scroll on the right, its heading announcing what it
- * describes as it changes. Below it, the facts sit in one slot after the
- * page's head: open on a subject's page, a disclosure on a list's (whose
- * summary keeps one fact in sight). Code pages keep the width for the code:
- * the inspector is a column from 1440 px and a sheet below, behind a Facts
- * button in the context bar.
- *
- * Rows and the head stop at 56 rem, left-aligned; prose at 70 ch is the
- * page's; code takes the whole pane.
- */
 import { useHydrated, useLocation, useRouter } from "@tanstack/react-router";
 import { Predicate } from "effect";
 import { ChevronDown, PanelRight } from "lucide-react";
@@ -29,45 +13,27 @@ import { crumbsFor } from "./sections.ts";
 import type { Crumb } from "./sections.ts";
 
 export interface WorkspaceProps {
-  /** The trail to the page; the address's when left out. */
   readonly crumbs?: readonly Crumb[];
-  /** The page head's title: the headline, or a title when it runs long. */
   readonly title: ReactNode;
-  /** The title is someone's own words (a want), shown as they wrote it. */
   readonly said?: boolean | undefined;
-  /** A status line under the title. */
   readonly status?: ReactNode;
-  /** A 14 px muted line under the status: kind, asker, age. */
   readonly meta?: ReactNode;
-  /** The subject's state in a word and a mark, at the context bar's end. */
   readonly state?: ReactNode;
-  /** A list's count, at the context bar's end ("10 open asks, 8 open to take"). */
   readonly count?: string;
-  /** The page's one command, copied from the context bar. */
   readonly primaryCommand?: string;
-  /** Filters, view toggles, sort: a bar that stays under the context bar. */
   readonly toolbar?: ReactNode;
-  /** The inspector's fact blocks; inline below the shell's width. */
   readonly facts?: ReactNode;
-  /** What the facts describe: "This ask", "Selected ask", "How a change lands here". */
   readonly factsHeading?: string;
-  /** The one fact a list keeps in sight below the shell's width (its posture). */
   readonly factsSummary?: ReactNode;
-  /** The facts' subject (a selected row's id): a new one settles in. */
   readonly factsKey?: string;
-  /** A document (the default), a list, or code. */
   readonly variant?: "code" | "document" | "list";
-  /** Main's content. */
   readonly children: ReactNode;
 }
 
-/** Main's side padding at each width. */
 export const GUTTER = "px-4 tablet:px-5 shell:px-6";
 
-/** How wide rows and the head run: 56 rem, from the left. */
 export const MEASURE = "max-w-[56rem]";
 
-/** Past this many characters a title is set a step down, to stay within three lines. */
 const LONG_TITLE = 80;
 
 const PageHead = ({
@@ -94,7 +60,6 @@ const PageHead = ({
   </div>
 );
 
-/** The inspector's heading row: names what the facts describe, and announces it when it changes. */
 const FactsHeading = ({ heading }: { readonly heading: string }) => (
   <div
     aria-live="polite"
@@ -104,7 +69,6 @@ const FactsHeading = ({ heading }: { readonly heading: string }) => (
   </div>
 );
 
-/** The facts settling in when their subject changes: 120 ms of opacity, nothing that moves. */
 const Settling = ({
   children,
   id,
@@ -117,7 +81,6 @@ const Settling = ({
   </div>
 );
 
-/** The facts in main, after the head, below the shell's width. */
 const InlineFacts = ({
   facts,
   heading,
@@ -160,7 +123,6 @@ const InlineFacts = ({
     </section>
   );
 
-/** A code page's Facts button, and its facts as a sheet from the right. */
 const FactsSheet = ({
   facts,
   heading,
@@ -217,7 +179,6 @@ const WorkspaceView = ({
   pathname,
   variant = "document",
 }: WorkspaceProps & {
-  /** The address, for the default trail; none outside a router. */
   readonly pathname: string;
 }) => {
   const hasFacts = facts !== undefined && facts !== null;
@@ -238,7 +199,6 @@ const WorkspaceView = ({
             crumbs={crumbs ?? crumbsFor(pathname)}
             end={
               code && hasFacts ? (
-                // The sheet belongs to the page it opened on.
                 <FactsSheet
                   facts={facts}
                   heading={factsHeading}
@@ -316,11 +276,6 @@ const AtAddress = (props: WorkspaceProps) => (
   />
 );
 
-/**
- * A page's panes. Inside the router its trail defaults to its address's; a
- * view rendered alone (its own test) draws the same panes with the trail
- * it is given.
- */
 export const Workspace = (props: WorkspaceProps) =>
   Predicate.isNotNullish(useRouter({ warn: false })) ? (
     <AtAddress {...props} />

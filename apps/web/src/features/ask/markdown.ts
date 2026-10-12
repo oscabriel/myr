@@ -1,14 +1,3 @@
-/**
- * An ask as Markdown, for agents: a harness reads an ask with one plain
- * fetch, either with `Accept: text/markdown` on the ask's own URL or at the
- * same URL with `.md`. The request decides; no user-agent list does.
- *
- * The brief is the platform's: `showAsk` renders it once, and the web only
- * serves it, with the banner that names the web's indexes under its title. A refusal is
- * set the way `git push` printed it, from `@repo/protocol/render`
- * (AGENTS.md principle 3), then its next command.
- * Pure: a `Request` or an `Exit` in, a string or a `Response` out.
- */
 import { indexBanner, underTitle } from "@repo/agent-kit/host-doc";
 import { Brand } from "@repo/brand";
 import type { Visibility } from "@repo/protocol/annotations";
@@ -19,17 +8,15 @@ import { Array, Cause, Exit, Option, Schema } from "effect";
 
 const MARKDOWN = "text/markdown; charset=utf-8";
 
-/** A contract's `Visibility`: a `public` one's answer may be cached for a minute, a `maintainers` one's never. */
 export type ContractVisibility = ReturnType<typeof Visibility.defaultValue>;
 
-/** One range of an `Accept` header: `text/markdown;q=0.8`. */
 interface MediaRange {
   readonly quality: number;
   readonly subtype: string;
   readonly type: string;
 }
 
-/** A q-value as RFC 9110 writes it: 0 to 1, at most three decimals; anything else is no range. */
+/** A q-value as RFC 9110 writes it: 0 to 1, at most three decimals. */
 const QUALITY = /^(?:0(?:\.\d{0,3})?|1(?:\.0{0,3})?)$/u;
 
 const rangesOf = (accept: string): readonly MediaRange[] =>
@@ -47,7 +34,6 @@ const rangesOf = (accept: string): readonly MediaRange[] =>
       : [{ quality: Number(quality), subtype, type }];
   });
 
-/** How closely `range` names `type/subtype`: 3 by name, 2 by `type/*`, 1 by `*\/*`, 0 not at all. */
 const closeness = (range: MediaRange, type: string, subtype: string) => {
   if (range.type === type) {
     if (range.subtype === subtype) {
@@ -60,7 +46,6 @@ const closeness = (range: MediaRange, type: string, subtype: string) => {
   return range.type === "*" && range.subtype === "*" ? 1 : 0;
 };
 
-/** The quality the closest range gives `type/subtype` (RFC 9110 §12.5.1), and how close it was. */
 const preferenceFor = (
   ranges: readonly MediaRange[],
   type: string,
@@ -80,10 +65,8 @@ const preferenceFor = (
 };
 
 /**
- * Whether the request asks for the ask as Markdown: it names `text/markdown`
- * itself, with a quality above zero and at least the quality it gives
- * `text/html`. A wildcard alone (`*\/*`, `text/*`, or no `Accept` at all)
- * gets the page, as a browser does.
+ * A wildcard alone (`*\/*`, `text/*`, or no `Accept` at all) gets the page, as
+ * a browser does.
  */
 export const wantsMarkdown = (request: Request) => {
   const ranges = rangesOf(request.headers.get("accept") ?? "");
@@ -97,11 +80,9 @@ export const wantsMarkdown = (request: Request) => {
   );
 };
 
-/** The longest run of backticks in `text`. */
 const longestTicks = (text: string) =>
   Math.max(0, ...[...text.matchAll(/`+/gu)].map(([run]) => run.length));
 
-/** `text` as inline code, its delimiter longer than any backticks inside it. */
 const inlineCode = (text: string) => {
   const ticks = longestTicks(text);
   const fence = "`".repeat(ticks + 1);
@@ -109,11 +90,6 @@ const inlineCode = (text: string) => {
   return ticks === 0 ? `${fence}${text}${fence}` : `${fence} ${text} ${fence}`;
 };
 
-/**
- * Refusals as an agent reads them in Markdown: every refusal's `explain`
- * lines in one text block, verbatim (git's `remote:` lines, without the
- * prefix), then each distinct `next` command once, as its own paragraph.
- */
 export const refusalsMarkdown = (
   refusals: Array.NonEmptyReadonlyArray<Refusal>
 ) => {
@@ -141,31 +117,21 @@ const markdown = (body: string, status: number, cacheControl: string) =>
     status,
   });
 
-/** What a Markdown answer may be cached for, by its contract's visibility. */
 const cacheFor = (visibility: ContractVisibility) =>
   visibility === "public" ? "public, max-age=60" : "private, no-store";
 
 const isRefusal = Schema.is(Refusal);
 
-/** What the web says when the platform gave neither the ask nor a refusal. */
 const UNANSWERED = [
   "The platform did not answer, so the web cannot read this ask now. Ask again in a moment.",
   "",
 ].join("\n");
 
-/** Where the web's indexes are, for the banner under an ask's title. */
 export interface AskIndex {
   readonly project: ProjectName;
   readonly webUrl: string;
 }
 
-/**
- * How reading an ask ended, as the Markdown response: the brief (200,
- * cacheable as its contract's visibility allows), with the banner naming
- * `index`'s `llms.txt` files under its title; a refusal (404, its
- * Markdown, no banner); or no answer from the platform (502). Only a brief
- * is cached.
- */
 export const askMarkdownResponse = <E>(
   result: Exit.Exit<{ readonly brief: string }, E>,
   visibility: ContractVisibility,
@@ -186,10 +152,6 @@ export const askMarkdownResponse = <E>(
       ),
   });
 
-/**
- * The answer to a path that can name no ask: a project's and an ask's names
- * are lowercase words joined by single dashes, so the platform is not asked.
- */
 export const noAskAt = (path: string) =>
   markdown(
     [
@@ -202,10 +164,8 @@ export const noAskAt = (path: string) =>
     "no-store"
   );
 
-/** Where an ask's Markdown lives: its page's URL with `.md`. */
 export const markdownPath = (project: string, ask: string) =>
   `/${project}/asks/${ask}.md`;
 
-/** The `Link` header that names an ask page's Markdown as an alternate of it. */
 export const markdownAlternate = (project: string, ask: string) =>
   `<${markdownPath(project, ask)}>; rel="alternate"; type="text/markdown"`;

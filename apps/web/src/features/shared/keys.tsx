@@ -1,21 +1,6 @@
 /**
- * The keyboard's single keys, one listener for the whole shell:
- *
- * - `?` opens the keys dialog, which lists them and holds the switch;
- * - `j` / `k` move through the page's list (its rows, `useListKeys`), and at
- *   the shell's width select the row, so the inspector follows; `Enter`
- *   opens the focused row, as a link does;
- * - `J` / `K` move between the page's files (`useFileKeys`);
- * - `1` to `9` copy the page's numbered commands, the inspector's first
- *   (`useNumberedCommand`);
- * - `Escape` clears the selection (a sheet or a dialog closes itself).
- *
- * No key acts while focus is in a text field, a combobox or the tree's
- * search, or with Ctrl, Alt or Meta held. Every key has a twin a pointer
- * reaches: rows are links, files are the tree's rows, commands have their
- * copy buttons. The switch turns every key but `?` off (WCAG 2.2 SC 2.1.4)
- * and is the viewer's own: kept in this browser's storage, on until turned
- * off, and on whenever the storage cannot be read.
+ * The switch turns every key but `?` off (WCAG 2.2 SC 2.1.4), and is on
+ * whenever the storage cannot be read.
  */
 import { Effect, Option, Result } from "effect";
 import {
@@ -32,17 +17,14 @@ import type { ReactNode } from "react";
 
 import { Kbd } from "../../components/ui/kbd.tsx";
 
-/** A key pressed, as the listener reads it. */
 export interface KeyPress {
   readonly altKey: boolean;
   readonly ctrlKey: boolean;
-  /** Whether focus is in a text field, a combobox or a search. */
   readonly inField: boolean;
   readonly key: string;
   readonly metaKey: boolean;
 }
 
-/** What a key asks for. */
 export type KeyIntent =
   | { readonly index: number; readonly kind: "copy" }
   | {
@@ -64,13 +46,8 @@ const MOVES = {
 
 const DIGIT = /^[1-9]$/u;
 
-/** The shell's width, from which the rail and the inspector are columns. */
 const SHELL_WIDTH = "(min-width: 70rem)";
 
-/**
- * What `press` asks for, with the single keys `on` or off; nothing for a
- * press in a text field, with a modifier held, or with no meaning here.
- */
 export const intentOf = (
   press: KeyPress,
   on: boolean
@@ -100,10 +77,8 @@ export const intentOf = (
   return move === undefined ? undefined : { kind: move[1] };
 };
 
-/** Where the switch is kept, in the browser's storage. */
 const SWITCH = "keys.single";
 
-/** Whether the single keys are on: on unless `storage` says off, or cannot say. */
 export const readShortcuts = (storage?: Storage): boolean =>
   storage === undefined ||
   Result.getOrElse(
@@ -111,16 +86,13 @@ export const readShortcuts = (storage?: Storage): boolean =>
     () => true
   );
 
-/** Keep the switch as `on` says; a storage that refuses keeps nothing. */
 export const writeShortcuts = (storage: Storage | undefined, on: boolean) => {
   Result.try(() => storage?.setItem(SWITCH, on ? "on" : "off"));
 };
 
-/** The browser's storage, when there is one this page may use. */
 const localStorageOf = (): Storage | undefined =>
   Result.getOrUndefined(Result.try(() => globalThis.localStorage));
 
-/** The keys and what each does, as the dialog lists them. */
 const KEYS = [
   { does: "Show these keys", keys: ["?"] },
   { does: "Next or previous row", keys: ["j", "k"] },
@@ -130,16 +102,11 @@ const KEYS = [
   { does: "Close, or clear the selection", keys: ["Esc"] },
 ] as const;
 
-/** The switch's two settings, each a button that says whether it is pressed. */
 const SETTINGS = [
   { label: "On", on: true },
   { label: "Off", on: false },
 ] as const;
 
-/**
- * The keys dialog's body: every key with what it does, and the switch. `?`
- * opens it even with the switch off, so the switch is always in reach.
- */
 export const KeysHelp = ({
   on,
   onChange,
@@ -192,12 +159,10 @@ export const KeysHelp = ({
   </div>
 );
 
-/** Which part of the page a command sits in: the inspector's are numbered first. */
 export type CommandSlot = "facts" | "main";
 
 const SlotContext = createContext<CommandSlot>("main");
 
-/** Commands under `slot` number as the inspector's or main's. */
 export const CommandSlotProvider = ({
   children,
   slot,
@@ -206,7 +171,6 @@ export const CommandSlotProvider = ({
   readonly slot: CommandSlot;
 }) => <SlotContext value={slot}>{children}</SlotContext>;
 
-/** A list the page lets `j` and `k` move through. */
 interface ListRegistration {
   readonly focus: (id: string) => void;
   readonly read: () => {
@@ -216,7 +180,6 @@ interface ListRegistration {
   focused?: string;
 }
 
-/** The files a page lets `J` and `K` move between. */
 interface FileRegistration {
   readonly read: () => {
     readonly onMove: (path: string) => void;
@@ -231,7 +194,6 @@ interface Command {
   readonly slot: CommandSlot;
 }
 
-/** What the page registers with the listener; one for the shell's life. */
 interface Registry {
   readonly clearers: Set<() => void>;
   readonly files: Set<FileRegistration>;
@@ -239,7 +201,6 @@ interface Registry {
   readonly register: (command: Command) => () => void;
 }
 
-/** What the keys show: whether they are on, the numbers, the last copy. */
 interface KeysState {
   readonly copied: string | undefined;
   readonly numbered: ReadonlyMap<string, number>;
@@ -251,10 +212,8 @@ const RegistryContext = createContext<Registry | undefined>(undefined);
 
 const StateContext = createContext<KeysState | undefined>(undefined);
 
-/** The keys' state, for the dialog. */
 export const useKeys = () => useContext(StateContext);
 
-/** `item` in `set` until the returned function takes it out. */
 const held = <A,>(set: Set<A>, item: A) => {
   set.add(item);
 
@@ -263,10 +222,9 @@ const held = <A,>(set: Set<A>, item: A) => {
   };
 };
 
-/** The last registered of `set`: the page's own, over any that left late. */
+/** The page's own, over any that left late. */
 const lastOf = <A,>(set: ReadonlySet<A>): A | undefined => [...set].at(-1);
 
-/** Whether `event` was pressed inside something that takes typing. */
 export const inField = (event: KeyboardEvent) => {
   const [target] = event.composedPath();
 
@@ -279,7 +237,6 @@ export const inField = (event: KeyboardEvent) => {
   );
 };
 
-/** Numbers commands 1 to 9: the inspector's first, each command once. */
 const numberOf = (
   commands: readonly Command[]
 ): ReadonlyMap<string, number> => {
@@ -295,7 +252,6 @@ const numberOf = (
   );
 };
 
-/** Copy `command`, then mark it copied for two seconds. */
 const copyNumbered = (command: string, shown: (copied?: string) => void) =>
   Effect.tryPromise(() => navigator.clipboard.writeText(command)).pipe(
     Effect.andThen(
@@ -312,7 +268,6 @@ const copyNumbered = (command: string, shown: (copied?: string) => void) =>
     Effect.ignore
   );
 
-/** The row a key moved to: focused, scrolled to, and selected at the shell's width. */
 const moveTo = (list: ListRegistration, step: 1 | -1) => {
   const { ids, onSelect } = list.read();
   const at = list.focused === undefined ? -1 : ids.indexOf(list.focused);
@@ -339,7 +294,6 @@ const moveTo = (list: ListRegistration, step: 1 | -1) => {
     row.scrollIntoView({ block: "nearest" });
   }
 
-  // The inspector is a column at the shell's width, so a move selects there.
   if (globalThis.matchMedia(SHELL_WIDTH).matches) {
     onSelect(next);
   }
@@ -356,7 +310,6 @@ const moveFile = (files: FileRegistration, step: 1 | -1) => {
   }
 };
 
-/** What the listener reads when a key is pressed. */
 interface Pressing {
   readonly copy: (command: string) => void;
   readonly numbered: ReadonlyMap<string, number>;
@@ -365,7 +318,6 @@ interface Pressing {
   readonly registry: Registry;
 }
 
-/** Do what `intent` asks; whether it did anything (so the browser does not too). */
 const act = (intent: KeyIntent, now: Pressing): boolean => {
   const { registry } = now;
 
@@ -415,10 +367,6 @@ const act = (intent: KeyIntent, now: Pressing): boolean => {
   return files !== undefined;
 };
 
-/**
- * The shell's one listener and the state behind it. `openDialog` opens the
- * keys dialog (the shell draws it).
- */
 export const KeysProvider = ({
   children,
   openDialog,
@@ -427,7 +375,7 @@ export const KeysProvider = ({
   readonly openDialog: () => void;
 }) => {
   // The server has no storage and renders the keys on; nothing it renders
-  // depends on them (a command's number comes once the page has run).
+  // depends on them.
   const [on, setOn] = useState(() => readShortcuts(localStorageOf()));
   const [commands, setCommands] = useState<readonly Command[]>([]);
   const [copied, setCopied] = useState<string>();
@@ -455,7 +403,6 @@ export const KeysProvider = ({
 
   const numbered = useMemo(() => numberOf(commands), [commands]);
 
-  // The listener reads the latest of these, kept here after each render.
   const pressing = useRef<Pressing | null>(null);
 
   useEffect(() => {
@@ -518,7 +465,6 @@ export const KeysProvider = ({
   );
 };
 
-/** `value`, kept current in a ref after each render, for a handler to read later. */
 const useLatest = <A,>(value: A) => {
   const latest = useRef(value);
 
@@ -529,12 +475,6 @@ const useLatest = <A,>(value: A) => {
   return latest;
 };
 
-/**
- * Let `j` and `k` move through `ids` (the page's rows, in order); at the
- * shell's width each move also selects the row (`onSelect`). Give each row's
- * link `data-list-key={id}` so the move focuses it and `Enter` opens it.
- * Returns the row the keys rest on, to draw as focused.
- */
 export const useListKeys = (
   ids: readonly string[],
   onSelect: (id: string) => void
@@ -557,7 +497,6 @@ export const useListKeys = (
   return focused === undefined ? {} : { focused };
 };
 
-/** Let `J` and `K` move between `paths` (the page's files, in order), each move calling `onMove`. */
 export const useFileKeys = (
   paths: readonly string[],
   onMove: (path: string) => void
@@ -574,11 +513,6 @@ export const useFileKeys = (
   );
 };
 
-/**
- * Number `command` among the page's commands: the digit that copies it, while
- * the single keys are on, to show before it ("Copy (1)"); nothing when they
- * are off or it is past the ninth.
- */
 export const useNumberedCommand = (command: string): number | undefined => {
   const registry = useContext(RegistryContext);
   const state = useContext(StateContext);
@@ -593,11 +527,9 @@ export const useNumberedCommand = (command: string): number | undefined => {
   return state?.on === true ? state.numbered.get(command) : undefined;
 };
 
-/** The command a number key copied in the last two seconds, to show as copied. */
 export const useCopiedCommand = (): Option.Option<string> =>
   Option.fromUndefinedOr(useContext(StateContext)?.copied);
 
-/** Let `Escape` call `clear` while the caller is on the page (the selection's). */
 export const useEscapeClears = (clear: () => void): void => {
   const registry = useContext(RegistryContext);
   const latest = useLatest(clear);

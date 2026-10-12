@@ -1,10 +1,3 @@
-/**
- * The code pages' ref line: the revision being read (main, a tag, or a
- * commit by its short id), and a switcher that opens the same page at
- * main or at any tag. Each choice is a link, so it can be opened in a new
- * tab, and the tags filter as the reader types. The list of tags arrives
- * after the page; until it has, only main is offered.
- */
 import type { RefsView } from "@repo/protocol/domain/code";
 import { GitBranch, GitCommitHorizontal, Tag } from "lucide-react";
 import { useState } from "react";
@@ -19,10 +12,8 @@ import { AppLink } from "../shared/link.tsx";
 import { isCommitId } from "./headers.ts";
 import { revLabel } from "./rev.ts";
 
-/** At most this many tags listed at once; the filter finds the rest. */
 const SHOWN = 100;
 
-/** A ref's mark: a branch for main, a tag for a tag, a commit for a SHA. */
 const RefMark = ({ rev }: { readonly rev: string }) => {
   if (rev === "main") {
     return (
@@ -45,7 +36,6 @@ const RefMark = ({ rev }: { readonly rev: string }) => {
   );
 };
 
-/** Under the list: that the tags are still being read, or how many the filter has left out. */
 const ListFoot = ({
   count,
   read,
@@ -76,11 +66,8 @@ export const RefSwitcher = ({
   refs,
   rev,
 }: {
-  /** The revision the page reads. */
   readonly rev: string;
-  /** Main and the tags, once read. */
   readonly refs?: RefsView | undefined;
-  /** The same page at another revision. */
   readonly hrefAt: (rev: string) => string;
 }) => {
   const [filter, setFilter] = useState("");

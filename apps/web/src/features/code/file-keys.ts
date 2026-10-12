@@ -1,16 +1,7 @@
-/**
- * `J` and `K` on the code pages: the next or the previous file, from the
- * one the page shows, in the tree's order (a file's page and its why page
- * move to the next file's; a commit's page scrolls its diff to the next
- * file's header). The keys mean what the shell's keys dialog says
- * (`intentOf`), and the switch that turns the single keys off turns these
- * off too. No key acts while focus is in a field or the tree's filter.
- */
 import { useEffect, useRef } from "react";
 
 import { inField, intentOf, useKeys } from "../shared/keys.tsx";
 
-/** The file `step` away from `current` in `paths`; the first or last when the page shows none of them. */
 export const stepFrom = (
   paths: readonly string[],
   current: string | undefined,
@@ -72,7 +63,8 @@ export const useCodeFileKeys = (
       }
     };
 
-    // Before the tree's own keys, which take letters to find a row.
+    // Captured, to run before the tree's own keys, which take letters to find a
+    // row.
     document.addEventListener("keydown", onKey, { capture: true });
 
     return () => {

@@ -1,9 +1,6 @@
 /**
- * A refusal, as `git push` printed it. The words are `@repo/protocol/render`'s
- * (`headline` and `explain`, the one renderer for git, the CLI, MCP and the
- * web, AGENTS.md principle 3); this view only sets them: each refusal's lines
- * verbatim, its tag in the rubric colour, then its `next` command to copy.
- * Whether retrying can help picks the mark, never the words.
+ * The words are `@repo/protocol/render`'s; this view only sets them. Whether
+ * retrying can help picks the mark, never the words.
  */
 import type { Refusal } from "@repo/protocol/refusal";
 import { explain, headline } from "@repo/protocol/render";
@@ -12,7 +9,6 @@ import { OctagonX, RotateCcw } from "lucide-react";
 
 import { CommandLine } from "./command.tsx";
 
-/** One refusal's lines, with its tag set apart on the first. */
 const Lines = ({ refusal }: { readonly refusal: Refusal }) => {
   const prefix = `${refusal._tag}:`;
 

@@ -1,25 +1,3 @@
-/**
- * An answer, read like a run of the gate: where it stands first, then the
- * stages it passed, the lanes (failed ones open, passed ones folded into a
- * line), the held-back checks as one line per area, and, once it landed,
- * the landing's credit and its commit. What was judged (head, base, merged
- * tree, patch id) is plumbing, so it sits last, in the inspector.
- *
- * - The outcome is the hero: the status line a step up, whose move it is,
- *   and a refusal drawn whole by `RefusalView`, as `git push` printed it.
- *   When the outcome changes while the page is open its word and mark
- *   settle in, and a landing that happened then is stamped once.
- * - A stage the answer never needed (no decider took part, no held-back
- *   checks judged it) reads not needed, never passed.
- * - With no answer judged yet, the page says who holds the ask, or gives
- *   the command that claims it: never a dead end.
- *
- * Held-back checks show only what `HeldBackResult` carries: an area, how
- * many passed of how many, and the suite's root. A lane's log is named
- * only by the command that reads it. The head and the merged tree live in
- * the claim's fork, which the code browser never reads, so only the base
- * and the landing link their commit pages.
- */
 import { Brand } from "@repo/brand";
 import type {
   HeldBackResult,
@@ -72,7 +50,6 @@ import {
   roundsAsTheyStand,
 } from "./subject.ts";
 
-/** How long a lane ran: "640 ms", "8.3 s", "2 min 5 s". */
 export const durationText = (millis: number) => {
   if (millis < 1000) {
     return `${millis} ms`;
@@ -87,7 +64,6 @@ export const durationText = (millis: number) => {
   return `${Math.floor(seconds / 60)} min ${seconds % 60} s`;
 };
 
-/** Each lane result as a mark, a word and its role colour: the word first. */
 const results = {
   blocked: { mark: "waiting", tone: "text-waiting", word: "blocked" },
   failed: { mark: "refused", tone: "text-refused", word: "failed" },
@@ -99,7 +75,6 @@ const results = {
   { readonly mark: StateMark; readonly tone: string; readonly word: string }
 >;
 
-/** The page's trail: the project, its asks, the ask, then this answer. */
 export const answerCrumbs = (ask: Ask): readonly Crumb[] => [
   { label: ask.project, to: `/${ask.project}` },
   { label: "Asks", to: `/${ask.project}` },
@@ -107,7 +82,6 @@ export const answerCrumbs = (ask: Ask): readonly Crumb[] => [
   { label: "Answer" },
 ];
 
-/** What reads a lane's log, when the platform kept one. */
 const LaneLog = ({
   lane,
   project,
@@ -130,7 +104,6 @@ const LaneLog = ({
   );
 };
 
-/** One lane: its mark, name and command, its result in a word, and how long it ran. */
 const LaneRow = ({
   lane,
   project,
@@ -170,13 +143,11 @@ const LaneRow = ({
   );
 };
 
-/** "6 lanes passed in 41 s": the lanes run one after another, so their times add up. */
 const passedLine = (lanes: readonly LaneResult[]) =>
   `${lanes.length} ${lanes.length === 1 ? "lane" : "lanes"} passed in ${durationText(
     lanes.reduce((total, { durationMs }) => total + durationMs, 0)
   )}`;
 
-/** The lanes the platform ran on the merged tree: what failed, open and first; what passed, in one line. */
 export const Lanes = ({
   checking = false,
   lanes,
@@ -184,7 +155,6 @@ export const Lanes = ({
 }: {
   readonly lanes: readonly LaneResult[];
   readonly project: Ask["project"];
-  /** The gate is still at work on the answer: its lanes may yet run. */
   readonly checking?: boolean;
 }) => {
   if (lanes.length === 0) {
@@ -236,7 +206,6 @@ export const Lanes = ({
   );
 };
 
-/** Held-back checks: one line per area, as the landing's trailer spells it, and nothing else. */
 export const HeldBackBits = ({
   results: areas,
 }: {
@@ -266,14 +235,12 @@ export const HeldBackBits = ({
   </ul>
 );
 
-/** A git id, short as git prints it, whole on hover. */
 const Sha = ({ sha }: { readonly sha: string }) => (
   <code className="text-mono font-mono" title={sha}>
     {shortSha(sha)}
   </code>
 );
 
-/** Content the inspector shows, left out of the facts drawn inline in main below the shell's width. */
 export const InspectorOnly = ({
   children,
 }: {
@@ -284,11 +251,6 @@ export const InspectorOnly = ({
   </div>
 );
 
-/**
- * Every push the gate checked, newest first, the one the page reads
- * selected: first in main, once there is more than one, so a verdict is
- * read against its round.
- */
 const RoundsRegion = ({
   ask,
   current,
@@ -299,11 +261,9 @@ const RoundsRegion = ({
   readonly ask: AskId;
   readonly project: ProjectName;
   readonly rounds: readonly Round[];
-  /** The head the page shows. */
   readonly current: CommitSha | undefined;
   readonly now: DateTime.Utc;
 }) => {
-  // The page reads the last round at its head.
   const read =
     current === undefined
       ? 0
@@ -337,16 +297,11 @@ const RoundsRegion = ({
   );
 };
 
-/**
- * What a waiting answer's contributor needs, from its rounds: there is
- * nothing to run, and what another push would start.
- */
 const waitingSentence = (round: ReturnType<typeof roundOf>) =>
   round === undefined
     ? "Nothing for you to run."
     : `Nothing for you to run. Pushing again starts round ${round.of + 1}; this verdict stays as round ${round.number}.`;
 
-/** What the hero says before any answer was judged: who holds the ask, or how to take it. */
 const NoAnswerYet = ({
   ask,
   now,
@@ -386,7 +341,6 @@ const NoAnswerYet = ({
     );
   }
 
-  // What it waits on must land before anyone can claim it.
   const waiting = ask.blockedBy.filter(
     (blocker) => states.get(blocker)?.landed === undefined
   ).length;
@@ -419,10 +373,6 @@ const NoAnswerYet = ({
   );
 };
 
-/**
- * The outcome, a step up: settled in when it changes while the page is
- * open (never on the first paint), and stamped once on a live landing.
- */
 const Hero = ({
   ask,
   now,
@@ -437,7 +387,6 @@ const Hero = ({
   readonly verdict: Verdict | undefined;
 }) => {
   const tag = verdict?.outcome._tag ?? "none";
-  // Only an outcome that replaced another while the page was open settles in.
   const [shown, setShown] = useState(tag);
   const [changed, setChanged] = useState(false);
 
@@ -474,7 +423,6 @@ const Hero = ({
   );
 };
 
-/** The answer's run: the gate, the lanes, the held-back checks, and the landing. */
 const Run = ({
   holds,
   landing,
@@ -485,7 +433,6 @@ const Run = ({
   readonly holds: ReturnType<typeof holdsOf>;
   readonly landing: LandingView | undefined;
   readonly now: DateTime.Utc;
-  /** Which round the verdict is, of how many. */
   readonly round: ReturnType<typeof roundOf>;
   readonly verdict: Verdict;
 }) => (
@@ -538,8 +485,7 @@ const Run = ({
 
     {landing === undefined ? null : (
       <Region id="answer-landing" title="Landing">
-        {/* The landing told as a sentence before it is shown as a hash:
-            the page's job is to credit the people. */}
+        {/* The landing told as a sentence before it is shown as a hash. */}
         <p className="text-title flex min-w-0 flex-wrap items-baseline gap-x-2 font-normal">
           <span className="flex items-center gap-2 font-semibold">
             <StateMarkIcon mark="landed" />
@@ -602,8 +548,7 @@ const Run = ({
       </Region>
     )}
 
-    {/* Below the shell's width the inspector's facts sit above the run, so
-        the plumbing comes here, last. */}
+    {/* Below the shell's width the inspector's facts sit above the run, so the plumbing comes here, last. */}
     <div className="shell:hidden">
       <ProvenanceFacts entries={verdictProvenance(verdict, now)} />
     </div>
@@ -611,28 +556,19 @@ const Run = ({
 );
 
 export interface AnswerViewProps {
-  /** The ask the answer is to: its want titles the page. */
   readonly ask: Ask;
-  /** The verdict on the answer; none before one was judged. */
   readonly verdict: Verdict | undefined;
-  /** The landing it made, once it landed. */
   readonly landing?: LandingView | undefined;
   readonly now: DateTime.Utc;
-  /** Where each ask stands, from the project's events (`askStates`). */
   readonly states?: ReadonlyMap<AskId, AskProgress>;
-  /** The family's parent, when the ask is a member of one. */
   readonly parent?: Ask | undefined;
-  /** The head the address names, when it names an earlier answer. */
   readonly head?: CommitSha | undefined;
-  /** It landed while the page was open: stamp the landing's mark, once. */
   readonly stamp?: boolean;
-  /** Who is reading, to tell the claimant the claim is theirs. */
   readonly viewer?: Handle | undefined;
 }
 
 const NONE: ReadonlyMap<AskId, AskProgress> = new Map();
 
-/** The answer's facts: its state, claim, family, territory and check, then what was judged. */
 const AnswerFacts = ({
   ask,
   now,
@@ -696,7 +632,6 @@ const AnswerFacts = ({
   );
 };
 
-/** The line under the hero's title: the ask, the round, when it was judged, and the way to the latest answer. */
 const AnswerMeta = ({
   ask,
   head,
@@ -796,8 +731,6 @@ export const AnswerView = ({
         />
       }
       status={
-        // The answer's head reads title, then which answer this is, then
-        // the outcome: a refusal drawn whole would bury a line after it.
         <div className="flex min-w-0 flex-col gap-4">
           <div className="text-ui text-muted-foreground">
             <AnswerMeta

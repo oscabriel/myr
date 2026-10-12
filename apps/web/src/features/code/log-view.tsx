@@ -1,15 +1,3 @@
-/**
- * The landings: the log from a revision along first parents, newest first,
- * a page at a time, under a sticky header per day (UTC). One row per
- * commit: its subject, then what it did (the ask it answered or opened),
- * its credit in one line, and "held back" with its lock when sealed checks
- * judged it; at the right its short id over its age. A commit the platform
- * did not land came in with the history the project adopted, and says so.
- *
- * The toolbar filters the page: every commit, the answers, or the asks'
- * openings. A landing reads as the platform recorded it
- * (`CommitView.landing`), never from a trailer.
- */
 import type { CommitView } from "@repo/protocol/domain/code";
 import type { ProjectName, RepoPath } from "@repo/protocol/ids";
 import { DateTime, Option } from "effect";
@@ -29,16 +17,13 @@ import { Pager } from "./pager.tsx";
 import { blobHref, commitHref, commitsHref, shortSha } from "./paths.ts";
 import { revLabel } from "./rev.ts";
 
-/** Which commits the page shows: all of them, the answers, or the asks' openings. */
 export type LogShow = "all" | "answers" | "openings";
 
-/** A day as its header says it: "October 6, 2026". */
 const dayWords = new Intl.DateTimeFormat("en", {
   dateStyle: "long",
   timeZone: "UTC",
 });
 
-/** The commits of each day, in the order given, each day once. */
 export const byDay = (commits: readonly CommitView[]) => {
   const days: { readonly day: string; readonly commits: CommitView[] }[] = [];
 
@@ -56,13 +41,11 @@ export const byDay = (commits: readonly CommitView[]) => {
   return days;
 };
 
-/** What a commit did: the ask it answered or opened, when it is a landing that did. */
 const linkedOf = (commit: CommitView) =>
   commit.landing === undefined
     ? undefined
     : Option.getOrUndefined(askOf(commit.landing));
 
-/** Whether `commit` belongs on the page `show` asks for. */
 export const shows = (show: LogShow, commit: CommitView) => {
   if (show === "all") {
     return true;
@@ -77,12 +60,10 @@ export const shows = (show: LogShow, commit: CommitView) => {
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-/** A part of a row's second line that holds links: above the row's own link, so it can be pressed. */
 const Raised = ({ children }: { readonly children: ReactNode }) => (
   <span className="relative z-[1]">{children}</span>
 );
 
-/** One commit's row. */
 const CommitRow = ({
   commit,
   now,
@@ -152,11 +133,8 @@ const CommitRow = ({
 };
 
 /**
- * Where the page before the one at `from` starts. A whole log's `from`
- * counts commits, so that page is one `LOG_PAGE` back. A path's history
- * counts the commits the platform scanned (up to 200 a call, most of
- * which may not touch the path), so where the page before began is not
- * known: Newer goes back to the newest.
+ * A path's history counts the commits the platform scanned, not those shown, so
+ * where the page before began is not known: Newer goes back to the newest.
  */
 const newerPage = (from: number, path: RepoPath | undefined) =>
   path === undefined ? { from: Math.max(0, from - LOG_PAGE) } : { path };
@@ -173,7 +151,6 @@ const FILTERS = [
 const FILTER =
   "text-ui text-muted-foreground hover:text-foreground aria-[current]:text-foreground flex h-10 items-center border-b-2 border-transparent px-1 no-underline aria-[current]:border-current aria-[current]:font-semibold";
 
-/** The page's title: the landings at the revision, or one path's history. */
 const titleOf = (path: RepoPath | undefined, rev: string) => {
   if (path !== undefined) {
     return `History of ${path}`;
@@ -182,7 +159,6 @@ const titleOf = (path: RepoPath | undefined, rev: string) => {
   return rev === "main" ? "Landings" : `Landings on ${revLabel(rev)}`;
 };
 
-/** The page's search with `show`: none for every commit. */
 const searchFor = (query: string, show: LogShow) => {
   const search: Record<string, string> = Object.fromEntries(
     new URLSearchParams(query)
@@ -197,16 +173,12 @@ const searchFor = (query: string, show: LogShow) => {
 
 export interface LogViewProps {
   readonly commits: readonly CommitView[];
-  /** Where this page starts. */
   readonly from: number;
-  /** Where the next (older) page starts; absent on the last. */
   readonly next?: number | undefined;
   readonly now: DateTime.Utc;
-  /** Only the commits that changed this path. */
   readonly path?: RepoPath | undefined;
   readonly project: ProjectName;
   readonly rev: string;
-  /** Which commits of the page to show. */
   readonly show?: LogShow;
 }
 
@@ -221,7 +193,6 @@ export const LogView = ({
   show = "all",
 }: LogViewProps) => {
   const filter = path === undefined ? {} : { path };
-  // The pager keeps the kind the page shows.
   const kind = show === "all" ? {} : { show };
   const shown = commits.filter((commit) => shows(show, commit));
   const base = commitsHref(project, rev, filter);

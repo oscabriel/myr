@@ -1,14 +1,3 @@
-/**
- * A decider's diff as plain text: what the server sends, and what a reader
- * sees until the browser has drawn the highlighted diff over it (or, on a
- * phone, the one file being read). It takes the code browser's measures
- * (a 44 px sticky file header, 13 px code on 20 px lines, the gutter, the
- * sign column, the diff's own tints), so the drawing arrives in place.
- *
- * Under a line it draws what the page puts there (a refusal that pointed
- * at it, a marker waiting on a decision); a note whose line the diff does
- * not show sits at the top of its file, saying which line it means.
- */
 import { Option } from "effect";
 import type { ReactNode } from "react";
 
@@ -19,7 +8,6 @@ import type { PatchFile, PatchLine } from "./files.ts";
 import { MarkRead } from "./mark-read.tsx";
 import type { MarkedFile } from "./read-marks.ts";
 
-/** Something drawn under one line of one file. */
 export interface LineNote {
   readonly path: string;
   readonly line: number;
@@ -46,7 +34,6 @@ const SIGNS = { addition: "+", context: " ", deletion: "-" } as const;
 const GUTTER =
   "border-background min-w-[calc(6ch+2px)] border-r-2 pr-[1ch] pl-[2ch] text-right tabular-nums select-none";
 
-/** The notes on one file: under a line it draws, and those it does not. */
 const notesFor = (file: PatchFile, notes: readonly LineNote[]) => {
   const mine = notes.filter(({ path }) => path === file.file.path);
 
@@ -62,7 +49,6 @@ const notesFor = (file: PatchFile, notes: readonly LineNote[]) => {
   };
 };
 
-/** One file's lines, with its notes under theirs. */
 const Lines = ({
   file,
   notes,
@@ -140,10 +126,8 @@ export const FinishPlainDiff = ({
 }: {
   readonly files: readonly PatchFile[];
   readonly notes: readonly LineNote[];
-  /** The files this reader marked read; each header offers "Mark read" when given. */
   readonly read?: ReadonlySet<string> | undefined;
   readonly onMark?: ((file: MarkedFile, read: boolean) => void) | undefined;
-  /** The files a refusal points into, marked in their headers. */
   readonly refused?: ReadonlySet<string> | undefined;
   readonly folded?: ReadonlySet<string> | undefined;
   readonly onFold?: ((path: string, folded: boolean) => void) | undefined;

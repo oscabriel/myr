@@ -1,17 +1,6 @@
 /**
- * A command copied with one press. The command itself is always text in
- * the page (inside the button, visually hidden where only the icon shows),
- * so an agent reading the HTML and a screen reader both get it, never only
- * a clipboard payload. After a copy the button shows a check and says
- * "Copied" for two seconds, once, in a polite live region.
- *
- * - `CopyAction`: a row's ghost button, 32 px square, named for what it
- *   copies ("Copy claim command").
- * - `CommandChip`: the command shown whole, small, at the end of a status
- *   line; pressing it copies it.
- *
- * Either can be numbered: while the single keys are on, its number copies
- * it, and shows in its title ("Copy claim command (1)").
+ * The command is always text in the page, so an agent reading the HTML and a
+ * screen reader both get it, never only a clipboard payload.
  */
 import { Brand } from "@repo/brand";
 import { Effect, Option } from "effect";
@@ -20,7 +9,6 @@ import { useState } from "react";
 
 import { useCopiedCommand, useNumberedCommand } from "./keys.tsx";
 
-/** Copy `command`, then show it copied for two seconds. */
 const copyFor = (command: string, shown: (copied: boolean) => void) =>
   Effect.tryPromise(() => navigator.clipboard.writeText(command)).pipe(
     Effect.andThen(
@@ -37,10 +25,6 @@ const copyFor = (command: string, shown: (copied: boolean) => void) =>
     Effect.ignore
   );
 
-/**
- * Copying `command`: whether it was just copied (by this control, or by its
- * number key), and the press that copies it.
- */
 export const useCopy = (command: string) => {
   const [pressed, setPressed] = useState(false);
   const byKey = useCopiedCommand();
@@ -55,9 +39,7 @@ export const useCopy = (command: string) => {
 
 interface CopyProps {
   readonly command: string;
-  /** What the button copies, as its accessible name: "Copy claim command". */
   readonly label: string;
-  /** Whether the page's number keys reach it. */
   readonly numbered?: boolean;
 }
 
@@ -101,7 +83,6 @@ const NumberedAction = (props: Omit<CopyProps, "numbered">) => (
   <ActionButton {...props} number={useNumberedCommand(props.command)} />
 );
 
-/** A row's copy button: the icon in sight, the command in the text. */
 export const CopyAction = ({ numbered = false, ...props }: CopyProps) =>
   numbered ? (
     <NumberedAction {...props} />
@@ -109,7 +90,6 @@ export const CopyAction = ({ numbered = false, ...props }: CopyProps) =>
     <ActionButton {...props} number={undefined} />
   );
 
-/** An open ask's claim command, as a row's copy button. */
 export const ClaimAction = ({
   ask,
   project,
@@ -123,7 +103,6 @@ export const ClaimAction = ({
   />
 );
 
-/** A command shown whole and small (a status line's next step); pressing it copies it. */
 export const CommandChip = ({ command }: { readonly command: string }) => {
   const { copied, copy } = useCopy(command);
   const Icon = copied ? Check : Copy;

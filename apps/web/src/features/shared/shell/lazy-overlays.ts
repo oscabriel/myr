@@ -1,8 +1,6 @@
 /**
- * The shell's overlays (`overlays.tsx`) and a code page's facts sheet
- * (`facts-sheet.tsx`), fetched once the page is up: the Worker never
- * renders one (an overlay opens on a press), and no page's first load
- * carries their dialog, sheet and combobox code.
+ * Fetched once the page is up: the Worker never renders one, and no page's
+ * first load carries their dialog, sheet and combobox code.
  */
 import { lazy } from "react";
 

@@ -1,13 +1,5 @@
-/**
- * What holds a row's or a fact block's place while it is read in the
- * browser (a selection's facts, a live fold, a route change): the same
- * size as what replaces it, drawn as hairline bars at 1.5:1 or more, still.
- * No shimmer: the wait is a fact, not a show. The lists themselves arrive
- * with the page, so these are only for what the browser reads after it.
- */
 import { Skeleton } from "../../components/ui/skeleton.tsx";
 
-/** A two-line row's place: 64 px, the want's bar over the metadata's. */
 export const RowSkeleton = () => (
   <div
     aria-hidden="true"
@@ -18,7 +10,6 @@ export const RowSkeleton = () => (
   </div>
 );
 
-/** The inspector's place: each block's label as it will read, its values as bars. */
 export const FactsSkeleton = ({
   labels,
 }: {

@@ -1,12 +1,3 @@
-/**
- * The page for an address that names no ask, or no answer: a 404 whose body
- * is the refusal the platform gave (`UnknownProject`, `UnknownAsk`), as
- * `git push` printed it, so a person reads what an agent reads in Markdown,
- * then the way onward: the project, when the address names one, and the
- * open asks. The refusals travel from the server in a not-found's data,
- * encoded as `Refusals`; `NoSuchAsk` decodes them where they arrive
- * (AGENTS.md principle 2).
- */
 import { ProjectName } from "@repo/protocol/ids";
 import { UnknownProject } from "@repo/protocol/refusal";
 import type { Refusal } from "@repo/protocol/refusal";
@@ -21,7 +12,6 @@ import { Refusals } from "../shared/refusals.ts";
 import type { Crumb } from "../shared/shell/sections.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 
-/** What a 404 says when the address could name no ask, so no refusal came back. */
 export const NAMES_ONLY =
   "Nothing is at this address: a project's and an ask's names are lowercase words joined by single dashes.";
 
@@ -29,7 +19,6 @@ const LINK = "decoration-rule underline hover:decoration-current";
 
 const isUnknownProject = Schema.is(UnknownProject);
 
-/** Where to go from a page that names nothing: the project, then every open ask. */
 const Onward = ({ project }: { readonly project: ProjectName | undefined }) => (
   <nav aria-label="Onward" className="text-ui flex flex-wrap gap-x-5 gap-y-1">
     {project === undefined ? null : (
@@ -50,15 +39,12 @@ export const NotFoundView = ({
   title,
 }: {
   readonly nothing?: string;
-  /** The project the address names, when it could be one. */
   readonly project?: ProjectName | undefined;
   readonly refusals: Array.NonEmptyReadonlyArray<Refusal> | undefined;
   readonly title: string;
 }) => {
-  // A project the platform says it lacks is no way onward.
   const known = refusals?.some(isUnknownProject) === true ? undefined : project;
 
-  // The trail goes as far as what exists: the project and its asks.
   const crumbs: readonly Crumb[] =
     known === undefined
       ? [{ label: "Asks", to: ASKS_PATH }, { label: title }]
@@ -84,12 +70,6 @@ const decodeRefusals = Schema.decodeUnknownOption(Refusals);
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
-/**
- * A route's not-found page: the refusals its loader's not-found carried,
- * decoded; `nothing` when it carried none (the address could name no ask).
- * `project` is the address's own segment, linked only when a project could
- * have that name.
- */
 export const NoSuchAsk = ({
   data,
   nothing = NAMES_ONLY,

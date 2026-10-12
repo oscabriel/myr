@@ -1,17 +1,3 @@
-/**
- * The front page: the open asks of every project, grouped by project, the
- * ones the viewer may take first; a family drawn as one row with its fan;
- * a toolbar that narrows the list by kind, by who may take an ask and by
- * project; and beside it, where to start, or the selected ask's facts.
- * Props in, markup out: the route reads the entries, the families' parents
- * and their projects' events on the server, the list of projects in the
- * browser (it may arrive after the rows, and moves none of them), and
- * hands them here.
- *
- * Each project's posture is said once, on its group's header, from the
- * list of projects; a row says only its own state. The filter is a link
- * (`/asks?kind=bug&take=open`), so a filtered list is an address to share.
- */
 import { Brand } from "@repo/brand";
 import { Reserve } from "@repo/protocol/domain/ask";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -48,7 +34,6 @@ import { countWith, filterEntries, frontPath } from "./filter.ts";
 import type { FrontFilter, FrontFilterInput } from "./filter.ts";
 import { EXPLAINER } from "./head.ts";
 
-/** The list's count, as the context bar says it: "10 open asks, 8 open to take". */
 export const frontCount = (shown: readonly FrontPageEntry[]) =>
   `${plural(shown.length, "open ask", "open asks")}, ${
     shown.filter(({ takeable }) => takeable).length
@@ -58,21 +43,15 @@ export interface FrontPageProps {
   readonly entries: readonly FrontPageEntry[];
   readonly filter: FrontFilter;
   readonly now: DateTime.Utc;
-  /** Each family's parent as the platform stores it: its children, all of them. */
   readonly parents: readonly Ask[];
-  /** The events of each project that holds a family on the page. */
   readonly events: ReadonlyMap<ProjectName, readonly ProjectEvent[]>;
-  /** The children that landed while the page was open, by project. */
   readonly stampsOf?: (project: ProjectName) => ReadonlySet<AskId>;
-  /** Every project with its posture; none until the list arrives. */
   readonly projects: readonly ProjectListing[] | undefined;
   readonly platformUrl: string;
   readonly webUrl: string;
-  /** The selected ask in full, once the browser has read it. */
   readonly selectedAsk?: Ask | undefined;
 }
 
-/** The entries of each project, in the order its first entry comes. */
 const byProject = (shown: readonly FrontPageEntry[]) => {
   const groups = new Map<ProjectName, FrontPageEntry[]>();
 
@@ -83,7 +62,6 @@ const byProject = (shown: readonly FrontPageEntry[]) => {
   return [...groups];
 };
 
-/** One option of a filter: its words and its count, the current one marked. */
 const FilterOption = ({
   count,
   current,
@@ -110,7 +88,6 @@ const FilterOption = ({
   </li>
 );
 
-/** A filter's options, under its name for a screen reader. */
 const Segment = ({
   children,
   label,
@@ -123,7 +100,6 @@ const Segment = ({
   </ul>
 );
 
-/** The kinds on the page, and the one filtered to, each once, by name. */
 const kindsOf = (entries: readonly FrontPageEntry[], filter: FrontFilter) =>
   [
     ...new Set([
@@ -132,7 +108,6 @@ const kindsOf = (entries: readonly FrontPageEntry[], filter: FrontFilter) =>
     ]),
   ].toSorted();
 
-/** The projects on the page, and the one filtered to, each once, by name. */
 const projectsOf = (entries: readonly FrontPageEntry[], filter: FrontFilter) =>
   [
     ...new Set([
@@ -147,9 +122,8 @@ const reserveWords = {
 } as const satisfies Record<Reserve, string>;
 
 /**
- * The projects as a menu: a disclosure of links, so it opens and narrows
- * with no script. A new address closes it (its key is the filter's
- * project).
+ * A disclosure of links, so it works with no script. Its key is the filter's
+ * project, so a new address closes it.
  */
 const ProjectMenu = ({
   entries,
@@ -193,7 +167,6 @@ const ProjectMenu = ({
   </details>
 );
 
-/** The toolbar: kind; open to take or held for newcomers; project. */
 const Toolbar = ({
   entries,
   filter,
@@ -264,10 +237,6 @@ const Toolbar = ({
   );
 };
 
-/**
- * The front page with no open ask: with no project yet, the command that
- * brings one; with projects, the command that opens an ask.
- */
 const NoAsks = ({
   projects,
 }: {
@@ -285,7 +254,6 @@ const NoAsks = ({
     />
   );
 
-/** A project's group of rows, as the page reads it. */
 interface Group {
   readonly project: ProjectName;
   readonly entries: readonly FrontPageEntry[];
@@ -293,7 +261,6 @@ interface Group {
   readonly states: ReadonlyMap<AskId, AskProgress>;
 }
 
-/** The row ids in the order the page shows them: what `j` and `k` walk. */
 const rowIds = (groups: readonly Group[]) =>
   groups.flatMap(({ items }) =>
     items.map((item) =>
@@ -301,7 +268,6 @@ const rowIds = (groups: readonly Group[]) =>
     )
   );
 
-/** A project's group: its header (name, posture once, counts), then its rows. */
 const ProjectGroup = ({
   group,
   listing,
@@ -361,7 +327,6 @@ const ProjectGroup = ({
           (ask) => ask.project === project && ask.id === item.parent.ask
         );
 
-        // A parent the platform did not give in full: its members stay rows.
         if (parent === undefined) {
           return [
             row(item.parent),
@@ -390,7 +355,6 @@ const ProjectGroup = ({
   );
 };
 
-/** The selected entry's facts, with its family when it is a member. */
 const Selected = ({
   entry,
   full,

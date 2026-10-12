@@ -1,10 +1,3 @@
-// A shell line a reader runs next: a refusal's `next`, a clone URL, the
-// install line. The terminal is where work happens, so every page that
-// suggests an action shows its command, whole and copyable, never a form.
-//
-// A page marks its main commands `numbered`: while the single keys are on,
-// each shows its number before the `$`, and that number key copies it
-// ("Copy (1)" in the button's title).
 import { Check, Copy } from "lucide-react";
 import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
@@ -13,26 +6,18 @@ import { Button } from "../../components/ui/button.tsx";
 import { useCopy } from "./copy-action.tsx";
 import { useNumberedCommand } from "./keys.tsx";
 
-/**
- * Where a command line is drawn: a box hugging its command in main, or
- * the inspector's bleed form, pane-wide between two hairlines, where the
- * column is narrow and every character of the line counts.
- */
 type Form = "bleed" | "box";
 
 const FormContext = createContext<Form>("box");
 
-/** Command lines under it take the inspector's bleed form. */
 export const InspectorCommands = ({
   children,
 }: {
   readonly children: ReactNode;
 }) => <FormContext value="bleed">{children}</FormContext>;
 
-/** How far a line of the command hangs, in ch, when the column breaks it: less in the inspector's narrow column. */
 const HANGS = { bleed: 2, box: 6 } as const satisfies Record<Form, number>;
 
-/** The box around the command, in each form. */
 const BOXES = {
   bleed:
     "border-rule bg-surface text-mono leading-terminal -mx-4 flex min-w-0 items-start gap-2 border-y py-1 pr-1 pl-4 font-mono",
@@ -40,11 +25,8 @@ const BOXES = {
 } as const satisfies Record<Form, string>;
 
 /**
- * A line's hang: `hang` ch, or less on a line so short that its longest word
- * would not fit beside the hang. The box hugs its longest line, so a line's
- * room beside its hang is its own length less the hang; a word wider than
- * that room is broken in two (`<cli> today` read "tod" / "<cli> ay"). Such a
- * line fits whole wherever its box does, so its hang never shows.
+ * The box hugs its longest line, so a word wider than the room beside the hang
+ * would be broken in two; such a line fits whole wherever its box does.
  */
 const hangOf = (hang: number, words: readonly string[], line: string) =>
   Math.min(
@@ -52,12 +34,8 @@ const hangOf = (hang: number, words: readonly string[], line: string) =>
     line.length - Math.max(0, ...words.map(({ length }) => length))
   );
 
-// The command's words, each kept whole on its line: a narrow column breaks
-// the line between words, never after a word's own hyphen
-// (`lint-heading-levels`, `--project`) nor before a closing ` \`; a word
-// longer than the line (a URL) still breaks, anywhere. Each of the
-// command's own lines hangs, so a line the column breaks reads as one line
-// going on. The text is the command's, space for space.
+// Breaks between words, never after a word's own hyphen (`--project`) nor
+// before a closing ` \`.
 const wordsOf = (command: string, form: Form) =>
   command.split("\n").map((line, at, lines) => {
     const parts = line.split(/(?<space>\s+)(?!\\$)/u);
@@ -149,7 +127,6 @@ export const CommandLine = ({
   numbered = false,
 }: {
   readonly command: string;
-  /** One of the page's main commands, which a number key copies. */
   readonly numbered?: boolean;
 }) =>
   numbered ? (

@@ -1,9 +1,3 @@
-/**
- * The docs on the web: the index, every page under Guides then Reference
- * with its summary, and one page, its Markdown under its title with the
- * pages listed in the inspector. Every word on them is `@repo/agent-kit`'s
- * (`docPages`); a view: pages in, markup out.
- */
 import type { DocPage, DocPart } from "@repo/agent-kit/docs/index";
 
 import { SiteMarkdown } from "../markdown/markdown.tsx";
@@ -12,7 +6,6 @@ import { docsPath } from "../shared/paths.ts";
 import { Workspace } from "../shared/shell/workspace.tsx";
 import { docsMarkdownPath } from "./head.ts";
 
-/** Each part's heading, in the order the index shows them. */
 const PARTS = [
   { part: "guide", title: "Guides" },
   { part: "reference", title: "Reference" },
@@ -21,7 +14,6 @@ const PARTS = [
 const LINK =
   "decoration-rule hover:decoration-foreground underline underline-offset-4";
 
-/** Only the page itself is current. */
 const EXACT = { exact: true, includeSearch: false } as const;
 
 export const DocsIndexView = ({
@@ -55,7 +47,6 @@ export const DocsIndexView = ({
   </Workspace>
 );
 
-/** The pages, for the inspector: the one being read is current. */
 const Contents = ({ pages }: { readonly pages: readonly DocPage[] }) => (
   <nav aria-label="Docs">
     {PARTS.map(({ part, title }) => (
@@ -81,7 +72,6 @@ const Contents = ({ pages }: { readonly pages: readonly DocPage[] }) => (
   </nav>
 );
 
-/** A page's Markdown past its title and summary, which the page head shows. */
 const bodyOf = ({ markdown, summary, title }: DocPage) =>
   markdown.slice(`# ${title}\n\n${summary}\n\n`.length);
 

@@ -1,24 +1,13 @@
 /**
- * A file as plain text, each line numbered and anchored (`#L42` scrolls
- * there with no script): what the server sends of a file, and what a
- * reader sees until the browser has drawn it highlighted over it. It takes
- * Pierre's measures for a file drawn without a header: 8 px above and
- * below the code, 13 px on 20 px lines, the gutter at least three figures
- * wide with two before them and one after, the text one column in. So the
- * highlighting arrives in place and nothing moves. Long lines scroll
- * sideways inside the code, never wrap.
- *
- * `bands` puts a row above a line (the why page's groups), as the drawing
- * puts its annotations.
+ * Takes Pierre's measures for a file drawn without a header, so the
+ * highlighting arrives in place and nothing moves.
  */
 import type { ReactNode } from "react";
 
 import { linesOf } from "./file-header.tsx";
 
-/** How many lines the server sends; the browser's drawing shows them all. */
 export const FALLBACK_LINES = 2000;
 
-/** Pierre's gutter: at least three figures, two before them and one after, then a 2 px gap. */
 const GUTTER =
   "border-background text-muted-foreground hover:text-foreground min-w-[calc(6ch+2px)] border-r-2 pr-[1ch] pl-[2ch] text-right tabular-nums no-underline select-none";
 
@@ -27,7 +16,6 @@ export const NumberedLines = ({
   text,
 }: {
   readonly text: string;
-  /** A row to draw above each of these lines, by line number. */
   readonly bands?: ReadonlyMap<number, ReactNode>;
 }) => {
   const lines = linesOf(text);

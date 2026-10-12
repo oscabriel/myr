@@ -1,31 +1,10 @@
 /**
- * What every drawing of code shares: the options each `@pierre/diffs` view
- * spreads into its own (`File`, `MultiFileDiff`, `FileDiff`), the options
- * of the `@pierre/trees` file tree, and the colour theme they draw in.
- *
- * The theme reads CSS variables (`--diffs-token-*`, `--diffs-foreground`,
- * `--diffs-background`), which `styles.css` sets on every
- * `diffs-container` from the web's own tokens: code sits on the paper and
- * follows the system's light or dark setting with the page, in low-chroma
- * colours that never borrow a state's. It is named for both schemes, so
- * Pierre leaves the scheme to the page: a single theme name would fix it
- * to the theme's own type (Shiki calls a variable theme dark). Colour is
- * all it carries: Pierre resolves a token's weight and slant through
- * `light-dark()`, which takes colours only, so a two-scheme drawing drops
- * them.
- *
- * The limits are Pierre's own defaults, written out so a reader sees them:
- * past them a file (or a line, or a changed line's pair) is drawn as plain
- * text, so a minified bundle or a lockfile cannot stall the page.
- *
- * The server draws a file or a diff with these same options
- * (`prerender-server.ts`), so the browser's drawing takes the place of the
- * server's with nothing on the screen changing.
- *
- * No React and no DOM here: the module loads in Node for its test, in the
- * Worker for the server's drawing, and in the browser only through the
- * views that draw. A drawing hands its code boxes over once drawn, so code
- * too wide for its pane is a stop for Tab.
+ * The theme reads CSS variables `styles.css` sets from the web's tokens. It is
+ * named for both schemes, so Pierre leaves the scheme to the page (a single
+ * name would fix it; Shiki calls a variable theme dark). It carries colour
+ * only: Pierre resolves a token's weight and slant through `light-dark()`,
+ * which takes colours only. The server draws with these same options, so the
+ * browser's drawing replaces it with nothing changing.
  */
 import {
   createCSSVariablesTheme,
@@ -34,10 +13,8 @@ import {
   registerCustomTheme,
 } from "@pierre/diffs";
 
-/** The token theme's registered name. */
 export const CODE_THEME = "repo-tokens";
 
-/** A drawn file's code box: whether it scrolls, and whether Tab reaches it. */
 interface CodeBox {
   readonly clientHeight: number;
   readonly clientWidth: number;
@@ -46,7 +23,6 @@ interface CodeBox {
   tabIndex: number;
 }
 
-/** A drawing as Pierre hands it over once drawn: its code boxes, in its shadow root. */
 interface Drawn {
   readonly shadowRoot: {
     readonly querySelectorAll: (selectors: "code") => Iterable<CodeBox>;
@@ -54,9 +30,8 @@ interface Drawn {
 }
 
 /**
- * Code that scrolls (a long line, a phone's width) is a stop for Tab, so a
- * keyboard can scroll it; code that fits is not, so a page of short files
- * adds no stops.
+ * Code that scrolls is a stop for Tab, so a keyboard can scroll it; code that
+ * fits is not.
  */
 const reachScrolledCode = (node: Drawn) => {
   for (const code of node.shadowRoot?.querySelectorAll("code") ?? []) {
@@ -68,14 +43,10 @@ const reachScrolledCode = (node: Drawn) => {
   }
 };
 
-/**
- * The focus ring inside a drawing's shadow root, which the page's own
- * stylesheet does not reach: the page's ink, as everywhere else.
- */
+/** The page's own stylesheet does not reach a drawing's shadow root. */
 export const FOCUS_CSS =
   "code:focus-visible { outline: 2px solid var(--foreground); outline-offset: -2px; }";
 
-/** Spread first into a drawing's own options. */
 export const diffsOptions = {
   maxLineDiffLength: 1000,
   onPostRender: reachScrolledCode,
@@ -87,7 +58,6 @@ export const diffsOptions = {
   unsafeCSS: FOCUS_CSS,
 } as const;
 
-/** A file's drawing: no header of its own (the page's sits above it), its lines selectable, scrolling sideways. */
 export const fileOptions = {
   ...diffsOptions,
   disableFileHeader: true,
@@ -96,7 +66,6 @@ export const fileOptions = {
   overflow: "scroll",
 } as const;
 
-/** A diff's drawing, unified or split: signs or side bars, changed words marked, unchanged runs folded into bars. */
 export const diffOptionsFor = (split: boolean) =>
   ({
     ...diffsOptions,
@@ -109,13 +78,8 @@ export const diffOptionsFor = (split: boolean) =>
     overflow: "scroll",
   }) as const;
 
-/** The file tree's look: compact rows, plain icons (`styles.css` greys them). */
 export const treesOptions = { density: "compact", icons: "minimal" } as const;
 
-/**
- * Where a variable is not set (a drawing outside `diffs-container`'s
- * mapping), the page's own tokens stand in.
- */
 const variableDefaults = {
   background: "var(--background)",
   foreground: "var(--foreground)",
@@ -131,10 +95,8 @@ const variableDefaults = {
 };
 
 /**
- * The token theme itself, made as Pierre's `registerCustomCSSVariableTheme`
- * makes it. The browser registers it by name; the server attaches it to
- * its highlighter directly, since Pierre refuses to resolve a theme by name
- * in a Worker's global scope.
+ * The server attaches it to its highlighter directly: Pierre refuses to resolve
+ * a theme by name in a Worker's global scope.
  */
 export const codeTheme = () =>
   createCSSVariablesTheme({
@@ -144,10 +106,9 @@ export const codeTheme = () =>
     variablePrefix: formatCSSVariablePrefix("global"),
   });
 
-/** Whether this page has registered the theme yet; Pierre refuses a name twice. */
+/** Pierre refuses a name registered twice. */
 const registered = { done: false };
 
-/** Registers the token theme, once; each drawing calls it before it draws. */
 export const registerCodeTheme = () => {
   if (!registered.done) {
     registered.done = true;

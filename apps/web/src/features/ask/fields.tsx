@@ -1,16 +1,3 @@
-/**
- * Labelled values, in two forms:
- *
- * - `Definitions` and `Definition`: a definition list, each term in the
- *   label's style over its value, side by side from the shell's width;
- *   the form records and agents' pages use (the ledger, the env shape, the
- *   policy, For agents).
- * - `Fields` and `Field`: the grid of ruled rows the pages not yet moved
- *   still use; from `lg` two fields share a row.
- *
- * Values that are code (ids, paths, SHAs) wrap anywhere, so a phone never
- * scrolls sideways.
- */
 import type { ReactNode } from "react";
 
 export const Fields = ({
@@ -41,7 +28,6 @@ export const Field = ({
   </div>
 );
 
-/** A list of terms and their values: one ruled row each. */
 export const Definitions = ({
   children,
   label,
@@ -54,7 +40,6 @@ export const Definitions = ({
   </dl>
 );
 
-/** One term over its value; beside it from the shell's width. */
 export const Definition = ({
   children,
   term,
@@ -68,7 +53,6 @@ export const Definition = ({
   </div>
 );
 
-/** A titled region of a page: a heading over its content, 32 px from the next. */
 export const Region = ({
   children,
   id,

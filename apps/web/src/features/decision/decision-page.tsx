@@ -1,19 +1,3 @@
-/**
- * One decision on its own page, every subject but a finish (which reads as
- * the code browser does, `features/finish/finish-view.tsx`). The title is
- * the subject in plain words; under it, when it expires, its default and
- * whose move it is. Main holds the evidence at the page's width (a
- * waiver's marker drawn at its line in the answer's diff, when the
- * decision carries the diff), a note, and the choices, each saying what
- * it does; on a phone the choices stay in a bar above the bottom bar.
- * The inspector holds the decision's own facts (its deciders, when it
- * opened and expires, its default), the ask or proposal it concerns, and,
- * for a posture change, the project's posture.
- *
- * Once taken, the record replaces the choices. Signed out, the page says
- * what a decision is and that its deciders take it on Today: no choices,
- * and nothing of its evidence.
- */
 import { Brand } from "@repo/brand";
 import type { Ask } from "@repo/protocol/domain/ask";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
@@ -55,19 +39,16 @@ const waives = DecisionSubject.isAnyOf(["Waiver"]);
 
 const finishes = DecisionSubject.isAnyOf(["Finish"]);
 
-/** No files: a decision that carries no diff. */
 const NO_FILES: readonly PatchFile[] = [];
 
 const LINK = "decoration-rule underline hover:decoration-current";
 
-/** The trail to a decision: its project, Today, its id. */
 const crumbsOf = (project: ProjectName, id: DecisionId) => [
   { label: project, to: `/${project}` },
   { label: "Today", to: "/today" },
   { label: id, mono: true },
 ];
 
-/** The decision's own facts: who decides it, when it opened and expires, its default. */
 const DecisionFacts = ({
   decision,
   now,
@@ -115,7 +96,6 @@ const DecisionFacts = ({
   </FactBlock>
 );
 
-/** The ask a decision concerns: its want and its page. */
 const AskFacts = ({ ask }: { readonly ask: Ask }) => (
   <FactBlock label="The ask">
     <p className="text-ui" data-said="">
@@ -127,7 +107,6 @@ const AskFacts = ({ ask }: { readonly ask: Ask }) => (
   </FactBlock>
 );
 
-/** The proposal a decision would open: its want, who proposed it, its page. */
 const ProposalFacts = ({ proposal }: { readonly proposal: Proposal }) => (
   <FactBlock label="The proposal">
     <p className="text-ui" data-said="">
@@ -145,7 +124,6 @@ const ProposalFacts = ({ proposal }: { readonly proposal: Proposal }) => (
   </FactBlock>
 );
 
-/** The waiver's marker drawn at its line, in the answer's diff of that file. */
 export const WaiverDiff = ({
   decision,
   files,
@@ -181,7 +159,6 @@ export const WaiverDiff = ({
   );
 };
 
-/** What a decision is, for a reader who does not decide it here. */
 const ForAnyone = ({
   children,
   id,
@@ -212,18 +189,13 @@ export interface DecisionViewProps {
   readonly data: DecisionPageData;
   readonly onDecide: (input: DecideInput) => void;
   readonly busy?: boolean;
-  /** The decision as the decider's choice left it, once taken here. */
   readonly taken?: Decision | undefined;
-  /** The waiver's diff, parsed, when the decision carries one. */
   readonly files?: readonly PatchFile[];
-  /** The page for a finish, when the decision is one (the route draws it whole). */
   readonly finish?: ReactNode;
   readonly here: string;
-  /** What the reader's last choice came back with, when it failed: shown above the choices. */
   readonly failure?: ReactNode;
 }
 
-/** A decision the reader may take, whole. */
 const Found = ({
   busy,
   failure,
@@ -299,7 +271,6 @@ const Found = ({
   );
 };
 
-/** The page for a decision that cannot be shown whole, with why. */
 const Apart = ({
   children,
   data,

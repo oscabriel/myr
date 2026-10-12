@@ -1,10 +1,3 @@
-/**
- * A why group's band, shared by the server's plain text and the browser's
- * annotation rows: who put these lines there, ask and answer first
- * (`band.tsx`), then where to go from here: why, one step back (the same
- * page at the commit's parent) and a proposal about the group's first
- * line. `LandingDetails` is the landing whole, for the line dialog.
- */
 import type { WhyView } from "@repo/protocol/domain/code";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -29,7 +22,6 @@ const LINK = "decoration-rule underline hover:decoration-current";
 
 const LABEL = "text-label text-muted-foreground";
 
-/** Where to go from a group: why one step back, and a proposal about its first line. */
 export const BandLinks = ({
   project,
   row,
@@ -69,7 +61,6 @@ export const BandLinks = ({
   );
 };
 
-/** One group's band: who put its lines there, then where to go from here. */
 export const WhyBand = ({
   now,
   project,
@@ -98,7 +89,6 @@ export const WhyBand = ({
   </div>
 );
 
-/** A landing whole: its ask, author, verdict, when it landed, its credit and agents. */
 export const LandingDetails = ({
   landing,
   project,

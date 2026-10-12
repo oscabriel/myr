@@ -1,25 +1,15 @@
 /**
- * A commit's changed files as the diff draws them, worked out once by the
- * same parser the drawing uses (`@pierre/diffs`' `parseDiffFromFile`), so
- * the server's plain-text diff and the highlighted one the browser draws
- * over it hold the same hunks, line for line: the swap moves nothing.
- *
- * Also here: each file's `+n −m`, which files start folded (an added or
- * deleted file past `LONG_FILE` lines), the order a tree lists paths in,
- * and a commit's stats split by path (the ask's territory, its tests, the
- * rest), counted by rule, never by a model.
- *
- * No React and no DOM: the server's render and the browser's both read it.
+ * Parsed by the same parser the drawing uses, so the server's plain-text diff
+ * and the browser's highlighted one hold the same hunks, line for line. No
+ * React and no DOM: both renders read it.
  */
 import { parseDiffFromFile } from "@pierre/diffs";
 import type { FileDiffMetadata } from "@pierre/diffs";
 import type { ChangedFile } from "@repo/protocol/domain/code";
 import { Option } from "effect";
 
-/** Past this many lines an added or deleted file starts folded. */
 export const LONG_FILE = 80;
 
-/** A file's diff, parsed from both its texts; none for a binary or unsent file. */
 export const fileDiffOf = (
   file: ChangedFile
 ): Option.Option<FileDiffMetadata> => {
@@ -48,14 +38,12 @@ export const fileDiffOf = (
   return Option.some(diff);
 };
 
-/** Each kind of change as the drawing names it. */
 const CHANGE_TYPES = {
   added: "new",
   deleted: "deleted",
   modified: "change",
 } as const satisfies Record<ChangedFile["status"], FileDiffMetadata["type"]>;
 
-/** A diff with no lines: a header alone, for a file whose lines are not shown. */
 export const emptyDiffOf = (file: ChangedFile): FileDiffMetadata => ({
   additionLines: [],
   cacheKey: `diff:${file.before ?? "none"}:${file.after ?? "none"}`,
@@ -68,7 +56,6 @@ export const emptyDiffOf = (file: ChangedFile): FileDiffMetadata => ({
   unifiedLineCount: 0,
 });
 
-/** Lines a file's diff adds and removes. */
 export interface Counts {
   readonly additions: number;
   readonly deletions: number;
@@ -76,7 +63,6 @@ export interface Counts {
 
 const NONE: Counts = { additions: 0, deletions: 0 };
 
-/** What `diff` adds and removes, line by line. */
 export const countsOf = (diff: Option.Option<FileDiffMetadata>): Counts => {
   if (Option.isNone(diff)) {
     return NONE;
@@ -93,19 +79,13 @@ export const countsOf = (diff: Option.Option<FileDiffMetadata>): Counts => {
   return { additions, deletions };
 };
 
-/** A changed file with its parsed diff and counts. */
 export interface DrawnFile {
   readonly file: ChangedFile;
   readonly diff: Option.Option<FileDiffMetadata>;
   readonly counts: Counts;
-  /** Whether it starts folded: added or deleted, past `LONG_FILE` lines. */
   readonly folded: boolean;
 }
 
-/**
- * The order a file tree lists paths in: segment by segment, a folder
- * before a file at the same level, then by name.
- */
 export const treeOrder = (left: string, right: string) => {
   const a = left.split("/");
   const b = right.split("/");
@@ -129,7 +109,6 @@ export const treeOrder = (left: string, right: string) => {
   return a.length - b.length;
 };
 
-/** `files` in tree order, each parsed and counted. */
 export const drawnFiles = (
   files: readonly ChangedFile[]
 ): readonly DrawnFile[] =>
@@ -149,12 +128,10 @@ export const drawnFiles = (
       };
     });
 
-/** A test file, by its path: a test folder, or a `.test.` or `.spec.` name. */
 export const isTestPath = (path: string) =>
   /(?:^|\/)(?:tests?|__tests__|spec)\//u.test(path) ||
   /\.(?:test|spec)\.[^/]+$/u.test(path);
 
-/** A territory glob (`src/format/**`, `src/*.ts`) as a test on a path. */
 export const globTest = (glob: string): ((path: string) => boolean) => {
   const pattern = glob
     .replaceAll(/[.+^${}()|[\]\\]/gu, "\\$&")
@@ -165,30 +142,21 @@ export const globTest = (glob: string): ((path: string) => boolean) => {
     .replaceAll("\u0000", "(?:.*/)?")
     .replaceAll("\u0001", ".*");
 
-  // A folder named without a pattern covers what is inside it.
   const whole = new RegExp(`^${pattern}(?:/.*)?$`, "u");
 
   return (path) => whole.test(path);
 };
 
-/** One part of a commit's stats: what its paths add and remove. */
 export interface StatsPart extends Counts {
   readonly label: "other" | "territory" | "tests";
   readonly files: number;
 }
 
-/** A commit's stats: files, lines added and removed, and the parts by path. */
 export interface DiffStats extends Counts {
   readonly files: number;
   readonly parts: readonly StatsPart[];
 }
 
-/**
- * The stats of `files`. With the ask's territory, a path it covers is the
- * territory's, a test file the tests', anything else the rest; without
- * one, a test file is the tests' and the rest is the rest. Empty parts are
- * left out.
- */
 export const statsOf = (
   files: readonly DrawnFile[],
   territory: readonly string[] = []
@@ -234,7 +202,6 @@ export const statsOf = (
   };
 };
 
-/** One row of a plain diff, as unified or split draws it. */
 export type PlainRow =
   | { readonly kind: "separator"; readonly lines: number }
   | {
@@ -243,15 +210,8 @@ export type PlainRow =
       readonly text: string;
     };
 
-/** A line as the diff stores it, without its line ending. */
 const bare = (line: string | undefined) => (line ?? "").replace(/\r?\n$/u, "");
 
-/**
- * `diff` as unified rows: before each hunk the unchanged lines it skips
- * as one separator, then its lines (deletions before additions in a
- * change, each numbered on its own side), and after the last hunk the
- * unchanged lines left.
- */
 export const unifiedRows = (diff: FileDiffMetadata): readonly PlainRow[] => {
   const rows: PlainRow[] = [];
   let lastAddition = 0;
@@ -307,10 +267,8 @@ export const unifiedRows = (diff: FileDiffMetadata): readonly PlainRow[] => {
   return rows;
 };
 
-/** One numbered line of a plain diff. */
 type Line = Extract<PlainRow, { readonly number: number }>;
 
-/** One row of a split diff: the old side and the new, either empty. */
 export type SplitRow =
   | { readonly kind: "separator"; readonly lines: number }
   | {
@@ -319,11 +277,6 @@ export type SplitRow =
       readonly right?: Line;
     };
 
-/**
- * `diff` as split rows: a context line on both sides, and in a change the
- * deletions beside the additions, row for row, the longer side's rest
- * against nothing.
- */
 export const splitRows = (diff: FileDiffMetadata): readonly SplitRow[] => {
   const rows: SplitRow[] = [];
   let lastAddition = 0;

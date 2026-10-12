@@ -1,15 +1,4 @@
-/**
- * A landing's trailers, as the commit carries them: credit first, in the
- * order of `CreditRole`'s literals (`Asked-by` before `Signed-off-by`), one
- * `Role: handle` line per person; then the `Held-back:` commitment, if the
- * landing was judged by held-back checks; then, apart and labelled, the
- * agents people worked through. `Assisted-by` is a disclosure, never credit
- * (GLOSSARY.md "Credit").
- *
- * `CompactCredit` is the same credit in one line for a row ("Asked by
- * ines-v · answered by tamsin"): the roles in the same order, each person
- * linked, and never an agent.
- */
+/** `Assisted-by` is a disclosure, never credit. */
 import { CreditRole } from "@repo/protocol/domain/credit";
 import type { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import { LockKeyhole } from "lucide-react";
@@ -19,11 +8,9 @@ import { HandleLink } from "./handle.tsx";
 
 const rank = (credit: Credit) => CreditRole.literals.indexOf(credit.role);
 
-/** Credits in trailer order; people in one role keep the order given. */
 export const inTrailerOrder = (credits: readonly Credit[]) =>
   credits.toSorted((one, other) => rank(one) - rank(other));
 
-/** An `Assisted-by:` value as the landing's trailer spells it: `pi:opus-4 (claimed)`. */
 export const assistedValue = ({ harness, model, verified }: AgentTrailer) =>
   `${harness}${model === undefined ? "" : `:${model}`} (${verified ? "verified" : "claimed"})`;
 
@@ -40,7 +27,6 @@ export const CreditTrailers = ({
   readonly assisted: readonly AgentTrailer[];
   readonly credits: readonly Credit[];
   readonly heldBack?: string;
-  /** "Credit" as a fact's label, or at Title weight, a region's own head (the Landed page). */
   readonly label?: "fact" | "title";
 }) => (
   <div className="flex flex-col gap-4">
@@ -80,7 +66,6 @@ export const CreditTrailers = ({
   </div>
 );
 
-/** Each role as a row's line says it: the trailer, in words. */
 const roleWords = {
   "Advised-by": "advised by",
   "Asked-by": "asked by",
@@ -91,11 +76,9 @@ const roleWords = {
   "Signed-off-by": "answered by",
 } as const satisfies Record<CreditRole, string>;
 
-/** A sentence's first word with its first letter raised. */
 const raised = (words: string) =>
   `${words.slice(0, 1).toUpperCase()}${words.slice(1)}`;
 
-/** What comes before the `index`th of `count` people in a list of words. */
 const before = (index: number, count: number) => {
   if (index === 0) {
     return "";
@@ -104,7 +87,6 @@ const before = (index: number, count: number) => {
   return index === count - 1 ? " and " : ", ";
 };
 
-/** People in a list of words: "bram", "bram and tamsin", "bram, ines and tamsin". */
 const Joined = ({ people }: { readonly people: readonly Credit[] }) =>
   people.map(({ handle }, index) => (
     <Fragment key={handle}>
@@ -113,13 +95,11 @@ const Joined = ({ people }: { readonly people: readonly Credit[] }) =>
     </Fragment>
   ));
 
-/** A landing's credit in one line: each role once, in trailer order, its people linked. */
 export const CompactCredit = ({
   credits,
   within = false,
 }: {
   readonly credits: readonly Credit[];
-  /** Inside a sentence, after a ` · `: its first word stays lower case. */
   readonly within?: boolean;
 }) => {
   const roles = CreditRole.literals.flatMap((role) => {

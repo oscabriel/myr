@@ -1,17 +1,3 @@
-/**
- * The import form: a signed-in person pastes a public repo's HTTPS URL,
- * may name a branch, picks the owner and the name, and presses Import. The
- * owner and the name follow the URL until the person changes them: the
- * URL's source namespace (`github.com/pallets`) when its host is one the
- * platform knows, else their handle; the URL's last segment as the name.
- * At a source namespace's address the owner is the address's, fixed.
- * Signed out, it says what would be imported and links to sign-in, coming
- * back to `here`. Props in, markup out: the route reads who is signed in,
- * sends the payload, and goes to the project once it is made.
- *
- * Nothing is imported until Import is pressed; nothing here asks a host
- * anything.
- */
 import { Brand } from "@repo/brand";
 import type {
   Handle,
@@ -39,54 +25,38 @@ import {
 } from "./prefill.ts";
 import type { ImportPayload } from "./prefill.ts";
 
-/** What the form starts with: a URL, and the owner and name it gives. */
 export interface ImportPrefill {
   readonly url: string;
   readonly owner?: SourceNamespace | undefined;
   readonly name?: ShortName | undefined;
 }
 
-/** Who is importing, and what became of the last press. */
 export interface Importer {
-  /** The handle signed in in this browser; none signed out. */
   readonly handle: Option.Option<Handle>;
-  /** Whether the browser is still learning who is signed in. */
   readonly checking?: boolean | undefined;
-  /** Whether an import is on its way: the button waits. */
   readonly busy?: boolean | undefined;
-  /** Sends the payload; the route goes to the project once it is made. */
   readonly onImport?: ((payload: ImportPayload) => void) | undefined;
-  /** What the last import came back with, when it was refused. */
   readonly refusal?: ReactNode | undefined;
 }
 
 export interface ImportFormProps extends Importer {
   readonly prefill?: ImportPrefill | undefined;
-  /** The owner the address fixes, at a source namespace's address. */
   readonly fixedOwner?: SourceNamespace | undefined;
-  /** The page's own address, where sign-in comes back to. */
   readonly here: string;
 }
 
-/** The import as a command, for a reader in a terminal. */
 export const importCommand = (project = "<owner>/<name>", url = "<url>") =>
   `${Brand.cli} init --project ${project} --import ${url}`;
 
 const LINK = "decoration-rule font-medium underline hover:decoration-current";
 
-/** A field's label and the words under it. */
 const LABEL = "text-ui font-medium";
 
 const HINT = "text-label text-muted-foreground font-normal";
 
-/**
- * A text field in mono: 16 px on a phone, so it does not zoom on focus, and
- * without ligatures, as code shows what was typed (`://` stays three).
- */
 const MONO_FIELD =
   "tablet:h-9 tablet:text-mono h-11 font-mono text-base [font-feature-settings:'calt'_0,'liga'_0]";
 
-/** What Import says, by where the form stands: why it waits, or what it does. */
 const IMPORT_WORDS = {
   busy: "Importing…",
   noName: "Name the project",
@@ -97,7 +67,6 @@ const IMPORT_WORDS = {
 
 type FormState = keyof typeof IMPORT_WORDS;
 
-/** Where the form stands: importing, waiting on a field, or ready. */
 const formState = ({
   branch,
   busy,
@@ -185,7 +154,6 @@ const SignInToImport = ({
   );
 };
 
-/** The owner, fixed by the address: in sight, and in the form. */
 const FixedOwner = ({
   hintId,
   owner,
@@ -201,7 +169,6 @@ const FixedOwner = ({
   </>
 );
 
-/** What the hint under Owner says, by what may be chosen. */
 const ownerHint = (fixed: boolean, choices: readonly Owner[]) => {
   if (fixed) {
     return "The address names it: the project keeps its source's account.";
@@ -212,7 +179,6 @@ const ownerHint = (fixed: boolean, choices: readonly Owner[]) => {
     : "Your handle: this URL's host is not one a project may be owned by.";
 };
 
-/** Under Name: the project's address once the name is one, else what a name is. */
 const NameHint = ({
   payload,
 }: {
@@ -294,7 +260,6 @@ const Form = ({
             setUrl(event.target.value);
           }}
           placeholder="https://github.com/pallets/click"
-          // At a source namespace's address the URL is the address's own.
           readOnly={busy || fixedOwner !== undefined}
           required
           spellCheck={false}
@@ -379,8 +344,6 @@ const Form = ({
 
       <div className="flex flex-col gap-2">
         <Button
-          // Waiting for a URL or a name, it says so at full strength, dashed
-          // like any field still to fill, rather than sitting grey.
           className={`tablet:h-9 tablet:w-fit h-11 w-full min-w-28 px-4 ${state === "ready" || state === "busy" ? "" : "text-muted-foreground border-dashed disabled:opacity-100"}`}
           data-state={state}
           disabled={state !== "ready"}
@@ -402,7 +365,6 @@ const Form = ({
   );
 };
 
-/** The form, the way to sign in, or the wait while the browser learns who is signed in. */
 export const ImportForm = ({
   busy,
   checking = false,

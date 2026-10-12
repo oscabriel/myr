@@ -1,20 +1,3 @@
-/**
- * A project's policy (its section reads "Policy"; its address stays
- * `/$project/people`), as its config folder states it at the landed
- * commit: who decides which paths, the vouch rule and the vouch file's
- * lines, the caps, budget and timings, and whether landings disclose
- * agents. The layers are one line that links the ledger, where who reads
- * and writes each one is told. The head says which commit and which file
- * it is read from; the inspector says how to change any of it.
- *
- * Props in, markup out: the route reads `projectPolicy` and `ledger`
- * (`src/client/{policy,ledger}.ts`) and hands them here. With no policy at
- * the landed commit, the page says why (`unevaluated`: no config folder, or
- * one that did not evaluate), names the commit and says what makes it
- * evaluate; with no reason either, nothing has landed yet. The page is
- * read-only: the one way to change any of it is to land a change to the
- * config folder, and it says so with the commands.
- */
 import { Brand } from "@repo/brand";
 import type { PolicyPending, PublicPolicy } from "@repo/protocol/domain/policy";
 import type { Ledger } from "@repo/protocol/domain/visibility";
@@ -36,10 +19,8 @@ import { Workspace } from "../shared/shell/workspace.tsx";
 
 type Vouches = PublicPolicy["vouches"];
 
-/** The project's config file, `project.ts` in the config folder. */
 const PROJECT_FILE = `${Brand.configDir}/project.ts`;
 
-/** The config folder as a reader writes it: `<configDir>/`. */
 const CONFIG_DIR = `${Brand.configDir}/`;
 
 const HOUR_MS = 3_600_000;
@@ -49,7 +30,6 @@ const LINK = "decoration-rule underline hover:decoration-current";
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/** A claim timing as a reader says it: whole hours up to two days, then days. */
 const spanOf = (ms: number) => {
   if (ms % HOUR_MS !== 0) {
     return plural(Math.round(ms / 60_000), "minute", "minutes");
@@ -62,7 +42,6 @@ const spanOf = (ms: number) => {
     : plural(hours, "hour", "hours");
 };
 
-/** What a vouch gates, in words. */
 const vouchModes = {
   all: "For everything: claiming an ask, offering a sealed answer and proposing an ask all need a vouch.",
   bansOnly:
@@ -77,7 +56,6 @@ const Code = ({ children }: { readonly children: ReactNode }) => (
   </code>
 );
 
-/** A file or a commit in running text: mono, linked. */
 const CodeLink = ({
   children,
   to,
@@ -90,7 +68,6 @@ const CodeLink = ({
   </AppLink>
 );
 
-/** Handles, each linked to their page, comma-separated. */
 const Handles = ({ handles }: { readonly handles: readonly Handle[] }) =>
   handles.map((handle, index) => (
     <Fragment key={handle}>
@@ -99,7 +76,6 @@ const Handles = ({ handles }: { readonly handles: readonly Handle[] }) =>
     </Fragment>
   ));
 
-/** "As of 71fda27, from <config folder>/project.ts", each linked; or the platform's defaults. */
 const AsOf = ({
   policy,
   project,
@@ -125,7 +101,6 @@ const AsOf = ({
   </>
 );
 
-/** Who decides each path: the path in mono, then its deciders. */
 const Deciders = ({
   deciders,
 }: {
@@ -218,7 +193,6 @@ const Vouching = ({
   );
 };
 
-/** A number a reader compares: set in tabular figures. */
 const Num = ({ children }: { readonly children: string }) => (
   <span className="tabular-nums">{children}</span>
 );
@@ -274,7 +248,6 @@ const Agents = ({ policy }: { readonly policy: PublicPolicy }) => (
   </Region>
 );
 
-/** The layers' one line: each by name and disclosure, and a link to the ledger. */
 const LayersLine = ({
   ledger,
   project,
@@ -316,11 +289,6 @@ const LayersLine = ({
     </p>
   );
 
-/**
- * The layers in one line, under a heading of their own: each by name and
- * disclosure, held back, and the ledger, where who reads and writes each
- * one is told. Nothing else.
- */
 const Layers = ({
   ledger,
   project,
@@ -333,7 +301,6 @@ const Layers = ({
   </Region>
 );
 
-/** The page over an evaluated policy: each of its sections. */
 const Evaluated = ({
   ledger,
   policy,
@@ -357,7 +324,6 @@ const Evaluated = ({
   </>
 );
 
-/** The landed commit, short and linked: "The config at the landed commit <sha> has not been evaluated". */
 const NotEvaluated = ({
   at,
   project,
@@ -372,12 +338,6 @@ const NotEvaluated = ({
   </>
 );
 
-/**
- * Why the config at the landed commit has not been evaluated, and what
- * makes it evaluate: a `project.ts` naming the test command, or a fix to
- * the folder that did not evaluate. Either way, it evaluates again at
- * every landing.
- */
 const Pending = ({
   pending,
   project,
@@ -431,7 +391,6 @@ const Pending = ({
   </div>
 );
 
-/** One way to change the policy: what it does, then its command, a flag to a line. */
 const Step = ({
   command,
   label,
@@ -445,11 +404,9 @@ const Step = ({
   </div>
 );
 
-/** `command`, then each flag with its value on a line of its own. */
 const lines = (command: string, flags: readonly string[]) =>
   [command, ...flags].join(" \\\n  ");
 
-/** How the policy changes: by a landing to the config folder, never here. */
 const ChangeFacts = ({ project }: { readonly project: ProjectName }) => (
   <FactBlock label="How to change these">
     <p className="text-ui">
@@ -486,7 +443,6 @@ export const PeopleView = ({
   readonly ledger: Ledger;
   readonly policy: Option.Option<PublicPolicy>;
   readonly project: ProjectName;
-  /** Why there is no policy at the landed commit; none before the first landing. */
   readonly unevaluated: Option.Option<PolicyPending>;
 }): ReactNode => (
   <Workspace

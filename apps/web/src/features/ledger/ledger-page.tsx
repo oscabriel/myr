@@ -1,18 +1,7 @@
 /**
- * A project's ledger, facts first. Its status line is one sentence: the
- * posture label the platform computed, then each sealed area's count and
- * authors ("Open with sealed evidence. export: 7 sealed checks by 3
- * people."). Then each declared layer (its audience, holdings, disclosure,
- * reason and who reads and writes it), each sealed area folded from the
- * entries (its salted root, its admission record, when it last changed),
- * and the history: one typed line per entry, newest first. The inspector
- * holds the posture, what is held back, the CLI line and what each
- * disclosure means.
- *
- * Props in, markup out: the route reads the ledger (`src/client/ledger.ts`)
- * and hands it here. The ledger carries no path, no check name and no file
- * name, and nothing here adds one; the layer read log is maintainers' data
- * and never reaches the public ledger.
+ * The ledger carries no path, no check name and no file name, and nothing here
+ * adds one; the layer read log is maintainers' data and never reaches the
+ * public ledger.
  */
 import { Brand } from "@repo/brand";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
@@ -45,16 +34,9 @@ import { When } from "../shared/time.tsx";
 import { areaHeadline, areaSummaries, ledgerHead, plural } from "./areas.ts";
 import type { AreaSummary } from "./areas.ts";
 
-/** A day as a reader skims it: "Oct 11", in UTC. */
 const dayOf = (at: DateTime.Utc) =>
   DateTime.formatUtc(at, { day: "numeric", locale: "en-US", month: "short" });
 
-/**
- * When the ledger was read, at the latest: `now`, or its newest entry's
- * time if that is later. The page keeps the `now` it was served with while
- * it reads the ledger again as entries arrive, and a recorded entry is never
- * in the future.
- */
 const readAt = (ledger: Ledger, now: DateTime.Utc) => {
   let latest = now;
 
@@ -65,7 +47,6 @@ const readAt = (ledger: Ledger, now: DateTime.Utc) => {
   return latest;
 };
 
-/** The ledger's entries, newest first. */
 const newestFirst = (ledger: Ledger) =>
   ledger.entries.toSorted((one, other) => other.seq - one.seq);
 
@@ -75,7 +56,6 @@ const Code = ({ children }: { readonly children: ReactNode }) => (
   </code>
 );
 
-/** The posture label leads, in its role; the areas follow in ink. */
 const postureTone = {
   open: "text-foreground",
   openCore: "text-sealed",
@@ -84,7 +64,6 @@ const postureTone = {
   sourceAvailable: "text-foreground",
 } as const satisfies Record<Ledger["posture"], string>;
 
-/** The ledger's status line: its posture, then every sealed area, in one sentence. */
 const HeadSentence = ({ ledger }: { readonly ledger: Ledger }) => {
   const { lead, rest } = ledgerHead(ledger);
 
@@ -105,7 +84,6 @@ const HeadSentence = ({ ledger }: { readonly ledger: Ledger }) => {
   );
 };
 
-/** Handles, each linked to their page, comma-separated. */
 const Handles = ({ handles }: { readonly handles: readonly Handle[] }) =>
   handles.map((handle, index) => (
     <Fragment key={handle}>
@@ -159,7 +137,6 @@ const LayerBlock = ({ layer }: { readonly layer: Layer }) => (
   </li>
 );
 
-/** "admitted Oct 11; passes main 3/3; catches 2 known-bad", or why there is none. */
 const admissionWords = (summary: AreaSummary) =>
   Option.match(summary.admission, {
     onNone: () => "joined without admission runs",
@@ -208,7 +185,6 @@ const AreaBlock = ({
   </li>
 );
 
-/** Each kind of entry's word, and whether it is about something sealed. */
 const kindOf = Match.type<LedgerEntry>().pipe(
   Match.tagsExhaustive({
     Admitted: () => ({ sealed: true, word: "Admitted" }),
@@ -221,7 +197,6 @@ const kindOf = Match.type<LedgerEntry>().pipe(
   })
 );
 
-/** One entry in words, as the ledger records it; its root, if it names one, is apart. */
 const EntryWords = ({
   entry,
   project,
@@ -278,7 +253,6 @@ const EntryWords = ({
     })
   );
 
-/** The salted root an entry names, if it names one. */
 const rootOf = (entry: LedgerEntry): Option.Option<string> =>
   LedgerEntry.match(entry, {
     Admitted: ({ suite }) => Option.some(suite),
@@ -290,7 +264,6 @@ const rootOf = (entry: LedgerEntry): Option.Option<string> =>
     ValueSet: () => Option.none(),
   });
 
-/** One entry on one line: when, its kind's word, what it says, and its root. */
 const EntryRow = ({
   entry,
   now,
@@ -352,7 +325,6 @@ const History = ({
     </ol>
   );
 
-/** What each disclosure lets the public learn, one line each. */
 const Disclosures = () => (
   <FactBlock label="What each disclosure shows">
     <ul className="flex flex-col gap-1.5">

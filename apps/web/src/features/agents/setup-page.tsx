@@ -1,13 +1,3 @@
-/**
- * The For agents page: one reference, in the order a reader reaches for
- * it: the CLI's synopsis, the ways to connect, the endpoints, the limits
- * and the refusals. The inspector is its contents. Every snippet and every
- * line of reference is `@repo/agent-kit`'s (`agentSetup` and its
- * neighbours), so the page has no text of its own for any of them
- * (principle 4). A shell line is a `CommandLine`; JSON and text to paste
- * sit in a block with the same copy affordance. A view: the CLI's commands
- * and the two hosts' URLs in, markup out.
- */
 import {
   agentEndpoints,
   agentLimits,
@@ -34,7 +24,6 @@ import {
   Synopsis,
 } from "./reference.tsx";
 
-/** The reference's sections, in order: each one's anchor and heading. */
 const SECTIONS = [
   { id: "synopsis", title: "Synopsis" },
   { id: "connect", title: "Connect" },
@@ -43,12 +32,6 @@ const SECTIONS = [
   { id: "refusals", title: "Refusals" },
 ] as const;
 
-/**
- * JSON or text to paste: whole, with a button that copies it. It keeps its
- * own lines and indentation and scrolls sideways where the screen is
- * narrower than a line, as code does everywhere on the web, rather than
- * wrapping a value under its key; the keyboard reaches it to scroll.
- */
 const SnippetBlock = ({ snippet }: { readonly snippet: SetupSnippet }) => {
   const { copied, copy } = useCopy(snippet.text);
 
@@ -57,7 +40,6 @@ const SnippetBlock = ({ snippet }: { readonly snippet: SetupSnippet }) => {
       <pre
         aria-label={snippet.label}
         className="text-mono leading-terminal min-w-0 flex-1 overflow-x-auto py-0.5 font-mono whitespace-pre"
-        // A box that scrolls is a stop for Tab, so a keyboard can scroll it.
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrolling region must take focus to be scrolled without a pointer (WCAG 2.1.1)
         tabIndex={0}
       >
@@ -90,7 +72,6 @@ const Snippet = ({ snippet }: { readonly snippet: SetupSnippet }) => (
   </figure>
 );
 
-/** One way to connect: its name, the agent it is for, and what to copy. */
 const Channel = ({ channel }: { readonly channel: SetupChannel }) => (
   <div className="border-rule flex min-w-0 flex-col gap-3 border-t pt-4">
     <h3 className="text-want font-semibold">{channel.title}</h3>
@@ -103,7 +84,6 @@ const Channel = ({ channel }: { readonly channel: SetupChannel }) => (
   </div>
 );
 
-/** The inspector: the sections, as anchors. */
 const Contents = () => (
   <nav aria-label="Contents">
     <ul className="flex flex-col">

@@ -1,8 +1,3 @@
-/**
- * A project's recent landings as one-line credits: what the landing did (the
- * ask it answered or opened), who is credited, in one sentence of roles,
- * and when. The full trailers are the landing's own, on its commit's page.
- */
 import type { LandingView } from "@repo/protocol/domain/landing";
 import { Option } from "effect";
 import type { DateTime } from "effect";
@@ -13,14 +8,11 @@ import { askPath } from "../shared/paths.ts";
 import { When } from "../shared/time.tsx";
 import { askOf } from "../why/rows.ts";
 
-/** How many landings the project's home shows. */
 export const RECENT_SHOWN = 3;
 
 /**
- * A landing's subject line. The platform writes `Answer <ask>` on a landing
- * that answers an ask; `LandingView` carries no subject for the rest, so
- * those read by what they are: an ask's opening as `Open ask <ask>`, then a
- * decider's own landing and the first adoption.
+ * `LandingView` carries a subject only for `Answer <ask>`, so the rest read by
+ * what they are.
  */
 export const landingSubject = (landing: LandingView) =>
   Option.match(askOf(landing), {
@@ -30,12 +22,6 @@ export const landingSubject = (landing: LandingView) =>
       kind === "opened" ? `Open ask ${ask}` : `Answer ${ask}`,
   });
 
-/**
- * The landings the project's home shows, newest first: the last three
- * answers once three have landed, so the landings that set the project up
- * (its first push, its openings) give way to the work people did; before
- * then, the last three of any kind.
- */
 export const recentShown = (
   landings: readonly LandingView[]
 ): readonly LandingView[] => {
@@ -85,7 +71,6 @@ const Landing = ({
   );
 };
 
-/** The landings given, each as one line of credit. */
 export const LandingList = ({
   landings,
   now,

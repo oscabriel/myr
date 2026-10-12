@@ -1,10 +1,3 @@
-/**
- * The import form's wiring, for the two pages that draw it (`/import` and
- * a source namespace's address nobody has made): who is signed in, read in
- * the browser; `importAtom`, sent only when Import is pressed; the move to
- * the project once it is made; and a refusal, drawn as the platform gave
- * it, under the form.
- */
 import { useAtom, useAtomValue } from "@effect/atom-react";
 import { ownerOf } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
@@ -19,11 +12,6 @@ import { whoAtom } from "../auth/who.ts";
 import { ProposalFailure } from "../proposal/failure.tsx";
 import type { Importer } from "./import-form.tsx";
 
-/**
- * Where an import that made `made` goes from a page at `at`: nowhere when
- * it is the project this address names (its page reads it again), else to
- * the project's page.
- */
 export const afterImport = (made: ProjectName, at?: ProjectName) =>
   made === at
     ? Option.none()
@@ -32,19 +20,12 @@ export const afterImport = (made: ProjectName, at?: ProjectName) =>
         to: "/$owner/$project" as const,
       });
 
-/**
- * Who is importing and what became of the last press. `at` is the project
- * this page's address names, if any: a project made there is read again
- * where it stands; any other is gone to.
- */
 export const useImporter = (at?: ProjectName): Importer => {
   const navigate = useNavigate();
   const router = useRouter();
   const here = useLocation({ select: hereOf });
   const who = useAtomValue(whoAtom);
   const [imported, send] = useAtom(importAtom);
-  // Set once this page sends: a project the atom still holds from an
-  // earlier visit never moves the page.
   const [sent, setSent] = useState(false);
   const made = sent ? Option.getOrUndefined(importMade(imported)) : undefined;
 
@@ -54,7 +35,6 @@ export const useImporter = (at?: ProjectName): Importer => {
     }
 
     Option.match(afterImport(made, at), {
-      // The loader read this address as no project: it reads it again.
       onNone: () => {
         void router.invalidate();
       },
