@@ -100,7 +100,7 @@ import {
 import type { Proposed } from "./attention/proposals.ts";
 import { recordOf } from "./attention/record.ts";
 import { today } from "./attention/today.ts";
-import { standing } from "./attention/vouch.ts";
+import { capped, standing } from "./attention/vouch.ts";
 import { ClaimState } from "./claim.ts";
 import { DraftResult } from "./draft-runs.ts";
 import type { UnlandedRunEnv } from "./env-port.ts";
@@ -1007,6 +1007,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
           propose(
             policy,
             ProposalCommand.Propose({
+              capped: capped(who),
               denounced: who === "denounced",
               files: files.map(({ path }) => path),
               id: ProposalId.make(
@@ -1080,6 +1081,7 @@ export const deciders = <H extends DeciderState, W extends DeciderWrites>(
             policy,
             ProposalCommand.Flag({
               ask: input.ask,
+              capped: capped(standing(policy, [], caller.handle)),
               denounced: standing(policy, [], caller.handle) === "denounced",
               id: ProposalId.make(
                 minted("prop", proposalsNow(h, writes).length)

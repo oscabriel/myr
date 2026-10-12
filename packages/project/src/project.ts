@@ -192,7 +192,7 @@ import type { AnswerQueue, AnswerRuns, RunnableEffect } from "./answer-runs.ts";
 import { isStep } from "./answer-runs/steps.ts";
 import { openDecision } from "./attention/decisions.ts";
 import { recordOf } from "./attention/record.ts";
-import { mayClaim, standing } from "./attention/vouch.ts";
+import { capFor, capped, mayClaim, standing } from "./attention/vouch.ts";
 import {
   ClaimCommand,
   ClaimEffect,
@@ -4244,6 +4244,7 @@ export const projectService = (
       return {
         denounced: who === "denounced",
         race: kind?.race ?? 1,
+        standing: who,
         vouched: admitted,
       };
     };
@@ -4274,7 +4275,7 @@ export const projectService = (
           const command = ClaimCommand.cases.Claim.make({
             base: live.value.landed,
             blockedBy: remainingBlockers(ask.value, h.asks),
-            cap: policy.caps.claimsPerPerson,
+            cap: capFor(trust.standing, policy.caps.claimsPerPerson),
             denounced: trust.denounced,
             heldByWho: heldBy(h, caller.handle, id),
             liveCount: h.claims.filter(
@@ -4499,9 +4500,11 @@ export const projectService = (
                 ask,
                 base,
                 claim: view,
-                claimsHeld: Principal.guards.Person(input.pusher)
-                  ? heldBy(h, input.pusher.handle)
-                  : 0,
+                claimsHeld:
+                  Principal.guards.Person(input.pusher) &&
+                  capped(standing(h.policy.value, [], input.pusher.handle))
+                    ? heldBy(h, input.pusher.handle)
+                    : 0,
                 head: input.after,
                 landed: live.value.landed,
                 policy: h.policy.value,

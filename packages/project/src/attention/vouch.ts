@@ -86,6 +86,13 @@ export const standing = (
   });
 };
 
+/** The caps are for the public: someone the project vouches for, or a decider, works without them. */
+export const capped = (who: Standing) => who !== "vouched";
+
+/** What a person may hold of a capped thing at once; no limit for a vouched one. */
+export const capFor = (who: Standing, cap: number) =>
+  capped(who) ? cap : Number.MAX_SAFE_INTEGER;
+
 const mentored = ({ ask, landingsInProject }: ClaimQuestion) =>
   ask.reserve === "newcomers" &&
   ask.mentor !== undefined &&
