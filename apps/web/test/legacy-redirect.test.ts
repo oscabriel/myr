@@ -101,6 +101,15 @@ describe("an address on a www. host", () => {
     );
   });
 
+  it("is kept nowhere by the edge, which keys by path alone and would hand it to the bare host", () => {
+    const www = new Request("https://www.web-test.example/docs");
+    const answered = Option.getOrThrow(canonicalAddress(www));
+
+    expect(forTheEdge(www, answered).headers.get("cache-control")).toBe(
+      KEPT_NOWHERE
+    );
+  });
+
   it("is a 308 for a request that is not a read, so it keeps its method", () => {
     expect(onWww("/oscabriel/datekit", "POST")).toStrictEqual(
       Option.some([308, "https://web-test.example/oscabriel/datekit"])

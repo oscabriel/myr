@@ -10,6 +10,7 @@ import type { LocationRewrite } from "@tanstack/react-router";
 import { Option, Schema } from "effect";
 
 import { segmentsOf } from "../features/shared/paths.ts";
+import { KEPT_NOWHERE } from "./edge-cache.ts";
 
 const isSourceHost = (segment: string) =>
   sourceHosts.some((host) => host === segment.toLowerCase());
@@ -83,6 +84,7 @@ const movedTo = (location: string) =>
 const withoutGit = (spelled: string) => spelled.replace(/\.git$/iu, "");
 
 // The web answers at its bare host only: a `www.` host is the same page there, and a write keeps its method with a 308.
+// Workers Cache keys by path alone, so the edge must never keep this answer: kept, it would send the bare host to itself.
 const bareHost = (url: URL, isRead: boolean): Option.Option<Response> => {
   if (!url.hostname.startsWith("www.")) {
     return Option.none();
@@ -92,9 +94,10 @@ const bareHost = (url: URL, isRead: boolean): Option.Option<Response> => {
   bare.hostname = url.hostname.slice("www.".length);
 
   return Option.some(
-    isRead
-      ? movedTo(bare.href)
-      : new Response(null, { headers: { location: bare.href }, status: 308 })
+    new Response(null, {
+      headers: { "cache-control": KEPT_NOWHERE, location: bare.href },
+      status: isRead ? 301 : 308,
+    })
   );
 };
 
