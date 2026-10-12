@@ -1,39 +1,10 @@
 /**
- * smoke: `bun scripts/smoke.ts --stage dev-<user>|demo [--url <origin>]
- * [--web-url <origin>]`. Read-only probes against a live stage's platform and
- * web; it fails loudly, naming
- * every probe that broke, and prints how long each took.
- * `infra/deploy.ts` runs it last (AGENTS.md principle 11).
+ * Usage:
+ *   bun scripts/smoke.ts --stage <stage> [--url <origin>] [--web-url <origin>]
+ *   bun scripts/smoke.ts --stage <stage> --loop [--draft] [--as <handle>]
  *
- * The stage's origins are `https://platform-<s>.<subdomain>.workers.dev` and
- * `https://web-<s>.<subdomain>.workers.dev`, with the subdomain `bun run
- * bootstrap` records in `infra/workers-dev.json`; `--url` points it at another
- * platform (the web's probes then run only with `--web-url`). The probes live
- * in `infra/smoke.ts`.
- *
- * `--loop` runs the whole core loop after the probes, through the
- * CLI and git (`lib/smoke/loop.ts`): a throwaway project `smoke-<run>`, an
- * ask opened red first, a claim, an out-of-territory push git refuses with
- * `OutOfScope`, the fixed answer landed with its credit, and its verdict
- * note. It needs two people's tokens in the env, never in an argument: the
- * operator's (`OPERATOR_TOKEN`), who makes the project and opens the ask,
- * and the answerer's, from `SESSION_TOKENS` (a JSON object from token to
- * handle, as the platform's own) by the handle `--as` names (`bram` unless
- * given). For example, with the stage's generated secrets file (outside the
- * repo, named by `STAGE_SECRETS_FILE`) loaded into the env:
- *
- *   set -a; . <the stage's secrets file>; set +a
- *   bun scripts/smoke.ts --stage dev-oscabriel --loop
- *
- * `--loop` refuses `--stage demo` before anything else: the throwaway would
- * show on the front page the user records.
- *
- * `--loop --draft` also has the platform's agent draft an ask on the
- * throwaway project: the answerer proposes a want with `--draft`, the loop
- * waits for the draft to go red first, and the decider accepts it; the
- * landing that opens the ask must disclose the drafter (`Assisted-by:`).
- * It prints the model, the attempts and the time. `--draft` without
- * `--loop` is refused before any request.
+ * `--loop` reads `OPERATOR_TOKEN` and `SESSION_TOKENS` (token to handle) from
+ * the env, never from an argument.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Handle, sameHandle } from "@repo/protocol/ids";
@@ -58,7 +29,6 @@ import {
 } from "../infra/stages.ts";
 import { DemoStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
 
-/** `--draft` was given without `--loop`: only the loop has a project to draft on. */
 export class DraftNeedsLoop extends Schema.TaggedError<DraftNeedsLoop>()(
   "DraftNeedsLoop",
   { flag: Schema.Literal("--draft") }
@@ -83,12 +53,10 @@ export { DemoStageRefused, LoopFailed, smokeLoop } from "./lib/smoke/loop.ts";
 
 export type { SmokeLoopReport } from "./lib/smoke/loop.ts";
 
-/** The loop's answerer when `--as` names none: a person every stage's sessions hold. */
 const ANSWERER = "bram";
 
 const failed = (reason: string) => new LoopFailed({ reason, step: "people" });
 
-/** A run's name: when it started, to the second, in UTC (`20261013-091500`). */
 const runName = Effect.map(DateTime.now, (now) =>
   DateTime.formatIso(now)
     .slice(0, 19)
@@ -100,11 +68,6 @@ const decodeSessions = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Record(Schema.String, Handle))
 );
 
-/**
- * The loop's two people's tokens, from the env: the operator's, and the
- * answerer's by handle from `SESSION_TOKENS`. A missing one fails naming
- * it, and never a token.
- */
 const tokensFrom = (answerer: string) =>
   Effect.gen(function* () {
     const decider = yield* Config.Redacted("OPERATOR_TOKEN").pipe(
@@ -141,7 +104,6 @@ const tokensFrom = (answerer: string) =>
       : { answerer: Redacted.make(token), decider };
   });
 
-/** Where the stage's platform lives: `--url`, or bootstrap's workers.dev record. */
 const originOf = (
   argv: readonly string[],
   stage: Parameters<typeof platformOrigin>[0]
@@ -160,11 +122,6 @@ const originOf = (
     onSome: (url) => Effect.succeed(url.replace(/\/+$/u, "")),
   });
 
-/**
- * `bun scripts/smoke.ts --stage <s> --loop [--as <handle>] [--url <origin>]`:
- * refuses demo first, then runs the probes, then the core loop, printing
- * each step's time as it passes and a summary at the end.
- */
 const loopMain = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const stage = yield* stageOf(argv);
@@ -206,10 +163,6 @@ const loopMain = (argv: readonly string[]) =>
     }
   });
 
-/**
- * `bun scripts/smoke.ts --stage <s> [--loop [--draft]] …`: the probes, and
- * with `--loop` the core loop after them; `--draft` alone is refused.
- */
 export const main = (argv: readonly string[]) =>
   Effect.gen(function* () {
     if (argv.includes("--loop")) {

@@ -1,13 +1,12 @@
 /**
- * The swarm's flags, read by a small decoder (the scripts' allow-list grants
- * `effect/process` only, so no `effect/cli`):
+ * A small hand decoder: the scripts' allow-list grants `effect/process` only, so no `effect/cli`.
  *
  *   --stage <s>              required: a stage `infra/stages.ts` declares
  *   --project <name>         default oscabriel/burrow
  *   --scenario plain|video   default plain
  *   --dry-run                print the plan; claim nothing, start nothing
  *   --json                   print JSON: the plan (dry run) or the run's summary
- *   --allow-demo             required with --stage demo: its burrow family is the recorded take's
+ *   --allow-demo             required with --stage demo
  *   --only <handle>…         run only these contributors (repeat, or comma-separate)
  *   --timeout-min <n>        each agent's run timeout, default 20
  *   --view headless|herdr    default headless; herdr runs each harness in a herdr pane
@@ -22,33 +21,27 @@ import { roster } from "./roster.ts";
 import { ScenarioName } from "./scenario.ts";
 import { SwarmFailed } from "./workspace.ts";
 
-/** What `bun scripts/swarm.ts` was asked to do. */
 export interface SwarmOptions {
   readonly stage: Stage;
   readonly project: ProjectName;
   readonly scenario: ScenarioName;
   readonly dryRun: boolean;
   readonly json: boolean;
-  /** The contributors to run; every one when `--only` names none. */
   readonly only: readonly Handle[];
   readonly timeoutMin: number;
-  /** Where the harnesses run: their own processes, or herdr's panes (`views/`). */
   readonly view: ViewName;
-  /** The platform's origin, when `--url` names it. */
   readonly url: Option.Option<string>;
 }
 
 export const USAGE =
   "bun scripts/swarm.ts --stage <dev-…|demo> [--project oscabriel/burrow] [--scenario plain|video] [--dry-run] [--json] [--allow-demo] [--only <handle>…] [--timeout-min 20] [--view headless|herdr] [--url <origin>]";
 
-/** The views a run can take. */
 export const ViewName = Schema.Literals(["headless", "herdr"]);
 
 export type ViewName = typeof ViewName.Type;
 
 const decodeView = Schema.decodeUnknownOption(ViewName);
 
-/** The flags that take a value. */
 const VALUED = [
   "--project",
   "--scenario",
@@ -58,12 +51,10 @@ const VALUED = [
   "--view",
 ] as const;
 
-/** The flags that stand alone. */
 const SWITCHES = ["--allow-demo", "--dry-run", "--json"] as const;
 
 const failed = (reason: string) => new SwarmFailed({ reason });
 
-/** The handles `--only` names: each value after each `--only`, comma-separated or not. */
 const onlyOf = (argv: readonly string[]) =>
   argv.flatMap((arg, at) => {
     if (arg.startsWith("--only=")) {
@@ -82,7 +73,6 @@ const onlyOf = (argv: readonly string[]) =>
     );
   });
 
-/** The arguments that are flags, with any `=value` cut off. */
 const flagsIn = (argv: readonly string[]) =>
   argv.flatMap((arg) =>
     arg.startsWith("--") ? [arg.split("=")[0] ?? arg] : []
@@ -91,10 +81,6 @@ const flagsIn = (argv: readonly string[]) =>
 const isValued = (flag: string): flag is (typeof VALUED)[number] =>
   VALUED.some((valued) => valued === flag);
 
-/**
- * The words no flag takes: each valued flag takes the word after it (unless
- * it wrote `=value`), and `--only` every word up to the next flag.
- */
 const straysIn = (argv: readonly string[]) => {
   const strays: string[] = [];
   let takes: "none" | "one" | "many" = "none";
@@ -118,7 +104,6 @@ const straysIn = (argv: readonly string[]) => {
   return strays;
 };
 
-/** `raw` as the platform's origin, without a trailing `/`, if it is an http(s) URL. */
 const originOf = (raw: string) =>
   Option.filter(
     Option.liftThrowable((url: string) => new URL(url))(raw),
@@ -129,7 +114,6 @@ const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
 const decodeScenario = Schema.decodeUnknownOption(ScenarioName);
 
-/** The swarm's options from its arguments, or why they don't make a run. */
 export const optionsOf = (
   argv: readonly string[]
 ): Effect.Effect<SwarmOptions, SwarmFailed> =>
@@ -169,7 +153,6 @@ export const optionsOf = (
       );
     }
 
-    // infra's own reading of `--stage`, and its words when it names none.
     const stage = yield* stageOf(argv).pipe(
       Effect.mapError(({ message }) => failed(`${message}. ${USAGE}`))
     );

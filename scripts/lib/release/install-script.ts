@@ -1,25 +1,8 @@
-/**
- * The install script the platform serves at `<origin>/install.sh`, as the
- * release writes it for one version and one origin:
- * `curl -fsSL <origin>/install.sh | sh`. POSIX `sh`, so it runs on Linux and
- * macOS as they come. It downloads the binary for the machine from the platform, checks it
- * against the release's `SHA256SUMS` from the same place, and installs nothing
- * unless the two agree.
- */
 import type { Brand } from "@repo/brand";
 
-/** `value` as one single-quoted shell word. */
 const quoted = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
 
-/**
- * The script for `version`, whose files are at `baseUrl`: the stage's
- * public origin and `/releases/<version>`, where the platform serves
- * `<slug>-<target>` and `SHA256SUMS`. `machines` are the targets a release
- * builds, without Bun's `bun-` prefix (`linux-x64`). It installs the
- * binary as `<dir>/<cli>` and links `<dir>/git-credential-<slug>` to it (the
- * one binary is git's credential helper when started by that name); `<dir>`
- * is `$<SLUG>_INSTALL_DIR`, or `~/.local/bin`.
- */
+// The one binary is also git's credential helper when started as `git-credential-<slug>`.
 export const installScriptFor = (input: {
   readonly brand: typeof Brand;
   readonly version: string;

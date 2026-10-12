@@ -1,45 +1,23 @@
-/**
- * The swarm run's summary: one `AgentRun` per contributor, written to
- * `<swarm>/<run>/agents.json`, where `<swarm>` is `SwarmDir`, outside the
- * checkout. A live issue records what a run shows in its own notes; nothing
- * here is committed.
- *
- * Every field follows the wire rule (AGENTS.md "Effect traps"): `Schema.Int`
- * or `Schema.Finite` for numbers, `Schema.optionalKey` for optional keys.
- */
 import { Brand } from "@repo/brand";
 import { Context, Effect, FileSystem, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 
-/** What the swarm's folder is placed by: the env's state home, else the user's home. */
 const StateEnv = Schema.Struct({
   HOME: Schema.optionalKey(Schema.NonEmptyString),
   XDG_STATE_HOME: Schema.optionalKey(Schema.NonEmptyString),
 });
 
-/**
- * The swarm's folder for `env`: `${XDG_STATE_HOME:-$HOME/.local/state}/
- * <slug>/swarm`, beside the hook's sessions, and never inside a checkout: a
- * harness reads every AGENTS.md and CLAUDE.md above its folder, so a
- * workspace inside this repo would hand each contributor the platform's own.
- * With neither variable set, the system's temp folder.
- */
+// Never inside a checkout: a harness reads every AGENTS.md and CLAUDE.md above its folder.
 export const swarmDirOf = (env: typeof StateEnv.Type) => {
   const home = env.HOME === undefined ? "/tmp" : `${env.HOME}/.local/state`;
 
   return `${env.XDG_STATE_HOME ?? home}/${Brand.slug}/swarm`;
 };
 
-/** The global scope, read only for its `process.env`. */
 const GlobalScope = Schema.Struct({
   process: Schema.Struct({ env: StateEnv }),
 });
 
-/**
- * The swarm's folder (`swarmDirOf` this process's env), unless a test points
- * it elsewhere. Each run writes below it: `<run>/agents.json` and one
- * workspace per contributor, `<run>/<handle>/`.
- */
 export const SwarmDir = Context.Reference<string>("swarm/SwarmDir", {
   defaultValue: () => {
     // Unknown on purpose: the runtime is whatever started this process.
@@ -54,11 +32,9 @@ export const SwarmDir = Context.Reference<string>("swarm/SwarmDir", {
   },
 });
 
-/** A run's own folder: `<swarm>/<run>`. */
 export const runDir = (run: string) =>
   Effect.map(SwarmDir, (dir) => `${dir}/${run}`);
 
-/** The four harnesses a swarm contributor may run. */
 export const Harness = Schema.Literals([
   "claude-code",
   "opencode",
@@ -68,12 +44,6 @@ export const Harness = Schema.Literals([
 
 export type Harness = typeof Harness.Type;
 
-/**
- * How one contributor's run ended: its answer landed, was refused (and the
- * continuations ran out), waits on a person (`AwaitingFinish`,
- * `AwaitingDecision`), was never pushed, ran past its timeout, or the run
- * itself failed (a claim refused, a harness that did not start).
- */
 export const AgentOutcome = Schema.Literals([
   "landed",
   "refused",
@@ -85,29 +55,23 @@ export const AgentOutcome = Schema.Literals([
 
 export type AgentOutcome = typeof AgentOutcome.Type;
 
-/** One contributor's run. */
 export const AgentRun = Schema.Struct({
   adapter: Schema.Boolean,
   ask: Schema.NonEmptyString,
-  /** Harness sessions started or resumed: the first run and each continuation. */
   attempts: Schema.Int,
   durationMs: Schema.Int,
   handle: Schema.NonEmptyString,
   harness: Harness,
-  /** The landing commit, when the answer landed. */
   landed: Schema.optionalKey(Schema.NonEmptyString),
   model: Schema.NonEmptyString,
   outcome: AgentOutcome,
-  /** Each refusal's `_tag`, with how often it came back across the attempts. */
   refusals: Schema.Record(Schema.String, Schema.Int),
 });
 
 export type AgentRun = typeof AgentRun.Type;
 
-/** A whole run: where it ran, from which commit, and each contributor's run. */
 export const AgentsResult = Schema.Struct({
   at: Schema.DateTimeUtcFromString,
-  /** The commit of this repo the swarm ran from. */
   commit: Schema.NonEmptyString,
   project: Schema.NonEmptyString,
   runs: Schema.Array(AgentRun),
@@ -118,10 +82,8 @@ export const AgentsResult = Schema.Struct({
 
 export type AgentsResult = typeof AgentsResult.Type;
 
-/** The file a run's summary is written to, below the swarm's folder. */
 export const agentsFile = (dir: string) => `${dir}/agents.json`;
 
-/** Writes `result` to `<swarm>/<run>/agents.json`, as indented JSON. */
 export const writeAgentsResult = (input: {
   readonly run: string;
   readonly result: AgentsResult;

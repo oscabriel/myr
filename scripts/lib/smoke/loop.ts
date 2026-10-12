@@ -1,40 +1,3 @@
-/**
- * smoke's `--loop`: the whole core loop on a platform, through
- * the CLI and git, as its people would take it (`core-loop.ts` holds the
- * steps):
- *
- * 1. `people`: who the decider's and the answerer's tokens name;
- * 2. `init`: the decider checks `<decider>/smoke-<run>` is free (on a stage
- *    the operator's, `oscabriel/smoke-<run>`), records its key, then makes
- *    it a throwaway project and pushes its first commit;
- * 3. `open-ask`: the decider opens an ask, red twice on main first;
- * 4. `claim`: the answerer claims it, and gets a fork;
- * 5. `out-of-scope`: an answer that reaches outside the ask's territory is
- *    refused, `OutOfScope` in git's own output;
- * 6. `answer`: the fixed answer is pushed and taken;
- * 7. `landing`: it lands on main, with the answerer as author, the platform
- *    as committer, and the `Asked-by` and `Signed-off-by` trailers;
- * 8. `verdict-note`: its verdict note is on the answer's head in the fork.
- *
- * With `draft`, three more steps on the same project:
- *
- * 9. `draft-propose`: the answerer proposes a want with `--draft`;
- * 10. `draft-ready`: `proposal <id>` until the platform's agent has
- *     drafted it, red first (a failed draft fails the step);
- * 11. `draft-accept`: the decider accepts it from Today, and the landing
- *     that opened its ask discloses the drafter (`Assisted-by:`) and
- *     credits the answerer as its asker.
- *
- * Each step is timed and printed as it passes; the first that fails ends
- * the run. Every throwaway is written to the throwaway ledger
- * (`infra/created.ts`, by `smoke`): the project and its repo before `init`
- * makes them, once the platform's list of projects shows the name free (a
- * taken name stops the run, recording nothing), so an `init` that fails
- * after making the project still leaves it recorded; the claim's fork just
- * after the claim, since its name is known only then. It never runs on
- * `demo`: a throwaway project would show on the front page the user
- * records.
- */
 import { Brand } from "@repo/brand";
 import { keyOf, ProjectName } from "@repo/protocol/ids";
 import type { Handle, LandedSha } from "@repo/protocol/ids";
@@ -73,7 +36,7 @@ import type { LoopStep, Patience } from "./core-loop.ts";
 
 export { LoopFailed, LoopStep } from "./core-loop.ts";
 
-/** `--loop` was pointed at demo, whose front page the user records. */
+// A throwaway project would show on demo's front page.
 export class DemoStageRefused extends Schema.TaggedError<DemoStageRefused>()(
   "DemoStageRefused",
   { stage: Schema.String }
@@ -83,53 +46,38 @@ export class DemoStageRefused extends Schema.TaggedError<DemoStageRefused>()(
   }
 }
 
-/** How long one step took. */
 export interface StepTiming {
   readonly step: LoopStep;
   readonly ms: number;
 }
 
-/** A drafted ask the loop accepted: the model, its attempts, and its landing's trailers. */
 export interface DraftReport {
   readonly model: string;
   readonly attempts: number;
-  /** From the proposal to the draft settled, in ms. */
+  // ms
   readonly ms: number;
   readonly trailers: readonly string[];
 }
 
-/** A loop that passed: what each step found, and how long each took. */
 export interface SmokeLoopReport {
   readonly project: ProjectName;
-  /** The refusals git printed for the out-of-territory push: `OutOfScope` among them. */
   readonly refusedWith: readonly string[];
-  /** main's commit after the landing. */
   readonly landed: LandedSha;
   readonly author: string;
   readonly committer: string;
-  /** Every trailer of the landing commit, as git prints them. */
   readonly trailers: readonly string[];
   readonly noteFound: boolean;
   readonly timings: readonly StepTiming[];
-  /** With `draft`, the drafted ask it accepted. */
   readonly draft?: DraftReport;
 }
 
-/** What one loop runs on, and as whom. */
 export interface LoopInput {
-  /** The stage, which names the throwaways in the ledger; never `demo`. */
   readonly stage: string;
-  /** This run's name: the project is `<decider>/smoke-<run>`. */
   readonly run: string;
-  /** The platform: its `/rpc` and git live here. */
   readonly origin: string;
-  /** Makes the project and opens the ask (on a stage, the operator). */
   readonly decider: Redacted.Redacted;
-  /** Claims the ask and pushes the answer. */
   readonly answerer: Redacted.Redacted;
-  /** How the loop waits for the landing: every 2 s, for up to 10 minutes, unless given. */
   readonly patience?: Patience;
-  /** Also propose with a draft, wait for it, and accept it (`--draft`). */
   readonly draft?: boolean;
 }
 
@@ -138,7 +86,6 @@ const PATIENCE: Patience = {
   within: Duration.minutes(10),
 };
 
-/** A step's run, timed and printed once it passes. */
 const timed =
   (stage: string, step: LoopStep) =>
   <A, R>(
@@ -155,10 +102,6 @@ const timed =
       )
     );
 
-/**
- * Writes one throwaway to the ledger, by smoke; a repo with its namespace
- * when the stage is one `infra/stages.ts` declares.
- */
 const recordThrowaway = (stage: string, kind: Created["kind"], name: string) =>
   Effect.gen(function* () {
     const namespace = Option.map(
@@ -189,10 +132,6 @@ const recordThrowaway = (stage: string, kind: Created["kind"], name: string) =>
     )
   );
 
-/**
- * The throwaway project of run `run`, in the namespace of the decider who
- * makes it: `<decider>/smoke-<run>`.
- */
 const projectOf = (decider: Handle, run: string) =>
   Schema.decodeEffect(ProjectName)(`${decider}/smoke-${run}`).pipe(
     Effect.mapError(
@@ -204,11 +143,6 @@ const projectOf = (decider: Handle, run: string) =>
     )
   );
 
-/**
- * Runs the core loop on the platform at `input.origin`, as the people the
- * two tokens name, and gives what each step found; refused on `demo`
- * before anything runs.
- */
 export const smokeLoop = (
   input: LoopInput
 ): Effect.Effect<
@@ -257,11 +191,9 @@ export const smokeLoop = (
 
     const project = yield* projectOf(decider.handle, input.run);
 
-    // The name is checked free, then recorded, then made: an init that
-    // makes the project and then fails still leaves it in the ledger, and
-    // a name someone else holds never enters teardown's plan. The ledger
-    // names what the platform keeps: the project's key, its Durable
-    // Object's id and its repo's name.
+    // Checked free, then recorded, then made: an init that makes the project
+    // and then fails still leaves it in the ledger, and a name someone else
+    // holds never enters teardown's plan.
     const [, init] = yield* timed(
       stage,
       "init"

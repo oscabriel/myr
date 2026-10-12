@@ -1,40 +1,15 @@
-/**
- * What `scripts/import-examples.ts` imports, the pages it reads to warm
- * each import, and the commands its `--tags` backfill runs: pure, so a test
- * reads them without a network.
- *
- * Thirty-eight repos. The first eight were each picked for a shape the
- * code browser must render: a Rust crate with a `master` default and 105
- * annotated tags first, then a TypeScript library, a Go CLI, a Python
- * package with a long merge history, a Markdown list, a deep monorepo with
- * 740 scoped tags, large single-file C headers, and a repo off GitHub with
- * a submodule. The thirty after them are well-known projects in
- * TypeScript, JavaScript, Rust, Go, Python, C, Ruby and shell, so a reader
- * finds code they know; each is a copy, read-only here, under its own
- * licence.
- */
 import { ProjectKey, ProjectName, sourceNamespaceOf } from "@repo/protocol/ids";
 import { Option, Redacted } from "effect";
 
-/**
- * One repo to import: the project it becomes, by its name at its source
- * path (`github.com/pallets/click`) and the key it was first imported
- * under (`click`), which the platform keeps as its repo's name and the
- * ledger records; where it is, its branch, what it is, and its licence.
- */
 export interface ImportExample {
   readonly name: ProjectName;
   readonly key: ProjectKey;
   readonly url: string;
-  /** The remote's default branch, named so the import never guesses. */
   readonly branch: string;
-  /** What kind of repo it is, said for a person. */
   readonly kind: string;
-  /** Its licence, as an SPDX expression. */
   readonly licence: string;
 }
 
-/** A row: its key, and its name at its source path, read from the URL. */
 const example = (
   key: string,
   url: string,
@@ -50,7 +25,7 @@ const example = (
   url,
 });
 
-/** The repos, in the order they import: anyhow first, the probe for `master` and tags. */
+// anyhow first: it probes a `master` default and tags.
 export const examples: readonly ImportExample[] = [
   example(
     "anyhow",
@@ -108,8 +83,6 @@ export const examples: readonly ImportExample[] = [
     "C on Codeberg",
     "MIT"
   ),
-  // Well known, so a reader meets code they have read before: permissive
-  // licences, each under 14 MB on GitHub, as the eight above import well.
   example(
     "hono",
     "https://github.com/honojs/hono",
@@ -322,11 +295,7 @@ export const examples: readonly ImportExample[] = [
   ),
 ];
 
-/**
- * The imports still to run: `only`'s example when it names one, else every
- * example, less each project the platform lists already. A name it lists
- * is never imported again, whatever repo it came from.
- */
+// A name the platform lists is never imported again, whatever repo it came from.
 export const planImports = (
   all: readonly ImportExample[],
   listed: ReadonlySet<ProjectName>,
@@ -340,12 +309,6 @@ export const planImports = (
       }) && !listed.has(name)
   );
 
-/**
- * The pages read once after an import, so its first reader does not pay
- * for a cold read: its home, its root folder, its landings, and, when it
- * has a README, the README and why each of its lines is there. Why and a
- * file's history are kept by commit once read (ADR 0020).
- */
 export const warmPaths = (
   project: ProjectName,
   readme: Option.Option<string>
@@ -362,39 +325,25 @@ export const warmPaths = (
   }),
 ];
 
-/** A git remote and the token that writes to it, kept apart so the URL can be shown. */
+// Kept apart from the token so the URL can be shown.
 export interface RedactedUrl {
   readonly url: string;
   readonly token: Redacted.Redacted;
 }
 
-/**
- * One command a run spawns: its argv, which may be printed, and env values
- * of its own, which never are.
- */
+// Its argv may be printed; its env values never are.
 export interface Command {
   readonly argv: readonly string[];
   readonly env?: Readonly<Record<string, Redacted.Redacted>>;
 }
 
-/** How a command is shown: its argv alone, never its env. */
 export const shownCommand = ({ argv }: Command) => argv.join(" ");
 
-/** Every tag, under its own name: the one refspec the backfill pushes. */
 const TAGS = "refs/tags/*:refs/tags/*";
 
-/**
- * The backfill of an import that came without its tags: fetch the
- * source's tags into the bare repo `mirror`, then push those tags, and
- * only those, to `remote`. The write token goes to git as an
- * `Authorization` header through git's `GIT_CONFIG_*` env, so it is in no
- * argument, no URL and no printed line. Nothing pushes a branch: `main`
- * moves only by a landing.
- *
- * Only the tags are fetched (not `clone --mirror`, which would bring every
- * `refs/pull/*` GitHub keeps): the canonical repo already has the history
- * they point into, so the push sends the tag objects and little else.
- */
+// The write token reaches git as an `Authorization` header through `GIT_CONFIG_*`,
+// so it is in no argument, URL or printed line. Only the tags are fetched: a
+// `clone --mirror` would bring every `refs/pull/*` GitHub keeps.
 export const tagBackfillCommands = (input: {
   readonly source: string;
   readonly mirror: string;
