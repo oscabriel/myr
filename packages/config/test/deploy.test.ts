@@ -1,5 +1,6 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
+import { Brand } from "@repo/brand";
 import {
   Console,
   ConfigProvider,
@@ -130,7 +131,7 @@ describe("a deploy without a known stage", () => {
     })
   );
 
-  it.live.each(["prod", "dev-", "dev-Alice", "dev-nobody", "local"])(
+  it.live.each(["staging", "dev-", "dev-Alice", "dev-nobody", "local"])(
     "fails with UnknownStage for --stage %s and spawns nothing",
     (stage) =>
       Effect.gen(function* () {
@@ -368,10 +369,10 @@ describe("what a failed deploy prints", () => {
   it.live("names the stages it knows when it refuses one", () =>
     Effect.gen(function* () {
       expect(yield* messageOf([])).toBe(
-        "no --stage: name one of dev-oscabriel, demo"
+        "no --stage: name one of dev-oscabriel, demo, prod"
       );
-      expect(yield* messageOf(["--stage", "prod"])).toBe(
-        "--stage prod is not a stage infra/stages.ts declares (dev-oscabriel, demo)"
+      expect(yield* messageOf(["--stage", "staging"])).toBe(
+        "--stage staging is not a stage infra/stages.ts declares (dev-oscabriel, demo, prod)"
       );
     })
   );
@@ -446,5 +447,49 @@ describe("a deploy to demo", () => {
           [],
         ]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+  );
+});
+
+describe("a deploy to prod", () => {
+  it.live(
+    "puts the platform and the web on the brand's own domain, and hands each the other's URL",
+    () =>
+      Effect.gen(function* () {
+        const { result, spawned } = yield* run(["--stage", "prod"]);
+        const git = `git.${Brand.domain}`;
+
+        expect(Result.isSuccess(result)).toBeTruthy();
+        expect(spawned.map(line)).toStrictEqual([
+          ".$ bun run verify",
+          "apps/sandbox$ wrangler deploy --env prod",
+          `apps/platform$ varlock-wrangler deploy --env prod --domain ${git} --var PUBLIC_WEB_URL:https://${Brand.domain}`,
+          "apps/web$ bun run build",
+          `apps/web$ wrangler deploy --env prod --domain ${Brand.domain} --var PUBLIC_PLATFORM_URL:https://${git}`,
+          ".$ bun run bootstrap --stage prod --check-triggers",
+          ".$ bun scripts/smoke.ts --stage prod",
+        ]);
+      })
+  );
+
+  it.live("names the Google redirect URI on the platform's own host", () =>
+    Effect.gen(function* () {
+      const printed: string[] = [];
+
+      const quiet: Console.Console = {
+        ...console,
+        log: (...args: readonly unknown[]) => {
+          printed.push(args.map(String).join(" "));
+        },
+      };
+
+      const { result } = yield* run(["--stage", "prod"]).pipe(
+        Effect.provideService(Console.Console, quiet)
+      );
+
+      expect(Result.isSuccess(result)).toBeTruthy();
+      expect(printed.at(-1)).toBe(
+        `deploy prod: to offer Google sign-in, register https://git.${Brand.domain}/oauth/google/callback as the Google client's redirect URI (H4)`
+      );
+    })
   );
 });

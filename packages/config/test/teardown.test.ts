@@ -685,7 +685,7 @@ describe("bun infra/teardown.ts", () => {
   );
 
   it.live.each([
-    [["--stage", "prod"], "prod"],
+    [["--stage", "staging"], "staging"],
     [["--stage"], "--stage"],
     [["--force"], "--force"],
     [["--keep"], "--keep"],

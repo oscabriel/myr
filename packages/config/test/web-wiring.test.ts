@@ -1,10 +1,12 @@
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, FileSystem, Path, Schema } from "effect";
+import { Effect, FileSystem, Option, Path, Schema } from "effect";
 
 import { blankJsonc } from "../../../infra/jsonc.ts";
 import {
+  customHosts,
   platformOrigin,
+  URL_FROM_DEPLOY,
   resources,
   stages,
   subdomainFile,
@@ -50,6 +52,7 @@ const Bound = Schema.Struct({
     Schema.Struct({ binding: Schema.String, service: Schema.String })
   ),
   vars: Schema.Record(Schema.String, Schema.String),
+  workers_dev: Schema.optionalKey(Schema.Boolean),
 });
 
 const decodeBound = Schema.decodeUnknownEffect(Bound);
@@ -125,20 +128,32 @@ describe("the web Worker's wrangler.jsonc", () => {
   );
 
   it.effect(
-    "points each stage's PLATFORM at that stage's platform Worker, and its public URL at that Worker's origin",
+    "points each stage's PLATFORM at that stage's platform Worker, and its public URL at that Worker's origin, which a stage on the brand's domain takes from the deploy",
     () =>
       Effect.gen(function* () {
         const config = yield* presentJson("apps/web/wrangler.jsonc", Wrangler);
         const { subdomain } = yield* presentJson(subdomainFile, WorkersDev);
 
         for (const stage of stages) {
-          const { services, vars } = yield* decodeBound(config.env[stage]);
+          const { services, vars, workers_dev } = yield* decodeBound(
+            config.env[stage]
+          );
 
           expect(services).toStrictEqual([
             { binding: "PLATFORM", service: resources(stage).platform },
           ]);
-          expect(vars.PUBLIC_PLATFORM_URL).toBe(
-            platformOrigin(stage, subdomain)
+          expect({
+            stage,
+            url: vars.PUBLIC_PLATFORM_URL,
+            workers_dev,
+          }).toStrictEqual(
+            Option.isSome(customHosts(stage))
+              ? { stage, url: URL_FROM_DEPLOY, workers_dev: false }
+              : {
+                  stage,
+                  url: platformOrigin(stage, subdomain),
+                  workers_dev: undefined,
+                }
           );
         }
       })

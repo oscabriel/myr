@@ -23,6 +23,7 @@ import { main as probeMain } from "../infra/smoke.ts";
 import {
   flagValue,
   platformOrigin,
+  publicStages,
   recordedSubdomain,
   stageOf,
   subdomainFile,
@@ -126,7 +127,7 @@ const loopMain = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const stage = yield* stageOf(argv);
 
-    yield* stage === "demo"
+    yield* publicStages.has(stage)
       ? Effect.fail(new DemoStageRefused({ stage }))
       : Effect.void;
 

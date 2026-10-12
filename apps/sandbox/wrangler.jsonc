@@ -102,5 +102,32 @@
         },
       ],
     },
+    "prod": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "CHECKER", "class_name": "Checker" },
+          { "name": "LANDER", "class_name": "Lander" },
+        ],
+      },
+      "containers": [
+        {
+          "class_name": "Checker",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "check": { "dockerfile": "./images/check.Dockerfile" },
+          },
+        },
+        {
+          "class_name": "Lander",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "land": {
+              "dockerfile": "./images/land.Dockerfile",
+              "build_context": "../..",
+            },
+          },
+        },
+      ],
+    },
   },
 }

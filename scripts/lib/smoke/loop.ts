@@ -15,7 +15,11 @@ import type { ChildProcessSpawner } from "effect/process";
 
 import { recordCreated } from "../../../infra/created.ts";
 import type { Created } from "../../../infra/created.ts";
-import { declaredStage, resources } from "../../../infra/stages.ts";
+import {
+  declaredStage,
+  publicStages,
+  resources,
+} from "../../../infra/stages.ts";
 import {
   acceptDraft,
   awaitDraft,
@@ -153,7 +157,7 @@ export const smokeLoop = (
   Effect.gen(function* () {
     const { origin, stage } = input;
 
-    if (stage === "demo") {
+    if (publicStages.has(stage)) {
       return yield* new DemoStageRefused({ stage });
     }
 

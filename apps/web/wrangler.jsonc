@@ -52,5 +52,17 @@
         "PUBLIC_PLATFORM_URL": "https://platform-demo.oscargabriel.workers.dev",
       },
     },
+    // Served on the brand's own domain, never workers.dev: infra/deploy.ts
+    // passes its Custom Domain and PUBLIC_PLATFORM_URL, which name the brand,
+    // so they live in infra/stages.ts. The URL here is a stand-in the
+    // deploy's --var replaces, so the generated Env still types it a string.
+    "prod": {
+      "workers_dev": false,
+      "cache": { "enabled": true },
+      "services": [{ "binding": "PLATFORM", "service": "platform-prod" }],
+      "vars": {
+        "PUBLIC_PLATFORM_URL": "https://from-infra-deploy.invalid",
+      },
+    },
   },
 }

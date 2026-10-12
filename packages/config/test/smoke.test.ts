@@ -635,8 +635,8 @@ describe("the smoke command", () => {
         new NoStage()
       );
       expect(
-        yield* Effect.flip(main(["--stage", "prod", "--url", origin]))
-      ).toStrictEqual(new UnknownStage({ stage: "prod" }));
+        yield* Effect.flip(main(["--stage", "staging", "--url", origin]))
+      ).toStrictEqual(new UnknownStage({ stage: "staging" }));
       expect(seen).toStrictEqual([]);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );

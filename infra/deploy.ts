@@ -21,6 +21,7 @@ import { schemaItems } from "./env-schema.ts";
 import { notRecording } from "./recording.ts";
 import type { RecordingInProgress } from "./recording.ts";
 import {
+  customHosts,
   platformOrigin,
   repoRoot,
   stageOf,
@@ -61,60 +62,85 @@ interface Step {
 
 const bin = (app: string, name: string) => `${app}/node_modules/.bin/${name}`;
 
+// A stage on the brand's own domain gets its hostnames and the URL vars that
+// name them here, never from `wrangler.jsonc` (see `customHosts`).
+const hostArgs = (stage: Stage) =>
+  Option.match(customHosts(stage), {
+    onNone: () => ({ platform: [], web: [] }),
+    onSome: ({ platform, web }) => ({
+      platform: [
+        "--domain",
+        platform,
+        "--var",
+        `PUBLIC_WEB_URL:https://${web}`,
+      ],
+      web: [
+        "--domain",
+        web,
+        "--var",
+        `PUBLIC_PLATFORM_URL:https://${platform}`,
+      ],
+    }),
+  });
+
 const stepsOf = (
   stage: Stage,
   options: {
     readonly web: boolean;
     readonly platformEnv: Readonly<Record<string, string>>;
   }
-): readonly Step[] => [
-  { args: ["run", "verify"], command: "bun", cwd: "", name: "verify" },
-  {
-    args: ["deploy", "--env", stage],
-    command: bin("apps/sandbox", "wrangler"),
-    cwd: "apps/sandbox",
-    name: "sandbox",
-  },
-  {
-    args: ["deploy", "--env", stage],
-    command: bin("apps/platform", "varlock-wrangler"),
-    cwd: "apps/platform",
-    env: options.platformEnv,
-    name: "platform",
-  },
-  // The Vite plugin takes the stage from CLOUDFLARE_ENV and writes its deploy
-  // config under `dist/`, so Wrangler gets no --env. NODE_ENV stops a shell's
-  // own value from making a development build, whose `#backend` is the dev world.
-  ...(options.web
-    ? [
-        {
-          args: ["run", "build"],
-          command: "bun",
-          cwd: "apps/web",
-          env: { CLOUDFLARE_ENV: stage, NODE_ENV: "production" },
-          name: "web build",
-        },
-        {
-          args: ["deploy", "--env", stage],
-          command: bin("apps/web", "wrangler"),
-          cwd: "apps/web",
-          name: "web",
-        },
-      ]
-    : []),
-  {
-    args: ["run", "bootstrap", "--stage", stage, "--check-triggers"],
-    command: "bun",
-    cwd: "",
-    name: "triggers",
-  },
-  {
-    args: ["scripts/smoke.ts", "--stage", stage],
-    command: "bun",
-    cwd: "",
-    name: "smoke",
-  },
-];
+): readonly Step[] => {
+  const hosts = hostArgs(stage);
+
+  return [
+    { args: ["run", "verify"], command: "bun", cwd: "", name: "verify" },
+    {
+      args: ["deploy", "--env", stage],
+      command: bin("apps/sandbox", "wrangler"),
+      cwd: "apps/sandbox",
+      name: "sandbox",
+    },
+    {
+      args: ["deploy", "--env", stage, ...hosts.platform],
+      command: bin("apps/platform", "varlock-wrangler"),
+      cwd: "apps/platform",
+      env: options.platformEnv,
+      name: "platform",
+    },
+    // The Vite plugin takes the stage from CLOUDFLARE_ENV and writes its deploy
+    // config under `dist/`, so Wrangler gets no --env. NODE_ENV stops a shell's
+    // own value from making a development build, whose `#backend` is the dev world.
+    ...(options.web
+      ? [
+          {
+            args: ["run", "build"],
+            command: "bun",
+            cwd: "apps/web",
+            env: { CLOUDFLARE_ENV: stage, NODE_ENV: "production" },
+            name: "web build",
+          },
+          {
+            args: ["deploy", "--env", stage, ...hosts.web],
+            command: bin("apps/web", "wrangler"),
+            cwd: "apps/web",
+            name: "web",
+          },
+        ]
+      : []),
+    {
+      args: ["run", "bootstrap", "--stage", stage, "--check-triggers"],
+      command: "bun",
+      cwd: "",
+      name: "triggers",
+    },
+    {
+      args: ["scripts/smoke.ts", "--stage", stage],
+      command: "bun",
+      cwd: "",
+      name: "smoke",
+    },
+  ];
+};
 
 const platformSecrets = (root: string) =>
   Effect.gen(function* () {

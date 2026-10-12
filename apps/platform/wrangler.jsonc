@@ -305,5 +305,95 @@
         ],
       },
     },
+    // Served on the brand's own domain, never workers.dev: infra/deploy.ts
+    // passes its Custom Domain and PUBLIC_WEB_URL, which name the brand, so
+    // they live in infra/stages.ts. The URL here is a stand-in the deploy's
+    // --var replaces. Bootstrap writes the D1 and KV ids.
+    "prod": {
+      "workers_dev": false,
+      "vars": {
+        "OPERATOR_HANDLE": "oscabriel",
+        "STAGE": "prod",
+        "LANDER_ADAPTER": "container",
+        "DRAFT_MODEL": "@cf/moonshotai/kimi-k2.7-code",
+        "PUBLIC_WEB_URL": "https://from-infra-deploy.invalid",
+      },
+      "secrets": {
+        "required": [
+          "OPERATOR_TOKEN",
+          "COOKIE_KEY",
+          "PASSWORD_PEPPER",
+          "MASTER_KEY",
+        ],
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "PROJECT", "class_name": "Project" }],
+      },
+      "workflows": [
+        { "name": "answer-prod", "binding": "ANSWER", "class_name": "Answer" },
+        {
+          "name": "on-push-prod",
+          "binding": "ON_PUSH",
+          "class_name": "OnPush",
+        },
+      ],
+      "artifacts": [
+        { "binding": "ARTIFACTS", "namespace": "projects-prod" },
+        { "binding": "ARTIFACTS_PRIVATE", "namespace": "layers-prod" },
+      ],
+      "d1_databases": [
+        {
+          "binding": "FRONT_PAGE",
+          "database_name": "front-page-prod",
+          "database_id": "00000000-0000-0000-0000-000000000000",
+          "migrations_dir": "migrations",
+        },
+      ],
+      // KV namespace `oauth-prod`.
+      "kv_namespaces": [
+        { "binding": "OAUTH_KV", "id": "00000000000000000000000000000000" },
+      ],
+      "r2_buckets": [
+        { "binding": "EVIDENCE", "bucket_name": "evidence-prod" },
+        { "binding": "RELEASES", "bucket_name": "releases-prod" },
+        { "binding": "CODE_CACHE", "bucket_name": "code-cache-prod" },
+      ],
+      "worker_loaders": [{ "binding": "LOADER" }],
+      "ai": { "binding": "AI" },
+      "services": [{ "binding": "SANDBOX", "service": "sandbox-prod" }],
+      "ratelimits": [
+        {
+          "name": "CLAIM_LIMIT",
+          "namespace_id": "1301",
+          "simple": { "limit": 10, "period": 60 },
+        },
+        {
+          "name": "PROPOSAL_LIMIT",
+          "namespace_id": "1302",
+          "simple": { "limit": 5, "period": 60 },
+        },
+        {
+          "name": "SIGN_IN_LIMIT",
+          "namespace_id": "1303",
+          "simple": { "limit": 5, "period": 60 },
+        },
+        {
+          "name": "DRAFT_LIMIT",
+          "namespace_id": "1304",
+          "simple": { "limit": 2, "period": 60 },
+        },
+      ],
+      "triggers": {
+        "events": [
+          {
+            "type": "cf.artifacts.repo.pushed",
+            "filter": { "namespace": "projects-prod" },
+            "targets": [
+              { "type": "workflow", "workflow_name": "on-push-prod" },
+            ],
+          },
+        ],
+      },
+    },
   },
 }

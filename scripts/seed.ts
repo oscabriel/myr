@@ -81,6 +81,12 @@ const stageFrom = (argv: readonly string[]) =>
       Effect.mapError(({ message }) => failed(message))
     );
 
+    if (stage === "prod") {
+      return yield* failed(
+        "--stage prod is the real platform: the examples are fictional, so seed them on a dev stage or demo"
+      );
+    }
+
     if (stage === "demo" && !argv.includes("--yes")) {
       return yield* failed(
         "--stage demo is the stage the user records on (H7): seed it only between takes, with --yes"

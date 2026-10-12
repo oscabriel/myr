@@ -917,8 +917,10 @@ describe("the Worker's rate limits", () => {
           WorkerCaps.claim,
           WorkerCaps.claim,
           WorkerCaps.claim,
+          WorkerCaps.claim,
         ]);
         expect(limitsOf("PROPOSAL_LIMIT")).toStrictEqual([
+          WorkerCaps.proposal,
           WorkerCaps.proposal,
           WorkerCaps.proposal,
           WorkerCaps.proposal,

@@ -157,6 +157,12 @@ export const optionsOf = (
       Effect.mapError(({ message }) => failed(`${message}. ${USAGE}`))
     );
 
+    if (stage === "prod") {
+      return yield* failed(
+        "--stage prod: the swarm's contributors are fictional, so run it on a dev stage or demo"
+      );
+    }
+
     if (stage === "demo" && !argv.includes("--allow-demo")) {
       return yield* failed(
         "--stage demo: its burrow family is for the recorded take; run it there only with --allow-demo"

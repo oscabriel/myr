@@ -292,10 +292,10 @@ describe("a release's plan", () => {
         build: false,
         env: { CLAUDECODE: "1" },
         publish: true,
-        stage: "prod",
+        stage: "staging",
         upload: true,
       })
-    ).toStrictEqual(Result.fail(new UnknownStage({ stage: "prod" })));
+    ).toStrictEqual(Result.fail(new UnknownStage({ stage: "staging" })));
   });
 
   it("publishes last when a person runs it", () => {
@@ -391,12 +391,12 @@ describe("a release's plan", () => {
         build: false,
         env: {},
         publish: false,
-        stage: "prod",
+        stage: "staging",
         upload: true,
       }),
     }).toStrictEqual({
       none: Result.fail(new NoStage()),
-      unknown: Result.fail(new UnknownStage({ stage: "prod" })),
+      unknown: Result.fail(new UnknownStage({ stage: "staging" })),
     });
   });
 });

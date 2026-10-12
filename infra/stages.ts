@@ -1,6 +1,7 @@
 // The one table of stages and the resources each owns, each named by its job
 // plus the stage, never the brand. `packages/config/test/bootstrap.test.ts`
 // holds every Worker's `wrangler.jsonc` env blocks to it.
+import { Brand } from "@repo/brand";
 import { Effect, FileSystem, Option, Path, Schema } from "effect";
 
 export const Stage = Schema.Union([
@@ -9,6 +10,7 @@ export const Stage = Schema.Union([
     Schema.String.check(Schema.isPattern(/^[a-z0-9]+$/u)),
   ]),
   Schema.Literal("demo"),
+  Schema.Literal("prod"),
 ]);
 
 export type Stage = typeof Stage.Type;
@@ -17,7 +19,33 @@ export type Stage = typeof Stage.Type;
 export const stages = [
   "dev-oscabriel",
   "demo",
+  "prod",
 ] as const satisfies readonly Stage[];
+
+// The stages people see: no script makes a throwaway project or seeds a
+// fictional one on them without being told to.
+export const publicStages: ReadonlySet<string> = new Set<Stage>([
+  "demo",
+  "prod",
+]);
+
+export interface Hosts {
+  readonly platform: string;
+  readonly web: string;
+}
+
+// A stage served on the brand's own domain, as Workers Custom Domains. The
+// names live here, not in `wrangler.jsonc`, so the brand stays in
+// `packages/brand`: `infra/deploy.ts` hands them to Wrangler as `--domain`
+// and as the URL vars, and such a stage turns its `workers.dev` route off.
+// What such a stage's `wrangler.jsonc` holds in each URL var: `.invalid`
+// never resolves, so a deploy that skipped `--var` fails where it shows.
+export const URL_FROM_DEPLOY = "https://from-infra-deploy.invalid";
+
+export const customHosts = (stage: Stage): Option.Option<Hosts> =>
+  stage === "prod"
+    ? Option.some({ platform: `git.${Brand.domain}`, web: Brand.domain })
+    : Option.none();
 
 export interface Resources {
   readonly platform: string;
@@ -124,7 +152,14 @@ export const recordedSubdomain = Effect.gen(function* () {
 });
 
 export const platformOrigin = (stage: Stage, subdomain: string) =>
-  `https://${resources(stage).platform}.${subdomain}.workers.dev`;
+  Option.match(customHosts(stage), {
+    onNone: () =>
+      `https://${resources(stage).platform}.${subdomain}.workers.dev`,
+    onSome: ({ platform }) => `https://${platform}`,
+  });
 
 export const webOrigin = (stage: Stage, subdomain: string) =>
-  `https://${resources(stage).web}.${subdomain}.workers.dev`;
+  Option.match(customHosts(stage), {
+    onNone: () => `https://${resources(stage).web}.${subdomain}.workers.dev`,
+    onSome: ({ web }) => `https://${web}`,
+  });

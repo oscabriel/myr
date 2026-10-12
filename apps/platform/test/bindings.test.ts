@@ -263,10 +263,15 @@ describe("the platform Worker's bindings", () => {
           vars: keysOf(PlatformVars.fields),
         };
 
-        expect(Object.keys(stages)).toStrictEqual(["dev-oscabriel", "demo"]);
+        expect(Object.keys(stages)).toStrictEqual([
+          "dev-oscabriel",
+          "demo",
+          "prod",
+        ]);
         expect({ top, ...stages }).toStrictEqual({
           demo: decoded,
           "dev-oscabriel": decoded,
+          prod: decoded,
           top: decoded,
         });
       }).pipe(Effect.provide(NodeServices.layer))
@@ -314,6 +319,7 @@ describe("the platform Worker's bindings", () => {
         expect({
           demo: yield* read(env.demo),
           "dev-oscabriel": yield* read(env["dev-oscabriel"]),
+          prod: yield* read(env.prod),
           top: yield* read(raw),
         }).toStrictEqual({
           demo: {
@@ -327,6 +333,14 @@ describe("the platform Worker's bindings", () => {
             draftLimit: draftLimit("1104"),
             model,
             web: "https://web-dev-oscabriel.oscargabriel.workers.dev",
+          },
+          prod: {
+            ai: "AI",
+            draftLimit: draftLimit("1304"),
+            model,
+            // A stand-in: on the brand's own domain, `infra/deploy.ts` passes
+            // the web's address as a `--var` (`packages/config/test/deploy.test.ts`).
+            web: "https://from-infra-deploy.invalid",
           },
           top: {
             ai: "AI",
@@ -361,10 +375,12 @@ describe("the platform Worker's bindings", () => {
       expect({
         demo: yield* codeCache(env.demo),
         "dev-oscabriel": yield* codeCache(env["dev-oscabriel"]),
+        prod: yield* codeCache(env.prod),
         top: yield* codeCache(raw),
       }).toStrictEqual({
         demo: "code-cache-demo",
         "dev-oscabriel": "code-cache-dev-oscabriel",
+        prod: "code-cache-prod",
         top: "code-cache-local",
       });
     }).pipe(Effect.provide(NodeServices.layer))
@@ -455,10 +471,15 @@ describe("the sandbox Worker's bindings", () => {
           vars: [],
         };
 
-        expect(Object.keys(stages)).toStrictEqual(["dev-oscabriel", "demo"]);
+        expect(Object.keys(stages)).toStrictEqual([
+          "dev-oscabriel",
+          "demo",
+          "prod",
+        ]);
         expect({ top, ...stages }).toStrictEqual({
           demo: read,
           "dev-oscabriel": read,
+          prod: read,
           top: read,
         });
       }).pipe(Effect.provide(NodeServices.layer))
