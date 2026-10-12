@@ -22,7 +22,7 @@ const PRIVATE = [
   "/home/",
   "wanted-explainer",
   "plans.gneiss.run",
-  ".scratch/build",
+  ".agents/scratch/build",
 ] as const;
 
 /**
@@ -110,8 +110,8 @@ const publicDocs = Effect.gen(function* () {
   return yield* withText([
     "AGENTS.md",
     "GLOSSARY.md",
-    ...(yield* markdownIn("docs/adr")),
-    ...(yield* markdownIn("docs/agents")),
+    ...(yield* markdownIn(".agents/adr")),
+    ...(yield* markdownIn(".agents/workflow")),
   ]);
 });
 
@@ -216,7 +216,7 @@ describe("the repo's public docs", () => {
 
   it.live("every ADR opens with a status line", () =>
     Effect.gen(function* () {
-      const adrs = yield* withText(yield* markdownIn("docs/adr"));
+      const adrs = yield* withText(yield* markdownIn(".agents/adr"));
 
       expect(
         adrs.flatMap(({ path, text }) =>
@@ -228,8 +228,8 @@ describe("the repo's public docs", () => {
 
   it.live("ADRs are numbered from 0001 with no gap", () =>
     Effect.gen(function* () {
-      const numbers = (yield* markdownIn("docs/adr")).map((path) =>
-        path.slice("docs/adr/".length, "docs/adr/".length + 5)
+      const numbers = (yield* markdownIn(".agents/adr")).map((path) =>
+        path.slice(".agents/adr/".length, ".agents/adr/".length + 5)
       );
 
       expect(numbers).toStrictEqual(

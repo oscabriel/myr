@@ -1,5 +1,5 @@
 /**
- * The demo folder. On recording day the user opens `docs/demo/`
+ * The demo folder. On recording day the user opens `.agents/demo/`
  * and finds a narration script timed to the video's seven beats, a shot list,
  * the swarm scenario and a rehearsal checklist that the live walk marks.
  *
@@ -35,7 +35,7 @@ import { Contracts } from "../../protocol/src/contracts.ts";
 import { repoRoot } from "./root.ts";
 
 /** The folder, from the repo root, and the four files the user records from. */
-const DEMO = "docs/demo";
+const DEMO = ".agents/demo";
 
 const DEMO_FILES = [
   "rehearsal.md",

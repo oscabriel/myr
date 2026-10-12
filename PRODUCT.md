@@ -107,7 +107,7 @@ What it declines:
 ## Evidence on Hand
 
 - The examples `examples/datekit` (a date library with a maintainers layer of sealed checks and an `.env.schema`) and `examples/burrow` (six services with a lint ratchet and a migrate ask split six ways) are fictional projects with fictional people (`ines-v`, `okonkwo`, `bram`, `okafor`, `lin-h`, and burrow's vouched contributors). Pages and the video show them as examples, never as real users.
-- The demo is planned in `docs/demo/`: a narration script, a shot list, the swarm scenario and a rehearsal checklist. What it stages is labelled there.
+- The demo is planned in `.agents/demo/`: a narration script, a shot list, the swarm scenario and a rehearsal checklist. What it stages is labelled there.
 - Measured numbers come only from recorded live runs on a stage, each with its date (the README's Numbers table). No testimonials, customers or adoption figures exist; none may be invented.
 - A heuristic critique of the web's front page, project home and answer pages, dated 2026-10-11 and kept in the design tool's working files (not committed), scored them 31 of 40. Its findings (the inspector's commands wrapping at 19 rem, one ask reading two state words, lists stacking their state words into a colour stripe, the Landed page ending on hashes, rows with no time) are the source of DESIGN.md's row, inspector, posture and Landed page rules of October 2026, and of ADR 0039. Two peer platforms were read from their own sources the same week, by mechanism; what was taken and declined from them is in ADRs 0034 to 0038 and DESIGN.md's "Rejected on purpose".
 
