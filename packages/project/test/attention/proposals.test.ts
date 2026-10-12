@@ -42,6 +42,7 @@ const byCarol = (
   standing: Partial<Parameters<typeof ProposalCommand.Propose>[0]> = {}
 ) =>
   ProposalCommand.Propose({
+    capped: true,
     denounced: false,
     files: [RepoPath.make("packages/parser/test/iso-week.test.ts")],
     id: minted.proposal(),
@@ -61,6 +62,7 @@ const flagBy = (
 ) =>
   ProposalCommand.Flag({
     ask: flagged,
+    capped: true,
     denounced: false,
     id: minted.proposal(),
     openCount: 0,
@@ -108,6 +110,12 @@ describe("proposing an ask", () => {
     expect(proposalOf(byCarol({ openCount: 2 }))).toStrictEqual(
       Result.fail(new CapReached({ cap: 2, limit: "proposals" }))
     );
+  });
+
+  it("lets a vouched person propose past the cap, which is for the public", () => {
+    expect(
+      Result.isSuccess(proposalOf(byCarol({ capped: false, openCount: 20 })))
+    ).toBeTruthy();
   });
 
   it("lets a person with one fewer than the cap open propose", () => {

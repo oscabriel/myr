@@ -303,11 +303,18 @@ const proposing = (api: ProjectApi) =>
     const onToday = yield* api.today(alice);
     const alarm = yield* scheduled;
 
-    const second = yield* api.proposeAsk(carol, { want: "Trim tabs too" });
+    // The cap is for the public: dave is not vouched, carol is.
+    const second = yield* api.proposeAsk(dave, { want: "Trim tabs too" });
+
+    yield* api.proposeAsk(dave, { want: "Trim spaces too" });
 
     const third = yield* api
-      .proposeAsk(carol, { want: "Trim newlines too" })
+      .proposeAsk(dave, { want: "Trim newlines too" })
       .pipe(Effect.flip);
+
+    const beyondCap = yield* api
+      .proposeAsk(carol, { want: "Trim carriage returns too" })
+      .pipe(Effect.result, Effect.map(Result.isSuccess));
 
     yield* redOnMain(files);
 
@@ -324,6 +331,7 @@ const proposing = (api: ProjectApi) =>
         .decide(alice, { choice: "decline", decision: firstDecision })
         .pipe(Effect.flip),
       alarm,
+      beyondCap,
       bobDecides: yield* api
         .decide(bob, {
           choice: "accept",
@@ -466,9 +474,14 @@ describe("a proposal", () => {
           },
         ]);
         expect(run.alarm).toStrictEqual(Option.some(daysAfter(noon, 14)));
-        expect([run.second.proposal.state, run.third]).toStrictEqual([
+        expect([
+          run.second.proposal.state,
+          run.third,
+          run.beyondCap,
+        ]).toStrictEqual([
           "open",
           new CapReached({ cap: 2, limit: "proposals" }),
+          true,
         ]);
       })
   );
@@ -503,6 +516,8 @@ describe("a proposal", () => {
           [
             [proposal, "accepted"],
             [ProposalId.make("prop-000002"), "open"],
+            [ProposalId.make("prop-000003"), "open"],
+            [ProposalId.make("prop-000004"), "open"],
           ]
         );
       })

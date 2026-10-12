@@ -27,6 +27,7 @@ import { ProjectEventInput } from "../events.ts";
 import { AttentionEffect } from "./effects.ts";
 
 interface Proposer {
+  readonly capped: boolean;
   readonly denounced: boolean;
   readonly id: ProposalId;
   readonly openCount: number;
@@ -78,7 +79,7 @@ const lacksVouch = (policy: Policy, { sealed, vouched }: Propose) => {
 
 const admit = (
   policy: Policy,
-  { denounced, openCount }: Proposer,
+  { capped, denounced, openCount }: Proposer,
   unvouched: boolean
 ): Result.Result<void, CapReached | Denounced | NotVouched> => {
   const cap = policy.caps.proposalsPerPerson;
@@ -91,7 +92,7 @@ const admit = (
     return Result.fail(new NotVouched({}));
   }
 
-  return openCount >= cap
+  return capped && openCount >= cap
     ? Result.fail(new CapReached({ cap, limit: "proposals" }))
     : Result.void;
 };
