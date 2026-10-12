@@ -30,7 +30,6 @@ import {
 } from "./stages.ts";
 import type { Stage } from "./stages.ts";
 
-
 export interface Existing {
   readonly namespaces: readonly string[];
   readonly d1: readonly { readonly name: string; readonly id: string }[];
@@ -65,7 +64,6 @@ export const plan = (stage: Stage, existing: Existing): readonly Step[] => {
     ),
   ];
 };
-
 
 export interface Ids {
   readonly frontPage?: string | undefined;
@@ -135,7 +133,6 @@ export const writeIds = (text: string, stage: Stage, ids: Ids): string => {
 
   return written;
 };
-
 
 const Target = Schema.Struct({
   script_name: Schema.String,
@@ -216,7 +213,6 @@ export const checkTriggers = (
       );
 };
 
-
 const jsonIn = (stdout: string) => {
   const start = stdout.search(/^[[{]/mu);
 
@@ -276,7 +272,6 @@ export const missingSecrets = (
   items.flatMap(({ name, required }) =>
     required && !listed.includes(name) ? [name] : []
   );
-
 
 export class CloudflareRefused extends Schema.TaggedError<CloudflareRefused>()(
   "CloudflareRefused",
