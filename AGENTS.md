@@ -2,7 +2,7 @@
 
 Myr is a Git platform on Cloudflare. Everything a project ships is public, its contribution process is typed code on main, and a push lands only by passing a typed gate. It is our entry to Cloudflare's "Build the next GitHub" competition, which closes Wed Oct 14, 11:59 PM PDT.
 
-The core loop runs on Cloudflare today: a person claims an ask, pushes an answer through the platform's git gateway, and the platform checks it and lands it, or refuses it: the cheap stages answer in git's own output, and the rest arrive later in `status`, `watch`, MCP and the verdict note. The CLI, MCP and the web all serve the same contracts, and typed visibility (layers, held-back checks, posture, the ledger and write-only env values) plugs in as one cartridge. `README.md` says how to run it, check it and cut it; `GLOSSARY.md` defines the words.
+The core loop runs on Cloudflare today: a person claims an ask, pushes an answer through the platform's git gateway, and the platform checks it and lands it, or refuses it: the cheap stages answer in git's own output, and the rest arrive later in `status`, `watch`, MCP and the verdict note. The CLI, MCP and the web all serve the same contracts, and typed visibility (layers, held-back checks, posture, the ledger and write-only env values) plugs in as one cartridge. `README.md` says how to run it and deploy it; `GLOSSARY.md` defines the words.
 
 `bun run verify` is the gate. The principles table names the check that holds each rule; a rule marked "No fence" is held by review.
 
@@ -36,7 +36,7 @@ A check wins over prose: if this file and a check disagree, fix this file.
 - changing a lint rule that fights an idiom Effect's own docs use, with the reason beside it in `oxlint.config.ts` (lint fits Effect, not the other way around);
 - an escape with its reason, where no idiomatic code does the job;
 - docs;
-- a cut that follows the README's "Keep or cut".
+- a cut that removes a cartridge by deletion (see Nouns).
 
 **Needs the user's sign-off:**
 
