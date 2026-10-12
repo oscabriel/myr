@@ -20,21 +20,12 @@ import type { FrozenFacts } from "../prelude.ts";
 import { factsOf, RulesEvaluator, RulesFailed } from "../rules-evaluator.ts";
 import type { ConfigBundle, RuleName } from "../rules-evaluator.ts";
 
-/**
- * One module as the Worker Loader takes it: ES module source, JSON data, or
- * text. (`@cloudflare/workers-types`' `WorkerLoaderModule`, for the kinds
- * used.)
- */
 export type LoaderModule =
   | { readonly js: string }
   | { readonly json: Schema.Json }
   | { readonly text: string };
 
-/**
- * The code the adapter hands the Loader: `WorkerLoaderWorkerCode`'s fields
- * it uses. There is no `env` (no binding reaches config code), no outbound
- * (`fetch` and `connect` throw), and no subrequests.
- */
+/** No `env` (no binding reaches config code), no outbound and no subrequests. */
 export interface LoaderCode {
   readonly compatibilityDate: string;
   readonly globalOutbound: null;
@@ -43,7 +34,6 @@ export interface LoaderCode {
   readonly modules: Readonly<Record<string, LoaderModule>>;
 }
 
-/** A loaded worker's default entrypoint, as `Fetcher#fetch` serves it. */
 export interface LoaderEntrypoint {
   readonly fetch: (
     url: string,
@@ -51,32 +41,25 @@ export interface LoaderEntrypoint {
   ) => Promise<{ readonly text: () => Promise<string> }>;
 }
 
-/** A loaded worker, as `WorkerStub#getEntrypoint` opens it. */
 export interface LoadedWorker {
   readonly getEntrypoint: () => LoaderEntrypoint;
 }
 
 /**
- * The Worker Loader binding, typed by the fields the adapter uses, so
- * `rules` needs no Workers types: the platform's `env.LOADER` (a
- * `WorkerLoader`) is one. `get` keeps a worker warm under its id and calls
- * `getCode` only for an id it doesn't hold.
+ * Typed by the fields the adapter uses, so `rules` needs no Workers types.
+ * `get` keeps a worker warm under its id and calls `getCode` only for an id it
+ * doesn't hold.
  */
 export interface LoaderBinding {
   readonly get: (id: string, getCode: () => LoaderCode) => LoadedWorker;
 }
 
-/** How the `/worker` adapter loads config code. */
 export interface WorkerOptions {
-  /** The loaded worker's compatibility date; the platform's by default. */
   readonly compatibilityDate?: string;
-  /** The CPU time one request may spend; 200 ms by default. */
   readonly cpuMs?: number;
-  /** How long one request may take, waiting included; 5 s by default. */
   readonly timeoutMs?: number;
 }
 
-/** What the loaded worker answers: the same results `/bun`'s main prints. */
 const Output = Schema.TaggedUnion({
   Called: { result: Schema.Json },
   Collected: Collected.fields,
@@ -90,7 +73,6 @@ type Output = typeof Output.Type;
 
 const decodeOutput = Schema.decodeEffect(Schema.fromJsonString(Output));
 
-/** A request to the loaded worker: collect the folder's exports, or call a rule. */
 type Job =
   | Readonly<Record<string, never>>
   | { readonly facts: Schema.Json; readonly rule: RuleName };
@@ -120,7 +102,6 @@ const RAN_OUT =
 // rejects the request instead of reaching the main.
 const WONT_START = /^Failed to start Worker\b/u;
 
-// A module the Loader imports as code.
 const SCRIPT = /\.[cm]?[jt]s$/u;
 
 const loadFailed = (detail: string) =>
@@ -138,10 +119,6 @@ const fromFailed = ({ detail, reason }: Extract<Output, { _tag: "Failed" }>) =>
 const messageOf = (cause: unknown) =>
   Predicate.isError(cause) ? cause.message : String(cause);
 
-/**
- * A rejection from the loaded worker: a module that won't compile, its CPU
- * limit spent, or its code threw.
- */
 const thrownBy = (cause: unknown) => {
   const message = messageOf(cause);
   const detail = `the loaded worker: ${message}`;
@@ -156,7 +133,6 @@ const thrownBy = (cause: unknown) => {
   });
 };
 
-/** Releases a stub the runtime handed out; one with no way to be released is left. */
 const released = (stub: LoadedWorker | LoaderEntrypoint) =>
   Effect.try(() => {
     const dispose =
@@ -169,7 +145,6 @@ const released = (stub: LoadedWorker | LoaderEntrypoint) =>
     }
   }).pipe(Effect.ignore);
 
-/** Sends one job to a loaded worker's entrypoint, and decodes its answer. */
 const requested = (entrypoint: LoaderEntrypoint, job: Job) =>
   Effect.tryPromise({
     catch: thrownBy,
@@ -195,10 +170,6 @@ const requested = (entrypoint: LoaderEntrypoint, job: Job) =>
     )
   );
 
-/**
- * Whether a bundle path names a module inside the folder: relative, with
- * no empty, `.` or `..` segment, and not the main's or the prelude's name.
- */
 const isModulePath = (path: string) =>
   path !== mainName &&
   path !== preludeName &&
@@ -206,7 +177,6 @@ const isModulePath = (path: string) =>
     .split("/")
     .every((segment) => segment !== "" && segment !== "." && segment !== "..");
 
-/** Refuses a bundle with a path outside the folder, before any worker loads. */
 const insideTheFolder = (bundle: ConfigBundle) => {
   const outside = Object.keys(bundle.modules).filter(
     (path) => !isModulePath(path)
@@ -223,11 +193,7 @@ const insideTheFolder = (bundle: ConfigBundle) => {
 
 const parsedJson = Schema.decodeOption(Schema.fromJsonString(Schema.Json));
 
-/**
- * A bundle file as a Loader module: a script as ES module source, JSON as
- * data (or as text when it won't parse, which fails only if config code
- * imports it), anything else as text.
- */
+/** JSON that won't parse goes as text, which fails only if config code imports it. */
 const moduleOf = (path: string, source: string): LoaderModule => {
   if (SCRIPT.test(path)) {
     return { js: source };
@@ -250,18 +216,7 @@ const moduleOf = (path: string, source: string): LoaderModule => {
 const workerIdOf = (bundle: ConfigBundle, at: string, clock: FrozenFacts) =>
   `rules:${at}:${bundle.sdkVersion}:${clock.now}:${clock.seed}`;
 
-/**
- * `RulesEvaluator` over the Worker Loader. Each request loads
- * the bundle's modules, a prelude that freezes the clock and randomness to
- * the injected facts, and a main that answers one JSON document, as a
- * Dynamic Worker with no bindings, no outbound and a CPU limit, kept warm
- * per landed commit; asks it to collect the folder's exports or call a
- * rule; and disposes it after, whatever it answered. A bundle with no
- * project module, no asks and no visibility module reads `policy.json`, or
- * gets the defaults, without a worker. Then `finishPolicy`, with the caller's `Finishers`. The
- * adapter reads no clock: an evaluation's clock is `facts.now`, the landed
- * commit's time.
- */
+/** The adapter reads no clock: an evaluation's clock is `facts.now`, the landed commit's time. */
 export const RulesEvaluatorWorker = (
   loader: LoaderBinding,
   options: WorkerOptions = {}
@@ -275,8 +230,8 @@ export const RulesEvaluatorWorker = (
       const timeoutMs = options.timeoutMs ?? 5000;
 
       /**
-       * The code the Loader gets for a bundle under a clock. The Loader asks
-       * for it only for an id it doesn't hold, so a warm request builds none.
+       * The Loader asks for it only for an id it doesn't hold, so a warm
+       * request builds none.
        */
       const codeOf = (bundle: ConfigBundle, clock: FrozenFacts): LoaderCode => {
         const modules: Record<string, LoaderModule> = {};
@@ -304,10 +259,6 @@ export const RulesEvaluatorWorker = (
         };
       };
 
-      /**
-       * Loads the bundle under a clock, runs one job, and disposes the
-       * worker and its entrypoint, within the time limit.
-       */
       const run = (
         bundle: ConfigBundle,
         at: string,

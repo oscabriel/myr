@@ -8,10 +8,6 @@ import { expectGolden, GoldenDir, normaliseGitOutput } from "../src/golden.ts";
 
 const id = "0123456789abcdef0123456789abcdef01234567";
 
-/**
- * One push of one fixed commit to a new bare repo, through a pre-receive hook
- * that prints what it received: git's whole stderr, as it printed it.
- */
 const pushOnce = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const root = yield* fs.makeTempDirectoryScoped().pipe(Effect.orDie);
@@ -42,11 +38,9 @@ const pushOnce = Effect.gen(function* () {
   return yield* git(work, "push", remote, "HEAD:refs/heads/main");
 }).pipe(Effect.scoped);
 
-/** What a failed expectation says, or nothing when it passed. */
 const complaint = (exit: Exit.Exit<void>) =>
   Exit.isFailure(exit) ? String(Cause.squash(exit.cause)) : "";
 
-/** Runs with golden files in a fresh folder, and `UPDATE_GOLDEN` as given. */
 const inTempGoldens = <A, E, R>(
   update: string,
   run: (dir: string) => Effect.Effect<A, E, R>

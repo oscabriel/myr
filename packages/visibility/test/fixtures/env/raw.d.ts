@@ -1,7 +1,3 @@
-/**
- * What Vite gives these tests to read files as text: a `.env.schema`
- * fixture by `?raw` import, and source files by `import.meta.glob`.
- */
 declare module "*?raw" {
   const text: string;
   export default text;

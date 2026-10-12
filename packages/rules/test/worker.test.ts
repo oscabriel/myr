@@ -32,17 +32,14 @@ import {
   nowMs,
 } from "./world.ts";
 
-/** The `/worker` adapter over a loader, with the fake finishers. */
 const workerEvaluator = (loader: LoaderBinding, options?: WorkerOptions) =>
   RulesEvaluatorWorker(loader, options).pipe(
     Layer.provide(Layer.succeed(Finishers, finishers))
   );
 
-/** A policy as JSON carries it: one the evaluator gave always encodes. */
 const encoded = (policy: Policy) =>
   Effect.orDie(Schema.encodeEffect(Policy)(policy));
 
-/** Evaluates a bundle at a landed commit: the encoded policy, or the failure. */
 const evaluated = (modules: ConfigBundle, landed = at) =>
   Effect.gen(function* () {
     const evaluator = yield* RulesEvaluator;
@@ -54,7 +51,6 @@ const evaluated = (modules: ConfigBundle, landed = at) =>
     );
   });
 
-/** Calls a function-valued rule: its answer, or the failure. */
 const called = (modules: ConfigBundle, call: RuleCall) =>
   Effect.gen(function* () {
     const evaluator = yield* RulesEvaluator;
@@ -62,7 +58,6 @@ const called = (modules: ConfigBundle, call: RuleCall) =>
     return yield* Effect.result(evaluator.call({ ...call, at, modules }));
   });
 
-/** The reason a result failed for; a policy or an answer fails the test. */
 const reasonOf = <A>(
   result: Result.Result<A, { readonly reason: string }>
 ): string => {
@@ -73,7 +68,6 @@ const reasonOf = <A>(
 
 const decodeProposal = Schema.decodeUnknownSync(ProposalFacts);
 
-/** A proposal for an ask of the example's `fixBug` kind, with a record. */
 const proposal = (record: number): RuleCall => ({
   facts: decodeProposal({
     kind: "fixBug",
@@ -84,22 +78,18 @@ const proposal = (record: number): RuleCall => ({
   rule: "opensAlone",
 });
 
-/** The defaults, written as a project module's data. */
 const baseEncoded = Schema.encodeSync(PolicyInput)({
   ...defaultPolicyInput,
   source: "config",
 });
 
-/** A folder with a project module and one ask file. */
 const bundle = bundleOf({
   "asks/a.ask.ts": "export default {};\n",
   "project.ts": "export default {};\n",
 });
 
-/** What the main answers for a folder whose project module is the defaults. */
 const collectedBase = `{"_tag":"Collected","asks":[],"project":${JSON.stringify(baseEncoded)}}`;
 
-/** The specifiers a module imports, in the order it names them. */
 const importsOf = (source: string) =>
   [
     ...source.matchAll(
@@ -107,7 +97,6 @@ const importsOf = (source: string) =>
     ),
   ].map((match) => match.groups?.specifier);
 
-/** A script module's source, from the modules a load handed over. */
 const scriptOf = (modules: LoaderCode["modules"], name: string): string => {
   const module = modules[name];
 
@@ -116,7 +105,6 @@ const scriptOf = (modules: LoaderCode["modules"], name: string): string => {
   return module.js;
 };
 
-/** The modules the first load handed over. */
 const firstLoaded = (loads: readonly { readonly code: LoaderCode }[]) => {
   const [load] = loads;
 
@@ -125,10 +113,6 @@ const firstLoaded = (loads: readonly { readonly code: LoaderCode }[]) => {
   return load.code;
 };
 
-/**
- * Evaluates `bundle` over a fake whose worker answers so, with a 20 ms
- * limit: why it failed ("ok" when it didn't), and the handles disposed.
- */
 const outcome = (answer: Answer) =>
   Effect.gen(function* () {
     const loader = fakeLoader(answer);
@@ -143,7 +127,6 @@ const outcome = (answer: Answer) =>
     };
   });
 
-/** Why evaluating `bundle` fails over a fake whose worker answers so. */
 const reasonFor = (answer: Answer) =>
   evaluated(bundle).pipe(
     Effect.provide(workerEvaluator(fakeLoader(answer).binding)),
@@ -269,7 +252,6 @@ describe("the /worker adapter", () => {
         yield* evaluated({ ...bundle, sdkVersion: "0.0.1" });
       }).pipe(Effect.provide(workerEvaluator(loader.binding)));
 
-      // Each cold start, by what its id names.
       const named = loader.loads.map(({ id }) => ({
         at: [at, other].find((sha) => id.includes(sha)),
         sdk: ["0.0.0", "0.0.1"].find((version) => id.includes(version)),
@@ -314,7 +296,6 @@ describe("the /worker adapter", () => {
         Effect.provide(workerEvaluator(loader.binding))
       );
 
-      // The same data, committed as policy.json, read without running code.
       const viaJson = yield* evaluated(
         bundleOf({ "policy.json": JSON.stringify(baseEncoded) })
       ).pipe(
@@ -372,12 +353,10 @@ describe("the /worker adapter", () => {
           responds:
             '{"_tag":"Failed","detail":".cfg/project.ts: Error: no policy today","reason":"threw"}',
         }),
-        // Exports that are not a policy.
         yield* reasonFor({
           responds:
             '{"_tag":"Collected","asks":[],"project":{"budget":"plenty"}}',
         }),
-        // An answer to a job it was not given.
         yield* reasonFor({ responds: '{"_tag":"Called","result":true}' }),
       ]).toStrictEqual([
         "timeout",
@@ -454,11 +433,6 @@ describe("the /worker adapter", () => {
   );
 });
 
-/**
- * The `/worker` adapter over a Loader that runs what it is handed in Bun,
- * so the main and the prelude run as the JavaScript they are, beside the
- * `/bun` adapter over the same bundles.
- */
 const running = Effect.gen(function* () {
   const services = yield* Effect.context<
     ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path
@@ -473,15 +447,6 @@ const running = Effect.gen(function* () {
   return workerEvaluator(bunLoader(services, sdk));
 });
 
-/**
- * A config whose project module reads the clock and randomness while it
- * loads, and whose one ask puts what it read into its context: the wall
- * clock, a dated `new Date()`, the clock reached through a date's own
- * constructor, whether `Date()` tells the same time as `new Date()`, the
- * clock reached through a date the runtime made (`structuredClone`) and
- * through whatever sits above `Date`, then `Math.random()`,
- * `crypto.getRandomValues()` and `crypto.randomUUID()`.
- */
 const readsTheClock = bundleOf({
   "asks/stamp.ask.ts": [
     'import { stamp } from "../project.ts";',
@@ -509,10 +474,6 @@ const readsTheClock = bundleOf({
   ].join("\n"),
 });
 
-/**
- * A folder with a `visibility.ts` beside its project module: one layer of
- * held-back checks, as the sdk writes it.
- */
 const withVisibility = bundleOf({
   "project.ts": `export default ${JSON.stringify(baseEncoded)};\n`,
   "visibility.ts": `export default ${JSON.stringify({

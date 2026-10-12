@@ -1,22 +1,18 @@
 import { Handle } from "@repo/protocol/ids";
 import { Schema } from "effect";
 
-/** One line of a vouch file: a person vouched for, or denounced. */
 export interface Vouch {
   readonly denounced: boolean;
   readonly handle: Handle;
   readonly note?: string;
-  /** The `platform:` prefix the line wrote, when it wrote one: `github`. */
   readonly platform?: string;
 }
 
-/** A line that names no valid handle, kept so it is reported, not dropped. */
 export interface InvalidVouchLine {
   readonly line: number;
   readonly text: string;
 }
 
-/** A vouch file, read: its vouches and denouncements, and its bad lines. */
 export interface VouchFile {
   readonly invalid: readonly InvalidVouchLine[];
   readonly vouches: readonly Vouch[];
@@ -30,7 +26,6 @@ const LINE =
 
 const isHandle = Schema.is(Handle);
 
-/** One non-blank, non-comment line, read; `undefined` when it names no handle. */
 const vouchOf = (text: string): Vouch | undefined => {
   const groups = LINE.exec(text)?.groups;
   const handle = groups?.handle;
@@ -49,13 +44,7 @@ const vouchOf = (text: string): Vouch | undefined => {
     : { ...withNote, platform: groups.platform };
 };
 
-/**
- * Reads a vouch file in Ghostty's `VOUCHED.td` format: one handle per line
- * (without `@`), an optional `platform:` prefix (`github:alice`), `-handle`
- * to denounce, text after a space as a note, and `#` lines as comments.
- * Blank lines are skipped; a line whose handle fails `Handle` is reported
- * in `invalid` with its line number.
- */
+/** Ghostty's `VOUCHED.td` format; a line whose handle fails `Handle` is reported in `invalid`. */
 export const parseVouchFile = (text: string): VouchFile => {
   const vouches: Vouch[] = [];
   const invalid: InvalidVouchLine[] = [];

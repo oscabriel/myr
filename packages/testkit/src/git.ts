@@ -25,7 +25,6 @@ const env = {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** Spawns a process and hands back its handle, for callers that feed stdin. */
 export const spawn = (
   command: string,
   args: readonly string[],
@@ -45,7 +44,6 @@ export const spawn = (
     )
   ).pipe(Effect.orDie);
 
-/** Runs git in `cwd` to the end; a failing git is a result, not an error. */
 export const git = (cwd: string, ...args: string[]) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -60,7 +58,6 @@ export const git = (cwd: string, ...args: string[]) =>
     })
   );
 
-/** Runs git and returns its trimmed output; a failing git fails the test. */
 export const gitOk = (cwd: string, ...args: string[]) =>
   Effect.flatMap(git(cwd, ...args), (ran) =>
     ran.exitCode === 0

@@ -18,7 +18,6 @@ import type { BunOptions } from "../src/rules-evaluator/bun.ts";
  */
 export const configFolder = ".cfg";
 
-/** The vouch file a policy that names none gets: `PolicyInput`'s default. */
 export const defaultVouchFile = Schema.decodeSync(PolicyInput)({
   asks: [],
   deciders: [],
@@ -30,19 +29,12 @@ export const defaultVouchFile = Schema.decodeSync(PolicyInput)({
   weakening: { markers: [] },
 }).vouch.file;
 
-/** The landed commit every test evaluates at. */
 export const at = LandedSha.make("a".repeat(40));
 
-/** The frozen clock the facts carry, as text and in epoch milliseconds. */
 export const now = "2026-10-07T12:00:00.000Z";
 
 export const nowMs = "1791374400000";
 
-/**
- * What the platform knows about datekit: two workspace packages, one CI
- * file, a vouch file with a vouch, a denouncement and a handle on another
- * platform, and its initializer.
- */
 export const factsEncoded = {
   ci: [{ content: "steps: [bun test]", path: ".github/workflows/ci.yml" }],
   initializer: "olivia",
@@ -62,11 +54,6 @@ export const factsEncoded = {
 
 export const facts = Schema.decodeSync(EvaluationFacts)(factsEncoded);
 
-/**
- * Fakes for `checks`' finder and judge closure: the finder finds one lane in
- * any CI, and the closure names the config folder, every CI file, and the
- * run block's test command it was handed.
- */
 export const finishers = Finishers.of({
   findRunBlock: (files) => ({
     run: { checks: { unit: "bun test" }, test: "bun test {path}" },
@@ -81,7 +68,6 @@ export const finishers = Finishers.of({
   }),
 });
 
-/** The `/bun` adapter over Node, with the fake finishers. */
 export const bunEvaluator = (
   options: BunOptions = {},
   finish: Finishers["Service"] = finishers
@@ -91,7 +77,6 @@ export const bunEvaluator = (
     Layer.provideMerge(NodeServices.layer)
   );
 
-/** A bundle of config-folder files, keyed by their path inside the folder. */
 export const bundleOf = (files: Readonly<Record<string, string>>) =>
   ({
     entry: `${configFolder}/project.ts`,
@@ -104,11 +89,7 @@ export const bundleOf = (files: Readonly<Record<string, string>>) =>
     sdkVersion: "0.0.0",
   }) satisfies ConfigBundle;
 
-/**
- * A fixture folder under `test/fixtures/`, read into the bundle the Lander
- * makes of a config folder. The folder has no config-folder segment on
- * disk; the bundle's keys get it.
- */
+/** The folder has no config-folder segment on disk; the bundle's keys get it. */
 export const folder = (name: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -133,7 +114,6 @@ export const folder = (name: string) =>
     return bundleOf(files);
   });
 
-/** A project module that exports the defaults as config: a base to vary. */
 export const baseProject = Effect.map(
   Schema.encodeEffect(PolicyInput)({ ...defaultPolicyInput, source: "config" }),
   (encoded) => `export default ${JSON.stringify(encoded)};\n`

@@ -8,13 +8,11 @@ import { defaultPolicyInput } from "../src/defaults.ts";
 import { finishPolicy } from "../src/finish.ts";
 import { at, facts, finishers } from "./world.ts";
 
-/** The whole repo, as one module. */
 const wholeRepo: (typeof AskInput.Encoded)["territory"] = {
   module: ".",
   paths: ["**"],
 };
 
-/** An ask with the given id, declared in `file`, in `territory`. */
 const askIn = (
   id: string,
   file: string,

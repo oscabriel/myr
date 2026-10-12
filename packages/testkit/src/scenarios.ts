@@ -1,17 +1,5 @@
-/**
- * Scenario builders: a project, its people and its policy as plain values,
- * built the same way every run. `aProject()` starts one; `withAsk`, `withKind`
- * and `withVouches` add to it in a pipe; `sixChildren()` is the migrate family
- * six agents claim at once.
- *
- * Values, not services: every builder is a pure function. None reads the
- * clock or randomness; time comes from `now` (default `2026-10-07T12:00:00Z`)
- * and ids from counters. Each value is decoded with the domain's own schema
- * as it is built, so a scenario the domain would refuse throws here.
- *
- * Like everything in `@repo/testkit`, this module is for `test/` directories
- * only: no `src/` imports it.
- */
+// Each value is decoded with the domain's own schema as it is built, so a
+// scenario the domain would refuse throws here.
 import { Brand } from "@repo/brand";
 import { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -34,19 +22,14 @@ import type { Types } from "effect";
 
 import { defaultNow } from "./clock.ts";
 
-/** An ask kind as a test writes it, before decoding. */
 export type AskKindEncoded = typeof AskKind.Encoded;
 
-/** A project at one landed commit, with the people a test acts as. */
 export interface Scenario extends Pipeable.Pipeable {
   readonly project: ProjectName;
-  /** The person who made the project; the first decider. */
   readonly initializer: Handle;
   readonly policy: Policy;
   readonly landed: LandedSha;
-  /** Everyone in the scenario by the name the test gave them, deciders first. */
   readonly people: ReadonlyMap<string, Handle>;
-  /** When the scenario's asks opened. */
   readonly now: DateTime.Utc;
 }
 
@@ -96,7 +79,6 @@ const xorLowByte = (word: number, byte: number) => {
   return word - low + mixed;
 };
 
-/** FNV-1a (32-bit) over the UTF-8 bytes of `text`, as eight hex digits. */
 const fnv1a = (text: string) => {
   let hash = 0x81_1c_9d_c5;
 
@@ -117,7 +99,6 @@ export const sha = (seed: string): CommitSha =>
     [0, 1, 2, 3, 4].map((round) => fnv1a(`${round}:${seed}`)).join("")
   );
 
-/** `prefix-000001`, `prefix-000002`, …: one counter per call of `ids()`. */
 const counter = (prefix: string) => {
   let next = 0;
 
@@ -128,10 +109,6 @@ const counter = (prefix: string) => {
   };
 };
 
-/**
- * Fresh counters for the ids a project mints: `req-000001`, `prop-000001`,
- * `dec-000001`. Each call starts again at 1.
- */
 export const ids = () => {
   const request = counter("req");
   const proposal = counter("prop");
@@ -178,11 +155,6 @@ const encodeTerritory = Schema.encodeSync(Territory);
 
 const encodeCheck = Schema.encodeSync(CheckSpec);
 
-/**
- * A project at its first landed commit: the defaults the config folder
- * leaves out, the kinds `fix` and `migrate`, and its deciders
- * (default `alice`) deciding everything. `people` are everyone else.
- */
 export const aProject = (
   options: {
     readonly name?: string;
@@ -238,7 +210,6 @@ export const aProject = (
   });
 };
 
-/** `packages/parser` → its module `parser` and its paths `packages/parser/**`; `.` → the whole repo. */
 const territoryOf = (folder: string) =>
   decodeTerritory(
     folder === "."
@@ -249,24 +220,17 @@ const territoryOf = (folder: string) =>
         }
   );
 
-/** An ask as `withAsk` takes it. */
 interface AskOptions {
   readonly id: string;
   readonly territory: string;
   readonly kind?: string;
-  /** Built with the domain's constructors: `CheckSpec.cases.LintToZero.make(…)`. */
   readonly check?: CheckSpec;
   readonly blockedBy?: readonly string[];
   readonly reserve?: "newcomers" | "people";
-  /** The migrate ask this one is a step of. */
   readonly parent?: string;
   readonly want?: string;
 }
 
-/**
- * Opens `ask` over `territory` in the scenario, and records the territory as
- * a module when `module` says it is one.
- */
 const openAsk = (
   scenario: Scenario,
   ask: AskOptions,
@@ -315,19 +279,11 @@ const openAsk = (
   });
 };
 
-/**
- * Adds an open ask, asked by the initializer in the landed commit, and its
- * territory's module. The territory is a folder (`packages/parser`) or `.`
- * (the whole repo, which is no module: modules are workspaces); the kind
- * defaults to `fix`, the check to a `RedThenGreen` file in the territory, the
- * want to a sentence naming both.
- */
 export const withAsk =
   (ask: AskOptions) =>
   (scenario: Scenario): Scenario =>
     openAsk(scenario, ask, territoryOf(ask.territory), ask.territory !== ".");
 
-/** Adds an ask kind, in place of one with the same name. */
 export const withKind =
   (kind: AskKindEncoded) =>
   (scenario: Scenario): Scenario => {
@@ -342,7 +298,6 @@ export const withKind =
     });
   };
 
-/** Adds the vouch file's lines: `handles` vouched for, then `denounced`. */
 export const withVouches =
   (handles: readonly string[], denounced: readonly string[] = []) =>
   (scenario: Scenario): Scenario =>
@@ -361,7 +316,6 @@ export const withVouches =
       ],
     });
 
-/** `legacyFetch` → `legacy-fetch`, `http.get` → `http-get`: a name an ask id can carry. */
 const words = (symbol: string) =>
   symbol
     .replaceAll(/(?<lower>[a-z0-9])(?<upper>[A-Z])/gu, "$<lower>-$<upper>")
@@ -371,19 +325,11 @@ const words = (symbol: string) =>
 
 const packages = Arr.makeBy(6, (n) => `packages/p${n + 1}`);
 
-/** The six packages together: where a family's parent and delete child reach. */
 const allSix = decodeTerritory({
   module: ".",
   paths: Arr.map(packages, (folder) => `${folder}/**`),
 });
 
-/**
- * "Six agents claim six children": the project `burrow` with a
- * migrate ask `drop-<symbol>` over `packages/p1` … `packages/p6`, a child per
- * package (`drop-<symbol>-p1` …), each moving the symbol in its own package,
- * and a delete child (`drop-<symbol>-delete`) blocked by all six. The six
- * packages are the project's modules.
- */
 export const sixChildren = (
   options: { readonly symbol?: string; readonly to?: string } = {}
 ): Scenario => {

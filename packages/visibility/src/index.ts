@@ -1,8 +1,3 @@
-/**
- * Typed visibility: layers, sealed checks, the ledger, the env shape
- * and write-only values, as a cartridge the platform plugs in. Each module
- * is its own subpath too (`@repo/visibility/env-schema`).
- */
 export { EnvSchemaParser, EnvSchemaUnreadable } from "./env-schema.ts";
 
 export type {

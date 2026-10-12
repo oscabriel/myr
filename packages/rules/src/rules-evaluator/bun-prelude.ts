@@ -1,18 +1,6 @@
-/**
- * The env var through which the `/bun` adapter hands the prelude the frozen
- * clock and seed, as JSON `{"now": "<ISO time>", "seed": <int>}`.
- */
 export const clockVariable = "RULES_CLOCK";
 
-/**
- * The preload the `/bun` adapter runs before any config code (principle 8):
- * `Date.now()`, `new Date()` with no argument, `Math.random()`,
- * `crypto.getRandomValues()`, `crypto.randomUUID()` and `performance.now()`
- * give values derived from the injected clock and seed, `fetch` is gone, and
- * config code's own logging goes to stderr so stdout carries only the
- * evaluator's one result. It is plain JavaScript written beside the modules:
- * source text here, not host code. The Worker's prelude is its own module.
- */
+/** Config code's own logging goes to stderr, so stdout carries only the evaluator's one result. */
 export const bunPrelude = `
 const clock = JSON.parse(process.env.${clockVariable} ?? "{}");
 delete process.env.${clockVariable};

@@ -1,10 +1,4 @@
-/**
- * What maintainers import in the config folder (its `project.ts`,
- * `asks/<id>.ask.ts` and `visibility.ts`, and a layer's `layer.ts`): object
- * literals and named helpers that evaluate to plain policy data. It runs
- * inside a network-off sandbox, so it reads no file, clock or randomness;
- * the rules evaluator does the rest.
- */
+// Runs inside a network-off sandbox, so it reads no file, clock or randomness.
 export { check, type CheckSpecInput, type RatchetMeasure } from "./check.ts";
 
 export {

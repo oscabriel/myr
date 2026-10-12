@@ -18,9 +18,6 @@ const project = ProjectName.make("oscabriel/datekit");
 
 const at = LandedSha.make("a1".repeat(20));
 
-// The env shape (ADR 0009): a project's `.env.schema`,
-// parsed at a landed SHA through the parser seam and never resolved, as the
-// public sees it.
 const parsers = [
   ["the /memory fake", EnvSchemaParserMemory(parsedByFile)],
   ["the /env-spec adapter", EnvSchemaParserEnvSpec],

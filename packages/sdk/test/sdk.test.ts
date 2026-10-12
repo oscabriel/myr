@@ -26,7 +26,6 @@ const { LintToZero, Migrate, Ratchet, RedThenGreen } = CheckSpec.cases;
 const redThenGreen = (path: string) =>
   RedThenGreen.make({ path: RedThenGreen.fields.path.make(path) });
 
-// A name a migrate moves from or to: `from` and `to` share one schema.
 const symbol = (name: string) => Migrate.fields.from.make(name);
 
 const askFile = (id: string) => `${Brand.configDir}/asks/${id}.ask.ts`;

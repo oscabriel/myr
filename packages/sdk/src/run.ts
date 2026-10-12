@@ -1,6 +1,3 @@
-/**
- * The run block: the project's own commands, written out or found from CI.
- */
 import { FromCI } from "@repo/protocol/domain/policy";
 import type { RunBlock } from "@repo/protocol/domain/run";
 
@@ -15,14 +12,9 @@ export type RunBlockInput = Omit<typeof RunBlock.Encoded, "test"> & {
   readonly test: TestCommand;
 };
 
-/** A project's run block: written out, or `run.fromCI`. */
 export type RunInput = RunBlockInput | typeof FromCI.Encoded;
 
-/** Where a project's run block comes from. */
 export const run = {
-  /**
-   * The run block the platform finds in the project's own scripts and CI
-   * files, shown to the initializer to confirm. The default.
-   */
+  /** The run block the platform finds in the project's scripts and CI, for the initializer to confirm. The default. */
   fromCI: FromCI.make({}),
 };

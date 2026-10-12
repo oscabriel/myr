@@ -1,14 +1,5 @@
-/**
- * The fence-shaped example's config folder: the `/bun` adapter
- * evaluates `examples/burrow`'s config folder, with the facts the platform
- * reads from burrow's tree (its root files, its six workspace packages and
- * its vouch file), into the policy the ratchet and the six-way migrate demo
- * run on.
- *
- * The folder is found as the one at burrow's root that holds a `project.ts`:
- * its name is the brand's, which `rules` never spells. Its presence is
- * asserted before it is read, so a missing folder is a failed assertion.
- */
+// The config folder is found as the one at burrow's root holding a
+// `project.ts`: its name is the brand's, which `rules` never spells.
 import { describe, expect, it } from "@effect/vitest";
 import { CheckSpec, RatchetMeasure } from "@repo/protocol/domain/check";
 import { Command, SymbolName } from "@repo/protocol/domain/common";
@@ -18,7 +9,6 @@ import { Effect, FileSystem, Path, Schema } from "effect";
 import { EvaluationFacts, RulesEvaluator } from "../src/rules-evaluator.ts";
 import { at, bundleOf, bunEvaluator, configFolder, now } from "./world.ts";
 
-/** A text file under burrow's root, by its path there. */
 interface File {
   readonly content: string;
   readonly path: string;
@@ -32,7 +22,6 @@ const Manifest = Schema.Struct({
 
 const decodeManifest = Schema.decodeEffect(Schema.fromJsonString(Manifest));
 
-/** The folders at `root` that hold a `project.ts`, and the files beside them. */
 const rootEntries = (root: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -56,7 +45,6 @@ const rootEntries = (root: string) =>
     return { files, folders };
   });
 
-/** Every `.ts` file under a folder, keyed by its path inside it. */
 const sourcesIn = (folder: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -76,11 +64,6 @@ const sourcesIn = (folder: string) =>
     return sources;
   });
 
-/**
- * The workspace packages a root manifest declares, as the platform reads
- * them: each `<dir>/*` glob is every folder in `<dir>`, and each package's
- * `exports` targets are its public files.
- */
 const workspacesAt = (root: string, globs: readonly string[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -111,7 +94,6 @@ const workspacesAt = (root: string, globs: readonly string[]) =>
     );
   });
 
-/** burrow's config folder as a bundle, and the facts the platform reads around it. */
 const readBurrow = () =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -149,7 +131,6 @@ const readBurrow = () =>
     };
   });
 
-/** burrow's policy at `at`, as `Policy` encodes it. */
 const evaluated = () =>
   Effect.gen(function* () {
     const { facts, modules } = yield* readBurrow();
@@ -160,7 +141,6 @@ const evaluated = () =>
     );
   });
 
-/** Every workspace package as its own module: its folder, and its `exports`. */
 const modules = [
   {
     module: "@burrow/auth",
@@ -194,7 +174,6 @@ const modules = [
   },
 ];
 
-/** The migrate ask, as `Policy` encodes it. */
 const dropLegacyFetch = {
   askedBy: "okafor",
   blockedBy: [],
@@ -220,7 +199,6 @@ const dropLegacyFetch = {
   territory: { module: ".", paths: ["packages/**"] },
 };
 
-/** The sdk's `migrate` kind, as `Policy` encodes it. */
 const migrateKind = {
   checkKind: "migrate",
   claimers: "vouched",
@@ -287,8 +265,6 @@ describe("examples/burrow's config folder", () => {
             setup: "bun install --frozen-lockfile",
             test: "bun test {path}",
           },
-          // The two deciders, six contributors (one for each migrate child),
-          // and one person denounced.
           vouches: [
             ["okafor", false],
             ["lin-h", false],
@@ -309,7 +285,6 @@ describe("examples/burrow's config folder", () => {
       const policy = yield* evaluated();
       const globs = policy.asks.flatMap(({ territory }) => territory.paths);
 
-      // Each module's folder lies under one of the ask's `<dir>/**` globs.
       const covered = policy.modules.filter(({ paths: [folder] }) =>
         globs.some(
           (glob) =>

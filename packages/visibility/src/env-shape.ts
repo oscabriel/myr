@@ -1,9 +1,5 @@
-/**
- * The env shape (ADR 0009): a project's `.env.schema`, parsed
- * through the parser seam, read the way varlock reads it, and never
- * resolved. Where the header is silent, items are required and sensitive,
- * as in varlock.
- */
+// Read the way varlock reads it, and never resolved. Where the header is
+// silent, items are required and sensitive, as in varlock.
 import type { EnvItem, EnvSchemaView } from "@repo/protocol/domain/env";
 import { EnvKey } from "@repo/protocol/ids";
 import type { LandedSha, ProjectName, RepoPath } from "@repo/protocol/ids";
@@ -19,32 +15,22 @@ import type {
   ParsedValue,
 } from "./env-schema.ts";
 
-/** The header's decorators, above its `# ---`. */
 type Header = ParsedEnvSchema["header"];
 
-/** The value of the named argument `key`, if the arguments carry one. */
 const namedArg = (args: ParsedArgs, key: string): Option.Option<ParsedValue> =>
   Option.map(
     Array.findFirst(args.named, (arg) => arg.key === key),
     ({ value }) => value
   );
 
-/**
- * The first of `decorators` named one of `names`: as in varlock, the first
- * flag written decides.
- */
+/** As in varlock, the first flag written decides. */
 const firstNamed = (
   decorators: readonly ParsedDecorator[],
   ...names: readonly string[]
 ): Option.Option<ParsedDecorator> =>
   Array.findFirst(decorators, ({ name }) => names.includes(name));
 
-/**
- * A flag and its opposite (`@required`/`@optional`): what the first one
- * written says, or `depends` when its value is anything but `true` or
- * `false` (`forEnv(production)`, `eq($A, b)`), which only the environment
- * decides.
- */
+/** `depends` when the flag's value is anything but `true` or `false`, which only the environment decides. */
 const flagOf = (
   decorators: readonly ParsedDecorator[],
   flag: string,
@@ -58,10 +44,8 @@ const flagOf = (
     return name === flag ? value : !value;
   });
 
-/** The proxy rule the env shape holds: hosts, and what narrows them. */
 type Proxy = NonNullable<EnvItem["proxy"]>;
 
-/** Text, or a list of texts (`[GET, POST]`), as a list; none when it is anything else. */
 const textsOf = (value: ParsedValue): Option.Option<readonly string[]> => {
   const each = Predicate.isString(value) ? [value] : value;
 
@@ -85,9 +69,7 @@ const swapsInsideTargets = (args: ParsedArgs): boolean =>
   });
 
 /**
- * One `@proxy(…)` rule: its hosts in order, and the path, method and
- * `block` that narrow it. None when it names no host as text (a host only
- * the environment decides gets no value). A rule the platform cannot honour
+ * None when it names no host as text. A rule the platform cannot honour
  * exactly is blocked rather than widened: one that waits on an `approval`,
  * carries `rules` for other paths, computes its credential with a
  * `transform`, keeps the value out of some headers (`substituteIn`), or has
@@ -131,7 +113,6 @@ const ruleOf = (args: ParsedArgs): Option.Option<Proxy> =>
     return Option.some(rule);
   });
 
-/** Whether the item is routed through `@proxy(…)`: any `@proxy` but `=passthrough` and `=omit`. */
 const isProxied = (item: ParsedItem): boolean =>
   item.decorators.some(
     ({ name, value }) =>
@@ -139,10 +120,8 @@ const isProxied = (item: ParsedItem): boolean =>
   );
 
 /**
- * The item's `@proxy` rule: the outbound requests on which the platform
- * swaps its placeholder for its value. Rules that differ only in hosts
- * share one; a later rule that differs otherwise is left out, so the value
- * goes nowhere the shape doesn't show.
+ * Rules that differ only in hosts share one; a later rule that differs
+ * otherwise is left out, so the value goes nowhere the shape doesn't show.
  */
 export const proxyOf = (item: ParsedItem): Option.Option<Proxy> => {
   const rules = Array.getSomes(
@@ -172,7 +151,6 @@ export const proxyOf = (item: ParsedItem): Option.Option<Proxy> => {
   });
 };
 
-/** The data types varlock builds in; none of them makes an item sensitive. */
 const builtInTypes = [
   "array",
   "boolean",
@@ -205,10 +183,6 @@ const isPluginTyped = (item: ParsedItem): boolean =>
     return !builtInTypes.some((builtIn) => builtIn === type);
   });
 
-/**
- * `@sensitive` with options (`{enabled=forEnv(production), preventLeaks=false}`)
- * as the flag its `enabled` says, which is `true` when it says nothing.
- */
 const enabledOf = (decorator: ParsedDecorator): ParsedDecorator =>
   decorator.name === "sensitive" && isArgs(decorator.value)
     ? {
@@ -220,11 +194,6 @@ const enabledOf = (decorator: ParsedDecorator): ParsedDecorator =>
       }
     : decorator;
 
-/**
- * What the header's `@defaultSensitive` says of an item with no flag of its
- * own: `true` or `false`, or, under `inferFromPrefix(P)`, sensitive unless
- * its key starts with `P`. Anything else counts as sensitive.
- */
 const defaultSensitive = (key: string, value: ParsedValue): boolean => {
   if (Predicate.isBoolean(value)) {
     return value;
@@ -239,12 +208,9 @@ const defaultSensitive = (key: string, value: ParsedValue): boolean => {
 };
 
 /**
- * Whether the item is sensitive: whether its value may be stored,
- * write-only, and never shown. Its own `@sensitive` or `@public` decides;
- * otherwise the header's `@defaultSensitive`, and a silent header means
- * sensitive. A flag only the environment decides counts as sensitive, and
- * so does an item whose `@type` only a plugin knows; an item routed through
- * `@proxy(…)` is sensitive whatever it says, as in varlock.
+ * A flag only the environment decides counts as sensitive, and so does an
+ * item whose `@type` only a plugin knows; an item routed through `@proxy(…)`
+ * is sensitive whatever it says, as in varlock.
  */
 export const isSensitive = (item: ParsedItem, header: Header): boolean =>
   isProxied(item) ||
@@ -258,12 +224,6 @@ export const isSensitive = (item: ParsedItem, header: Header): boolean =>
     onSome: (flag) => flag !== false,
   });
 
-/**
- * Whether the item must have a value. Its own `@required` or `@optional`
- * decides; otherwise the header's `@defaultRequired` (`infer`: required
- * when the schema gives it a value), and a silent header means required.
- * `depends` when the schema decides it with a function.
- */
 export const requiredOf = (
   item: ParsedItem,
   header: Header
@@ -281,7 +241,6 @@ export const requiredOf = (
     })
   );
 
-/** A value as the schema writes it: `enum(development, test)`, `[GET, POST]`, `url`. */
 const textOf = (value: ParsedValue): string => {
   if (isCall(value)) {
     return value.text;
@@ -302,7 +261,6 @@ const textOf = (value: ParsedValue): string => {
   return String(value);
 };
 
-/** Every tag the item's `@tag(…)`s attach, in order, each once. */
 const tagsOf = (item: ParsedItem): readonly string[] =>
   Array.dedupe(
     item.decorators.flatMap(({ name, value }) =>
@@ -315,7 +273,6 @@ const tagsOf = (item: ParsedItem): readonly string[] =>
     )
   );
 
-/** The link of the item's first `@docs(url)` or `@docs(label, url)`. */
 const docsOf = (item: ParsedItem): Option.Option<string> =>
   Option.flatMap(firstNamed(item.decorators, "docs"), ({ value }) =>
     isArgs(value)
@@ -323,7 +280,6 @@ const docsOf = (item: ParsedItem): Option.Option<string> =>
       : Option.none()
   );
 
-/** One item as the public sees it: its declaration, never a value. */
 const itemOf = (
   item: ParsedItem & { readonly key: EnvKey },
   header: Header
@@ -383,12 +339,10 @@ const itemOf = (
   return shown;
 };
 
-/** An item the shape can name: its key is an env key (`PAYMENTS_KEY`). */
 const isNamed = (
   item: ParsedItem
 ): item is ParsedItem & { readonly key: EnvKey } => Schema.is(EnvKey)(item.key);
 
-/** The item `@currentEnv` names (`@currentEnv=$APP_ENV`), if it names one. */
 const currentEnvOf = (header: Header): Option.Option<EnvKey> =>
   Option.flatMap(firstNamed(header, "currentEnv"), ({ value }) => {
     const key =
@@ -397,7 +351,6 @@ const currentEnvOf = (header: Header): Option.Option<EnvKey> =>
     return Schema.is(EnvKey)(key) ? Option.some(key) : Option.none();
   });
 
-/** The env shape of one parsed `.env.schema` at a landed SHA. */
 export const envSchemaViewOf = (input: {
   readonly at: LandedSha;
   readonly file: RepoPath;

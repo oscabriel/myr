@@ -1,14 +1,12 @@
 /**
- * The parser seam's adapter over `@env-spec/parser` 0.6.1 (MIT; varlock's
- * format), pinned exactly: its API is 0.x. It reads the text into
- * plain data and nothing else. The parser's own expansion only rewrites
- * syntax (`$APP_ENV` becomes the call `ref(APP_ENV)`, `$(…)` the call
- * `exec(…)`); nothing here runs a call, loads a `@plugin` or follows an
- * `@import`, and this module imports nothing that could.
+ * Over `@env-spec/parser` 0.6.1, pinned exactly: its API is 0.x. The parser's
+ * own expansion only rewrites syntax (`$APP_ENV` becomes the call
+ * `ref(APP_ENV)`, `$(…)` the call `exec(…)`); nothing here runs a call, loads
+ * a `@plugin` or follows an `@import`, and this module imports nothing that
+ * could.
  *
  * A static `undefined` (`@sensitive=undefined`, `KEY=undefined`) is read as
- * absent, which is what varlock makes of it: a flag so set leaves the
- * default in place.
+ * absent, as varlock reads it: a flag so set leaves the default in place.
  */
 import {
   ParsedEnvSpecFunctionArgs,
@@ -40,7 +38,6 @@ import type {
   ParsedValue,
 } from "../env-schema.ts";
 
-/** A value node of the parser's tree. */
 type ValueNode =
   | ParsedEnvSpecArrayLiteral
   | ParsedEnvSpecFunctionArgs
@@ -48,7 +45,6 @@ type ValueNode =
   | ParsedEnvSpecObjectLiteral
   | ParsedEnvSpecStaticValue;
 
-/** A static value: text, a number, a flag, or none for `undefined`. */
 const staticOf = (
   node: ParsedEnvSpecStaticValue
 ): Option.Option<ParsedValue> => {
@@ -61,9 +57,7 @@ const staticOf = (
     : Option.none();
 };
 
-/** A node as plain data, never evaluated; none for a static `undefined`. */
 const valueOf = (node: ValueNode): Option.Option<ParsedValue> => {
-  /** Arguments as written: the positional ones, then the `key=value` ones. */
   const argsOf = (
     values: readonly (
       | ParsedEnvSpecFunctionCall
@@ -112,7 +106,6 @@ const valueOf = (node: ValueNode): Option.Option<ParsedValue> => {
   return Option.some(Array.getSomes(node.values.map(valueOf)));
 };
 
-/** The decorators as written, but those set to `undefined`. */
 const decoratorsOf = (
   decorators: readonly ParsedEnvSpecDecorator[]
 ): readonly ParsedDecorator[] =>
@@ -125,7 +118,6 @@ const decoratorsOf = (
     )
   );
 
-/** The text of an item's value, if it has one: `KEY=` and `KEY=undefined` have none. */
 const valueTextOf = (item: ParsedEnvSpecConfigItem): Option.Option<string> => {
   const { value } = item;
 
@@ -138,7 +130,6 @@ const valueTextOf = (item: ParsedEnvSpecConfigItem): Option.Option<string> => {
     : Option.some(value.toString());
 };
 
-/** One item: its key, its description comment, its decorators, its value's text. */
 const itemOf = (item: ParsedEnvSpecConfigItem): ParsedItem => {
   const parsed: Types.Mutable<ParsedItem> = {
     decorators: decoratorsOf(item.decoratorsArray),
@@ -158,14 +149,12 @@ const itemOf = (item: ParsedEnvSpecConfigItem): ParsedItem => {
   return parsed;
 };
 
-/** Where the parser stopped, as its syntax errors carry it. */
 const Stopped = Schema.Struct({
   location: Schema.Struct({
     start: Schema.Struct({ column: Schema.Int, line: Schema.Int }),
   }),
 });
 
-/** Why a text is not a schema: where it stops parsing, never the text itself. */
 const unreadable = (file: RepoPath, cause: unknown) =>
   new EnvSchemaUnreadable({
     file,

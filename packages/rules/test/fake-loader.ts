@@ -10,29 +10,20 @@ import type {
   LoaderModule,
 } from "../src/rules-evaluator/worker.ts";
 
-/** How a loaded worker's entrypoint answers every request. */
 export type Answer =
-  /** With this body. */
   | { readonly responds: string }
-  /** By rejecting with this error, as the runtime does when the worker fails. */
   | { readonly rejects: Error }
-  /** Never. */
   | { readonly hangs: true };
 
-/** One cold start: the id the adapter asked for, and the code it handed over. */
 export interface Load {
   readonly code: LoaderCode;
   readonly id: string;
 }
 
-/** A fake Worker Loader, and what it saw. */
 export interface FakeLoader {
   readonly binding: LoaderBinding;
-  /** The stubs and entrypoints handed out, and how many were disposed. */
   readonly handles: () => { readonly disposed: number; readonly out: number };
-  /** Each cold start, in order: a warm id loads nothing. */
   readonly loads: readonly Load[];
-  /** Each request's body, as sent. */
   readonly requests: readonly string[];
 }
 
@@ -43,18 +34,13 @@ const disposeKey: unknown = Object.getOwnPropertyDescriptor(
   "dispose"
 )?.value;
 
-/**
- * A fake Worker Loader whose workers answer every request the same way. It
- * keeps workers warm by id, as the Loader does: a second `get` with an id it
- * has seen calls no `getCode`.
- */
+/** Keeps workers warm by id, as the Loader does: a second `get` with a seen id calls no `getCode`. */
 export const fakeLoader = (answer: Answer): FakeLoader => {
   const loads: Load[] = [];
   const requests: string[] = [];
   const warm = new Set<string>();
   const counts = { disposed: 0, out: 0 };
 
-  /** A handle that counts itself out, and in again when disposed. */
   const handle = <A extends object>(value: A): A => {
     counts.out += 1;
 
@@ -103,7 +89,6 @@ export const fakeLoader = (answer: Answer): FakeLoader => {
   };
 };
 
-/** A module's source, as the Loader would read it. */
 const sourceOf = (module: LoaderModule) => {
   if ("js" in module) {
     return module.js;
@@ -112,7 +97,6 @@ const sourceOf = (module: LoaderModule) => {
   return "json" in module ? JSON.stringify(module.json) : module.text;
 };
 
-/** Runs the main's default `fetch` once, and prints what it answered. */
 const harness = `
 import worker from "./main.js";
 const body = await Bun.file(new URL("./request.json", import.meta.url)).text();
@@ -121,7 +105,6 @@ process.stdout.write(await response.text());
 process.exit(0);
 `;
 
-/** Writes the code's modules under a temp directory, and runs one request. */
 const runInBun = (code: LoaderCode, body: string, sdk: string) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -133,7 +116,6 @@ const runInBun = (code: LoaderCode, body: string, sdk: string) =>
         ...Object.fromEntries(
           Object.entries(code.modules).map(([name, module]) => [
             name,
-            // The config modules import the sdk by its workspace name.
             sourceOf(module).replaceAll('"@repo/sdk"', JSON.stringify(sdk)),
           ])
         ),
@@ -164,12 +146,7 @@ const runInBun = (code: LoaderCode, body: string, sdk: string) =>
     })
   ).pipe(Effect.orDie);
 
-/**
- * A Loader that runs the code it is handed, in a `bun` subprocess per
- * request: Bun stands in for workerd, so the main and the prelude are run
- * as the JavaScript they are, without workerd's limits. Every import of the
- * sdk by its workspace name points at `sdk`.
- */
+/** Bun stands in for workerd, so the main and the prelude run as the JavaScript they are, without workerd's limits. */
 export const bunLoader = (
   services: Context.Context<
     ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path

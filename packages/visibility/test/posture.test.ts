@@ -70,7 +70,6 @@ const decode = Schema.decodeUnknownSync(VisibilityPolicy);
 
 const policy = (layers: readonly unknown[]) => decode({ ...config, layers });
 
-/** A policy whose maintainers layer holds the held-back checks. */
 const sealed = (layers: readonly unknown[]) =>
   decode({ ...config, checks: sealedChecks, layers });
 
@@ -82,7 +81,6 @@ const of = (visibility: VisibilityPolicy, licence = mit) =>
 const postureUnder = (licence: string) =>
   of(policy([]), Option.some(licence)).posture;
 
-// The posture table, one row at a time.
 describe("a project's posture", () => {
   it("is Open with no visibility config", () => {
     expect(
@@ -98,7 +96,6 @@ describe("a project's posture", () => {
     });
   });
 
-  // A public layer hides nothing from anyone, so it narrows nothing.
   it("is Open with a layer everyone may read", () => {
     expect(
       of(policy([{ ...enterprise, audience: "public", disclose: "public" }]))
@@ -145,7 +142,6 @@ describe("a project's posture", () => {
     });
   });
 
-  // Sponsorware is source that opens after a declared delay.
   it("is Open on schedule when the source layer opens within a declared delay", () => {
     expect(of(policy([{ ...enterprise, maxDays: 90 }]))).toStrictEqual({
       label: "Open on schedule · embargo ≤ 90 days",

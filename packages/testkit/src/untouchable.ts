@@ -1,16 +1,10 @@
 /**
- * A stand-in for a Workers binding, or any runtime object, handed to code a
- * test expects not to use it: every read throws and names the member, so the
- * test proves what a call touches (a fake env's bindings, a Worker's
- * context). The members `known` gives read as given. Symbols and `then` read
- * as absent: printing a value or resolving a promise with it is not a use.
- *
- * Like everything in `@repo/testkit`, this module is for `test/` directories
- * only: no `src/` imports it.
+ * Every read throws and names the member, so a test proves what a call
+ * touches. Symbols and `then` read as absent: printing a value or resolving a
+ * promise with it is not a use.
  */
 import { Predicate } from "effect";
 
-/** What reading `name.member` hit: a member the test did not give. */
 export class TouchedError extends Error {
   constructor(name: string, member: string) {
     super(`a test touched ${name}.${member}`);

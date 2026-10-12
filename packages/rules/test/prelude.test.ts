@@ -7,7 +7,6 @@ import {
 } from "../src/prelude.ts";
 import type { FreezableScope, FrozenFacts } from "../src/prelude.ts";
 
-/** 2026-10-07T12:00:00.000Z, the landed commit's time, and its seed. */
 const facts: FrozenFacts = { now: 1_791_374_400_000, seed: 7 };
 
 /**
@@ -34,7 +33,6 @@ const scopeOf = (): FreezableScope => ({
   performance: { now: () => 1 },
 });
 
-/** Two words and a UUID from a scope frozen with `seed`. */
 const draws = (seed: number) => {
   const scope = scopeOf();
 

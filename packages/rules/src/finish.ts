@@ -12,17 +12,12 @@ import { RulesFailed } from "./rules-evaluator.ts";
 import type { EvaluationFacts } from "./rules-evaluator.ts";
 import { parseVouchFile } from "./vouch.ts";
 
-/** A file the finishers read: a CI workflow, a hook config, a manifest. */
 export interface FactFile {
   readonly content: string;
   readonly path: string;
 }
 
-/**
- * What `rules` needs from `checks` without importing it: the judge closure
- * and the run-block finder. The caller passes `checks`' own functions; tests
- * pass fakes.
- */
+/** What `rules` needs from `checks` without importing it. */
 export class Finishers extends Context.Service<
   Finishers,
   {
@@ -47,7 +42,6 @@ export class Finishers extends Context.Service<
  */
 const isSignInPlatform = (platform: string) => platform === "github";
 
-/** The run block: the config folder's own, or the one the finder finds in CI. */
 const runBlockOf = (
   run: PolicyInput["run"],
   facts: EvaluationFacts,
@@ -70,10 +64,7 @@ const runBlockOf = (
   }).pipe(Effect.mapError(failedAt(`the run block found in ${where}`)));
 };
 
-/**
- * The vouch file's lines as the policy holds them. A line that names no
- * handle fails the policy, so a typo is reported rather than dropped.
- */
+/** A line that names no handle fails the policy, so a typo is reported rather than dropped. */
 const vouchesOf = (text: string, file: RepoPath) => {
   const { invalid, vouches } = parseVouchFile(text);
 
@@ -103,17 +94,12 @@ const vouchesOf = (text: string, file: RepoPath) => {
   );
 };
 
-/** A workspace folder as a glob prefix: `./packages/x/` is `packages/x`. */
 const folderOf = (dir: string) =>
   dir
     .replace(/^(?:\.\/)+/u, "")
     .replace(/\/+$/u, "")
     .replace(/^\.$/u, "");
 
-/**
- * The territories answers may change: one per workspace package, its paths
- * its folder, its public files its `exports`; `.` for a single-package repo.
- */
 const territoriesOf = (
   workspaces: EvaluationFacts["workspaces"]
 ): (typeof Policy.Encoded)["modules"] =>
@@ -131,7 +117,6 @@ const territoriesOf = (
           : { module: name, paths, publicFiles: exports };
       });
 
-/** A glob with the package's folder written over the sdk's `{dir}`. */
 const placed = (glob: string, folder: string) => {
   const written = glob.replaceAll(packageDir, folder).replace(/^\/+/u, "");
 
@@ -139,13 +124,9 @@ const placed = (glob: string, folder: string) => {
 };
 
 /**
- * An ask's territory with its package's folder written in. The sdk's
- * `territory.package(name)` can't know where the package lives, so it names
- * the workspace by `module` and writes `{dir}` in its paths; here the
- * workspace's folder replaces it, and its `exports` become the public files
- * unless the ask states its own. A module no workspace names keeps the
- * placeholder, which matches no real path, so the gate refuses every change
- * (it fails closed).
+ * The sdk's `territory.package(name)` can't know where the package lives, so
+ * it writes `{dir}`. A module no workspace names keeps the placeholder, which
+ * matches no real path, so the gate refuses every change (it fails closed).
  */
 const placedIn = (
   workspaces: EvaluationFacts["workspaces"],
@@ -168,7 +149,6 @@ const placedIn = (
     : { ...territory, paths, publicFiles: workspace.exports };
 };
 
-/** Fails when two asks share an id: an id names one ask, and one fork per claim. */
 const distinctAsks = (asks: PolicyInput["asks"]) => {
   const seen = new Map<string, string>();
 
@@ -191,14 +171,9 @@ const distinctAsks = (asks: PolicyInput["asks"]) => {
 };
 
 /**
- * Turns what the config folder evaluated to into the project's `Policy` at
- * `at`, filling in what the platform knows from the facts: the run block
- * (`fromCI` resolved by the finder), the modules from the workspaces, each
- * package territory's folder (the sdk's `{dir}`), the judge closure, `owners` as the initializer, and the vouch
- * file's lines. Each ask counts as open, opened at `facts.now` in `at`: the
- * Project DO overwrites `openedAt`, `openedIn` and `state` from its own rows.
- * The whole is decoded with `Policy`, so a value the finishers or facts got
- * wrong fails here as `RulesFailed`, not later.
+ * Each ask counts as open, opened at `facts.now`: the Project DO overwrites
+ * `openedAt`, `openedIn` and `state` from its own rows. The whole is decoded
+ * with `Policy`, so a value the finishers or facts got wrong fails here.
  */
 export const finishPolicy = (input: {
   readonly at: LandedSha;
@@ -246,8 +221,6 @@ export const finishPolicy = (input: {
       weakening: policy.weakening,
     } satisfies typeof Policy.Encoded;
 
-    // The project's layers and held-back checks, as `visibility.ts` states
-    // them; a project without one is Open.
     const stated =
       policy.visibility === undefined
         ? candidate

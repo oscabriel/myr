@@ -109,7 +109,6 @@ describe("the private-path guard", () => {
     ).toStrictEqual(Option.none());
   });
 
-  // A layer may name a folder in its path set: whatever sits under it is its.
   it("refuses a path under a folder in a layer's path set", () => {
     const changes: readonly Change[] = [added(sealed, blob("2"))];
 

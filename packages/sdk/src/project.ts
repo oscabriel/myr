@@ -1,7 +1,3 @@
-/**
- * The config folder's `project.ts`: a project's process as one object
- * literal, and the defaults a project with no config folder runs on.
- */
 import { Brand } from "@repo/brand";
 import type { PolicyInput } from "@repo/protocol/domain/policy";
 import { Duration, Predicate } from "effect";
@@ -37,7 +33,6 @@ export type Span = `${number} ${
   | "week"
   | "weeks"}`;
 
-/** A span in whole days or weeks, as config writes it: `"30 days"`, `"2 weeks"`. */
 export type Days = `${number} ${"day" | "days" | "week" | "weeks"}`;
 
 /**
@@ -50,17 +45,12 @@ export type VouchMode = PolicyInputEncoded["vouch"] extends
   ? M
   : never;
 
-/** A ratchet by name: its measure, and the territory it counts, if only one. */
 export interface RatchetEntry {
   readonly measure: RatchetMeasure;
-  /** The territory's module the ratchet counts. */
   readonly territory?: string;
 }
 
-/**
- * A project's process, as the config folder's `project.ts` writes it. Every key is
- * optional; one left out takes its default (`defaults` shows them all).
- */
+/** A project's process. Every key is optional; one left out takes its default (see `defaults`). */
 export interface ProjectConfig {
   /** A trust rule in code: whether a person may claim an ask. Called on demand. */
   readonly admit?: Admit;
@@ -81,16 +71,12 @@ export interface ProjectConfig {
     readonly lapseAfter: Span;
     readonly warnAfter: Span;
   };
-  /**
-   * Who decides for which paths: a glob, and the handles of its deciders,
-   * or `"owners"` for the person who made the project. Default `{ "**": "owners" }`.
-   */
+  /** Who decides for which paths: a glob, and its deciders' handles or `"owners"`. Default `{ "**": "owners" }`. */
   readonly deciders?: Readonly<
     Record<string, readonly [string, ...string[]] | "owners">
   >;
   /** The ask kinds the project's asks are made from. Default `[kinds.fix]`. */
   readonly kinds?: readonly DeclaredKind[];
-  /** Where the project's modules come from. Default and only: `territory.fromWorkspaces()`. */
   readonly modules?: ModulesInput;
   /** Ratchets, by name: `{ "no-explicit-any": check.ratchet.count("bun run lint --format json", { rule }) }`. */
   readonly ratchets?: Readonly<Record<string, RatchetEntry | RatchetMeasure>>;
@@ -109,10 +95,6 @@ export interface ProjectConfig {
   readonly weakening?: { readonly markers: readonly string[] };
 }
 
-/**
- * A project file's default export: its process as policy data, with its
- * function-valued rules carried beside the data.
- */
 export type ProjectDefinition = PolicyInputEncoded &
   WithFunctions<ProjectFunctions>;
 
@@ -221,28 +203,12 @@ const define = (
   );
 };
 
-/**
- * Declares a project's process: the default export of the config folder's
- * `project.ts`.
- * Plain data, except `admit` and a kind's `opensAlone`, which are flagged
- * in the data and called on demand.
- */
+/** Declares a project's process: the default export of the config folder's `project.ts`. */
 export const project = (config: ProjectConfig): ProjectDefinition =>
   define(config, "config");
 
-/**
- * What a project with no config folder runs on: the `fix` kind, the run
- * block found from CI, the person who made the project deciding for every
- * path, 5 decisions a day that expire after 14 days, 2 open proposals and 3
- * claims a person, vouches for code, `Assisted-by:` trailers, and a record
- * that counts landings unreverted for 30 days over 365.
- */
 export const defaults: ProjectDefinition = define({}, "defaults");
 
-/**
- * A project file's data, for the rules evaluator: the policy it states,
- * without the function-valued rules, ready to encode as JSON.
- */
 export const toPolicyInput = (
   definition: ProjectDefinition
 ): PolicyInputEncoded => ({ ...definition });

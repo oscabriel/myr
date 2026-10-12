@@ -1,8 +1,3 @@
-/**
- * The parser seam's fake: `.env.schema` files already parsed, by path. It
- * reads no text; the imports each header names are checked and recorded
- * by the same rule the real parser follows (`withImports`).
- */
 import type { RepoPath } from "@repo/protocol/ids";
 import { Effect, Layer } from "effect";
 

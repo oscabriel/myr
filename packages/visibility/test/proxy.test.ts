@@ -11,7 +11,6 @@ import { placeholderFor, proxyMap } from "../src/proxy.ts";
 
 const item = Schema.decodeUnknownSync(EnvItem);
 
-/** datekit's one `@sensitive` item, behind `@proxy(domain="sentry.io", path="/api/**")`. */
 const sentryAuthToken = item({
   description:
     "Source-map upload token. Release step only; never enters a check.",
@@ -22,11 +21,6 @@ const sentryAuthToken = item({
   tags: ["release"],
 });
 
-/**
- * datekit's `.env.schema` as its env shape reads: `@defaultSensitive=false`
- * in the header, and one `@sensitive` item behind
- * `@proxy(domain="sentry.io", path="/api/**")`.
- */
 const datekit = {
   items: [
     item({

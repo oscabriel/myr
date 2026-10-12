@@ -22,7 +22,6 @@ class ImportRefused extends Data.TaggedError("ImportRefused")<{
   readonly reason: string;
 }> {}
 
-/** What a promise of the binding threw. */
 class Thrown extends Data.TaggedError("Thrown")<{ readonly error: Error }> {}
 
 const commit = CommitSha.make("c".repeat(40));
@@ -37,7 +36,6 @@ const hello = new TextEncoder().encode("hello\n");
 
 const answerer = { email: "answerer@example.com", name: "Answerer" };
 
-/** The one commit every repo holds on `main`. */
 const firstCommit = {
   author: answerer,
   authoredAt: 1_791_300_000,
@@ -49,10 +47,6 @@ const firstCommit = {
   tree,
 };
 
-/**
- * A repo host as small as the fake needs: every repo holds one commit on
- * `main`, whose tree has `a.txt` ("hello") and a folder `src`.
- */
 const tinyHost = (): HostLike => {
   const repos = new Set<RepoName>();
   let minted = 0;
@@ -149,7 +143,6 @@ const tinyHost = (): HostLike => {
   };
 };
 
-/** Awaits one of the binding's promises. */
 const call = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({
     catch: (error) =>
@@ -159,7 +152,6 @@ const call = <A>(run: () => Promise<A>) =>
     try: run,
   });
 
-/** What one of the binding's promises threw, or an error saying it resolved. */
 const thrown = <A>(run: () => Promise<A>) =>
   call(run).pipe(
     Effect.match({
@@ -171,7 +163,6 @@ const thrown = <A>(run: () => Promise<A>) =>
 const text = (bytes: Blob | null) =>
   bytes === null ? Effect.succeed(null) : call(() => bytes.text());
 
-/** An error as a plain record: its name and message, and its code and number if it has them. */
 const described = (error: Error) => ({
   code: "code" in error ? error.code : undefined,
   isError: error instanceof Error,
@@ -180,7 +171,6 @@ const described = (error: Error) => ({
   numericCode: "numericCode" in error ? error.numericCode : undefined,
 });
 
-/** A binding over a fresh tiny host, with `datekit` made, and the repo `get` hands back. */
 const withDatekit = (
   options: Parameters<typeof fakeArtifactsBinding>[1] = {}
 ) =>

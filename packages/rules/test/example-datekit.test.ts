@@ -1,11 +1,3 @@
-/**
- * The datekit example's config folder, evaluated by the `/bun`
- * adapter as the Lander's bundle of it would be: every file in the folder,
- * keyed by its repo path, with the facts the platform would give a
- * single-package repo (no workspaces, its vouch file, `ines-v` as the
- * initializer). Its `.ts` files import the sdk by the name users write, the
- * published one, which the adapter points at the sdk.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -17,14 +9,9 @@ import { EvaluationFacts, RulesEvaluator } from "../src/rules-evaluator.ts";
 import type { ConfigBundle } from "../src/rules-evaluator.ts";
 import { at, bunEvaluator, now } from "./world.ts";
 
-/** Where the example lives, from this test's folder. */
 const exampleUrl = new URL("../../../examples/datekit/", import.meta.url);
 
-/**
- * The example's dot-folders that hold a `project.ts`: its config folder, as
- * the repo names it. `rules` never spells that name (it lives in
- * `packages/brand`), so the test finds it.
- */
+/** `rules` never spells the config folder's name, so the test finds it. */
 const configFolders = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -43,7 +30,6 @@ const configFolders = Effect.gen(function* () {
   return { folders, root };
 });
 
-/** Every file in the example's config folder, as the bundle the Lander makes of it. */
 const exampleBundle = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -76,7 +62,6 @@ const exampleBundle = Effect.gen(function* () {
   };
 });
 
-/** The policy the example's config folder evaluates to, encoded. */
 const evaluated = Effect.gen(function* () {
   const { bundle, folder } = yield* exampleBundle;
   const evaluator = yield* RulesEvaluator;
@@ -96,7 +81,6 @@ const evaluated = Effect.gen(function* () {
   return { folder, policy: yield* Schema.encodeEffect(Policy)(policy) };
 });
 
-/** What one of the example's asks is, beside its brief. */
 const askOf = (
   folder: string,
   id: string,
@@ -194,7 +178,6 @@ describe("the datekit example's config folder", () => {
             current: brief.current !== undefined,
             id,
             outOfScope: (brief.outOfScope ?? []).length > 0,
-            // A want is behavioural: no file paths, no line numbers.
             wantNamesCode: /\.ts\b|:\d+|\bline \d/u.test(brief.want),
           }))
         ).toStrictEqual(
