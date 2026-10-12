@@ -57,10 +57,10 @@ What it declines:
 - **No model's opinion in the gate.** Checks are commands with exit statuses and counts; an answer is judged by them, and taste is a decider's finish.
 - **No scores.** A person appears by handle and role; their record serves trust rules only and is never shown as a number, rank or leaderboard.
 - **No overclaiming.** Held-back checks are hidden from people and agents, not from the code under test, so they are no security boundary. Myr is a prototype, not a whole forge; it makes no claim about speed or scale beyond measured, dated numbers.
-- **No second way to land.** The web adds no form for what git or the CLI does. Its only writes are a decider's choices, proposing an ask (and asking the platform's agent to draft it), and signing in or out. Landed code and each landing's diff are public, as a clone already makes them; an answer that has not landed shows its diff only to the decider finishing it.
+- **No second way to land.** The web adds no form for what git or the CLI does. Its only writes are a decider's choices, proposing an ask (and asking the platform's agent to draft it), and signing in or out; after the window, posting in a discussion joins them (ADR 0040). Landed code and each landing's diff are public, as a clone already makes them; an answer that has not landed shows its diff only to the decider finishing it.
 - **No stacks of submissions.** A contributor's commits are not ordered into a stack that lands in parts; work is ordered by asks, and a family is the typed dependency, with a delete child that waits. A stack is a second ordering outside the gate.
 - **No free labels.** Kinds and territories are typed; a label with no check behind it is work nobody asked for.
-- **No discussion threads or reactions on a round.** Discussion is outside the gate and outside the window: not now, not never.
+- **No discussion on rounds, and no reactions anywhere.** The gate's verdict is the only voice on a round. Decided for after the window: a project has freeform discussions, outside the gate, that a decider turns into an ask with the platform's agent (ADR 0040).
 - **No mirroring by a second push URL.** It is a second way onto main (ADR 0010).
 - **No identity held by a third party.** A person is a platform account (ADR 0016); a second identity, if ever, is a key the person holds.
 - **No vouch counts.** A vouch is read as the line it is, with its reason and the landing it followed; "vouched for by 3 people" is a score by another name.
