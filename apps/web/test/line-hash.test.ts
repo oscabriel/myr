@@ -1,8 +1,3 @@
-/**
- * A line anchor, as a file page's address carries it: `#L10` names one
- * line and `#L10-L20` a range, whichever end comes first. Anything else
- * names no line. One pure parser, read by the file, why and propose pages.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Option } from "effect";
 

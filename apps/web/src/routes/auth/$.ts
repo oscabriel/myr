@@ -3,14 +3,8 @@ import { Effect } from "effect";
 
 import type { Handled } from "../../server/session.ts";
 
-/**
- * Any other `/auth/<name>`. A development build serves the dev sign-in
- * (`-dev.ts`) at `dev`; Vite writes `import.meta.env.DEV` as `false` in a
- * production build, so the `import()` below is dead code there and the dev
- * module never enters the bundle (`test/production-bundle.test.ts`). It is
- * reached this way, not as a route of its own, so the route tree names no
- * dev path.
- */
+// Vite writes `import.meta.env.DEV` as `false` in a production build, so this `import()` is dead code there
+// and the dev module never enters the bundle. Reached this way so the route tree names no dev path.
 const devRoute = import.meta.env.DEV
   ? () => Effect.promise(() => import("./-dev.ts"))
   : undefined;

@@ -1,8 +1,3 @@
-/**
- * Ten listed projects, as the platform lists them (in no order the page
- * keeps), two pairs tied on open asks, and the eight that lead: the most
- * open asks first, a tie by name.
- */
 import { ProjectListing } from "@repo/protocol/domain/front-page";
 import { Schema } from "effect";
 
@@ -19,7 +14,6 @@ export const TEN_LISTED = Schema.decodeSync(Schema.Array(ProjectListing))([
   { openAsks: 7, posture: "open", project: "oscabriel/ember" },
 ]);
 
-/** The eight of `TEN_LISTED` that lead, in order. */
 export const EIGHT_LEADING = [
   "oscabriel/burrow",
   "oscabriel/ember",

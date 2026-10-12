@@ -1,13 +1,3 @@
-/**
- * The page's live view: `watchAtom(project)`, mounted by the
- * project and answer pages, follows the project's events from the last
- * number of the replay the page read and invalidates the keys each one
- * changes, so the page's reads fetch again (and, once the replay is in,
- * the keys its events change, for what came before the stream); a stream
- * that fails before it hears anything turns into a poll every `POLL_MS`. Each test runs the atom
- * in a registry of its own, over a stub stream, a replay given as the
- * project's events and the test's own `Reactivity`, on the TestClock.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { LandingView } from "@repo/protocol/domain/landing";
@@ -56,16 +46,10 @@ const landing: LandingView = {
   sha,
 };
 
-/** The page's two kinds of key: the project's, and its ask's own. */
 const projectKey = "project";
 
 const askKey = "ask";
 
-/**
- * The keys invalidated so far, by kind, each once per invalidation: the
- * test's `Reactivity`, with one listener on the project's key and one on
- * the ask's own.
- */
 const invalidations = Effect.gen(function* () {
   const reactivity = yield* Reactivity.make;
   const fired: string[] = [];
@@ -83,11 +67,6 @@ const invalidations = Effect.gen(function* () {
   return { fired, reactivity };
 });
 
-/**
- * A registry standing for one browser tab: the page has read `replay` as
- * the project's events, and `watchAtom`'s runtime follows `follow` and
- * invalidates through `reactivity`, its time the TestClock's.
- */
 const tab = (
   follow: (since: number) => Stream.Stream<ProjectEvent, string>,
   reactivity: Reactivity.Reactivity,
@@ -125,11 +104,9 @@ const tab = (
     registry.mount(watchAtom(datekit));
   });
 
-/** Lets the atom's fiber run until `done` holds, or long enough that it would have. */
 const runUntil = (done: () => boolean) =>
   Effect.yieldNow.pipe(Effect.repeat({ times: 200, until: done }));
 
-/** What `fired` holds once something has fired, sorted; then it is emptied. */
 const firedNow = (fired: string[]) =>
   Effect.gen(function* () {
     yield* runUntil(() => fired.length > 0);

@@ -1,28 +1,3 @@
-/**
- * Every page of the web, as a browser and a keyboard reach it, in both
- * colour schemes at 1440 and 390 px wide:
- *
- * - axe-core finds no serious or critical violation (it is loaded from
- *   cdnjs into the page at run time, so no package is added for it);
- * - no page scrolls sideways at 390 or 360;
- * - no word the web keeps off its screens (review, approve, merge, queue,
- *   …) appears in its own chrome; text that comes from a repository or a
- *   person (a README, code, a diff, a want, a brief, a commit message, a
- *   note, a refusal's own text) is left out by the marker its view sets;
- * - the keyboard: the skip link is the first stop and lands on main; focus
- *   shows on every stop; the rail, the toolbar's filters, a row's copy
- *   button and the inspector's commands come in that order; `?` opens the
- *   keys dialog, whose switch turns `j`/`k` off; `j`/`k` move the
- *   selection on the front page and Today; `J`/`K` move between files on a
- *   commit and a finish; `1` copies the inspector's first command; every
- *   sheet keeps focus inside it and gives it back to its button on Escape.
- *
- * It runs only against `WEB_URL`, the web's dev world with its fixtures
- * (`VITE_DEV_FIXTURES=1 bun run dev -- --port <port>`): the pages it visits
- * are the fixture project's, and it signs in through the dev world's own
- * `/auth/dev`. `A11Y_PROJECT` names the fixture project by its full name
- * (`oscabriel/vellum` unless given). It only reads, but for the keys switch, kept in this browser.
- */
 import { expect, test } from "@playwright/test";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { Brand } from "@repo/brand";
@@ -49,10 +24,8 @@ const { project } = settings;
 const at = (path: string) =>
   `${Option.getOrElse(settings.web, () => "")}${path}`;
 
-/** The decider the dev world signs in. */
 const DECIDER = "ines-v";
 
-/** A page to visit: where, whether a decider must be signed in, what it answers. */
 interface Visit {
   readonly name: string;
   readonly path: string;
@@ -60,14 +33,9 @@ interface Visit {
   readonly status?: number;
 }
 
-/**
- * The commit page's address comes from the landings page (its SHA is the
- * dev world's), so it is visited by name and found at run time: the newest
- * ask opening, which changes two files or more (the ask and its check).
- */
+// Its SHA is the dev world's, so it is found at run time from the landings page.
 const COMMIT = "<the newest ask opening>";
 
-/** Every page group, over the fixture project's states. */
 const VISITS: readonly Visit[] = [
   { name: "landing", path: "/" },
   { name: "front", path: "/asks" },
@@ -155,24 +123,14 @@ const SCHEMES = ["light", "dark"] as const;
 
 const WIDTHS = [1440, 390] as const;
 
-/**
- * Words the web keeps off its screens, matched whole and in any case
- * ("merged tree" passes; "merge" does not).
- */
+// Matched whole and in any case: "merged tree" passes, "merge" does not.
 const FORBIDDEN =
   /\b(?:review|reviewer|approve|approval|PR|pull request|issue|merge|lease|reputation|inbox|queue|dashboard|explore|trending|nit)\b/iu;
 
-/**
- * Text a repository or a person wrote, which the web shows as given: the
- * views mark each such block (`data-said` for a want, a brief, a commit's
- * subject or body, a note). A refusal's own text comes from the one
- * renderer every surface shares (`data-refusal`), and the gate's own names
- * for its stages ("Merge") are the protocol's (`data-term`).
- */
+// Text a repository or a person wrote, which its view marks; the forbidden words are not looked for there.
 const NOT_OURS =
   "[data-readme], [data-code], [data-diff], [data-said], [data-refusal], [data-term], script, style, noscript";
 
-/** A context for `scheme` at `width`, signed in as the decider when asked. */
 const contextFor = (
   browser: Browser,
   scheme: (typeof SCHEMES)[number],
@@ -198,7 +156,6 @@ const contextFor = (
     return context;
   });
 
-/** The newest landing's commit page, read from the landings page. */
 const commitPath = (context: BrowserContext) =>
   Effect.gen(function* () {
     const page = yield* Effect.promise(() => context.newPage());
@@ -217,20 +174,18 @@ const commitPath = (context: BrowserContext) =>
     return href ?? `/${project}/commits/main`;
   });
 
-/** Open `path` and let the browser take the page over. */
 const open = (page: Page, path: string) =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>
       page.goto(at(path), { waitUntil: "load" })
     );
 
-    // The page hydrates, then its client reads settle (lists, the tree).
+    // The page hydrates, then its client reads settle.
     yield* Effect.promise(() => page.waitForTimeout(1500));
 
     return response?.status();
   });
 
-/** The page's own words that the web keeps off its screens. */
 const forbiddenOn = (page: Page) =>
   Effect.promise(() =>
     page.evaluate(
@@ -340,7 +295,6 @@ test.describe("every page, by axe, at two widths, in both schemes", () => {
   }
 });
 
-/** What has focus: its tag, its name, and the landmark it sits in. */
 const focused = (page: Page) =>
   Effect.promise(() =>
     page.evaluate(() => {
@@ -361,7 +315,6 @@ const focused = (page: Page) =>
       const style = getComputedStyle(element);
       const after = getComputedStyle(element, "::after");
 
-      // Where the stop sits, first match wins.
       const places = [
         ["[role=dialog]", "dialog"],
         ["nav[aria-label=Site]", "rail"],
@@ -379,8 +332,6 @@ const focused = (page: Page) =>
           .trim()
           .slice(0, 60),
         tag: element.tagName.toLowerCase(),
-        // The ring: an outline, a row link's outline drawn on its ::after,
-        // or the kit's box-shadow ring.
         visible:
           (style.outlineStyle !== "none" && style.outlineWidth !== "0px") ||
           (after.outlineStyle !== "none" && after.outlineWidth !== "0px") ||
@@ -389,11 +340,7 @@ const focused = (page: Page) =>
     })
   );
 
-/**
- * Tab through the page, up to `limit` stops, and what each stop was;
- * `settle` waits after each press (a sheet's trap moves focus in the next
- * frame).
- */
+// `settle` waits after each press: a sheet's focus trap moves focus in the next frame.
 const tabStops = (page: Page, limit: number, settle = 0) =>
   Effect.gen(function* () {
     const stops: NonNullable<Effect.Success<ReturnType<typeof focused>>>[] = [];
@@ -417,7 +364,6 @@ const tabStops = (page: Page, limit: number, settle = 0) =>
     return stops;
   });
 
-/** A page on its own context, for a keyboard walk. */
 const keyboardPage = (
   browser: Browser,
   path: string,
@@ -451,7 +397,6 @@ test.describe("the keyboard", () => {
   test("the skip link comes first, lands on main, and every stop shows its focus", ({
     browser,
   }) => {
-    // Every page, each tabbed through: far longer than one page's check.
     test.setTimeout(VISITS.length * 30_000);
 
     return Effect.runPromise(
@@ -514,8 +459,6 @@ test.describe("the keyboard", () => {
       Effect.gen(function* () {
         const { context, page } = yield* keyboardPage(browser, "/asks", 1440);
 
-        // A row selected, so the inspector holds its commands; then the
-        // same address again, tabbed from its start.
         yield* Effect.promise(() => page.keyboard.press("j"));
         yield* Effect.promise(() => page.waitForTimeout(500));
         yield* open(
@@ -583,7 +526,6 @@ test.describe("the keyboard", () => {
 
           expect(searchOf(page).get(param)).toBe(firstSelected);
 
-          // The switch: off, `j` does nothing; `?` still opens the dialog.
           yield* Effect.promise(() => page.keyboard.press("?"));
 
           const dialog = page.getByRole("dialog", { name: "Keys" });
@@ -627,7 +569,6 @@ test.describe("the keyboard", () => {
 
         const ask = searchOf(page).get("ask") ?? "";
 
-        // The selected row's own claim command, as its copy button holds it.
         const command = yield* Effect.promise(() =>
           page
             .locator(`li[data-ask="${ask}"] button code`)

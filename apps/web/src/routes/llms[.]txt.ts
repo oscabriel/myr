@@ -4,7 +4,6 @@ import { env } from "cloudflare:workers";
 import { serverClient } from "../server/client.ts";
 import { frontLlmsHandler } from "../server/llms.ts";
 
-// `/llms.txt`: the platform for an agent (`server/llms.ts`).
 export const Route = createFileRoute("/llms.txt")({
   server: {
     handlers: {

@@ -1,7 +1,3 @@
-/**
- * A `Client` of a fresh dev world with its fixtures, as a route's loader
- * calls the platform on the server: signed in as `handle`, or as nobody.
- */
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { Handle } from "@repo/protocol/ids";
 import { Effect, Layer } from "effect";

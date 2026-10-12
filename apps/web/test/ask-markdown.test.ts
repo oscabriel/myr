@@ -1,11 +1,3 @@
-/**
- * An ask answers as Markdown, so a harness reads it with one plain fetch:
- * the ask's URL with `Accept: text/markdown`, or the same URL with `.md`.
- * The body is the brief the platform rendered (`showAsk`), with the banner
- * naming the web's indexes under its title; an unknown ask is a 404 whose
- * body is the refusal, as git would print it.
- * A browser asking for HTML gets the page.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -31,10 +23,8 @@ import { ask, askId, brief, project } from "./ask-fixtures.ts";
 
 const WEB = "https://web-test.example.workers.dev";
 
-/** Where the web's indexes are for datekit's asks, as the routes find them. */
 const index = { project, webUrl: WEB };
 
-/** An ask's Markdown as served: the brief's title, the banner naming the indexes, then the rest of the brief unchanged. */
 const [title = "", ...rest] = brief.split("\n");
 
 const served = [title, "", indexBanner(index), ...rest].join("\n");
@@ -44,10 +34,6 @@ const MARKDOWN = "text/markdown; charset=utf-8";
 const BROWSER =
   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 
-/**
- * A platform that knows datekit and its one ask, counting `showAsk` calls,
- * as a route's client.
- */
 const platformOf = (calls: Ref.Ref<number>) => () =>
   Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
     Layer.provide([
@@ -73,7 +59,6 @@ const platformOf = (calls: Ref.Ref<number>) => () =>
     ])
   );
 
-/** A platform that cannot be reached: every call dies on the way. */
 const unreachable = () =>
   Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
     Layer.provide([unanswered, asTester])
@@ -89,7 +74,6 @@ const params = (askName: string, projectName: string = project) => ({
   project: projectName,
 });
 
-/** What a response says, read whole. */
 const read = (response: Response) =>
   Effect.map(
     Effect.promise(() => response.text()),
@@ -102,7 +86,6 @@ const read = (response: Response) =>
     })
   );
 
-/** The page's own render, which a Markdown request must never reach. */
 const PAGE = new Response("<!doctype html><title>the page</title>");
 
 describe("an ask's URL with Accept: text/markdown", () => {

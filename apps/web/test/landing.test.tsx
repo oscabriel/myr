@@ -1,12 +1,3 @@
-/**
- * The landing, as a first-time reader meets it: what the platform is, the
- * way to the open asks before anything else, the install line to copy, the
- * screen `git push` prints when the gate refuses (from the one renderer),
- * the four nouns, the loop, and the projects to read, each with its
- * posture. Drawn in the house style: no banned word, and no rounded,
- * shadowed or gradient surface. Its projects are read on the server as
- * nobody, so the page is the same for everyone, script or not.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Contracts } from "@repo/protocol/contracts";
@@ -44,7 +35,6 @@ const pageWith = (projects: LandingProjects) =>
     <LandingView platformUrl={PLATFORM} projects={projects} webUrl={WEB} />
   );
 
-/** Every link's address, in the page's order. */
 const hrefsOf = (markup: string) =>
   [...markup.matchAll(/<a\b[^>]*href="(?<href>[^"]+)"/gu)].map(
     (found) => found.groups?.href
@@ -160,9 +150,7 @@ describe(LandingView, () => {
         const markup = yield* pageWith(listed);
         const text = textIn(markup).toLowerCase();
 
-        // DESIGN.md's list, and the glossary's words to avoid. "Merge" is
-        // banned for a landing, and the page never says it of one ("merges
-        // onto main" is the gate's step, in the README's words).
+        // DESIGN.md's list, and the glossary's words to avoid. "Merge" is banned for a landing.
         expect(
           [
             "review",
@@ -193,7 +181,6 @@ describe(LandingView, () => {
   );
 });
 
-/** A platform that lists `projects`, and answers nothing else. */
 const listing = (projects: readonly ProjectListing[]) =>
   platformWith(
     Contracts.toLayerHandler("listProjects", () => Effect.succeed({ projects }))

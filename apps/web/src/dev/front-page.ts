@@ -1,18 +1,3 @@
-/**
- * The dev world's front page: the read model the platform keeps in D1
- * (`@repo/project/projection-d1`), folded the same way from the same rows,
- * which here are the events every project's outbox hands the world's
- * projection (`projection.ts`). An ask opened goes on the page and one closed comes off; a
- * claim marks it claimed until it lapses or is released. An entry is what
- * the anonymous viewer sees: takeable when no live claim holds it, nothing
- * it waits on is still on the page, and it is held for nobody; newest first.
- * A project is listed from its first event, `open` until a `PostureChanged`
- * ledger entry moves it, with when it last landed (the `projects` table);
- * `listProjects` reads each one's standing posture from its own ledger
- * (`withStandingPosture`) and keeps this one only as the fallback. A
- * person's credits are each project's own count, joined (`creditsFor`): the
- * rule D1's `credits` table is fed by, read at the source.
- */
 import { FrontPage } from "@repo/project/front-page";
 import type { FrontPageFilter } from "@repo/project/front-page";
 import type { ProjectedEvent } from "@repo/project/projection";
@@ -30,7 +15,6 @@ import { Array, DateTime, Effect, Layer, Order } from "effect";
 
 import { DevProjected } from "./projection.ts";
 
-/** One open ask on the page, as D1's `front_page` row holds it. */
 interface Row {
   readonly ask: AskListing;
   readonly claims: number;
@@ -38,7 +22,6 @@ interface Row {
   readonly project: ProjectName;
 }
 
-/** A project as D1's `projects` row holds it, but for its open asks, which the page counts. */
 interface Listed {
   readonly landedAt?: DateTime.Utc;
   readonly posture: Posture;
@@ -46,13 +29,11 @@ interface Listed {
 
 const keyOf = (project: ProjectName, ask: string) => `${project}/${ask}`;
 
-/** Every project's events in its own order. */
 const inOrder = Order.mapInput(
   Order.Tuple([Order.String, Order.Number]),
   ({ event, project }: ProjectedEvent) => [project, event.seq] as const
 );
 
-/** The page's rows with one ask's claim count moved by `change`, if it is on the page. */
 const withClaims = (
   rows: ReadonlyMap<string, Row>,
   key: string,
@@ -68,7 +49,6 @@ const withClaims = (
       });
 };
 
-/** The page's rows after one project's event, as D1's statements change them. */
 const step = (
   rows: ReadonlyMap<string, Row>,
   { event, project }: ProjectedEvent
@@ -101,7 +81,6 @@ const step = (
     Warned: () => rows,
   });
 
-/** The project list after one project's event, as D1's statements change it. */
 const listedStep = (
   listed: ReadonlyMap<ProjectName, Listed>,
   { event, project }: ProjectedEvent
@@ -129,7 +108,6 @@ const empty: ReadonlyMap<string, Row> = new Map();
 
 const unlisted: ReadonlyMap<ProjectName, Listed> = new Map();
 
-/** The page's rows after `events`, and every project they came from, by name. */
 const fold = (events: readonly ProjectedEvent[]) => {
   const ordered = Array.sort(events, inOrder);
 
@@ -145,11 +123,9 @@ const fold = (events: readonly ProjectedEvent[]) => {
 
 type Folded = ReturnType<typeof fold>;
 
-/** A project's posture as the list holds it: `open` until a ledger entry moves it. */
 const postureOf = (folded: Folded, project: ProjectName): Posture =>
   folded.listed.get(project)?.posture ?? "open";
 
-/** One project as `listProjects` answers it. */
 const listingOf =
   (folded: Folded) =>
   (project: ProjectName): ProjectListing => {
@@ -164,14 +140,12 @@ const listingOf =
     return landedAt === undefined ? listing : { ...listing, landedAt };
   };
 
-/** Newest first, then by project and ask, as D1's query orders them. */
 const newestFirst = Order.combineAll([
   Order.flip(Order.mapInput(DateTime.Order, ({ openedAt }: Row) => openedAt)),
   Order.mapInput(Order.String, ({ project }: Row) => project),
   Order.mapInput(Order.String, ({ ask }: Row) => ask.ask),
 ]);
 
-/** A row as the anonymous viewer sees it. */
 const entryOf =
   (folded: Folded) =>
   (row: Row): FrontPageEntry => {
@@ -198,7 +172,6 @@ const matches =
     (kind === undefined || ask.kind === kind) &&
     (reserved === undefined || ask.reserve === reserved);
 
-/** `FrontPage` over the memory projection's events, and credits from `Projects`. */
 export const DevFrontPage: Layer.Layer<
   FrontPage,
   never,

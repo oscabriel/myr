@@ -22,18 +22,8 @@ import { pageHead } from "../../../features/shared/head.ts";
 import { branchPage } from "../../../server/cache-headers.ts";
 import { serverClient } from "../../../server/client.ts";
 
-// A project's policy (its section reads "Policy" at the address it has
-// always had): who decides what, who is vouched for, its limits, and its
-// layers in a line, from the evaluated policy at the landed commit beside
-// the ledger. The loader reads both on the server, so the page arrives whole
-// and an address naming no project is a 404; in the browser each reads
-// again as the platform lands changes and appends entries.
+// The project's policy page, at the address it has always had.
 
-/**
- * What the page's loader carries from the server, encoded: the policy
- * (absent until evaluated), why it has not evaluated (absent before the
- * first landing and once it has), and the ledger.
- */
 const PeoplePageData = Schema.Struct({
   ledger: Ledger,
   policy: Schema.optionalKey(PublicPolicy),
@@ -42,7 +32,6 @@ const PeoplePageData = Schema.Struct({
 
 type PeoplePageData = typeof PeoplePageData.Type;
 
-/** The policy and ledger of the project `name`, or a not-found when there is no such project (a 404). */
 export const readPeople = (name: string) =>
   Effect.gen(function* () {
     const project = yield* Schema.decodeEffect(ProjectName)(name).pipe(
@@ -65,7 +54,6 @@ const peoplePage = createServerFn({ method: "GET" })
     Effect.runPromise(readPeople(data).pipe(Effect.provide(serverClient(env))))
   );
 
-/** The page over the two atoms, which start from what the loader read and read again as the project changes. */
 const FreshPeople = ({
   project,
   read,
@@ -73,7 +61,6 @@ const FreshPeople = ({
   readonly project: ProjectName;
   readonly read: PeoplePageData;
 }) => {
-  // Live: a landing re-reads the policy, a ledger entry the layers.
   useAtomMount(watchAtom(project));
 
   const { policy, unevaluated } = Option.getOrElse(
@@ -127,7 +114,6 @@ const Unknown = () => {
 
 export const Route = createFileRoute("/$owner/$project/people")({
   loader: ({ params }) => peoplePage({ data: params.project }),
-  // The policy moves with the next landing: kept briefly, read again behind.
   headers: () => branchPage,
   head: ({ params: { project } }) =>
     pageHead({

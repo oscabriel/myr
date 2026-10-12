@@ -1,17 +1,3 @@
-/**
- * Every contract, served by the dev world the way the platform serves it
- * (`apps/platform/src/handlers.ts`, which an app may not import): a
- * contract that names a project calls that project's service as the caller
- * `Authenticated` named; the cross-project reads (`listProjects`,
- * `frontPage`, `credits`) come from the front page folded over the world's
- * projects; `status` and `today` without a project ask every project it
- * lists and merge what each says; `evidence` reads the world's lane logs.
- * Unlike the platform, nothing spends a rate limit: the world has one
- * browser at a time. Every `remote` names the origin the caller reached the
- * world by, as the platform's do. The code reads run the same
- * `@repo/project/code` functions the platform's do, over the world's
- * `RepoHost`.
- */
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { EvidenceStore, LogRef } from "@repo/checks/evidence-store";
 import {
@@ -43,20 +29,13 @@ import type { Layer } from "effect";
 import { HttpServerRequest } from "effect/http";
 import type { Rpc, RpcGroup } from "effect/rpc";
 
-/** How many commits a page of `log` holds when the caller names no limit. */
 const LOG_PAGE = 30;
 
-/** How many events `watch` reads from its project at a time. */
 const EVENT_PAGE = 100;
 
-/** The caller, as the `Authenticated` server side named them. */
 const caller = Effect.service(CurrentPrincipal);
 
-/**
- * The caller of a contract only a person may call. `Authenticated` lets an
- * anonymous call reach only a `public` contract, so anyone else here is a
- * defect in the server side, never a caller to serve.
- */
+// `Authenticated` lets an anonymous call reach only a `public` contract, so anyone else here is a defect.
 const person = Effect.flatMap(caller, (principal) =>
   Principal.match(principal, {
     Anonymous: () =>
@@ -65,7 +44,6 @@ const person = Effect.flatMap(caller, (principal) =>
   })
 );
 
-/** Where the caller reached the world: the request's origin. */
 const gateway = Effect.map(
   Effect.serviceOption(HttpServerRequest.HttpServerRequest),
   (request) =>
@@ -77,18 +55,15 @@ const gateway = Effect.map(
     )
 );
 
-/** A repo's git URL at the origin the caller came through. */
 const remoteOf = (repo: RepoName | ProjectName) =>
   Effect.map(gateway, (origin) => `${origin}/${repo}.git`);
 
-/** A claim, with its fork's URL at the caller's origin. */
 const atGateway = (claim: ClaimView) =>
   Effect.map(remoteOf(claim.fork), (remote): ClaimView => ({
     ...claim,
     remote,
   }));
 
-/** The caller's claims and answers, each claim at the caller's origin, under their handle. */
 const statusAtGateway = (
   who: Person,
   status: {
@@ -102,7 +77,6 @@ const statusAtGateway = (
     handle: who.handle,
   }));
 
-/** Decisions across projects: soonest to expire first, then oldest, then by project and id. */
 const byExpiry: Order.Order<Decision> = Order.combineAll([
   Order.mapInput(DateTime.Order, ({ expiresAt }: Decision) => expiresAt),
   Order.mapInput(DateTime.Order, ({ openedAt }: Decision) => openedAt),
@@ -110,11 +84,6 @@ const byExpiry: Order.Order<Decision> = Order.combineAll([
   Order.mapInput(Order.String, ({ id }: Decision) => id),
 ]);
 
-/**
- * One decider's Today across the projects they decide in, as the platform
- * merges it: budgets added up, decisions in one order of expiry, the rest
- * side by side. A person who decides in none has no Today.
- */
 const acrossProjects = (
   decider: Person,
   pages: readonly Today[]
@@ -145,7 +114,6 @@ const acrossProjects = (
     : Effect.fail(new NotDecider({}));
 };
 
-/** Every contract over the dev world. A missing contract is a type error here. */
 export const devHandlers: Layer.Layer<
   Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>,
   never,
@@ -157,13 +125,11 @@ export const devHandlers: Layer.Layer<
     const evidence = yield* EvidenceStore;
     const host = yield* RepoHost;
 
-    /** `call` on the project named `project`; one never made is `UnknownProject`. */
     const on = <A, E>(
       project: ProjectName,
       call: (api: ProjectApi) => Effect.Effect<A, E>
     ) => Effect.flatMap(projects.get(project), call);
 
-    /** A code read of `project`'s canonical repo, over the world's `RepoHost`. */
     const code = <A, E>(
       project: ProjectName,
       read: (of: CodeProject) => Effect.Effect<A, E, RepoHost>
@@ -174,7 +140,6 @@ export const devHandlers: Layer.Layer<
         )
       );
 
-    /** `call` on every project the front page lists, in name order, keeping what each finds. */
     const everywhere = <A, E>(
       call: (api: ProjectApi) => Effect.Effect<Option.Option<A>, E>
     ) =>
@@ -359,7 +324,6 @@ export const devHandlers: Layer.Layer<
             return yield* on(project, (api) => api.today(who));
           }
 
-          // A project the caller decides nothing in has no page for them.
           const pages = yield* everywhere((api) =>
             api.today(who).pipe(
               Effect.asSome,

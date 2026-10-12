@@ -1,10 +1,3 @@
-/**
- * Every drawing of code takes its options from one module: the theme that
- * reads the web's tokens (so code sits on the paper and follows the scheme
- * with the page), the highlighter, and the limits past which a minified
- * file or a lockfile is drawn as plain text instead of stalling the page.
- * The module touches no DOM and no React, so it loads here, in Node.
- */
 import { describe, expect, it, vi } from "@effect/vitest";
 import { DEFAULT_TOKENIZE_MAX_LENGTH, resolveTheme } from "@pierre/diffs";
 import { Effect } from "effect";
@@ -16,7 +9,6 @@ import {
   treesOptions,
 } from "../src/features/code/pierre.ts";
 
-/** A drawn code box, wider than its pane when it `scrolls`. */
 const box = (scrolls: boolean) => ({
   clientHeight: 400,
   clientWidth: 600,

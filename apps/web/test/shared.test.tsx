@@ -1,10 +1,3 @@
-/**
- * The pieces every page repeats, rendered to HTML with `react-dom/server`
- * (no DOM library): a state as its mark and its word, a posture as the
- * platform labels it, a person by handle, a time as a distance, a command
- * whole and copyable, and an empty list with the command that fills it.
- * (Refusals and outcomes: `outcome.test.tsx`; credit: `credits.test.tsx`.)
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Handle } from "@repo/protocol/ids";
@@ -151,7 +144,6 @@ describe(When, () => {
   });
 });
 
-/** Each line's hang, in ch, as the command line sets it. */
 const hangs = (command: string) =>
   [
     ...markupOf(<CommandLine command={command} />).matchAll(

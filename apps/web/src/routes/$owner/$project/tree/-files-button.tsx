@@ -1,9 +1,3 @@
-/**
- * The Files button on the code pages below the shell's width, where the
- * rail is not drawn: it opens the files as a sheet from the left (the
- * whole screen on a phone), loaded on the first press. Not a route: the
- * `-` prefix keeps the router from reading it as one.
- */
 import { FolderTree } from "lucide-react";
 import { lazy, Suspense, useState } from "react";
 

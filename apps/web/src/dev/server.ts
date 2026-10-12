@@ -1,12 +1,3 @@
-/**
- * The dev world as a fetch handler: `POST /rpc` is an `RpcServer` over
- * `Contracts` with the dev handlers, protocol's `Authenticated` server side
- * over dev tokens (`sessions.ts`) and JSON, as the platform's `/rpc` serves
- * it, over a fresh world the seed has brought to its state; and
- * `GET /<project>/raw/<rev>/<path…>` answers a project's raw files with
- * the response the platform's `raw.ts` gives (`@repo/project/code/raw`).
- * `backend.ts` makes the one an isolate serves; a test makes its own.
- */
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { rawFor } from "@repo/project/code/raw";
 import { Projects } from "@repo/project/projects";
@@ -26,26 +17,15 @@ import { seedDev, seedEnd } from "./seed.ts";
 import { devSessions } from "./sessions.ts";
 import { devWorldAt } from "./world.ts";
 
-/** How a dev world is made: with the fixtures or without, how soon the live landing comes, and when it is. */
 export interface DevWorldOptions {
   readonly fixtures?: FixtureMode;
-  /** In `live` mode, how long after vellum's `watch` is first answered its lint child lands. */
   readonly liveAfter?: Duration.Duration;
-  /**
-   * Where the world's time stands. `"fixed"`, as a test builds it: the
-   * calendar as written, from `devStart`, and the clock standing where the
-   * seed left it. `"present"`, as the running dev server builds it: the
-   * calendar moved so the seed's last instant is the minute the world is
-   * built in, and the clock running on from there in real time.
-   */
   readonly time?: "fixed" | "present";
 }
 
-/** The calendar's instant a seed with `fixtures` leaves the clock at. */
 const seedEndOf = (fixtures: FixtureMode) =>
   fixtures === "off" ? seedEnd : fixturesNow;
 
-/** A fresh world whose calendar starts at `start`, seeded; with the fixtures when `fixtures` asks for them. */
 const seededFrom = (start: DateTime.Utc, options: DevWorldOptions) => {
   const { fixtures = "off" } = options;
 
@@ -54,7 +34,6 @@ const seededFrom = (start: DateTime.Utc, options: DevWorldOptions) => {
     : withFixtures(fixtures, options.liveAfter, start);
 };
 
-/** A fresh world, seeded, at the time `options` asks for. */
 const seededWorld = (options: DevWorldOptions) => {
   const { fixtures = "off", time = "fixed" } = options;
 
@@ -71,11 +50,6 @@ const seededWorld = (options: DevWorldOptions) => {
 
 const decodeProject = Schema.decodeUnknownOption(ProjectName);
 
-/**
- * `/<project>/raw/<rev>/<path…>`: a project's raw files, as the platform
- * serves them, at each spelling of a name: `oscabriel/datekit`,
- * `github.com/pallets/click`, and a key from before owners, `datekit`.
- */
 const raw = Layer.unwrap(
   Effect.gen(function* () {
     const services = Context.make(RepoHost, yield* RepoHost).pipe(
@@ -108,12 +82,7 @@ const raw = Layer.unwrap(
   })
 );
 
-/**
- * The contracts at `/rpc` and the raw files over a fresh, seeded world. `toWebHandler` builds
- * its layer as soon as it is called, so the world is made and seeded from
- * that moment, and a request that arrives before the seed is done waits for
- * it. `dispose` ends the world.
- */
+// `toWebHandler` builds its layer as soon as it is called; a request that arrives before the seed is done waits for it.
 export const devServer = (options: DevWorldOptions = {}) =>
   HttpRouter.toWebHandler(
     Layer.merge(

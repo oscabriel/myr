@@ -1,9 +1,3 @@
-/**
- * The keyboard's single keys: what each press does, when none acts (focus in
- * a text field, the switch off), and the switch itself, kept in the
- * browser's storage as a per-viewer convenience that must survive a
- * storage that refuses to read or write.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -14,7 +8,6 @@ import {
   writeShortcuts,
 } from "../src/features/shared/keys.tsx";
 
-/** A press of `key` outside any text field, with no modifier held. */
 const press = (key: string, inField = false) => ({
   altKey: false,
   ctrlKey: false,
@@ -23,7 +16,6 @@ const press = (key: string, inField = false) => ({
   metaKey: false,
 });
 
-/** A `Storage` whose every read and write throws, as a blocked one does. */
 const refusing: Storage = {
   clear: () => {
     throw new Error("blocked");
@@ -45,7 +37,6 @@ const refusing: Storage = {
   },
 };
 
-/** A `Storage` held in a map, as a browser's is. */
 const kept = (): Storage => {
   const items = new Map<string, string>();
 

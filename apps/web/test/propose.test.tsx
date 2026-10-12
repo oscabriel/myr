@@ -1,11 +1,3 @@
-/**
- * The propose form, rendered to HTML with `react-dom/server`: a signed-in
- * member writes a want, may name a territory from the project's top
- * folders, and lets the platform's agent draft the ask (checked by
- * default). A line from the why page arrives as `?about&line&at` and starts
- * the want. Signed out, the page offers sign-in and no form. What the form
- * sends is the `proposeAsk` contract's own payload.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { ProposeAsk } from "@repo/protocol/contracts";
@@ -36,7 +28,6 @@ const signedIn = (about: Option.Option<About> = Option.none()) =>
     <ProposeView about={about} modules={modules} project={datekit} signedIn />
   );
 
-/** The want's textarea, as the server renders it: its opening tag and text. */
 const textareaOf = (markup: string) =>
   /<textarea[^>]*>(?<text>[^<]*)<\/textarea>/u.exec(markup);
 
@@ -174,7 +165,6 @@ describe(topFolders, () => {
   });
 });
 
-/** `proposeAsk`'s answer: the proposal `id`, made. */
 const made = (id: string) =>
   Schema.decodeUnknownSync(ProposeAsk.successSchema)({
     proposal: {

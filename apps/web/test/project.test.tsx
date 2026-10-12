@@ -1,12 +1,3 @@
-/**
- * A project's home, which is its list of asks: read on the server by the
- * route's loader (its asks, its own ledger, its events, its policy, its
- * README) and rendered inside the router. Its asks come first, a family
- * expanded as a fan with its children listed; then its README; beside them,
- * how a change lands here, with the commands that take part and the last
- * landings as one-line credits. A child that lands while the page is open
- * stamps its node once.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -69,7 +60,6 @@ import { markupOf, textIn, textOf } from "./markup.ts";
 import { renderAt } from "./render.tsx";
 import { reachingTransport } from "./transport.ts";
 
-/** The markup of the row for `ask`: from its `<li>` to the next row or the list's end. */
 const rowOf = (markup: string, ask: string) => {
   const start = markup.indexOf(`data-ask="${ask}"`);
 
@@ -82,19 +72,15 @@ const rowOf = (markup: string, ask: string) => {
   return start === -1 ? "" : markup.slice(start, Math.min(...ends));
 };
 
-/** Which of `parts` `text` does not hold. */
 const missingFrom = (text: string, parts: readonly string[]) =>
   parts.filter((part) => !text.includes(part));
 
-/** Which of `parts` `text` holds. */
 const foundIn = (text: string, parts: readonly string[]) =>
   parts.filter((part) => text.includes(part));
 
-/** The page's main pane, the inline facts left in (they sit after its head). */
 const mainOf = (markup: string) =>
   markup.slice(markup.indexOf("<main"), markup.indexOf("</main>"));
 
-/** The inspector, as the shell's width shows it. */
 const inspectorOf = (markup: string) =>
   markup.slice(markup.indexOf('data-facts="inspector"'));
 
@@ -177,7 +163,6 @@ const parent: Ask = {
   kind: KindName.make("migrate"),
 };
 
-/** A landing of `ask` (or an opening of it), credited to `answerer`. */
 const landingOf = (
   sha: string,
   more: { readonly ask?: string; readonly opened?: string },
@@ -605,7 +590,6 @@ describe(ledeOf, () => {
   });
 });
 
-/** The contracts over HTTP, each request answered by `answer`. */
 const clientOver = (answer: (request: Request) => Promise<Response>) =>
   Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
     Layer.provide(RpcClient.layerProtocolHttp({ url: "http://localhost/rpc" })),
@@ -617,10 +601,6 @@ const clientOver = (answer: (request: Request) => Promise<Response>) =>
     )
   );
 
-/**
- * `handler`, but with the list of projects failing when `listed` counts its
- * calls.
- */
 const failingProjects =
   (
     handler: (request: Request) => Promise<Response>,
@@ -641,11 +621,6 @@ const failingProjects =
       })
     );
 
-/**
- * A fresh dev world with `options`, served; with `listed`, its list of
- * projects fails and each call to it is counted. The world ends with the
- * scope.
- */
 const devWorldWith = (options: DevWorldOptions, listed?: Ref.Ref<number>) =>
   Layer.unwrap(
     Effect.gen(function* () {
@@ -659,12 +634,10 @@ const devWorldWith = (options: DevWorldOptions, listed?: Ref.Ref<number>) =>
 
 const devWorld = devWorldWith({});
 
-/** A platform that does not answer: every call comes back a 503. */
 const unanswering = clientOver(() =>
   Promise.resolve(new Response("", { status: 503 }))
 );
 
-/** A platform that knows every project and has landed nothing on any. */
 const nothingLanded = Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
   Layer.provide([
     Layer.mergeAll(
@@ -680,14 +653,12 @@ const nothingLanded = Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
 
 const decodePage = Schema.decodeEffect(ProjectPageData);
 
-/** An input's opening tag, by its `name`. */
 const inputNamed = (markup: string, name: string) =>
   new RegExp(`<input[^>]*name="${name}"[^>]*>`, "u").exec(markup)?.[0] ?? "";
 
 /** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
 const seededWorld = { timeout: 30_000 };
 
-/** The page as the route draws it from what its loader read. */
 const sentFrom = (
   data: ProjectPageData,
   more: Partial<ProjectViewProps> = {}

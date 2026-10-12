@@ -28,17 +28,8 @@ import { notFoundFor, Refusals } from "../../../../features/shared/refusals.ts";
 import { personalPage } from "../../../../server/cache-headers.ts";
 import { serverClient } from "../../../../server/client.ts";
 
-// `/$project/proposals/$proposal`: one proposal and the platform's draft of
-// its ask. The loader reads `showProposal` on the server, so the page
-// arrives whole and an address naming no project or proposal is a 404; in
-// the browser it reads again on each `ProposalDrafted` (the project's
-// watch), so a draft moves from Drafting to Ready or Failed on screen.
-// Who is signed in and the reader's Today (a decider's: it holds the open
-// decision on the proposal) are read in the browser only.
-
 type Shown = typeof ShowProposal.successSchema.Type;
 
-/** The proposal `name/id` names, encoded for the page; a not-found when there is none. */
 export const readProposal = (name: string, id: string) =>
   Effect.gen(function* () {
     const project = yield* Schema.decodeEffect(ProjectName)(name).pipe(
@@ -73,7 +64,6 @@ const proposalPage = createServerFn({ method: "GET" })
     )
   );
 
-/** The open decision on `proposal` in the reader's Today, if it is there. */
 const decisionOn = (
   today: AsyncResult.AsyncResult<Today, unknown>,
   proposal: Proposal
@@ -89,7 +79,6 @@ const decisionOn = (
     ).pipe(Option.map(({ id }) => id))
   );
 
-/** Whether `who` is the proposer, or the reader decides in the project (their Today answered). */
 const mayRedraftAs = (
   who: AsyncResult.AsyncResult<Option.Option<Handle>, unknown>,
   today: AsyncResult.AsyncResult<Today, unknown>,
@@ -101,7 +90,6 @@ const mayRedraftAs = (
     (handle) => handle.toLowerCase() === proposal.proposer.toLowerCase()
   );
 
-/** The page over the proposal's atom, which starts from what the loader read. */
 const FreshProposal = ({
   project,
   read,
@@ -109,7 +97,6 @@ const FreshProposal = ({
   readonly project: ProjectName;
   readonly read: Shown;
 }) => {
-  // Live: a `ProposalDrafted` re-reads the proposal.
   useAtomMount(watchAtom(project));
 
   const { files, proposal } = Option.getOrElse(
@@ -171,7 +158,6 @@ const ProposalPage = () => {
 
 const decodeRefusals = Schema.decodeUnknownOption(Refusals);
 
-/** A proposal or a project the platform does not know: its refusal, as git prints it. */
 const Unknown = ({ data }: { readonly data?: unknown }) => (
   <NotFoundView
     nothing="Nothing is at this address: a project's name is lowercase words joined by single dashes, and a proposal's id reads prop- and six digits."
@@ -182,7 +168,6 @@ const Unknown = ({ data }: { readonly data?: unknown }) => (
 
 export const Route = createFileRoute("/$owner/$project/proposals/$proposal")({
   loader: ({ params }) => proposalPage({ data: params }),
-  // Who may draft it again and the decision on it are the reader's own.
   headers: () => personalPage,
   head: ({ loaderData, params: { project, proposal } }) =>
     pageHead(

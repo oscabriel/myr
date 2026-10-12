@@ -1,9 +1,3 @@
-/**
- * The document every page shares (`routes/__root.tsx`): what its head
- * carries reaches the page whole. TanStack's `HeadContent` keeps one meta per
- * `name`, the last a route gives, so two metas sharing a name lose one
- * silently (once, only the dark `theme-color` reached the page).
- */
 import { describe, expect, it } from "@effect/vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 

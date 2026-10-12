@@ -5,10 +5,7 @@ import { backend } from "#backend";
 
 import { forwarded } from "../../../../../features/agents/forward.ts";
 
-// A file's bytes at a revision: the platform serves them, under its
-// sandboxing headers and content types, at the same path; the web
-// passes GET and HEAD on and hands the answer back untouched, headers and
-// all, as `routes/releases/$.ts` does.
+// The platform serves the bytes under its sandboxing headers; the web passes GET and HEAD on and hands the answer back untouched.
 export const Route = createFileRoute("/$owner/$project/raw/$rev/$")({
   server: { handlers: forwarded(backend, env) },
 });

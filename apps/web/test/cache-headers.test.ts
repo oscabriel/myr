@@ -1,9 +1,3 @@
-/**
- * How long a browser may keep a page, by what the page is addressed by: a
- * page at `main`, a tag or a commit changes with the next landing (a
- * commit's page carries its landing), and a page about the person reading
- * it is theirs alone. A route gives one of these as its `headers`.
- */
 import { describe, expect, it } from "@effect/vitest";
 
 import * as CacheHeaders from "../src/server/cache-headers.ts";

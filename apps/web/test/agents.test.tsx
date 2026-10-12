@@ -1,9 +1,3 @@
-/**
- * The For agents page: a reference in five sections (Synopsis, Connect,
- * Endpoints, Limits, Refusals), every word of it from `@repo/agent-kit`,
- * so the page has no text of its own for a snippet, a command or an
- * endpoint (principle 4); `/agents.md` is the same reference as Markdown.
- */
 import { describe, expect, it } from "@effect/vitest";
 import {
   agentEndpoints,
@@ -26,7 +20,6 @@ const webUrl = "https://web-test.example.workers.dev";
 
 const channels = agentSetup({ commands, platformUrl, webUrl });
 
-/** The entities React writes for text, and what each reads as. */
 const ENTITIES: ReadonlyMap<string, string> = new Map([
   ["&#x27;", "'"],
   ["&amp;", "&"],
@@ -41,22 +34,18 @@ const decoded = (html: string) =>
     (entity) => ENTITIES.get(entity) ?? entity
   );
 
-/** What a reader sees: the markup without its tags, entities decoded. */
 const textOf = (html: string) => decoded(html.replaceAll(/<[^>]+>/gu, ""));
 
-/** The text of every `<code>` in `html`, in order. */
 const codeOf = (html: string) =>
   [...html.matchAll(/<code\b[^>]*>(?<body>.*?)<\/code>/gsu)].map(
     ({ groups: found }) => textOf(found?.body ?? "")
   );
 
-/** The page at `/agents`, inside a router. */
 const page = renderAt(
   "/agents",
   <AgentsView commands={commands} platformUrl={platformUrl} webUrl={webUrl} />
 );
 
-/** The section whose id is `id`: its markup, from its tag to its close. */
 const sectionOf = (html: string, id: string) => {
   const start = html.indexOf(`<section aria-labelledby="${id}"`);
   const end = html.indexOf("</section>", start);

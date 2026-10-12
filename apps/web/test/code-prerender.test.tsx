@@ -1,14 +1,3 @@
-/**
- * Code the server sends highlighted (ADR 0027): a blob page's file and a
- * commit page's first files, drawn by `@pierre/diffs/ssr` into a
- * declarative shadow root, in a fixed set of languages and within the
- * server's own limit; anything else is sent as plain text, as before.
- *
- * Each page is rendered as its route renders it on the server: the loader
- * draws the code ahead (`drawFileAhead`, `drawDiffAhead`), then the page
- * renders with the browser's drawing (`ClientFile`, `ClientDiffs`) holding
- * the server's fallback, which is all a server render shows.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ChangedFile, CommitDiff, FileView } from "@repo/protocol/domain/code";
 import { ProjectName } from "@repo/protocol/ids";
@@ -41,13 +30,10 @@ const decodeFile = Schema.decodeSync(FileView);
 
 const decodeFiles = Schema.decodeSync(Schema.Array(ChangedFile));
 
-/** A highlighted token, as Pierre draws one in the token theme. */
 const TOKEN = /--diffs-token-light:var\(--diffs-token-[a-z-]+/gu;
 
-/** How many highlighted tokens `markup` holds. */
 const tokensIn = (markup: string) => [...markup.matchAll(TOKEN)].length;
 
-/** How many server drawings `markup` holds. */
 const shadowRootsIn = (markup: string) =>
   [...markup.matchAll(/<template shadowrootmode="open">/gu)].length;
 
@@ -59,7 +45,6 @@ const TYPESCRIPT = [
   "",
 ].join("\n");
 
-/** `count` lines of TypeScript. */
 const linesOf = (count: number) =>
   Array.from(
     { length: count },
@@ -68,7 +53,6 @@ const linesOf = (count: number) =>
 
 let blobs = 0;
 
-/** A file at `path`, with a blob id of its own, so no drawing is shared. */
 const fileAt = (path: string, text: string) => {
   blobs += 1;
 
@@ -83,7 +67,6 @@ const fileAt = (path: string, text: string) => {
   });
 };
 
-/** The blob page's markup for `file`, as the server renders it once its loader has drawn the file. */
 const blobPage = (file: FileView) =>
   Effect.gen(function* () {
     yield* Effect.promise(() => drawFileAhead(file));
@@ -116,7 +99,6 @@ const signature = {
   name: "Lin",
 };
 
-/** A commit changing `files`, imported (no landing). */
 const commitOf = (files: readonly (typeof ChangedFile.Encoded)[]) =>
   Schema.decodeSync(CommitDiff)({
     commit: {
@@ -133,7 +115,6 @@ const commitOf = (files: readonly (typeof ChangedFile.Encoded)[]) =>
     truncated: false,
   });
 
-/** The commit page's markup, as the server renders it once its loader has drawn the first files. */
 const commitPage = (diff: CommitDiff) =>
   Effect.gen(function* () {
     const drawn = drawnFiles(diff.files);
@@ -163,14 +144,12 @@ const commitPage = (diff: CommitDiff) =>
     );
   });
 
-/** The markup of one file's section of a diff. */
 const sectionOf = (markup: string, path: string) =>
   new RegExp(
     `<section aria-label="${path.replaceAll(".", "\\.")}"[\\s\\S]*?</section>`,
     "u"
   ).exec(markup)?.[0] ?? "";
 
-/** An added file at `path`, `lines` long, with a blob id of its own. */
 const added = (path: string, lines: number) => {
   blobs += 1;
 

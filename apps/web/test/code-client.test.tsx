@@ -1,17 +1,3 @@
-/**
- * The code browser's client-only drawings, rendered directly (as
- * `finish.test.tsx` renders `patch-diff.tsx`): a file is drawn by
- * `@pierre/diffs` (`<diffs-container>`), a commit's diff by its `CodeView`
- * (which draws nothing until it mounts, so its server markup is its
- * marked host alone; `code.test.tsx` holds the plain text it replaces), and
- * the repo's file tree by `@pierre/trees` (`<file-tree-container>`). The
- * pages import these only through a dynamic import the Worker's build
- * drops, so the Worker never bundles them (the server's own highlighting
- * is `code-prerender.test.tsx`'s).
- *
- * The tree moves the page through the router: choosing a file calls the
- * page's own `onOpen`, never `location.assign`, so the document stays.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { FileTree } from "@pierre/trees";
 import { ChangedFile } from "@repo/protocol/domain/code";
@@ -73,20 +59,13 @@ describe("the client-only drawings", () => {
 
   it("draw the repo's file tree with @pierre/trees", () => {
     const markup = renderToStaticMarkup(
-      <RepoTree
-        current="src/parse.ts"
-        onOpen={() => {
-          // Nothing is chosen in a server render.
-        }}
-        paths={PATHS}
-      />
+      <RepoTree current="src/parse.ts" onOpen={() => {}} paths={PATHS} />
     );
 
     expect(markup).toContain("<file-tree-container");
   });
 });
 
-/** A tree over `PATHS` showing `current`, and the files it asked the page to open. */
 const treeAt = (current: string) => {
   const opened: string[] = [];
   const tree = new FileTree(treeOptionsFor({ current, paths: PATHS }));

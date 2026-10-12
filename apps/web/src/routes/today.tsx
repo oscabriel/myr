@@ -26,13 +26,6 @@ import { TodayView } from "../features/today/today-page.tsx";
 import { personalPage } from "../server/cache-headers.ts";
 import { serverClient } from "../server/client.ts";
 
-// `/today`: the signed-in decider's decisions across their projects, or in
-// the one `?project=` names. The loader reads it on the server with the
-// reader's own session (their cookie goes with the call), so the page
-// arrives with its rows; in the browser the same read stays live, and a
-// choice reads it again. A page about its reader is kept by no cache.
-
-/** What the address may name: a project to narrow to, and the decision selected. */
 const TodaySearch = Schema.Struct({
   decision: Schema.optionalKey(Schema.String),
   project: Schema.optionalKey(ProjectName),
@@ -42,10 +35,8 @@ type TodaySearch = typeof TodaySearch.Type;
 
 const searchOf = Schema.decodeUnknownOption(TodaySearch);
 
-/** A page about its reader, kept by no cache. */
 export const todayHeaders = () => personalPage;
 
-/** What the atom holds now, or the loader's read until it has read. */
 const readFrom = (
   result: AsyncResult.AsyncResult<Today, unknown>,
   loaded: TodayRead
@@ -65,7 +56,6 @@ const todayPage = createServerFn({ method: "GET" })
     )
   );
 
-/** Today over its atom, which starts from what the loader read and reads again after a choice. */
 const LiveToday = ({
   data,
   project,

@@ -55,17 +55,6 @@ import {
   readProjectPage,
 } from "../../../server/project-page.ts";
 
-// A project's home, which is its list of asks. The loader reads, on the
-// server and at once, the project's asks, its own ledger (its posture), its
-// events (each ask's progress, a family's marks, its landings), its policy
-// (who decides) and its root folder with its README, then each family's
-// parent in full; so the page, and an agent fetching it, arrive with the
-// asks and the README. A read the platform cannot give now leaves its
-// section to the browser; an address naming no project is a 404 that shows
-// the platform's `UnknownProject` refusal. The list of projects is never
-// read here. The same URL answers `Accept: text/markdown` with the
-// project's `llms.txt`.
-
 const projectPage = createServerFn({ method: "GET" })
   .validator((name: string) => name)
   .handler(({ data }) =>
@@ -74,15 +63,10 @@ const projectPage = createServerFn({ method: "GET" })
     )
   );
 
-/** Where a project's Markdown is; none for a name that can name no project. */
 const markdownOf = (name: string) =>
   Option.map(decodeName(name), (project) => `/${project}/llms.txt`);
 
-/**
- * The page's headers: varied by `Accept`; for a name that can be a
- * project's, kept briefly with its Markdown named. A path that cannot names
- * nothing, so no raw path text reaches a header.
- */
+// A path that cannot name a project names nothing, so no raw path text reaches a header.
 export const projectPageHeaders = ({
   params,
 }: {
@@ -97,7 +81,6 @@ export const projectPageHeaders = ({
     }),
   });
 
-/** The page's head: its name, its README's first sentence, and its Markdown. */
 export const projectPageHead = ({
   loaderData,
   params,
@@ -125,11 +108,7 @@ export const projectPageHead = ({
 
 const root = getRouteApi("__root__");
 
-/**
- * The selected ask in full, read in the browser once it is selected. It
- * wraps the page whether or not a row is selected, so selecting one never
- * remounts the list (and loses the row the keys rest on).
- */
+// Wraps the page whether or not a row is selected, so selecting one never remounts the list.
 const WithFull = ({
   children,
   pick,
@@ -146,7 +125,6 @@ const WithFull = ({
 
 const decodeAsk = Schema.decodeUnknownOption(AskId);
 
-/** An atom's value once it has one, else what the loader read. */
 const valueOr = <A, E, B>(
   read: AsyncResult.AsyncResult<A, E>,
   seeded: B | undefined,
@@ -154,7 +132,6 @@ const valueOr = <A, E, B>(
 ): B | undefined =>
   Option.getOrElse(Option.map(AsyncResult.value(read), pick), () => seeded);
 
-/** The page over its atoms, each section as its read arrives, all kept live. */
 const LiveProject = ({
   data,
   platformUrl,
@@ -169,7 +146,6 @@ const LiveProject = ({
   const { project } = data;
   const hydrated = useHydrated();
 
-  // Live: each event the project commits makes these reads fetch again.
   useAtomMount(watchAtom(project));
 
   const asksRead = useAtomValue(asksAtom(project));
@@ -293,17 +269,12 @@ const ProjectPage = () => {
   );
 };
 
-/** The import offer for `project`, wired. */
 const Offer = ({ project }: { readonly project: ProjectName }) => {
   const importer = useImporter(project);
 
   return <ImportOffer importer={importer} project={project} />;
 };
 
-/**
- * No project at this address: at a source namespace's
- * (`/github.com/pallets/click`) the import offer, else the not-found.
- */
 const Unknown = () => {
   const { project } = Route.useParams();
 

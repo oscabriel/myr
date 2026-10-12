@@ -1,15 +1,8 @@
-/**
- * What the browser checks share: axe's serious and critical violations on a
- * page, and how far a page scrolls sideways. `a11y.e2e.ts` runs them over
- * every page; `landing.e2e.ts` adds the landing at 360 px.
- */
 import type { Page } from "@playwright/test";
 import { Effect, Schema } from "effect";
 
-/** axe-core, from cdnjs, at the version this check was written against. */
 const AXE = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js";
 
-/** What axe's `run` resolves to, as much of it as this check reads. */
 const AxeRun = Schema.Struct({
   violations: Schema.Array(
     Schema.Struct({
@@ -24,12 +17,10 @@ const AxeRun = Schema.Struct({
 
 const decodeAxeRun = Schema.decodeUnknownEffect(AxeRun);
 
-/** axe's serious and critical violations on the page, as `rule (n): targets`. */
 export const axeOn = (page: Page) =>
   Effect.gen(function* () {
     yield* Effect.promise(() => page.addScriptTag({ url: AXE }));
 
-    // axe's results come from the page: decoded here, as any outside input.
     const raw: unknown = yield* Effect.promise(() =>
       page.evaluate("axe.run()")
     );
@@ -47,7 +38,6 @@ export const axeOn = (page: Page) =>
       );
   });
 
-/** How far the page scrolls sideways, in px; 0 when it does not. */
 export const sideways = (page: Page) =>
   Effect.promise(() =>
     page.evaluate(

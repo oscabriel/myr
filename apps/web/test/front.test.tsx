@@ -1,11 +1,3 @@
-/**
- * The front page: the open asks of every project, read on the server by the
- * route's loader and rendered inside the router, grouped by project with
- * each project's posture said once on its group's header, a family drawn
- * as one fan row, each ask the viewer may take with its claim command as
- * text, narrowed by kind, by whether it is open to take or held for
- * newcomers, and by project.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { deleteChildId, splitFamily } from "@repo/project/migrate";
@@ -42,7 +34,6 @@ import { reachingTransport } from "./transport.ts";
 
 const kind = Schema.decodeSync(KindName);
 
-/** The markup of the row for `ask`: from its `<li>` to the next row or group. */
 const rowOf = (markup: string, ask: string) => {
   const start = markup.indexOf(`data-ask="${ask}"`);
 
@@ -55,13 +46,11 @@ const rowOf = (markup: string, ask: string) => {
   return start === -1 ? "" : markup.slice(start, Math.min(...ends));
 };
 
-/** The ask ids of the rows on the page, top to bottom. */
 const rowsIn = (markup: string) =>
   [...markup.matchAll(/<li\b[^>]*data-ask="(?<ask>[^"]+)"/gu)].map(
     (row) => row.groups?.ask
   );
 
-/** The markup of each project group's sticky header, by its project. */
 const headersIn = (markup: string) =>
   [
     ...markup.matchAll(
@@ -69,7 +58,6 @@ const headersIn = (markup: string) =>
     ),
   ].map((match) => [match.groups?.project, match.groups?.header] as const);
 
-/** The list itself: from the toolbar to the end of main, the facts left out. */
 const listIn = (markup: string) =>
   markup.slice(markup.indexOf("data-toolbar"), markup.indexOf("</main>"));
 
@@ -135,7 +123,6 @@ const projects = Schema.decodeSync(Schema.Array(ProjectListing))([
 const asksOf = (shown: readonly FrontPageEntry[]) =>
   shown.map(({ ask }) => ask.ask);
 
-/** The page's props, with nothing the loader read beyond `entries`. */
 const props = (
   filter: FrontFilter,
   more: Partial<FrontPageProps> = {}
@@ -222,7 +209,6 @@ describe(readFilter, () => {
   });
 });
 
-/** A listing as the contracts return one. */
 const listing = (id: string, blockedBy: readonly string[] = []) =>
   Schema.decodeSync(AskListing)({
     ask: id,
@@ -594,7 +580,6 @@ describe(FrontPageView, () => {
   );
 });
 
-/** The contracts over HTTP, each request answered by `answer`. */
 const clientOver = (answer: (request: Request) => Promise<Response>) =>
   Layer.effect(Client)(RpcClient.make(Contracts)).pipe(
     Layer.provide(RpcClient.layerProtocolHttp({ url: "http://localhost/rpc" })),
@@ -606,7 +591,6 @@ const clientOver = (answer: (request: Request) => Promise<Response>) =>
     )
   );
 
-/** The contracts over a fresh dev world; the world ends with the scope. */
 const devWorld = Layer.unwrap(
   Effect.gen(function* () {
     const { dispose, handler } = devServer();
@@ -617,7 +601,6 @@ const devWorld = Layer.unwrap(
   })
 );
 
-/** A platform that answers the front page and never answers the list of projects. */
 const projectsNeverAnswer = Layer.effect(
   Client,
   RpcTest.makeClient(Contracts)
@@ -637,7 +620,6 @@ const decodeData = Schema.decodeEffect(FrontPageData);
 /** A fresh dev world seeds itself first, which a full test run can slow past 5 s. */
 const seededWorld = { timeout: 30_000 };
 
-/** The page as the route renders it from what its loader read. */
 const sentFrom = (data: FrontPageData, filter: FrontFilter = {}) =>
   renderAt(
     "/asks",

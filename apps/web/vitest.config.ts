@@ -1,10 +1,7 @@
 import { preset } from "@repo/config/vitest";
 import { defineConfig, mergeConfig } from "vitest/config";
 
-// View tests render React (`*.test.tsx`). Type tests (`*.test-d.ts`) hold
-// the generated `Env` to principle 7; they run under `vitest --typecheck`,
-// beside the runtime tests. Route modules import `cloudflare:workers`, which
-// only workerd serves; in Node it resolves to a shim (a file, not a folder).
+// Route modules import `cloudflare:workers`, which only workerd serves; in Node it resolves to a shim.
 export default mergeConfig(
   preset,
   defineConfig({

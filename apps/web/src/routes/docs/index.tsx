@@ -10,10 +10,6 @@ import { DocsIndexView } from "../../features/docs/docs-view.tsx";
 import { docsIndexHead } from "../../features/docs/head.ts";
 import { branchPage } from "../../server/cache-headers.ts";
 
-// `/docs`: the guides and the reference, each page with its summary,
-// written for this stage's platform and the web's own origin. The same for
-// every reader, and it changes only with a deploy.
-
 const root = getRouteApi("__root__");
 
 const DocsIndex = () => {

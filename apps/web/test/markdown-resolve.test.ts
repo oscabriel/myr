@@ -1,10 +1,3 @@
-/**
- * A Markdown file's link or image, resolved into the project at the commit
- * it was read at: a fragment and anything with a scheme stay as written,
- * `/x` starts at the repo root, anything else starts at the file's
- * directory, `..` stops at the root, and a query and a fragment survive.
- * Links open the file's page, media its raw bytes, always at the SHA.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha, ProjectName } from "@repo/protocol/ids";
 

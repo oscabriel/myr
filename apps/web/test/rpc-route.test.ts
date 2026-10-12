@@ -1,12 +1,3 @@
-/**
- * The web's `/rpc`: the route hands each request to a backend with the
- * Worker's env, and the production backend forwards it to the platform over
- * `PLATFORM`, at the platform's own URL (so the remotes the platform names,
- * read from the request's origin, are its own), keeping method,
- * headers and body, but never the browser's cookies (the session cookie
- * becomes a bearer there: `session.test.ts`). A server route's
- * own calls go through the same backend, in process.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Client } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
@@ -25,7 +16,6 @@ const WEB_URL = "https://web-test.example.workers.dev";
 const LIST_ASKS =
   '[{"_tag":"Request","id":"0","tag":"listAsks","payload":{"project":"datekit"},"headers":[]}]';
 
-/** What a backend or a binding was handed, read whole. */
 const seenOf = (request: Request) =>
   Effect.map(
     Effect.promise(() => request.text()),
@@ -39,7 +29,6 @@ const seenOf = (request: Request) =>
     })
   );
 
-/** A fetch-shaped stub that keeps each request it is handed and answers `answer`. */
 const recorder = (answer: () => Response) => {
   const handed: Request[] = [];
 
@@ -52,7 +41,6 @@ const recorder = (answer: () => Response) => {
   return { fetch, seen: Effect.suspend(() => Effect.forEach(handed, seenOf)) };
 };
 
-/** A web Worker env whose PLATFORM binding answers `fetch` and nothing else. */
 const envWith = (fetch: (request: Request) => Promise<Response>): Env => ({
   PLATFORM: untouchable<Fetcher>("PLATFORM", {
     fetch: (input, init) => fetch(new Request(input, init)),
@@ -62,7 +50,6 @@ const envWith = (fetch: (request: Request) => Promise<Response>): Env => ({
 
 const unused = envWith(() => Promise.resolve(new Response("unused")));
 
-/** A `listAsks` call as the browser's AtomRpc client posts it. */
 const listAsksPost = (headers: Readonly<Record<string, string>> = {}) =>
   new Request(`${WEB_URL}/rpc`, {
     body: LIST_ASKS,

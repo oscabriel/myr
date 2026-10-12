@@ -1,15 +1,5 @@
-/**
- * The dev world's Lander: what the trusted Lander does, over the memory
- * repo host, in a few lines a developer can read. It composes a decider's
- * files onto main for a check, merges an answer by laying the files it
- * changed over main (a path both main and the answer changed since the
- * answer's base is a conflict), lands a tree on main as the platform's
- * commit with a compare-and-swap push and then the mirror ref, and reads the
- * config folder at a commit. It writes no verdict notes: nothing in the
- * world reads them. The scripted `/memory` Lander answers in a fixed order,
- * which a world people click through can't follow, so this one does the
- * work, as `/isogit` does, through `git.ts`.
- */
+// The scripted `/memory` Lander answers in a fixed order, which a world people click through can't follow,
+// so this one does the work over the memory repo host.
 import { RefName, RefOutcome, RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
 import { composeRef, Lander, landedRef, Rebuild } from "@repo/project/lander";
@@ -34,14 +24,12 @@ const mainRef = RefName.make("refs/heads/main");
 
 const blocked = () => new VerifierBlocked({});
 
-/** A commit's files, or `VerifierBlocked` when the repo doesn't hold it. */
 const read = (repo: RepoName, commit: CommitSha) =>
   filesAt(repo, commit).pipe(
     Effect.flatMap(Effect.fromOption),
     Effect.mapError(blocked)
   );
 
-/** What `head` changed against `base`, path by path, in path order. */
 const changesOf = (base: Snapshot, head: Snapshot): readonly Change[] =>
   Array.dedupe([...base.keys(), ...head.keys()])
     .toSorted()
@@ -72,7 +60,6 @@ const changesOf = (base: Snapshot, head: Snapshot): readonly Change[] =>
           ];
     });
 
-/** An answer's head merged onto main: main's files with what the answer changed laid over them. */
 const merged = (input: {
   readonly repo: RepoName;
   readonly main: LandedSha;
@@ -102,7 +89,6 @@ const merged = (input: {
       });
     }
 
-    // Main's files, with each path the answer changed as the answer left it.
     const files = new Map(textOf(main));
 
     for (const { path } of changes) {
@@ -118,7 +104,6 @@ const merged = (input: {
     return { changes, files: files satisfies Files };
   });
 
-/** The files a landing's tree is rebuilt from. */
 const rebuilt = (job: LandJob) =>
   Rebuild.$match(job.rebuild, {
     Compose: ({ files }) =>
@@ -136,11 +121,9 @@ const rebuilt = (job: LandJob) =>
       ),
   });
 
-/** The commit an answer's landing was made on: its base; otherwise main. */
 const baseOf = (job: LandJob) =>
   Rebuild.$is("Merge")(job.rebuild) ? job.rebuild.base : job.main;
 
-/** The Lander over the memory repo host, landing at the world's clock. */
 export const DevLander: Layer.Layer<Lander, never, RepoHost> = Layer.effect(
   Lander,
   Effect.gen(function* () {
@@ -216,7 +199,7 @@ export const DevLander: Layer.Layer<Lander, never, RepoHost> = Layer.effect(
           new Map(all).set(job.requestId, sha)
         );
 
-        // The mirror follows main in a push of its own (ADR 0005).
+        // The mirror follows main in a push of its own.
         const mirror = yield* tipOf(job.repo, landedRef);
 
         yield* host

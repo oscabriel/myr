@@ -1,9 +1,3 @@
-/**
- * datekit's `parse-iso-week` (a fictional ask in a fictional project), and
- * the answers to it, as the platform's contracts return them: the ask and
- * its brief (`showAsk`), a verdict (`verdict`) and a landing (`landing`).
- * Also how the view tests read rendered markup.
- */
 import { Brand } from "@repo/brand";
 import type { Verdict } from "@repo/protocol/domain/answer";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -35,7 +29,6 @@ export const project = ProjectName.make("oscabriel/datekit");
 
 export const askId = AskId.make("parse-iso-week");
 
-/** The moment every view test renders at. */
 export const now = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
 export const ask: Ask = {
@@ -66,7 +59,6 @@ export const ask: Ask = {
   },
 };
 
-/** The brief as the platform renders it for `showAsk`; the web serves it untouched. */
 export const brief = `# Parse ISO week dates like 2026-W41-3
 
 Ask \`parse-iso-week\` in datekit, a \`fix\` ask from ines-v.
@@ -88,7 +80,6 @@ export const landedSha = LandedSha.make(
   "9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c"
 );
 
-/** A verdict on the ask's latest answer: lint passed, unit failed, one held-back area 6 of 7. */
 export const verdictOf = (outcome: Outcome): Verdict => ({
   ask: askId,
   at: DateTime.makeUnsafe("2026-10-07T11:40:00Z"),
@@ -134,7 +125,6 @@ export const landing: LandingView = {
   sha: landedSha,
 };
 
-/** The landing as a decider's finish made it: decided, and judged by held-back checks. */
 export const decidedLanding: LandingView = {
   ...landing,
   credits: [
@@ -143,7 +133,6 @@ export const decidedLanding: LandingView = {
   ],
 };
 
-/** The landing as one that needed neither a decider nor held-back checks makes it. */
 export const plainLanding: LandingView = {
   ask: askId,
   assisted: [],
@@ -158,10 +147,8 @@ export const plainLanding: LandingView = {
   sha: landedSha,
 };
 
-/** When the events below happened. */
 const eventAt = DateTime.makeUnsafe("2026-10-07T11:30:00Z");
 
-/** `claimant` claimed `on`, as event `seq`. */
 export const claimedEvent = (seq: number, claimant: string, on = askId) =>
   ProjectEvent.cases.Claimed.make({
     ask: on,
@@ -170,7 +157,6 @@ export const claimedEvent = (seq: number, claimant: string, on = askId) =>
     seq,
   });
 
-/** An answer at `head` to `on` was judged `outcome`, as event `seq`. */
 export const judgedEvent = (
   seq: number,
   outcome: Outcome,
@@ -179,14 +165,12 @@ export const judgedEvent = (
 ) =>
   ProjectEvent.cases.Judged.make({ ask: on, at: eventAt, head, outcome, seq });
 
-/** An answer to `on` was pushed at `head`, as event `seq`. */
 export const pushedEvent = (
   seq: number,
   head = CommitSha.make(sha("b")),
   on = askId
 ) => ProjectEvent.cases.Pushed.make({ ask: on, at: eventAt, head, seq });
 
-/** `on` closed by a landing, as event `seq`. */
 export const closedEvent = (seq: number, on = askId) =>
   ProjectEvent.cases.AskClosed.make({
     ask: on,
@@ -203,7 +187,6 @@ const familyChildren = ["format", "parse", "zones"].map((module) =>
 
 const familyDelete = AskId.make("retire-old-week-delete");
 
-/** One member of the family below: blocked by `blockedBy`, its parent named. */
 const member = (id: AskId, blockedBy: readonly AskId[]): Ask => ({
   ...ask,
   blockedBy,
@@ -213,9 +196,7 @@ const member = (id: AskId, blockedBy: readonly AskId[]): Ask => ({
   parent: familyParent,
 });
 
-/** A migrate family in datekit: a parent, three children, and the delete child that waits on them. */
 export const family = {
-  /** The child at `index`, which waits on nothing. */
   child: (index: number) =>
     member(familyChildren[index] ?? AskId.make("retire-old-week-format"), []),
   children: familyChildren,
@@ -234,7 +215,6 @@ export const family = {
   } satisfies Ask,
 };
 
-/** The entities React writes for text, and what each reads as. */
 const ENTITIES: ReadonlyMap<string, string> = new Map([
   ["&#x27;", "'"],
   ["&amp;", "&"],
@@ -246,7 +226,6 @@ const ENTITIES: ReadonlyMap<string, string> = new Map([
 export const markupOf = (element: ReactElement) =>
   renderToStaticMarkup(element);
 
-/** What a reader sees of `markup`: the text without its tags, entities decoded. */
 export const plainText = (markup: string) =>
   markup
     .replaceAll(/<[^>]+>/gu, " ")
@@ -256,10 +235,8 @@ export const plainText = (markup: string) =>
     )
     .replaceAll(/\s+/gu, " ");
 
-/** What a reader sees of `element`, rendered. */
 export const textOf = (element: ReactElement) => plainText(markupOf(element));
 
-/** Whether each of `parts` appears in `text`, each after the one before. */
 export const inOrder = (text: string, parts: readonly string[]) => {
   let from = 0;
 

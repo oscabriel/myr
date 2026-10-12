@@ -1,11 +1,3 @@
-/**
- * A proposal's page, rendered to HTML with `react-dom/server` from a
- * `showProposal` answer decoded with the protocol's own schema: the want and
- * its proposer, where the platform's draft stands, the drafted files, the
- * red-first evidence and who drafted it, the last refusal when it failed,
- * "Draft again" for the proposer or a decider while it is open and not
- * drafting, and the way to its decision when one is open.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { DRAFT_ROUNDS } from "@repo/project/draft-runs";
@@ -44,7 +36,6 @@ const testFile = "src/format.offset.test.ts";
 
 type Shown = typeof ShowProposal.successSchema.Type;
 
-/** A proposal with no draft yet, as `showProposal` answers it, holding `files`. */
 const shownWith = (files: readonly string[]): Shown =>
   decodeShown({
     files: files.map((path) => ({ content: `// ${path}\n`, path })),
@@ -60,7 +51,6 @@ const shownWith = (files: readonly string[]): Shown =>
     },
   });
 
-/** `base` with its proposal's draft at `draft`. */
 const withDraft = (base: Shown, draft: DraftState): Shown => ({
   ...base,
   proposal: { ...base.proposal, draft },
@@ -294,7 +284,6 @@ describe("a failed call on the proposal page", () => {
   });
 });
 
-/** A platform that knows datekit's prop-000007 only, counting what it is asked. */
 const platformHandlers = (
   asked: Ref.Ref<{ proposal: number; today: number }>
 ) =>
@@ -403,7 +392,6 @@ describe(readProposal, () => {
   );
 });
 
-/** Lets the atoms' fibers run until `done` holds, or long enough that it would have. */
 const runUntil = (done: Effect.Effect<boolean>) =>
   Effect.yieldNow.pipe(
     Effect.andThen(done),

@@ -1,12 +1,3 @@
-/**
- * The paths the platform serves and the web host only passes on:
- * the projects' skills under `/.well-known/agent-skills/`, the CLI's
- * `/install.sh` and its `/releases/`. Each route hands GET and HEAD to the
- * backend; the production backend forwards over `PLATFORM` at the
- * platform's URL with the path, query, method and headers as they came,
- * and the platform's answer comes back as it is, a redirect's path-absolute
- * `Location` included, so the next request stays on the web host.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { untouchable } from "@repo/testkit/untouchable";
@@ -22,7 +13,6 @@ const PLATFORM_URL = "https://platform-test.example.workers.dev";
 
 const WEB_URL = "https://web-test.example.workers.dev";
 
-/** A PLATFORM binding that keeps each request it is handed and answers `answer`. */
 const platform = (answer: (request: Request) => Response) => {
   const handed: Request[] = [];
 
@@ -42,7 +32,6 @@ const platform = (answer: (request: Request) => Response) => {
   return { env, handed };
 };
 
-/** The production routes' handlers, over a fake PLATFORM. */
 const served = (answer: (request: Request) => Response) => {
   const binding = platform(answer);
 
@@ -128,7 +117,6 @@ describe("a path the platform serves, reached on the web host", () => {
   );
 });
 
-/** What a route says of its server handlers. */
 interface ServerRoute {
   readonly options: { readonly server?: { readonly handlers?: object } };
 }

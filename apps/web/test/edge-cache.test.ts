@@ -1,13 +1,3 @@
-/**
- * What the edge's cache may keep of the web's answers (ADR 0026). Workers
- * Cache keys an answer by its path and query alone, never by the cookie a
- * request carries, so the Worker's entry decides for every answer: one to a
- * request that carries a cookie or an `Authorization`, one that sets a
- * cookie, and one that says nothing of how long it may be kept, is kept
- * nowhere; any other the cache may store varies by `Cookie`, so it is served
- * only to a request with none. And no page the cache may keep reads who is
- * reading it: only a page kept nowhere reaches the reader's request.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
@@ -33,24 +23,19 @@ const WEB_URL = "https://web-test.example.workers.dev";
 
 const PLATFORM_URL = "https://platform-test.example.workers.dev";
 
-/** A signed-in reader's cookie, as the browser sends it. */
 const SIGNED_IN = `${SESSION_COOKIE}=dev-ada`;
 
-/** A GET for `path` on the web host, with `headers`. */
 const get = (path: string, headers: HeadersInit = {}) =>
   new Request(`${WEB_URL}${path}`, { headers });
 
-/** What the edge sees of an answer: how long it may be kept, and what it varies by. */
 const kept = (response: Response) => ({
   cacheControl: response.headers.get("cache-control"),
   vary: response.headers.get("vary"),
 });
 
-/** An answer under `headers`, with a body. */
 const answer = (headers: HeadersInit, status = 200) =>
   new Response("the page", { headers, status });
 
-/** Every `Cache-Control` the web gives or passes on, and none. */
 const ANSWERS: readonly (readonly [string, HeadersInit])[] = [
   ["a page at main", branchPage],
   ["a page about its reader", personalPage],
@@ -243,9 +228,6 @@ describe("the Worker's entry", () => {
   });
 });
 
-// --- The routes that read the reader's credential ----------------------------
-
-/** A platform that lists datekit and no asks, and answers nothing else. */
 const listingDatekit = () =>
   Layer.effect(Client, RpcTest.makeClient(Contracts)).pipe(
     Layer.provide([
@@ -268,7 +250,6 @@ const listingDatekit = () =>
     ])
   );
 
-/** An env whose PLATFORM answers every request with a long-lived public answer. */
 const platformEnv: Env = {
   PLATFORM: untouchable<Fetcher>("PLATFORM", {
     fetch: () =>
@@ -279,12 +260,7 @@ const platformEnv: Env = {
   PUBLIC_PLATFORM_URL: PLATFORM_URL,
 };
 
-/**
- * Each server route that hands the reader's cookie on (to the platform, as
- * its credential), by the request it answers. Each answers a public
- * `Cache-Control` of its own; the entry is what keeps a reader's answer
- * from the edge.
- */
+// Each answers a public `Cache-Control` of its own; the entry is what keeps a reader's answer from the edge.
 const CREDENTIAL_ROUTES: readonly (readonly [
   string,
   (request: Request) => Promise<Response>,
@@ -341,7 +317,6 @@ const CREDENTIAL_ROUTES: readonly (readonly [
   ],
 ];
 
-/** A signed-in agent's request for `path`, as Markdown. */
 const signedInAt = (path: string) =>
   get(path, { accept: "text/markdown", cookie: SIGNED_IN });
 
@@ -379,7 +354,6 @@ describe("a route that hands the reader's cookie on", () => {
   );
 });
 
-/** The landing's GET, falling through to a page the edge may keep. */
 const landing = (request: Request) =>
   Promise.resolve(
     landingHandler(
@@ -440,8 +414,6 @@ describe("the landing", () => {
   );
 });
 
-// --- The pages ---------------------------------------------------------------
-
 const routeSources: Readonly<Record<string, string>> = import.meta.glob(
   "../src/routes/**/*.{ts,tsx}",
   { eager: true, import: "default", query: "?raw" }
@@ -452,10 +424,6 @@ const allSources: Readonly<Record<string, string>> = import.meta.glob(
   { eager: true, import: "default", query: "?raw" }
 );
 
-/**
- * Where a page's loader or server function reaches the request it answers
- * (its cookie, its headers): TanStack Start's server helpers.
- */
 const readsTheRequest = /from "@tanstack\/react-start\/server"/u;
 
 describe("a page", () => {

@@ -1,18 +1,3 @@
-/**
- * A web import, as a browser does it: signed in, `/import?url=<repo>`
- * fills the form (owner and name from the URL), Import runs it, the page
- * says "Importing…" while the platform clones, and lands on the project's
- * page, which names where it was imported from. Saved as
- * `e2e/out/import.png`.
- *
- * It runs only when `WEB_IMPORT_URL` names a tiny public repo to import
- * (an HTTPS clone URL) and `WEB_URL` a web's origin, and is skipped
- * otherwise. It signs in with `WEB_SESSION`, a session token for the
- * stage, or, without one, through the dev world's own `/auth/dev` as
- * `WEB_IMPORT_AS` (oscabriel unless given). `WEB_IMPORT_NAME` names the
- * project instead of the URL's last segment, so a second run does not meet
- * `ProjectExists`. It writes: each run makes a project.
- */
 import { expect, test } from "@playwright/test";
 import { Config, Effect, Option, Redacted } from "effect";
 
@@ -33,10 +18,8 @@ const settings = Effect.runSync(
   })
 );
 
-/** Where the screenshot goes: `e2e/out/import.png`. */
 const out = decodeURIComponent(new URL("out/", import.meta.url).pathname);
 
-/** An import clones the repo: up to half a minute, and some margin. */
 const IMPORTING = 90_000;
 
 test.describe("a web import", () => {

@@ -1,9 +1,3 @@
-/**
- * The docs on the web: `/docs` lists every page, guides then reference,
- * each linking its page with its summary; a page draws its Markdown under
- * its title, with the list of pages beside it; `/docs/<page>.md` serves the
- * text, and a page that does not exist is a 404.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { docPage, docPages } from "@repo/agent-kit/docs/index";
 import { Effect, Option } from "effect";
@@ -116,7 +110,6 @@ describe("a page of the docs", () => {
   });
 });
 
-/** What `/docs/<page>.md` answers. */
 const served = (page: string) =>
   Effect.gen(function* () {
     const response = yield* Effect.promise(() =>

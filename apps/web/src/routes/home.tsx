@@ -11,12 +11,6 @@ import { reloadOnEnter } from "../features/shared/shell/selection.ts";
 import { personalPage } from "../server/cache-headers.ts";
 import { serverClient } from "../server/client.ts";
 
-// `/home`: the signed-in reader's own page, where the landing sends them.
-// The loader reads it on the server with the reader's own session (their
-// cookie goes with the call), so the page arrives with its rows. A page
-// about its reader is kept by no cache.
-
-/** A page about its reader, kept by no cache. */
 export const homeHeaders = () => personalPage;
 
 const homePage = createServerFn({ method: "GET" }).handler(() =>

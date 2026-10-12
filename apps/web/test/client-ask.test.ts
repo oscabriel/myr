@@ -1,7 +1,3 @@
-/**
- * An ask's reads, as the web's atoms make them.
- * Over the dev world in process (`dev-browser.ts`).
- */
 import { describe, expect, it } from "@effect/vitest";
 import { AskId } from "@repo/protocol/ids";
 import { UnknownAsk } from "@repo/protocol/refusal";

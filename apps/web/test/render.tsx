@@ -1,25 +1,4 @@
-/**
- * A view rendered to HTML inside a router, at an address: what a view that
- * draws the router's links (`AppLink`), reads the location or the route's
- * params needs around it, as the app's router gives it in the browser.
- *
- * The routes are the app's shape without its loaders: `/` (the landing,
- * outside the shell), `/asks`, `/home`, `/import`, `/today`, `/docs`, `/docs/$page`,
- * `/agents`, `/people/$handle` and `/$owner/$project` with its pages under
- * it, read through the app's own rewrite and params, so the shell finds the
- * project in `/oscabriel/datekit/ledger` and
- * `/github.com/pallets/click/tree/main`, and none in `/agents`.
- * The view itself is the root's component: it renders whatever the
- * address, and a page's own route never runs.
- *
- * ```tsx
- * it.effect("…", () =>
- *   Effect.gen(function* () {
- *     const markup = yield* renderAt("/oscabriel/datekit/ledger", <AppShell>…</AppShell>);
- *   })
- * );
- * ```
- */
+// The view itself is the root's component: it renders whatever the address, and a page's own route never runs.
 import {
   createMemoryHistory,
   createRootRoute,
@@ -34,7 +13,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import { addressRewrite, projectParams } from "../src/server/addresses.ts";
 
-/** What a test may add to the routes: the rail's content on a project's pages. */
 export interface RenderOptions {
   readonly rail?: ComponentType;
 }
@@ -75,10 +53,6 @@ const routesFor = (view: ReactNode, options: RenderOptions) => {
   ]);
 };
 
-/**
- * The app's router at `url`, in memory, drawing `view` whatever the
- * address: what a test navigates as a page would, and reads where it went.
- */
 export const routerAt = (
   url: string,
   view: ReactNode = null,
@@ -90,7 +64,6 @@ export const routerAt = (
     routeTree: routesFor(view, options),
   });
 
-/** `view`'s static markup inside a router whose location is `url`. */
 export const renderAt = (
   url: string,
   view: ReactNode,

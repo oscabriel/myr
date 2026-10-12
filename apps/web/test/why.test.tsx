@@ -1,11 +1,3 @@
-/**
- * The file in Why mode, rendered to HTML with `react-dom/server` from a
- * `WhyView` decoded with the protocol's own schema: the server's fallback
- * is the numbered lines with a band above each group of lines one commit
- * brought, ask and answer first and the commit second, each linked; the
- * browser's drawing is Pierre's (`<diffs-container>`), loaded only there,
- * with the same bands as its annotations.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Client, Contracts } from "@repo/protocol/contracts";
 import { CommitView, FileView, WhyView } from "@repo/protocol/domain/code";
@@ -25,7 +17,6 @@ import { readWhyPage } from "../src/routes/$owner/$project/why/$rev/$.tsx";
 
 const markupOf = (element: ReactElement) => renderToStaticMarkup(element);
 
-/** What a reader sees: the markup without its tags, entities decoded. */
 const textOf = (markup: string) =>
   markup
     .replaceAll(/<[^>]+>/gu, " ")
@@ -34,7 +25,6 @@ const textOf = (markup: string) =>
     .replaceAll("&amp;", "&")
     .replaceAll(/\s+/gu, " ");
 
-/** Every `href` in `markup`, in order, entities decoded. */
 const hrefsOf = (markup: string) =>
   [...markup.matchAll(/href="(?<href>[^"]*)"/gu)].map((match) =>
     (match.groups?.href ?? "").replaceAll("&amp;", "&")
@@ -128,7 +118,6 @@ const page = (
   <WhyLines now={now} project={datekit} rev="main" text={TEXT} view={view} />
 );
 
-/** The band of the group marked `data-range` with `value`, up to the next band or line. */
 const bandOf = (markup: string, value: string) => {
   const start = markup.indexOf(`data-range="${value}"`);
   const rest = markup.slice(start + 1);
@@ -276,10 +265,6 @@ describe("the why page's fallback", () => {
 
 const OPENED = "6".repeat(40);
 
-/**
- * `src/format.ts` where lines 1–2 came from an ask's opening: a landing
- * with `opened` and no `ask`, so it answers nothing.
- */
 const opening = Schema.decodeSync(WhyView)({
   at: AT,
   commits: [
@@ -346,7 +331,6 @@ describe("the why page's band for an ask's opening", () => {
   });
 });
 
-/** The line dialog's landing, rendered; nothing for no landing. */
 const detailsOf = (landing: LandingView | undefined) =>
   landing === undefined
     ? ""
@@ -384,18 +368,12 @@ describe("the why page's drawing", () => {
   });
 });
 
-/** What the platform was asked by one page read: each `readFile`'s `at`, and the most calls under way at once. */
 interface Asked {
   readonly files: readonly string[];
   readonly peak: number;
   readonly under: number;
 }
 
-/**
- * A platform answering `why` with `view` and `readFile` with the file at
- * the commit `main` names (`mainAt`), each after a few milliseconds, every
- * call noted in `asked`.
- */
 const whyPlatform = (asked: Ref.Ref<Asked>, mainAt: string) => {
   const during = <A, E>(answer: Effect.Effect<A, E>) =>
     Effect.acquireUseRelease(

@@ -26,15 +26,6 @@ import { CodeRail } from "../../tree/-code-rail.tsx";
 import { FilesButton } from "../../tree/-files-button.tsx";
 import { softLanding } from "../../tree/-soft-landing.ts";
 
-// Why each line of a file at a revision is there, read on the server: the
-// blame's ranges with their commits and landings, the file at the commit
-// the blame resolved, so the two always agree (all asked for at once, the
-// file again only if the revision moved between them), and the commit
-// that last changed it. The browser then draws the file with a band above
-// each group of lines. A path missing at a revision that exists lands on
-// the nearest folder above it; any other address naming nothing is a 404
-// showing the platform's refusal.
-
 const WhyPageData = Schema.Struct({
   file: FileView,
   last: Schema.optionalKey(CommitView),
@@ -51,7 +42,6 @@ interface WhyParams {
   readonly rev: string;
 }
 
-/** The view and the file's text, or a not-found carrying the platform's refusal. */
 export const readWhyPage = (params: WhyParams) =>
   Effect.gen(function* () {
     const project = yield* Effect.fromOption(projectOf(params.project));

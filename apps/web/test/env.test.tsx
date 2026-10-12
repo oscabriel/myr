@@ -1,11 +1,3 @@
-/**
- * A project's env shape, rendered to HTML with `react-dom/server` from
- * datekit's `.env.schema` as `envShape` returns it: each item's name,
- * description, type, whether it is required, whether it is sensitive, its
- * `@proxy` hosts, docs and deprecation; for a sensitive item who set its
- * value and when, never the value, and no control that would take or show
- * one. A caption credits the format to varlock.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts, EnvSchemaOf } from "@repo/protocol/contracts";
@@ -30,7 +22,6 @@ const now = DateTime.makeUnsafe("2026-10-12T12:00:00Z");
 
 const decodeView = Schema.decodeSync(EnvSchemaView);
 
-/** datekit's items, encoded, as its `.env.schema` declares them. */
 const items: readonly (typeof EnvItem.Encoded)[] = [
   {
     key: "APP_ENV",
@@ -67,7 +58,6 @@ const items: readonly (typeof EnvItem.Encoded)[] = [
   },
 ];
 
-/** datekit's env shape at its landed SHA, as `envShape` returns it. */
 const datekit = decodeView({
   at: "9b1c3e5d7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7c",
   currentEnvKey: "APP_ENV",
@@ -82,7 +72,6 @@ const scriptAddress = ["javascript", "alert(1)"].join(":");
 
 const page = <EnvView now={now} schema={datekit} />;
 
-/** The markup of the item `key`: from its row to the next item's. */
 const itemOf = (markup: string, key: string) => {
   const start = markup.indexOf(`data-env-key="${key}"`);
   const next = markup.indexOf("data-env-key=", start + 1);
@@ -92,7 +81,6 @@ const itemOf = (markup: string, key: string) => {
     : markup.slice(start, next === -1 ? undefined : next);
 };
 
-/** Each item's key, in the order the page lists them. */
 const keysOf = (markup: string) =>
   [...mainOf(markup).matchAll(/data-env-key="(?<key>[^"]*)"/gu)].map(
     (found) => found.groups?.key
@@ -340,7 +328,6 @@ describe("the env shape's way in", () => {
   });
 });
 
-/** What the stub platform was asked: env shapes and ask lists. */
 interface Asked {
   readonly asks: number;
   readonly schemas: number;
@@ -348,11 +335,6 @@ interface Asked {
 
 const nothingAsked: Asked = { asks: 0, schemas: 0 };
 
-/**
- * A platform as the env page's loader calls it: `known` says whether it
- * knows datekit at all, `landed` whether datekit's main has landed (before
- * that, `envShape` has no commit to read and answers `UnknownProject`).
- */
 const platformWhere = (
   asked: Ref.Ref<Asked>,
   { known, landed }: { readonly known: boolean; readonly landed: boolean }

@@ -9,14 +9,6 @@ import { commands } from "../features/agents/catalog.ts";
 import { markdown, unavailable } from "../features/agents/respond.ts";
 import { serverClient } from "../server/client.ts";
 
-/**
- * `/llms-full.txt`: the index, then every refusal, how git meets the
- * platform, how a landing happens, the events and the guides, with the
- * projects the platform lists now. The web alone serves it: the platform's
- * `/` stays the index (`apps/platform/test/home.test.ts`).
- */
-
-/** The route's handler as a function of its client and the platform's URL, which its test hands in. */
 export const llmsFullHandler =
   (clientFor: (request: Request) => Layer.Layer<Client>, platformUrl: string) =>
   ({ request }: { readonly request: Request }): Promise<Response> =>

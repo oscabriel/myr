@@ -1,10 +1,3 @@
-/**
- * The inspector's fact blocks: typed facts under a label, never prose the
- * page already says. A claim never shows a deadline (no read carries one),
- * agents sit below the line that says they are not credit, long hashes are
- * shortened with the whole value kept, and the gate marks where an answer
- * stands.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Glob } from "@repo/protocol/domain/common";

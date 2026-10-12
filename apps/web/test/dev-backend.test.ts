@@ -1,9 +1,3 @@
-/**
- * The dev world's seed, read back through the contracts a fresh world
- * serves: the same world every time, every time it holds counted in whole
- * minutes from one fixed start (so a page looks the same on every machine
- * and every run), and an answer that landed with its credit.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -35,10 +29,6 @@ const decider = devToken(Handle.make("ines-v"));
 
 const contributor = devToken(Handle.make("bram"));
 
-/**
- * A fresh world, seeded and served, and `read` run against it: each
- * `as(token)` is a client whose requests carry that bearer, or none.
- */
 const inFreshWorld = <A, E>(
   read: (
     as: (token?: string) => Layer.Layer<Client>
@@ -74,11 +64,9 @@ const inFreshWorld = <A, E>(
     })
   );
 
-/** The client a layer from `as(token)` makes, for as long as the world lives. */
 const clientOf = (layer: Layer.Layer<Client>) =>
   Effect.map(Layer.build(layer), Context.get(Client));
 
-/** The front page and the project list, as anyone reads them. */
 const pages = inFreshWorld((as) =>
   Effect.gen(function* () {
     const anyone = yield* clientOf(as());
@@ -89,7 +77,6 @@ const pages = inFreshWorld((as) =>
   })
 );
 
-/** Every instant a reader of the seeded world can see. */
 const instants = inFreshWorld((as) =>
   Effect.gen(function* () {
     const anyone = yield* clientOf(as());
@@ -126,7 +113,6 @@ const instants = inFreshWorld((as) =>
   })
 );
 
-/** datekit's landed answer, as Today samples it and as `landing` reads it. */
 const landedAnswer = inFreshWorld((as) =>
   Effect.gen(function* () {
     const anyone = yield* clientOf(as());
@@ -147,7 +133,6 @@ const landedAnswer = inFreshWorld((as) =>
   })
 );
 
-/** The project list beside datekit's landed answer, as anyone reads them. */
 const listedWithLanding = inFreshWorld((as) =>
   Effect.gen(function* () {
     const anyone = yield* clientOf(as());
@@ -174,7 +159,6 @@ const listedWithLanding = inFreshWorld((as) =>
   })
 );
 
-/** The project list beside each project's ledger, as anyone reads them. */
 const listedWithLedgers = inFreshWorld((as) =>
   Effect.gen(function* () {
     const anyone = yield* clientOf(as());
@@ -188,11 +172,7 @@ const listedWithLedgers = inFreshWorld((as) =>
   })
 );
 
-/**
- * Each test seeds whole worlds, the first one cold, while turbo runs every
- * package's tests at once: about 0.5 s alone, near vitest's 5 s default
- * under that load once burrow's migrate opens as a family of eight asks.
- */
+// Each test seeds whole worlds while turbo runs every package's tests at once: near vitest's 5 s default.
 const seededWorlds = { timeout: 30_000 };
 
 describe("the dev seed", seededWorlds, () => {
@@ -312,7 +292,6 @@ describe("the dev seed", seededWorlds, () => {
   );
 });
 
-/** Each of `paths` on a fresh world's own handler: its status, headers and body. */
 const fetched = (paths: readonly string[]) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -360,10 +339,6 @@ describe("the dev world's raw files", seededWorlds, () => {
   );
 });
 
-/**
- * bram proposes a want for datekit with a draft, and what follows: the
- * proposal as anyone reads it, and ines-v's Today before and after.
- */
 const drafted = inFreshWorld((as) =>
   Effect.gen(function* () {
     const anyone = yield* clientOf(as());

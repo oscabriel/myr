@@ -1,8 +1,3 @@
-/**
- * The front page's reads, as the web's atoms make them: every open ask
- * of every project.
- * Over the dev world in process (`dev-browser.ts`).
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit } from "effect";
 

@@ -1,9 +1,3 @@
-/**
- * Where an answer stands, as every page that shows one reads it: a refusal
- * as `git push` printed it, an outcome as one sentence (waiting is never a
- * refusal), and the gate's stages as a results row that says which stages
- * ran, which refused and which the answer never needed.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Outcome } from "@repo/protocol/domain/outcome";
@@ -28,7 +22,6 @@ import {
 import { RefusalView } from "../src/features/shared/refusal.tsx";
 import { allInOrder, markupOf, textOf } from "./markup.ts";
 
-/** Each `<li>` that names a stage, as `[stage, state]`. */
 const stagesOf = (element: ReactElement) =>
   [...markupOf(element).matchAll(/<li\b[^>]*>/gu)].flatMap(([tag]) => {
     const stage = /data-stage="(?<value>[^"]+)"/u.exec(tag)?.groups?.value;

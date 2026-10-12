@@ -46,45 +46,30 @@ import {
   readFrontPage,
 } from "../server/front-page.ts";
 
-// `/asks`, the front page: every open ask, read on the server by the loader, so the
-// page (and an agent fetching it) arrives with its asks; narrowed here by
-// the address's search. The whole list is read, so the filter offers every
-// kind. The list of projects (each group's posture) is the browser's read,
-// never the loader's: it may arrive after the rows, and moves none of them.
-// The same URL answers `Accept: text/markdown` with `llms.txt`.
-
 const TITLE = "Open asks";
 
-/** Where the page's Markdown is. */
 const MARKDOWN = "/llms.txt";
 
 const frontPageData = createServerFn({ method: "GET" }).handler(() =>
   Effect.runPromise(readFrontPage.pipe(Effect.provide(serverClient(env))))
 );
 
-/** The page's headers: kept briefly, varied by `Accept`, its Markdown named. */
 export const frontPageHeaders = () => ({
   ...branchPage,
   link: markdownLink(MARKDOWN),
   vary: "Accept",
 });
 
-/** The page's head: its title, its one sentence, and its Markdown. */
 export const frontPageHead = () => ({
   ...pageHead({ description: EXPLAINER, title: TITLE }),
   links: [markdownAlternateLink(MARKDOWN)],
 });
 
-/** The open asks, unfiltered: the page narrows them, so its filter can offer every kind. */
 const everyAsk = frontPageAtom({});
 
 const root = getRouteApi("__root__");
 
-/**
- * The selected ask in full, read in the browser once it is selected. It
- * wraps the page whether or not a row is selected, so selecting one never
- * remounts the list (and loses the row the keys rest on).
- */
+// Wraps the page whether or not a row is selected, so selecting one never remounts the list.
 const WithFull = ({
   children,
   pick,
@@ -101,7 +86,6 @@ const WithFull = ({
 
 const decodeAsk = Schema.decodeUnknownOption(AskId);
 
-/** The page over its atoms, which start from what the loader read and stay live. */
 const LiveFront = ({
   data,
   filter,
@@ -123,7 +107,6 @@ const LiveFront = ({
   const key = projectsKey(data.events.map(({ project }) => project));
   const refresh = useAtomRefresh(everyAsk);
 
-  // Live: each family's project, followed while the page is open.
   useAtomMount(followedAtom(key));
 
   // The loader read as anyone; once someone is signed in, read who may take what for them.
@@ -210,7 +193,6 @@ const FrontPage = () => {
   );
 };
 
-/** The filter, and the selected ask, from the address. */
 const readSearch = (search: {
   readonly ask?: unknown;
   readonly kind?: unknown;

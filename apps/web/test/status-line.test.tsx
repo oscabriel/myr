@@ -1,9 +1,3 @@
-/**
- * The status line, one sentence under every subject's title: a mark, the
- * lead word in its role's colour, the rest in ink, whose move it is, and
- * the command that runs next. Waiting is never drawn as refusing, and a
- * refusal is named by its tag, never paraphrased.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -74,7 +68,6 @@ const proposal: Proposal = {
   want: "Format durations in words",
 };
 
-/** The status line's mark, lead and role, as its markup carries them. */
 const rendered = (element: ReactElement) => {
   const markup = markupOf(element);
 

@@ -1,8 +1,3 @@
-/**
- * Who a browser is: the session cookie `/auth/dev` sets names the person
- * whoami answers with.
- * Over the dev world in process (`dev-browser.ts`).
- */
 import { describe, expect, it } from "@effect/vitest";
 import { env } from "cloudflare:workers";
 import { Effect } from "effect";

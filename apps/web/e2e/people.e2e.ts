@@ -1,21 +1,10 @@
-/**
- * The deployed Policy page (`/<project>/people`), as a browser shows it: who decides which paths
- * and the commit the config is read at, saved as `e2e/out/people.png` for
- * the shot list.
- *
- * It runs only against `WEB_URL` (a stage's web origin) and is skipped
- * without it. `WEB_PROJECT` picks the project (datekit, which the seed puts
- * on every stage, unless given). It only reads.
- */
 import { expect, test } from "@playwright/test";
 import { ProjectName } from "@repo/protocol/ids";
 import { Config, Effect, Option } from "effect";
 
-/** What the check reads of its env: where the web lives, and which project to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
     return {
-      // Read by the one parser: `datekit` and `oscabriel/datekit` alike.
       project: yield* Config.schema(ProjectName, "WEB_PROJECT").pipe(
         Config.withDefault(ProjectName.make("oscabriel/datekit"))
       ),
@@ -29,10 +18,8 @@ const settings = Effect.runSync(
 
 const { project } = settings;
 
-/** Where the screenshot goes: `e2e/out/people.png`. */
 const out = decodeURIComponent(new URL("out/", import.meta.url).pathname);
 
-/** What every page that could not reach the platform says instead of its content. */
 const UNREACHABLE = "The platform did not answer";
 
 test.describe("the deployed policy page", () => {
@@ -54,8 +41,6 @@ test.describe("the deployed policy page", () => {
 
         expect(response?.status()).toBe(200);
 
-        // The page reads Policy, and its deciders: their heading and at
-        // least the whole-repo glob's row.
         yield* Effect.promise(() =>
           expect(
             browser.getByRole("heading", { level: 1, name: "Policy" })

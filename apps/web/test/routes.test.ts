@@ -1,10 +1,4 @@
-/**
- * The web takes some first path segments for its own pages and files, and
- * `/$owner/$project` takes every other one. A project owned by one of the
- * web's words would be unreachable at `<web>/<owner>/<name>`, so
- * `ProjectName` refuses each such owner. This holds the protocol's list to the routes
- * and the public files the web really has.
- */
+// A project owned by one of the web's own first segments would be unreachable, so `ProjectName` refuses each such owner.
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectName, reservedProjectNames } from "@repo/protocol/ids";
 import { Schema } from "effect";
@@ -16,16 +10,12 @@ const publicFiles = Object.keys(
   import.meta.glob("../public/**/*", { query: "?url" })
 );
 
-/** The first path segment `file` serves under, as a browser spells it. */
 const firstSegment = (file: string, root: string) =>
   (file.slice(root.length).split("/")[0] ?? "")
     .replace(/\.tsx?$/u, "")
     .replaceAll("[.]", ".");
 
-/**
- * Files that serve no segment of their own: the shell, `/`, a project, and
- * `_headers`, which the asset host reads and never serves.
- */
+// `_headers` is read by the asset host and never served.
 const notSegments = new Set(["__root", "_headers", "index"]);
 
 const segments = [

@@ -1,9 +1,3 @@
-/**
- * A person's page, rendered inside a router from fixtures decoded with the
- * protocol's own schemas: their credit by project and area, each area one
- * sentence of the roles they hold there, and no number anywhere (the No
- * Score Rule): the counts the read carries are never drawn.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { CreditSummary } from "@repo/protocol/domain/record";
 import { Handle } from "@repo/protocol/ids";
@@ -31,14 +25,12 @@ const credits = Schema.decodeSync(Schema.Array(CreditSummary))([
 const markupOf = (element: ReactElement) =>
   renderAt(`/people/${handle}`, element);
 
-/** What a reader sees: the markup without its tags, entities decoded. */
 const textOf = (html: string) =>
   html
     .replaceAll(/<[^>]+>/gu, "")
     .replaceAll("&#x27;", "'")
     .replaceAll("&amp;", "&");
 
-/** The credits: every project's group, from the first to the last. */
 const creditsOf = (html: string) => {
   const start = html.indexOf('data-credits=""');
   const end = html.indexOf("</main>", start);

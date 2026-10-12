@@ -1,25 +1,10 @@
-/**
- * A monorepo's tags on a deployed web, as a browser shows them: the refs
- * page's first view lists the packages the tags version, `@changesets/cli`
- * among them; its link lists that package's tags alone, newest first; and
- * the first one's tree opens. The package's page is saved as
- * `e2e/out/tags.png` for the shot list.
- *
- * It runs only against `WEB_URL` (a stage's web origin) and is skipped
- * without it. `WEB_TAGS_PROJECT` picks the project by its full name
- * (`github.com/changesets/changesets`, which `scripts/import-examples.ts`
- * puts on a dev stage, unless given). It only
- * reads.
- */
 import { expect, test } from "@playwright/test";
 import { ProjectName } from "@repo/protocol/ids";
 import { Config, Effect, Option } from "effect";
 
-/** What the check reads of its env: where the web lives, and which project to look at. */
 const settings = Effect.runSync(
   Effect.gen(function* () {
     return {
-      // Read by the one parser: `changesets` and its full name alike.
       project: yield* Config.schema(ProjectName, "WEB_TAGS_PROJECT").pipe(
         Config.withDefault(ProjectName.make("github.com/changesets/changesets"))
       ),
@@ -33,24 +18,19 @@ const settings = Effect.runSync(
 
 const { project } = settings;
 
-/** The package whose tags the check follows. */
 const PACKAGE = "@changesets/cli";
 
-/** Where the screenshot goes: `e2e/out/tags.png`. */
 const out = decodeURIComponent(new URL("out/", import.meta.url).pathname);
 
-/** What every page that could not reach the platform says instead of its content. */
 const UNREACHABLE = "The platform did not answer";
 
 const awaited = <A>(promise: () => Promise<A>) => Effect.promise(promise);
 
-/** A tag's release numbers (`@changesets/cli@2.27.1` → 2, 27, 1). */
 const numbersOf = (tag: string) =>
   (tag.slice(tag.lastIndexOf("@") + 1).match(/\d+/gu) ?? [])
     .slice(0, 3)
     .map(Number);
 
-/** `one` is no older than `other` by their first three numbers. */
 const noOlder = (one: readonly number[], other: readonly number[]) => {
   const at = one.findIndex((value, index) => value !== (other[index] ?? 0));
 
@@ -76,7 +56,6 @@ test.describe("a monorepo's tags", () => {
 
         expect(response?.status()).toBe(200);
 
-        // The first view: the package list, holding the package.
         const row = browser.locator(`[data-package="${PACKAGE}"]`);
 
         yield* awaited(() => expect(row).toBeVisible());
@@ -89,7 +68,6 @@ test.describe("a monorepo's tags", () => {
           `/${project}/refs?package=${encodeURIComponent(PACKAGE)}`
         );
 
-        // Its link: that package's tags alone, newest first.
         yield* awaited(() => browser.goto(`${web}${href ?? ""}`));
 
         const tags = browser.locator("[data-tag]");
@@ -120,7 +98,6 @@ test.describe("a monorepo's tags", () => {
           browser.screenshot({ fullPage: true, path: `${out}tags.png` })
         );
 
-        // The newest tag's tree opens.
         const tree = yield* awaited(() =>
           tags.first().locator("a").first().getAttribute("href")
         );

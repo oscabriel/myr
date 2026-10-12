@@ -1,10 +1,3 @@
-/**
- * A project's section row, rendered to HTML: the seven sections every
- * project page shares, in one line under the page's head where the rail is
- * not drawn, each linking to its page, and only the page being read marked
- * as the current one. Inside the router it draws the router's links; a view
- * rendered alone draws the same addresses as plain links.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectName } from "@repo/protocol/ids";
 import { Effect } from "effect";
@@ -15,7 +8,6 @@ import { renderAt } from "./render.tsx";
 
 const datekit = ProjectName.make("oscabriel/datekit");
 
-/** Each link in `markup`: its text, its href, and whether it is current. */
 const linksOf = (markup: string) =>
   [...markup.matchAll(/<a\b(?<attributes>[^>]*)>(?<text>.*?)<\/a>/gu)].map(
     ({ groups }) => ({

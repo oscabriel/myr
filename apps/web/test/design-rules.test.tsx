@@ -1,10 +1,3 @@
-/**
- * DESIGN.md's named values, held against the components that draw them:
- * the inspector's widths (its `spacing` tokens) and the row's state word
- * (the Mark Carries Rule), and a path's file name read before its
- * folders. A change to either side without the other
- * fails here, so the document and the web never drift apart.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectName } from "@repo/protocol/ids";
 import { Effect } from "effect";
@@ -20,12 +13,10 @@ import { wordTone } from "../src/features/shared/row.tsx";
 import { Workspace } from "../src/features/shared/shell/workspace.tsx";
 import { renderAt } from "./render.tsx";
 
-/** A `spacing` token's value in DESIGN.md's frontmatter. */
 const spacing = (name: string) =>
   new RegExp(`^ {2}${name}: "(?<value>[^"]+)"$`, "mu").exec(design)?.groups
     ?.value;
 
-/** The inspector's class list, as a page with facts draws it. */
 const inspectorClasses = (code: boolean) => {
   const markup = renderToStaticMarkup(
     <Workspace

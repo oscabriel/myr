@@ -9,12 +9,6 @@ import { AgentsView } from "../features/agents/setup-page.tsx";
 import { pageHead } from "../features/shared/head.ts";
 import { branchPage } from "../server/cache-headers.ts";
 
-// `/agents`: the reference an agent and the person running it read, drawn
-// from `@repo/agent-kit` for this stage's platform and the web's own origin
-// (the router's: the request's on the server, the page's in the browser),
-// so the server's render and the browser's agree. `/agents.md` is the same
-// text as Markdown.
-
 const root = getRouteApi("__root__");
 
 const AgentsPage = () => {
@@ -28,7 +22,6 @@ const AgentsPage = () => {
 
 export const Route = createFileRoute("/agents")({
   component: AgentsPage,
-  // The same for every reader, and it changes only with a deploy.
   headers: () => branchPage,
   head: () =>
     pageHead({

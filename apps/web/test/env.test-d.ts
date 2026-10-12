@@ -1,9 +1,5 @@
-/**
- * Principle 7's type fence: the web Worker's generated `Env` (from
- * `wrangler.jsonc`, by `bun run types`) reaches the platform only through
- * `PLATFORM`, and holds no Artifacts binding, public or private, so no code
- * in a public page can reach a repo.
- */
+// The web Worker's `Env` reaches the platform only through `PLATFORM` and holds no Artifacts binding,
+// so no code in a public page can reach a repo.
 import { describe, expectTypeOf, it } from "vitest";
 
 describe("the web Worker's Env", () => {

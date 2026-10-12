@@ -1,12 +1,3 @@
-/**
- * The soft landing for a missing path (the nearest folder, with the
- * refusal above it): when a code page's path is not at a revision
- * that exists, the folders above it are read, nearest first, and the
- * first that exists travels in the 404 with the platform's `UnknownPath`,
- * so the page shows that folder with the refusal's own words as its
- * notice. The root always exists where the revision does. Not a route:
- * the `-` prefix keeps the router from reading it as one.
- */
 import { Client } from "@repo/protocol/contracts";
 import type { TreeListing } from "@repo/protocol/domain/code";
 import { RepoPath } from "@repo/protocol/ids";
@@ -19,7 +10,6 @@ import { ancestorsOf } from "../../../../features/code/paths.ts";
 import { SoftLanding } from "../../../../features/code/soft-landing.ts";
 import { notFoundFor } from "../../../../features/shared/refusals.ts";
 
-/** Each folder above `path`, nearest first, then the root (none). */
 const above = (path: string): readonly Option.Option<RepoPath>[] => [
   ...ancestorsOf(path)
     .toReversed()
@@ -27,7 +17,6 @@ const above = (path: string): readonly Option.Option<RepoPath>[] => [
   Option.none(),
 ];
 
-/** A 404 for `refusal` that lands on the nearest folder above its path at its commit. */
 export const softLanding = (
   refusal: UnknownPath,
   project: ProjectName,

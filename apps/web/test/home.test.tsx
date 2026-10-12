@@ -1,12 +1,3 @@
-/**
- * `/home`, a signed-in reader's own page: their work (each claim, its ask's
- * want, where its answer stands and the command that runs next), the
- * decisions waiting when they decide somewhere, the asks they may take, and
- * their record; each block says what to do when it is empty or did not
- * come. Read on the server with the reader's session from the dev world and
- * its fixtures, and drawn from reads made here. Signed out, it says what
- * the page is and how to sign in. A page about its reader, kept by no cache.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import type { AnswerView } from "@repo/protocol/domain/answer";
@@ -41,7 +32,6 @@ import { renderAt } from "./render.tsx";
 
 const NOW = "2026-10-07T12:00:00.000Z";
 
-/** The page as the route renders it from what the loader sent. */
 const pageFrom = (encoded: typeof HomePageData.Encoded) =>
   Effect.gen(function* () {
     const data = yield* Schema.decodeEffect(HomePageData)(encoded);
@@ -52,7 +42,6 @@ const pageFrom = (encoded: typeof HomePageData.Encoded) =>
     );
   });
 
-/** The page drawn from a signed-in read made here. */
 const pageOf = (read: Partial<typeof HomeRead.cases.Read.Type>) =>
   renderAt(
     "/home",
@@ -70,13 +59,11 @@ const pageOf = (read: Partial<typeof HomeRead.cases.Read.Type>) =>
     />
   );
 
-/** The sections' names, in order. */
 const sectionsOf = (markup: string) =>
   [...markup.matchAll(/<section\b[^>]*aria-label="(?<name>[^"]+)"/gu)].map(
     (found) => found.groups?.name
   );
 
-/** The commands a reader can copy: each in the DOM as text. */
 const commandsOf = (markup: string) =>
   [...markup.matchAll(/<code\b[^>]*>(?<command>.*?)<\/code>/gsu)].map((found) =>
     textIn(found.groups?.command ?? "").trim()
@@ -98,7 +85,6 @@ const claim = (fields: Partial<typeof ClaimView.Encoded> = {}) =>
     ...fields,
   });
 
-/** An answer refused because its claim lapsed, which a new claim can mend. */
 const refused = (ask: string): AnswerView => ({
   ask: AskId.make(ask),
   at: DateTime.makeUnsafe("2026-10-07T11:00:00Z"),
