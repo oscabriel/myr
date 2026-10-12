@@ -1,17 +1,4 @@
-/**
- * The null answer: the ask's territory as an answer that does
- * nothing. Every function, arrow, class method and getter the territory
- * exports returns `undefined`, a name a check imports from the territory
- * that main lacks gets a stand-in that does the same, and the rest of the
- * tree stays as it is. A check that still passes against it observes no
- * behaviour, so any answer passes it: `nullAnswerVerdict` calls it
- * `WeakCheck{weakness: "nullAnswer"}`.
- *
- * The codemod runs on an in-memory ts-morph project and hands back new
- * contents; it never touches a disk. ts-morph bundles the TypeScript
- * compiler, so this module is reached only through `@repo/checks/null-answer`
- * and only by Bun hosts (the Checker image, the CLI): no Worker imports it.
- */
+// ts-morph bundles the TypeScript compiler: only Bun hosts import this module, never a Worker.
 import { WeakCheck } from "@repo/protocol/refusal";
 import { Array, Effect, Option, pipe, Predicate, Result, Schema } from "effect";
 import { Node, Project, ts } from "ts-morph";
@@ -22,38 +9,30 @@ import type { RepoFile } from "./finder.ts";
 import { matchGlob } from "./judge.ts";
 import type { RunEvidence } from "./red-first.ts";
 
-/** The null answer could not be made: a file that does not parse, or nothing to stub. */
 export class NullAnswerFailed extends Schema.TaggedError<NullAnswerFailed>()(
   "NullAnswerFailed",
   { path: Schema.String, reason: Schema.String }
 ) {}
 
-/** The part of an ask's territory the null answer reads. */
 export interface NullAnswerTerritory {
-  /** The territory's globs; a `!` glob takes paths back out. */
   readonly paths: readonly string[];
-  /** The module's public files; without them, its `package.json` `exports`. */
   readonly publicFiles?: readonly string[];
 }
 
-/** A replacement of `[start, end)` in one file's text. */
 interface Edit {
   readonly end: number;
   readonly start: number;
   readonly text: string;
 }
 
-/** A body that returns nothing, typed to fit any declared return type. */
 const NULL_BODY = "{ return undefined as never; }";
 
-/** An arrow's expression body that returns nothing. */
 const NULL_EXPRESSION = "undefined as never";
 
 const SOURCE = /\.(?:[cm]?ts|tsx)$/u;
 
 const DECLARATION = /\.d\.[cm]?ts$/u;
 
-/** A TypeScript source the codemod reads (declaration files hold no bodies). */
 const isSource = (path: string) => SOURCE.test(path) && !DECLARATION.test(path);
 
 const EXCLUDE = "!";
@@ -67,7 +46,6 @@ const inTerritory = (territory: NullAnswerTerritory, path: string) =>
       glob.startsWith(EXCLUDE) && matchGlob(glob.slice(EXCLUDE.length), path)
   );
 
-// The in-memory project's files sit under `/`, at their repo paths.
 const ROOT = "/";
 
 const placed = (path: string) => `${ROOT}${path}`;
@@ -97,7 +75,6 @@ const isJsonArray = (value: Schema.Json): value is Schema.JsonArray =>
 const isJsonObject = (value: Schema.Json): value is Schema.JsonObject =>
   Predicate.isObject(value) && !isJsonArray(value);
 
-/** Every string an `exports` field leads to, nested conditions included. */
 const exportTargets = (value: Schema.Json | undefined): readonly string[] => {
   if (value === undefined || value === null) {
     return [];
@@ -114,7 +91,6 @@ const exportTargets = (value: Schema.Json | undefined): readonly string[] => {
   return isJsonObject(value) ? Object.values(value).flatMap(exportTargets) : [];
 };
 
-/** What a manifest exports: its `exports`, or its `main` when it has none, as Node reads a package. */
 const targetsOf = ({
   exports,
   main,
@@ -125,11 +101,6 @@ const targetsOf = ({
 
 const PATTERN = "*";
 
-/**
- * The repo paths one target names: the target itself, or, for a subpath
- * pattern (`./src/*.ts`), each of `paths` its `*` matches, any run of
- * characters with `/` included, as Node reads one.
- */
 const targetPaths = (
   target: string,
   paths: readonly string[]
@@ -160,7 +131,6 @@ const folderOf = (path: string) => {
 const joined = (folder: string, path: string) =>
   folder === "" ? path : `${folder}/${path}`;
 
-/** The folders from `path`'s own up to the root (`""`). */
 const foldersAbove = (path: string): readonly string[] => {
   const folders: string[] = [];
   let folder = folderOf(path);
@@ -173,11 +143,6 @@ const foldersAbove = (path: string): readonly string[] => {
   return [...folders, ""];
 };
 
-/**
- * The module's entry points when the territory names no public files: the
- * source files the `exports` (or else the `main`) of the `package.json`
- * nearest each territory file lead to, a subpath pattern's included.
- */
 const manifestEntries = (
   files: readonly RepoFile[],
   territory: NullAnswerTerritory
@@ -221,7 +186,6 @@ const manifestEntries = (
   );
 };
 
-/** A function-like node's body, as returning nothing. */
 const bodyEdit = (body: Node | undefined): readonly Edit[] => {
   if (body === undefined) {
     return [];
@@ -236,7 +200,6 @@ const bodyEdit = (body: Node | undefined): readonly Edit[] => {
   ];
 };
 
-/** An expression without the parentheses and type assertions around it. */
 const unwrapped = (node: Node): Node =>
   Node.isParenthesizedExpression(node) ||
   Node.isAsExpression(node) ||
@@ -244,7 +207,6 @@ const unwrapped = (node: Node): Node =>
     ? unwrapped(node.getExpression())
     : node;
 
-/** The edits that make one exported declaration return nothing. */
 const stubsOf = (node: Node): readonly Edit[] => {
   if (
     Node.isFunctionDeclaration(node) ||
@@ -278,7 +240,6 @@ const stubsOf = (node: Node): readonly Edit[] => {
   return [];
 };
 
-/** A file's text with the edits made, from its last edit to its first. */
 const edited = (text: string, edits: readonly Edit[]) => {
   const lastFirst = Array.dedupeWith(
     edits,
@@ -294,22 +255,18 @@ const edited = (text: string, edits: readonly Edit[]) => {
   return result;
 };
 
-/** The declarations a file exports that it declares itself. */
 const ownExports = (file: SourceFile): readonly Node[] =>
   [...file.getExportedDeclarations().values()]
     .flat()
     .filter((node) => node.getSourceFile() === file);
 
-/** A name a stand-in can be declared as (not a string-literal import name). */
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/u;
 
 const DEFAULT = "default";
 
-/** A stand-in for a name the territory does not have yet: it returns nothing too. */
 const standIn = (name: string) =>
   `export ${name === DEFAULT ? "default function " : `function ${name}`}(..._args: readonly unknown[]): never ${NULL_BODY}`;
 
-/** A file's text with stand-ins for `names` written after it. */
 const withStandIns = (text: string, names: readonly string[]) => {
   const lines = names.map(standIn).join("\n");
 
@@ -329,7 +286,6 @@ const SCRIPT_AS_SOURCE = [
   [/\.cjs$/u, ".cts"],
 ] as const;
 
-/** The repo path a relative import names, when no file answers it yet. */
 const intendedPath = (importer: string, specifier: string) => {
   const segments: string[] = [];
 
@@ -355,7 +311,6 @@ const intendedPath = (importer: string, specifier: string) => {
   return SOURCE.test(path) ? path : `${path}.ts`;
 };
 
-/** What an import asks for at run time: its default and its value names. */
 const valueNamesOf = (declaration: ImportDeclaration): readonly string[] =>
   declaration.isTypeOnly()
     ? []
@@ -368,11 +323,6 @@ const valueNamesOf = (declaration: ImportDeclaration): readonly string[] =>
           .filter((name) => IDENTIFIER.test(name)),
       ];
 
-/**
- * Where a name an import asks of `target` would be declared: `target`
- * itself when it is in the territory, or else the first territory file it
- * re-exports whole (`export * from`, which passes on no default).
- */
 const homeOf = (
   territory: NullAnswerTerritory,
   target: SourceFile
@@ -389,12 +339,6 @@ const homeOf = (
         )
       );
 
-/**
- * The names the tree imports from the territory that the territory does not
- * have yet, by the territory file they belong in: a check written before its
- * subject imports a name main lacks, or a file main lacks. A name a file
- * declares but does not export is left out (a stand-in would clash with it).
- */
 const wantedNames = (
   project: Project,
   territory: NullAnswerTerritory
@@ -446,11 +390,6 @@ const wantedNames = (
 const messageOf = (cause: unknown) =>
   cause instanceof Error ? cause.message : globalThis.String(cause);
 
-/**
- * The new contents of every territory file the entry points reach: each one
- * an entry point lies in, or declares something an entry point exports (at
- * any depth of re-export).
- */
 const stubbedContents = (
   files: readonly RepoFile[],
   territory: NullAnswerTerritory,
@@ -525,29 +464,8 @@ const stubbedContents = (
   return Result.succeed(contents);
 };
 
-/**
- * The tree with the ask's territory made a null answer: each function and
- * arrow the territory exports returns `undefined as never`, and so does each
- * method and getter of each class it exports. Constructors, setters, values,
- * types and every other file stay as they were. Entry points are the
- * territory's `publicFiles`, or else the source files its `package.json`
- * `exports` (or `main`) lead to; a territory file is stubbed when an entry
- * point lies in it or exports something it declares, through any number of
- * re-exports.
- *
- * A check written before its subject imports what main lacks: each value
- * name the tree imports from a territory file that the file does not export
- * gets a stand-in function there that returns nothing, and a territory file
- * it imports that does not exist is made of stand-ins. So the check loads,
- * and fails, or passes, on what it asserts.
- *
- * The files come back in their order, then any new file in path order; the
- * input is untouched. It reads TypeScript sources (`.ts`, `.mts`, `.cts`,
- * `.tsx`) and follows relative imports only, so `files` holds at least the
- * territory, the manifests naming its entry points, and the check. The null
- * answer has only to run: a project that typechecks with `noUnusedLocals` or
- * `noUnusedParameters` finds the stubs' unread parameters and helpers.
- */
+// The null answer has only to run: a project with `noUnusedLocals` or
+// `noUnusedParameters` will flag the stubs' unread parameters.
 export const nullAnswer = (
   files: readonly RepoFile[],
   territory: NullAnswerTerritory
@@ -604,13 +522,6 @@ export const nullAnswer = (
     ];
   });
 
-/**
- * What a run of the check against the null answer says of the check:
- * passing it is `WeakCheck{nullAnswer}` (it observes no behaviour), and
- * finding no tests is `WeakCheck{no assertion}`, as in red first. Any other
- * end shows no weakness here; whether the check failed for the right reason
- * (by an assertion) is red first's question, read with `failureSignature`.
- */
 export const nullAnswerVerdict = (run: RunEvidence): Option.Option<WeakCheck> =>
   Diagnosis.$match(diagnose(run.exit), {
     Blocked: () => Option.none(),

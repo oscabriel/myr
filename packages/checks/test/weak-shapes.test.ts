@@ -2,8 +2,6 @@ import { describe, expect, it } from "@effect/vitest";
 
 import { weaknessesOf } from "../src/weak-shapes.ts";
 
-// The check files are datekit's, held as text: the lint reads source, never
-// runs it. The territory is what `territory.package` gives a workspace.
 const territory = ["packages/week/**"];
 
 const check = (

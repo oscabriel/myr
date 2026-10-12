@@ -58,14 +58,12 @@ const debuggers = counted([
 const globs = (...patterns: readonly string[]) =>
   patterns.map((pattern) => Glob.make(pattern));
 
-/** What an unreadable count kept of the output, or `None` when it counted. */
 const unreadHead = (result: Result.Result<LintCount, CountUnreadable>) =>
   Result.match(result, {
     onFailure: ({ head }) => Option.some(head),
     onSuccess: () => Option.none(),
   });
 
-/** Both recordings, each with what makes its paths repo-relative. */
 const both = Effect.all({
   eslint: recorded("eslint").pipe(
     Effect.map((output) => ({ output, root: ESLINT_ROOT }))
@@ -73,7 +71,6 @@ const both = Effect.all({
   oxlint: recorded("oxlint").pipe(Effect.map((output) => ({ output }))),
 });
 
-/** How many `any`s a recording counts within a territory's globs. */
 const anysWithin = (
   input: { readonly output: string; readonly root?: string },
   territory: readonly string[]

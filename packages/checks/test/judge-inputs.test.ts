@@ -1,9 +1,3 @@
-/**
- * `judgeInputs`: the files the finder and the judge closure are handed,
- * chosen from a commit's listing by reading only what their walks reach.
- * The platform's facts and the CLI's local check both gather them through
- * it, so the closure over its files must be the closure over every file.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { Command } from "@repo/protocol/domain/common";
@@ -22,13 +16,6 @@ import type { ListedFile } from "../src/judge.ts";
 
 const file = (path: string, content: string): RepoFile => ({ content, path });
 
-/**
- * A small monorepo whose judge reaches past the root: a hook config naming a
- * shell script that runs a hook script with a helper, a package tsconfig
- * extending the base and a file of its own, a lint plugin with a helper and
- * a test elsewhere that names it, a config folder whose run block names a
- * check script with a helper beside it, and product code nothing reaches.
- */
 const tree: readonly RepoFile[] = [
   file(
     "package.json",
@@ -92,7 +79,6 @@ const tree: readonly RepoFile[] = [
   file("src/app.ts", 'import { a } from "@kit/a";\n\nexport const app = a;\n'),
 ];
 
-/** The run block the config folder above declares. */
 const run: RunBlock = {
   checks: { [LaneName.make("api")]: Command.make("bun scripts/check/api.ts") },
   test: Command.make("bun test {path}"),
@@ -103,7 +89,6 @@ const encoder = new TextEncoder();
 const listingOf = (files: readonly RepoFile[]): readonly ListedFile[] =>
   files.map(({ path }) => ({ path }));
 
-/** `judgeInputs` over `files`, and every path it asked to read, batch by batch. */
 const gathered = (
   files: readonly RepoFile[],
   listing: readonly ListedFile[] = listingOf(files)

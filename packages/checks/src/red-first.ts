@@ -1,9 +1,6 @@
-/**
- * Red first, for the right reason: an ask opens only when its check
- * fails on main twice in the same way, by an assertion. A check that fails to
- * load fails because its subject is missing, and any answer that exports the
- * subject could pass it; a check that fails two different ways is flaky.
- */
+// A check that fails to load fails because its subject is missing, and any
+// answer that exports the subject could pass it; a check that fails two
+// different ways is flaky.
 import type { LaneName } from "@repo/protocol/ids";
 import { NotRedFirst, WeakCheck } from "@repo/protocol/refusal";
 import { Data, Option, Result } from "effect";
@@ -12,19 +9,16 @@ import type { CheckRun } from "./check-runner.ts";
 import { diagnose, Diagnosis } from "./classify.ts";
 import type { RunExit } from "./classify.ts";
 
-/** One run of an ask's check on main. */
 export interface RunEvidence {
   readonly lane: LaneName;
   readonly exit: RunExit;
 }
 
-/** How the check fails on main, the same both times. */
 export interface RedSignature {
   readonly signature: string;
   readonly lane: LaneName;
 }
 
-/** What one run says about the check, for comparing it with the other. */
 type Reading =
   | { readonly _tag: "Red"; readonly signature: string }
   | { readonly _tag: "NoTests" }
@@ -73,12 +67,6 @@ const judge = (
     : Result.fail(new NotRedFirst({}));
 };
 
-/**
- * Whether two runs of one check, from their exits, failed the same way by an
- * assertion. A run that found no tests is `WeakCheck{no assertion}`; a pass,
- * a load error, a time-out, a throw that is not an assertion, two different
- * failures or two different lanes are `NotRedFirst`.
- */
 export const redFirst = ([first, second]: readonly [
   RunEvidence,
   RunEvidence,
@@ -87,11 +75,7 @@ export const redFirst = ([first, second]: readonly [
     ? judge(first.lane, [readExit(first.exit), readExit(second.exit)])
     : Result.fail(new NotRedFirst({}));
 
-/**
- * `redFirst` for the platform, which sees two `CheckRun`s and never their
- * output: the lane must have failed both times with the same evidence
- * signature.
- */
+// The platform never sees a run's output, only its evidence signature.
 export const redFirstOfRuns = (
   [first, second]: readonly [CheckRun, CheckRun],
   lane: LaneName

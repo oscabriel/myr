@@ -1,10 +1,3 @@
-/**
- * The command finder: a project's own commands (how to set up, how to run
- * one test file, and the lanes every answer must pass), read from the files
- * it already has: GitHub and Forgejo workflows, lefthook, husky, pre-commit
- * and `package.json` scripts. Pure: it reads the contents it is given and
- * runs nothing. A maintainer confirms what it finds at init.
- */
 import type { RunBlock } from "@repo/protocol/domain/run";
 import { LaneName } from "@repo/protocol/ids";
 import { Array as Arr, Option, Result, Schema } from "effect";
@@ -12,27 +5,18 @@ import { parse } from "yaml";
 
 import { PATH_PLACEHOLDER } from "./kinds.ts";
 
-/** The run block as it travels before decoding. */
 export type RunBlockEncoded = typeof RunBlock.Encoded;
 
-/** One file of a repo, by its path from the root. */
 export interface RepoFile {
   readonly content: string;
   readonly path: string;
 }
 
-/**
- * What the finder found: a partial run block, and where each part came from
- * (`checks.lint from .github/workflows/ci.yml`), plus every file it skipped
- * and why (`skipped <path>: <reason>`). The shape `@repo/rules`'
- * `Finishers.findRunBlock` takes.
- */
 export interface FoundRunBlock {
   readonly run: Partial<RunBlockEncoded>;
   readonly sources: readonly string[];
 }
 
-/** The lane names the finder prefers; any other lane takes its script's name. */
 type Canonical = "build" | "format" | "lint" | "types" | "unit";
 
 const isLaneName = Schema.is(LaneName);
@@ -47,8 +31,6 @@ const hasAny = (tokens: readonly string[], flags: readonly string[]) =>
   tokens.some((token) =>
     flags.some((flag) => token === flag || token.startsWith(`${flag}=`))
   );
-
-// --- What a command is --------------------------------------------------
 
 const SETUP: readonly (readonly string[])[] = [
   ["corepack", "enable"],
@@ -75,7 +57,6 @@ const SETUP: readonly (readonly string[])[] = [
   ["pre-commit", "install-hooks"],
 ];
 
-// Leading `NAME=value` words set the environment; they aren't the command.
 const withoutEnv = (tokens: readonly string[]) => {
   const first = tokens.findIndex((token) => !/^\w+=/u.test(token));
 
@@ -91,7 +72,6 @@ const isSetup = (command: string) => {
   );
 };
 
-// Words that run a tool rather than being one: `npx eslint`, `uv run pytest`.
 const RUNNERS: readonly (readonly string[])[] = [
   ["npx"],
   ["bunx"],
@@ -113,7 +93,6 @@ const RUNNERS: readonly (readonly string[])[] = [
   ["yarn"],
 ];
 
-/** Where the tool starts in a command's words, past env and runner words. */
 const toolIndex = (tokens: readonly string[]): number => {
   let at = tokens.length - withoutEnv(tokens).length;
 
@@ -130,7 +109,6 @@ const toolIndex = (tokens: readonly string[]): number => {
 
 const CHECK_FLAGS = ["--check", "-c", "--list-different", "-l"];
 
-/** A tool's words, the lane it checks, and whether these arguments check. */
 const TOOLS: readonly {
   readonly lane: Canonical;
   readonly tool: readonly string[];
@@ -221,7 +199,6 @@ const TOOLS: readonly {
   { lane: "build", tool: ["zig", "build"] },
 ];
 
-/** Script, task and hook names that say their lane outright. */
 const NAMED: readonly { readonly lane: Canonical; readonly names: RegExp }[] = [
   { lane: "unit", names: /^(?:tests?|unit|tests?[:-](?:unit|ci))$/u },
   { lane: "lint", names: /^(?:lint|lint[:-](?:check|ci)|eslint|oxlint)$/u },
@@ -237,31 +214,26 @@ const NAMED: readonly { readonly lane: Canonical; readonly names: RegExp }[] = [
   { lane: "build", names: /^build$/u },
 ];
 
-// Names that are never a check, even when a workflow runs them.
 const NEVER_A_LANE =
   /(?:^|[:-])(?:dev|start|serve|preview|watch|deploy|release|publish|prepare|install|clean|version|fix|docs)(?:$|[:-])/u;
 
 const namedLane = (name: string): Option.Option<Canonical> =>
   Option.fromNullishOr(NAMED.find(({ names }) => names.test(name))?.lane);
 
-/** A name as a lane name: `test:e2e` → `test-e2e`. */
 const asLaneName = (name: string): Option.Option<string> =>
   Option.liftPredicate(
     name.replaceAll(/[^A-Za-z0-9-]+/gu, "-").replaceAll(/^-+|-+$/gu, ""),
     isLaneName
   );
 
-/** A script or task's name as a lane, unless the name says it checks nothing. */
 const scriptLane = (name: string): Option.Option<string> =>
   NEVER_A_LANE.test(name) ? Option.none() : asLaneName(name);
 
 const FIXERS = ["--fix", "--write"];
 
-/** Whether a command, or any command a script chains, rewrites files. */
 const fixes = (body: string) =>
   body.split("&&").some((part) => hasAny(words(part), FIXERS));
 
-/** The lane a tool command checks: `npx eslint .` → `lint`. Fixers check nothing. */
 const toolLane = (command: string): Option.Option<Canonical> => {
   const tokens = words(command);
   const rest = tokens.slice(toolIndex(tokens));
@@ -278,8 +250,6 @@ const toolLane = (command: string): Option.Option<Canonical> => {
   );
 };
 
-// --- Scripts -------------------------------------------------------------
-
 type PackageManager = "bun" | "npm" | "pnpm" | "yarn";
 
 const MANAGERS: readonly PackageManager[] = ["bun", "npm", "pnpm", "yarn"];
@@ -287,16 +257,11 @@ const MANAGERS: readonly PackageManager[] = ["bun", "npm", "pnpm", "yarn"];
 const isManager = (word: string | undefined): word is PackageManager =>
   MANAGERS.some((manager) => manager === word);
 
-/** What the repo's root `package.json` says: its scripts and package manager. */
 interface Scripts {
   readonly byName: ReadonlyMap<string, string>;
   readonly manager: Option.Option<PackageManager>;
 }
 
-/**
- * The script a command runs, if it runs one: `npm test`, `bun run lint`,
- * `pnpm typecheck` (a pnpm or yarn word that names a script).
- */
 const scriptOf = (command: string, scripts: Scripts): Option.Option<string> => {
   const [manager, verb, name] = withoutEnv(words(command));
 
@@ -319,8 +284,6 @@ const scriptOf = (command: string, scripts: Scripts): Option.Option<string> => {
     : Option.none();
 };
 
-// Task runners name a task the way a script is named: `make test`,
-// `just lint`, `turbo run typecheck`; several turbo tasks make one lane.
 const TASKS: readonly (readonly string[])[] = [
   ["make"],
   ["just"],
@@ -345,7 +308,6 @@ const taskOf = (command: string): Option.Option<string> => {
 
 const segments = (body: string) => body.split("&&").map((part) => part.trim());
 
-/** A script's body, followed through scripts that only run another script. */
 const bodyOf = (
   name: string,
   scripts: Scripts,
@@ -366,11 +328,8 @@ const bodyOf = (
       : Option.some(body);
   });
 
-/** How the repo's package manager runs a script: `pnpm run build`, `npm test`. */
 const runScript = (manager: PackageManager, name: string) =>
   manager === "npm" && name === "test" ? "npm test" : `${manager} run ${name}`;
-
-// --- One test file ------------------------------------------------------
 
 const insertBefore = (
   tokens: readonly string[],
@@ -384,18 +343,14 @@ const insertBefore = (
     : [...tokens.slice(0, at), ...added, ...tokens.slice(at)];
 };
 
-/** A `go test` package pattern: `.`, `./pkg`, `./...`, `example.com/m/...`. */
 const isGoPackages = (arg: string) =>
   arg === "." ||
   arg.startsWith("./") ||
   arg.startsWith("../") ||
   arg.includes("...");
 
-/**
- * The command that runs one test file, for runners that can: `vitest run`
- * → `vitest run {path}`. Go runs a package and Cargo a test target, so theirs
- * name the file's directory or stem through the shell.
- */
+// Go runs a package and Cargo a test target, so theirs name the file's
+// directory or stem through the shell.
 const oneFile = (command: string): Option.Option<string> => {
   const tokens = words(command);
   const at = toolIndex(tokens);
@@ -423,7 +378,6 @@ const oneFile = (command: string): Option.Option<string> => {
   }
 
   if (startsWith(rest, ["go", "test"])) {
-    // Keep every flag and its value (`-run TestX`); drop the packages.
     const flags = rest.slice(2).filter((arg) => !isGoPackages(arg));
 
     return write("go", "test", ...flags, `"./$(dirname ${PATH_PLACEHOLDER})"`);
@@ -441,15 +395,11 @@ const oneFile = (command: string): Option.Option<string> => {
   return Option.none();
 };
 
-// --- Reading sources ----------------------------------------------------
-
-/** A command a source runs, with the name the source gives it, if any. */
 interface Step {
   readonly command: string;
   readonly name: Option.Option<string>;
 }
 
-/** A lane a source offers: its command, and the file its test runner was read from. */
 interface Offer {
   readonly command: string;
   readonly fallback: Option.Option<string>;
@@ -458,7 +408,6 @@ interface Offer {
   readonly runner: { readonly body: string; readonly path: string };
 }
 
-/** One source file, read: its setup commands and lanes, or why it was skipped. */
 interface Read {
   readonly offers: readonly Offer[];
   readonly path: string;
@@ -467,7 +416,6 @@ interface Read {
 
 const PACKAGE_JSON = "package.json";
 
-// An error's message on one line, for a `skipped …` source.
 const oneLine = (message: string) =>
   message
     .split("\n")
@@ -475,10 +423,7 @@ const oneLine = (message: string) =>
     .filter(Boolean)
     .join(" ");
 
-/**
- * A YAML file decoded by `schema`, or why not. YAML errors keep their first
- * line (the rest is a code frame); schema errors keep every line.
- */
+// YAML errors keep their first line (the rest is a code frame).
 const readYaml = <A>(
   schema: Schema.ConstraintDecoder<A>,
   content: string
@@ -495,8 +440,6 @@ const readYaml = <A>(
     )
   );
 
-// A shell line split into the commands it chains; comments and blank lines
-// dropped, `\` continuations joined.
 const shellCommands = (text: string): readonly string[] =>
   text
     .replaceAll("\\\n", " ")
@@ -599,7 +542,6 @@ const PRE_COMMIT_STAGES: ReadonlySet<string> = new Set([
   "pre-commit",
 ]);
 
-/** pre-commit's hook ids that name a canonical lane. */
 const HOOKS: ReadonlyMap<string, Canonical> = new Map([
   ["ruff", "lint"],
   ["ruff-check", "lint"],
@@ -624,7 +566,6 @@ const isWorkflow = (file: RepoFile) => workflowFile.test(file.path);
 
 const huskyFile = /^\.husky\/pre-(?:commit|push)$/u;
 
-// Every name lefthook reads its config from, as the judge closure lists them.
 const LEFTHOOK: ReadonlySet<string> = new Set([
   "lefthook.yml",
   "lefthook.yaml",
@@ -652,8 +593,6 @@ const LOCKFILES: readonly (readonly [string, PackageManager])[] = [
   ["package-lock.json", "npm"],
 ];
 
-// --- Putting it together ------------------------------------------------
-
 const offerFromStep = (
   step: Step,
   path: string,
@@ -679,7 +618,6 @@ const offerFromStep = (
 
   const fallback = Option.flatMap(ownName, scriptLane);
 
-  // A dev server, deploy or release is no check, whatever tool its body runs.
   const neverALane = [step.name, task].some((name) =>
     Option.exists(name, (text) => NEVER_A_LANE.test(text))
   );
@@ -747,7 +685,6 @@ const readPreCommit = (file: RepoFile) =>
     }))
   );
 
-// Root scripts that name or run a check become lanes, run the repo's way.
 const readScripts = (manager: PackageManager, scripts: Scripts): Read => ({
   offers: [...scripts.byName].flatMap(([name, body]) => {
     const lane = Option.orElse(namedLane(name), () =>
@@ -773,7 +710,6 @@ const readScripts = (manager: PackageManager, scripts: Scripts): Read => ({
   setup: [],
 });
 
-/** Lanes by name, in the order found, each with its offer. */
 type Lanes = ReadonlyMap<string, Offer>;
 
 // One group's offers, merged under the lanes already found by the groups
@@ -828,7 +764,6 @@ const INSTALL = {
 
 const skip = (path: string, reason: string) => `skipped ${path}: ${reason}`;
 
-/** Each file read, and a `skipped …` line for each one that wasn't. */
 const readEach = (
   files: readonly RepoFile[],
   read: (file: RepoFile) => Result.Result<Read, string>
@@ -843,7 +778,6 @@ const readEach = (
   };
 };
 
-/** The root `package.json`'s scripts and package manager, or why it can't be read. */
 const readPackage = (files: readonly RepoFile[]) =>
   Option.map(
     Option.fromNullishOr(files.find(fileNamed(PACKAGE_JSON))),
@@ -866,7 +800,6 @@ const scriptsOf = (root: Option.Option<typeof PackageJson.Type>): Scripts => ({
   ),
 });
 
-/** Setup commands with the file each came from, deduplicated, in order. */
 type Setup = readonly (readonly [command: string, path: string])[];
 
 // The install commands of the source group setup comes from, plus the hook
@@ -883,7 +816,6 @@ const setupOf = (reads: readonly Read[], lanes: Lanes): Setup => {
   return [...new Map([...found, ...hooks])];
 };
 
-/** The one-file test command, and where its runner was read. */
 const testOf = (lanes: Lanes) =>
   Option.map(Option.fromNullishOr(lanes.get("unit")), (unit) =>
     Option.match(Option.firstSomeOf(segments(unit.runner.body).map(oneFile)), {
@@ -892,20 +824,8 @@ const testOf = (lanes: Lanes) =>
     })
   );
 
-/**
- * Finds a project's run block in its files. Sources rank CI workflows first,
- * then lefthook, husky and pre-commit hooks, then root `package.json`
- * scripts; a lower source only adds lanes the higher ones lack. Lanes are
- * named `lint`, `types`, `unit`, `build` and `format` when the finder knows
- * the tool or the name, else by their script's name; a dev server, deploy,
- * release or fixer is never a lane. `test` runs one file (`{path}`) for
- * runners it knows (vitest, jest, bun test, pytest, go test, cargo test, and
- * a few more); otherwise it is the unit lane's command as found. Setup is the
- * install commands the top source runs, or else the package manager's
- * install, frozen only when a lockfile is committed. A file that doesn't
- * parse is skipped with its reason in `sources`; nothing found leaves `run`
- * and `sources` empty.
- */
+// Sources rank CI workflows, then hooks, then root scripts; a lower source
+// only adds lanes the higher ones lack.
 export const findRunBlock = (files: readonly RepoFile[]): FoundRunBlock => {
   const sorted = files.toSorted(byPath);
   const root = readPackage(sorted);
@@ -939,7 +859,6 @@ export const findRunBlock = (files: readonly RepoFile[]): FoundRunBlock => {
 
   const hooks = [...lefthook.reads, ...husky, ...preCommit.reads];
 
-  // Setup comes from the highest-ranked group that installs anything.
   const installing =
     [workflows.reads, hooks].find((reads) =>
       reads.some(({ setup }) => setup.length > 0)

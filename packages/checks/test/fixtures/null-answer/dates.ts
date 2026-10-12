@@ -1,11 +1,3 @@
-/**
- * A fixture repo for the null answer: a Bun workspace whose `dates` package
- * exports a function (`parse`), an arrow (`format`) and a class (`Clock`)
- * through its `exports` entry, beside a `notes` package no ask's territory
- * holds, and two checks of `parse`: one that observes what it returns and
- * one that only asks that it exists. Then the same `dates` files as the null
- * answer has them, written out by hand.
- */
 import type { Schema } from "effect";
 
 import type { RepoFile } from "../../../src/finder.ts";
@@ -18,7 +10,6 @@ const file = (path: string, ...lines: readonly string[]): RepoFile => ({
 const manifest = (path: string, fields: Schema.JsonObject) =>
   file(path, JSON.stringify(fields, undefined, 2));
 
-/** The check that only asks that `parse` exists, which any answer passes. */
 export const weakCheck = file(
   "checks/weak.test.ts",
   'import { expect, test } from "bun:test";',
@@ -30,7 +21,6 @@ export const weakCheck = file(
   "});"
 );
 
-/** The check that asserts what `parse` reads a day as. */
 export const strongCheck = file(
   "checks/strong.test.ts",
   'import { expect, test } from "bun:test";',
@@ -42,7 +32,6 @@ export const strongCheck = file(
   "});"
 );
 
-/** A check written before its subject: `dates` exports no `weekOf` yet. */
 export const weakNewCheck = file(
   "checks/week-weak.test.ts",
   'import { expect, test } from "bun:test";',
@@ -54,7 +43,6 @@ export const weakNewCheck = file(
   "});"
 );
 
-/** The same, asserting the week a day falls in. */
 export const strongNewCheck = file(
   "checks/week-strong.test.ts",
   'import { expect, test } from "bun:test";',
@@ -109,7 +97,6 @@ const clockHead = [
   "",
 ] as const;
 
-/** The repo at main, every file a null answer reads. */
 export const datesRepo: readonly RepoFile[] = [
   manifest("package.json", {
     name: "dates-repo",
@@ -184,7 +171,6 @@ export const datesRepo: readonly RepoFile[] = [
   strongCheck,
 ];
 
-/** The `dates` files of `datesRepo` as the null answer has them. */
 export const nullDates: readonly RepoFile[] = [
   file(
     "packages/dates/src/index.ts",

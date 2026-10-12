@@ -25,7 +25,6 @@ import type { JudgeClosure } from "../src/judge.ts";
 
 const file = (path: string, content = ""): RepoFile => ({ content, path });
 
-/** A fence-shaped monorepo: root scripts, a tsconfig chain, a lint config, a hook config. */
 const fence: readonly RepoFile[] = [
   file(
     "package.json",
@@ -856,14 +855,12 @@ const MAX_BYTES = 256 * 1024;
 
 const encoder = new TextEncoder();
 
-/** One tracked file of this repo: its path, its size in bytes, and its text (empty above the limit). */
 interface Tracked {
   readonly content: string;
   readonly path: string;
   readonly size: number;
 }
 
-/** This repo's tracked files, as `git ls-files` lists them, and its closure. */
 class ThisRepo extends Context.Service<
   ThisRepo,
   {
@@ -1007,9 +1004,7 @@ layer(thisRepo, { excludeTestServices: true })(
           expect(judgeClosure(verify, inputs)).toStrictEqual(judge);
           expect((yield* Ref.get(read)).length).toBeLessThan(files.length);
         }),
-      // A walk of the whole repo per round, a few rounds: half a second
-      // alone, several while turbo runs every package's tests at once. The
-      // limit catches a hang, not a busy machine.
+      // The limit catches a hang, not a busy machine.
       { timeout: 30_000 }
     );
 

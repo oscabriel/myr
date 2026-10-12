@@ -1,30 +1,16 @@
-/**
- * Red for the right reason: what one run of a lane says happened.
- * A failure by an assertion is told apart from a run that never got that
- * far (a load or compile error, or no tests at all), from the runner's JSON
- * report where there is one and from its output otherwise.
- */
 import type { LaneOutcome } from "@repo/protocol/domain/answer";
 import type { LaneName } from "@repo/protocol/ids";
 import { Array, Data, Option, Order, pipe, Schema, String } from "effect";
 
-/** How one lane's command ended, as the runner saw it. */
 export interface RunExit {
   /** The exit code; negative when the process had none (a signal ended it). */
   readonly code: number;
   readonly stdout: string;
   readonly stderr: string;
-  /** The runner's JSON report, when it wrote one (vitest's `--reporter=json`). */
   readonly report?: unknown;
-  /** The runner was stopped at the lane's time limit. */
   readonly timedOut?: boolean;
 }
 
-/**
- * What one run says happened. `Failed` carries the failing tests' signature
- * when every failure was an assertion's; a test that threw anything else
- * (`TypeError: parseWeek is not a function`) failed with none.
- */
 export type Diagnosis =
   | { readonly _tag: "Blocked" }
   | { readonly _tag: "Failed"; readonly signature: Option.Option<string> }
@@ -34,7 +20,6 @@ export type Diagnosis =
 
 export const Diagnosis = Data.taggedEnum<Diagnosis>();
 
-// The fields of vitest's JSON report (jest's shape) that tell what happened.
 // A file that failed with a message and collected no tests failed to load.
 const VitestReport = Schema.Struct({
   numTotalTests: Schema.Finite,
@@ -57,14 +42,11 @@ type VitestReport = typeof VitestReport.Type;
 
 const decodeReport = Schema.decodeUnknownOption(VitestReport);
 
-/** A line that reports a failed assertion: chai's, node's, jest's and bun's `expect`, pytest's `assert`. */
 const ASSERTION =
   /AssertionError|^E\s+assert\b|^(?:error: |Error: )?expect\(|^Snapshot .+ mismatched/u;
 
-/** The details jest and bun print under an `expect(received)` line. */
 const EXPECTATION_DETAIL = /^(?:Expected|Received)\b/u;
 
-/** The output of a run that never reached its tests. */
 const LOAD_ERROR = [
   /Cannot find (?:module|package)/u,
   /ERR_MODULE_NOT_FOUND/u,
@@ -74,7 +56,6 @@ const LOAD_ERROR = [
   /Transform failed/u,
 ];
 
-/** The output of a run that found no tests: vitest's, bun's or jest's, pytest's, node's. */
 const NO_TESTS = [
   /No test files found/u,
   /did not match any test files|No tests found/u,
@@ -82,7 +63,6 @@ const NO_TESTS = [
   /^ℹ tests 0$/mu,
 ];
 
-/** A line naming a failed test: bun's `(fail)`, pytest's `FAILED`, vitest's `FAIL`. */
 const FAILED_TEST = [
   /^\(fail\) (?<name>.+)$/u,
   /^FAILED (?<name>\S+)/u,
@@ -104,7 +84,6 @@ const BRACKETED_DURATION = /\s*[[(]\d+(?:\.\d+)?\s?m?s[\])]/gu;
 
 const DURATION = /\b\d+(?:\.\d+)?\s?m?s\b/gu;
 
-/** Without the parts that change between two runs of the same failure. */
 const normalise = (text: string) =>
   text
     .replaceAll(ANSI, "")
@@ -120,7 +99,6 @@ const firstLine = (text: string) => text.split("\n", 1)[0] ?? "";
 const signatureOf = (entries: readonly string[]) =>
   Array.dedupe(entries).toSorted(Order.String).join("\n");
 
-/** The first assertion line, with jest's and bun's `Expected:`/`Received:` lines under it. */
 const assertionOf = (lines: readonly string[]) =>
   Option.map(
     Array.findFirstIndex(lines, (line) => ASSERTION.test(line)),
@@ -218,13 +196,8 @@ const fromReport = (report: VitestReport, exit: RunExit): Diagnosis => {
 const neverRan = (code: number) =>
   code < 0 || code === 126 || code === 127 || (code > 128 && code < 160);
 
-/**
- * What one run says happened. A run stopped at its time limit, or one whose
- * command never ran, is `Blocked`: the verifier's trouble, not the answer's.
- * Otherwise exit 0 is `Passed` whatever the report says (a run with
- * `--passWithNoTests` found none and passed), and a failure is read from the
- * report, or from the output when there is none.
- */
+// A timeout or a command that never ran is `Blocked`, the verifier's trouble.
+// Exit 0 is `Passed` whatever the report says (`--passWithNoTests`).
 export const diagnose = (exit: RunExit): Diagnosis => {
   if (exit.timedOut === true || neverRan(exit.code)) {
     return Diagnosis.Blocked();
@@ -240,11 +213,7 @@ export const diagnose = (exit: RunExit): Diagnosis => {
   });
 };
 
-/**
- * How one lane's run ended. `failed` is any failure once the tests ran;
- * `loadError` is a run that never reached them (a load or compile error, or
- * no tests found). A single run is never `flaked`: that takes a second run.
- */
+// A single run is never `flaked`: that takes a second run.
 export const classifyRun = (lane: LaneName, exit: RunExit): LaneOutcome =>
   Diagnosis.$match(diagnose(exit), {
     Blocked: () => "blocked" as const,
@@ -254,12 +223,7 @@ export const classifyRun = (lane: LaneName, exit: RunExit): LaneOutcome =>
     Passed: () => "passed" as const,
   });
 
-/**
- * The failing tests' names and the first line of each one's assertion,
- * normalised (absolute paths, durations and addresses stripped), so two runs
- * that failed the same way have the same signature. None unless the run
- * failed on assertions.
- */
+// Normalised so two runs that failed the same way share a signature.
 export const failureSignature = (exit: RunExit): Option.Option<string> => {
   const diagnosis = diagnose(exit);
 

@@ -1,10 +1,3 @@
-/**
- * The judge closure: every file that decides what an answer's checks do, so
- * no answer may change it (GLOSSARY "Judge closure"). It is data: globs, plus
- * JSON pointers into files an answer may still edit elsewhere, such as
- * `package.json#/scripts` beside its dependencies. Pure; it reads only the
- * file contents it is given.
- */
 import { Brand } from "@repo/brand";
 import { Glob } from "@repo/protocol/domain/common";
 import type { Policy } from "@repo/protocol/domain/policy";
@@ -16,15 +9,8 @@ import { parse } from "yaml";
 import { findRunBlock } from "./finder.ts";
 import type { RepoFile } from "./finder.ts";
 
-/** A closure glob that starts with this takes paths back out of the closure. */
 const EXCLUDE = "!";
 
-/**
- * Where each harness and git hook manager the platform knows keeps its hooks:
- * Claude Code, Cursor, Codex, GitHub Copilot, Gemini CLI, pi, OpenCode and
- * Amp; lefthook (and its scripts folder), husky and pre-commit. A hook runs in
- * every contributor's session, so an answer may not change one.
- */
 export const hookConfigGlobs: readonly Glob[] = [
   ".claude/settings*.json",
   ".cursor/hooks.json",
@@ -45,13 +31,6 @@ export const hookConfigGlobs: readonly Glob[] = [
   ".pre-commit-config.yaml",
 ].map((glob) => Glob.make(glob));
 
-/**
- * The workspace and task-runner policy files, and formatter config: what a
- * package manager, a task runner or a formatter check reads before it runs
- * anything (bun's and pnpm's install policy, turbo's and nx's task graph,
- * yarn's own release and plugins). `.editorconfig` is not one: no check
- * reads it.
- */
 export const policyFileGlobs: readonly Glob[] = [
   "**/bunfig.toml",
   "pnpm-workspace.yaml",
@@ -68,12 +47,6 @@ export const policyFileGlobs: readonly Glob[] = [
   "**/prettier.config.*",
 ].map((glob) => Glob.make(glob));
 
-/**
- * What every project's judge holds before its run block adds to it: the
- * config folder, the env schema and committed env files (never `*.local`
- * ones), CI, test and lint config, the tsconfig files, generated contribute
- * skills, the workspace and task-runner policy files, and every hook config.
- */
 export const defaultJudgeGlobs: readonly Glob[] = [
   ...[
     `${Brand.configDir}/**`,
@@ -105,8 +78,6 @@ export const defaultJudgeGlobs: readonly Glob[] = [
 
 const withoutDotSlash = (path: string) => path.replace(/^(?:\.\/)+/u, "");
 
-// One path segment against one glob segment: `*` is any run of characters
-// and `?` is one, never a `/`. Greedy, backing up to the last `*` on a miss.
 const matchSegment = (pattern: string, text: string): boolean => {
   let at = 0;
   let from = 0;
@@ -164,24 +135,13 @@ const matchSegments = (
   );
 };
 
-/**
- * Whether a repo path matches a glob: `**` as a whole segment is any number
- * of directories (none included), `*` is any run of characters within a
- * segment and `?` one character. A leading dot is matched like any other
- * character, so `*` reaches dotfiles. No braces, no classes, no negation.
- * Pure and dependency-free, so the gate can copy it.
- */
+// A leading dot is matched like any other character, so `*` reaches dotfiles.
 export const matchGlob = (glob: string, path: string): boolean =>
   matchSegments(
     withoutDotSlash(glob).split("/"),
     withoutDotSlash(path).split("/")
   );
 
-/**
- * Whether an answer that changes `path` changes the judge: some closure glob
- * matches it and no `!` glob takes it back out. A JSON pointer never judges a
- * whole file (`package.json` stays editable); `touchedPointers` reads those.
- */
 export const isJudged = (closure: Policy["judge"], path: string): boolean => {
   const excluded = closure.paths.some(
     (glob) =>
@@ -204,8 +164,6 @@ const isJsonArray = (value: Schema.Json): value is Schema.JsonArray =>
 const isJsonObject = (value: Schema.Json): value is Schema.JsonObject =>
   Predicate.isObject(value) && !isJsonArray(value);
 
-// The index just past the string literal whose quote is at `at`; an
-// unclosed string runs to the end.
 const stringEnd = (text: string, at: number): number => {
   const quote = text.charAt(at);
   let next = at + 1;
@@ -217,10 +175,8 @@ const stringEnd = (text: string, at: number): number => {
   return Math.min(next + 1, text.length);
 };
 
-/** Where the comment that opens at `at` ends, if one opens there. */
 type CommentEnd = (text: string, at: number) => Option.Option<number>;
 
-// The index just past the comment that opens at `at`, if one does.
 const commentEnd: CommentEnd = (text, at) => {
   if (text.startsWith("//", at)) {
     const end = text.indexOf("\n", at);
@@ -237,7 +193,6 @@ const commentEnd: CommentEnd = (text, at) => {
   return Option.none();
 };
 
-// The index just past the `#` comment (TOML's) that opens at `at`, if one does.
 const hashCommentEnd: CommentEnd = (text, at) => {
   if (text.charAt(at) !== "#") {
     return Option.none();
@@ -250,10 +205,6 @@ const hashCommentEnd: CommentEnd = (text, at) => {
 
 const QUOTES = new Set(['"', "'", "`"]);
 
-/**
- * Text with each comment outside a string as one space: `//` and `/* *\/`
- * ones by default (JavaScript, JSONC), or those `opens` finds.
- */
 const withoutComments = (
   text: string,
   opens: CommentEnd = commentEnd
@@ -282,7 +233,6 @@ const withoutComments = (
 
 const isSpace = (char: string) => /\s/u.test(char);
 
-// Whether the next character after `at` that isn't space closes a bracket.
 const closesNext = (text: string, at: number) => {
   let peek = at;
 
@@ -293,7 +243,6 @@ const closesNext = (text: string, at: number) => {
   return peek < text.length && "]}".includes(text.charAt(peek));
 };
 
-/** JSON text with each comma that closes nothing (`[1, 2,]`) left out. */
 const withoutTrailingCommas = (text: string): string => {
   let kept = "";
   let at = 0;
@@ -309,10 +258,6 @@ const withoutTrailingCommas = (text: string): string => {
   return kept;
 };
 
-/**
- * JSONC (tsconfig, `.oxlintrc.json`, harness settings) read as JSON: its
- * comments and trailing commas are dropped first. Pure and dependency-free.
- */
 const decodeJsonc = (text: string): Option.Option<Schema.Json> =>
   decodeJson(withoutTrailingCommas(withoutComments(text)));
 
@@ -323,7 +268,6 @@ const UNREAD = "not among the files read; judged unread";
 
 const dirname = (path: string) => path.split("/").slice(0, -1).join("/");
 
-// `a/b` joined with `../c` is `c`; `..` above the root leaves the repo.
 const join = (dir: string, relative: string): Option.Option<string> => {
   const parts: string[] = dir === "" ? [] : dir.split("/");
 
@@ -348,12 +292,6 @@ const isRelative = (specifier: string) =>
 
 const isPackageJson = (path: string) => matchGlob("**/package.json", path);
 
-/**
- * The files a closure is computed over: every path, in the order given, and
- * a file's text when asked for it (`undefined` for a path not among them).
- * Every walk reads a file's text only through `read`, so a caller can learn
- * which files a closure reads (`judgeReads`).
- */
 interface Tree {
   readonly paths: ReadonlySet<string>;
   readonly read: (path: string) => string | undefined;
@@ -364,7 +302,6 @@ const treeOf = (contents: ReadonlyMap<string, string>): Tree => ({
   read: (path) => contents.get(path),
 });
 
-/** Each workspace package's name and folder, from the manifests given. */
 const workspacesOf = (tree: Tree): ReadonlyMap<string, string> =>
   new Map(
     [...tree.paths]
@@ -383,11 +320,6 @@ const workspacesOf = (tree: Tree): ReadonlyMap<string, string> =>
       )
   );
 
-/**
- * A package specifier read as a workspace package's own file: `@repo/x/y`
- * is `y` inside the folder of the package named `@repo/x`, the longest name
- * winning. A package no workspace declares is a dependency, not a path.
- */
 const inWorkspace = (
   specifier: string,
   workspaces: ReadonlyMap<string, string>
@@ -408,11 +340,6 @@ const configFile = (path: string, paths: ReadonlySet<string>) =>
   [path, `${path}.json`].find((candidate) => paths.has(candidate)) ??
   (path.endsWith(".json") ? path : `${path}.json`);
 
-/**
- * Where a tsconfig's `extends` entry points: a relative path from the file's
- * folder, or a file of a workspace package (a bare package name is its
- * `tsconfig.json`). Any other package (`@tsconfig/node24`) is a dependency.
- */
 const resolveExtends = (
   from: string,
   specifier: string,
@@ -438,7 +365,6 @@ const extendsOf = (config: Schema.Json): readonly string[] => {
   return [value ?? []].flat().filter(Predicate.isString);
 };
 
-/** A path the walk could not read past, and why. */
 const note = (path: string, reason: string) => `${path}: ${reason}`;
 
 const chainFrom = (
@@ -472,13 +398,6 @@ const chainFrom = (
   return { chain: chain.map((path) => RepoPath.make(path)), notes };
 };
 
-/**
- * A tsconfig and every file its `extends` reaches, in the order tsc reads
- * them: string and array forms, relative paths (`.json` added as tsc adds
- * it) and workspace packages' files. Files are read as JSONC. A file that
- * still doesn't parse ends its branch and stays in the chain, as does a
- * target not among `files`; each says why in `notes`.
- */
 export const tsconfigChain = (
   start: RepoPath,
   files: ReadonlyMap<string, string>
@@ -491,7 +410,6 @@ export const tsconfigChain = (
   return chainFrom(start, tree, workspacesOf(tree));
 };
 
-/** A token of JavaScript or JSON text, its comments dropped. */
 interface Token {
   readonly kind: "mark" | "string" | "word";
   readonly text: string;
@@ -499,18 +417,12 @@ interface Token {
 
 const isWordChar = (char: string) => /[\w$]/u.test(char);
 
-// A string literal's value; a template with `${…}` in it is no one value.
 const literal = (quote: string, body: string): Token =>
   quote === "`" && body.includes("${")
     ? { kind: "mark", text: quote }
     : { kind: "string", text: body.replaceAll(/\\(?<char>.)/gu, "$<char>") };
 
-/**
- * Source text as words, string literals and single marks, comments
- * dropped (JavaScript's by default; TOML passes its `#`). Enough to read
- * imports and literal arrays without running the file; a regex literal that
- * holds a quote can mislead it.
- */
+// Not a full lexer: a regex literal that holds a quote can mislead it.
 const tokensOf = (
   source: string,
   comments: CommentEnd = commentEnd
@@ -542,11 +454,8 @@ const tokensOf = (
   return tokens;
 };
 
-// Words a module path follows as a call's first argument: `import("…")`,
-// `require("…")`, `require.resolve("…")`, `new URL("…", import.meta.url)`.
 const LOADERS = new Set(["URL", "import", "require", "resolve"]);
 
-/** The module specifiers source text imports, exports from or requires. */
 const importSpecifiers = (tokens: readonly Token[]): readonly string[] =>
   tokens.flatMap((token, at) => {
     const next = tokens[at + 1];
@@ -570,20 +479,15 @@ const importSpecifiers = (tokens: readonly Token[]): readonly string[] =>
       : [];
   });
 
-// Marks that open and close a nesting level in source text.
 const OPENS = new Set(["(", "[", "{"]);
 
 const CLOSES = new Set([")", "]", "}"]);
 
-/** What a `jsPlugins` key in source text holds, as far as its text says. */
 interface PluginList {
-  /** Each plugin string in a literal array, or an object's `specifier:` string. */
   readonly specifiers: readonly string[];
-  /** Whether some `jsPlugins` holds something other than a literal array. */
   readonly opaque: boolean;
 }
 
-// The strings of one `jsPlugins: [...]` array that starts at token `at`.
 const listedAt = (tokens: readonly Token[], at: number): readonly string[] => {
   const found: string[] = [];
   let depth = 0;
@@ -612,10 +516,6 @@ const listedAt = (tokens: readonly Token[], at: number): readonly string[] => {
   return found;
 };
 
-/**
- * The `jsPlugins` arrays of an oxlint config's source, read as text: a key's
- * (`jsPlugins: [...]`) or a variable's (`const jsPlugins = [...]`).
- */
 const jsPluginsInSource = (tokens: readonly Token[]): PluginList => {
   const starts = tokens.flatMap((token, at) =>
     token.text === "jsPlugins" &&
@@ -632,7 +532,6 @@ const jsPluginsInSource = (tokens: readonly Token[]): PluginList => {
   };
 };
 
-/** The `jsPlugins` of a JSON oxlint config: strings, or `{specifier}` objects. */
 const jsPluginsInJson = (config: Schema.Json): readonly string[] => {
   const list = isJsonObject(config) ? config.jsPlugins : undefined;
 
@@ -651,11 +550,9 @@ const jsPluginsInJson = (config: Schema.Json): readonly string[] => {
 
 const basename = (path: string) => path.split("/").at(-1) ?? path;
 
-// `.oxlintrc.json`, `.oxlintrc`, `.eslintrc.json`: configs written as JSONC.
 const isJsonConfig = (path: string) =>
   /\.jsonc?$/u.test(path) || basename(path) === ".oxlintrc";
 
-/** The lint configs whose plugins and imports judge: oxlint's and eslint's. */
 const lintConfigGlobs = [
   "**/oxlint.config.*",
   "**/oxlint.*.config.*",
@@ -668,7 +565,6 @@ const lintConfigGlobs = [
 const isLintConfig = (path: string) =>
   lintConfigGlobs.some((glob) => matchGlob(glob, path));
 
-/** What one lint config names: its plugins, and the modules it imports or extends. */
 interface LintNames {
   readonly imports: readonly string[];
   readonly notes: readonly string[];
@@ -708,7 +604,6 @@ const lintNames = (config: RepoFile): LintNames => {
   };
 };
 
-// Relative specifiers, as paths from the repo root.
 const relativeFrom = (
   from: string,
   specifiers: readonly string[]
@@ -718,21 +613,9 @@ const relativeFrom = (
     .flatMap((specifier) => Option.toArray(join(dirname(from), specifier)))
     .map((path) => RepoPath.make(path));
 
-/**
- * The local plugins an oxlint config loads, as repo paths: each `jsPlugins`
- * entry of a `.oxlintrc*.json` (a string or `{specifier}`), or each string in
- * an `oxlint.config.*`'s `jsPlugins` array, read as text and never run.
- * Relative to the config's folder; a package name (`eslint-plugin-foo`) is a
- * dependency, not a path. A config that doesn't parse names none.
- */
 export const jsPluginSpecifiers = (config: RepoFile): readonly RepoPath[] =>
   relativeFrom(config.path, lintNames(config).plugins);
 
-/**
- * The local modules an eslint config imports or requires (plugins and shared
- * configs alike), as repo paths from the config's folder, read as text and
- * never run. Packages are dependencies, not paths.
- */
 export const eslintLocalPlugins = (config: RepoFile): readonly RepoPath[] =>
   relativeFrom(config.path, lintNames(config).imports);
 
@@ -766,16 +649,8 @@ const sourceTwins = (path: string): readonly string[] => {
   return (TWINS.get(path.slice(dot)) ?? []).map((ext) => `${stem}${ext}`);
 };
 
-/**
- * What a module path turns out to be among the repo's files: a file (an
- * `index.*` brings its whole folder), a folder (`./rules` with
- * `rules/index.js`), or, when it is neither, the path, its extensions and
- * its folder, so a file an answer adds there is judged too.
- */
 interface Settled {
-  /** The plugin's own path: its file, or its folder for a folder plugin. */
   readonly anchor: string;
-  /** The file to read next, when one exists. */
   readonly file: Option.Option<string>;
   readonly globs: readonly string[];
 }
@@ -825,10 +700,6 @@ const settle = (path: string, paths: ReadonlySet<string>): Settled => {
       };
 };
 
-// A command's words that could name a file: split on whitespace and shell
-// operators, quotes dropped, a leading `$VAR/` or `${VAR}/` dropped (the
-// project folder a harness exports), a `--flag=value`'s value, and a path
-// after `$(…)` read from the root.
 const wordsOf = (command: string): readonly string[] =>
   command
     .split(/[\s;&|()<>`]+/u)
@@ -839,12 +710,8 @@ const wordsOf = (command: string): readonly string[] =>
     .flatMap((word) => [word, word.replace(/^\/+/u, "")])
     .map(withoutDotSlash);
 
-/**
- * Manifests, lockfiles and dependency lists. A command may name one (`pip
- * install -r requirements.txt`), and it stays editable all the same:
- * dependency edits are allowed, as they are in `package.json`, whose scripts
- * alone judge, by pointer.
- */
+// A command may name one of these, yet it stays editable: dependency edits
+// are allowed, as in `package.json`, where only the scripts are judged.
 const dependencyFileGlobs = [
   "**/package.json",
   "**/bun.lock",
@@ -867,12 +734,6 @@ const dependencyFileGlobs = [
 const isDependencyFile = (path: string) =>
   dependencyFileGlobs.some((glob) => matchGlob(glob, path));
 
-/**
- * The tracked files commands run or read, from the words that name one:
- * `bun "${CLAUDE_PROJECT_DIR}/scripts/hooks/x.ts"` → `scripts/hooks/x.ts`.
- * A manifest, lockfile or dependency list is never one (dependency edits stay
- * allowed). Sorted.
- */
 export const commandScripts = (
   commands: readonly string[],
   files: ReadonlySet<string>
@@ -892,8 +753,6 @@ const isShell = (path: string) =>
 
 const CODE = /\.[cm]?[jt]sx?$/u;
 
-// What one file runs, as repo paths: a code file's relative imports and
-// `jsPlugins` strings, or the tracked files a shell script's lines name.
 const runsFrom = (
   path: string,
   content: string,
@@ -911,13 +770,6 @@ const runsFrom = (
   return isShell(path) ? commandScripts(content.split("\n"), paths) : [];
 };
 
-/**
- * Every module the seeds reach by relative imports, and every script a
- * shell script among them runs, settled to globs: what a lint plugin, a hook
- * script or a check script runs is judged with it. Packages, workspace ones
- * included, are not followed, nor any path `follows` refuses. A file without
- * contents ends its branch.
- */
 const walkImports = (
   seeds: readonly string[],
   tree: Tree,
@@ -946,19 +798,12 @@ const walkImports = (
   return globs;
 };
 
-/** The lint sources a repo's lint configs name, and where they stand. */
 interface LintSources {
-  /** Each plugin's own path, for its rule fixtures. */
   readonly anchors: readonly string[];
   readonly globs: readonly string[];
   readonly notes: readonly string[];
 }
 
-/**
- * Every lint config's plugins and imports, settled: relative paths, and
- * workspace packages by their folders (a package a lint config names is
- * lint source too). Then what those modules import, relatively.
- */
 const lintSources = (
   tree: Tree,
   workspaces: ReadonlyMap<string, string>
@@ -999,8 +844,6 @@ const lintSources = (
   };
 };
 
-// A whole folder (`a/b/**`) the closure holds makes any other glob or path
-// under it redundant.
 const withoutCovered = (globs: readonly string[]): readonly string[] => {
   const folders = globs.flatMap((glob) =>
     glob.endsWith("/**") && !glob.slice(0, -3).includes("*")
@@ -1021,11 +864,9 @@ const FIXTURE_FOLDERS = ["__fixtures__", "test", "tests"];
 const TEST_FILE =
   /(?:^|\/)(?:__fixtures__|__tests__|tests?)\/|\.(?:spec|test)\.[cm]?[jt]sx?$/u;
 
-// A path without its file's extension: `lint/plugin.mjs` is `lint/plugin`.
 const stemOf = (path: string) =>
   hasExtension(path) ? path.slice(0, path.lastIndexOf(".")) : path;
 
-/** A plugin as a test can name it: its folder, or its file with or without extension. */
 interface PluginName {
   readonly folder: boolean;
   readonly path: string;
@@ -1036,8 +877,6 @@ const namesPlugin = (candidate: string, plugin: PluginName) =>
     ? candidate === plugin.path || candidate.startsWith(`${plugin.path}/`)
     : stemOf(candidate) === stemOf(plugin.path);
 
-// The paths a string in a test at `from` can mean: relative to the test,
-// and, for `./x` or a bare path, from the repo root (a config written inline).
 const readingsOf = (from: string, text: string): readonly string[] => {
   if (text.startsWith("../")) {
     return Option.toArray(join(dirname(from), text));
@@ -1050,7 +889,6 @@ const readingsOf = (from: string, text: string): readonly string[] => {
     : [rooted];
 };
 
-/** `ruleFixtures`, reading a test file's text only when some plugin may be named in it. */
 const fixturesOf = (
   pluginPaths: readonly string[],
   files: readonly string[],
@@ -1065,7 +903,6 @@ const fixturesOf = (
         }
   );
 
-  // A plugin's folder sits beside its fixtures as a plugin file does.
   const beside = plugins.flatMap((plugin) => {
     const folder = dirname(plugin.path);
 
@@ -1074,7 +911,6 @@ const fixturesOf = (
       : FIXTURE_FOLDERS.map((name) => `${folder}/${name}/**`);
   });
 
-  // Cheap first: a test that never spells a plugin's last name can't name it.
   const lastNames = plugins.map((plugin) => basename(stemOf(plugin.path)));
 
   const naming = files.filter((path) => {
@@ -1104,14 +940,8 @@ const fixturesOf = (
     .map((glob) => Glob.make(glob));
 };
 
-/**
- * The rule fixture tests of local lint plugins: the `test/`, `tests/` and
- * `__fixtures__/` folders beside each plugin (beside a plugin file, or beside
- * a plugin's folder; never at the repo root, where they hold the project's
- * own tests), any `*-rule.test.*`, and every test file whose text names a
- * plugin's path, by import or as a string from the root. Plugins are given
- * as their entry files (an `index.*` stands for its folder) or folders.
- */
+// Fixture folders are never taken at the repo root, where they hold the
+// project's own tests.
 export const ruleFixtures = (
   pluginPaths: readonly string[],
   files: readonly string[],
@@ -1119,9 +949,6 @@ export const ruleFixtures = (
 ): readonly Glob[] =>
   fixturesOf(pluginPaths, files, (path) => contents.get(path));
 
-// Keys whose strings a hook manager runs: Claude Code, Cursor, Codex and
-// Gemini's `command` (with `args`), Copilot's `bash` and `powershell`,
-// lefthook's `run` and `script`, pre-commit's `entry`.
 const COMMAND_KEYS = new Set([
   "args",
   "bash",
@@ -1133,7 +960,6 @@ const COMMAND_KEYS = new Set([
   "script",
 ]);
 
-// Every string under a command key, at any depth of a JSON or YAML value.
 const commandsIn = (
   value: Schema.Json,
   underKey: boolean
@@ -1155,7 +981,6 @@ const commandsIn = (
 
 const decodeAnyJson = Schema.decodeUnknownOption(Schema.Json);
 
-// YAML that `yaml` can't parse, or that holds a value JSON can't, is None.
 const decodeYaml = (text: string): Option.Option<Schema.Json> =>
   Option.flatten(
     Option.liftThrowable((source: string) =>
@@ -1163,7 +988,6 @@ const decodeYaml = (text: string): Option.Option<Schema.Json> =>
     )(text)
   );
 
-/** What one hook config runs, as command lines, and why it could not be read. */
 interface HookCommands {
   readonly commands: readonly string[];
   readonly notes: readonly string[];
@@ -1174,11 +998,6 @@ const unreadable = (path: string, reason: string): HookCommands => ({
   notes: [note(path, reason)],
 });
 
-/**
- * The commands a hook config runs: the strings under command keys of a JSON
- * (JSONC) or YAML config, the strings of a TOML config or a code plugin, and
- * every line of a shell hook. Other files (a README) run nothing.
- */
 const hookCommands = (hook: RepoFile): HookCommands => {
   const { content, path } = hook;
 
@@ -1211,10 +1030,6 @@ const hookCommands = (hook: RepoFile): HookCommands => {
   return { commands: isShell(path) ? content.split("\n") : [], notes: [] };
 };
 
-/**
- * The hook configs among the files, the scripts their commands name, and
- * what those scripts and code plugins (pi, OpenCode, Amp) import.
- */
 const hookSources = (tree: Tree, sorted: readonly string[]) => {
   const configs = sorted.filter((path) =>
     hookConfigGlobs.some((glob) => matchGlob(glob, path))
@@ -1239,23 +1054,14 @@ const hookSources = (tree: Tree, sorted: readonly string[]) => {
 
 const SCRIPTS = "#/scripts";
 
-/**
- * A judge closure as data, the shape `Policy.judge` stores: globs (a `!` glob
- * takes paths back out), and `<file>#<JSON pointer>` parts of files.
- */
 export interface JudgeClosure {
   readonly paths: readonly Glob[];
   readonly pointers: readonly string[];
-  /** Where the walk stopped early (a file that isn't JSONC, one not read), and why. */
   readonly notes?: readonly string[];
 }
 
-/**
- * What the scripts run commands name import and run in turn, inside each
- * script's own folder only: a check script's helpers sit beside it, while
- * what it imports from elsewhere is the product it checks, which an answer
- * must stay free to change. A script at the root follows nothing.
- */
+// Only a check script's own folder is followed: what it imports from
+// elsewhere is the product it checks, which an answer must stay free to change.
 const checkScripts = (
   scripts: readonly string[],
   tree: Tree
@@ -1268,13 +1074,11 @@ const checkScripts = (
       : walkImports([script], tree, (path) => path.startsWith(`${folder}/`));
   });
 
-/** Every command a run block runs. */
 const commandsOf = (run: RunBlock): readonly string[] =>
   [run.setup, run.doctor, run.test, ...Object.values(run.checks)].filter(
     Predicate.isNotUndefined
   );
 
-/** `judgeClosure` over a tree, for run commands given as text. */
 const closureOf = (commands: readonly string[], tree: Tree): JudgeClosure => {
   const { paths } = tree;
   const sorted = [...paths].toSorted();
@@ -1326,18 +1130,6 @@ const closureOf = (commands: readonly string[], tree: Tree): JudgeClosure => {
   return notes.length === 0 ? closure : { ...closure, notes };
 };
 
-/**
- * The judge closure for a run block over a repo's files: the defaults (the
- * policy files and every hook config among them); every file a run command
- * names (`./test.sh` → `test.sh`) and what it imports or runs from its own
- * folder; every script a hook command names, with all it imports or runs;
- * each tsconfig's `extends` chain; every lint plugin and module a lint config
- * loads, with what it imports and its rule fixture tests; and each
- * `package.json`'s scripts as a pointer. Manifests, lockfiles and dependency
- * lists stay editable. Files are read as text, never run; one that doesn't
- * parse is still judged, and `notes` says where the walk stopped. Its shape
- * is `@repo/rules`' `Finishers.judgeClosure`, so the platform passes it in.
- */
 export const judgeClosure = (
   run: RunBlock,
   files: readonly RepoFile[]
@@ -1358,7 +1150,6 @@ const pointerTokens = (pointer: string): readonly string[] =>
         .split("/")
         .map((token) => token.replaceAll("~1", "/").replaceAll("~0", "~"));
 
-// One step down a JSON value: an object's own key, or an array's index.
 const childAt = (
   value: Schema.Json,
   token: string
@@ -1387,8 +1178,6 @@ const valueAt = (
   return value;
 };
 
-// What one side of a change holds at a pointer: nothing (no file, or no such
-// key), the value, or the text of a file that isn't JSON.
 const read = (
   file: RepoFile | undefined,
   target: string,
@@ -1401,13 +1190,6 @@ const read = (
         onSome: (json) => Option.map(valueAt(json, tokens), Result.succeed),
       });
 
-/**
- * The closure's pointers whose value differs between a file's two versions:
- * `["package.json#/scripts"]` when a script changed, `[]` for a dependency
- * edit. Values compare as JSON, so moving a key or reformatting is no change.
- * A file added (no `before`), deleted (no `after`), or no longer valid JSON
- * counts as a change.
- */
 export const touchedPointers = (
   closure: Policy["judge"],
   before: RepoFile | undefined,
@@ -1424,47 +1206,35 @@ export const touchedPointers = (
     );
   });
 
-// ------------------------------------------------------------ what it reads
-
-/** The largest file the finder and the judge closure read; a larger one is listed with no text. */
+// A larger file is listed with no text.
 export const MAX_FACT_BYTES = 256 * 1024;
 
-/** One file of a commit, as a listing gives it: its path, and its size in bytes when the listing knows it. */
 export interface ListedFile {
   readonly path: string;
   readonly size?: number;
 }
 
-/** One file's bytes, as a reader gives them back. */
 export interface ReadFile {
   readonly bytes: Uint8Array;
   readonly path: string;
 }
 
-/** One file as the finder and the judge closure are handed it. */
 export interface JudgeInput {
   readonly content: string;
   readonly path: RepoPath;
 }
 
-/** The folders whose files the run-block finder reads, beside the root's. */
 const CI_FOLDERS: ReadonlySet<string> = new Set([
   ".github/workflows",
   ".forgejo/workflows",
   ".husky",
 ]);
 
-/**
- * Whether a file is read before any walk: the finder reads the root's files
- * and the CI folders', and the config folder's run block names the scripts
- * its checks run.
- */
 const isSeed = (path: string) =>
   dirname(path) === "" ||
   CI_FOLDERS.has(dirname(path)) ||
   path.startsWith(`${Brand.configDir}/`);
 
-/** The commands a found run block runs. */
 const foundCommands = (files: readonly RepoFile[]): readonly string[] => {
   const { run } = findRunBlock(files);
 
@@ -1476,17 +1246,8 @@ const foundCommands = (files: readonly RepoFile[]): readonly string[] => {
   ].filter(Predicate.isNotUndefined);
 };
 
-/**
- * Which listed files' text the finder and the judge closure still need,
- * given the texts read so far: the root's files and the CI folders' (the
- * finder's), the config folder's, and every file the closure's walks reach
- * from what is read, for any command the config folder's strings or the
- * found run block could run. Pure: the closure is walked over the listing
- * with each file not read yet as empty text, and every such file it reads is
- * wanted. A file the listing says is over `MAX_FACT_BYTES` is never wanted.
- * Read what it returns and ask again until it returns nothing
- * (`judgeInputs` does): reading more can only reach more.
- */
+// Call again with what it returned read until it returns nothing: reading
+// more can only reach more.
 const judgeReads = (
   listed: readonly ListedFile[],
   texts: ReadonlyMap<string, string>
@@ -1532,14 +1293,6 @@ const judgeReads = (
   return [...wanted].toSorted();
 };
 
-/**
- * The files the finder and the judge closure are handed for one commit:
- * every listed file, sorted by path, with its text where some walk reads it
- * (`judgeReads`) and empty text elsewhere, or where it is over
- * `MAX_FACT_BYTES`. `readAll` reads a batch of paths; a path it leaves out
- * reads as empty. The platform's facts and the CLI's local check and hook
- * all gather through this, so each hands the closure the same files.
- */
 export const judgeInputs = <E, R>(
   listed: readonly ListedFile[],
   readAll: (

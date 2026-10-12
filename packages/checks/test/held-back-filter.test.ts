@@ -39,11 +39,8 @@ describe(areaBits, () => {
       areaBits({
         areas: [parser],
         exits: [
-          // An assertion failed.
           exit(parser, 1),
-          // The file did not load (a runner's own exit code for that).
           exit(parser, 2),
-          // It ran out of time: no exit code of its own.
           exit(parser, -1, true),
           // It exited 0 as the time limit hit: still a timeout.
           exit(parser, 0, true),

@@ -1,17 +1,6 @@
-/**
- * `CheckRunner` as real processes on this machine, for the CLI's `check`:
- * each job gets a checkout from the caller (the CLI makes a git worktree), and
- * each lane runs there under `sh -c`, one after another, to its time limit.
- *
- * It reaches nothing a lane would not: no network of its own, no git config
- * from this machine (`GIT_CONFIG_GLOBAL=/dev/null`, as `@repo/testkit/git`
- * runs git), no repo but the checkout (a hook's `GIT_DIR` is unset), and a
- * `HOME` in a temp dir it removes after the job. Placeholders
- * and proxies are the Checker's; here a lane sees the user's own env. A sealed
- * suite runs only in the Checker, so a job with one is `VerifierBlocked`.
- * A count lane (`output: "stdout"`) hands back what it printed, as the
- * Checker's does.
- */
+// Placeholders and proxies are the Checker's: here a lane sees the user's own
+// env. A sealed suite runs only in the Checker, so a job with one is
+// `VerifierBlocked`.
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import { Duration, Effect, FileSystem, Layer, Option, Stream } from "effect";
 import type { Scope } from "effect";
@@ -23,16 +12,13 @@ import { classifyRun } from "../classify.ts";
 import type { RunExit } from "../classify.ts";
 
 export interface LocalOptions {
-  /** Makes the job's tree a directory, removed when the scope closes. */
   readonly checkout: (
     at: CheckAt
   ) => Effect.Effect<string, VerifierBlocked, Scope.Scope>;
 }
 
-/** A lane with no time limit of its own gets ten minutes. */
 const DEFAULT_TIMEOUT = Duration.minutes(10);
 
-/** After the time limit's SIGTERM, how long a lane has before SIGKILL. */
 const FORCE_KILL_AFTER = Duration.seconds(2);
 
 // Fixed identity and dates, English messages, no prompts, no colours, and no
@@ -71,8 +57,6 @@ const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
 
 const timedOut: RunExit = { code: -1, stderr: "", stdout: "", timedOut: true };
 
-// A count lane that ran to its end hands back its stdout, which its count is
-// read from; any other lane's output goes nowhere.
 const printed = (lane: CheckLane, exit: RunExit): readonly LaneOutput[] =>
   lane.output === "stdout" && exit.timedOut !== true
     ? [{ lane: lane.lane, stdout: exit.stdout }]
@@ -92,8 +76,8 @@ export const CheckRunnerLocal = {
         const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
         const fs = yield* FileSystem.FileSystem;
 
-        // One lane to its end or its time limit. A process a signal ended
-        // has no exit code: -1. The scope's close kills its process group.
+        // A process a signal ended has no exit code: -1. The scope's close kills its
+        // process group.
         const exitOf = (cwd: string, home: string, lane: CheckLane) =>
           Effect.scoped(
             Effect.gen(function* () {

@@ -1,16 +1,7 @@
-/**
- * The static half of "red for the right reason": five shapes of check
- * that pass whatever the answer does, read from the check file's source
- * before it ever runs. It reads expect-style checks (vitest, jest, bun); a
- * file with no `expect(` call (pytest, go test) is outside it and flags
- * nothing, and the twice-red run still guards it.
- */
+// Reads expect-style checks (vitest, jest, bun) only: a file with no
+// `expect(` call flags nothing, and the twice-red run still guards it.
 import { Array, Option, pipe } from "effect";
 
-/**
- * A shape of check that passes whatever the answer does, as `WeakCheck`'s
- * `weakness` names it.
- */
 export type Weakness =
   | "self-referential"
   | "constant pin"
@@ -18,16 +9,11 @@ export type Weakness =
   | "mock-only"
   | "fixture-asserts-fixture";
 
-/**
- * The check file as an ask carries it: its repo path, which places its
- * relative imports, and its source.
- */
 export interface CheckFile {
   readonly path: string;
   readonly content: string;
 }
 
-/** One `expect(subject).matcher(expected)` in the check, as source text. */
 interface Expectation {
   readonly subject: string;
   readonly negated: boolean;
@@ -35,7 +21,6 @@ interface Expectation {
   readonly expected: string;
 }
 
-/** The check's source twice: without comments, and with string contents blanked too. */
 interface Source {
   readonly text: string;
   readonly masked: string;
@@ -43,7 +28,6 @@ interface Source {
 
 const QUOTES = new Set(['"', "'", "`"]);
 
-/** The index just past the string literal that opens at `start`. */
 const stringEnd = (source: string, start: number) => {
   const quote = source[start];
   let at = start + 1;
@@ -57,11 +41,8 @@ const stringEnd = (source: string, start: number) => {
 
 const blank = (text: string) => text.replaceAll(/[^\n]/gu, " ");
 
-/**
- * Comments become spaces in both copies; a string stays in `text` and keeps
- * only its quotes in `masked`. Both keep every index, so a position found in
- * `masked` reads the same span of `text`.
- */
+// Both copies keep every index, so a position found in `masked` reads the
+// same span of `text`.
 const read = (source: string): Source => {
   const text: string[] = [];
   const masked: string[] = [];
@@ -72,7 +53,6 @@ const read = (source: string): Source => {
     const char = source[at] ?? "";
 
     if (pair === "//" || pair === "/*") {
-      // A line comment ends before its newline, a block comment after `*/`.
       const close = pair === "//" ? "\n" : "*/";
       const found = source.indexOf(close, at + 2);
       const end = found === -1 ? source.length : found + close.length;
@@ -98,7 +78,6 @@ const read = (source: string): Source => {
   return { masked: masked.join(""), text: text.join("") };
 };
 
-/** The index of the `)` that closes the `(` at `open`, in masked source. */
 const closing = (masked: string, open: number) => {
   let depth = 0;
 
@@ -125,7 +104,6 @@ const expectationAt = (
     const open = masked.indexOf("(", start);
     const close = yield* closing(masked, open);
 
-    // `.not`, `.resolves` and `.rejects`, then the matcher's call.
     const chain =
       /\s*(?<modifiers>(?:\.\s*(?:not|resolves|rejects)\s*)*)\.\s*(?<matcher>[A-Za-z_$][\w$]*)\s*\(/uy;
 
@@ -169,11 +147,8 @@ const GLOB = /[*?[{]/u;
 const segmentsOf = (path: string) =>
   path.split("/").filter((segment) => segment !== "" && segment !== ".");
 
-/**
- * The folder a territory glob covers: its fixed head (`packages/week/**` →
- * `packages/week`), or, for a glob naming one file, that file's folder, since
- * a check reaches a file through its folder's index too.
- */
+// A glob naming one file covers its folder, since a check reaches a file
+// through its folder's index too.
 const baseOf = (glob: string) => {
   const segments = segmentsOf(glob);
   const fixed = Array.takeWhile(segments, (segment) => !GLOB.test(segment));
@@ -184,7 +159,6 @@ const baseOf = (glob: string) => {
   return isFile ? fixed.slice(0, -1) : fixed;
 };
 
-/** A relative import's repo path, resolved from the check file's folder. */
 const resolve = (checkPath: string, specifier: string) => {
   const resolved = segmentsOf(checkPath).slice(0, -1);
 
@@ -202,12 +176,6 @@ const resolve = (checkPath: string, specifier: string) => {
 const startsWith = (path: readonly string[], head: readonly string[]) =>
   head.every((segment, index) => path[index] === segment);
 
-/**
- * Whether an import reaches into a territory's folder: a relative import
- * that resolves inside it, or to a folder above it (`../src` reaching
- * `src/week.ts` through `src/index.ts`), or a package import whose unscoped
- * name is one of its folders (`@datekit/week` for `packages/week/**`).
- */
 const reaches =
   (checkPath: string) => (specifier: string, base: readonly string[]) => {
     if (!specifier.startsWith(".")) {
@@ -241,7 +209,6 @@ const isLiteral = (text: string) =>
       .replaceAll(/[A-Za-z_$][\w$]*\s*:/gu, "")
   );
 
-/** `not.toThrow()`, `toBeUndefined()`, `toBeFalsy()` and their mirrors. */
 const isAbsence = ({ matcher, negated }: Expectation) =>
   negated
     ? ["toThrow", "toThrowError", "toBeDefined", "toBeTruthy"].includes(matcher)
@@ -271,7 +238,6 @@ const isOnMock = (mocks: ReadonlySet<string>) => (each: Expectation) =>
   /\b(?:vi|jest)\.fn\s*\(/u.test(each.subject) ||
   mocks.has(rootOf(each.subject) ?? "");
 
-/** The names the check binds to a call's result (`const range = weekRange(…)`). */
 const resultsOf = ({ text }: Source) =>
   new Set(
     Array.map(
@@ -286,12 +252,6 @@ const resultsOf = ({ text }: Source) =>
 
 const squash = (text: string) => text.replaceAll(/\s+/gu, "");
 
-/**
- * Expected and actual from one source: the same expression twice, or the
- * subject read straight off the fixture the expected one comes from. A value
- * the check computed is not a fixture: two of its fields may be compared
- * (`expect(range.start).toBeLessThan(range.end)`).
- */
 const isFromOneFixture =
   (results: ReadonlySet<string>) =>
   ({ expected, subject }: Expectation) => {
@@ -307,25 +267,11 @@ const isFromOneFixture =
     );
   };
 
-/** `expect(1).toBe(1)`: a literal held against a literal, or against nothing. */
 const isConstantPin = ({ expected, subject }: Expectation) =>
   isLiteral(subject) && (expected === "" || isLiteral(expected));
 
-/**
- * The weak shapes a check file is in, given the territory's paths (globs).
- * A shape over expectations holds only when every expectation in the file
- * has it, so one real assertion among weak ones keeps the check:
- *
- * - `self-referential`: the check imports nothing from the territory's
- *   folders (its relative imports resolved from its own path);
- * - `constant pin`: every expectation holds a literal against a literal
- *   (`expect(1).toBe(1)`);
- * - `absence-only`: every expectation is `not.toThrow`, `toBeUndefined` or
- *   `toBeFalsy` (or a mirror);
- * - `mock-only`: every expectation is on a `vi.fn()` or a spy;
- * - `fixture-asserts-fixture`: every expectation takes expected and actual
- *   from the same fixture, or computes both the same way.
- */
+// A shape over expectations holds only when every expectation has it, so one
+// real assertion among weak ones keeps the check.
 export const weaknessesOf = (
   checkFile: CheckFile,
   territoryPaths: readonly string[]

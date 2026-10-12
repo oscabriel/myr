@@ -31,7 +31,6 @@ const anyCount = RatchetName.make("anyCount");
 
 const lintCommand = "oxlint --format json";
 
-/** Counts `any` with the project's linter, in every territory. */
 const counting = RatchetSpec.make({
   measure: RatchetMeasure.cases.Count.make({
     command: Command.make(lintCommand),
@@ -40,7 +39,6 @@ const counting = RatchetSpec.make({
   name: anyCount,
 });
 
-/** Counts `any` in the one territory the spec names. */
 const countingIn = (territory: string) =>
   RatchetSpec.make({ ...counting, territory });
 
@@ -48,7 +46,6 @@ const bundleKb = RatchetName.make("bundleKb");
 
 const bundleCommand = "bun scripts/bundle-size.ts --json";
 
-/** Reads one number from a bundle report, for the whole project. */
 const bundle = RatchetSpec.make({
   measure: RatchetMeasure.cases.Metric.make({
     command: Command.make(bundleCommand),
@@ -57,7 +54,7 @@ const bundle = RatchetSpec.make({
   name: bundleKb,
 });
 
-/** A fake runner that prints `stdout` for any command, exiting 1 as a linter with findings does, and keeps what it was asked to run. */
+// Exits 1, as a linter with findings does.
 const printing = (stdout: string) =>
   Effect.gen(function* () {
     const ran = yield* Ref.make<readonly string[]>([]);

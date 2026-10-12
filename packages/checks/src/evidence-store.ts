@@ -1,11 +1,3 @@
-/**
- * The `EvidenceStore` port: where a lane's raw log goes, so a
- * `LaneResult.logRef` (and a `ChecksFailed.logRef`) names something real and
- * the log itself never travels to an answerer.
- *
- * Adapters: `/memory`, for tests and the web's dev backend, and `/r2` over
- * the stage's `evidence-<stage>` bucket, which the Worker runs.
- */
 import type { ProjectName } from "@repo/protocol/ids";
 import {
   keyOf,
@@ -16,16 +8,11 @@ import {
 import { Context, Option, Schema } from "effect";
 import type { Effect } from "effect";
 
-/**
- * A kept log's name: `<project>/<requestId>/<lane>#<attempt>`. It is
- * deterministic, so a replayed step overwrites its log, never adds a second
- * one (principle 8).
- */
+// Deterministic, so a replayed step overwrites its log rather than adding one.
 export const LogRef = Schema.NonEmptyString.pipe(Schema.brand("LogRef"));
 
 export type LogRef = typeof LogRef.Type;
 
-/** One lane's log from one attempt at one answer request. */
 export interface LaneLog {
   readonly project: ProjectName;
   readonly requestId: RequestId;
@@ -34,16 +21,11 @@ export interface LaneLog {
   readonly text: string;
 }
 
-/**
- * The name a lane's log is kept under, whichever adapter keeps it: by the
- * project's key, so a name holds one `/` before the request (ADR 0032).
- */
 export const logRefOf = (log: Omit<LaneLog, "text">): LogRef =>
   LogRef.make(
     `${keyOf(log.project)}/${log.requestId}/${log.lane}#${log.attempt}`
   );
 
-/** A log's name, read back into what it names. */
 const LogName = Schema.TemplateLiteralParser([
   ProjectNameFromKey,
   "/",
@@ -54,12 +36,7 @@ const LogName = Schema.TemplateLiteralParser([
   Schema.Int,
 ]);
 
-/**
- * What a log's name points at: `logRefOf` read backwards, or `None` for a
- * name it never makes. None of its parts holds a `/` or a `#`; the attempt
- * reads as a number (`#01`, `#1.0` and `#+1` all read as 1), so a name is
- * kept only when `logRefOf` spells it back the same.
- */
+// A name is kept only when `logRefOf` spells it back the same.
 export const logOfRef = (ref: string): Option.Option<Omit<LaneLog, "text">> =>
   Option.filter(
     Option.map(
@@ -77,13 +54,8 @@ export const logOfRef = (ref: string): Option.Option<Omit<LaneLog, "text">> =>
 export class EvidenceStore extends Context.Service<
   EvidenceStore,
   {
-    /** Keeps the log, replacing any kept under the same name. */
     readonly put: (log: LaneLog) => Effect.Effect<LogRef>;
-    /**
-     * A kept log, for its answer's claimant and the project's deciders
-     * only: callers check who asks (`ProjectApi.evidence`); the port does
-     * not.
-     */
+    // Callers check who asks (`ProjectApi.evidence`); the port does not.
     readonly get: (ref: LogRef) => Effect.Effect<Option.Option<string>>;
   }
 >()("checks/EvidenceStore") {}
