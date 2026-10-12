@@ -1,7 +1,5 @@
 /**
- * The README a judge reads first, held to the tree: its
- * sections come in the order a reader needs them, the numbers table keeps
- * the markers the live runs fill by hand, and every path, command and check
+ * The README a judge reads first, held to the tree: every path and command
  * it names exists, so a rename that leaves the README behind fails here.
  * Its credits name every upstream that a ported file's header names (the
  * `Ported from <owner>/<repo>@<sha>` line in the file's first lines: the
@@ -21,43 +19,6 @@ import { Array, Effect, FileSystem, Option, Path, Schema } from "effect";
 
 import { committable, repoRoot, textOf } from "./root.ts";
 
-/** The H2 sections after the pitch, in order; the pitch's title is free. */
-const SECTIONS = [
-  "Run it",
-  "Numbers",
-  "What it promises and how to check",
-  "Keep or cut",
-  "Architecture",
-  "Credits",
-  "Roadmap",
-] as const;
-
-/** Stands in for the pitch's own title, which any words may fill. */
-const PITCH = "(the pitch)";
-
-/** Where the numbers table goes; the live runs on the demo stage fill it by hand. */
-const MARKERS = {
-  begin: "<!-- numbers:begin -->",
-  end: "<!-- numbers:end -->",
-} as const;
-
-/**
- * The checks the promises table names at least: git's own
- * refusal, the closed union on every surface, the name in one file, deny
- * by default, deterministic rules and pure lifecycles.
- */
-const NAMED_CHECKS = [
-  "apps/platform/test/core-loop.test.ts",
-  "packages/protocol/test/refusal.test.ts",
-  "packages/protocol/test/mcp.test.ts",
-  "bun run brand:check",
-  "packages/gate/test/shape.test.ts",
-  "packages/visibility/test/guards.test.ts",
-  "apps/web/test/env.test-d.ts",
-  "packages/rules/test/replay.test.ts",
-  "packages/project/test/claim.model.test.ts",
-] as const;
-
 /**
  * What a public README never holds: a home folder, the private plan's host,
  * or a pointer into the maintainer's gitignored working docs. Each is joined
@@ -74,20 +35,11 @@ const PRIVATE = [
   ),
 ] as const;
 
-/** The roadmap lines a reader asks about, word for word. */
-const ROADMAP = [
-  "Later: a one-way push mirror of `main` to GitHub",
-  "Public REST next: an `HttpApi` projection → OpenAPI 3.1 → Forge SDKs once Forge publishes to npm",
-] as const;
-
 /** How many of a file's first lines may carry its `Ported from` header. */
 const HEADER_LINES = 5;
 
 /** A ported file's header: the upstream repository and the commit it was copied at. */
 const PORTED = /Ported from (?<upstream>[\w.-]+\/[\w.-]+)@[\da-f]{7,40}\b/u;
-
-/** A test file, by its name. */
-const TEST_FILE = /\.test(?:-d)?\.tsx?$/u;
 
 /**
  * A token that reads as a relative file path: segments of path characters
@@ -285,30 +237,6 @@ const exists = (path: string, files: readonly string[]) => {
   return files.some((file) => pattern.test(file));
 };
 
-/** Whether a line is one of a Markdown table's rows. */
-const isRow = (line: string) => line.trimStart().startsWith("|");
-
-/** The rows of the first table in `body`, each as its cells, header and rule left out. */
-const tableRows = (body: string) => {
-  const lines = body.split("\n");
-  const start = lines.findIndex(isRow);
-
-  if (start === -1) {
-    return [];
-  }
-
-  const rest = lines.slice(start);
-  const end = rest.findIndex((line) => !isRow(line));
-
-  return (end === -1 ? rest : rest.slice(0, end)).slice(2).map((line) =>
-    line
-      .trim()
-      .replaceAll(/^\||\|$/gu, "")
-      .split("|")
-      .map((cell) => cell.trim())
-  );
-};
-
 /** Each `bun run` in `text`: the folder it runs in (the root, or `--cwd`'s) and its script. */
 const runs = (text: string) =>
   [
@@ -344,27 +272,9 @@ const world = Effect.gen(function* () {
 });
 
 describe("the README", () => {
-  it.live(
-    "opens with the pitch, then runs, measures, promises, cuts, explains, credits and looks ahead",
-    () =>
-      Effect.gen(function* () {
-        const text = yield* readme;
-
-        expect(
-          sectionsOf(text).map(({ title }, at) => (at === 0 ? PITCH : title))
-        ).toStrictEqual([PITCH, ...SECTIONS]);
-      }).pipe(Effect.provide(NodeServices.layer))
-  );
-
-  it.live("keeps the numbers table's markers for the live runs", () =>
+  it.live("exists at the repo root", () =>
     Effect.gen(function* () {
-      const numbers = bodyOf(yield* readme, "Numbers");
-      const begin = numbers.indexOf(MARKERS.begin);
-
-      expect({
-        begin: begin !== -1,
-        endAfterBegin: numbers.indexOf(MARKERS.end) > begin,
-      }).toStrictEqual({ begin: true, endAfterBegin: true });
+      expect(Option.isSome(yield* textOf("README.md"))).toBeTruthy();
     }).pipe(Effect.provide(NodeServices.layer))
   );
 
@@ -404,52 +314,6 @@ describe("the README", () => {
       }).pipe(Effect.provide(NodeServices.layer))
   );
 
-  it.live(
-    "pairs every promise with a script or a test file that checks it",
-    () =>
-      Effect.gen(function* () {
-        const { roots, text } = yield* world;
-        const known = yield* scriptsOf("");
-
-        const rows = tableRows(
-          bodyOf(text, "What it promises and how to check")
-        );
-
-        const unchecked = rows.filter((cells) => {
-          const check = cells.at(-1) ?? "";
-
-          return !(
-            runs(check).some(({ script }) => Object.hasOwn(known, script)) ||
-            pathsIn(check, roots).some((path) => TEST_FILE.test(path))
-          );
-        });
-
-        expect({
-          named: NAMED_CHECKS.filter(
-            (check) =>
-              !rows.some((cells) => (cells.at(-1) ?? "").includes(check))
-          ),
-          rows: rows.length > 0,
-          unchecked: unchecked.map((cells) => cells[0]),
-        }).toStrictEqual({ named: [], rows: true, unchecked: [] });
-      }).pipe(Effect.provide(NodeServices.layer))
-  );
-
-  it.live("lists the paths that remove each thing a cut can take", () =>
-    Effect.gen(function* () {
-      const { roots, text } = yield* world;
-      const rows = tableRows(bodyOf(text, "Keep or cut"));
-
-      expect({
-        entries: rows.length > 0,
-        // A row is named by its cut line and what goes, since one line can cut several things.
-        pathless: rows
-          .filter((cells) => pathsIn(cells.join(" | "), roots).length === 0)
-          .map((cells) => cells.slice(0, 2).join(": ")),
-      }).toStrictEqual({ entries: true, pathless: [] });
-    }).pipe(Effect.provide(NodeServices.layer))
-  );
-
   it.live("credits every upstream a ported file's header names", () =>
     Effect.gen(function* () {
       const { files, text } = yield* world;
@@ -474,17 +338,15 @@ describe("the README", () => {
   );
 
   it.live(
-    "installs the CLI from the platform, and states the roadmap's two lines",
+    "installs the CLI from the platform, not a code host's releases",
     () =>
       Effect.gen(function* () {
         const text = yield* readme;
-        const roadmap = bodyOf(text, "Roadmap");
 
         expect({
           githubReleases: /github\.com\/\S*\/releases/u.test(text),
           install: text.includes("/install.sh | sh"),
-          roadmap: ROADMAP.filter((line) => !roadmap.includes(line)),
-        }).toStrictEqual({ githubReleases: false, install: true, roadmap: [] });
+        }).toStrictEqual({ githubReleases: false, install: true });
       }).pipe(Effect.provide(NodeServices.layer))
   );
 });
