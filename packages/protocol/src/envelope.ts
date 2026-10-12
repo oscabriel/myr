@@ -3,10 +3,6 @@ import type { Array } from "effect";
 
 import { Refusal } from "./refusal.ts";
 
-/**
- * The one shape of every CLI command's `--json` output: the command's result,
- * or the refusals it met instead, under a version a script can check.
- */
 export const Envelope = <A extends Schema.Top>(data: A) =>
   Schema.Union([
     Schema.Struct({
@@ -23,7 +19,6 @@ export const Envelope = <A extends Schema.Top>(data: A) =>
     }),
   ]);
 
-/** A command's `--json` output whose result is an `A`. */
 export type Envelope<A> =
   | {
       readonly command: string;

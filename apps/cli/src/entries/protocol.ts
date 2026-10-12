@@ -1,8 +1,3 @@
-/**
- * The package's `./protocol` export: types only, for a maintainer's config
- * folder that names the data its rules evaluate to (the policy, its asks,
- * kinds, checks and territories) and the ids inside it.
- */
 export type {
   AreaName,
   AskId,

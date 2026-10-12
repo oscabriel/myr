@@ -18,7 +18,6 @@ import { SignedOut } from "../signed-out.ts";
 import { aCheckRepo, handle, project } from "./fixture.ts";
 import type { CheckRepo } from "./fixture.ts";
 
-/** A platform no offline run may call. */
 const unreachable = Layer.mock(Client)({});
 
 const services = Layer.mergeAll(
@@ -29,7 +28,6 @@ const services = Layer.mergeAll(
   SignedOut
 ).pipe(Layer.provideMerge(NodeServices.layer));
 
-/** `check --offline --shape-only --json` in the repo: how it ended, and what it printed where. */
 const checked = (root: string) =>
   Effect.gen(function* () {
     const exit = yield* Effect.exit(
@@ -51,26 +49,21 @@ const name = ProjectName.make(project);
 
 const skill = `.agents/skills/${keyOf(ProjectName.make(project))}-contribute/SKILL.md`;
 
-/** The landing an older copy of the skill came from. */
 const older = LandedSha.make("a".repeat(40));
 
-/** The policy at the fixture's main, as `check` reads it. */
 const policyAtMain = (repo: CheckRepo) =>
   localPolicy(repo.root, "main", {
     initializer: Handle.make(handle),
     project: name,
   }).pipe(Effect.provide(ConfigBundlerBun));
 
-/** An older run block: one lane, `ok`, where main has two. */
 const olderRun = Schema.decodeSync(RunBlock)({
   checks: { ok: "true" },
   test: "true {path}",
 });
 
-/** The policy at main with the older run block. */
 const withOlderRun = (policy: Policy): Policy => ({ ...policy, run: olderRun });
 
-/** Writes `content` at `file` in the repo's work tree, leaving it uncommitted. */
 const writeFile = (repo: CheckRepo, file: string, content: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -81,7 +74,6 @@ const writeFile = (repo: CheckRepo, file: string, content: string) =>
     yield* fs.writeFileString(at, content);
   });
 
-/** The fixture with HEAD on its clean answer, which the shape stage passes. */
 const cleanRepo = Effect.gen(function* () {
   const repo = yield* aCheckRepo;
 

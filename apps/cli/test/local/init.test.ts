@@ -33,7 +33,6 @@ import { program } from "../../src/main.ts";
 import { OutputPlain } from "../../src/output.ts";
 import { SignedOut } from "../signed-out.ts";
 
-/** Credentials for a run signed in as `handle`, whose profile `login` wrote. */
 const signedInAs = (handle: string) =>
   Layer.mock(Credentials)({
     current: Effect.succeedSome({
@@ -64,10 +63,6 @@ const ci = [
   "",
 ].join("\n");
 
-/**
- * The config `init` proposes for the machine's repo: the commands its CI
- * and scripts run, each with where it was found.
- */
 const proposal = projectFile(
   {
     checks: Object.fromEntries(
@@ -89,12 +84,6 @@ const proposal = projectFile(
   ]
 );
 
-/**
- * A maintainer's machine: a repo on branch `work` whose scripts test, lint
- * and type-check and whose CI installs with Bun; an empty bare repo that
- * stands in for the platform's; and a `HOME` whose git config names who
- * commits and nothing else.
- */
 const aMachine = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -129,11 +118,6 @@ const aMachine = Effect.gen(function* () {
 
 type Machine = Effect.Success<typeof aMachine>;
 
-/**
- * The real process spawner, as if the CLI were started in `machine.repo`
- * with `machine.home` as `HOME`: a command's relative folder is taken from
- * the repo, and git reads only the machine's global config.
- */
 const startedIn = (machine: Machine) =>
   Layer.effect(ChildProcessSpawner.ChildProcessSpawner)(
     Effect.gen(function* () {
@@ -164,11 +148,6 @@ const startedIn = (machine: Machine) =>
     })
   ).pipe(Layer.provide(NodeServices.layer));
 
-/**
- * A platform whose `initProject` records each payload it decodes and answers
- * `reply`, reached through a client over the contracts' own schemas; any
- * other contract dies.
- */
 const aPlatform = (
   reply: Effect.Effect<
     typeof InitProject.successSchema.Type,
@@ -193,11 +172,9 @@ const aPlatform = (
     ),
   }));
 
-/** The exit code the process would end with, as the runtime decides it. */
 const exitCodeOf = (exit: Exit.Exit<unknown, unknown>) =>
   Exit.isSuccess(exit) ? 0 : Runtime.getErrorExitCode(Cause.squash(exit.cause));
 
-/** Runs `<cli> argv` on `machine` against `platform`: its exit code and what it printed. */
 const cli = (
   machine: Machine,
   platform: Layer.Layer<Client>,
@@ -232,7 +209,6 @@ const decodeEnvelope = Schema.decodeEffect(
   Schema.fromJsonString(Envelope(Schema.Unknown))
 );
 
-/** The one envelope `--json` printed. */
 const envelopeOf = (out: readonly string[]) =>
   Effect.gen(function* () {
     expect(out).toHaveLength(1);
@@ -240,7 +216,6 @@ const envelopeOf = (out: readonly string[]) =>
     return yield* decodeEnvelope(out[0] ?? "");
   });
 
-/** What git says about the machine's repo and the platform's. */
 const state = (machine: Machine) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -267,7 +242,6 @@ const state = (machine: Machine) =>
     };
   });
 
-/** The platform made the project `demo`, served at the machine's bare repo. */
 const created = (machine: Machine) =>
   Effect.succeed({
     project: ProjectName.make("oscabriel/demo"),
@@ -846,7 +820,6 @@ const decodeCalls = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ project: Schema.String }))
 );
 
-/** The project `init --import <url>` sends with `flags`, signed in as `handle`. */
 const importSends = (handle: string, url: string, flags: readonly string[]) =>
   Effect.gen(function* () {
     const machine = yield* aMachine;
@@ -870,8 +843,6 @@ const importSends = (handle: string, url: string, flags: readonly string[]) =>
     return calls.map(({ project }) => project);
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
-// A bare word is the person's own, and an import named by nobody takes its
-// source path when its host is one the platform knows.
 describe(`${Brand.cli} init's project name`, () => {
   it.live(
     "gives a bare --project the profile's handle, even on an import from a known host",

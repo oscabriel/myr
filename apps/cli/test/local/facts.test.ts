@@ -40,7 +40,6 @@ const about = {
   project: ProjectName.make(project),
 };
 
-/** The policy at `main`, with this CLI's own bundler for a TypeScript folder. */
 const policyAt = (root: string) =>
   localPolicy(root, "main", about).pipe(Effect.provide(ConfigBundlerBun));
 
@@ -52,17 +51,11 @@ const target = PushTarget.ClaimFork({
   project: ProjectName.make(project),
 });
 
-/** A `Fetch` for a host that reaches nothing over the network. */
 const offline = Layer.succeed(Fetch)({
   fetch: (request) =>
     Effect.fail(new FetchFailed({ reason: "offline", url: request.url })),
 });
 
-/**
- * `@repo/git`'s change list and added lines from the merge base of `main`
- * and `head` to `head`, over a bare copy of the repo that `RepoHost`
- * `/local` opens as it opens any repo it hosts.
- */
 const gitSays = (repo: CheckRepo, head: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -168,14 +161,6 @@ describe(localFacts, () => {
   );
 });
 
-/**
- * A tree whose judge reaches past the root and the CI folders, as
- * `packages/project/test/facts.test.ts` gives the platform: lefthook runs a
- * shell script that runs a hook script with a helper, Claude Code's settings
- * run `scripts/hooks/shell-policy.ts`, a package's tsconfig extends the base
- * and a file of its own, oxlint loads a plugin that imports a helper, and a
- * test outside the plugin's folder names it.
- */
 const wideTree = {
   ".claude/settings.json": JSON.stringify({
     hooks: {

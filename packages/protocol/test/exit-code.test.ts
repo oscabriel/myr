@@ -16,8 +16,6 @@ import {
 import type { Refusal } from "../src/refusal.ts";
 import { ask, base, examples, main, path } from "./examples.ts";
 
-// Each tag's code, as scripts and agents branch on it: a public contract,
-// pinned here so a change to one is a change to this table.
 const pinned = {
   AskBlocked: 75,
   AskFull: 75,

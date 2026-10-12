@@ -39,10 +39,8 @@ import {
 } from "./annotations.ts";
 import type { Unauthenticated } from "./principal.ts";
 
-/** How a call can fail before its handler runs: in transit, or unauthenticated. */
 type CallError = RpcClientError.RpcClientError | Unauthenticated;
 
-/** The tool an Rpc becomes: its payload as parameters, its errors as failures. */
 export type ToolOf<R extends Rpc.Any> =
   R extends Rpc.Rpc<
     infer Tag,
@@ -67,7 +65,6 @@ export type ToolsOf<Rpcs extends Rpc.Any> = {
   readonly [R in Rpcs as R["_tag"]]: ToolOf<R>;
 };
 
-/** A tool as MCP's `tools/list` shows it to a client. */
 export interface ToolListing {
   readonly name: string;
   readonly description: string;
@@ -91,11 +88,7 @@ const definitionKey = ($ref: string) => {
   return tokens?.length === 2 && tokens[0] === "$defs" ? tokens[1] : undefined;
 };
 
-/**
- * A schema as MCP lists it, derived the way `McpServer` derives a tool's:
- * JSON Schema with an object root (a top-level `$ref` is inlined) and its
- * definitions under `$defs`.
- */
+/** Derived the way `McpServer` derives a tool's: a top-level `$ref` is inlined. */
 export const toJsonSchema = (schema: Schema.Top): JsonSchema.JsonSchema => {
   const { definitions, schema: root } = Schema.toJsonSchemaDocument(schema);
 
@@ -110,14 +103,9 @@ export const toJsonSchema = (schema: Schema.Top): JsonSchema.JsonSchema => {
     : { ...inlined, $defs: definitions };
 };
 
-/**
- * The tools a toolkit lists, in its order, as a client reads them from
- * `tools/list`. The generated MCP reference is written from this.
- */
 export const listTools = <Tools extends Readonly<Record<string, Tool.Any>>>(
   toolkit: Toolkit.Toolkit<Tools>
 ): readonly ToolListing[] =>
-  // A toolkit keys each tool by its name.
   Object.entries(toolkit.tools).map(([name, tool]) => ({
     annotations: {
       destructiveHint: Context.get(tool.annotations, Tool.Destructive),
@@ -133,18 +121,13 @@ export const listTools = <Tools extends Readonly<Record<string, Tool.Any>>>(
 
 export interface ToolkitProjection<Rpcs extends Rpc.AnyWithProps, R> {
   readonly toolkit: Toolkit.Toolkit<ToolsOf<Rpcs>>;
-  /** Handlers that answer each tool by calling its Rpc through the client. */
   readonly layer: Layer.Layer<Tool.HandlersFor<ToolsOf<Rpcs>>, never, R>;
 }
 
-/** What a tool says before a person-approved contract runs. */
 const ASKS_FIRST = " Asks a person first.";
 
-/**
- * One contract as a tool. Its hints come from the contract's own annotations,
- * and every tool says it reaches nothing outside the platform: MCP's defaults
- * would read an unannotated tool as destructive and open-world.
- */
+// Every hint is explicit: MCP's defaults read an unannotated tool as
+// destructive and open-world.
 const toTool = (rpc: Rpc.AnyWithProps) => {
   const description = Context.get(rpc.annotations, Description);
 
@@ -162,11 +145,6 @@ const toTool = (rpc: Rpc.AnyWithProps) => {
     .annotate(Tool.OpenWorld, false);
 };
 
-/**
- * Projects a group of contracts onto MCP tools. A tool call runs as a call to
- * its Rpc through `client`, so a refusal reaches the agent as the Rpc's own
- * encoded error, `_tag` and all.
- */
 export const toToolkit = <Rpcs extends Rpc.AnyWithProps, R>(
   group: RpcGroup.RpcGroup<Rpcs>,
   client: Effect.Effect<RpcClient.RpcClient<Rpcs, CallError>, never, R>

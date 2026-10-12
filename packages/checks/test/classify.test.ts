@@ -49,14 +49,12 @@ const failedToLoadUrl: RunExit = {
   stdout: " Test Files  1 failed (1)\n      Tests  no tests",
 };
 
-// A bun-style failure whose assertion line names a path, a duration and an address.
 const exit = (path: string, ms: string, address: string): RunExit => ({
   code: 1,
   stderr: `(fail) parses [${ms}]\nAssertionError: ${path}/week.ts took ${ms} at ${address}`,
   stdout: "",
 });
 
-// The same run as the /local runner sees it: output only, never a report.
 const withoutReport = ({ code, stderr, stdout }: RunExit): RunExit => ({
   code,
   stderr,
@@ -82,7 +80,6 @@ describe(classifyRun, () => {
     });
   });
 
-  // The /local runner never has a report: vitest's own output decides.
   describe("from vitest's output, with the report left out", () => {
     it("is failed on an assertion", () => {
       expect(classifyRun(unit, withoutReport(vitestAssertion))).toBe("failed");

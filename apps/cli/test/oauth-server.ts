@@ -1,22 +1,12 @@
-/**
- * A stand-in for the platform's OAuth authorization server, as the CLI's
- * `login` meets it: `/authorize` sends the browser back to the loopback
- * `redirect_uri` with a code and the state it was given, and `/token` trades
- * that code for an access token only if the `code_verifier` hashes (S256,
- * RFC 7636) to the challenge `/authorize` saw.
- */
 import { NodeHttpServer } from "@effect/platform-node";
 import { Context, Effect, Layer, Ref, Schema } from "effect";
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 export interface OAuthServerOptions {
-  /** The access token `/token` issues. */
   readonly token: string;
-  /** The state `/authorize` sends back: the client's own, or another one. */
   readonly state?: "same" | "other";
 }
 
-/** A code `/authorize` gave out, and what `/token` must be shown for it. */
 interface Grant {
   readonly challenge: string;
   readonly clientId: string;
@@ -38,7 +28,6 @@ const base64url = (bytes: Uint8Array) =>
     .replaceAll("/", "_")
     .replace(/=+$/u, "");
 
-/** `BASE64URL(SHA256(verifier))`. */
 const s256 = (verifier: string) =>
   Effect.map(
     Effect.promise(() =>
@@ -50,10 +39,6 @@ const s256 = (verifier: string) =>
 const refused = (error: string) =>
   HttpServerResponse.jsonUnsafe({ error }, { status: 400 });
 
-/**
- * The server on a local port: its origin, and the query of every
- * `/authorize` request it answered.
- */
 export const oauthServer = (options: OAuthServerOptions) =>
   Effect.gen(function* () {
     const grants = yield* Ref.make<ReadonlyMap<string, Grant>>(new Map());

@@ -1,11 +1,3 @@
-/**
- * `<cli> today`, written by hand so it can take `--tui`: without it, the
- * command prints Today exactly as the `today` contract's projected command
- * does (the same flags, view, `--json` envelope and refusals); with it, a
- * person at a terminal gets Today full-screen (`run.ts`). It stands in for
- * the projected command, as `init` and `env set` do for theirs, and calls
- * the same contract through the CLI's remote client.
- */
 import { Client, Description, TodayOf } from "@repo/protocol/contracts";
 import { ProjectName } from "@repo/protocol/ids";
 import type { NotDecider, UnknownProject } from "@repo/protocol/refusal";
@@ -20,10 +12,6 @@ const COMMAND = "today";
 
 const encodeToday = Schema.encodeUnknownEffect(TodayOf.successSchema);
 
-/**
- * The `today` contract's refusals, each printed once where the command's
- * refusals go; the command then ends `Reported`, with the refusal's exit code.
- */
 const reported = (json: boolean) => {
   const once = (refusal: NotDecider | UnknownProject) =>
     Effect.flatMap(Effect.service(Output), (output) =>
@@ -33,7 +21,6 @@ const reported = (json: boolean) => {
   return { NotDecider: once, UnknownProject: once };
 };
 
-/** Today printed once, in the form the invocation policy chose. */
 const print = (input: {
   readonly json: boolean;
   readonly project: Option.Option<ProjectName>;
@@ -62,10 +49,6 @@ const print = (input: {
     });
   });
 
-/**
- * Today full-screen. `--json` asks for one document for a script, which a
- * screen is not, so the two together are refused like a script's `--tui`.
- */
 const full = (input: {
   readonly json: boolean;
   readonly project: Option.Option<ProjectName>;

@@ -1,9 +1,3 @@
-/**
- * The facts a hook session decides by, gathered once per session: the repo
- * the harness runs in, the claim its remote names, the ask behind it (one
- * `showAsk`), and the judge closure at the claim's base. Anything missing
- * leaves the session without a claim, with the reason, and the hook allows.
- */
 import { Brand } from "@repo/brand";
 import { Client } from "@repo/protocol/contracts";
 import type { ClaimView } from "@repo/protocol/domain/claim";
@@ -16,7 +10,6 @@ import type { HookClaim } from "./decide.ts";
 import { askJudge, judgeAt } from "./judge.ts";
 import type { SessionState } from "./session.ts";
 
-/** No closure: a session without a claim judges nothing. */
 const NO_JUDGE: SessionState["judge"] = { paths: [], pointers: [] };
 
 const without = (root: string, why: string): SessionState => ({
@@ -26,14 +19,9 @@ const without = (root: string, why: string): SessionState => ({
   why,
 });
 
-/**
- * How long the platform has to answer one call. A hook the harness kills
- * for its time also lets the agent go on, but only after the harness's own
- * limit (a minute in Claude Code), on every turn.
- */
+/** A hook the harness kills for its time also lets the agent go on, but only after the harness's own limit, every turn. */
 const PLATFORM_LIMIT = Duration.seconds(10);
 
-/** The platform did not answer in time; the session goes on without a claim. */
 class PlatformSilent extends Schema.TaggedError<PlatformSilent>()(
   "PlatformSilent",
   { limit: Schema.String }
@@ -43,7 +31,6 @@ class PlatformSilent extends Schema.TaggedError<PlatformSilent>()(
   }
 }
 
-/** A platform call, given at most `PLATFORM_LIMIT` to answer. */
 const inTime = <A, E, R>(call: Effect.Effect<A, E, R>) =>
   Effect.timeoutOrElse(call, {
     duration: PLATFORM_LIMIT,
@@ -53,19 +40,13 @@ const inTime = <A, E, R>(call: Effect.Effect<A, E, R>) =>
       ),
   });
 
-/** A failure's first line, for a reason on stderr. */
 const firstLine = (cause: Cause.Cause<unknown>) =>
   String(Cause.squash(cause)).split("\n")[0] ?? "unknown failure";
 
 const isLive = (claim: ClaimView) =>
   claim.state === "live" || claim.state === "warned";
 
-/**
- * The caller's claim this repo works on: the one a claim's fork names, or,
- * in the project's own repo or a working fork, the caller's only live claim
- * in the project (an answer may be made in a clone of main and pushed to the
- * fork). Otherwise why there is none.
- */
+/** In the project's own repo or a working fork, the caller's only live claim: an answer may be made in a clone of main. */
 const claimFor = (
   ref: RepoRef,
   claims: readonly ClaimView[]
@@ -97,13 +78,6 @@ const claimFor = (
       );
 };
 
-/**
- * The session's facts for a harness running in `cwd`. The repo's remote
- * names the project, and a claim's fork (`<owner>/<name>--<ask>--<handle>`)
- * the ask; `status` gives the caller's live claim and its check
- * command; `showAsk` gives the want and the territory; git gives the files
- * at the claim's base for the judge closure.
- */
 export const gatherFacts = (
   cwd: string
 ): Effect.Effect<

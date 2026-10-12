@@ -22,7 +22,6 @@ const listing = {
   want: "Weeks start on the locale's first day",
 };
 
-/** `listAsks` lists one open ask; `claim` finds it taken. */
 const platform = Layer.mergeAll(
   unanswered,
   Contracts.toLayerHandler("listAsks", () =>

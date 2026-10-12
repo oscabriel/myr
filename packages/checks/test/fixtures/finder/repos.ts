@@ -1,8 +1,3 @@
-/**
- * Fixture repos for the command finder, as the in-memory file lists the
- * platform reads at a landed commit. Each one is shaped like a real project's
- * CI, hook and script files.
- */
 import type { RepoFile } from "../../../src/finder.ts";
 
 const file = (path: string, ...lines: readonly string[]): RepoFile => ({
@@ -10,7 +5,6 @@ const file = (path: string, ...lines: readonly string[]): RepoFile => ({
   path,
 });
 
-/** A Bun workspace whose GitHub workflow installs, lints and tests. */
 export const bunWorkspace: readonly RepoFile[] = [
   file(
     "package.json",
@@ -55,7 +49,6 @@ export const bunWorkspace: readonly RepoFile[] = [
   file("src/index.ts", "export const parse = (text: string) => text;"),
 ];
 
-/** A pnpm library on Forgejo, with lefthook running lint and types before a commit. */
 export const forgejoLefthook: readonly RepoFile[] = [
   file(
     "package.json",
@@ -99,7 +92,6 @@ export const forgejoLefthook: readonly RepoFile[] = [
   ),
 ];
 
-/** An npm package with husky hooks and no CI. */
 export const huskyOnly: readonly RepoFile[] = [
   file(
     "package.json",
@@ -117,7 +109,6 @@ export const huskyOnly: readonly RepoFile[] = [
   file(".husky/_/husky.sh", "#!/usr/bin/env sh", "exit 0"),
 ];
 
-/** A Python project: pre-commit runs ruff and mypy, and the workflow runs pytest. */
 export const python: readonly RepoFile[] = [
   file(
     ".pre-commit-config.yaml",
@@ -155,13 +146,11 @@ export const python: readonly RepoFile[] = [
   file("pyproject.toml", "[project]", 'name = "fossil"'),
 ];
 
-/** A repo with nothing the finder reads. */
 export const nothing: readonly RepoFile[] = [
   file("README.md", "# wrec"),
   file("src/main.zig", "pub fn main() void {}"),
 ];
 
-/** A broken workflow beside a good one: the broken one is skipped, not thrown. */
 export const brokenWorkflow: readonly RepoFile[] = [
   file(".github/workflows/bad.yml", "jobs: [unclosed", "  steps: {"),
   file(".github/workflows/shape.yml", "jobs: just a string"),
@@ -174,7 +163,6 @@ export const brokenWorkflow: readonly RepoFile[] = [
   ),
 ];
 
-/** A fence-shaped monorepo with no CI: its root scripts are its gate, run by turbo. */
 export const turboMonorepo: readonly RepoFile[] = [
   file(
     "package.json",
@@ -195,10 +183,6 @@ export const turboMonorepo: readonly RepoFile[] = [
   ),
 ];
 
-/**
- * A workflow that runs a fixer, a deploy that builds first, a dev server, an
- * unknown script and both kinds of `ruff format`.
- */
 export const mixedWorkflow: readonly RepoFile[] = [
   file(
     "package.json",

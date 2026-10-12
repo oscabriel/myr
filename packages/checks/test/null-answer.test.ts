@@ -30,7 +30,6 @@ const unit = LaneName.make("unit");
 
 const onUnit = (exit: RunExit) => ({ exit, lane: unit });
 
-/** A tree as path → content, to compare whole trees at once. */
 const contentsOf = (files: readonly RepoFile[]) =>
   Object.fromEntries(files.map(({ content, path }) => [path, content]));
 
@@ -258,7 +257,6 @@ describe(nullAnswerVerdict, () => {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** The tree in a temp folder of its own, removed when the scope closes. */
 const written = (files: readonly RepoFile[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -275,7 +273,6 @@ const written = (files: readonly RepoFile[]) =>
     return dir;
   });
 
-/** Runs `command` in `dir` under `sh -c`, as the Checker runs a lane: how it ended. */
 const ran = (dir: string, command: string) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -342,7 +339,6 @@ describe("a check run against the null answer", () => {
 });
 
 describe("a check written before its subject", () => {
-  /** Main with two checks of `weekOf`, which no file exports yet. */
   const beforeWeekOf = [...datesRepo, weakNewCheck, strongNewCheck];
 
   it.live("fails on main by a load error, not an assertion", () =>

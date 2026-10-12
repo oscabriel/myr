@@ -37,19 +37,16 @@ import { Output, OutputPlain } from "../../src/output.ts";
 import type { Mode } from "../../src/output.ts";
 import { SignedOut } from "../signed-out.ts";
 
-/** A value no output, note or log line may ever hold. */
 const secret = "sk_live_0123456789abcdef";
 
 const key = EnvKey.make("SENTRY_AUTH_TOKEN");
 
 const setAt = DateTime.makeUnsafe("2026-10-07T09:00:00Z");
 
-/** A person piping the value in, as `printf '…\n' |` does. */
 const piped = Stream.make(new TextEncoder().encode(`${secret}\n`));
 
 type Payload = Rpc.Payload<typeof SetEnv>;
 
-/** What the platform answers `setEnv` with. */
 type Answer = Effect.Effect<
   Rpc.Success<typeof SetEnv>,
   NotSensitive | ValueTooShort
@@ -61,17 +58,11 @@ const stored: Answer = Effect.succeed({
   setBy: Handle.make("alice"),
 });
 
-/** One call through `Output`, as the command made it. */
 interface Printed {
   readonly method: "success" | "refused" | "plan" | "note";
-  /** The call's input: a note's text, or the others' object. */
   readonly input: object | string;
 }
 
-/**
- * How one run went: its exit code, what reached stdout, stderr and the
- * logger, what the platform was asked, and what the command handed `Output`.
- */
 interface Ran {
   readonly code: number;
   readonly out: string;
@@ -83,16 +74,13 @@ interface Ran {
 }
 
 interface Setup {
-  /** Who reads: a person at a terminal, or an agent under the agent policy. */
   readonly mode?: Mode;
   readonly stdin?: Stream.Stream<Uint8Array>;
   readonly stdinIsTerminal?: boolean;
-  /** What a person types at the hidden prompt, key by key. */
   readonly typed?: string;
   readonly answer?: Answer;
 }
 
-/** How the process would exit, by the runtime's own rule. */
 const exitCodeOf = (exit: Exit.Exit<unknown, unknown>) =>
   Exit.isSuccess(exit) ? 0 : Runtime.getErrorExitCode(Cause.squash(exit.cause));
 
@@ -101,10 +89,6 @@ const press = (name: string, input: Option.Option<string>) => ({
   key: { ctrl: false, meta: false, name, shift: false },
 });
 
-/**
- * Runs `<cli> env set …` with `setup`'s stdin, terminal and platform, and
- * returns everything it printed, logged and asked.
- */
 const run = (args: readonly string[], setup: Setup = {}) =>
   Effect.gen(function* () {
     const calls = yield* Ref.make<readonly Payload[]>([]);
@@ -115,7 +99,6 @@ const run = (args: readonly string[], setup: Setup = {}) =>
     const record = (method: Printed["method"], input: Printed["input"]) =>
       Ref.update(printed, (all) => [...all, { input, method }]);
 
-    // The CLI's plain output, recorded, as whichever reader `setup` names.
     const output = Layer.effect(
       Output,
       Effect.gen(function* () {
@@ -160,7 +143,6 @@ const run = (args: readonly string[], setup: Setup = {}) =>
       })
     );
 
-    // The platform in process: `setEnv` records what it got and answers.
     const platform = Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
       Layer.provide([
         Layer.mergeAll(
@@ -210,7 +192,6 @@ const run = (args: readonly string[], setup: Setup = {}) =>
     } satisfies Ran;
   }).pipe(Effect.provide(TestConsole.layer));
 
-/** Asserts the value reached no output, note, log line or terminal frame. */
 const neverShown = (ran: Ran) => {
   for (const seen of [
     ran.out,
@@ -228,7 +209,6 @@ const decodeEnvelope = Schema.decodeEffect(
   Schema.fromJsonString(Envelope(Schema.Unknown))
 );
 
-/** The one call the platform got, with its value opened for the check. */
 const onlyCall = (ran: Ran) => {
   expect(ran.calls).toHaveLength(1);
 

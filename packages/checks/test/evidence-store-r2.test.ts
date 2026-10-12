@@ -7,17 +7,11 @@ import { EvidenceStore, LogRef } from "../src/evidence-store.ts";
 import { EvidenceStoreR2 } from "../src/evidence-store/r2.ts";
 import type { EvidenceBucket } from "../src/evidence-store/r2.ts";
 
-/** One object as the fake bucket keeps it: its body and the options it was put with. */
 interface Kept {
   readonly text: string;
   readonly options: Parameters<EvidenceBucket["put"]>[2];
 }
 
-/**
- * An R2 bucket in memory, in the shape the Worker's `EVIDENCE` binding has:
- * `put` keeps a body under its key, replacing any there, and `get` answers
- * the body or `null`.
- */
 const fakeBucket = () => {
   const objects = new Map<string, Kept>();
 
@@ -39,7 +33,6 @@ const fakeBucket = () => {
   return { bucket, objects };
 };
 
-/** A bucket whose every call fails, as R2 does when it cannot be reached. */
 const brokenBucket: EvidenceBucket = {
   get: () => Promise.reject(new Error("R2 is unreachable")),
   put: () => Promise.reject(new Error("R2 is unreachable")),
@@ -55,13 +48,11 @@ const unitLog = {
 
 const key = "datekit/push-0123456789/unit#1";
 
-/** How a call ended, as its defect prints. */
 const printed = <A>(call: Effect.Effect<A>) =>
   Effect.map(Effect.exit(call), (exit) =>
     Exit.isFailure(exit) ? Cause.pretty(exit.cause) : "it succeeded"
   );
 
-/** The store over `bucket`, as the Worker composes it. */
 const over = (bucket: EvidenceBucket) =>
   Effect.provide(EvidenceStoreR2(bucket) satisfies Layer.Layer<EvidenceStore>);
 

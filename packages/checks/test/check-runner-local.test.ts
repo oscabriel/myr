@@ -23,10 +23,6 @@ const lane = (name: string, command: string) => ({
   lane: LaneName.make(name),
 });
 
-/**
- * A git repo whose `test` script fails, and a runner whose checkout copies
- * it into a fresh temp dir for each job.
- */
 const world = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const repo = yield* fs.makeTempDirectoryScoped({ prefix: "datekit-" });
@@ -85,7 +81,6 @@ describe(CheckRunnerLocal.layer, () => {
           job([
             lane("test", "bun run test"),
             lane("ok", "exit 0"),
-            // The user's git config never reaches a lane.
             lane(
               "isolated",
               `test -z "$(git config --global --get user.name)"`

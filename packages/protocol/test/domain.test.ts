@@ -57,7 +57,6 @@ import {
 import { Anonymous, Person, Principal } from "../src/principal.ts";
 import wire from "./fixtures/domain.json" with { type: "json" };
 
-/** The fixture file: hand-written encoded values, as JSON carries them. */
 const Fixture = Schema.Struct({
   refused: Schema.Record(
     Schema.String,
@@ -69,10 +68,8 @@ const Fixture = Schema.Struct({
 
 const fixture = Schema.decodeUnknownSync(Fixture)(wire);
 
-/** A `--json` envelope around `listAsks`'s result. */
 const Listed = Envelope(Schema.Struct({ asks: Schema.Array(AskListing) }));
 
-/** Every schema the fixture has examples for, by its key there. */
 const schemas = {
   AgentTrailer,
   AnswerReceipt,
@@ -158,9 +155,6 @@ describe("the domain schemas", () => {
     expect(schema !== undefined && refuses(schema, value)).toBeTruthy();
   });
 
-  // MCP tool schemas and the reference docs come from these documents. A bare
-  // `Schema.Number` admits "Infinity" and "NaN"; a bare `Schema.optional`
-  // admits `null`.
   it.each([
     ["Policy", Policy],
     ["Verdict", Verdict],
@@ -180,8 +174,6 @@ describe("the domain schemas", () => {
     }
   );
 
-  // `draftAsk`'s note and a running draft's are one schema: what the
-  // member asked the agent for, at most 2,000 characters.
   it("keep a draft's note to 2,000 characters", () => {
     expect([
       refuses(DraftNote, "x".repeat(2000)),
@@ -240,7 +232,6 @@ describe("the domain schemas", () => {
 });
 
 describe("a project's visibility", () => {
-  // A `visibility.ts`, as the data the sdk writes for it.
   const [stated] = wire.roundTrip.VisibilityPolicy;
 
   const [policy] = wire.roundTrip.Policy;
@@ -255,7 +246,6 @@ describe("a project's visibility", () => {
     ).toStrictEqual(withVisibility);
   });
 
-  // No `visibility.ts` means no layers and the posture Open.
   it("is absent from a policy whose config folder declares none", () => {
     expect(Schema.decodeUnknownSync(Policy)(policy)).not.toHaveProperty(
       "visibility"
@@ -264,8 +254,6 @@ describe("a project's visibility", () => {
 });
 
 describe("names and ids", () => {
-  // GitHub tells logins apart without case, and claim forks lowercase them,
-  // so a vouch file's or a policy's `Alice` is the person signed in as `alice`.
   it("tell two handles apart without case, as sign-in does", () => {
     expect(sameHandle(Handle.make("Alice"), Handle.make("alice"))).toBeTruthy();
     expect(sameHandle(Handle.make("alice"), Handle.make("alicia"))).toBeFalsy();
@@ -285,10 +273,6 @@ describe("names and ids", () => {
     }
   );
 
-  // A project's name is `<owner>/<name>`; `project-name.test.ts` holds its
-  // grammar. An ask's name is one word, and the web serves its own pages at
-  // the words below, so a project's owner may not be one; an ask may still
-  // take them: an ask's page is under its project.
   it.each(["a", "a-b", "iso-week-2"])(
     "an owner may make a project named %j",
     (name) => {
@@ -296,10 +280,6 @@ describe("names and ids", () => {
     }
   );
 
-  // `--` separates a fork's parts, and `me` and `layer` stand where an ask's
-  // name would in a working fork's or a layer's repo name. `open` and `flag`
-  // are `<cli> ask`'s subcommands, so `<cli> ask open` could never show an
-  // ask named `open`.
   it.each(["me", "layer", "open", "flag"])(
     "an ask may not be named %j",
     (name) => {
@@ -355,8 +335,6 @@ describe("names and ids", () => {
     expect(refuses(schema, bad)).toBeTruthy();
   });
 
-  // A layer's repo is `<project>--<layer>`; a layer named `a--b` would make
-  // `<project>--a--b`, which reads as a claim fork (`<project>--<ask>--<handle>`).
   it("names a layer in an ask's words, so its repo never reads as a claim fork", () => {
     expect(
       ["security-review", "maintainers2"].map((name) =>

@@ -1,26 +1,16 @@
-/**
- * The repo the CLI stands in: its root, the remote that reaches a platform,
- * and what that remote's repo name says it is. Read once per
- * command, from git itself.
- */
 import { AskId, Handle, LayerName, ProjectName } from "@repo/protocol/ids";
 import { Array, Effect, Option, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { Credentials } from "./credentials.ts";
 
-/** What a repo is: a project's own, a claim's fork, a person's working fork, or a layer's. */
 export type RepoKind = "canonical" | "claim" | "working" | "layer";
 
-/** What a repo's name says, part by part. */
 export interface RepoRef {
   readonly kind: RepoKind;
   readonly project: ProjectName;
-  /** A claim's fork: the ask it answers. */
   readonly ask?: AskId;
-  /** A claim's or a working fork: whose it is, in lowercase as the name spells it. */
   readonly handle?: Handle;
-  /** A layer's repo: the layer. */
   readonly layer?: LayerName;
 }
 
@@ -30,17 +20,14 @@ const asAsk = Schema.decodeOption(AskId);
 
 const asLayer = Schema.decodeOption(LayerName);
 
-/** A handle as a fork's name spells it: valid, and in lowercase. */
 const asForkHandle = (part: string) =>
   Option.filter(
     Schema.decodeOption(Handle)(part),
     (handle) => handle === handle.toLowerCase()
   );
 
-/** The word a working fork has where a claim's fork has its ask. */
 const WORKING = "me";
 
-/** What a three-part name `<project>--<second>--<third>` is. */
 const forkOf = (
   project: ProjectName,
   second: string,
@@ -57,13 +44,7 @@ const forkOf = (
         ({ ask, handle }): RepoRef => ({ ask, handle, kind: "claim", project })
       );
 
-/**
- * What a repo's address says it is: `<project>`, `<project>--<ask>--<handle>`,
- * `<project>--me--<handle>` or `<project>--<layer>`, where the project is its
- * name (`alice/datekit`, `github.com/pallets/click`) or a key a project kept
- * from before owners (`datekit`). `--` occurs in no name or ask, so an
- * address splits back into its parts; any other is none of the platform's.
- */
+/** `--` occurs in no name or ask, so an address splits back into its parts. */
 export const parseRepoName = (name: string): Option.Option<RepoRef> => {
   const slash = name.lastIndexOf("/");
   const [first = "", ...rest] = name.slice(slash + 1).split("--");
@@ -90,7 +71,6 @@ export const parseRepoName = (name: string): Option.Option<RepoRef> => {
 
 const asUrl = Option.liftThrowable((url: string) => new URL(url));
 
-/** `url`'s scheme and host, if it is an HTTP(S) url. */
 const webOrigin = (url: string) =>
   Option.map(
     Option.filter(asUrl(url), ({ protocol }) =>
@@ -102,11 +82,6 @@ const webOrigin = (url: string) =>
     })
   );
 
-/**
- * A remote url as a platform serves repos: `https://<host>/<address>.git`,
- * the address one to three path segments (a project's name, a fork's parts
- * on the last), over HTTP(S). The origin drops any user the url carries.
- */
 export const parseRemote = (
   url: string
 ): Option.Option<{ readonly origin: string; readonly repo: string }> =>
@@ -121,22 +96,16 @@ export const parseRemote = (
       : Option.none();
   });
 
-/** Where the CLI stands, as git sees it. */
 export interface RepoContext {
-  /** The work tree's top folder. */
   readonly root: string;
-  /** The remote that reaches a platform: the signed-in one's, else `origin`. */
   readonly remote: Option.Option<{
     readonly name: string;
     readonly url: string;
   }>;
-  /** That remote's platform origin, if its url is a platform's. */
   readonly origin: Option.Option<string>;
-  /** What that remote's repo name says it is, if it is the platform's. */
   readonly repo: Option.Option<RepoRef>;
 }
 
-/** `cwd` is in no git work tree. */
 export class NotARepo extends Schema.TaggedError<NotARepo>()("NotARepo", {
   cwd: Schema.String,
 }) {
@@ -148,7 +117,6 @@ export class NotARepo extends Schema.TaggedError<NotARepo>()("NotARepo", {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** Runs git in `cwd` to the end: its stdout and exit code; stderr is dropped. */
 const git = (cwd: string, args: readonly string[]) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -171,7 +139,6 @@ const git = (cwd: string, args: readonly string[]) =>
     })
   );
 
-/** `git remote -v`'s fetch urls, by remote, in git's order. */
 const remotesOf = (listing: string) =>
   listing.split("\n").flatMap((line) => {
     const match = /^(?<name>\S+)\t(?<url>\S+) \(fetch\)$/u.exec(line);
@@ -181,11 +148,6 @@ const remotesOf = (listing: string) =>
       : [{ name: match.groups.name, url: match.groups.url }];
   });
 
-/**
- * Reads the repo at `cwd`: `git rev-parse --show-toplevel`, then `git
- * remote -v`. The remote is the one on the signed-in platform's origin when
- * `Credentials` is there to say which, else `origin`.
- */
 export const repoContext = (
   cwd: string
 ): Effect.Effect<

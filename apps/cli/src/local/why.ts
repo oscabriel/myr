@@ -1,11 +1,3 @@
-/**
- * `<cli> why <path>:<line>`: which landing put a line there, and why. git
- * blame names the commit; the platform's landing record names the ask (the
- * one it answers, or the one an ask's opening opened), the accountable
- * author, every credit and the verdict. A commit the platform did not land
- * is said to be none of its landings, with the trailers its author wrote. A verdict note fetched from the platform rides along, but
- * the landing record is the source.
- */
 import { notesRef } from "@repo/git/notes";
 import { parseTrailers } from "@repo/git/trailers";
 import type { Trailer } from "@repo/git/trailers";
@@ -31,19 +23,11 @@ import type { View } from "../output.ts";
 import { repoContext } from "../repo-context.ts";
 import type { RepoContext } from "../repo-context.ts";
 
-/**
- * Where a local command runs git: the process's own folder unless a caller
- * (a test) provides another. Shared with `env set`.
- */
 export const WorkingDirectory = Context.Reference<string>(
   "cli/WorkingDirectory",
   { defaultValue: () => "." }
 );
 
-/**
- * A command used wrongly: `program` prints its one line on stderr and the
- * process exits 2 with nothing more printed. Shared with `env set`.
- */
 export class UsageError extends Schema.TaggedError<UsageError>()("UsageError", {
   reason: Schema.String,
 }) {
@@ -55,19 +39,11 @@ export class UsageError extends Schema.TaggedError<UsageError>()("UsageError", {
   }
 }
 
-/**
- * Ends the command as a usage error: `program` prints `reason` once on
- * stderr, as it does every misuse, and exits 2.
- */
 export const usage = (reason: string) =>
   Effect.fail(new UsageError({ reason }));
 
 const isRefusal = Schema.is(Refusal);
 
-/**
- * Prints a refusal the platform answered with, once, through `Output`, and
- * ends with `Reported` and the refusal's exit code. Shared with `env set`.
- */
 export const reportRefusals =
   (command: string, json: boolean) =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -79,10 +55,6 @@ export const reportRefusals =
       )
     );
 
-/**
- * The project a command acts on: `--project`, else the one the repo's
- * platform remote names. Shared with `env set`.
- */
 export const projectOf = (
   named: Option.Option<ProjectName>,
   context: Option.Option<RepoContext>
@@ -102,11 +74,9 @@ export const projectOf = (
     }
   );
 
-// A path, then a line number from 1 with no sign or leading zero. The path
-// takes everything before the last colon, so a path may hold one.
+// The path takes everything before the last colon, so a path may hold one.
 const LOCATION = /^(?<path>.+):(?<line>[1-9][0-9]*)$/u;
 
-/** A line of a file as people and compilers write it: `src/week.ts:42`. */
 export const parseLocation = (
   text: string
 ): Option.Option<{ readonly path: RepoPath; readonly line: number }> => {
@@ -118,16 +88,12 @@ export const parseLocation = (
     : Option.some({ line, path: RepoPath.make(groups.path) });
 };
 
-/** What `why` found: the line's commit and what is known of it. */
 const LineOrigin = Schema.Struct({
-  /** The platform's record, when the commit is one of its landings. */
   landing: Schema.optionalKey(LandingView),
   line: Schema.Int,
-  /** The verdict note on the commit, when one was fetched. */
   note: Schema.optionalKey(Verdict),
   path: RepoPath,
   sha: CommitSha,
-  /** The commit's own trailers, when the platform did not land it. */
   trailers: Schema.optionalKey(
     Schema.Array(Schema.Struct({ key: Schema.String, value: Schema.String }))
   ),
@@ -142,7 +108,6 @@ const decodeNote = Schema.decodeOption(Schema.fromJsonString(Verdict));
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/** Runs git in `cwd` to the end: its stdout and exit code; stderr is dropped. */
 const git = (cwd: string, args: readonly string[]) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -165,13 +130,11 @@ const git = (cwd: string, args: readonly string[]) =>
     })
   );
 
-/** The line is in no file committed at HEAD. */
 const noSuchLine = (location: string) =>
   usage(
     `${location} is not a line of a file committed at HEAD: ${location.replace(/:[0-9]+$/u, "")} is not there, or is shorter.`
   );
 
-/** `path` as the repo names it from its root, if HEAD holds it. */
 const pathAtHead = (cwd: string, path: RepoPath, location: string) =>
   Effect.flatMap(
     git(cwd, [
@@ -195,7 +158,6 @@ const pathAtHead = (cwd: string, path: RepoPath, location: string) =>
 // git blame's porcelain opens with the line's commit, then its line numbers.
 const BLAMED = /^(?<sha>[0-9a-f]{40}) /u;
 
-/** The commit that last changed line `line` of `path` at HEAD. */
 const blamed = (cwd: string, path: RepoPath, line: number, location: string) =>
   Effect.flatMap(
     git(cwd, [
@@ -216,13 +178,11 @@ const blamed = (cwd: string, path: RepoPath, line: number, location: string) =>
     }
   );
 
-/** The trailers `sha`'s author wrote, as git reads them. */
 const trailersOf = (cwd: string, sha: CommitSha) =>
   Effect.map(git(cwd, ["log", "-1", "--format=%B", sha]), ({ stdout }) =>
     parseTrailers(stdout)
   );
 
-/** The verdict note on `sha`, if one was fetched and it reads as a verdict. */
 const noteOn = (cwd: string, sha: CommitSha) =>
   Effect.flatMap(
     git(cwd, ["notes", `--ref=${notesRef}`, "show", sha]),
@@ -245,11 +205,9 @@ const noteOn = (cwd: string, sha: CommitSha) =>
 
 const short = (sha: string) => sha.slice(0, 7);
 
-/** One fact about the line, as a list item. */
 interface Row {
   readonly label: string;
   readonly value: string;
-  /** Code in Markdown: an id or a path. */
   readonly code?: boolean;
 }
 
@@ -261,10 +219,6 @@ const verdictRow = (verdict: Verdict): Row => ({
   ].join(", "),
 });
 
-/**
- * The ask a landing links: the one it answers ("Ask"), else the one it
- * opened ("Opened": an opening answers nothing), else none.
- */
 const askRow = (landing: LandingView): Row => {
   if (landing.ask !== undefined) {
     return { code: true, label: "Ask", value: landing.ask };
@@ -294,7 +248,6 @@ const landingRows = (landing: LandingView): readonly Row[] => [
 const trailerRows = (trailers: readonly Trailer[]): readonly Row[] =>
   trailers.map(({ key, value }) => ({ label: key, value }));
 
-/** The line's story, in Markdown for agents and plain text for a person. */
 const viewOf = (origin: LineOrigin): View => {
   const at = `${origin.path}:${origin.line}`;
   const commit = short(origin.sha);

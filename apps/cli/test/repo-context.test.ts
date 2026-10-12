@@ -107,7 +107,6 @@ describe("a remote's url", () => {
   });
 });
 
-/** A fresh git repo, its real path, with `remotes` added in order. */
 const aRepo = (remotes: readonly (readonly [string, string])[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -122,7 +121,6 @@ const aRepo = (remotes: readonly (readonly [string, string])[]) =>
     return dir;
   });
 
-/** Credentials whose current profile is on `url`. */
 const signedIn = (url: string) => {
   const profile: Profile = {
     token: Redacted.make("tok-0123456789abcdefghijklmnopqrstuvwxyz"),

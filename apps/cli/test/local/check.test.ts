@@ -67,7 +67,6 @@ import {
 } from "./fixture.ts";
 import type { CheckRepo } from "./fixture.ts";
 
-/** A platform that says the caller holds no claims anywhere, and answers nothing else. */
 const noClaims = Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
   Layer.provide([
     Layer.mergeAll(
@@ -86,10 +85,6 @@ const noClaims = Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
 
 const claimView = Schema.decodeUnknownSync(ClaimView);
 
-/**
- * A platform that says the caller holds a live claim on the ask, made when
- * main stood at `base`, and answers nothing else.
- */
 const claimedAt = (base: string) =>
   Layer.effect(Client)(RpcTest.makeClient(Contracts)).pipe(
     Layer.provide([
@@ -121,10 +116,8 @@ const claimedAt = (base: string) =>
     ])
   );
 
-/** A platform no offline run may call. */
 const unreachable = Layer.mock(Client)({});
 
-/** What `check` runs with: a test console, plain output, real processes. */
 const services = (client: Layer.Layer<Client>) =>
   Layer.mergeAll(
     TestConsole.layer,
@@ -134,7 +127,6 @@ const services = (client: Layer.Layer<Client>) =>
     SignedOut
   ).pipe(Layer.provideMerge(NodeServices.layer));
 
-/** Runs the CLI on `argv`: how it ended, and what it printed where. */
 const run = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const exit = yield* Effect.exit(program(argv));
@@ -146,13 +138,11 @@ const run = (argv: readonly string[]) =>
     };
   });
 
-/** The code a run's process ends with: 0 for a success. */
 const exitCodeOf = (exit: Exit.Exit<unknown, unknown>) =>
   Exit.isSuccess(exit) ? 0 : Runtime.getErrorExitCode(Cause.squash(exit.cause));
 
 const decodeJson = Schema.decodeEffect(Schema.fromJsonString(Schema.Json));
 
-/** The one document `--json` printed on stdout. */
 const envelopeOf = (out: readonly string[]) =>
   Effect.gen(function* () {
     expect(out).toHaveLength(1);
@@ -164,7 +154,6 @@ const decodeEnvelope = Schema.decodeEffect(
   Schema.fromJsonString(Envelope(Schema.Unknown))
 );
 
-/** The one document `--json` printed on stdout, read as the envelope it is. */
 const decodedOf = (out: readonly string[]) =>
   Effect.gen(function* () {
     expect(out).toHaveLength(1);
@@ -174,19 +163,11 @@ const decodedOf = (out: readonly string[]) =>
 
 const encodeRefusals = Schema.encodeEffect(Schema.Array(Refusal));
 
-/** A `Fetch` for a host that reaches nothing over the network. */
 const offline = Layer.succeed(Fetch)({
   fetch: (request) =>
     Effect.fail(new FetchFailed({ reason: "offline", url: request.url })),
 });
 
-/**
- * What the gate says of `head` in `repo`, from facts this test builds on
- * its own: a bare copy of the repo opened through `RepoHost` `/local`, the
- * change list and added lines from `@repo/git`, against the merge base of
- * `main` and `head`; the policy at `main`; and a live claim on the ask by
- * the fork's claimant.
- */
 const gateSays = (repo: CheckRepo, head: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -285,10 +266,6 @@ const gateSays = (repo: CheckRepo, head: string) =>
     return { encoded: yield* encodeRefusals(refusals), refusals };
   });
 
-/**
- * What `check` must leave as it found it: where HEAD points, every ref, the
- * repo's config and index, its worktrees, and the files in its git folder.
- */
 const stateOf = (root: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -305,11 +282,7 @@ const stateOf = (root: string) =>
     };
   });
 
-/**
- * What git exports to a hook that runs the CLI, such as a pre-commit hook
- * under `git commit -a`: its own repo and index, and the config given with
- * `git -c`. Restored when the scope closes.
- */
+// What git exports to a hook it runs, such as pre-commit under `git commit -a`.
 const inHook = (root: string) =>
   Effect.acquireRelease(
     Effect.sync(() => {
@@ -320,13 +293,8 @@ const inHook = (root: string) =>
     () => Effect.sync(() => vi.unstubAllEnvs())
   );
 
-/** The ratchet the projects below declare, and the rule it counts. */
 const ratchet = "no-explicit-any";
 
-/**
- * A lint that prints oxlint's JSON: one `no-explicit-any` finding per
- * explicit `any` under `packages/`, so its count follows the tree it runs on.
- */
 const countingLint = [
   "grep -rnow any packages | awk -F: '",
   '  BEGIN { printf "{\\"diagnostics\\":[" }',
@@ -337,11 +305,6 @@ const countingLint = [
   "",
 ].join("\n");
 
-/**
- * Main as a project that declares the ratchet, counted by `command`, writes
- * it: the config folder in TypeScript (the fixture's `fix-a`, as a file of
- * its own), the lint, and two explicit `any`s in a. HEAD is left on main.
- */
 const declaringRatchet = (repo: CheckRepo, command: string) =>
   Effect.gen(function* () {
     const sdk = `${Brand.cliPackage}/rules`;
@@ -381,7 +344,6 @@ const declaringRatchet = (repo: CheckRepo, command: string) =>
     );
   });
 
-/** An answer on a branch of its own from main that types a third value in a as `any`. */
 const raisingInA = (repo: CheckRepo) =>
   Effect.gen(function* () {
     yield* gitOk(repo.root, "checkout", "--quiet", "-b", "raising", "main");
@@ -653,7 +615,6 @@ describe(`${Brand.cli} check`, () => {
       Effect.gen(function* () {
         const repo = yield* aCheckRepo;
 
-        // What the gateway says of the answer pushed onto the claim's base.
         const expected = yield* gateSays(repo, repo.straying);
 
         // A contributor who clones the project and commits the answer on
@@ -734,8 +695,6 @@ describe(`${Brand.cli} check`, () => {
           "--json",
         ]).pipe(Effect.provide(services(unreachable)));
 
-        // What the platform said live of the same raise: the
-        // ratchet, the module, and main's count before the answer's after.
         expect(Exit.isFailure(printed.exit)).toBeTruthy();
         expect(yield* decodedOf(printed.out)).toStrictEqual({
           command: "check",

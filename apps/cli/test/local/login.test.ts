@@ -40,7 +40,6 @@ import { program } from "../../src/main.ts";
 import { OutputPlain } from "../../src/output.ts";
 import { oauthServer } from "../oauth-server.ts";
 
-/** The env names the CLI reads, spelled from the brand. */
 const SLUG = Brand.slug.toUpperCase();
 
 const url = "https://platform.test";
@@ -49,21 +48,18 @@ const given = "tok-given-0123456789abcdefghijklmnopqrstuvwxyz";
 
 const issued = "tok-issued-0123456789abcdefghijklmnopqrstuvwxyz";
 
-/** The three lines `login` sets in git's global config for `at`. */
 const helperLines = (at: string) => [
   `git config --global --replace-all credential.${at}.helper ""`,
   `git config --global --add credential.${at}.helper ${Brand.slug}`,
   `git config --global credential.${at}.useHttpPath true`,
 ];
 
-/** The same three, as the argv lists `--json` carries. */
 const helperArgv = (at: string) => [
   ["git", "config", "--global", "--replace-all", `credential.${at}.helper`, ""],
   ["git", "config", "--global", "--add", `credential.${at}.helper`, Brand.slug],
   ["git", "config", "--global", `credential.${at}.useHttpPath`, "true"],
 ];
 
-/** A temp HOME with its own global git config: a person's shell, for the CLI and git. */
 const home = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -77,7 +73,6 @@ const credentialsIn = (env: Record<string, string>) =>
     Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env })))
   );
 
-/** The profile `name` as the file holds it: its url, handle and token. */
 const stored = (env: Record<string, string>, name: string) =>
   Effect.provide(
     Effect.flatMap(Effect.service(Credentials), ({ current }) => current),
@@ -92,7 +87,6 @@ const stored = (env: Record<string, string>, name: string) =>
     )
   );
 
-/** `git config --global <args>` in `env`: its stdout and exit code. */
 const gitConfig = (env: Record<string, string>, ...args: string[]) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -114,11 +108,6 @@ const gitConfig = (env: Record<string, string>, ...args: string[]) =>
 
 const isPerson = Schema.is(Person);
 
-/**
- * The platform's side of a call, as `status` sees it: whoever the server side
- * takes the caller for holds no claim yet (every first login), and `status`
- * names them.
- */
 const statusHandler = Contracts.toLayerHandler("status", () =>
   Effect.flatMap(Effect.service(CurrentPrincipal), (principal) =>
     isPerson(principal)
@@ -127,17 +116,10 @@ const statusHandler = Contracts.toLayerHandler("status", () =>
   )
 );
 
-/** A server side that refuses every credential, as for a revoked token. */
 const refusesEveryone = Layer.succeed(Authenticated, () =>
   Effect.fail(new Unauthenticated())
 );
 
-/**
- * The world `login` runs in, faked at its three host seams: the platform's
- * client (an in-process one, whose server side is `server`), the person's
- * browser, and the loopback server (a Node server on an ephemeral port).
- * Each records what `login` asked of it.
- */
 const seams = (server: Layer.Layer<Authenticated>) =>
   Effect.gen(function* () {
     const connected = yield* Ref.make<
@@ -186,13 +168,10 @@ const seams = (server: Layer.Layer<Authenticated>) =>
     };
   });
 
-/** A platform that takes the caller for `handle`. */
 const signedInAs = (handle: string) => asPerson(Handle.make(handle));
 
-/** What the tests themselves run on: a test console, and Node for files, git and servers. */
 const testServices = Layer.mergeAll(TestConsole.layer, NodeServices.layer);
 
-/** A terminal nothing may touch: every use of it dies. */
 const noTerminal = Layer.succeed(
   Terminal.Terminal,
   Terminal.make({
@@ -207,13 +186,10 @@ const noTerminal = Layer.succeed(
 interface Run {
   readonly env: Record<string, string>;
   readonly seams: Layer.Layer<never>;
-  /** What stdin holds. */
   readonly stdin?: string;
-  /** Whether stdout is a terminal, as a person's would be. */
   readonly terminal?: boolean;
 }
 
-/** Runs `argv` as the CLI would, in `run`'s world; how it ended. */
 const cli = (argv: readonly string[], run: Run) =>
   Effect.exit(
     program(argv).pipe(
@@ -238,11 +214,9 @@ const cli = (argv: readonly string[], run: Run) =>
     )
   );
 
-/** What was printed, one entry per line however it was written. */
 const lines = (all: readonly unknown[]) =>
   all.flatMap((chunk) => String(chunk).split("\n"));
 
-/** Every line printed so far, on stdout and on stderr. */
 const printed = Effect.gen(function* () {
   return {
     stderr: lines(yield* TestConsole.errorLines),
@@ -250,7 +224,6 @@ const printed = Effect.gen(function* () {
   };
 });
 
-/** The sign-in URL `login` printed for `origin`, once it has. */
 const signInUrl = (origin: string) =>
   Effect.gen(function* () {
     for (let attempt = 0; attempt < 250; attempt += 1) {
@@ -268,7 +241,6 @@ const signInUrl = (origin: string) =>
     return yield* Effect.die("login printed no sign-in URL");
   });
 
-/** GET `at` as a browser would, following redirects: the page's status. */
 const visit = (at: string) =>
   Effect.gen(function* () {
     const client = yield* HttpClient.HttpClient;
@@ -277,7 +249,6 @@ const visit = (at: string) =>
     return response.status;
   }).pipe(Effect.provide(FetchHttpClient.layer));
 
-/** The query `/authorize` was sent, field by field. */
 const fieldsOf = (query: URLSearchParams | undefined) =>
   Object.fromEntries(query?.entries() ?? []);
 

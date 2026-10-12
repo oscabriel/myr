@@ -1,33 +1,18 @@
-/**
- * Lint counts: how many findings a project's own linter reports, read from
- * the JSON it prints (oxlint's `--format json` or ESLint's `--format json`),
- * per path, for one rule or all, within a territory. Pure: the linter runs
- * elsewhere, and this reads what it printed, exactly as it printed it.
- */
 import type { Glob } from "@repo/protocol/domain/common";
 import { RepoPath } from "@repo/protocol/ids";
 import { Option, Order, Result, Schema } from "effect";
 
 import { matchGlob } from "../judge.ts";
 
-/** The JSON a linter prints: oxlint's report object, or ESLint's array of files. */
 export type LintFormat = "oxlint" | "eslint";
 
-/** A lint count: the findings in all, and per repo path (only paths with any). */
 export interface LintCount {
   readonly total: number;
   readonly byPath: ReadonlyMap<RepoPath, number>;
 }
 
-/** How much of an unreadable output a `CountUnreadable` keeps. */
 const HEAD_LENGTH = 200;
 
-/**
- * A counter's output held no count the platform can read: not JSON, not the
- * shape its format prints, or no integer where a metric's path points. It
- * keeps the output's first 200 characters, so the answerer and the deciders
- * see what the command printed instead.
- */
 export class CountUnreadable extends Schema.TaggedError<CountUnreadable>()(
   "CountUnreadable",
   { head: Schema.String }
@@ -36,9 +21,7 @@ export class CountUnreadable extends Schema.TaggedError<CountUnreadable>()(
     new CountUnreadable({ head: output.slice(0, HEAD_LENGTH) });
 }
 
-// `oxlint --format json`: one object; each diagnostic names its file and,
-// unless it is a parse error or a directive report, its rule as
-// `plugin(rule)`.
+// A parse error or directive report carries no rule.
 const OxlintReport = Schema.Struct({
   diagnostics: Schema.Array(
     Schema.Struct({
@@ -48,8 +31,7 @@ const OxlintReport = Schema.Struct({
   ),
 });
 
-// `eslint --format json`: one entry per file, each with its messages; a
-// parse error or a directive report has a null `ruleId`.
+// A parse error or directive report has a null `ruleId`.
 const EslintReport = Schema.Array(
   Schema.Struct({
     filePath: Schema.NonEmptyString,
@@ -61,7 +43,6 @@ const EslintReport = Schema.Array(
   })
 );
 
-/** One finding: the file it is in, and the rule that reported it, if one did. */
 interface Finding {
   readonly path: string;
   readonly rule: Option.Option<string>;
@@ -91,18 +72,11 @@ const findingsOf = (
         )
       );
 
-/**
- * A rule, as either tool or a maintainer writes it: oxlint's code form
- * `typescript(no-explicit-any)`, a config's `typescript/no-explicit-any`,
- * ESLint's `@typescript-eslint/no-explicit-any`, or a bare `no-debugger`.
- * `plugin` is `None` for a bare name.
- */
 interface RuleName {
   readonly plugin: Option.Option<string>;
   readonly name: string;
 }
 
-// `plugin(rule)`, oxlint's code form.
 const CODE_FORM = /^(?<plugin>[^()]+)\((?<name>[^()]+)\)$/u;
 
 // The core rules' plugin: oxlint prints them as `eslint(no-debugger)`, ESLint
@@ -135,12 +109,8 @@ const ruleNameOf = (written: string): RuleName => {
       };
 };
 
-/**
- * Whether a finding's rule is the one asked for. A bare name asks for that
- * rule in any plugin (`no-explicit-any` counts typescript's); a finding's
- * bare name is a core rule. A finding with no rule (a file the linter could
- * not parse, an unused directive) is counted only when no rule is asked for.
- */
+// A bare name asks for that rule in any plugin; a finding with no rule is
+// counted only when no rule is asked for.
 const isRule =
   (wanted: RuleName) =>
   (finding: Finding): boolean =>
@@ -160,7 +130,6 @@ const isRule =
       },
     });
 
-/** A path relative to the repo: without `root`'s prefix and any leading `./`. */
 const repoPathOf = (path: string, root: Option.Option<string>): string => {
   const inside = Option.match(root, {
     onNone: () => path,
@@ -178,7 +147,6 @@ const repoPathOf = (path: string, root: Option.Option<string>): string => {
 
 const EXCLUDE = "!";
 
-/** Whether a path is in a territory: some glob matches it, and no `!` glob takes it back. */
 const within = (territory: readonly Glob[], path: string) =>
   territory.some(
     (glob) => !glob.startsWith(EXCLUDE) && matchGlob(glob, path)
@@ -191,11 +159,6 @@ const within = (territory: readonly Glob[], path: string) =>
 const totalOf = (byPath: ReadonlyMap<RepoPath, number>) =>
   [...byPath.values()].reduce((sum, count) => sum + count, 0);
 
-/**
- * The part of a count inside a territory: the paths its globs match, with
- * `!` globs taking paths back out. One linter run counted once serves every
- * territory a ratchet keeps a baseline for.
- */
 export const countWithin = (
   count: LintCount,
   territory: readonly Glob[]
@@ -207,18 +170,10 @@ export const countWithin = (
   return { byPath, total: totalOf(byPath) };
 };
 
-/** The format an output is in, by its JSON's shape: an array is ESLint's. */
 const detect = (output: string): LintFormat =>
   output.trimStart().startsWith("[") ? "eslint" : "oxlint";
 
-/**
- * Counts a linter's findings from its JSON output, per repo path. `rule`
- * keeps one rule's (in either tool's spelling); `territory` keeps the paths
- * its globs match (with `!` taking paths back out); `root` is stripped from
- * the front of each path, since ESLint prints absolute ones. The format is
- * read from the output when not given. Output it can't read, in the format
- * given or detected, is a `CountUnreadable`, never a thrown error.
- */
+// `root` is stripped since ESLint prints absolute paths.
 export const countLint = (input: {
   readonly output: string;
   readonly format?: LintFormat | undefined;

@@ -1,11 +1,5 @@
-/**
- * The Stop hook's question: does `<cli> check` refuse the work as it stands?
- * Asked through a port, so the hook never imports the check command's
- * modules: the default adapter runs this same CLI as a child process,
- * `check --shape-only --offline --json --base <claim's base>`, and decodes
- * its envelope. Offline, the check cannot read the claim's base itself, and
- * main would be the wrong start for work committed on main.
- */
+// A port, so the hook never imports the check command's modules. Offline, the check cannot read the
+// claim's base itself, so it is passed: main would be the wrong start for work committed on main.
 import { Envelope } from "@repo/protocol/envelope";
 import type { Refusal } from "@repo/protocol/refusal";
 import {
@@ -19,7 +13,6 @@ import {
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-/** The check could not say: it did not start, ran too long, or printed no envelope. */
 export class PushCheckFailed extends Schema.TaggedError<PushCheckFailed>()(
   "PushCheckFailed",
   { reason: Schema.String }
@@ -32,10 +25,6 @@ export class PushCheckFailed extends Schema.TaggedError<PushCheckFailed>()(
 export class PushCheck extends Context.Service<
   PushCheck,
   {
-    /**
-     * The refusals `<cli> check --shape-only` gives for the repo at `root`,
-     * diffed from the claim's `base` as the gateway diffs; none when it passes.
-     */
     readonly run: (
       root: string,
       base: string
@@ -43,10 +32,8 @@ export class PushCheck extends Context.Service<
   }
 >()("cli/PushCheck") {}
 
-/** The arguments after the CLI's own command. */
 const CHECK = ["check", "--shape-only", "--offline", "--json"] as const;
 
-/** The check reads the diff and the config and runs nothing: a minute is plenty. */
 const LIMIT = Duration.minutes(1);
 
 const decodeEnvelope = Schema.decodeUnknownEffect(
@@ -56,12 +43,7 @@ const decodeEnvelope = Schema.decodeUnknownEffect(
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/**
- * `PushCheck` over a child process: `command` (the CLI, as this process was
- * started) with `check --shape-only --offline --json --base <base>`, in
- * `root`. A refusal ends it with the refusal's exit code, but the envelope
- * says all, so only the envelope is read.
- */
+/** A refusal ends with the refusal's exit code, but the envelope says all, so only the envelope is read. */
 export const pushCheckWith = (
   command: readonly [string, ...string[]]
 ): Layer.Layer<PushCheck, never, ChildProcessSpawner.ChildProcessSpawner> =>
@@ -125,20 +107,14 @@ export const pushCheckWith = (
     })
   );
 
-/** How this process was started, as the runtime's `process` global reports it. */
 const Started = Schema.Struct({
   argv: Schema.Array(Schema.String),
   execPath: Schema.NonEmptyString,
 });
 
-/** The global scope, read only for its `process`. */
 const GlobalScope = Schema.Struct({ process: Started });
 
-/**
- * The command that runs this CLI again: a compiled binary is its own
- * executable (its entry lives in Bun's embedded `/$bunfs/` or `B:/~BUN/`),
- * otherwise the runtime runs the entry it was started with.
- */
+/** A compiled binary is its own executable: its entry lives in Bun's embedded `/$bunfs/` or `B:/~BUN/`. */
 export const selfCommand = (
   started: typeof Started.Type
 ): readonly [string, ...string[]] => {
@@ -151,12 +127,6 @@ export const selfCommand = (
     : [started.execPath, entry];
 };
 
-/**
- * The default `PushCheck`: this same CLI, run again as a child process.
- * The global scope is decoded at the boundary (the CLI's types name no
- * runtime); a runtime without a `process` (none the CLI ships on) fails
- * every check, which the hook allows.
- */
 export const PushCheckChild: Layer.Layer<
   PushCheck,
   never,

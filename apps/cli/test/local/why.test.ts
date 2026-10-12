@@ -52,7 +52,6 @@ const alice = Handle.make("alice");
 
 const carol = Handle.make("carol");
 
-/** The second commit's message: its trailers, as an answerer wrote them. */
 const message = [
   "Start the week on Monday",
   "",
@@ -61,10 +60,6 @@ const message = [
   "Assisted-by: claude-code",
 ].join("\n");
 
-/**
- * A repo with two commits: the first writes `src/week.ts` lines 1 and 2,
- * the second adds line 3 with `message`.
- */
 const aRepo = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -93,13 +88,10 @@ const aRepo = Effect.gen(function* () {
   return { dir, first, second };
 });
 
-/** What the platform was asked: each `landing` call's payload. */
 type Asked = readonly { readonly project: string; readonly sha: string }[];
 
-/** A record of `landing` calls, none yet. */
 const noCalls = Ref.make<Asked>([]);
 
-/** The platform's record of the second commit's landing. */
 const landingOf = (sha: CommitSha): LandingView => ({
   ask: AskId.make("fix-week"),
   assisted: [{ harness: "claude-code", verified: false }],
@@ -113,7 +105,6 @@ const landingOf = (sha: CommitSha): LandingView => ({
   sha: LandedSha.make(sha),
 });
 
-/** The same landing as `--json` prints it. */
 const landingJson = (sha: string) => ({
   ask: "fix-week",
   assisted: [{ harness: "claude-code", verified: false }],
@@ -127,10 +118,6 @@ const landingJson = (sha: string) => ({
   sha,
 });
 
-/**
- * The platform in process, answering `landing` with `answer` and every
- * other contract never: a test reaching one fails.
- */
 const platform = (
   answer: (payload: {
     readonly project: ProjectName;
@@ -147,10 +134,6 @@ const platform = (
     ])
   );
 
-/**
- * A platform that knows `landed` as a landing and no other commit, and
- * records every `landing` call it is asked.
- */
 const platformKnowing = (
   landed: Option.Option<CommitSha>,
   calls: Ref.Ref<Asked>
@@ -165,10 +148,6 @@ const platformKnowing = (
     )
   );
 
-/**
- * Output as the agent policy gives it when `CLAUDECODE=1`: Markdown for
- * results, refusals and notes on stderr. `OutputPlain` is the person's.
- */
 const OutputForAgent = Layer.succeed(Output)({
   mode: "agent",
   note: (text) => Console.error(text),
@@ -177,14 +156,9 @@ const OutputForAgent = Layer.succeed(Output)({
   success: ({ view }) => Console.log(view.markdown),
 });
 
-/** How the process would exit, by the runtime's own rule. */
 const exitCodeOf = (exit: Exit.Exit<unknown, unknown>) =>
   Exit.isSuccess(exit) ? 0 : Runtime.getErrorExitCode(Cause.squash(exit.cause));
 
-/**
- * Runs `<cli> why …` in `dir` against `client`, printing through `output`,
- * and returns its exit code, stdout and stderr.
- */
 const run = (
   dir: string,
   args: readonly string[],

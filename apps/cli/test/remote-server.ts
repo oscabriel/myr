@@ -1,8 +1,3 @@
-/**
- * The platform as the CLI's tests meet it: in process, through a test
- * client, for `program` runs; or over HTTP, as an `RpcServer` for the
- * contracts on an ephemeral port, for the remote client.
- */
 import { NodeHttpServer, NodeServices } from "@effect/platform-node";
 import { authenticated, bearerToken } from "@repo/protocol/authenticate";
 import { Client, Contracts } from "@repo/protocol/contracts";
@@ -32,12 +27,10 @@ import { policyFor } from "../src/policy.ts";
 import { WorkingDirectory } from "../src/surfaces.ts";
 import { SignedOut } from "./signed-out.ts";
 
-/** Handlers for every contract, as a test sets them up. */
 export type Handlers = Layer.Layer<
   Rpc.ToHandler<RpcGroup.Rpcs<typeof Contracts>>
 >;
 
-/** A Terminal that counts every prompt it is asked for, and answers none. */
 const promptless = (prompts: Ref.Ref<number>) => {
   const prompted = Ref.update(prompts, (count) => count + 1).pipe(
     Effect.andThen(Effect.die("the CLI prompted"))
@@ -54,31 +47,19 @@ const promptless = (prompts: Ref.Ref<number>) => {
   );
 };
 
-/** What was printed to a stream, one entry per line however it was written. */
 const lines = (output: Effect.Effect<readonly unknown[]>) =>
   Effect.map(output, (all) =>
     all.flatMap((chunk) => String(chunk).split("\n"))
   );
 
 export interface Invocation {
-  /** The calls' handlers: the platform in process, as `tester`. */
   readonly handlers: Handlers;
-  /** How the CLI reaches the platform instead, such as over HTTP. */
   readonly client?: Layer.Layer<Client>;
-  /** The env the CLI reads its mode from. */
   readonly env?: Readonly<Record<string, string>>;
-  /** Whether stdout is a terminal; it is, unless said otherwise. */
   readonly isTTY?: boolean;
-  /** Where the CLI stands; the test process's own folder unless given. */
   readonly cwd?: string;
 }
 
-/**
- * Runs `program` on `args` as the process would: the mode from `env` and the
- * TTY, the platform from `handlers`, and a terminal that fails any prompt.
- * Returns what it printed, its exit code as the runtime would set it, and
- * how many prompts it asked for.
- */
 export const runProgram = (
   args: readonly string[],
   { client, cwd, env = {}, handlers, isTTY = true }: Invocation
@@ -134,10 +115,8 @@ export const runProgram = (
     };
   });
 
-/** A person the HTTP platform knows by their token. */
 export const knownToken = "token-of-tester";
 
-/** The person a token names: `tester` for `knownToken`, nobody for any other. */
 const verify = (token: string) =>
   Effect.succeed(
     token === knownToken
@@ -145,7 +124,6 @@ const verify = (token: string) =>
       : Option.none()
   );
 
-/** `app` served on an ephemeral port for the test's scope: returns its origin. */
 const serving = <E>(
   app: Effect.Effect<
     HttpServerResponse.HttpServerResponse,
@@ -165,13 +143,7 @@ const serving = <E>(
       : yield* Effect.die("the test platform listens on a socket, not a port");
   });
 
-/**
- * The contracts over HTTP at `/rpc`, on an ephemeral port: `handlers` answer
- * as the person `knownToken` names, or as anyone for a public contract when
- * a request carries no credential. Any other bearer token is a 401 before
- * the contracts see it, as at the platform's gate. Returns the origin, and
- * every `authorization` header the server saw, in order.
- */
+// Any other bearer token is a 401 before the contracts see it, as at the platform's gate.
 export const httpPlatform = (handlers: Handlers) =>
   Effect.gen(function* () {
     const seen = yield* Ref.make<readonly (string | undefined)[]>([]);
@@ -201,9 +173,5 @@ export const httpPlatform = (handlers: Handlers) =>
     return { origin: yield* serving(gate), seen: Ref.get(seen) };
   });
 
-/**
- * A platform that answers every request with `status` and an empty body, as
- * a platform that is down does: returns its origin.
- */
 export const failingPlatform = (status: number) =>
   serving(Effect.succeed(HttpServerResponse.empty({ status })));

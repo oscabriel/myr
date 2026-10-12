@@ -39,8 +39,6 @@ const tags = (phases: readonly Phase[]) => phases.map(({ _tag }) => _tag);
 const keyOf = (phases: readonly Phase[]) =>
   phases.flatMap((phase) => (Phase.$is("Snapshot")(phase) ? [phase.key] : []));
 
-// Every input combination: setup or none, extra setup hosts or none,
-// held-back or none, placeholders or none, and zero, one or two lanes.
 const { setup: _setup, setupEgress: _egress, ...bare } = run;
 
 const runBlocks: readonly RunBlock[] = [
@@ -145,7 +143,6 @@ describe(phasePlan, () => {
 
       expect(afterWrite).not.toContain("Snapshot");
 
-      // Egress is off before the run, and the report comes last.
       expect(
         order.filter((tag) => ["EgressOff", "Run", "Report"].includes(tag))
       ).toStrictEqual(["EgressOff", "Run", "Report"]);

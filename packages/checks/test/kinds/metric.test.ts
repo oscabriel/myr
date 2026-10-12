@@ -10,7 +10,6 @@ const report = '{"total": 412, "parts": [{"kb": 3}, {"kb": 9}]}';
 const read = (output: string, path: string) =>
   readMetric(output, JsonPath.make(path));
 
-/** What an unreadable count kept of the output, or `None` when it read one. */
 const unreadHead = (result: Result.Result<number, CountUnreadable>) =>
   Result.match(result, {
     onFailure: ({ head }) => Option.some(head),

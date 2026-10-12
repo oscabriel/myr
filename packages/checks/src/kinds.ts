@@ -1,7 +1,3 @@
-/**
- * Check kinds: what each kind of ask check runs, and the version that keys
- * its cached verdicts together with the tree SHA (principle 8).
- */
 import { CheckSpec } from "@repo/protocol/domain/check";
 import type { RatchetSpec } from "@repo/protocol/domain/check";
 import { Command } from "@repo/protocol/domain/common";
@@ -11,10 +7,8 @@ import { CheckVersion, LaneName } from "@repo/protocol/ids";
 import { Option, Predicate } from "effect";
 import type { Schema } from "effect";
 
-/** The placeholder a run block's `test` holds for the one check file it runs. */
 export const PATH_PLACEHOLDER = "{path}";
 
-/** The check kind a check is of, as an ask kind names it: `RedThenGreen` → `redThenGreen`. */
 export const checkKindOf = (spec: CheckSpec): CheckKind =>
   CheckSpec.match(spec, {
     LintToZero: (): CheckKind => "lintToZero",
@@ -24,7 +18,6 @@ export const checkKindOf = (spec: CheckSpec): CheckKind =>
     SymbolAbsent: (): CheckKind => "symbolAbsent",
   });
 
-// Bare when the shell would read it as one word, single-quoted otherwise.
 const shellWord = (path: string) =>
   /^[\w./@+-]+$/u.test(path) ? path : `'${path.replaceAll("'", `'\\''`)}'`;
 
@@ -34,14 +27,6 @@ const declared = (
 ): Option.Option<RatchetSpec> =>
   Option.fromNullishOr(ratchets.find((ratchet) => ratchet.name === name));
 
-/**
- * The command an ask's check runs, and the lane its result is reported as
- * (the check kind's name, which no project lane shadows in practice).
- * `redThenGreen` fills the run block's `{path}` with the check file;
- * `lintToZero`, `migrate` and `symbolAbsent` run their own command; a
- * `ratchet` runs the measure its policy declares. `None` when the check can't
- * run: a `test` command with no `{path}`, or an undeclared ratchet.
- */
 export const commandFor = (
   spec: CheckSpec,
   run: RunBlock,
@@ -147,13 +132,8 @@ const fnv1a64 = (text: string) => {
   return hash.toString(16).padStart(16, "0");
 };
 
-/**
- * The version of a check run: `<checkKind>@<sdkVersion>+<runHash>`, where
- * the run hash covers everything the run executes and nothing else: the
- * check itself and its command (a ratchet's declared measure included), every
- * lane, setup, its egress and the image. `doctor` judges nothing, so it is
- * left out. A verdict is reused only for the same tree and the same version.
- */
+// The run hash covers everything the run executes and nothing else; `doctor`
+// judges nothing, so it is left out.
 export const checkVersion = (
   spec: CheckSpec,
   sdkVersion: string,

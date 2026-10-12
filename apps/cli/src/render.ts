@@ -1,8 +1,3 @@
-/**
- * The CLI's prose for the contracts' results: Markdown for an agent (and a
- * script), and plain text for a person where a table reads better padded.
- * A contract without a view here prints its encoded JSON in a fenced block.
- */
 import { IMPORTED_NOTE } from "@repo/agent-kit/docs/imported-note";
 import { Brand } from "@repo/brand";
 import type { View } from "@repo/protocol/cli";
@@ -43,11 +38,9 @@ const when = (at: DateTime.Utc) => DateTime.formatIso(at);
 
 const yesNo = (value: boolean) => (value ? "yes" : "no");
 
-/** A cell's text, safe inside a Markdown table row. */
 const cell = (text: string) =>
   text.replaceAll("|", "\\|").replaceAll(/\s*\n\s*/gu, " ");
 
-/** `text` as a Markdown code span, fenced by one more backtick than its longest run. */
 const codeSpan = (text: string) => {
   const longest = Math.max(
     0,
@@ -60,12 +53,7 @@ const codeSpan = (text: string) => {
   return `${fence}${pad}${text}${pad}${fence}`;
 };
 
-/**
- * Rows as a Markdown table, and as a padded plain table for a person.
- * `empty` stands in for both when there are no rows. The columns in `code`
- * hold literal text (a glob, a path) that Markdown shows as code, so `**`
- * never reads as emphasis; the plain table shows it as it is.
- */
+/** Columns in `code` hold literal text (a glob, a path), shown as code so `**` never reads as emphasis. */
 const table = (
   headers: readonly string[],
   rows: readonly (readonly string[])[],
@@ -106,7 +94,6 @@ const table = (
   };
 };
 
-/** Labelled values, one a line: a Markdown list, and padded for a person. */
 const fields = (rows: readonly (readonly [string, string])[]): View => {
   const width = Math.max(0, ...rows.map(([label]) => label.length));
 
@@ -118,16 +105,13 @@ const fields = (rows: readonly (readonly [string, string])[]): View => {
   };
 };
 
-/** Views one after another, as sections. */
 const joined = (...parts: readonly View[]): View => ({
   markdown: parts.map(({ markdown }) => markdown).join("\n\n"),
   text: parts.map(({ markdown, text }) => text ?? markdown).join("\n\n"),
 });
 
-/** The same words for every reader. */
 const prose = (text: string): View => ({ markdown: text });
 
-/** Where an answer stands, in a few words. */
 const outcomeText = (outcome: Outcome) =>
   Outcome.match(outcome, {
     AwaitingDecision: ({ decision }) => `waits on decision ${decision}`,
@@ -139,7 +123,6 @@ const outcomeText = (outcome: Outcome) =>
     WaitingOnParent: ({ ask }) => `passed; waits for ${ask} to land`,
   });
 
-/** What a decision is about, in a few words. */
 const subjectText = (subject: DecisionSubject) =>
   DecisionSubject.match(subject, {
     Finish: ({ ask, head }) => `finish the answer to ${ask} at ${short(head)}`,
@@ -159,7 +142,6 @@ const subjectText = (subject: DecisionSubject) =>
       `allow ${marker} at ${at.path}:${at.line} ("${reason}")`,
   });
 
-/** One ledger entry, in a few words. */
 const entryText = (entry: LedgerEntry) =>
   LedgerEntry.match(entry, {
     Admitted: ({ area, knownBadCaught, mainRuns, suite }) =>
@@ -177,7 +159,6 @@ const entryText = (entry: LedgerEntry) =>
     ValueSet: ({ by, key }) => `${by} set the write-only value of ${key}`,
   });
 
-/** A view that renders a success it can read, and none for anything else. */
 const viewOf = <S extends Schema.Top>(
   schema: S,
   render: (success: S["Type"]) => View
@@ -336,12 +317,10 @@ const today = viewOf(TodayOf.successSchema, (page) =>
 const plural = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
-/** How many a vouch file names, as the people page says none: "nobody". */
 const countOf = (count: number) => (count === 0 ? "nobody" : `${count}`);
 
 const HOUR_MS = 3_600_000;
 
-/** A claim timing as the people page says it: whole hours up to two days, then days. */
 const spanOf = (ms: number) => {
   if (ms % HOUR_MS !== 0) {
     return plural(Math.round(ms / 60_000), "minute", "minutes");
@@ -354,10 +333,8 @@ const spanOf = (ms: number) => {
     : plural(hours, "hour", "hours");
 };
 
-/** The config folder's `project.ts`. */
 const PROJECT_FILE = `${Brand.configDir}/project.ts`;
 
-/** What a vouch gates, in the people page's words. */
 const vouchModes = {
   all: "For everything: claiming an ask, offering a sealed answer and proposing an ask all need a vouch.",
   bansOnly:
@@ -366,7 +343,6 @@ const vouchModes = {
     "For code: claiming an ask or offering a sealed answer needs a vouch; anyone not denounced may propose an ask.",
 } as const satisfies Record<PublicPolicy["vouch"]["mode"], string>;
 
-/** A policy at its landed commit, section by section, as the people page shows it. */
 const evaluated = (policy: PublicPolicy) => {
   const { agents, budget, caps, claims, record, vouch, vouches } = policy;
   const denounced = vouches.filter((line) => line.denounced).length;
@@ -424,11 +400,7 @@ const evaluated = (policy: PublicPolicy) => {
   );
 };
 
-/**
- * Why the config at the landed commit has not evaluated, and the step that
- * makes it, as a terminal's lines. The view sees only the success, which
- * names no project, so the command names it as `<owner>/<name>`.
- */
+/** The view sees only the success, which names no project, so the command names it as `<owner>/<name>`. */
 const pendingText = ({ at, reason }: PolicyPending) => {
   const notEvaluated = `The config at the landed commit ${short(at)} has not been evaluated`;
 
@@ -443,13 +415,11 @@ const pendingText = ({ at, reason }: PolicyPending) => {
       ];
 };
 
-/** Where an imported project came from, and what a copy is (ADR 0031). */
 const importedText = ({ branch, url }: ImportSource) =>
   prose(
     `Imported from ${url}${branch === undefined ? "" : ` (branch ${branch})`}: this project is ${IMPORTED_NOTE}.`
   );
 
-/** The policy's own view: evaluated, why not yet, or nothing landed. */
 const policyText = (read: typeof PolicyOf.successSchema.Type): View => {
   if (read.policy !== undefined) {
     return evaluated(read.policy);
@@ -527,11 +497,6 @@ const front = viewOf(FrontPage.successSchema, ({ entries }) =>
   )
 );
 
-/**
- * Where an offered answer stands, in the line git's `remote:` output gives a
- * push of the same answer. A refused one never reaches its view: its
- * refusals print as refusals (`refusalsIn`).
- */
 const receipt = (offered: AnswerReceipt) =>
   prose(
     Result.getOrElse(receiptLine(offered), () => `${offered.ask} was refused`)
@@ -541,15 +506,9 @@ const submitted = viewOf(SubmitAnswer.successSchema, receipt);
 
 const finished = viewOf(Finish.successSchema, receipt);
 
-/** Any receipt: an answer's (`submit`, `finish`) has a landing's fields too. */
 const isReceipt = Schema.is(LandReceipt);
 
-/**
- * The refusals a contract's success carries in place of a result: a refused
- * receipt's (`finish` and `land` refuse at stages 0–1 that way, and `submit`
- * gives a refused request's receipt back again). The command prints them as
- * refusals, once, and exits 1.
- */
+/** `finish` and `land` refuse stages 0–1 inside a success's receipt; the command prints them as refusals and exits 1. */
 export const refusalsIn = (
   success: Rpc.Success<Contract>
 ): readonly Refusal[] =>
@@ -557,7 +516,6 @@ export const refusalsIn = (
     ? success.outcome.refusals
     : [];
 
-/** Each contract's view, by tag. */
 export const views = {
   claim,
   credits,

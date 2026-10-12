@@ -5,7 +5,6 @@ import { Effect, Schema } from "effect";
 
 import { runProgram } from "./remote-server.ts";
 
-/** What `schema` prints: a JSON Schema object, as far as these tests read it. */
 const PayloadSchema = Schema.fromJsonString(
   Schema.Struct({
     $schema: Schema.String,
@@ -24,7 +23,6 @@ const PayloadSchema = Schema.fromJsonString(
 
 const decodePayloadSchema = Schema.decodeEffect(PayloadSchema);
 
-/** `schema` asks the platform nothing. */
 const schemaOf = (words: readonly string[], env = {}) =>
   runProgram(["schema", ...words], { env, handlers: unanswered });
 

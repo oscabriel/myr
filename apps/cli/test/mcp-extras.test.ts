@@ -1,9 +1,3 @@
-/**
- * `<cli> mcp` beside its tools, forked over stdio as a harness
- * spawns it, in MCP's stateless 2026-07-28 protocol: an ask's brief is a
- * resource read through the CLI's `Client`, and the platform's skill is the
- * prompt `contribute`.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { commandDocs } from "@repo/agent-kit/command-doc";
 import { readManaged } from "@repo/agent-kit/generated-file";
@@ -24,7 +18,6 @@ const fixWeek = AskId.make("fix-week");
 
 const want = "week reads the ISO week of a date";
 
-/** fix-week as `showAsk` returns it. */
 const askWire = {
   askedBy: "dora",
   blockedBy: [],
@@ -46,7 +39,6 @@ const askWire = {
 
 const brief = `# ${fixWeek}\n\n${want}.\n`;
 
-/** A platform with datekit's one open ask, fix-week. */
 const datekit = Layer.mergeAll(
   unanswered,
   Contracts.toLayerHandler("showAsk", ({ ask }) =>
@@ -76,7 +68,7 @@ const meta = {
   "io.modelcontextprotocol/protocolVersion": "2026-07-28",
 };
 
-/** A stateless 2026-07-28 request over stdio: each carries its `_meta`. */
+// The stateless 2026-07-28 protocol: every request carries its own `_meta`.
 const request = (
   id: number,
   method: string,
@@ -106,10 +98,6 @@ const PromptText = Schema.Struct({
   ),
 });
 
-/**
- * The platform's skill body, from agent-kit's command list: the contracts'
- * commands and the hand-written ones.
- */
 const skillBody = platformSkill({ commands: commandDocs(Contracts) }).pipe(
   Effect.map(([file]) =>
     Option.match(

@@ -1,9 +1,3 @@
-/**
- * The platform tokens the CLI holds, by profile, in the CLI's own file under
- * the user's config dir. git's credential helper, `login` and every remote
- * command read them here, and nowhere else. The env can stand in for the
- * file (`<SLUG>_TOKEN` with `<SLUG>_URL`), as a CI job would set it.
- */
 import { Brand } from "@repo/brand";
 import { Handle } from "@repo/protocol/ids";
 import {
@@ -19,19 +13,14 @@ import {
   Schema,
 } from "effect";
 
-/** One platform the CLI can call, as whom. */
 export const Profile = Schema.Struct({
-  /** The handle the token was issued to, when `login` learned it. */
   handle: Schema.optionalKey(Handle),
-  /** The platform token: the only identity the CLI and git present. */
   token: Schema.RedactedFromValue(Schema.NonEmptyString),
-  /** The platform's origin: `https://platform-dev.example.workers.dev`. */
   url: Schema.NonEmptyString,
 });
 
 export type Profile = typeof Profile.Type;
 
-/** The credentials file could not be written, or is there and unreadable. */
 export class CredentialsUnwritable extends Schema.TaggedError<CredentialsUnwritable>()(
   "CredentialsUnwritable",
   { path: Schema.String }
@@ -44,22 +33,18 @@ export class CredentialsUnwritable extends Schema.TaggedError<CredentialsUnwrita
 export class Credentials extends Context.Service<
   Credentials,
   {
-    /** The env's token and url, else the profile `<SLUG>_PROFILE` names, else `default`. */
     readonly current: Effect.Effect<Option.Option<Profile>>;
-    /** The profile whose url is on `host` (`host[:port]`), the current one first. */
     readonly forHost: (host: string) => Effect.Effect<Option.Option<Profile>>;
     readonly put: (
       name: string,
       profile: Profile
     ) => Effect.Effect<void, CredentialsUnwritable>;
-    /** Whether there was a profile by that name to remove. */
     readonly remove: (
       name: string
     ) => Effect.Effect<boolean, CredentialsUnwritable>;
   }
 >()("cli/Credentials") {}
 
-/** The file: profiles by name. */
 const Store = Schema.fromJsonString(
   Schema.Struct({ profiles: Schema.Record(Schema.String, Profile) })
 );
@@ -68,10 +53,8 @@ const decodeStore = Schema.decodeEffect(Store);
 
 const encodeStore = Schema.encodeEffect(Store);
 
-/** The env names, spelled from the brand: `<SLUG>_TOKEN`. */
 const SLUG = Brand.slug.toUpperCase();
 
-/** What the CLI reads of its env, once. */
 const Env = Config.all({
   configHome: Config.option(Config.NonEmptyString("XDG_CONFIG_HOME")),
   home: Config.option(Config.NonEmptyString("HOME")),
@@ -80,7 +63,6 @@ const Env = Config.all({
   url: Config.option(Config.NonEmptyString(`${SLUG}_URL`)),
 });
 
-/** `url`'s `host[:port]`, in lowercase, if it is a URL. */
 const hostOf = Option.liftThrowable((url: string) =>
   new URL(url).host.toLowerCase()
 );
@@ -90,10 +72,7 @@ const FILE_MODE = 0o600;
 
 const DIR_MODE = 0o700;
 
-/**
- * The credentials file: `${XDG_CONFIG_HOME:-$HOME/.config}/<slug>/credentials.json`,
- * mode 0600, replaced whole on every write so no reader sees half of one.
- */
+/** Replaced whole on every write so no reader sees half of one. */
 export const CredentialsFile = Layer.effect(Credentials)(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -118,7 +97,6 @@ export const CredentialsFile = Layer.effect(Credentials)(
       ({ token, url }): Profile => ({ token, url })
     );
 
-    /** The profiles on disk: none without a file; a failure if it can't be read. */
     const load = Option.match(file, {
       onNone: () => Effect.succeed<Readonly<Record<string, Profile>>>({}),
       onSome: (at) =>
@@ -136,7 +114,6 @@ export const CredentialsFile = Layer.effect(Credentials)(
         }).pipe(Effect.mapError(() => new CredentialsUnwritable({ path: at }))),
     });
 
-    /** The profiles to read from: an unreadable file holds none. */
     const readable = Effect.orElseSucceed(
       load,
       (): Readonly<Record<string, Profile>> => ({})
@@ -207,13 +184,7 @@ export const CredentialsFile = Layer.effect(Credentials)(
   })
 );
 
-/**
- * The `git config --global …` commands `login` and `init` run so that git
- * asks this CLI for the platform's token: `credential.<url>.helper` names
- * `<slug>`, so git runs `git-credential-<slug>`, after an empty helper that
- * drops any general one (a keychain) for this url; `useHttpPath` hands the
- * helper the repo's path too.
- */
+/** An empty helper comes first to drop any general one (a keychain) for this url. */
 export const gitHelperConfig = (
   url: string
 ): readonly (readonly string[])[] => [

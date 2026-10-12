@@ -9,9 +9,6 @@ import {
 } from "../../src/kinds/lint-to-zero.ts";
 import { recorded } from "./recorded.ts";
 
-// The recordings `lint-count.test.ts` describes: oxlint over a fixture with
-// `any` in `packages/parser` and `packages/lexer`, none in `packages/printer`.
-
 const anysIn = (output: string, territory: string) =>
   Result.getOrThrow(
     countLint({

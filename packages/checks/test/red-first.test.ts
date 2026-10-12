@@ -20,7 +20,6 @@ const passed: RunExit = { code: 0, stderr: "", stdout: " 1 pass\n 0 fail" };
 
 const notRedFirst = Result.fail(new NotRedFirst({}));
 
-// What the platform sees of a run: lanes and evidence, never the output.
 const checkRun = (
   result: CheckRun["lanes"][number]["result"],
   evidence: Omit<CheckRun["evidence"][number], "lane">

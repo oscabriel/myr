@@ -16,7 +16,6 @@ import {
 } from "./ids.ts";
 import { Posture } from "./posture.ts";
 
-/** Where in the tree a refusal points, when it points at one line. */
 export { At } from "./domain/common.ts";
 
 const cli = (...args: readonly string[]) => [Brand.cli, ...args].join(" ");
@@ -36,16 +35,12 @@ const Retryable = {
 
 const Final = { ...Retryable, retryable: Schema.tag(false) };
 
-/** A `next` that needs no ids, so the constructor fills it in. */
 const nextIs = (command: string) => ({
   next: Schema.NonEmptyString.pipe(
     Schema.withConstructorDefault(Effect.succeed(command))
   ),
 });
 
-// Push and claim
-
-/** The pusher holds no claim on the ask. */
 export class NotClaimed extends Schema.TaggedError<NotClaimed>()("NotClaimed", {
   ...Retryable,
   ask: AskId,
@@ -54,7 +49,6 @@ export class NotClaimed extends Schema.TaggedError<NotClaimed>()("NotClaimed", {
     new NotClaimed({ ask, next: cli("claim", ask) });
 }
 
-/** The claim expired before this push. */
 export class ClaimLapsed extends Schema.TaggedError<ClaimLapsed>()(
   "ClaimLapsed",
   {
@@ -66,19 +60,11 @@ export class ClaimLapsed extends Schema.TaggedError<ClaimLapsed>()(
     new ClaimLapsed({ ask, next: cli("claim", ask) });
 }
 
-/** No member of the project has vouched for the pusher. */
 export class NotVouched extends Schema.TaggedError<NotVouched>()("NotVouched", {
   ...Final,
   ...nextIs(cli("status")),
 }) {}
 
-/**
- * The caller reached a limit of `cap`. `limit` says which: claims held (also
- * when absent, the first meaning, so a claim cap needs no key), open
- * proposals, or a proposal's draft rounds. A rate limit across the platform
- * also gives `retryAfter`, the seconds until one more is let through; a cap
- * without it lifts when something held is released, landed or decided.
- */
 export class CapReached extends Schema.TaggedError<CapReached>()("CapReached", {
   ...Retryable,
   ...nextIs(cli("status")),
@@ -91,37 +77,28 @@ export class CapReached extends Schema.TaggedError<CapReached>()("CapReached", {
   ),
 }) {}
 
-/** Someone else holds the ask's one claim. */
 export class AskFull extends Schema.TaggedError<AskFull>()("AskFull", {
   ...Retryable,
   ...nextIs(cli("asks")),
   ask: AskId,
 }) {}
 
-/** The push names no open ask. */
 export class NoAsk extends Schema.TaggedError<NoAsk>()("NoAsk", {
   ...Final,
   ...nextIs(cli("asks")),
 }) {}
 
-/** The repo's storage was busy with another push. */
 export class RepoBusy extends Schema.TaggedError<RepoBusy>()("RepoBusy", {
   ...Retryable,
   ...nextIs("git push"),
 }) {}
 
-/**
- * The push tried to move a ref the pusher may not move: a canonical ref
- * (main moves only by a landing; an answer goes to the claim's fork), or, on
- * a fork, a ref outside `refs/heads/`, which the platform writes itself.
- */
 export class DirectPush extends Schema.TaggedError<DirectPush>()("DirectPush", {
   ...Final,
   ...nextIs(cli("asks")),
   ref: Label,
 }) {}
 
-/** The ask waits on other asks to land first, as the delete step of a migrate does. */
 export class AskBlocked extends Schema.TaggedError<AskBlocked>()("AskBlocked", {
   ...Retryable,
   ...nextIs(cli("asks")),
@@ -134,22 +111,17 @@ export class AskBlocked extends Schema.TaggedError<AskBlocked>()("AskBlocked", {
   ) => new AskBlocked({ ask, blockedBy });
 }
 
-/** The project's vouch file denounces the caller, so it takes no claims or proposals from them. */
 export class Denounced extends Schema.TaggedError<Denounced>()("Denounced", {
   ...Final,
   ...nextIs(cli("status")),
 }) {}
 
-// Shape: these accumulate, so one push hears about every one at once
-
-/** The answer changes paths outside the ask's territory. */
 export class OutOfScope extends Schema.TaggedError<OutOfScope>()("OutOfScope", {
   ...Final,
   ...nextIs(cli("check")),
   paths: Paths,
 }) {}
 
-/** The answer changes the judge closure. */
 export class TouchedJudge extends Schema.TaggedError<TouchedJudge>()(
   "TouchedJudge",
   {
@@ -159,7 +131,6 @@ export class TouchedJudge extends Schema.TaggedError<TouchedJudge>()(
   }
 ) {}
 
-/** The answer adds a marker that disables a check, or raises a ratchet. */
 export class Weakened extends Schema.TaggedError<Weakened>()("Weakened", {
   ...Final,
   ...nextIs(cli("check")),
@@ -174,28 +145,16 @@ export class Weakened extends Schema.TaggedError<Weakened>()("Weakened", {
   ]),
 }) {}
 
-/** The answer's tree would put held-back paths on main. */
 export class PrivatePathInPublicTree extends Schema.TaggedError<PrivatePathInPublicTree>()(
   "PrivatePathInPublicTree",
   { ...Final, ...nextIs(cli("check")), paths: Paths }
 ) {}
 
-/**
- * The answer imports another module's internals: a file that module does not
- * export. `to` is what the import names.
- */
 export class ReachedInternals extends Schema.TaggedError<ReachedInternals>()(
   "ReachedInternals",
   { ...Final, ...nextIs(cli("check")), from: RepoPath, to: Label }
 ) {}
 
-// Merge
-
-/**
- * The landing on main that last changed a path an answer conflicts in: its
- * commit, the person accountable for it, and the ask it answered or opened
- * (none for a decider's own landing).
- */
 export const MovedBy = Schema.Struct({
   ask: Schema.optionalKey(AskId),
   author: Handle,
@@ -205,12 +164,6 @@ export const MovedBy = Schema.Struct({
 
 export type MovedBy = typeof MovedBy.Type;
 
-/**
- * Main moved past the answer's base; git's `fetch first` and `stale ref`
- * land here too. When the merge onto main conflicts, `conflicts` names the
- * paths, and `movedBy` the landing that last changed each one the
- * project's record holds, so the rebase knows whose change to keep.
- */
 export class StaleBase extends Schema.TaggedError<StaleBase>()("StaleBase", {
   ...Retryable,
   ...nextIs("git pull --rebase"),
@@ -220,21 +173,14 @@ export class StaleBase extends Schema.TaggedError<StaleBase>()("StaleBase", {
   movedBy: Schema.optionalKey(Schema.NonEmptyArray(MovedBy)),
 }) {}
 
-/**
- * A layer the answer was checked with moved since; the answer is checked
- * again against it, as a moved main is.
- */
 export class StaleLayer extends Schema.TaggedError<StaleLayer>()("StaleLayer", {
   ...Retryable,
   ...nextIs(cli("status")),
   layer: Label,
 }) {}
 
-// Checks
-
 const LOCAL = "local:";
 
-/** A check failed; `next` is the command that reproduces it. */
 export class ChecksFailed extends Schema.TaggedError<ChecksFailed>()(
   "ChecksFailed",
   {
@@ -243,19 +189,11 @@ export class ChecksFailed extends Schema.TaggedError<ChecksFailed>()(
     logRef: Label,
   }
 ) {
-  /**
-   * The `logRef` of a lane whose log held a stored write-only value: the log
-   * was never kept, and nothing names the item.
-   */
+  /** A lane whose log held a stored write-only value: the log was never kept. */
   static readonly withheld = "withheld";
 
-  /**
-   * The `logRef` of a lane the CLI's local check ran on the caller's machine:
-   * its log was kept nowhere, so `evidence` has nothing to read.
-   */
   static readonly localRef = (lane: string) => `${LOCAL}${lane}`;
 
-  /** Whether `logRef` names a lane the local check ran. */
   static readonly isLocal = (logRef: string) => logRef.startsWith(LOCAL);
 }
 
@@ -265,7 +203,6 @@ export class HeldBackFailed extends Schema.TaggedError<HeldBackFailed>()(
   { ...Final, ...nextIs(cli("status")), area: Label, suite: Label }
 ) {}
 
-/** The pusher used every attempt on an area's held-back checks for now. */
 export class AttemptsExhausted extends Schema.TaggedError<AttemptsExhausted>()(
   "AttemptsExhausted",
   {
@@ -276,24 +213,17 @@ export class AttemptsExhausted extends Schema.TaggedError<AttemptsExhausted>()(
   }
 ) {}
 
-// Never counted against the answerer
-
-/** A check failed and then passed on the same tree; the platform retries it. */
 export class Flake extends Schema.TaggedError<Flake>()("Flake", {
   ...Retryable,
   ...nextIs(cli("status")),
   lane: Label,
 }) {}
 
-/** The platform could not run the checks. */
 export class VerifierBlocked extends Schema.TaggedError<VerifierBlocked>()(
   "VerifierBlocked",
   { ...Retryable, ...nextIs(cli("status")) }
 ) {}
 
-// At ask open
-
-/** The ask's check does not fail on main twice in the same way, by an assertion. */
 export class NotRedFirst extends Schema.TaggedError<NotRedFirst>()(
   "NotRedFirst",
   {
@@ -302,28 +232,22 @@ export class NotRedFirst extends Schema.TaggedError<NotRedFirst>()(
   }
 ) {}
 
-/** The ask's check would pass a trivial answer. */
 export class WeakCheck extends Schema.TaggedError<WeakCheck>()("WeakCheck", {
   ...Final,
   ...nextIs(cli("check")),
   weakness: Label,
 }) {}
 
-/** The ask's brief leaves out fields its kind requires. */
 export class IncompleteBrief extends Schema.TaggedError<IncompleteBrief>()(
   "IncompleteBrief",
   { ...Final, ...nextIs(cli("check")), missing: Schema.NonEmptyArray(Label) }
 ) {}
 
-// Maintainers only
-
-/** A layer's files would enter a public tree. */
 export class LayerContentInPublicTree extends Schema.TaggedError<LayerContentInPublicTree>()(
   "LayerContentInPublicTree",
   { ...Final, ...nextIs(cli("check")), paths: Paths }
 ) {}
 
-/** A write-only value showed up in output or in the tree. */
 export class SecretInOutput extends Schema.TaggedError<SecretInOutput>()(
   "SecretInOutput",
   {
@@ -334,42 +258,31 @@ export class SecretInOutput extends Schema.TaggedError<SecretInOutput>()(
   }
 ) {}
 
-/**
- * A held-back check in this area enforces something no public clause states,
- * so it cannot enter the suite: a sealed check must cite what it holds.
- */
 export class UnstatedRequirement extends Schema.TaggedError<UnstatedRequirement>()(
   "UnstatedRequirement",
   { ...Final, ...nextIs(cli("check")), area: Label }
 ) {}
 
-// Decision
-
-/** Landing would change the project's posture, which takes a decider. */
 export class PostureChange extends Schema.TaggedError<PostureChange>()(
   "PostureChange",
   { ...Final, ...nextIs(cli("today")), from: Posture, to: Posture }
 ) {}
 
-/** Only one of the project's deciders may do this. */
 export class NotDecider extends Schema.TaggedError<NotDecider>()("NotDecider", {
   ...Final,
   ...nextIs(cli("status")),
 }) {}
 
-/** The decision was already taken, or expired to its default. */
 export class DecisionClosed extends Schema.TaggedError<DecisionClosed>()(
   "DecisionClosed",
   { ...Final, ...nextIs(cli("today")), decision: DecisionId }
 ) {}
 
-/** The proposal was accepted, declined or expired, so nothing more is drafted for it. */
 export class ProposalClosed extends Schema.TaggedError<ProposalClosed>()(
   "ProposalClosed",
   { ...Final, ...nextIs(cli("today")), proposal: ProposalId }
 ) {}
 
-/** The platform is drafting this proposal's ask already; its page says when it settles. */
 export class DraftInProgress extends Schema.TaggedError<DraftInProgress>()(
   "DraftInProgress",
   { ...Retryable, proposal: ProposalId }
@@ -378,66 +291,47 @@ export class DraftInProgress extends Schema.TaggedError<DraftInProgress>()(
     new DraftInProgress({ next: cli("proposal", proposal), proposal });
 }
 
-// Lookup
-
-/** No project has this name. */
 export class UnknownProject extends Schema.TaggedError<UnknownProject>()(
   "UnknownProject",
   { ...Final, ...nextIs(cli("asks")), project: ProjectName }
 ) {}
 
-/** The project has no ask with this name. */
 export class UnknownAsk extends Schema.TaggedError<UnknownAsk>()("UnknownAsk", {
   ...Final,
   ...nextIs(cli("asks")),
   ask: AskId,
 }) {}
 
-/** The project has no commit with this id. */
 export class UnknownCommit extends Schema.TaggedError<UnknownCommit>()(
   "UnknownCommit",
   { ...Final, ...nextIs("git fetch"), sha: CommitSha }
 ) {}
 
-/** The project has no decision with this id. */
 export class UnknownDecision extends Schema.TaggedError<UnknownDecision>()(
   "UnknownDecision",
   { ...Final, ...nextIs(cli("today")), decision: DecisionId }
 ) {}
 
-/**
- * The project has no file or folder at this path at this commit. The
- * commit is `commit`: `at` points at a line, as on every refusal.
- */
 export class UnknownPath extends Schema.TaggedError<UnknownPath>()(
   "UnknownPath",
   { ...Final, ...nextIs("git ls-tree"), commit: CommitSha, path: RepoPath }
 ) {}
 
-/** Neither `main`, a commit the project holds, nor one of its tags. */
 export class UnknownRevision extends Schema.TaggedError<UnknownRevision>()(
   "UnknownRevision",
   { ...Final, ...nextIs("git ls-remote"), rev: Schema.String }
 ) {}
 
-/** The project has no proposal with this id. */
 export class UnknownProposal extends Schema.TaggedError<UnknownProposal>()(
   "UnknownProposal",
   { ...Final, ...nextIs(cli("today")), proposal: ProposalId }
 ) {}
 
-// Setup
-
-/** A project with this name already exists. */
 export class ProjectExists extends Schema.TaggedError<ProjectExists>()(
   "ProjectExists",
   { ...Final, ...nextIs(cli("asks")), project: ProjectName }
 ) {}
 
-/**
- * The name's owner is neither the caller's handle nor the import's source
- * namespace: a project is made only in a namespace of one's own (ADR 0032).
- */
 export class NotYourNamespace extends Schema.TaggedError<NotYourNamespace>()(
   "NotYourNamespace",
   { ...Final, handle: Handle, project: ProjectName }
@@ -454,30 +348,22 @@ export class NotYourNamespace extends Schema.TaggedError<NotYourNamespace>()(
     });
 }
 
-/** The repo to import could not be read; `reason` says what went wrong. */
 export class ImportFailed extends Schema.TaggedError<ImportFailed>()(
   "ImportFailed",
   { ...Retryable, ...nextIs(cli("init")), reason: Label }
 ) {}
 
-// Env
-
-/** The project's env shape has no item with this key. */
 export class UnknownEnvItem extends Schema.TaggedError<UnknownEnvItem>()(
   "UnknownEnvItem",
   { ...Final, ...nextIs(cli("env", "shape")), key: EnvKey }
 ) {}
 
-/** Only an `@sensitive` env item holds a write-only value, and this one is not. */
 export class NotSensitive extends Schema.TaggedError<NotSensitive>()(
   "NotSensitive",
   { ...Final, ...nextIs(cli("env", "shape")), key: EnvKey }
 ) {}
 
-/**
- * The value is shorter than the item asks for. The refusal names the minimum
- * only: never the value, and never its length.
- */
+/** Names the minimum only: never the value, nor its length. */
 export class ValueTooShort extends Schema.TaggedError<ValueTooShort>()(
   "ValueTooShort",
   { ...Final, key: EnvKey, minimum: Schema.Int }
@@ -489,7 +375,6 @@ export class ValueTooShort extends Schema.TaggedError<ValueTooShort>()(
       next: cli("env", "set", key, "--acknowledge-short"),
     });
 
-  /** Shorter than the floor no acknowledgement lifts: the next step is another value. */
   static readonly belowFloor = (key: EnvKey, minimum: number) =>
     new ValueTooShort({ key, minimum, next: cli("env", "set", key) });
 }
@@ -552,10 +437,6 @@ const setup = [ProjectExists, NotYourNamespace, ImportFailed] as const;
 
 const env = [UnknownEnvItem, NotSensitive, ValueTooShort] as const;
 
-/**
- * The union's members by group, in union order. The reference docs file each
- * refusal under its group; a new refusal joins its group here and in the union.
- */
 export const groups = [
   { members: pushAndClaim, name: "Push and claim" },
   { members: accumulating, name: "Shape" },

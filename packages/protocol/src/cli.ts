@@ -50,51 +50,36 @@ import { ExitCode, exitCodeFor } from "./exit-code.ts";
 import type { Unauthenticated } from "./principal.ts";
 import { Refusal } from "./refusal.ts";
 
-/** How a call can fail before its handler runs: in transit, or unauthenticated. */
 type CallError = RpcClientError.RpcClientError | Unauthenticated;
 
-/** A schema that needs no services to decode or encode, as every wire schema is. */
 type Plain = Schema.Top & {
   readonly DecodingServices: never;
   readonly EncodingServices: never;
 };
 
-/**
- * An Rpc a command can project: its payload is a struct of plain fields, or
- * a record that takes none (`listProjects`).
- */
 export type CommandRpc = Rpc.AnyWithProps & {
   readonly errorSchema: Plain;
   readonly payloadSchema: Plain;
   readonly successSchema: Plain;
 };
 
-/** A result as prose: Markdown, and plain text where a person reads it. */
 export interface View {
   readonly markdown: string;
   readonly text?: string;
 }
 
-/**
- * How a projected command prints. apps/cli's `Output` implements it, and
- * decides the form: text for a person, Markdown for an agent, one `--json`
- * envelope for a script.
- */
 export interface CommandOutput {
-  /** The command's result; `data` is its encoded success. */
   readonly success: (input: {
     readonly command: string;
     readonly json: boolean;
     readonly data: unknown;
     readonly view: View;
   }) => Effect.Effect<void>;
-  /** The refusals the command met instead: printed there, and only there. */
   readonly refused: (input: {
     readonly command: string;
     readonly json: boolean;
     readonly refusals: Array.NonEmptyReadonlyArray<Refusal>;
   }) => Effect.Effect<void>;
-  /** What `--dry-run` would send; `payload` is encoded. */
   readonly plan: (input: {
     readonly command: string;
     readonly json: boolean;
@@ -102,47 +87,22 @@ export interface CommandOutput {
   }) => Effect.Effect<void>;
 }
 
-/**
- * Values for payload fields a person may leave out, such as the project the
- * repo they stand in belongs to.
- */
 export interface Defaults<R> {
-  /** The fields it may fill, each with where its value comes from, for `--help`. */
   readonly fields: Readonly<Record<string, string>>;
-  /**
-   * Their values, as typed on the command line. Read only when a required
-   * field it may fill was left out; a field it has no value for stays out.
-   */
   readonly values: Effect.Effect<Readonly<Record<string, string>>, never, R>;
 }
 
 export interface ToCommandOptions<Success, OutputR, DefaultsR> {
-  /** Where the command prints its result, its refusals and its plan. */
   readonly output: Effect.Effect<CommandOutput, never, OutputR>;
   readonly defaults?: Defaults<DefaultsR> | undefined;
-  /** The result as prose; none, or none given, prints the encoded JSON. */
   readonly render?: ((success: Success) => Option.Option<View>) | undefined;
-  /**
-   * The refusals a success carries in place of a result, such as a refused
-   * answer's receipt: they print as a refusal does, once, and the command
-   * fails with `Reported`.
-   */
   readonly refusalsIn?: ((success: Success) => readonly Refusal[]) | undefined;
 }
 
-/**
- * Each contract's result as prose, by tag. A view reads any contract's
- * success and renders the one it knows; a contract with no view prints its
- * encoded JSON.
- */
 export type Views<Rpcs extends Rpc.Any> = Readonly<
   Record<string, (success: Rpc.Success<Rpcs>) => Option.Option<View>>
 >;
 
-/**
- * A command that changes something a person must approve ran without
- * `--yes`. A usage error: nothing was called.
- */
 export class ApprovalNeeded extends Schema.TaggedError<ApprovalNeeded>()(
   "ApprovalNeeded",
   { command: Schema.String }
@@ -152,10 +112,6 @@ export class ApprovalNeeded extends Schema.TaggedError<ApprovalNeeded>()(
   }
 }
 
-/**
- * A required payload field was given neither on the command line nor by the
- * defaults. A usage error: nothing was called, and nobody was asked for it.
- */
 export class MissingValue extends Schema.TaggedError<MissingValue>()(
   "MissingValue",
   { command: Schema.String, flag: Schema.String }
@@ -165,26 +121,16 @@ export class MissingValue extends Schema.TaggedError<MissingValue>()(
   }
 }
 
-/**
- * Everything a command printed has been printed: the program exits with
- * `exitCode` (1 unless refusals set it) and prints nothing more, and the
- * runtime reports nothing of its own.
- */
 export class Reported extends Schema.TaggedError<Reported>()("Reported", {
   exitCode: Schema.optionalKey(Schema.Int),
 }) {
   override readonly [Runtime.errorExitCode] = this.exitCode ?? ExitCode.failed;
   override readonly [Runtime.errorReported] = false;
 
-  /** Refusals printed: the program exits with the code they share (`exitCodeFor`). */
   static readonly of = (refusals: Array.NonEmptyReadonlyArray<Refusal>) =>
     new Reported({ exitCode: exitCodeFor(refusals) });
 }
 
-/**
- * Hands `refusals` to `output` once, then ends the command as `Reported`
- * with their exit code: how every command meets a refusal.
- */
 export const endRefused = (
   output: Pick<CommandOutput, "refused">,
   input: Parameters<CommandOutput["refused"]>[0]
@@ -269,10 +215,6 @@ const describe = (field: Plain): FieldSpec => {
   return { description, kind, literals: [], optional };
 };
 
-/**
- * A payload's fields, by name: a struct's, or none for a payload that takes
- * nothing (an empty record, which an MCP tool's input needs).
- */
 const fieldsOf = (payload: Plain): readonly (readonly [string, Plain])[] =>
   SchemaAST.isObjects(payload.ast)
     ? payload.ast.propertySignatures.flatMap(({ name, type }) =>
@@ -282,7 +224,6 @@ const fieldsOf = (payload: Plain): readonly (readonly [string, Plain])[] =>
       )
     : [];
 
-/** Whether a person must give the field: a switch is off unless named. */
 const isRequired = (spec: FieldSpec) =>
   !spec.optional && spec.kind !== "boolean" && spec.kind !== "switch";
 
@@ -300,7 +241,6 @@ const flagBuilders = {
   // The field's own schema checks the text, so a malformed value is refused
   // by the parser, naming its flag, before anything is called.
   string: (name, field) => Flag.String(name).pipe(Flag.withSchema(field)),
-  // On when named; left out of the payload otherwise.
   switch: (name) =>
     Flag.Boolean(name).pipe(
       Flag.withDefault(false),
@@ -311,7 +251,6 @@ const flagBuilders = {
   (name: string, field: Plain, spec: FieldSpec) => Flag.Flag<unknown>
 >;
 
-/** A field's help text, and where its default comes from when it has one. */
 const helpOf = (spec: FieldSpec, fallback: string | undefined) => {
   if (fallback === undefined) {
     return spec.description;
@@ -322,10 +261,6 @@ const helpOf = (spec: FieldSpec, fallback: string | undefined) => {
     : `${spec.description}; defaults to ${fallback}`;
 };
 
-/**
- * A field as a flag. It is optional when the payload says so, or when the
- * defaults may fill it; the handler then says if it is still missing.
- */
 const flagFor = (
   name: string,
   field: Plain,
@@ -364,10 +299,9 @@ const argumentBuilders = {
 >;
 
 /**
- * An argument that was a flag until now, left out: none yet. The parser
- * takes it so, since the flag it was may still give its value, and the
- * handler says if neither did (`MissingValue`). Unlike `Argument.optional`,
- * a fallback leaves help showing the argument as required.
+ * The former flag may still give the value, so the parser lets the argument
+ * be left out and the handler refuses if neither did. Unlike
+ * `Argument.optional`, a fallback keeps help showing it as required.
  */
 const leftOutForNow = (
   argument: Argument.Argument<unknown>
@@ -401,11 +335,7 @@ const argumentFor = (
   return wasFlag ? leftOutForNow(described) : described;
 };
 
-/**
- * The flag a positional field was until now (`Cli`'s `formerFlags`): it
- * still parses, checked by the field's schema, but help leaves it out and
- * using it prints nothing more.
- */
+/** Still parses, checked by the field's schema, but hidden from help. */
 const formerFlagFor = (name: string, field: Plain): Flag.Flag<unknown> => {
   const spec = describe(field);
 
@@ -416,11 +346,6 @@ const formerFlagFor = (name: string, field: Plain): Flag.Flag<unknown> => {
   );
 };
 
-/**
- * The flags a projected command takes beside its payload's: `--json`
- * always, `--yes` when a person approves it, and `--dry-run` unless it only
- * reads.
- */
 const controls = (approval: boolean, readOnly: boolean) =>
   Object.fromEntries([
     [
@@ -462,11 +387,9 @@ const controls = (approval: boolean, readOnly: boolean) =>
 
 const isRefusal = Schema.is(Refusal);
 
-/** The contract's command, as a person types it: `asks`, `ask open`. */
 export const commandName = (rpc: Rpc.AnyWithProps): string =>
   Context.get(rpc.annotations, Cli).name ?? rpc._tag;
 
-/** The words that reach the contract's command: `["ask", "open"]`. */
 export const commandPath = (
   rpc: Rpc.AnyWithProps
 ): readonly [string, ...string[]] => {
@@ -475,22 +398,11 @@ export const commandPath = (
   return [first, ...rest];
 };
 
-/** JSON text as Markdown, and as itself for a person. */
 const asJson = (text: string): View => ({
   markdown: ["```json", text, "```"].join("\n"),
   text,
 });
 
-/**
- * Projects one contract onto a CLI command. Its payload's fields become
- * flags (or the positional arguments its `Cli` annotation names), and it is
- * named by the last word of that annotation's name. Every command takes
- * `--json`; one that needs approval takes `--yes` and runs only with it;
- * one that changes something takes `--dry-run`, which prints the encoded
- * payload and calls nothing. A refusal, or the refusals a success carries
- * (`refusalsIn`), go to `output.refused` once, and the command fails with
- * `Reported` and their exit code (`endRefused`).
- */
 export const toCommand = <
   R extends CommandRpc,
   ClientR,
@@ -541,7 +453,6 @@ export const toCommand = <
   const encodePayload = Schema.encodeUnknownEffect(rpc.payloadSchema);
   const encodeSuccess = Schema.encodeUnknownEffect(rpc.successSchema);
 
-  /** The fields given, by name, then the defaults for required ones left out. */
   const complete = (given: readonly (readonly [string, unknown])[]) =>
     Effect.gen(function* () {
       const provided = Object.fromEntries(
@@ -590,7 +501,6 @@ export const toCommand = <
           return yield* new ApprovalNeeded({ command });
         }
 
-        // An argument left out takes the value its former flag gave.
         const decoded = yield* complete(
           Object.entries(given).map(
             ([name, value]) => [name, value ?? formerly[name]] as const
@@ -664,18 +574,12 @@ export interface ToCommandsOptions<Rpcs extends Rpc.Any, OutputR, DefaultsR> {
   readonly output: Effect.Effect<CommandOutput, never, OutputR>;
   readonly defaults?: Defaults<DefaultsR> | undefined;
   readonly views?: Views<Rpcs> | undefined;
-  /** The refusals any contract's success carries in place of a result. */
   readonly refusalsIn?:
     | ((success: Rpc.Success<Rpcs>) => readonly Refusal[])
     | undefined;
-  /** Tags a hand-written command wraps instead, such as `setEnv`'s `env set`. */
   readonly exclude: readonly string[];
 }
 
-/**
- * Every contract in `group` whose `Surfaces` include `cli`, but those
- * `exclude` names, as a command at the path its `Cli` annotation names.
- */
 export const toCommands = <
   Rpcs extends CommandRpc,
   ClientR,

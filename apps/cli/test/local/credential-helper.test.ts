@@ -35,7 +35,6 @@ import type { Profile } from "../../src/credentials.ts";
 import { program } from "../../src/main.ts";
 import { OutputPlain } from "../../src/output.ts";
 
-/** The env names the CLI reads, spelled from the brand. */
 const SLUG = Brand.slug.toUpperCase();
 
 const token = "t0ken-0123456789abcdefghijklmnopqrstuvwxyz";
@@ -45,27 +44,20 @@ const platform: Profile = {
   url: "https://platform.test",
 };
 
-/** What git writes to its helper for a repo on `host`, blank line and all. */
 const asked = (host: string, protocol = "https") =>
   `protocol=${protocol}\nhost=${host}\npath=datekit--fix-week--alice.git\n\n`;
 
-/** A pi session's env, as pi hands it to the git it runs. */
 const pi = { AI_AGENT: "pi", PI_MODEL: "kimi-k3" };
 
 const encoder = new TextEncoder();
 
 const decoder = new TextDecoder();
 
-/** The credentials file in the config dir `env` names. */
 const credentialsIn = (env: Record<string, string>) =>
   CredentialsFile.pipe(
     Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env })))
   );
 
-/**
- * A fresh config dir holding `profiles`, and the env that names it: the
- * shell a person who ran `login` would give git.
- */
 const storedIn = (profiles: Readonly<Record<string, Profile>>) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -84,7 +76,6 @@ const storedIn = (profiles: Readonly<Record<string, Profile>>) =>
     return env;
   });
 
-/** A terminal that no helper may touch: every use of it dies. */
 const noTerminal = Layer.succeed(
   Terminal.Terminal,
   Terminal.make({
@@ -96,10 +87,6 @@ const noTerminal = Layer.succeed(
   })
 );
 
-/**
- * Runs `<cli> credential <op>` as git runs its helper: `stdin` in, with
- * `env`. What it wrote to stdout and stderr, and whether it succeeded.
- */
 const helper = (
   op: string,
   stdin: Stream.Stream<Uint8Array>,
@@ -143,7 +130,6 @@ const helper = (
     return { ok: Exit.isSuccess(exit), stderr, stdout };
   }).pipe(Effect.provide(TestConsole.layer));
 
-/** `text` as stdin that ends after it. */
 const input = (text: string) => Stream.make(encoder.encode(text));
 
 describe(`${Brand.cli} credential, git's credential helper`, () => {
@@ -351,11 +337,7 @@ const Basic = /^Basic (?<encoded>\S+)$/u;
 
 const fromBase64 = Schema.decodeOption(Schema.StringFromBase64);
 
-/**
- * `git http-backend` over `root` behind basic auth, on a local port: a
- * request without credentials gets the 401 that makes git ask its helper.
- * Its base URL, and every `user:password` pair it was sent.
- */
+// A request without credentials gets the 401 that makes git ask its helper.
 const guarded = (root: string) =>
   Effect.gen(function* () {
     const spawner =

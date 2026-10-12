@@ -1,9 +1,3 @@
-/**
- * The CLI's version: `src/version.ts` says it, a run no build stamped says
- * `0.0.0`, and `build.ts` stamps a release's version into both bundlers'
- * output through one define. The real build compiles binaries, so it is
- * run by hand (issue 1104's comments), not here.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -29,7 +23,6 @@ const services = Layer.mergeAll(
   SignedOut
 ).pipe(Layer.provideMerge(NodeServices.layer));
 
-/** What a built `version.ts` exports. */
 const Built = Schema.Struct({ cliVersion: Schema.String });
 
 describe("the CLI's version, unbuilt", () => {
@@ -134,7 +127,6 @@ describe("the build's version stamp", () => {
   });
 });
 
-/** What the build would run with for `argv`, if it would run. */
 const parsed = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const seen = yield* Ref.make(Option.none<BuildOptions>());
