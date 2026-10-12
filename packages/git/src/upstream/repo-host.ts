@@ -15,13 +15,11 @@ import {
 import { Exchange, Upstream, UpstreamFailure } from "../upstream.ts";
 import type { Service } from "../upstream.ts";
 
-/** How long a token the upstream mints is asked to last. */
 const TOKEN_TTL = Duration.hours(1);
 
 /** A token is dropped this long before it expires, so none expires mid-exchange. */
 const MARGIN = Duration.minutes(1);
 
-/** Tokens kept at once, one per (repo, scope). */
 const CAPACITY = 1024;
 
 class TokenKey extends Data.Class<{
@@ -29,7 +27,6 @@ class TokenKey extends Data.Class<{
   readonly scope: TokenScope;
 }> {}
 
-/** A clone or fetch reads; only a push writes. */
 const scopeOf = (service: Service): TokenScope =>
   service === "git-receive-pack" ? "write" : "read";
 
@@ -65,12 +62,7 @@ const requestOf = (
   });
 };
 
-/**
- * The production `Upstream`: each exchange goes to the repo's own remote in
- * the store, with a token the store minted for the exchange's scope. Tokens
- * are cached per (repo, scope) until a minute before they expire, in a cache
- * made when the layer is built: one per isolate in a Worker.
- */
+/** Tokens are cached per (repo, scope) in a cache made when the layer is built: one per isolate. */
 export const UpstreamRepoHost: Layer.Layer<Upstream, never, RepoHost | Fetch> =
   Layer.effect(
     Upstream,

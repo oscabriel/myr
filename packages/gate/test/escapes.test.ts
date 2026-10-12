@@ -25,7 +25,6 @@ const generated = "/* eslint-disable no-console -- generated tables */";
 
 const parseEscapes = RatchetName.make("escapes-datekit-parse");
 
-/** The `Waiver` for the escape `marker` with `reason` at `path:line`. */
 const waiver = (path: string, line: number, marker: string, reason: string) =>
   DecisionSubject.cases.Waiver.make({
     ask: ask.id,

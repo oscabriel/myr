@@ -9,11 +9,9 @@ const hex = (bytes: ArrayBuffer) =>
     .join("");
 
 /**
- * An answer's patch id: SHA-256 over its change set as sorted
- * `path\0before\0after\n` lines, an absent blob as the empty string. It
- * ignores order and moves exactly when a blob the answer touches moves. It
- * is the platform's own id, not `git patch-id`, so a Worker computes it with
- * WebCrypto and no diff.
+ * SHA-256 over sorted `path\0before\0after\n` lines, an absent blob as the
+ * empty string. Not `git patch-id`, so a Worker computes it with WebCrypto and
+ * no diff.
  */
 export const patchId = (changes: readonly Change[]): Effect.Effect<PatchId> => {
   const lines = Array.sort(

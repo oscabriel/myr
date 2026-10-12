@@ -1,8 +1,3 @@
-/**
- * Stage 0, parse: who may push what. It reads only the push's target, the
- * pusher, the policy and the claim, so it is free; the first rule a push
- * breaks is its one refusal.
- */
 import type { Policy } from "@repo/protocol/domain/policy";
 import { sameHandle } from "@repo/protocol/ids";
 import type { Handle } from "@repo/protocol/ids";
@@ -33,10 +28,8 @@ const isPusher = (facts: PushFacts, handle: Handle) =>
   Option.exists(handleOf(facts.pusher), (pusher) => sameHandle(pusher, handle));
 
 /**
- * Where a person stands by the vouch file: a line names them vouched or
- * denounced, and a denouncement on any line wins, as the project service
- * reads the file (`attention/vouch.ts`). Deciders vouch for others, so a
- * decider with no line is vouched.
+ * A denouncement on any line wins, as the project service reads the file.
+ * Deciders vouch for others, so a decider with no line is vouched.
  */
 const standingOf = (policy: Policy, handle: Handle) => {
   const lines = policy.vouches.filter((vouch) =>
@@ -58,7 +51,6 @@ const standingOf = (policy: Policy, handle: Handle) => {
   return decides ? "vouched" : "unknown";
 };
 
-/** Where a person's work goes on a fork: its branches, never another ref. */
 const branchPrefix = "refs/heads/";
 
 /**
@@ -104,7 +96,6 @@ const trust: Rule = (facts) =>
       : Option.none();
   });
 
-/** The rules for a push to a claim's fork, in order. */
 const claimFork = (
   facts: PushFacts,
   fork: Data.TaggedEnum.Value<PushTarget, "ClaimFork">
@@ -121,7 +112,6 @@ const claimFork = (
     return Option.some(new NoAsk({}));
   }
 
-  // The fork is named for its claimant, who must hold the ask's claim.
   const held = Option.filter(
     facts.claim,
     (claim) =>
@@ -155,7 +145,6 @@ const claims: Rule = (facts) =>
 
 const rules: readonly Rule[] = [directPush, trust, claims];
 
-/** Parse: the first rule the push breaks, or nothing. */
 export const parse: Stage<never> = {
   accumulate: false,
   name: "parse",

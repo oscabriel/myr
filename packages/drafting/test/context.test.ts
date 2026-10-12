@@ -1,7 +1,3 @@
-/**
- * What the model reads: `pickFiles` over a project's canonical tree, the
- * same every time, within its byte budget, and never a layer's path.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { RepoPath } from "@repo/protocol/ids";
@@ -14,7 +10,6 @@ const askFile = (id: string) => `${Brand.configDir}/asks/${id}.ask.ts`;
 const askSource = (id: string) =>
   `export default kinds.fix.ask({\n  path: "test/asks/${id}.test.ts",\n  want: "w",\n});\n`;
 
-/** A datekit-shaped tree, with what each file holds. */
 const files = {
   ".github/workflows/ci.yml": "steps: []\n",
   "README.md": "# datekit\n",

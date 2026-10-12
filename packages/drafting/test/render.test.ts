@@ -1,9 +1,3 @@
-/**
- * The ask file is written by code from the drafted fields: rendered, then
- * evaluated by the rules' `/bun` adapter beside datekit's own config folder,
- * it states the same ask as the hand-written file, and every string the
- * model gave stays data.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -24,7 +18,6 @@ const at = LandedSha.make("a".repeat(40));
 
 const askFile = (id: string) => `${Brand.configDir}/asks/${id}.ask.ts`;
 
-/** datekit's config folder, as the Lander bundles it, keyed by repo path. */
 const datekitModules = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -45,7 +38,6 @@ const datekitModules = Effect.gen(function* () {
   return modules;
 });
 
-/** The asks a bundle of datekit's folder evaluates to, encoded, by id. */
 const asksOf = (modules: Readonly<Record<string, string>>) =>
   Effect.gen(function* () {
     const evaluator = yield* RulesEvaluator;
@@ -87,7 +79,6 @@ const test = (id: string) => ({
   source: 'import { expect, it } from "bun:test";\n',
 });
 
-/** `format-ordinal.ask.ts`'s fields, as a drafter would give them. */
 const formatOrdinal: DraftedAsk = {
   current: "The 11th, 12th and 13th of a month print as 11st, 12nd and 13rd.",
   id: AskId.make("format-ordinal"),
@@ -105,7 +96,6 @@ const formatOrdinal: DraftedAsk = {
   want: "The Do token of format prints the day of the month as an English ordinal: 1st, 2nd, 3rd and 4th, 11th, 12th and 13th, then 21st, 22nd, 23rd and 31st.",
 };
 
-/** `add-months-clamp.ask.ts`'s fields: every brief field a draft may give. */
 const addMonthsClamp: DraftedAsk = {
   context: [
     "addYears adds twelve months, so it follows: February 29 plus a year becomes February 28.",

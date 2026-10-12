@@ -1,8 +1,3 @@
-/**
- * First-parent blame over a file's versions, newest first: each line of
- * the newest goes to the oldest version that still holds it unchanged, as
- * contiguous ranges of lines numbered from 1.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha } from "@repo/protocol/ids";
 

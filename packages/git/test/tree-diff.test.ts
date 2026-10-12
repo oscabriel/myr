@@ -35,7 +35,6 @@ const after: Files = [
   ["src/b/c.ts", "export const c = 3;\n"],
 ];
 
-/** The memory store, with each tree id `readTree` is asked for written to `reads`. */
 const countedBy = (reads: Ref.Ref<readonly string[]>) =>
   Layer.effect(
     RepoHost,
@@ -52,10 +51,6 @@ const countedBy = (reads: Ref.Ref<readonly string[]>) =>
     })
   ).pipe(Layer.provide(RepoHostMemory));
 
-/**
- * The memory store, with a submodule's pointer added to the trees `links`
- * names: git writes one as a `160000` entry naming a commit in another repo.
- */
 const withSubmodules = (links: Ref.Ref<ReadonlyMap<string, TreeEntry>>) =>
   Layer.effect(
     RepoHost,
@@ -77,13 +72,11 @@ const withSubmodules = (links: Ref.Ref<ReadonlyMap<string, TreeEntry>>) =>
     })
   ).pipe(Layer.provide(RepoHostMemory));
 
-/** Store reads under way at once: now, and the most at any moment. */
 interface InFlight {
   readonly now: number;
   readonly most: number;
 }
 
-/** The memory store, with the `readTree` calls under way at once counted in `reads`. */
 const inFlightBy = (reads: Ref.Ref<InFlight>) =>
   Layer.effect(
     RepoHost,
@@ -118,7 +111,6 @@ const grid = (content: string): Files =>
     content,
   ]);
 
-/** A submodule's pointer at `vendor`, naming commit `digit` × 40 in another repo. */
 const pointer = (digit: string): TreeEntry => ({
   mode: "160000",
   name: "vendor",
@@ -126,7 +118,6 @@ const pointer = (digit: string): TreeEntry => ({
   type: "commit",
 });
 
-/** Two commits in `demo`, and the ids of their trees and blobs as git wrote them. */
 const twoCommits = Effect.gen(function* () {
   const repos = yield* RepoHost;
   const client = yield* gitClient(memoryFs());
@@ -144,7 +135,6 @@ const twoCommits = Effect.gen(function* () {
       Effect.map(({ tree }) => TreeSha.make(tree))
     );
 
-  /** The id of the entry at `path` under `root`. */
   const idAt = (root: string, path: string): Effect.Effect<string> =>
     Effect.gen(function* () {
       const [head = "", ...rest] = path.split("/");
@@ -176,7 +166,6 @@ const twoCommits = Effect.gen(function* () {
   };
 });
 
-/** Lines from a three-word alphabet, from a fixed seed (Park and Miller's generator). */
 const randomFiles = (cases: number) => {
   let state = 20_261_007;
 
@@ -192,7 +181,6 @@ const randomFiles = (cases: number) => {
   return Array.from({ length: cases }, () => [file(), file()] as const);
 };
 
-/** The length of a longest common subsequence, by the textbook table. */
 const lcs = (one: readonly string[], other: readonly string[]) => {
   const table = Array.from({ length: one.length + 1 }, () =>
     Array.from({ length: other.length + 1 }, () => 0)
@@ -438,7 +426,6 @@ describe("the changes between two trees", () => {
             })
         );
 
-        // Every case keeps a common subsequence as long as any there is.
         expect(
           cases.filter(
             ({ kept, longest, subsequence }) => !subsequence || kept !== longest

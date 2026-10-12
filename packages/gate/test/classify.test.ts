@@ -19,10 +19,8 @@ const week = RepoPath.make("packages/parse/src/week.ts");
 
 const pad = RepoPath.make("packages/format/src/pad.ts");
 
-/** The answer changed `week.ts` only. */
 const changed: ReadonlySet<RepoPath> = new Set([week]);
 
-/** The unit lane, green on main and red on the merged tree in `week.ts`. */
 const red: LaneEvidence = {
   command: "bun run test",
   failingPaths: [week],
@@ -34,8 +32,6 @@ const red: LaneEvidence = {
   rerun: Option.none(),
 };
 
-// The classification table: the platform never charges the answerer for its own
-// trouble, nor for a main that moved underneath them.
 const rows: readonly {
   readonly name: string;
   readonly evidence: LaneEvidence;

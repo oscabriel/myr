@@ -5,7 +5,6 @@ import { Option, Schema } from "effect";
 
 import { importSpecifiers, reachedInternals } from "../src/imports.ts";
 
-/** The text of `lines`, one per line. */
 const text = (...lines: readonly string[]) => lines.join("\n");
 
 describe(importSpecifiers, () => {

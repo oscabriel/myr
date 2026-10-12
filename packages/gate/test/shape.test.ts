@@ -38,11 +38,9 @@ const week = "packages/parse/src/week.ts";
 
 const weekTest = "packages/parse/test/week.test.ts";
 
-/** The path set of a layer holding `each`: files, or folders. */
 const layerHolds = (...each: readonly string[]): ReadonlySet<RepoPath> =>
   new Set(each.map((path) => RepoPath.make(path)));
 
-/** A push that changes `files` and adds `lines` to them. */
 const push = (
   files: readonly string[],
   lines: readonly (readonly [string, number, string])[] = [],
@@ -54,7 +52,6 @@ const push = (
     ...overrides,
   });
 
-/** One push with every problem shape knows. */
 const everyProblem = push(
   [week, "docs/guide.md", ".github/workflows/ci.yml"],
   [
@@ -69,8 +66,6 @@ const everyProblem = push(
 // the marker is joined at run time.
 const effectDiagnostics = ["@effect", "-diagnostics"].join("");
 
-// Two modules, `a` and `b`; the ask's territory is `a`, and the judge
-// closure also holds the lint config.
 const [moduleA, moduleB] = Schema.decodeSync(
   Schema.Tuple([Territory, Territory])
 )([
@@ -90,7 +85,6 @@ const x = "packages/a/src/x.ts";
 
 const xTest = "packages/a/test/x.test.ts";
 
-/** A push answering an ask in module `a`. */
 const pushToA = (
   files: readonly string[],
   lines: readonly (readonly [string, number, string])[] = []
@@ -107,7 +101,6 @@ const pushToA = (
     },
   });
 
-// Every default marker, as a tool writes it on an added line.
 const markerLines: readonly (readonly [string, string])[] = [
   [".skip(", '  it.skip("parses week 53", () => {'],
   [".only(", '  describe.only("weeks", () => {'],
@@ -129,12 +122,9 @@ const markerLines: readonly (readonly [string, string])[] = [
 
 const pad = "../../format/src/pad.ts";
 
-/** ReachedInternals for an import of `to` on line `line` of `week`. */
 const reachedFromWeek = (line: number, to: string) =>
   new ReachedInternals({ at: at(week, line), from: RepoPath.make(week), to });
 
-// Each row is one push. Shape reports every problem the push has, in the
-// order of the refusal union's Shape group.
 const rows: readonly {
   readonly name: string;
   readonly facts: PushFacts;

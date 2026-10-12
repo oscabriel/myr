@@ -1,15 +1,9 @@
-/**
- * The line diff: a whole edit script from one file's lines to another's,
- * the shortest one Myers' diff finds, as runs of equal, deleted and
- * inserted lines that, applied to the old lines, rebuild the new.
- */
 import { describe, expect, it } from "@effect/vitest";
 
 import { Edit, lineDiff } from "../src/line-diff.ts";
 
 const lines = (text: string) => (text === "" ? [] : text.split(" "));
 
-/** `before` with `edits` applied, the inserted lines taken from `after`. */
 const apply = (
   before: readonly string[],
   after: readonly string[],

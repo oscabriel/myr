@@ -1,14 +1,5 @@
-/**
- * What the platform's agent is told. The system prompt holds the rules of a
- * good draft and a digest of the project's public policy; the user prompt
- * holds the want, the files picked for it and, from attempt 2 on, what went
- * wrong with the last attempt.
- *
- * The digest is built from a `PublicPolicy`, and reads only its kinds,
- * modules, run block and deciders, so no layer, held-back check or reason
- * from `visibility` can reach a prompt. The product's name comes from
- * `Brand`.
- */
+// The policy digest reads only a `PublicPolicy`'s kinds, modules, run block
+// and deciders, so no layer, held-back check or reason can reach a prompt.
 import { Brand } from "@repo/brand";
 import type { PublicPolicy } from "@repo/protocol/domain/policy";
 import type { Refusal } from "@repo/protocol/refusal";
@@ -17,23 +8,14 @@ import { Option } from "effect";
 
 import type { DraftInput } from "./drafted.ts";
 
-/** The most of a failing run's output an attempt is shown: its last 4 KB. */
 const tailBytes = 4 * 1024;
 
-/** Why the last attempt's draft did not open: the gate's refusal, its diagnosis and the run's output. */
 export interface Feedback {
-  /** The red-first diagnosis: `Passed`, `LoadError`, `Weak` and the like. */
   readonly diagnosis: string;
-  /** The failing run's output; only its tail is shown. */
   readonly excerpt: string;
   readonly refusal: Refusal;
 }
 
-/**
- * The project's public policy, as the system prompt states it: its ask
- * kinds, its modules, its run block, its deciders, and the folder its ask
- * tests sit in (from the picked style example, `askTestFolderOf`).
- */
 export const policyDigest = (
   policy: PublicPolicy,
   askTests: Option.Option<string>
@@ -57,7 +39,6 @@ export const policyDigest = (
     }),
   ].join("\n");
 
-/** The rules of a draft, then the project's policy digest. */
 export const systemPrompt = (digest: string): string =>
   [
     `You draft one ask for a project hosted on ${Brand.name}. An ask is a file in which a project states one change it wants: a behavioural want, a territory, and a test that fails on main today.`,
@@ -88,7 +69,6 @@ const encoder = new TextEncoder();
 
 const decoder = new TextDecoder();
 
-/** The last `tailBytes` of a run's output, starting on a whole line where one fits. */
 const tailOf = (output: string) => {
   const bytes = encoder.encode(output);
 
@@ -103,10 +83,6 @@ const tailOf = (output: string) => {
   return tail.includes("\n") ? tail.slice(tail.indexOf("\n") + 1) : tail;
 };
 
-/**
- * The last attempt's failure as the next one reads it: the refusal as
- * `protocol/render` gives it, the diagnosis, and the output's tail.
- */
 export const feedbackText = (feedback: Feedback): string =>
   [
     ...explain([feedback.refusal]),
@@ -115,7 +91,6 @@ export const feedbackText = (feedback: Feedback): string =>
     tailOf(feedback.excerpt),
   ].join("\n");
 
-/** One attempt's question: the want, what to change, the files, and the last failure. */
 export const userPrompt = (input: DraftInput): string =>
   [
     `Project: ${input.context.project}, at ${input.context.at}.`,

@@ -8,11 +8,9 @@ import { pushStages, runGate } from "../src/gate.ts";
 import type { Stage } from "../src/stage.ts";
 import { ask, modified, testFacts, wire } from "./facts.ts";
 
-/** What the gate answered, as it crosses the wire; `None` stays `None`. */
 const wired = (answer: Option.Option<readonly Refusal[]>) =>
   Option.map(answer, wire);
 
-/** A stage that answers every push with `refusals`. */
 const always = (
   accumulate: boolean,
   refusals: readonly Refusal[]

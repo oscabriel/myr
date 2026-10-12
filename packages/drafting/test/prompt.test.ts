@@ -1,8 +1,3 @@
-/**
- * What the model is told: a system prompt from the project's public policy
- * (never its layers), and a user prompt that carries, from attempt 2 on,
- * the last attempt's refusal and the tail of its output.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import type { Policy } from "@repo/protocol/domain/policy";
@@ -22,7 +17,6 @@ import {
 
 const { policy } = aProject();
 
-/** Layer facts no prompt may carry. */
 const visibility = Schema.decodeSync(VisibilityPolicy)({
   checks: {
     areas: { export: "src/sealed-area/**" },

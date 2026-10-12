@@ -7,7 +7,6 @@ import { addedLines, policy } from "./facts.ts";
 
 const texts = defaultMarkers.map((marker) => marker.text);
 
-// One added line per default marker, as each tool writes it.
 const lines: readonly (readonly [string, string])[] = [
   [".skip(", '  it.skip("parses week 53", () => {'],
   [".only(", '  describe.only("weeks", () => {'],

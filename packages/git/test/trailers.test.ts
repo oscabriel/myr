@@ -41,7 +41,6 @@ const landing = formatLanding({
   subject: "Give December 31 the week it belongs to",
 });
 
-/** What git itself reads as `message`'s trailers, one `key: value` per line. */
 const gitTrailers = (message: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -70,7 +69,6 @@ const gitTrailers = (message: string) =>
         });
   }).pipe(Effect.scoped);
 
-// git's scissors line: it and everything below it are not the message.
 const scissors = "# ------------------------ >8 ------------------------";
 
 // Messages whose last paragraph tests git's rules: a title is never trailers,
@@ -88,7 +86,6 @@ const edges = [
   "Title\n\nBody\n\nAcked-by: someone\n\nConflicts:\n\tsrc/a.ts\n# a comment\n",
 ];
 
-// Lines git's trailer rules turn on, for messages drawn at random.
 const pieces = [
   "Title",
   "",
@@ -112,7 +109,6 @@ const pieces = [
   "Not a: trailer",
 ];
 
-/** Messages of 1 to 14 lines from `pieces`, from a fixed seed (Park and Miller's generator). */
 const randomMessages = (count: number) => {
   let state = 20_261_007;
 
@@ -128,7 +124,6 @@ const randomMessages = (count: number) => {
       () => pieces[draw(pieces.length)] ?? ""
     );
 
-    // One in four has no newline after its last line.
     return `${lines.join("\n")}${draw(4) === 0 ? "" : "\n"}`;
   });
 };

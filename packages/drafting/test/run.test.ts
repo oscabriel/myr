@@ -1,7 +1,3 @@
-/**
- * The draft run's program over a fake step runner: the steps it names, and
- * what it settles, with the project and the drafter faked at their ports.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { DraftResult } from "@repo/project/draft-runs";
@@ -23,7 +19,6 @@ const scenario = aProject();
 
 const proposal = ProposalId.make("prop-000001");
 
-/** The scenario's policy as anyone reads it, with no `fix` kind. */
 const withoutFix = Schema.decodeSync(PublicPolicy)(
   Schema.encodeSync(PublicPolicy)({
     ...Struct.omit(scenario.policy, ["asks", "functions", "visibility"]),

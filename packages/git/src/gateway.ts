@@ -26,22 +26,14 @@ import type { Service } from "./upstream.ts";
 const ROUTE =
   /^\/(?<name>[A-Za-z0-9._-]+?(?:\/[A-Za-z0-9._-]+?){0,2})(?:\.git)?\/(?<endpoint>info\/refs|git-upload-pack|git-receive-pack)$/u;
 
-/** One of the three endpoints of git's smart HTTP. */
 export type GitEndpoint = "info/refs" | "git-upload-pack" | "git-receive-pack";
 
-/** What a smart HTTP path names: the address as spelled, its repo, and the endpoint. */
 export interface GitRoute {
   readonly endpoint: GitEndpoint;
-  /** The address as the path spelled it, for a message. */
   readonly name: string;
-  /** The repo the address names (ADR 0032); none for an address no project can have. */
   readonly repo: Option.Option<RepoName>;
 }
 
-/**
- * The repo a smart HTTP path names, and the endpoint it asks for; `None`
- * for any other path.
- */
 export const gitRoute = (pathname: string): Option.Option<GitRoute> =>
   Option.flatMap(
     Option.fromNullishOr(ROUTE.exec(pathname)?.groups),
@@ -80,10 +72,7 @@ const forwarded = (headers: Headers) => {
   return picked;
 };
 
-/**
- * Passes bytes and fails the stream on anything else: the Workers types leave
- * a request body's chunk type open.
- */
+/** The Workers types leave a request body's chunk type open. */
 const bytes = () =>
   new TransformStream<unknown, Uint8Array>({
     transform: (chunk, controller) => {
@@ -97,13 +86,11 @@ const bytes = () =>
     },
   });
 
-/** A POST's body, the only kind of request with one here. */
 const bodyOf = (request: Request) =>
   request.method === "POST" && request.body !== null
     ? Option.some(request.body.pipeThrough(bytes()))
     : Option.none();
 
-/** A plain-text reply, which git prints as the reason a request failed. */
 export const plain = (
   status: number,
   text: string,
@@ -114,7 +101,6 @@ export const plain = (
     status,
   });
 
-/** The upstream's reply as the client gets it: status, type and body, uncached. */
 const relay = (response: Response) =>
   new Response(response.body, {
     headers: {
@@ -144,7 +130,6 @@ const BUSY = "artifacts_git_receive_pack_busy";
 const busy = (messages: readonly Uint8Array[]) =>
   messages.some((message) => new TextDecoder().decode(message).includes(BUSY));
 
-/** Where each ref in the upstream points now. */
 const tipsOf = (repo: RepoName) =>
   Effect.gen(function* () {
     const response = yield* (yield* Upstream).exchange(
@@ -164,10 +149,6 @@ const tipsOf = (repo: RepoName) =>
     );
   }).pipe(Effect.orElseSucceed(() => new Map<string, CommitSha>()));
 
-/**
- * The upstream's refusals in the closed union: a ref that moved under the
- * push is `StaleBase`, from the base the pusher named to where the ref is now.
- */
 const translate = (
   repo: RepoName,
   commands: readonly Command[],
@@ -201,11 +182,6 @@ const translate = (
     );
   });
 
-/**
- * The upstream's reply to a push, as the pusher gets it. When every ref
- * landed, custody reviews the push and may still turn it away. A reply that
- * is not a report passes on as it came.
- */
 const answer = (
   repo: RepoName,
   opening: Opening,
@@ -292,10 +268,6 @@ const answer = (
       : result(reply);
   });
 
-/**
- * A push: custody admits it or it goes no further. A refused push is read to
- * its end and answered here; the upstream never sees it.
- */
 const push = (
   repo: RepoName,
   headers: Headers,
@@ -343,11 +315,7 @@ const push = (
     )
   );
 
-/**
- * The platform's git endpoint, speaking git's smart HTTP: `info/refs`,
- * `git-upload-pack` (protocol v2 passes straight through) and
- * `git-receive-pack`. Packs stream through and are never held whole.
- */
+/** Packs stream through and are never held whole. */
 export const gateway = (
   request: Request
 ): Effect.Effect<Response, never, Upstream | Custody> =>
