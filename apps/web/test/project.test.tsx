@@ -443,7 +443,7 @@ describe(ProjectView, () => {
             "Imported from",
             "https://github.com/dtolnay/anyhow",
             "branch master",
-            "This project is a copy of a public repo, read-only here and not run by its maintainers.",
+            "This project is a copy of a public repo, read-only here and not run by its upstream maintainers.",
           ])
         ).toStrictEqual([]);
         expect(facts).toMatch(

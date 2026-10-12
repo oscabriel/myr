@@ -181,7 +181,7 @@ describe("policy's view of an imported project", () => {
     const lines = linesOf(textOf(imported));
 
     expect(lines[0]).toBe(
-      "Imported from https://github.com/dtolnay/anyhow (branch master): this project is a copy of a public repo, read-only here and not run by its maintainers."
+      "Imported from https://github.com/dtolnay/anyhow (branch master): this project is a copy of a public repo, read-only here and not run by its upstream maintainers."
     );
     expect(
       lines.some((line) => line.includes("has not been evaluated"))
