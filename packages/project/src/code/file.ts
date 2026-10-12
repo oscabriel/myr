@@ -1,10 +1,3 @@
-/**
- * One file's contents as a reader sees them: its size, whether it is
- * binary (a NUL in its first 8 KiB, git's own test and `tree-diff.ts`'s),
- * and its text up to 1 MiB; past that, or when Artifacts answers that the
- * blob is too large to hold (`MEMORY_LIMIT`), it is truncated with no text.
- * Kept by the blob's id, unless its text is large.
- */
 import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
 import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import type { FileView, Rev } from "@repo/protocol/domain/code";
@@ -20,20 +13,16 @@ import { versionAt } from "./file-walk.ts";
 import { commitAt, resolveRev } from "./revision.ts";
 import { entryAt } from "./tree.ts";
 
-/** The most text a file's view carries: 1 MiB. */
 export const TEXT_CAP = 1024 * 1024;
 
 // git's own test: a NUL among the first bytes means the blob is not text.
 const SNIFF = 8192;
 
-/** The largest text a cache entry keeps; a larger one is read again. */
 const KEPT_TEXT = 256 * 1024;
 
-/** Whether `bytes` read as binary: a NUL among the first 8 KiB. */
 export const isBinary = (bytes: Uint8Array) =>
   bytes.subarray(0, SNIFF).includes(0);
 
-/** A file's contents: its text only when it is text and within the cap. */
 export interface Contents {
   readonly size: number;
   readonly binary: boolean;
@@ -41,15 +30,11 @@ export interface Contents {
   readonly text: Option.Option<string>;
 }
 
-/** What Artifacts throws when a blob is too large for the Worker to hold. */
 const MemoryLimit = Schema.Struct({ code: Schema.Literal("MEMORY_LIMIT") });
 
 const isMemoryLimit = Schema.is(MemoryLimit);
 
-/**
- * `read`, or `tooLarge` when Artifacts said the blob was too large to hold:
- * its binding throws that as a defect, which here is an answer.
- */
+/** Artifacts' binding throws a too-large blob as a defect, which here is an answer. */
 export const unlessTooLarge = <A, E, R>(
   read: Effect.Effect<A, E, R>,
   tooLarge: () => A
@@ -58,7 +43,6 @@ export const unlessTooLarge = <A, E, R>(
     isMemoryLimit(defect) ? Effect.succeed(tooLarge()) : Effect.die(defect)
   );
 
-/** `bytes` as a reader sees them. */
 export const contentsOfBytes = (bytes: Uint8Array): Contents => {
   const binary = isBinary(bytes);
   const truncated = !binary && bytes.length > TEXT_CAP;
@@ -74,10 +58,6 @@ export const contentsOfBytes = (bytes: Uint8Array): Contents => {
   };
 };
 
-/**
- * The blob `blob`'s contents, kept by its id; none when the repo has no
- * blob by it (a submodule's commit).
- */
 export const contentsOf = (
   repo: RepoName,
   blob: BlobSha
@@ -114,7 +94,6 @@ export const contentsOf = (
     );
   });
 
-/** A file's view from its blob id and contents. */
 const viewOf = (
   commit: CommitSha,
   path: RepoPath,
@@ -133,13 +112,7 @@ const viewOf = (
   }),
 });
 
-/**
- * The file at `path` in `commit` read whole, one call, kept by the commit
- * and path in the isolate's cache (when within `KEPT_TEXT`); none when no
- * file is there or it is too large to hold, so the view looks it up by its
- * folders. ASSUMPTION: Artifacts' `readFile` gives a symlink's own blob, as
- * the tree does, rather than following it.
- */
+/** ASSUMPTION: Artifacts' `readFile` gives a symlink's own blob, as the tree does, rather than following it. */
 const wholeAt = (repo: RepoName, commit: CommitSha, path: RepoPath) =>
   Effect.gen(function* () {
     const cache = yield* CodeCache;
@@ -158,12 +131,6 @@ const wholeAt = (repo: RepoName, commit: CommitSha, path: RepoPath) =>
     );
   });
 
-/**
- * One file at `at`: its text, or that it is binary or too large. A file
- * is read whole in one call (on a cold isolate its folders took one call
- * each, one after another); a folder, a submodule, a missing path or a
- * file too large to hold is looked up by its folders.
- */
 export const fileView = (
   project: CodeProject,
   at: Option.Option<Rev>,

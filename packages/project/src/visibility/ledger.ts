@@ -1,14 +1,3 @@
-/**
- * The public ledger as the Project DO keeps it:
- * its rows numbered in order, each one also told to watchers and the
- * projection as `LedgerAppended`, and the posture the public is shown.
- *
- * A change to the visibility config that narrows the posture is a
- * `PostureChange` decision (the posture's ratchet): until a decider accepts it
- * and the config's notice period has run since it opened, the posture that
- * stood before stays in effect. Widening needs no decision, and a project's
- * first config stands at once: nothing was public before it existed.
- */
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
 import { LedgerEntry } from "@repo/protocol/domain/visibility";
@@ -27,7 +16,6 @@ import type { ProjectSnapshot, ProjectWrites } from "../project-store.ts";
 import type { LayerRow, LedgerRow } from "../project-store/rows.ts";
 import { policyIn } from "../visibility-port.ts";
 
-/** Each posture in GLOSSARY.md's words: how a posture still in effect is shown. */
 const WORDS = {
   open: "Open",
   openCore: "Open core",
@@ -36,11 +24,9 @@ const WORDS = {
   sourceAvailable: "Source available",
 } as const satisfies Record<Posture, string>;
 
-/** The number the next ledger row takes: one past the highest kept. */
 export const nextSeq = (rows: readonly LedgerRow[]): number =>
   Math.max(0, ...rows.map(({ seq }) => seq)) + 1;
 
-/** Ledger rows as a plan writes them: the rows, and an event for each. */
 export const appended = (entries: readonly LedgerEntry[]): ProjectWrites =>
   entries.length === 0
     ? {}
@@ -51,7 +37,6 @@ export const appended = (entries: readonly LedgerEntry[]): ProjectWrites =>
         ledger: entries,
       };
 
-/** The visibility config a snapshot's policy holds. */
 export const visibilityIn = (
   snapshot: ProjectSnapshot
 ): Option.Option<VisibilityPolicy> =>
@@ -59,7 +44,6 @@ export const visibilityIn = (
     Option.fromUndefinedOr(policy.visibility)
   );
 
-/** The posture a config declares, and its label, read from the config alone. */
 export const declaredBy = (visibility: Option.Option<VisibilityPolicy>) =>
   postureOf({ licence: Option.none(), visibility });
 
@@ -68,7 +52,6 @@ type PostureChange = Extract<
   { readonly _tag: "PostureChange" }
 >;
 
-/** A decision about a posture change, with its subject typed. */
 interface Asked {
   readonly decision: Decision;
   readonly subject: PostureChange;
@@ -79,10 +62,6 @@ const askedOf = (decision: Decision): Option.Option<Asked> =>
     ? Option.some({ decision, subject: decision.subject })
     : Option.none();
 
-/**
- * When an accepted narrowing takes effect: once it was accepted, and its
- * notice period has run since it opened. None while nobody accepted it.
- */
 const takesEffect = (decision: Decision, noticeDays: number) =>
   Option.map(
     Option.filter(
@@ -93,13 +72,10 @@ const takesEffect = (decision: Decision, noticeDays: number) =>
       DateTime.max(at, DateTime.add(decision.openedAt, { days: noticeDays }))
   );
 
-/** The posture in effect, and the decision that put it there or keeps it waiting. */
 export interface Standing {
   readonly label: string;
   readonly posture: Posture;
-  /** The posture the config declares, which may still wait on a decision. */
   readonly declared: Posture;
-  /** The accepted narrowing that made the declared posture stand, and when it did. */
   readonly changed: Option.Option<{
     readonly at: DateTime.Utc;
     readonly decision: Decision;
@@ -107,17 +83,7 @@ export interface Standing {
   }>;
 }
 
-/**
- * The posture in effect at `now` under `visibility`: the declared one,
- * unless the latest posture decision asked about narrowing to it and has
- * not taken effect (open, declined, expired, or accepted with notice still
- * to run); then the posture it would narrow from, in GLOSSARY's words.
- *
- * Only the latest posture decision counts: every landing that narrows what
- * stands opens one, so a config that moved on from the latest one's `to`
- * without a decision widened, and stands, whatever an older decision about
- * the same posture came to.
- */
+/** Only the latest posture decision counts: a config that moved on from its `to` without a decision widened, and stands. */
 export const standing = (input: {
   readonly decisions: readonly Decision[];
   readonly now: DateTime.Utc;
@@ -165,13 +131,6 @@ export const standing = (input: {
   });
 };
 
-/**
- * The next instant the posture in effect moves by the clock alone: an
- * accepted narrowing whose notice still runs at `now`. None when only an
- * event can move it: no narrowing waits, one waits on its decision (a
- * `Decided` event settles it), or one took effect already. A later landing
- * or decision may move it sooner; this is only when time does.
- */
 export const nextMove = (input: {
   readonly decisions: readonly Decision[];
   readonly now: DateTime.Utc;
@@ -193,18 +152,10 @@ export const nextMove = (input: {
   );
 };
 
-/**
- * Whether the config's held-back checks judge answers yet: not while a
- * narrowing from Open waits on its decision (nothing was sealed before).
- */
+/** Not while a narrowing from Open waits on its decision: nothing was sealed before. */
 export const sealedInEffect = (posture: Standing) =>
   posture.posture !== "open" || posture.declared === "open";
 
-/**
- * The `PostureChanged` row an accepted narrowing owes the ledger once it
- * took effect, if no row records it yet. A plan that writes appends it, so
- * the projection and the ledger's entries catch up with the posture shown.
- */
 export const postureCaughtUp = (
   snapshot: ProjectSnapshot,
   posture: Standing,
@@ -229,7 +180,6 @@ export const postureCaughtUp = (
           ],
   });
 
-/** Each declared layer with the repo the project keeps for it, when it has one. */
 const withRepos = (
   visibility: VisibilityPolicy,
   rows: readonly LayerRow[]
@@ -246,11 +196,7 @@ const withRepos = (
   ),
 });
 
-/**
- * The public ledger: `ledgerOf` over the project's rows and its
- * config (each layer with its repo), shown with the posture in effect at
- * `now`. The layer read log is the layers' readers' own, never in it.
- */
+/** The layer read log is the layers' readers' own, never in the public ledger. */
 export const ledgerFor = (
   project: ProjectName,
   snapshot: ProjectSnapshot,

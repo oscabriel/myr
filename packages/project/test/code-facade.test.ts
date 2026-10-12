@@ -1,8 +1,3 @@
-/**
- * The code façade both handler files call: a project's code read from its
- * canonical repo alone, with main resolved through the project's record.
- * Why each line is there is `code-why.test.ts`'.
- */
 import { describe, expect, it } from "@effect/vitest";
 import type { ProjectApi } from "@repo/project/project";
 import { keyOf, LandedSha, ProjectName } from "@repo/protocol/ids";
@@ -16,7 +11,6 @@ const project = ProjectName.make("alice/datekit");
 
 const landed = LandedSha.make("4".repeat(40));
 
-/** A project's record, as the façade reads it: only these three. */
 const api = untouchable<ProjectApi>("ProjectApi", {
   forks: () => Effect.succeed([]),
   head: () => Effect.succeed({ landed }),

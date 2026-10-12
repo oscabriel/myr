@@ -28,13 +28,6 @@ import type { ProjectApi } from "../src/project.ts";
 import { projectService } from "../src/project.ts";
 import { CheckScript, composedAt, Pusher, worldOf } from "./world.ts";
 
-// A model test (ADR 0012), as `claim.model.test.ts` is for claims: generated
-// histories of drafted proposals (proposed, settled red or refused, in the
-// current round or a stale one, drafted again, accepted, expired) run
-// through the project service over the memory world, and after every step
-// the stored proposals and decisions are checked against the drafting
-// invariants.
-
 const scenario = aProject({ people: ["carol", "dave"] }).pipe(
   withVouches(["carol", "dave"]),
   withAsk({ id: "parse-week", territory: "packages/parser" })
@@ -94,15 +87,12 @@ const failed = DraftResult.cases.Failed.make({
   refusal: new NotRedFirst({}),
 });
 
-/** Which of the (at most two) proposals a move is about, by the order they were made in. */
 const Which = Schema.Literals([0, 1]);
 
-/** A settle's round: the proposal's current one, or one either side of it. */
 const Round = Schema.Literals(["current", "before", "after"]);
 
 type Round = typeof Round.Type;
 
-/** One thing that happens, as a history step names it. */
 const Move = Schema.TaggedUnion({
   Accept: { which: Which },
   Expire: {},
@@ -116,10 +106,8 @@ type Move = typeof Move.Type;
 const roll = (maximum: number) =>
   Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum, minimum: 0 })));
 
-/** Mostly the first proposal, so one proposal lives through many moves. */
 const anyWhich = roll(3).pipe(Arbitrary.map((n) => (n === 3 ? 1 : 0)));
 
-/** Mostly the current round; a stale one now and then. */
 const rounds: readonly Round[] = [
   "current",
   "current",
@@ -133,7 +121,6 @@ const anyRound = roll(rounds.length - 1).pipe(
   Arbitrary.map((n) => rounds[n] ?? "current")
 );
 
-/** Mostly someone who may draft again; now and then someone who may not. */
 const drafters: readonly People[] = [
   "carol",
   "alice",
@@ -165,8 +152,8 @@ const proposes = Arbitrary.Constant(Move.cases.Propose.make({}));
 const expires = Arbitrary.Constant(Move.cases.Expire.make({}));
 
 /**
- * Moves by weight. A roll leans towards 0, and shrinks towards it, so a
- * settle comes first: the move that runs into most of the rules.
+ * A roll leans and shrinks towards 0, so a settle, the move that runs into most
+ * rules, comes first.
  */
 const weighted = [
   settles,
@@ -188,7 +175,6 @@ const histories = Arbitrary.array(moves, { maxLength: 16 });
 
 const offset = (round: Round) => ({ after: 1, before: -1, current: 0 })[round];
 
-/** The labels of a proposal's evidence that are not its files. */
 const notFiles = new Set([
   "want",
   "territory",
@@ -208,11 +194,9 @@ const decisionsFor = (snapshot: ProjectSnapshot, proposal: Proposal) =>
 
 const roundOf = (proposal: Proposal) => proposal.draft?.round ?? 1;
 
-/** The round a settle names for `proposal`, never below the first. */
 const settledRound = (proposal: Proposal, round: Round) =>
   Math.max(1, roundOf(proposal) + offset(round));
 
-/** Whether a settle of `round` is the proposal's current, unsettled round, while it is open. */
 const isCurrent = (proposal: Proposal, round: number) =>
   proposal.state === "open" &&
   proposal.draft !== undefined &&
@@ -224,10 +208,8 @@ const fileLabels = (decision: Decision) =>
     notFiles.has(label) ? [] : [label]
   );
 
-/** The files each proposal held when a round of it last settled ready. */
 type ReadyFiles = ReadonlyMap<ProposalId, readonly RepoPath[]>;
 
-/** `ready`, with the files of every proposal that reads `Ready` in `snapshot`. */
 const readyIn = (ready: ReadyFiles, snapshot: ProjectSnapshot): ReadyFiles =>
   new Map([
     ...ready,
@@ -238,14 +220,6 @@ const readyIn = (ready: ReadyFiles, snapshot: ProjectSnapshot): ReadyFiles =>
     ),
   ]);
 
-/**
- * What a step broke. No decision exists while a proposal drafts its first
- * round; a settle of a stale round, or of a closed proposal, changes
- * nothing; an open `Ready` proposal's files are exactly the files its
- * decision's evidence holds, beside its red first; and a `Failed` one keeps
- * the files of its last ready round (none if it never had one), which its
- * decision holds, with its red first when there are any, and says why.
- */
 const brokenBy = (
   move: Move,
   before: ProjectSnapshot,
@@ -321,7 +295,6 @@ const brokenBy = (
 
 const stored = ProjectStore.use((store) => store.load());
 
-/** The drafted files composed onto main as it now stands, scripted red there. */
 const redOnMain = Effect.gen(function* () {
   const refs = yield* (yield* RepoHost).refs(repo).pipe(Effect.orDie);
 
@@ -336,7 +309,6 @@ const redOnMain = Effect.gen(function* () {
   );
 });
 
-/** One move, as a person or the platform makes it; a refusal is part of the history. */
 const step = (api: ProjectApi, before: ProjectSnapshot, move: Move) => {
   const proposalAt = (which: number) =>
     Option.fromUndefinedOr(before.proposals[which]);
@@ -393,7 +365,6 @@ const step = (api: ProjectApi, before: ProjectSnapshot, move: Move) => {
   });
 };
 
-/** Runs a history over a fresh project; returns its first bad step and what it broke. */
 const firstBreak = (history: readonly Move[]) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-08T12:00:00Z");
@@ -427,11 +398,7 @@ const firstBreak = (history: readonly Move[]) =>
     return [];
   }).pipe(Effect.provide(worldOf(scenario, "memory")));
 
-/**
- * Each history runs the project service over the memory world, a project
- * made fresh: a few hundred milliseconds on an idle machine, more while
- * turbo runs every package's tests at once. The limit catches a hang.
- */
+/** Catches a hang, not a busy machine. */
 const generated = { timeout: 120_000 };
 
 describe("drafting, over generated histories", generated, () => {

@@ -61,7 +61,7 @@ const proposal = minted.proposal();
 
 const { OpenProposal, StrayPush } = DecisionSubject.cases;
 
-/** Every subject, with the default it must have: doing nothing lets nothing in. */
+/** Every subject's default: doing nothing lets nothing in. */
 const defaults: readonly (readonly [DecisionSubject, Choice])[] = [
   [OpenProposal.make({ proposal }), "decline"],
   [DecisionSubject.cases.Finish.make({ ask, head: sha("answer") }), "decline"],
@@ -113,7 +113,6 @@ const evidence = [
   Evidence.make({ label: "check", value: "packages/parser/test/iso.test.ts" }),
 ];
 
-/** A decision for alice and dana, opened at noon with a 14-day expiry. */
 const open = (subject: DecisionSubject) =>
   openDecision({
     deciders: [alice, dana],
@@ -131,7 +130,6 @@ const strayPush = open(StrayPush.make({ after, before, ref: main }));
 
 const later = at("2026-10-08T09:30:00Z");
 
-/** Alice's choice on `decision`, made the next morning. */
 const choose = (decision: Decision, choice: Choice, by = alice) =>
   decide([decision], {
     by,
@@ -141,7 +139,6 @@ const choose = (decision: Decision, choice: Choice, by = alice) =>
     now: later,
   });
 
-/** The word `decision` records when alice chooses `choice`. */
 const words = (decision: Decision, choice: Choice) =>
   Result.map(
     choose(decision, choice),

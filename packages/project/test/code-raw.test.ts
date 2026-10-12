@@ -1,11 +1,3 @@
-/**
- * A project's raw bytes as the platform and the dev world serve them: each
- * file under a sandboxing CSP and `nosniff`, typed by its extension so
- * that only images render as themselves (an SVG under the sandbox), markup
- * comes back as plain text, an immutable cache for a commit's id and a
- * minute for a name that moves, and a 404 with nothing from the repo for
- * anything else.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
 import { ProjectName, RepoPath } from "@repo/protocol/ids";

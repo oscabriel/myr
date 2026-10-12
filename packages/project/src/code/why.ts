@@ -1,24 +1,3 @@
-/**
- * Why each line of a file is there (ADR 0019): a first-parent blame from
- * a revision, kept by immutable ids (`history.ts`): the path's blob at the
- * commit, the ranges, the commits they name and where the walk stopped,
- * under `<repo>/why/v<WHY_VERSION>/<commit>/<scan>/<sha256(path)>`. Each
- * view reads the commits it names (kept by id) and asks the project's
- * record for their landings in one batch, so an imported commit never
- * reads as a landing and a later landing shows at once.
- *
- * Kept nowhere yet, the why is computed from the nearest first-parent
- * ancestor within `INCREMENT_REACH` commits that has one: each line is
- * carried forward through the file's versions between them (a line diff
- * per change), and a line a version inserted goes to the commit that made
- * it. Otherwise the walk takes at most `WHY_SCAN` first-parent commits from
- * the log, looks up the path's blob in each (`READS_AT_ONCE` under way, in
- * order, with no batch to wait on, until the file's first commit), then
- * reads the changed versions newest first only until every line has its
- * commit (`@repo/git/blame`). Lines older than the walk reached point at
- * the commit it stopped at, named `stoppedAt`. A binary file, or one past
- * 1 MiB, has no ranges.
- */
 import { inRepoSession, ObjectId, RepoHost } from "@repo/artifacts/repo-host";
 import type { Commit, RepoNotFound } from "@repo/artifacts/repo-host";
 import {
@@ -54,22 +33,18 @@ import { commitViews, pageOf } from "./log.ts";
 import { commitAt, resolveRev } from "./revision.ts";
 import { entryAt, READS_AT_ONCE } from "./tree.ts";
 
-/** The most first-parent commits one view walks. */
 export const WHY_SCAN = 200;
 
-/** A version of the file: its blob, and the oldest commit that holds it. */
 interface Version {
   readonly blob: BlobSha;
   readonly commit: Commit;
 }
 
-/** The file's versions newest first, and whether the walk stopped short of its first commit. */
 interface Versions {
   readonly versions: readonly Version[];
   readonly stopped: boolean;
 }
 
-/** The file's blob at `path` in `commit`, if a file is there. */
 const blobAt = (repo: RepoName, commit: Commit, path: RepoPath) =>
   Effect.map(
     entryAt(repo, commit.tree, path),
@@ -80,19 +55,11 @@ const blobAt = (repo: RepoName, commit: Commit, path: RepoPath) =>
     )
   );
 
-/**
- * The file's blob in each of `commits` (first parents, newest first), by
- * `blobOf`, up to the first commit without the file. One pass with
- * `READS_AT_ONCE` lookups under way and no barrier: a slow lookup holds up
- * only itself, not the ones after it. Once a commit without the file is
- * found, lookups further back are skipped.
- */
 const lookups = <E, R>(
   commits: readonly Commit[],
   blobOf: (commit: Commit) => Effect.Effect<Option.Option<BlobSha>, E, R>
 ) =>
   Effect.gen(function* () {
-    // Where the file was found missing: no lookup past it is needed.
     const missingAt = yield* Ref.make(commits.length);
 
     const found = yield* Effect.forEach(
@@ -120,11 +87,6 @@ const lookups = <E, R>(
     return missing === -1 ? looked : looked.slice(0, missing + 1);
   });
 
-/**
- * The file's versions newest first, from `newest` and the blobs `found` in
- * the commits before it, and whether the walk stopped short of the file's
- * first commit.
- */
 const versionsOf = (
   newest: Version,
   found: readonly {
@@ -158,11 +120,8 @@ const versionsOf = (
   };
 };
 
-/**
- * An older version's text as the blame reads it, empty for a binary or too
- * large one. Read past the cache: old versions are seldom viewed, and
- * keeping them would push out the reads a reader comes back to.
- */
+// Read past the cache: old versions are seldom viewed, and keeping them would
+// push out the reads a reader comes back to.
 const textOf = (repo: RepoName, blob: BlobSha) =>
   unlessTooLarge(
     RepoHost.use((host) => host.readBlob(repo, ObjectId.make(blob))).pipe(
@@ -171,20 +130,17 @@ const textOf = (repo: RepoName, blob: BlobSha) =>
     Option.none
   ).pipe(Effect.map(Option.getOrElse(() => "")));
 
-/** The landings among `shas`, asked for in batches the record answers. */
 const landingsOf = (project: CodeProject, shas: readonly CommitSha[]) =>
   Effect.map(
     Effect.forEach(Array.chunksOf(shas, MAX_LANDINGS), project.landings),
     Array.flatten
   );
 
-/** Each line's commit, from ranges of consecutive lines numbered from 1. */
 const ownersOf = (ranges: readonly WhyRange[]): readonly CommitSha[] =>
   ranges.flatMap(({ end, sha, start }) =>
     Array.makeBy(end - start + 1, () => sha)
   );
 
-/** Each line's commit as ranges of consecutive lines, numbered from 1. */
 const rangesOf = (owners: readonly CommitSha[]): readonly WhyRange[] => {
   const ranges: WhyRange[] = [];
 
@@ -202,11 +158,6 @@ const rangesOf = (owners: readonly CommitSha[]): readonly WhyRange[] => {
   return ranges;
 };
 
-/**
- * Each line of `after`'s commit, carried forward from `before`'s: a line
- * the diff keeps keeps its commit, and a line `after` inserted goes to
- * `sha`, the commit that made `after`.
- */
 const carried = (
   before: { readonly text: string; readonly owners: readonly CommitSha[] },
   after: string,
@@ -226,7 +177,6 @@ const carried = (
   return owners;
 };
 
-/** The why kept at `log[at]`'s nearest ancestor within reach, and how far back. */
 const nearestKept = (
   repo: RepoName,
   path: RepoPath,
@@ -249,12 +199,6 @@ const nearestKept = (
       )
   );
 
-/**
- * The why at `log[0]`, whose blob is `newest`, carried forward from `kept`
- * at `log[back]` through the blobs `between` them; none when the file is
- * missing in a commit between (its history starts again there, so the
- * whole walk answers).
- */
 const forward = (
   repo: RepoName,
   log: readonly Commit[],
@@ -269,8 +213,6 @@ const forward = (
 
     const blobs = [newest, ...between.map(Option.getOrThrow)];
 
-    // Each version the commits made, oldest first: where a commit's blob
-    // differs from its parent's.
     const changes = blobs
       .flatMap((blob, at) => {
         const parent = blobs[at + 1] ?? from.kept.blob;
@@ -336,12 +278,6 @@ const forward = (
     });
   });
 
-/**
- * The why at `head` from its file's text and the blobs `found` in the
- * commits before it: the newest version is the file as read, and the
- * older ones are read in order by `readText`, `READS_AT_ONCE` under way,
- * only until every line has its commit.
- */
 const blamed = <R>(
   head: Commit,
   newest: BlobSha,
@@ -392,11 +328,6 @@ const blamed = <R>(
       : { ...none, ranges, shas };
   });
 
-/**
- * The why at `log[0]` by reading the file whole at each commit
- * (`file-walk.ts`): one call a commit, and every version's text kept from
- * those reads, so the blame reads nothing more.
- */
 const walkedByFile = (
   repo: RepoName,
   path: RepoPath,
@@ -411,8 +342,6 @@ const walkedByFile = (
       return { blob: newest.blob, ranges: [], shas: [] };
     }
 
-    // Each version's bytes, by its blob id: the commits that share one
-    // share its text.
     const texts = new Map<string, Uint8Array>([[newest.blob, newest.bytes]]);
 
     const found = yield* lookups(log.slice(1), (commit) =>
@@ -440,12 +369,6 @@ const walkedByFile = (
     });
   });
 
-/**
- * The why at `log[0]` by the whole walk: by reading the file whole at each
- * commit when it is small enough at the head, else by its folders. The
- * head's blob and text are read beside the other commits' lookups, so
- * nothing waits on the head's folders before the pass starts.
- */
 const walked = (
   repo: RepoName,
   at: CommitSha,
@@ -495,7 +418,6 @@ const walked = (
     );
   });
 
-/** The why at `at`, computed: from a kept ancestor's when one is in reach. */
 const computed = (
   repo: RepoName,
   at: CommitSha,
@@ -539,12 +461,6 @@ const computed = (
     return yield* walked(repo, at, path, log, head);
   });
 
-/**
- * The view of `kept`: each commit it names as a reader sees it, and their
- * landings. The commits come from the walk's page of the log (kept by the
- * isolate once the walk read it, else one read), not one read each: a
- * why names up to dozens of them. One the page lacks is read on its own.
- */
 const viewOf = (
   project: CodeProject,
   at: CommitSha,
@@ -598,7 +514,6 @@ const viewOf = (
     };
   });
 
-/** Why each line of `path` at `at` is there, walking at most `scan` commits. */
 export const whyView = (
   project: CodeProject,
   at: Option.Option<Rev>,
@@ -617,8 +532,4 @@ export const whyView = (
     );
 
     return yield* viewOf(project, commit, path, kept, scan);
-  }).pipe(
-    // The walk and the commits it names: one session, one handle.
-    inRepoSession,
-    Effect.catchTag("RepoNotFound", Effect.die)
-  );
+  }).pipe(inRepoSession, Effect.catchTag("RepoNotFound", Effect.die));

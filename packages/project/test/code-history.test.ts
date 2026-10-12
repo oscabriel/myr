@@ -1,13 +1,3 @@
-/**
- * Code history kept by immutable ids, over the memory repo
- * host behind a wrapper that counts the trees and blobs read, the memory
- * code store, and a fresh `CodeCacheLive` for each isolate: a why and a
- * path's log computed on one isolate are read back on another without a
- * walk; one landing past a kept result costs a handful of reads and agrees
- * with the whole walk; landings are always asked fresh; a cold walk keeps
- * many reads under way and looks each commit's entry up once; a value
- * that no longer decodes is computed again and replaced.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHost, RepoSession, Revision } from "@repo/artifacts/repo-host";
 import type { RepoSessionApi } from "@repo/artifacts/repo-host";
@@ -44,18 +34,11 @@ const format = RepoPath.make("src/format.ts");
 
 const text = (value: string) => Content.Text({ text: value });
 
-/**
- * What the counting host saw: trees and blobs read, the most under way at
- * once, and each read's start (`+<id>`) and end (`-<id>`) in order.
- */
 interface Seen {
   readonly trees: number;
   readonly blobs: number;
-  /** Files read whole at a commit (`readFile`). */
   readonly files: number;
-  /** Commits read one by one (`readCommit`). */
   readonly commits: number;
-  /** Pages of the log read (`log`). */
   readonly logs: number;
   readonly peak: number;
   readonly events: readonly string[];
@@ -71,14 +54,8 @@ const none: Seen = {
   trees: 0,
 };
 
-/** How long a read of the object `id` takes, once a test sets it. */
 type Delay = Option.Option<(id: string) => Duration.Duration>;
 
-/**
- * The memory store, each tree and blob read counted in `seen` and, once
- * `delay` is set, taking as long as it says: a live store answers each
- * read in tens to hundreds of milliseconds.
- */
 const counted = (seen: Ref.Ref<Seen>, delay: Ref.Ref<Delay>) =>
   Layer.effect(
     RepoHost,
@@ -127,7 +104,6 @@ const counted = (seen: Ref.Ref<Seen>, delay: Ref.Ref<Delay>) =>
         readBlob: (name, id) => timed("blobs", id, host.readBlob(name, id)),
         readCommit: (name, sha) =>
           timed("commits", sha, host.readCommit(name, sha)),
-        // A file read at a commit is noted by the commit's id.
         readFile: (name, at, path) =>
           timed(
             "files",
@@ -152,7 +128,6 @@ const landingOf = (sha: CommitSha, ask: string): LandingView => ({
   sha: LandedSha.make(sha),
 });
 
-/** A project's record whose landings a test may add to, each batch asked for counted. */
 const recordOf = (head: CommitSha) =>
   Effect.gen(function* () {
     const landed = yield* Ref.make<readonly LandingView[]>([]);
@@ -176,17 +151,11 @@ const recordOf = (head: CommitSha) =>
     return { asked, code, landed };
   });
 
-/** histkit's tree: its README and `src/format.ts`. */
 const filesOf = (formatted: string, readme: string): Tree => [
   ["README.md", text(readme)],
   ["src/format.ts", text(formatted)],
 ];
 
-/**
- * histkit: `src/format.ts` grows over four commits (one leaves it alone),
- * then two children of the fourth: `grown` inserts two lines and changes
- * one, `still` changes only the README.
- */
 const history = Effect.gen(function* () {
   const git = yield* writer;
 
@@ -229,15 +198,12 @@ const history = Effect.gen(function* () {
   return { c1, c3, c4, grown, still };
 });
 
-/** `effect` on a fresh isolate: a code cache of its own. */
 const onIsolate = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.provide(effect, CodeCacheLive(100));
 
-/** `effect` with a store of its own, empty: the whole walk, from nothing. */
 const fromNothing = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   onIsolate(Effect.provide(effect, CodeStoreMemory));
 
-/** A view's ranges, the commits it names and where it stopped. */
 const whyOfView = (view: {
   readonly ranges: readonly unknown[];
   readonly commits: readonly { readonly sha: CommitSha }[];
@@ -248,7 +214,6 @@ const whyOfView = (view: {
   stoppedAt: view.stoppedAt,
 });
 
-/** A test body over the counting host and one store every isolate shares. */
 const within = <A, E>(
   body: (counts: {
     readonly seen: Ref.Ref<Seen>;
@@ -283,8 +248,7 @@ describe("code history kept across isolates", () => {
           const { blobs, commits, files, logs, trees } = yield* Ref.get(seen);
 
           expect(again).toStrictEqual(first);
-          // The commits it names come from one page of the log, not one
-          // read each.
+          // The commits it names come from one page of the log, not one read each.
           expect({ blobs, commits, files, logs, trees }).toStrictEqual({
             blobs: 0,
             commits: 0,
@@ -331,7 +295,6 @@ describe("code history kept across isolates", () => {
   );
 });
 
-/** The first page of `src/format.ts`'s log from `from`. */
 const formatLog = (from: CommitSha) => ({
   at: Option.some(from),
   from: 0,
@@ -402,7 +365,6 @@ describe("code history one landing past a kept result", () => {
           const counts = yield* Ref.get(seen);
           const whole = yield* fromNothing(logOf(code, formatLog(grown)));
 
-          // `src/format.ts` two folders down, in `grown` and in `c4`.
           expect(counts.trees).toBeLessThanOrEqual(4);
           expect(next).toStrictEqual(whole);
           expect(next.commits.map(({ sha }) => sha)[0]).toBe(grown);
@@ -418,7 +380,6 @@ describe("landings beside kept history", () => {
         const { c1, grown } = yield* history;
         const { code, landed } = yield* recordOf(grown);
 
-        // One isolate, so the second view finds the first's history kept.
         const [before, after] = yield* onIsolate(
           Effect.gen(function* () {
             const first = yield* whyOf(code, Option.none(), format);
@@ -438,11 +399,6 @@ describe("landings beside kept history", () => {
   );
 });
 
-/**
- * `count` commits: each changes `count.txt` at the root and leaves
- * `a/b/c/d/deep.txt` alone, so the commits' root trees all differ and the
- * folders under them never do.
- */
 const deepHistory = (count: number) =>
   Effect.gen(function* () {
     const git = yield* writer;
@@ -503,11 +459,9 @@ describe("a cold walk", () => {
     long
   );
 
-  // Counted, not timed: a batch of 16 waits for its slowest read, so while
-  // one commit's file takes a second, at most its 15 neighbours finish;
-  // with no barrier, every other commit does. Wall time under a loaded
-  // machine says less than this count (the walk took about a quarter of
-  // the batched walk's 1,250 ms when each read took 50 ms).
+  // Counted, not timed: a batch of 16 waits for its slowest read, so while one
+  // commit's file takes a second, at most its 15 neighbours finish; with no
+  // barrier, every other commit does.
   it.live(
     "goes on past a slow read: every other commit's file is read while one takes a second",
     () =>
@@ -516,8 +470,6 @@ describe("a cold walk", () => {
           const { head, shas } = yield* deepHistory(64);
           const { code } = yield* recordOf(head);
 
-          // The commit after the head: the first the pass looks up. A file
-          // read is noted by its commit's id.
           const slow = shas[62] ?? "";
 
           yield* Ref.set(seen, none);
@@ -589,10 +541,8 @@ describe("a cold walk", () => {
           });
 
           expect(commits).toHaveLength(1);
-          // Each commit's root tree read once from the store, and `a`, the
-          // same tree in every commit, once. The view shares a tree read
-          // under way among its fibers, so this count holds the store's
-          // reads, not how often the walk asked.
+          // Each commit's root tree once, and `a`, the same tree in every commit,
+          // once: in-flight tree reads are shared among the view's fibers.
           expect((yield* Ref.get(seen)).trees).toBe(201);
         })
       ),
@@ -709,10 +659,6 @@ describe("what the store keeps", () => {
   );
 });
 
-/**
- * The memory store, the session each commit, tree, blob and log read ran
- * in noted in `sessions`, in order.
- */
 const sessioned = (
   sessions: Ref.Ref<readonly Option.Option<RepoSessionApi>[]>
 ) => {
@@ -742,7 +688,6 @@ const sessioned = (
   ).pipe(Layer.provide(RepoHostMemory));
 };
 
-/** How many sessions `sessions` names, and whether a read ran in none. */
 const sessionsIn = (sessions: readonly Option.Option<RepoSessionApi>[]) => ({
   outside: sessions.some(Option.isNone),
   sessions: new Set(sessions.flatMap(Option.toArray)).size,
@@ -850,8 +795,6 @@ describe("a cold walk over a file", () => {
 
           const { blobs, files, trees } = yield* Ref.get(seen);
 
-          // One read of the file per commit is one call each; the folders
-          // above it took five per commit.
           expect({ blobs, files }).toStrictEqual({ blobs: 0, files: 20 });
           expect(trees).toBeLessThanOrEqual(5);
         })

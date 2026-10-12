@@ -1,7 +1,3 @@
-/**
- * The kept standing postures in memory, for tests: a map per layer, kept
- * whole, with no projection beside it to clear an entry.
- */
 import type { ProjectName } from "@repo/protocol/ids";
 import { Effect, Layer, Ref } from "effect";
 
@@ -11,7 +7,6 @@ import type {
   StandingPosturesApi,
 } from "../standing-posture.ts";
 
-/** A fresh, empty store each time the layer is built. */
 export const StandingPosturesMemory = Layer.effect(
   StandingPostures,
   Effect.gen(function* () {

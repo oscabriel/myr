@@ -20,11 +20,6 @@ import type { ProjectApi } from "../src/project.ts";
 import { projectService } from "../src/project.ts";
 import { CheckScript, composedAt, Pusher, worldOf } from "./world.ts";
 
-/**
- * datekit with two asks: `parse-iso` in the module `parser`, and
- * `trim-input` over two paths alone, as `territory.paths(...)` makes it
- * (module `.`).
- */
 const scenario = aProject().pipe(
   withAsk({ id: "parse-iso", territory: "packages/parser" }),
   withAsk({ id: "trim-input", territory: "." })
@@ -66,7 +61,6 @@ const start: Files = [
   ["src/trim.ts", "export const trim = (s) => s;\n"],
 ];
 
-/** alice opens `id`: its file and its check, scripted red twice on main. */
 const openRed = (api: ProjectApi, id: string) =>
   Effect.gen(function* () {
     const { check, file } = askOf(id);
@@ -99,7 +93,6 @@ const openRed = (api: ProjectApi, id: string) =>
     return yield* api.openAsk(alice, { ask: AskId.make(id), files });
   });
 
-/** The brief's Territory section, its one line. */
 const territoryLine = (brief: string) =>
   brief.split("## Territory\n\n")[1]?.split("\n")[0];
 

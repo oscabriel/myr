@@ -39,7 +39,6 @@ import type { ProjectApi } from "../src/project.ts";
 import { projectService } from "../src/project.ts";
 import { CheckScript, composedAt, Pusher, worldOf } from "./world.ts";
 
-/** datekit, decided by alice alone, with one `fix` ask carol may want. */
 const scenario = aProject({ people: ["carol", "dave"] }).pipe(
   withVouches(["carol", "dave"]),
   withAsk({ id: "parse-week", territory: "packages/parser" })
@@ -90,7 +89,6 @@ const askSource = `export default "parse-week";\n`;
 
 const testSource = `import { parseWeek } from "../src/parse.ts";\n`;
 
-/** The drafted ask's files: its ask file and its failing test. */
 const files = Array.make(
   { content: askSource, path: ask.file },
   { content: testSource, path: testPath }
@@ -114,13 +112,11 @@ const failed = DraftResult.cases.Failed.make({
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** Every draft run the project started, in order. */
 class Started extends Context.Service<
   Started,
   { readonly runs: Effect.Effect<readonly DraftParams[]> }
 >()("test/Started") {}
 
-/** `DraftRuns` that records each run it is asked to start. */
 const recorded = Layer.effectContext(
   Effect.gen(function* () {
     const started = yield* Ref.make<readonly DraftParams[]>([]);
@@ -133,7 +129,6 @@ const recorded = Layer.effectContext(
 
 const world = Layer.mergeAll(worldOf(scenario, "memory"), recorded);
 
-/** alice makes datekit; carol proposes the want with a draft. */
 const proposed = Effect.gen(function* () {
   yield* advanceTo("2026-10-08T12:00:00Z");
 
@@ -166,7 +161,6 @@ const openProposalDecisions = Effect.map(stored, ({ decisions }) =>
 
 const runs = Started.use(({ runs: all }) => all);
 
-/** The drafted files composed onto main, their check scripted red there. */
 const redOnMain = Effect.gen(function* () {
   const refs = yield* (yield* RepoHost).refs(repo).pipe(Effect.orDie);
 
@@ -183,7 +177,6 @@ const redOnMain = Effect.gen(function* () {
 
 const firstDecision = DecisionId.make("dec-000001");
 
-/** datekit as above, with dave deciding the parser beside alice. */
 const parserByDave = {
   policy: {
     ...scenario.policy,
@@ -219,7 +212,6 @@ describe("a proposal with a draft", () => {
         opened: (yield* api.events(0, 100)).flatMap(({ event }) =>
           ProjectEvent.guards.ProposalOpened(event) ? [event.proposal] : []
         ),
-        // The run's row ran, and is gone.
         outbox: (yield* stored).outbox,
         runs: yield* runs,
         today: (yield* api.today(alice)).decisions,
@@ -555,7 +547,6 @@ describe("a proposal with a draft", () => {
             value: `${Brand.cli}-drafter:${model} (verified)`,
           },
         ]);
-        // Beside alice's first push, the landing that opened the ask.
         expect(
           landings
             .filter(({ sha }) => sha === tip)

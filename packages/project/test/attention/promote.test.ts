@@ -33,7 +33,6 @@ import { promotions } from "../../src/attention/promote.ts";
 import type { FinishRecord, Promotion } from "../../src/attention/promote.ts";
 import { FinishersFromChecks, MethodSchemas } from "../../src/project.ts";
 
-/** The sdk's `lintToZero` kind, as the policy lists it. */
 const lintToZeroKind = {
   checkKind: "lintToZero",
   claimers: "vouched",
@@ -45,14 +44,12 @@ const lintToZeroKind = {
   strength: "assertion",
 } as const;
 
-/** The project's own lint, which prints JSON: what its ratchet counts with. */
 const lint = Command.make("bun run lint --format json");
 
 const scenario = aProject({ deciders: ["alice"], people: ["bob"] }).pipe(
   withKind(lintToZeroKind)
 );
 
-/** Datekit with a ratchet counted by its JSON lint, so a lint command is known. */
 const policy: Policy = {
   ...scenario.policy,
   ratchets: [
@@ -76,7 +73,6 @@ const askFile = RepoPath.make(
   `${Brand.configDir}/asks/no-date-equality-in-src-date.ask.ts`
 );
 
-/** A finish by alice in `src/date`, with no rule from its lanes and no note unless given. */
 const finish = (
   ask: string,
   day: string,
@@ -100,7 +96,6 @@ const diffMonths = finish("diff-months", "2026-10-05", {
   note: Option.some(`Date compared with === again: \`${rule}\``),
 });
 
-/** Two finishes whose notes name `no-date-equality`, one of them in backticks. */
 const pair = [compareDays, diffMonths];
 
 const promote = (
@@ -123,13 +118,11 @@ const promote = (
   });
 };
 
-/** A decision's evidence without the files its proposal holds. */
 const shown = ({ decision, proposal }: Promotion) =>
   decision.evidence.filter(
     ({ label }) => !proposal.files.some((path) => path === label)
   );
 
-/** The files a proposal holds, read back from its decision's evidence by path, as an accepted proposal's are. */
 const heldFiles = ({ decision, proposal }: Promotion) =>
   proposal.files.flatMap((path) =>
     decision.evidence.flatMap(({ label, value }) =>
@@ -196,7 +189,6 @@ describe("promoting a repeated finish", () => {
   });
 });
 
-/** One evidence line of each promotion, by its label. */
 const lineOf = (made: readonly Promotion[], label: string) =>
   made.flatMap(({ decision }) =>
     decision.evidence.flatMap((each) =>
@@ -204,7 +196,6 @@ const lineOf = (made: readonly Promotion[], label: string) =>
     )
   );
 
-/** `decision` as a decider left it: declined by alice the day it opened. */
 const declined = (decision: Decision): Decision => ({
   ...decision,
   decided: { at: now, by: alice, choice: "decline" },
@@ -212,7 +203,6 @@ const declined = (decision: Decision): Decision => ({
 
 const carol = Handle.make("carol");
 
-/** Two finishes in `src/date` whose notes both say `note`. */
 const twice = (note: string) =>
   promote([
     finish("compare-days", "2026-10-01", { note: Option.some(note) }),
@@ -553,9 +543,6 @@ describe("accepting a promotion", () => {
   });
 });
 
-// ------------------------------------------- the ask file, through the sdk
-
-/** One workspace, `parser`, and alice as the project's initializer. */
 const facts = Schema.decodeSync(EvaluationFacts)({
   ci: [],
   initializer: "alice",
@@ -575,7 +562,6 @@ const projectFile = [
   "",
 ].join("\n");
 
-/** What promotions' ask files state, as the rules evaluator reads them back from a config folder. */
 const evaluated = (made: readonly Promotion[]) =>
   Effect.gen(function* () {
     const evaluator = yield* RulesEvaluator;

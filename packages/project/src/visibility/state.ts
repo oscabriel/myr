@@ -1,31 +1,3 @@
-/**
- * The visibility cartridge's project state: the `ProjectVisibility` port, over
- * the private namespace's repos (`LayerRepos`), a source of secret salts, and
- * what starts an admission.
- *
- * - A landing that declares layers provisions each one's repo,
- *   `<project>--<layer>` in the private namespace, once (an outbox effect,
- *   retried until done; a repo that exists already counts as made), and
- *   appends `LayerDeclared`. A change that narrows the posture opens a
- *   `PostureChange` decision for a second decider (`./ledger.ts`).
- * - A push to a layer proposes its head. With admission off it lands at
- *   once: the layer's sealed checks (its manifest, `<config folder>/
- *   layer.json` in the layer repo, filtered to the policy's areas) are
- *   committed to under a fresh salt, which the DO's store alone keeps, and
- *   each area's root, check count and author count are published
- *   (`CommitmentPublished`). With admission on, the head waits for
- *   `./admission.ts`'s judgement of its runs (the `Answer` Workflow's
- *   admission steps run them), then lands the same way, each admitted
- *   area's `Admitted` entry after its commitment; a push that changes no
- *   held-back check lands at once.
- * - A claim opened while a sealed suite is in effect is pinned to its root
- *   and layer commit; its answers are judged by that suite, read back at
- *   that commit, and their failures counted per claim and per person, area
- *   and week (`./claims.ts`), never against their record.
- *
- * Nothing it returns for the public names a layer's path, a check, or a
- * salt: roots, counts and area bits only.
- */
 import { ObjectId, Revision } from "@repo/artifacts/repo-host";
 import type { RepoExists } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
@@ -105,16 +77,11 @@ import {
   visibilityIn,
 } from "./ledger.ts";
 
-/** Where a commitment's secret salt comes from: 32 random bytes each time. */
 export class SaltSource extends Context.Service<
   SaltSource,
   { readonly next: Effect.Effect<Uint8Array> }
 >()("project/SaltSource") {}
 
-/**
- * What starts the admission of a layer push's sealed checks: the `Answer`
- * Workflow's admission run. Starting one twice runs it once.
- */
 export class AdmissionStarts extends Context.Service<
   AdmissionStarts,
   {
@@ -126,13 +93,8 @@ export class AdmissionStarts extends Context.Service<
   }
 >()("project/AdmissionStarts") {}
 
-/**
- * Where a layer repo keeps its manifest: the JSON form of `layer.ts`,
- * committed beside it, which the DO reads without evaluating code.
- */
 export const manifestPath = RepoPath.make(`${Brand.configDir}/layer.json`);
 
-/** The effects this port's plans ask for, settled after their commit. */
 const Planned = Schema.Union([
   Schema.TaggedStruct("Provision", { repo: RepoName }),
   Schema.TaggedStruct("Admit", {
@@ -150,25 +112,17 @@ const encodePlanned = Schema.encodeEffect(PlannedJson);
 
 const decodePlanned = Schema.decodeUnknownEffect(PlannedJson);
 
-// A pushed manifest may leave a check's clause out: admission refuses it
-// (`UnstatedRequirement`) rather than read the manifest as none.
+// A manifest may leave a clause out: admission refuses it (`UnstatedRequirement`) rather than read it as none.
 const decodeManifest = Schema.decodeUnknownEffect(
   Schema.fromJsonString(PushedManifest)
 );
 
-/** The repo a declared layer keeps in the private namespace. */
 const repoFor = (project: ProjectName, layer: LayerName) =>
   RepoName.make(`${keyOf(project)}--${layer}`);
 
-/**
- * Whether a layer gets a repo of its own. A personal layer is each
- * person's own, and an embargo is config only: neither
- * has one, so neither is provisioned or reachable.
- */
 const ownsRepo = (layer: LayerDeclaration) =>
   layer.audience !== "personal" && layer.audience !== "security";
 
-/** The people a rule names: the project's deciders, for any path, or those listed. */
 const membersOf = (policy: Policy, members: Members): readonly Handle[] =>
   members === "deciders"
     ? policy.deciders.flatMap(({ handles }) => handles)
@@ -186,22 +140,18 @@ const byPath = Order.mapInput(
   (file: { readonly path: RepoPath }) => file.path
 );
 
-/** The areas a suite reports, sorted by name. */
 const areasOf = (checks: SealedChecks) =>
   Arr.sort(Object.keys(checks.areas), Order.String).map((area) =>
     AreaName.make(area)
   );
 
-/** One sealed check as a layer commit holds it: its file, its area, its blob and its author. */
 interface Sealed extends SuiteFile {
   readonly author: Handle;
 }
 
-/** The project's name, from its row. */
 const projectOf = (snapshot: ProjectSnapshot) =>
   Option.map(snapshot.project, ({ project }) => project);
 
-/** A declared layer that keeps a repo, by name. */
 const declaredLayer = (
   visibility: Option.Option<VisibilityPolicy>,
   layer: LayerName
@@ -210,7 +160,6 @@ const declaredLayer = (
     Arr.findFirst(layers, (each) => each.name === layer && ownsRepo(each))
   );
 
-/** The sealed checks a layer holds, when the policy keeps them in it. */
 const checksIn = (
   visibility: Option.Option<VisibilityPolicy>,
   layer: LayerName
@@ -220,7 +169,6 @@ const checksIn = (
     (checks) => checks.layer === layer
   );
 
-/** The project's row for a layer, or a new one for its repo. */
 const rowFor = (
   snapshot: ProjectSnapshot,
   project: ProjectName,
@@ -231,13 +179,7 @@ const rowFor = (
     () => ({ name: layer, repo: repoFor(project, layer) })
   );
 
-/**
- * The decision a narrowing landing opens: for the project's own
- * deciders but those who landed it, so a second decider countersigns; when
- * nobody else decides for the whole project, its deciders as they are.
- * Its default is decline, and it stays open through the notice period and
- * the policy's usual expiry after it.
- */
+/** Excludes those who landed it, so a second decider countersigns; when nobody else decides, the deciders as they are. */
 const narrowingDecision = (input: {
   readonly after: Policy;
   readonly from: Posture;
@@ -294,20 +236,17 @@ const narrowingDecision = (input: {
   });
 };
 
-/** A plan of rows and the effects to settle after them. */
 const planOf = (
   writes: ProjectWrites,
   effects: readonly VisibilityEffect[] = []
 ): VisibilityPlan => ({ effects, writes });
 
-/** A planned effect, as a plan carries it. */
 const effectOf = (id: string, planned: Planned) =>
   Effect.map(
     Effect.orDie(encodePlanned(planned)),
     (body): VisibilityEffect => ({ body, id })
   );
 
-/** The `PostureChanged` row a narrowing that took effect still owes the ledger, numbered from `seq`. */
 const caughtUp = (
   snapshot: ProjectSnapshot,
   visibility: Option.Option<VisibilityPolicy>,
@@ -319,7 +258,6 @@ const caughtUp = (
     nextSeq(snapshot.ledger)
   );
 
-/** How far `who` reaches into a layer of the project's policy. */
 const reach = (
   policy: Policy,
   layer: LayerDeclaration,
@@ -332,7 +270,6 @@ const reach = (
   return names(membersOf(policy, layer.readers), who) ? "read" : "none";
 };
 
-/** One held-back run of a claim's answer, judged against its attempts (`./claims.ts`). */
 const judgeHeldBack: VisibilityPort["judgeHeldBack"] = (input, snapshot) => {
   const checks = Option.flatMap(visibilityIn(snapshot), ({ checks: sealed }) =>
     Option.fromUndefinedOr(sealed)
@@ -359,7 +296,6 @@ const judgeHeldBack: VisibilityPort["judgeHeldBack"] = (input, snapshot) => {
   };
 };
 
-/** A read of a layer through the gateway, for its readers' log. */
 const recordRead: VisibilityPort["recordRead"] = (input) => ({
   layerReads: [
     {
@@ -374,7 +310,6 @@ const recordRead: VisibilityPort["recordRead"] = (input) => ({
   ],
 });
 
-/** How far `who` reaches into a declared layer that keeps a repo. */
 const access: VisibilityPort["access"] = (who, layer, snapshot) =>
   Option.flatMap(policyIn(snapshot), (policy) =>
     Option.map(
@@ -383,7 +318,6 @@ const access: VisibilityPort["access"] = (who, layer, snapshot) =>
     )
   );
 
-/** The layers `who` reads: the write-down guard runs only for these. */
 const readableLayers: VisibilityPort["readableLayers"] = (who, snapshot) =>
   new Set(
     Option.match(policyIn(snapshot), {
@@ -397,12 +331,6 @@ const readableLayers: VisibilityPort["readableLayers"] = (who, snapshot) =>
     })
   );
 
-/**
- * A landing that moved the config: `LayerDeclared` for each layer it adds
- * or changes, a row and a provisioning effect for each layer that has no
- * repo yet, and, for a narrowing, a `PostureChange` decision; first the
- * `PostureChanged` row a narrowing that took effect before still owes.
- */
 const onPolicy: VisibilityPort["onPolicy"] = (input, snapshot) =>
   Effect.gen(function* () {
     const project = projectOf(snapshot);
@@ -419,7 +347,6 @@ const onPolicy: VisibilityPort["onPolicy"] = (input, snapshot) =>
       return noPlan;
     }
 
-    // What stood before this landing, under the config as it was.
     const was = standing({
       decisions: snapshot.decisions,
       now: input.now,
@@ -450,8 +377,7 @@ const onPolicy: VisibilityPort["onPolicy"] = (input, snapshot) =>
       effectOf(`provision:${repo}`, Planned.cases.Provision.make({ repo }))
     );
 
-    // A project's first config stands at once, and an unchanged one
-    // decides nothing again (a declined narrowing stays declined).
+    // A first config stands at once; an unchanged one decides nothing again (a declined narrowing stays declined).
     const changed = Option.isSome(input.before) && !Equal.equals(before, after);
 
     const to = declaredBy(after);
@@ -485,15 +411,11 @@ const live = Effect.gen(function* () {
   const repos = yield* LayerRepos;
   const salts = yield* SaltSource;
   const admissions = yield* AdmissionStarts;
-  // `pinSuite` and `ledger` are read without a `now`: the posture's notice
-  // runs on this clock (the TestClock in tests).
+  // `pinSuite` and `ledger` take no `now`: the posture's notice runs on this clock.
   const clock = yield* Clock.Clock;
 
   const nowOf = () => DateTime.makeUnsafe(clock.currentTimeMillisUnsafe());
 
-  // ------------------------------------------------------- layer commits
-
-  /** A layer commit, which must exist: a pinned or landed SHA the store recorded. */
   const commitAt = (repo: RepoName, at: CommitSha) =>
     Effect.flatMap(Effect.orDie(repos.readCommit(repo, at)), (found) =>
       Option.match(found, {
@@ -502,7 +424,6 @@ const live = Effect.gen(function* () {
       })
     );
 
-  /** Every blob a layer commit's tree holds, by path. */
   const blobsAt = (repo: RepoName, at: CommitSha) =>
     Effect.gen(function* () {
       const commit = yield* commitAt(repo, at);
@@ -534,7 +455,6 @@ const live = Effect.gen(function* () {
       return blobs;
     });
 
-  /** A layer commit's manifest, when it holds one for this layer that decodes. */
   const manifestAt = (repo: RepoName, layer: LayerName, at: CommitSha) =>
     Effect.gen(function* () {
       const bytes = yield* Effect.orDie(
@@ -561,13 +481,6 @@ const live = Effect.gen(function* () {
       return manifest;
     });
 
-  /**
-   * The sealed checks a layer commit holds: its manifest's checks in the
-   * policy's areas (a check in an area the policy does not name runs
-   * nowhere) that cite a clause (one that cites none never judges
-   * an answer, admission or not) and whose files the commit has,
-   * sorted by path.
-   */
   const sealedAt = (
     repo: RepoName,
     layer: LayerName,
@@ -618,11 +531,6 @@ const live = Effect.gen(function* () {
       );
     });
 
-  /**
-   * A layer's head, landed: with sealed checks in it, committed to under a
-   * fresh salt (kept in the layer's row, nowhere else), and each area's
-   * root, check count and author count published.
-   */
   const landLayer = (input: {
     readonly checks: Option.Option<SealedChecks>;
     readonly head: CommitSha;
@@ -678,13 +586,7 @@ const live = Effect.gen(function* () {
       } satisfies ProjectWrites;
     });
 
-  // ------------------------------------------------------------ the port
-
-  /**
-   * Every path any layer holds, at its landed head and at a head still
-   * proposed: deny by default, so nothing from a layer enters a public
-   * tree, admitted yet or not (principle 7).
-   */
+  /** Deny by default: heads still proposed count too, so nothing from a layer enters a public tree, admitted or not. */
   const layerPaths: VisibilityPort["layerPaths"] = (snapshot) =>
     Effect.gen(function* () {
       const heads = snapshot.layers.flatMap(({ landedSha, proposed, repo }) =>
@@ -794,7 +696,6 @@ const live = Effect.gen(function* () {
       });
     });
 
-  /** A blob the layer repo must hold: one its tree named. */
   const contentOf = (repo: RepoName, blob: ObjectId) =>
     Effect.flatMap(Effect.orDie(repos.readBlob(repo, blob)), (content) =>
       Option.match(content, {
@@ -804,12 +705,6 @@ const live = Effect.gen(function* () {
       })
     );
 
-  /**
-   * A known-bad commit the layer repo holds, as the files it lays over
-   * main for its run: every file it holds that the pushed head does not
-   * (so neither the checks nor the manifest), the public code it breaks at
-   * main's paths. None when the repo holds no such commit.
-   */
   const overlayAt = (
     repo: RepoName,
     at: CommitSha,
@@ -840,12 +735,7 @@ const live = Effect.gen(function* () {
       );
     });
 
-  /**
-   * The runs that would admit `head` to `layer` (`./admission.ts`), against
-   * main as it stands: none without a manifest, or for a check that cites no
-   * clause. The runs carry the root of the suite they test under a salt
-   * drawn for them and kept nowhere: the landing draws its own.
-   */
+  /** The runs carry a salt drawn here and kept nowhere: the landing draws its own. */
   const admissionOf = (
     input: { readonly head: CommitSha; readonly layer: LayerName },
     snapshot: ProjectSnapshot
@@ -887,7 +777,6 @@ const live = Effect.gen(function* () {
           ? Option.none<PushedManifest>()
           : yield* manifestAt(row.repo, row.name, row.landedSha);
 
-      // The bytes of each check the manifest lists and the head holds.
       const files = new Map(
         yield* Effect.forEach(
           manifest.value.checks.flatMap(({ path }) =>
@@ -959,9 +848,7 @@ const live = Effect.gen(function* () {
       const project = projectOf(snapshot);
       const visibility = visibilityIn(snapshot);
 
-      // The gateway lets only the layer's writers push; a push heard
-      // from anyone else, or to a layer the config no longer declares,
-      // moves nothing.
+      // Only the layer's writers may push; anyone else, or an undeclared layer, moves nothing.
       if (
         Option.isNone(project) ||
         !Option.contains(
@@ -978,7 +865,6 @@ const live = Effect.gen(function* () {
 
       const row = rowFor(snapshot, project.value, input.layer);
 
-      // The same push heard again changes nothing.
       if (row.landedSha === input.head || row.proposed === input.head) {
         return noPlan;
       }
@@ -987,8 +873,7 @@ const live = Effect.gen(function* () {
       const checks = checksIn(visibility, input.layer);
       const admits = Option.exists(checks, ({ admit }) => admit !== undefined);
 
-      // Admission decides: the head waits, proposed, for its runs. A
-      // push that changes no held-back check has none, and lands at once.
+      // A push that changes no held-back check has no runs, and lands at once.
       const planned = admits
         ? yield* admissionOf({ head: input.head, layer: input.layer }, snapshot)
         : Option.none<AdmissionPlan>();
@@ -1027,8 +912,7 @@ const live = Effect.gen(function* () {
       );
     });
 
-  // Only a head still proposed has a plan: the layer repo is not read for
-  // one that landed or was pushed over (every run step asks again).
+  // Only a head still proposed has a plan (every run step asks again).
   const admissionPlan: VisibilityPort["admissionPlan"] = (input, snapshot) =>
     Arr.some(
       snapshot.layers,
@@ -1037,15 +921,6 @@ const live = Effect.gen(function* () {
       ? admissionOf(input, snapshot)
       : Effect.succeedNone;
 
-  /**
-   * An admission's results, judged by `./admission.ts` against the plan the
-   * project makes again now (a reported run it did not plan counts for
-   * nothing). When every area the push changes is admitted, the head lands
-   * as a push with admission off does, under a fresh salt with each area's
-   * commitment published, then each admitted area's `Admitted` entry,
-   * rooted at its new commitment. Otherwise the landed SHA stays where it
-   * was, and the head stays proposed.
-   */
   const onAdmission: VisibilityPort["onAdmission"] = (input, snapshot) =>
     Effect.gen(function* () {
       const row = Arr.findFirst(
@@ -1067,7 +942,6 @@ const live = Effect.gen(function* () {
       const judged = judgeAdmission(planned.value, input.results, input.now);
       const areas = Arr.dedupe(planned.value.runs.map(({ area }) => area));
 
-      // Every area the push changes admitted, or nothing lands.
       if (judged.admitted.length < areas.length) {
         yield* Effect.logWarning(
           `the push of ${input.head} to ${input.layer} was not admitted`,
@@ -1099,8 +973,7 @@ const live = Effect.gen(function* () {
         )
       );
 
-      // Each admitted area cites its new commitment, never the root its
-      // runs carried (that salt was kept nowhere, so nobody could check it).
+      // Each admitted area cites its new commitment, never its runs' root (that salt was kept nowhere).
       const admitted = yield* Effect.forEach(judged.admitted, (entry, index) =>
         Option.match(Option.fromUndefinedOr(roots.get(entry.area)), {
           onNone: () =>
@@ -1122,7 +995,6 @@ const live = Effect.gen(function* () {
       });
     });
 
-  /** One planned effect, run: a repo made (or found made), an admission started. */
   const run = (planned: Planned) =>
     Planned.match(planned, {
       Admit: ({ head, layer, project }) =>
@@ -1182,10 +1054,6 @@ const live = Effect.gen(function* () {
   return port;
 });
 
-/**
- * The live `ProjectVisibility`, over the private namespace's repos, a salt
- * source (WebCrypto at the platform's edge) and what starts admissions.
- */
 export const ProjectVisibilityLive: Layer.Layer<
   never,
   never,

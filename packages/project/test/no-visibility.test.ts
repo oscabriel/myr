@@ -1,11 +1,3 @@
-/**
- * The project service without the visibility cartridge: over
- * memory adapters with the neutral ports `NoVisibility` and `NoEnv`, a
- * project is Open, declares no layer, keeps an empty ledger and an empty
- * env shape (its committed `.env.schema` notwithstanding), takes no
- * write-only value, pins no held-back suite on a claim, and holds no layer
- * paths. What the cartridge changes, it changes through those two ports.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { CheckSpec } from "@repo/protocol/domain/check";
@@ -47,7 +39,6 @@ const bob = Person.make({
 
 const anyone = Anonymous.make({});
 
-/** The first push: a package, and an env schema whose header says nothing. */
 const start: Files = [
   [
     "package.json",
@@ -64,7 +55,6 @@ const parseIso = Option.getOrThrow(
   Array.findFirst(scenario.policy.asks, (ask) => ask.id === "parse-iso")
 );
 
-/** The ask's own files: its file in the config folder, and its check. */
 const askFiles = Array.make(
   { content: 'export default "parse-iso";\n', path: parseIso.file },
   {
@@ -83,7 +73,6 @@ const askFiles = Array.make(
   }
 );
 
-/** Everything a caller can learn of the project's visibility, with nothing plugged in. */
 const seen = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -125,7 +114,6 @@ const seen = Effect.gen(function* () {
   };
 });
 
-/** The project's world over memory adapters, with the neutral ports said out loud. */
 const world = Layer.mergeAll(worldOf(scenario, "memory"), NoVisibility, NoEnv);
 
 describe("the project service with no visibility plugged in", () => {

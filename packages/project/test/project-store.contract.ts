@@ -39,11 +39,9 @@ import {
 // Rows are written here encoded, as the store keeps them, and decoded once;
 // a snapshot is compared encoded, so every field reads back as written.
 
-/** A minute after noon on the day the store was built. */
 const at = (minute: number) =>
   `2026-10-07T12:${String(minute).padStart(2, "0")}:00.000Z`;
 
-/** A 40-hex commit id from a number, so each fixture SHA is distinct. */
 const sha = (n: number) => n.toString(16).padStart(40, "0");
 
 const decoded = <A, I>(schema: Schema.Codec<A, I>, value: NoInfer<I>): A =>
@@ -54,7 +52,6 @@ const decodedAll = <A, I>(
   values: readonly NoInfer<I>[]
 ) => values.map((value) => decoded(schema, value));
 
-/** Lifecycle states are the service's JSON; the store never reads into them. */
 const json = (text: string) =>
   Schema.decodeSync(Schema.fromJsonString(Schema.Json))(text);
 
@@ -190,10 +187,6 @@ const pushEventOf = (eventId: string) =>
     repo: "alice__datekit--empty-date--bob",
   }) satisfies (typeof PushEventRow)["Encoded"];
 
-// The visibility tables: a declared layer, attempts on its held-back
-// checks, the public ledger, a write-only value (sealed; the store never
-// reads into it) and the layer read log.
-
 const declared = {
   admittedAt: at(6),
   landedSha: sha(7),
@@ -242,7 +235,6 @@ const readBy = (handle: string, minute: number) => ({
   sha: CommitSha.make(sha(7)),
 });
 
-/** A layer read as the store keeps it once numbered, encoded. */
 const readRow = (handle: string, minute: number, seq: number) =>
   ({
     at: at(minute),
@@ -272,7 +264,6 @@ const pushed: ProjectEventInput = ProjectEvent.cases.Pushed.mapFields(
 
 const pushes = (count: number) => Array.from({ length: count }, () => pushed);
 
-/** The writes most cases start from: one of each core row. */
 const everything: ProjectWrites = {
   answers: decodedAll(AnswerRow, [answer]),
   asks: decodedAll(AskRow, [askA, askB]),
@@ -283,7 +274,6 @@ const everything: ProjectWrites = {
   queue,
 };
 
-/** A snapshot in its encoded form, so a comparison sees every field as stored. */
 const EncodedSnapshot = Schema.Struct({
   answers: Schema.Array(AnswerRow),
   asks: Schema.Array(AskRow),
@@ -322,7 +312,6 @@ const empty = {
   ratchets: [],
 };
 
-/** The store's snapshot, encoded. */
 const loaded = Effect.gen(function* () {
   const store = yield* ProjectStore;
 
@@ -332,16 +321,11 @@ const loaded = Effect.gen(function* () {
 const since = (seq: number, limit: number) =>
   ProjectStore.use((store) => store.eventsSince(seq, limit));
 
-/** The layer read log after `seq`, encoded. */
 const readsSince = (seq: number, limit: number) =>
   ProjectStore.use((store) => store.layerReadsSince(seq, limit)).pipe(
     Effect.flatMap(Schema.encodeEffect(Schema.Array(LayerReadRow)))
   );
 
-/**
- * What every ProjectStore adapter must do, written against the port.
- * `/memory` and `/sqlite` (over sqlite-node) run it on every `verify`.
- */
 export const describeProjectStore = (
   adapter: string,
   layer: Layer.Layer<ProjectStore>

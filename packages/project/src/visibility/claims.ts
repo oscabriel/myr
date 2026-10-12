@@ -1,13 +1,3 @@
-/**
- * Attempts on held-back checks, pure: how many
- * times one claim, and one person in one area, may fail an area's sealed
- * checks in one ISO week before the platform stops judging them.
- *
- * Both caps count failures in the ISO week (UTC) a run is judged in, so
- * both reset when the next week starts: `AttemptsExhausted` is retryable
- * and says when. A failure is a count here and nothing else: it never
- * reaches the answerer's record.
- */
 import type { HeldBackResult } from "@repo/protocol/domain/answer";
 import type { SealedChecks } from "@repo/protocol/domain/visibility";
 import { AreaName, sameHandle } from "@repo/protocol/ids";
@@ -20,11 +10,9 @@ import type { AttemptRow } from "../project-store/rows.ts";
 
 const DAY = 86_400_000;
 
-/** The Monday, 00:00 UTC, that starts the ISO week `at` falls in. */
 const mondayOf = (at: DateTime.Utc) =>
   DateTime.startOf(at, "week", { weekStartsOn: 1 });
 
-/** The ISO week a moment falls in, as attempts are counted by: `2026-W41`, in UTC. */
 export const isoWeek = (at: DateTime.Utc): string => {
   // The week belongs to the year its Thursday falls in.
   const thursday = DateTime.add(mondayOf(at), { days: 3 });
@@ -40,22 +28,14 @@ export const isoWeek = (at: DateTime.Utc): string => {
   return `${year}-W${String(week).padStart(2, "0")}`;
 };
 
-/** When the ISO week `at` falls in ends: the next Monday, 00:00 UTC. */
 export const weekEnds = (at: DateTime.Utc): DateTime.Utc =>
   DateTime.add(mondayOf(at), { days: 7 });
 
-/** Whether one more failure may be judged, and when the counts that stop it reset. */
 export interface AttemptsLeft {
   readonly ok: boolean;
   readonly resetsAt: Option.Option<DateTime.Utc>;
 }
 
-/**
- * Whether one more failure may be judged: the claim's failures in an area
- * this week are under the policy's `perClaim`, and the person's, across
- * all their claims, under `perPersonPerAreaPerWeek`. When either cap is
- * reached, the counts reset as the next ISO week starts.
- */
 export const attemptsLeft = (input: {
   readonly claimCount: number;
   readonly weekCount: number;
@@ -72,29 +52,12 @@ export const attemptsLeft = (input: {
   };
 };
 
-/** A held-back run, judged: its refusals, the trailer's value when none, and the attempts it counted. */
 export interface AttemptsJudged {
   readonly attempts: readonly AttemptRow[];
   readonly refusals: readonly (AttemptsExhausted | HeldBackFailed)[];
   readonly trailer: Option.Option<string>;
 }
 
-/**
- * One held-back run of a claim's answer, judged against its attempts,
- * in each sealed area that ran in it, sorted by name:
- *
- * - an area whose attempts were already used up this week is
- *   `AttemptsExhausted`, whatever the run said, and counts nothing: its
- *   bits stay unread until the counts reset;
- * - an area that failed counts one attempt for the claim and for the
- *   person this week, and is `HeldBackFailed` under the pinned suite, or
- *   `AttemptsExhausted` when that failure used the last attempt;
- * - an area that passed counts nothing.
- *
- * With no refusal, the value of the `Held-back:` trailer (`heldBackValue`'s
- * format, areas with no check in the run as `n/a`). The rows are the attempts
- * the run counted; nothing here reaches the answerer's record.
- */
 export const judgeAttempts = (input: {
   readonly attempts: readonly AttemptRow[];
   readonly ask: AskId;

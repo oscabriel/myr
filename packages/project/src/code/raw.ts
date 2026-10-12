@@ -1,15 +1,3 @@
-/**
- * A project's raw bytes, `GET /<project>/raw/<rev>/<path…>` (ADR 0019),
- * as one pure response both the platform (`apps/platform/src/raw.ts`) and
- * the web's dev world serve. Both origins hold a session cookie, so no file
- * may run as script there: every answer carries `nosniff` and a sandboxing
- * CSP, images come back as themselves (an SVG too: an `<img>` never runs
- * its script, and opened on its own the sandbox gives it no script and an
- * opaque origin), markup and every other text as plain text, and anything
- * else binary as bytes to save. A file at a commit's id never changes, so
- * it is cached for good; at a name that moves, for a minute. Anything that
- * is not a file at a revision is a 404 that says nothing of the repo.
- */
 import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
 import { Rev } from "@repo/protocol/domain/code";
 import { BlobSha, RepoPath } from "@repo/protocol/ids";
@@ -23,7 +11,7 @@ import { isBinary, unlessTooLarge } from "./file.ts";
 import { commitAt, isFullSha, resolveRev } from "./revision.ts";
 import { entryAt, segmentsOf } from "./tree.ts";
 
-/** What a raw answer may load and do: nothing but its own images and inline styles, sandboxed. */
+/** Both origins hold a session cookie, so no raw file may run as script: every answer, a refusal too, carries `nosniff` and this CSP. */
 const SANDBOX =
   "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox";
 
@@ -40,13 +28,11 @@ const IMAGES = new Map([
 
 const TEXT = "text/plain; charset=utf-8";
 
-/** What every raw answer carries, a refusal too (ADR 0019). */
 const SAFE = {
   "content-security-policy": SANDBOX,
   "x-content-type-options": "nosniff",
 } as const;
 
-/** `path`'s extension, lowercased; none without one. */
 const extensionOf = (path: string) => {
   const name = path.slice(path.lastIndexOf("/") + 1);
   const dot = name.lastIndexOf(".");
@@ -54,12 +40,6 @@ const extensionOf = (path: string) => {
   return dot <= 0 ? "" : name.slice(dot + 1).toLowerCase();
 };
 
-/**
- * The headers a raw answer for the blob `blob` at `path` carries: its type
- * by extension (an image as itself, anything else as plain text, or as
- * bytes when `binary`), `nosniff` and the sandbox, and a cache for good
- * when `rev` is a commit's id, for a minute when it is a name.
- */
 export const rawHeaders = (
   path: RepoPath,
   rev: "sha" | "ref",
@@ -83,13 +63,10 @@ export const rawHeaders = (
   return headers;
 };
 
-/** A 404 that says nothing of the repo. */
 const notFound = () => new Response(null, { headers: SAFE, status: 404 });
 
-/** A 413: Artifacts said the blob is too large to hold. */
 const tooLarge = () => new Response(null, { headers: SAFE, status: 413 });
 
-/** The file `path` at `rev` of the project's canonical repo, as raw bytes. */
 export const rawOf = (
   project: CodeProject,
   rev: Rev,
@@ -142,12 +119,6 @@ const decodePath = Schema.decodeUnknownOption(RepoPath);
 
 const decoded = Option.liftThrowable(decodeURIComponent);
 
-/**
- * A raw request's revision and path from everything after `raw/`, as the
- * URL carries it: the first segment is the revision (a tag's `/` arrives
- * as `%2F`), the rest the file's path, each decoded once. A path with an
- * empty, `.` or `..` segment, before or after decoding, is none.
- */
 export const rawRequestOf = (
   rest: string
 ): Option.Option<{ readonly rev: Rev; readonly path: RepoPath }> => {
@@ -166,14 +137,7 @@ export const rawRequestOf = (
   });
 };
 
-/**
- * Everything after `/<project>/raw/` in a request's URL (whole, or its path
- * and query), still encoded, where the project's name takes as many
- * segments as it has (`oscabriel/datekit`, `github.com/pallets/click`, or a
- * legacy key's one). Read from the URL itself, not a router's parameter: a
- * router decodes `%2F`, which would cut a tag's name
- * (`%40datekit%2Fcore%402.0.0`) in two.
- */
+/** Read from the URL, not a router's parameter: a router decodes `%2F`, which would cut a tag's name in two. */
 export const rawRestOf = (url: string, project: ProjectName): string => {
   const segments = new URL(url, "http://raw.invalid").pathname.split("/");
   const named = project.split("/").length;
@@ -185,11 +149,6 @@ export const rawRestOf = (url: string, project: ProjectName): string => {
   return segments[2] === "raw" ? segments.slice(3).join("/") : "";
 };
 
-/**
- * The answer to `GET /<project>/raw/<rest>` at `url` (whole, or its path
- * and query): the project found by its name, then its file. A project
- * never made is a 404 too.
- */
 export const rawFor = (
   project: ProjectName,
   url: string

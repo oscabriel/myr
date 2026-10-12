@@ -1,25 +1,3 @@
-/**
- * One commit and what it changed against its first parent (a root commit
- * against the empty tree), through `treeDiff` (`@repo/git/tree-diff`): each
- * file's status, both blob ids, whether it is binary, and its old and new
- * text. At most 300 files and 2 MiB of text in all: past 300 files every
- * file is a path only, and once the text runs past 2 MiB the files after
- * it are; either way the diff says it is `truncated`.
- *
- * Each file's two sides are read `SIDES_AT_ONCE` files at a time, in path
- * order, and the budget is spent in that order, so the diff is the one a
- * read of one file after another gives. A tree entry carries no size, so
- * a side the budget drops cannot be known before it is read: once the
- * budget runs out no further window is read, and at most one window's
- * reads go unused.
- *
- * What a commit changed never changes, so the finished diff is kept in the
- * code store by its repo and id (`commitKey`), without its landing: the
- * landing is asked of the project's record on every call, so a later
- * landing shows at once and the store holds none (principle 7). A kept
- * value that no longer decodes is computed again; the list of changes is
- * also kept in the isolate's cache by the commit's id.
- */
 import { RepoHost } from "@repo/artifacts/repo-host";
 import type { RepoNotFound, TreeEntry } from "@repo/artifacts/repo-host";
 import { treeDiff } from "@repo/git/tree-diff";
@@ -41,26 +19,21 @@ import { filesUnder, PATHS_CAP } from "./paths.ts";
 import { commitAt } from "./revision.ts";
 import { entriesOf, entryAt } from "./tree.ts";
 
-/** The most files a commit's diff carries text for. */
 export const DIFF_FILES = 300;
 
-/** The most text a commit's diff carries in all: 2 MiB. */
 export const DIFF_TEXT = 2 * 1024 * 1024;
 
-/** The kept commit's version, in its key: it moves when what is kept changes. */
+/** Bump when what is kept changes. */
 export const COMMIT_VERSION = 1;
 
-/** Where a commit's diff is kept in the code store: by its repo and its id. */
 export const commitKey = (repo: RepoName, sha: CommitSha) =>
   `${repo}/commit/v${COMMIT_VERSION}/${sha}`;
 
-/** How many files' sides are read at once: the fan-out the changes are listed with. */
 const SIDES_AT_ONCE = 8;
 
-/** The longest list of changes the cache keeps. */
 const KEPT_CHANGES = 1000;
 
-/** A change, and whether each side is a submodule (whose id names no blob here). */
+/** Whether each side is a submodule, whose id names no blob here. */
 interface Changed extends Change {
   readonly links: { readonly before: boolean; readonly after: boolean };
 }
@@ -68,7 +41,6 @@ interface Changed extends Change {
 const isLink = (entry: Option.Option<TreeEntry>) =>
   Option.exists(entry, ({ type }) => type === "commit");
 
-/** Every file under a root commit's tree, each added. */
 const rootChanges = (repo: RepoName, tree: string) =>
   Effect.map(filesUnder(repo, tree, PATHS_CAP), ({ files }) =>
     files.map(({ entry, path }): Changed => ({
@@ -79,10 +51,6 @@ const rootChanges = (repo: RepoName, tree: string) =>
     }))
   );
 
-/**
- * What changed from `base` to `head`, by `treeDiff` over this repo's trees
- * read through the cache (so the side lookups that follow read none again).
- */
 const changesBetween = (repo: RepoName, base: string, head: string) =>
   Effect.gen(function* () {
     const host = yield* RepoHost;
@@ -125,7 +93,6 @@ const changesBetween = (repo: RepoName, base: string, head: string) =>
 
 const byPath = Order.mapInput(Order.String, (change: Changed) => change.path);
 
-/** A side's contents, unless it is a submodule or absent. */
 const sideOf = (
   repo: RepoName,
   blob: BlobSha | undefined,
@@ -133,7 +100,6 @@ const sideOf = (
 ): Effect.Effect<Option.Option<Contents>, RepoNotFound, RepoHost> =>
   blob === undefined || link ? Effect.succeedNone : contentsOf(repo, blob);
 
-/** A change as a path, its status and its blob ids, with no text. */
 const pathOnly = ({ after, before, path, status }: Changed): ChangedFile => {
   const file = { binary: false, path, status };
 
@@ -148,22 +114,16 @@ const pathOnly = ({ after, before, path, status }: Changed): ChangedFile => {
   return after === undefined ? file : { ...file, after };
 };
 
-/** Both sides of `change`: its old contents and its new, where it has them. */
 const sidesOf = (repo: RepoName, change: Changed) =>
   Effect.all([
     sideOf(repo, change.before, change.links.before),
     sideOf(repo, change.after, change.links.after),
   ]);
 
-/** The length of a side's text, or 0 when it has none. */
 const lengthOf = (text: Option.Option<string>) =>
   Option.match(text, { onNone: () => 0, onSome: ({ length }) => length });
 
-/**
- * Each change with its text while the budget lasts, and whether any went
- * without: the sides read a window of `SIDES_AT_ONCE` files at a time, the
- * budget spent in path order, and no window read once it ran out.
- */
+/** The budget is spent in path order, and no window is read once it runs out. */
 const withText = (repo: RepoName, changes: readonly Changed[]) =>
   Effect.gen(function* () {
     if (changes.length > DIFF_FILES) {
@@ -226,14 +186,12 @@ const withText = (repo: RepoName, changes: readonly Changed[]) =>
     return { files, truncated };
   });
 
-/** A diff as the store keeps it: JSON, by the protocol's own schema. */
 const Kept = Schema.fromJsonString(CommitDiff);
 
 const decodeKept = Schema.decodeUnknownOption(Kept);
 
 const encodeKept = Schema.encodeEffect(Kept);
 
-/** `diff` with its commit's landing, asked of the project's record now. */
 const withLanding = (
   project: CodeProject,
   diff: CommitDiff
@@ -251,7 +209,6 @@ const withLanding = (
     )
   );
 
-/** The diff kept for `sha` in the code store, if one is and it still decodes. */
 const keptDiff = (repo: RepoName, sha: CommitSha) =>
   Effect.gen(function* () {
     const store = yield* CodeStore;
@@ -263,7 +220,7 @@ const keptDiff = (repo: RepoName, sha: CommitSha) =>
     );
   });
 
-/** `diff`, which carries no landing, kept for `sha`; a store that fails keeps nothing. */
+/** Kept without its landing, which is asked of the record on every call. */
 const keepDiff = (repo: RepoName, sha: CommitSha, diff: CommitDiff) =>
   Effect.gen(function* () {
     const store = yield* CodeStore;
@@ -276,7 +233,6 @@ const keepDiff = (repo: RepoName, sha: CommitSha, diff: CommitDiff) =>
     );
   });
 
-/** The diff of `sha` against its first parent, computed, with no landing. */
 const computedDiff = (
   repo: RepoName,
   sha: CommitSha
@@ -309,7 +265,6 @@ const computedDiff = (
           onNone: () => rootChanges(repo, commit.tree),
           onSome: ({ tree }) => changesBetween(repo, tree, commit.tree),
         }),
-        // A longer list is listed again, over trees the cache keeps.
         { heavy: true, keep: (all) => all.length <= KEPT_CHANGES }
       )
       .pipe(Effect.orDie);
@@ -322,7 +277,6 @@ const computedDiff = (
     return { commit: commitView(commit, Option.none()), files, truncated };
   });
 
-/** One commit and the files it changed against its first parent. */
 export const commitDiff = (
   project: CodeProject,
   sha: CommitSha

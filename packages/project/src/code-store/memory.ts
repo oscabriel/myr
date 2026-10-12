@@ -1,13 +1,8 @@
-/**
- * The code store in memory, for tests: a map per layer, and a count of
- * every get and put, so a test can say a read was served from the store.
- */
 import { Context, Effect, Layer, Option, Ref } from "effect";
 
 import { CodeStore, fittingKey } from "../code-store.ts";
 import type { CodeStoreApi } from "../code-store.ts";
 
-/** How often the memory store was asked, for tests. */
 export class CodeStoreCounts extends Context.Service<
   CodeStoreCounts,
   {
@@ -18,7 +13,6 @@ export class CodeStoreCounts extends Context.Service<
   }
 >()("project/CodeStoreCounts") {}
 
-/** A fresh store in memory, with its counts. */
 export const CodeStoreMemory = Layer.effectContext(
   Effect.gen(function* () {
     const kept = yield* Ref.make<ReadonlyMap<string, string>>(new Map());

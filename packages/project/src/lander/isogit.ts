@@ -1,24 +1,3 @@
-/**
- * The `Lander` over isomorphic-git in a Worker: the production
- * fallback until the container Lander in `apps/sandbox` passes, and the one
- * the core-loop tests run on. It runs no project code and installs nothing.
- *
- * It is stateless. Each call reads the commits, trees and blobs it needs
- * through `RepoHost` (never `fetch`), writes the objects it makes into a
- * scratch git directory in memory, and pushes from there: canonical `main`
- * with a non-force compare-and-swap, then the mirror ref and the verdict
- * note, each in its own push, since Artifacts has no atomic multi-ref push.
- * A scratch directory holds only the objects the repo lacks; the
- * rest are referenced by id.
- *
- * The merge is three-way at the tree level, read through the port: it
- * descends only into folders both sides changed, and a file both sides
- * changed is merged line by line by isomorphic-git's `merge` over a scratch
- * history of that one file.
- *
- * `bundleRules` returns the config folder's sources as committed. This
- * adapter bundles no TypeScript; the container Lander bundles with Bun.
- */
 import {
   BranchName,
   ObjectId,
@@ -79,12 +58,10 @@ const SNIFF = 8000;
 
 const blocked = () => new VerifierBlocked({});
 
-/** A store that lost a repo cannot merge or land: `VerifierBlocked`. */
 const unlessLost = <A, R>(
   effect: Effect.Effect<A, RepoNotFound, R>
 ): Effect.Effect<A, VerifierBlocked, R> => Effect.mapError(effect, blocked);
 
-/** An object the store should hold and does not: `VerifierBlocked` too. */
 const found = <A, R>(
   read: Effect.Effect<Option.Option<A>, RepoNotFound, R>
 ): Effect.Effect<A, VerifierBlocked, R> =>
@@ -110,19 +87,16 @@ const blobIn = (repo: RepoName, blob: ObjectId) =>
 const refsIn = (repo: RepoName) =>
   RepoHost.use((host) => host.refs(repo)).pipe(unlessLost);
 
-/** One ref's compare-and-swap, alone in its push; what it came to. */
 const pushOne = (repo: RepoName, source: PushSource, update: RefUpdate) =>
   RepoHost.use((host) => host.push(repo, source, [update])).pipe(
     Effect.map((outcomes) => Option.fromNullishOr(outcomes[0]))
   );
 
-/** A push whose ref did not move, for a ref where that is not a refusal. */
 const moves = (outcome: Option.Option<RefOutcome>) =>
   Option.exists(outcome, RefOutcome.$is("Updated"))
     ? Effect.void
     : Effect.fail(blocked());
 
-/** Clock time, in the whole seconds a git signature holds. */
 const seconds = Effect.map(Clock.currentTimeMillis, (millis) =>
   Math.floor(millis / 1000)
 );
@@ -130,7 +104,6 @@ const seconds = Effect.map(Clock.currentTimeMillis, (millis) =>
 const git = <A>(run: () => Promise<A>) =>
   Effect.tryPromise(run).pipe(Effect.orDie);
 
-/** A git signature at `at` seconds past the epoch, in UTC. */
 const signed = (who: GitIdentity, at: number) => ({
   email: who.email,
   name: who.name,
@@ -142,10 +115,6 @@ const signed = (who: GitIdentity, at: number) => ({
 const kept = (id: ObjectId, made: ObjectId) =>
   made === id ? Effect.void : Effect.die(`copying ${id} produced ${made}`);
 
-/**
- * A bare git directory in memory: what a call writes its new objects into
- * and pushes from. One per call; nothing outlives it.
- */
 const scratch = Effect.gen(function* () {
   const source: PushSource = { fs: memoryFs(), gitdir: "/lander.git" };
 
@@ -196,7 +165,6 @@ const scratch = Effect.gen(function* () {
       (oid) => CommitSha.make(oid)
     );
 
-  /** A commit of one file holding `bytes` (or of nothing) on `parents`. */
   const fileCommit = (
     bytes: Option.Option<Uint8Array>,
     parents: readonly CommitSha[]
@@ -219,11 +187,6 @@ const scratch = Effect.gen(function* () {
       });
     });
 
-  /**
-   * One file's three versions merged line by line, by isomorphic-git's
-   * `merge` over a history of that file alone: the merged blob, or `None`
-   * when the changes conflict.
-   */
   const lines = (
     base: Option.Option<Uint8Array>,
     ours: Uint8Array,
@@ -290,7 +253,6 @@ const sameEntry = (one: TreeEntry | undefined, other: TreeEntry | undefined) =>
 const isFile = (entry: TreeEntry | undefined) =>
   entry?.mode === "100644" || entry?.mode === "100755";
 
-/** The folder an entry is, if it is one. */
 const folderOf = (entry: TreeEntry | undefined) =>
   entry?.type === "tree" ? Option.some(entry.sha) : Option.none();
 
@@ -303,13 +265,11 @@ const entriesAt = (repo: RepoName, tree: Option.Option<ObjectId>) =>
     onSome: (id) => treeIn(repo, id),
   });
 
-/** Where an answer's sides are read: main from canonical, base and head from the fork. */
 interface Sides {
   readonly canonical: RepoName;
   readonly fork: RepoName;
 }
 
-/** A merged folder's entries, or the paths under it that conflict. */
 interface MergedTree {
   readonly entries: readonly TreeEntry[];
   readonly conflicts: readonly string[];
@@ -325,12 +285,6 @@ const conflict = (path: string): MergedTree => ({
   entries: [],
 });
 
-/**
- * Makes `theirs`, an entry the merge takes from the head, pushable: every
- * object under it that differs from the base's entry at its path is copied
- * from the fork into the scratch directory. What equals the base is already
- * in canonical, since the base is a commit on canonical's history.
- */
 const adopt = (
   sides: Sides,
   into: Scratch,
@@ -359,7 +313,6 @@ const adopt = (
   });
 };
 
-/** A file's mode once both sides changed it, unless they changed it differently. */
 const mergedMode = (
   base: TreeEntry | undefined,
   ours: TreeEntry,
@@ -372,7 +325,6 @@ const mergedMode = (
   return base?.mode === ours.mode ? Option.some(theirs.mode) : Option.none();
 };
 
-/** A file both sides changed, merged; `None` when the changes conflict. */
 const mergeFile = (
   sides: Sides,
   into: Scratch,
@@ -429,11 +381,6 @@ const mergeFile = (
     return Option.map(yield* into.lines(before, mine, yours), file);
   });
 
-/**
- * Three folders merged by name. An entry only one side changed is taken from
- * that side; a folder both changed is merged inside; a file both changed is
- * merged line by line; anything else both changed conflicts.
- */
 const mergeTrees = (
   sides: Sides,
   into: Scratch,
@@ -478,7 +425,6 @@ const mergeTrees = (
               theirs: Option.some(t.sha),
             });
 
-            // Both sides emptied it, or something in it conflicts.
             if (inner.conflicts.length > 0 || inner.entries.length === 0) {
               return { conflicts: inner.conflicts, entries: [] };
             }
@@ -514,11 +460,6 @@ const mergeTrees = (
     };
   });
 
-/**
- * The answer's head merged onto `main`, with the base as the merge base:
- * the merged root (written into `into`) and the base's and head's roots, or
- * `StaleBase` with every path that conflicts.
- */
 const mergeOnto = (into: Scratch, job: MergeJob) =>
   Effect.gen(function* () {
     const [base, ours, theirs] = yield* Effect.all([
@@ -557,13 +498,11 @@ const mergeOnto = (into: Scratch, job: MergeJob) =>
     };
   });
 
-/** A file to place, by the folders and name its path is made of. */
 interface Placed {
   readonly segments: readonly string[];
   readonly content: string;
 }
 
-/** A path's folders and file name; one that cannot name a file is a defect upstream. */
 const placed = ({ content, path }: ComposedFile) => {
   const segments = path.split("/");
 
@@ -572,11 +511,6 @@ const placed = ({ content, path }: ComposedFile) => {
     : Effect.die(`${path} cannot name a file in a repo`);
 };
 
-/**
- * `files` written into `repo`'s folder `tree` (or a new folder), folder by
- * folder, keeping every other entry: the new folder's id. A file where a
- * folder stands, or a folder where a file stands, is a defect upstream.
- */
 const placeFiles = (
   repo: RepoName,
   into: Scratch,
@@ -632,7 +566,6 @@ const placeFiles = (
     return yield* into.tree([...entries.values()]);
   });
 
-/** `main` with `files` added, written into `into`: the new root. */
 const composeOnto = (
   into: Scratch,
   repo: RepoName,
@@ -648,7 +581,6 @@ const composeOnto = (
     );
   });
 
-/** The tree a land rebuilds, written into `into` where it is new. */
 const rebuilt = (into: Scratch, job: LandJob) =>
   Rebuild.$match(job.rebuild, {
     Compose: ({ files }) => composeOnto(into, job.repo, job.main, files),
@@ -670,10 +602,6 @@ const carriesRequest = (message: string, requestId: RequestId) =>
     ? Effect.void
     : Effect.die(`a landing's message must carry Request-Id: ${requestId}`);
 
-/**
- * The commit an earlier land of the same request put on `main`: a child of
- * the job's `main` carrying its `Request-Id`, on main's first parents.
- */
 const landedBefore = (job: LandJob) =>
   Effect.gen(function* () {
     const history = yield* RepoHost.use((host) =>
@@ -688,7 +616,6 @@ const landedBefore = (job: LandJob) =>
     return Option.fromNullishOr(mine?.sha);
   });
 
-/** The mirror ref moved to the landing, while the landing is still main's tip. */
 const mirror = (repo: RepoName, landing: CommitSha) =>
   Effect.gen(function* () {
     const refs = yield* refsIn(repo);
@@ -710,7 +637,6 @@ const mirror = (repo: RepoName, landing: CommitSha) =>
     );
   });
 
-/** Whether the notes at `tip` already hold a note on `target`. */
 const noted = (
   repo: RepoName,
   tip: Option.Option<CommitSha>,
@@ -727,7 +653,6 @@ const noted = (
       }),
   });
 
-/** The verdict written as the landing's note, unless it is there already. */
 const note = (repo: RepoName, landing: CommitSha, verdict: Verdict) =>
   Effect.gen(function* () {
     const refs = yield* refsIn(repo);
@@ -750,7 +675,6 @@ const note = (repo: RepoName, landing: CommitSha, verdict: Verdict) =>
     );
   });
 
-/** One piece of bookkeeping: `None` once written, its name when it was not. */
 const attempt = <E>(
   item: Bookkeeping,
   write: Effect.Effect<void, E, RepoHost>
@@ -765,11 +689,8 @@ const attempt = <E>(
     )
   );
 
-/**
- * What follows a landing on `main`, in order and each in its own push: the
- * mirror ref, then the verdict note. Neither fails the landing; what was not
- * written comes back pending, and landing the same job again writes it.
- */
+// Mirror ref then verdict note, each in its own push. Neither fails the landing;
+// what was not written comes back pending, and landing the job again writes it.
 const settle = (job: LandJob, landing: CommitSha) =>
   Effect.gen(function* () {
     const mirrored = yield* attempt("mirror", mirror(job.repo, landing));
@@ -785,7 +706,6 @@ const settle = (job: LandJob, landing: CommitSha) =>
     };
   });
 
-/** The base a stale land names: the answer's own, or the main it was built on. */
 const baseOf = (job: LandJob) =>
   Rebuild.$match(job.rebuild, {
     Compose: () => job.main,
@@ -793,7 +713,6 @@ const baseOf = (job: LandJob) =>
     Merge: ({ base }) => base,
   });
 
-/** A land that found `main` at `tip`: the earlier land of the same request, or stale. */
 const moved = (job: LandJob, tip: Option.Option<CommitSha>) =>
   Effect.gen(function* () {
     const earlier = yield* landedBefore(job);
@@ -898,7 +817,6 @@ const compose = (job: ComposeJob) =>
     return { commit, tree };
   });
 
-/** Every file under the folder `tree`, by repo path, as committed. */
 const filesUnder = (
   repo: RepoName,
   tree: ObjectId,
@@ -928,7 +846,6 @@ const filesUnder = (
     return nested.flat();
   });
 
-/** The config folder in the root `root`, if the commit has one. */
 const configFolder = (repo: RepoName, root: ObjectId) =>
   Effect.reduce(
     Brand.configDir.split("/"),
@@ -971,7 +888,6 @@ const merge = (job: MergeJob) =>
     return { changes, tree };
   });
 
-/** The Lander over isomorphic-git, reading and pushing through `RepoHost`. */
 export const LanderIsogit: Layer.Layer<Lander, never, RepoHost> = Layer.effect(
   Lander,
   Effect.gen(function* () {

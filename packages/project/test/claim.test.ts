@@ -34,7 +34,6 @@ const { Claim, Land, Push, Release, Tick } = ClaimCommand.cases;
 
 const HOUR = 3_600_000;
 
-/** The defaults: warned after 2 quiet hours, lapsed after 24. */
 const policy = { lapseAfterMs: 24 * HOUR, warnAfterMs: 2 * HOUR };
 
 const project = ProjectName.make("alice/datekit");
@@ -53,15 +52,12 @@ const bob = Handle.make("Bob");
 
 const carol = Handle.make("carol");
 
-/** Bob's fork: his handle in lowercase. */
 const fork = RepoName.make("alice__datekit--parse-iso--bob");
 
 const start = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
-/** `hours` after the claim was made. */
 const at = (hours: number) => DateTime.add(start, { hours });
 
-/** A claim by a vouched person under their cap, on an ask nobody holds. */
 const claimBy = (
   handle: Handle,
   standing: Partial<Omit<typeof Claim.Type, "_tag" | "who">> = {}
@@ -82,7 +78,6 @@ const claimBy = (
 
 const open = ClaimState.cases.Open.make({ ask });
 
-/** Bob's claim, made at `start`, never pushed to. */
 const fresh = {
   ask,
   base,

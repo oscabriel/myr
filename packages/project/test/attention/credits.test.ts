@@ -12,13 +12,11 @@ import { creditsByArea } from "../../src/attention/credits.ts";
 
 const now = at("2026-10-07T12:00:00Z");
 
-/** `datekit`: asks in `packages/parser` and `packages/format`. */
 const datekit = aProject({ now }).pipe(
   withAsk({ id: "parse-iso", territory: "packages/parser" }),
   withAsk({ id: "format-week", territory: "packages/format" })
 );
 
-/** `burrow`: an ask in `packages/p1`. */
 const burrow = aProject({ name: "alice/burrow", now }).pipe(
   withAsk({ id: "drop-legacy-p1", territory: "packages/p1" })
 );
@@ -38,7 +36,6 @@ const credit = (role: CreditRole, handle: Handle): Credit => ({
   role,
 });
 
-/** A landing in `scenario` answering `ask` (none: a decider's own landing), with these trailers. */
 const landing = (
   scenario: Scenario,
   seed: string,

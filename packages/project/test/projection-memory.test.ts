@@ -1,10 +1,6 @@
 /**
- * `ProjectionMemory`, the read models' feed in tests and in the platform's
- * local composition: it keeps each project's events once by
- * `(project, event.seq)`, as the `Projection` port asks, even though every
- * project's outbox names its rows by the event's number alone
- * (`projected:<seq>`). Found by the web's dev world: burrow's events vanished
- * from a projection datekit's had reached first.
+ * Every project's outbox names its rows by event number alone
+ * (`projected:<seq>`), so the projection must key events by project too.
  */
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectEvent } from "@repo/protocol/domain/event";

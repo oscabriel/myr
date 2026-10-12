@@ -21,21 +21,12 @@ import {
   RatchetRow,
 } from "./rows.ts";
 
-// How each kind of row is kept, shared by every adapter: the table it lives
-// in, the columns a row is found by, its body (the row's encoded JSON), and
-// which tables a commit writes from which `ProjectWrites` field. The SQLite
-// tables themselves are created by `migrations.ts`.
-
-/** A column's value: text, or an integer. */
 export type Column = string | number;
 
-/** One table's rows: how a row becomes its key columns and body, and back. */
 export interface Table<A> {
-  /** Every column besides `body`, by name, for one row. */
   readonly columns: (row: A) => Readonly<Record<string, Column>>;
   readonly decode: (body: string) => Effect.Effect<A>;
   readonly encode: (row: A) => Effect.Effect<string>;
-  /** The columns that make a row's key: writing a row again under it replaces it. */
   readonly key: readonly string[];
   readonly name: string;
 }
@@ -61,7 +52,6 @@ const tableOf = <A, I>(
   };
 };
 
-/** The tables that hold many rows, by the `ProjectWrites` field that carries them. */
 export const Tables = {
   answers: tableOf("answers", AnswerRow, ["request_id"], (row) => ({
     request_id: row.requestId,
@@ -118,10 +108,8 @@ export const Tables = {
   ),
 } as const;
 
-/** A table with one row at most: the project, and the landing queue. */
 const single = { id: 1 } as const;
 
-/** The project's own row. */
 export const ProjectTable = tableOf(
   "project",
   ProjectRow,
@@ -129,7 +117,6 @@ export const ProjectTable = tableOf(
   () => single
 );
 
-/** The encoded landing queue, one row. */
 export const QueueTable = tableOf(
   "landing_queue",
   Schema.Json,
@@ -137,12 +124,10 @@ export const QueueTable = tableOf(
   () => single
 );
 
-/** The project's events, each body carrying the `seq` it was given. */
 export const EventTable = tableOf("events", ProjectEvent, ["seq"], (event) => ({
   seq: event.seq,
 }));
 
-/** The layer read log, each body carrying the `seq` it was given. */
 export const LayerReadTable = tableOf(
   "layer_reads",
   LayerReadRow,
@@ -150,25 +135,16 @@ export const LayerReadTable = tableOf(
   (read) => ({ at: DateTime.toEpochMillis(read.at), seq: read.seq })
 );
 
-/** How an adapter writes one table's rows, each replacing any row under its key. */
 export type Upsert<E, R> = <A>(
   table: Table<A>,
   rows: readonly A[]
 ) => Effect.Effect<void, E, R>;
 
-/** The newest numbers a store gave: its last event's, and its last layer read's. */
 export interface LastNumbers {
   readonly read: number;
   readonly seq: number;
 }
 
-/**
- * Writes every row in `writes` through an adapter's `upsert`, table by
- * table, with the events numbered on from `last.seq` and the layer reads
- * from `last.read`, and returns the numbers it gave the events. Both
- * adapters commit through it, so a table `ProjectWrites` gains is written by
- * both or by neither.
- */
 export const writeAll = <E, R>(
   writes: ProjectWrites,
   last: LastNumbers,

@@ -123,15 +123,10 @@ describe(decideRaise, () => {
   });
 });
 
-// The model drives a project's ratchets through generated histories of
-// landings, answers and decisions on the answers' raises, and after every
-// step checks that no baseline rose but by an accepted RaiseRatchet.
-
 const ratchets = [noExplicitAny, RatchetName.make("escapes")] as const;
 
 const territories = [parser, "packages/lexer"] as const;
 
-/** Every (ratchet, territory) pair the histories touch, by index. */
 const keys = ratchets.flatMap((ratchet) =>
   territories.map((territory) => ({ ratchet, territory }))
 );
@@ -142,12 +137,6 @@ const KeyIndex = Schema.Int.check(
 
 const longest = 40;
 
-/**
- * One move of a history: a landing or an answer measures some keys (a key
- * counted twice keeps its first count, as `measure` yields one per
- * territory); an answer may ask to raise some; a decision answers one of the
- * raises still waiting, picked by `pick`.
- */
 const Move = Schema.Struct({
   choice: Choice,
   counts: Schema.Array(
@@ -169,7 +158,6 @@ const histories = Arbitrary.array(Arbitrary.schema(Move), {
 
 interface Model {
   readonly baselines: readonly RatchetBaseline[];
-  /** Raises answers asked for, waiting on a decider. */
   readonly waiting: readonly RaiseRatchet[];
 }
 
@@ -204,7 +192,6 @@ const raisesBy = (move: Move): readonly RaiseRequest[] =>
 
 const approves = (choice: Choice) => choice === "accept" || choice === "adopt";
 
-/** What one step did: its new model, and the subject it decided, if it decided one. */
 interface Stepped {
   readonly model: Model;
   readonly decided: Option.Option<{
@@ -212,7 +199,6 @@ interface Stepped {
     readonly choice: Choice;
   }>;
   readonly broken: Option.Option<string>;
-  /** How many raises the step refused. */
   readonly refused: number;
 }
 
@@ -319,7 +305,6 @@ const step = (model: Model, move: Move, at: number): Stepped => {
   });
 };
 
-/** The first baseline that rose in a step, unless an accepted raise of it set it. */
 const roseUnasked = (before: Model, stepped: Stepped): Option.Option<string> =>
   Array.findFirst(stepped.model.baselines, (now) =>
     Option.match(baselineOf(before.baselines, now), {
@@ -341,7 +326,6 @@ const roseUnasked = (before: Model, stepped: Stepped): Option.Option<string> =>
     )
   );
 
-/** A history's end, and what happened on the way. */
 interface Run {
   readonly model: Model;
   readonly lowered: number;
@@ -351,7 +335,6 @@ interface Run {
 
 const begin: Model = { baselines: [], waiting: [] };
 
-/** How many baselines moved down from one model to the next. */
 const loweredBetween = (before: Model, after: Model) =>
   after.baselines.filter((now) =>
     Option.exists(
@@ -360,7 +343,6 @@ const loweredBetween = (before: Model, after: Model) =>
     )
   ).length;
 
-/** Runs a history; fails with the first broken rule and where it broke. */
 const run = (moves: readonly Move[]): Result.Result<Run, string> => {
   let ran: Run = { accepted: 0, lowered: 0, model: begin, refused: 0 };
 
@@ -399,12 +381,7 @@ const holds = (moves: readonly Move[]) =>
     onSuccess: () => Effect.succeed(true),
   });
 
-/**
- * Generated histories are CPU work alone: under a second on an idle machine,
- * several seconds while turbo runs every package's tests at once (the CLI's
- * build test compiles binaries beside them). This limit is there to catch a
- * hang, not a busy machine.
- */
+/** Generous: it catches a hang, not a busy machine running every package's tests. */
 const generated = { timeout: 30_000 };
 
 describe("ratchets over generated histories", generated, () => {

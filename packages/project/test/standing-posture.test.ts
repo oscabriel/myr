@@ -1,12 +1,3 @@
-/**
- * A listed project's posture, as its own record says it now: each listing
- * the projection gives is overlaid with the posture its project's ledger
- * stands at, a few projects at once. A project the platform never made, or
- * one whose read breaks, keeps the posture the projection listed, and the
- * list still answers. What was read is kept (`StandingPostures`) until the
- * instant it moves by the clock, so a second list reads only the projects
- * whose kept posture ran out; a store that fails is a miss.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import type { ProjectListing } from "@repo/protocol/domain/front-page";
@@ -55,10 +46,6 @@ const burrow = ProjectName.make("alice/burrow");
 
 const landedAt = DateTime.makeUnsafe("2026-10-08T12:00:00Z");
 
-/**
- * An api whose only answered read is `standing`, at `posture`, having seen
- * 7 events, moving by the clock at `until` when given.
- */
 const standingAt = (
   project: ProjectName,
   posture: Posture,
@@ -76,10 +63,6 @@ const standingAt = (
       ),
   });
 
-/**
- * The platform's projects: datekit's ledger stands sealed, burrow's open,
- * `broken`'s read dies, and `ghost` was never made.
- */
 const platform = Layer.succeed(
   Projects,
   Projects.of({
@@ -117,7 +100,6 @@ const listed: readonly ProjectListing[] = [
   { landedAt, openAsks: 2, posture: "openOnSchedule", project: burrow },
 ];
 
-/** The projects as `listed` stands them, `datekit` sealed and `burrow` open. */
 const standingListed = [
   {
     landedAt,
@@ -130,13 +112,8 @@ const standingListed = [
   { landedAt, openAsks: 2, posture: "open", project: burrow },
 ] satisfies readonly ProjectListing[];
 
-/** One hour past the TestClock's start: when datekit's narrowing takes effect, below. */
 const inAnHour = DateTime.makeUnsafe(Duration.toMillis(Duration.hours(1)));
 
-/**
- * `platform`, each project's `standing` read counted in `reads`; datekit's
- * moves by the clock at `datekitUntil`.
- */
 const counted = (
   reads: Ref.Ref<readonly ProjectName[]>,
   datekitUntil: Option.Option<DateTime.Utc> = Option.none()
@@ -176,7 +153,6 @@ const counted = (
     })
   );
 
-/** A store whose every read and write dies. */
 const brokenStore = Layer.succeed(StandingPostures, {
   get: () => Effect.die("D1 is down"),
   put: () => Effect.die("D1 is down"),
@@ -380,14 +356,12 @@ describe("a listing's kept standing posture", () => {
   );
 });
 
-/** The kept postures and the projection over the platform's D1, in sqlite. */
 const d1 = Layer.mergeAll(StandingPosturesD1, ProjectionD1).pipe(
   Layer.provideMerge(
     migrated([frontPageMigration, projectsMigration, posturesMigration])
   )
 );
 
-/** One event of `project`'s, as the projection is handed it from the outbox. */
 const projected = (project: ProjectName, event: ProjectEvent) =>
   Effect.flatMap(projectedRows(project, [event], landedAt), (rows) =>
     Projection.use((projection) => projection.apply(rows))
@@ -401,7 +375,6 @@ describe("a listing's standing posture kept in D1 beside the projection", () => 
         const reads = yield* Ref.make<readonly ProjectName[]>([]);
 
         yield* Effect.gen(function* () {
-          /** One list; the projects it read, but broken, whose read always fails. */
           const list = Effect.gen(function* () {
             yield* Ref.set(reads, []);
 

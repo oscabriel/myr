@@ -1,14 +1,3 @@
-/**
- * What crosses the service binding between the platform and the sandbox
- * Worker for each `Lander` job (`merge`, `land`, `compose`, `bundleRules`):
- * the job as the port takes it, the remotes the platform mints tokens for,
- * and the job's outcome on the way back. Both sides decode with these
- * schemas (principle 2): the platform encodes jobs and decodes outcomes;
- * the sandbox's Lander does the reverse.
- *
- * Each job schema decodes to the port's own argument type (`satisfies`
- * below), so the wire and the port cannot drift apart.
- */
 import { Remote } from "@repo/checks/check-runner/wire";
 import { Verdict } from "@repo/protocol/domain/answer";
 import {
@@ -39,7 +28,6 @@ export { Remote } from "@repo/checks/check-runner/wire";
 
 export { ConfigBundle } from "@repo/rules/rules-evaluator";
 
-/** One file a decider adds at its path. */
 export const ComposedFile = Schema.Struct({
   content: Schema.String,
   path: RepoPath,
@@ -58,7 +46,6 @@ export const Merged = Schema.Struct({
   tree: TreeSha,
 }) satisfies Schema.Codec<MergedResult, unknown, unknown, unknown>;
 
-/** How a stateless Lander rebuilds the tree it lands (the port's `Rebuild`). */
 export const Rebuild = Schema.TaggedUnion({
   Compose: { files: Schema.NonEmptyArray(ComposedFile) },
   Existing: { commit: CommitSha },
@@ -97,21 +84,13 @@ export const BundleJob = Schema.Struct({
   repo: RepoName,
 }) satisfies Schema.Codec<BundleJobArgs, unknown, unknown, unknown>;
 
-/**
- * A merge: a read token on canonical, and a write token on the answer's
- * fork, where the merged commit waits for the Checker.
- */
 export const MergeWire = Schema.Struct({
   fork: Remote,
   job: MergeJob,
   main: Remote,
 });
 
-/**
- * A land: a write token on canonical, which goes only to the trusted Lander,
- * never to a Checker or outside the platform's Workers; a read
- * token on the fork when the rebuild is a merge.
- */
+/** The write token on canonical goes only to the trusted Lander, never to a Checker. */
 export const LandWire = Schema.Struct({
   fork: Schema.optionalKey(Remote),
   job: LandJob,
@@ -121,10 +100,8 @@ export const LandWire = Schema.Struct({
 /** A compose: a write token on canonical, used only for a compose ref, never `main`. */
 export const ComposeWire = Schema.Struct({ job: ComposeJob, main: Remote });
 
-/** A bundle of the config folder: a read token on canonical. */
 export const BundleWire = Schema.Struct({ job: BundleJob, main: Remote });
 
-/** A merge's outcome as it comes back: the merged tree, a refusal, or a defect, as JSON. */
 export const MergeExit = Schema.toCodecJson(
   Schema.Exit(
     Merged,
@@ -133,7 +110,6 @@ export const MergeExit = Schema.toCodecJson(
   )
 );
 
-/** A land's outcome as it comes back, as JSON. */
 export const LandExit = Schema.toCodecJson(
   Schema.Exit(
     Landed,
@@ -142,12 +118,10 @@ export const LandExit = Schema.toCodecJson(
   )
 );
 
-/** A compose's outcome as it comes back, as JSON. */
 export const ComposeExit = Schema.toCodecJson(
   Schema.Exit(Composed, VerifierBlocked, Schema.Defect())
 );
 
-/** A bundle's outcome as it comes back, as JSON. */
 export const BundleExit = Schema.toCodecJson(
   Schema.Exit(ConfigBundle, VerifierBlocked, Schema.Defect())
 );

@@ -1,10 +1,3 @@
-/**
- * Attempts on held-back checks: the ISO week
- * they are counted in, whether one more failure may still be judged, and
- * the live `ProjectVisibility` judging held-back runs over datekit's
- * sealed suite: area bits only, three failures a claim and ten a person,
- * area and week, and never a word to the answerer's record.
- */
 import { describe, expect, it } from "@effect/vitest";
 import type { HeldBackResult } from "@repo/protocol/domain/answer";
 import { AreaName, AskId, LaneName, RequestId } from "@repo/protocol/ids";
@@ -83,10 +76,8 @@ const exportArea = AreaName.make("export");
 
 const parserArea = AreaName.make("parser");
 
-/** The project's rows as its store keeps them. */
 const stored = ProjectStore.use((store) => store.load());
 
-/** datekit with its suite sealed and in effect: the posture accepted, the layer pushed. */
 const suiteSealed = Effect.gen(function* () {
   const { api } = yield* sealedByInes;
 
@@ -103,14 +94,12 @@ const suiteSealed = Effect.gen(function* () {
   return { api, pinned };
 });
 
-/** bob's claim on `ask`, pinned to `pinned`, as the port sees a claim. */
 const claimOn = (ask: string, pinned: PinnedClaim["pinned"]): PinnedClaim => ({
   ask: AskId.make(ask),
   claimant: bob.handle,
   pinned,
 });
 
-/** The area bits of a run: `export` passed `exported` of 2, `parser` 1 of 1. */
 const bits = (
   pinned: PinnedClaim["pinned"],
   exported: number
@@ -119,10 +108,6 @@ const bits = (
   { area: parserArea, passed: 1, suite: pinned.suite, total: 1 },
 ];
 
-/**
- * One held-back run judged by the live port over the project as stored,
- * and what it counted committed, as the service commits a port's writes.
- */
 const judged = (claim: PinnedClaim, results: readonly HeldBackResult[]) =>
   Effect.gen(function* () {
     const visibility = yield* ProjectVisibility;
@@ -243,7 +228,6 @@ describe("a held-back run, judged by the live port", () => {
   );
 });
 
-/** bob's answer to `parse-iso`, merged onto main: its checks wait on the held-back run. */
 const answered = (api: ProjectApi) =>
   Effect.gen(function* () {
     const base = yield* mainTip;

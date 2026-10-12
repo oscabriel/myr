@@ -1,9 +1,3 @@
-/**
- * The public ledger through the project service:
- * the `ledger` method is `ledgerOf` over the project's rows and its
- * config, every row is also an event for watchers and the projection, and
- * neither the layer read log nor a salt ever reaches it.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { ProjectEvent } from "@repo/protocol/domain/event";
 import { Ledger } from "@repo/protocol/domain/visibility";

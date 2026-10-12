@@ -1,14 +1,3 @@
-/**
- * The project service through its visibility ports: with
- * recording fakes of `ProjectVisibility` and `ProjectEnv` provided, every
- * delegation reaches the port, sees the project as the call has it, and
- * the service commits what the port plans: a landing's policy plan (its
- * ledger rows, and its effect settled after the commit), the suite pinned at
- * claim, the layer paths stage 1 refuses, a held-back judgement judged once
- * per tree with its trailer on the landing, layer reads and pushes, and
- * write-only values. Group A and B issues build the real ports to these
- * seams.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
@@ -71,7 +60,6 @@ const maintainers = LayerName.make("maintainers");
 
 const exportArea = AreaName.make("export");
 
-/** The suite the fake pins every claim to. */
 const pinned = {
   at: CommitSha.make("e".repeat(40)),
   suite: SuiteRoot.make(`sha256:${"3f".repeat(32)}`),
@@ -92,7 +80,6 @@ const parseIso = Option.getOrThrow(
   Array.findFirst(scenario.policy.asks, (ask) => ask.id === "parse-iso")
 );
 
-/** The ask's own files: its file in the config folder, and its check. */
 const askFiles = Array.make(
   { content: 'export default "parse-iso";\n', path: parseIso.file },
   {
@@ -115,7 +102,6 @@ const redThenGreen = LaneName.make("redThenGreen");
 
 const lanes = [redThenGreen, LaneName.make("lint"), LaneName.make("types")];
 
-/** What the fakes were asked, in order. */
 interface Seen {
   readonly judged: PinnedClaim[];
   readonly landedEnv: string[];
@@ -123,12 +109,6 @@ interface Seen {
   readonly settled: VisibilityEffect[];
 }
 
-/**
- * A visibility port that pins every claim to `pinned`, holds `sealedPath`
- * in a layer alice reads, judges every held-back run a pass with a trailer,
- * declares the maintainers layer in the ledger at each policy it hears,
- * and plans one effect it then settles.
- */
 const fakeVisibility = (seen: Seen): VisibilityPort => ({
   ...noVisibility,
   access: (who, layer) =>
@@ -194,7 +174,6 @@ const fakeVisibility = (seen: Seen): VisibilityPort => ({
           { body: { layer: maintainers }, id: "provision-maintainers" },
         ],
         writes: {
-          // The layer the project keeps a repo for, as the real port writes it.
           layers: [
             {
               name: maintainers,
@@ -239,7 +218,6 @@ const fakeVisibility = (seen: Seen): VisibilityPort => ({
     }),
 });
 
-/** An env port that takes any value for any key a decider sets, and hears each landing. */
 const fakeEnv = (seen: Seen): EnvPort => ({
   ...noEnv,
   onLanded: (input) =>
@@ -264,7 +242,6 @@ const fakeEnv = (seen: Seen): EnvPort => ({
     }),
 });
 
-/** The world, with answer runs left to the test and the fakes plugged in. */
 const worldWith = (seen: Seen) =>
   Layer.mergeAll(
     worldOf(scenario, "memory"),
@@ -280,7 +257,6 @@ const fresh = (): Seen => ({
   settled: [],
 });
 
-/** alice makes datekit, opens `parse-iso`, and bob claims it. */
 const claimed = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 
@@ -309,18 +285,15 @@ const claimed = Effect.gen(function* () {
   return { api, claim, main: opened.landed };
 });
 
-/** The project's rows as its store keeps them. */
 const stored: Effect.Effect<ProjectSnapshot, never, ProjectStore> =
   ProjectStore.use((store) => store.load());
 
-/** The files bob's answer holds: main's, with the parser fixed. */
 const answerFiles: Files = [
   ...start,
   ...askFiles.map(({ content, path }) => [path, content] as const),
   ["packages/parser/src/parse.ts", "export const parse = (s) => s;\n"],
 ];
 
-/** bob's answer, pushed and submitted, and its merge reported: its checks wait. */
 const merged = (input: Effect.Success<typeof claimed>) =>
   Effect.gen(function* () {
     const { api } = input;
@@ -364,7 +337,6 @@ const merged = (input: Effect.Success<typeof claimed>) =>
     return { head, requestId };
   });
 
-/** The area bits of a held-back run that passed. */
 const passed: readonly HeldBackResult[] = [
   { area: exportArea, passed: 1, suite: pinned.suite, total: 1 },
 ];
@@ -492,7 +464,6 @@ describe("the project service through its visibility ports", () => {
           judged: [pinned],
           refusals: [[], []],
           suite: Option.some(pinned.suite),
-          // The trailer's value: every reader adds its key.
           trailer: `export 1/1 @ ${pinned.suite}`,
         });
         expect(

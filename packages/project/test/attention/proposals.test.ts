@@ -38,7 +38,6 @@ const sealed = {
   head: sha("carol's fix for ISO weeks"),
 };
 
-/** Carol, vouched, with no proposal open and no record, proposes a new ask. */
 const byCarol = (
   standing: Partial<Parameters<typeof ProposalCommand.Propose>[0]> = {}
 ) =>
@@ -57,7 +56,6 @@ const byCarol = (
     ...standing,
   });
 
-/** Carol flags the open ask `parse-iso`. */
 const flagBy = (
   standing: Partial<Parameters<typeof ProposalCommand.Flag>[0]> = {}
 ) =>
@@ -239,7 +237,6 @@ describe("flagging an ask", () => {
   });
 });
 
-/** A proposal opened now, and one opened now and accepted since. */
 const proposals = () => {
   const opened = Result.getOrThrow(proposalOf(byCarol()));
 

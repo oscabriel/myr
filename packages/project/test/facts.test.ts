@@ -1,10 +1,3 @@
-/**
- * The rules' facts at a commit, as the platform reads them through
- * `RepoHost`: the files handed to the judge closure are what `@repo/checks`'
- * `judgeInputs` gathers, the same function the CLI's local check and hook
- * gather through, so the closure the gateway judges a push by is the one
- * every file of the tree gives (one home for the policy facts).
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { RepoHostMemory } from "@repo/artifacts/repo-host/memory";
@@ -41,14 +34,6 @@ const project = ProjectName.make("alice/kit");
 
 const repo = RepoName.make(keyOf(project));
 
-/**
- * A tree whose judge reaches past the root and the CI folders: lefthook
- * runs `scripts/pre-commit.sh`, which runs a hook script with a helper;
- * Claude Code's settings run `scripts/hooks/shell-policy.ts`; a package's
- * tsconfig extends the root base and a file of its own; oxlint loads a
- * plugin that imports a helper; a test outside the plugin's folder names
- * it; and product code nothing reaches.
- */
 const tree: Files = [
   ["package.json", JSON.stringify({ name: "kit", workspaces: ["packages/*"] })],
   [
@@ -102,7 +87,6 @@ const tree: Files = [
 
 const run: RunBlock = { checks: {}, test: Command.make("bun test {path}") };
 
-/** `tree` committed and pushed to the project's repo, as its first commit. */
 const pushed = Effect.gen(function* () {
   const host = yield* RepoHost;
   const client = yield* gitClient(memoryFs());
@@ -186,8 +170,6 @@ describe(evaluationFacts, () => {
   );
 });
 
-// ------------------------------------------------------------ through the gate
-
 const scenario = aProject({ people: ["bob"] }).pipe(
   withVouches(["bob"]),
   withAsk({ id: "parse-iso", territory: "packages/parser" })
@@ -213,7 +195,6 @@ const ask = Option.getOrThrow(
   Array.findFirst(scenario.policy.asks, ({ id }) => id === parseIso)
 );
 
-/** The ask's own files: its file in the config folder, and its check. */
 const askFiles = Array.make(
   { content: `export default "${parseIso}";\n`, path: ask.file },
   {
@@ -224,10 +205,6 @@ const askFiles = Array.make(
   }
 );
 
-/**
- * A project whose harness hook config sits in a subfolder, not at the root
- * or in a CI folder, and runs a script outside both.
- */
 const hooked: Files = [
   [
     "package.json",
@@ -252,10 +229,6 @@ const hooked: Files = [
   ["scripts/hooks/shell-policy.ts", "export {};\n"],
 ];
 
-/**
- * alice makes the project and opens parse-iso red first; bob claims it and
- * pushes an edit to the script the hook config runs. What the gate says.
- */
 const hookScriptPushed = Effect.gen(function* () {
   yield* advanceTo("2026-10-07T12:00:00Z");
 

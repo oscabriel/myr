@@ -26,7 +26,6 @@ import type { ProjectApi } from "../src/project.ts";
 import { projectService } from "../src/project.ts";
 import { Pusher, worldOf } from "./world.ts";
 
-/** datekit, decided by alice alone, with one `fix` ask in its parser. */
 const scenario = aProject({ people: ["bob"] }).pipe(
   withVouches(["bob"]),
   withAsk({ id: "parse-week", territory: "packages/parser" })
@@ -54,7 +53,6 @@ const start: Files = [
   ["packages/parser/src/parse.ts", "export const parse = (s) => ({});\n"],
 ];
 
-/** The ask's file and its test, as a drafter would write them. */
 const files = Array.make(
   { content: `export default "parse-week";\n`, path: ask.file },
   {
@@ -81,11 +79,6 @@ const mainTip = Effect.gen(function* () {
   return Option.fromUndefinedOr(refs.get(mainRef));
 });
 
-/**
- * A rehearsal of the ask's files on datekit as alice made it, its check
- * scripted to give `results` on the composed commit and to print `stdout`;
- * with main, the landings, the decisions and the asks before and after.
- */
 const rehearsed = (results: readonly LaneOutcome[], stdout = "") => {
   const script = new Map<string, readonly LaneResult[]>();
   const outputs = new Map<string, string>();
@@ -151,7 +144,6 @@ const rehearsed = (results: readonly LaneOutcome[], stdout = "") => {
   );
 };
 
-/** alice rehearses the ask's files red, then opens them with `openAsk`. */
 const openedAfterRehearsal = Effect.suspend(() => {
   const script = new Map<string, readonly LaneResult[]>();
 

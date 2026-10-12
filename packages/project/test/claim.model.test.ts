@@ -27,13 +27,8 @@ import {
 } from "../src/claim.ts";
 import type { ClaimResult, ClaimStep, Live } from "../src/claim.ts";
 
-// A model test (ADR 0012): generated histories of claims, pushes, alarms,
-// releases and landings run through `transition` the way the project service
-// would, and every step is checked against the claim lifecycle's invariants.
-
 const HOUR = 3_600_000;
 
-/** The defaults: warned after 2 quiet hours, lapsed after 24. */
 const policy = { lapseAfterMs: 24 * HOUR, warnAfterMs: 2 * HOUR };
 
 const project = ProjectName.make("alice/datekit");
@@ -54,14 +49,9 @@ const cap = 3;
 
 const start = DateTime.makeUnsafe("2026-10-07T12:00:00Z");
 
-/** Four people; `Bob` checks that a fork's name lowercases the handle. */
+/** `Bob` checks that a fork's name lowercases the handle. */
 const People = Schema.Literals(["alice", "Bob", "carol", "dave"]);
 
-/**
- * How the person making a claim stands: each flag is one refusal the claim
- * would meet (the ask blocked, the person at their cap, denounced, or not
- * vouched). A claim may meet several, so their order is checked too.
- */
 const Standing = Schema.Struct({
   atCap: Schema.Boolean,
   blocked: Schema.Boolean,
@@ -69,7 +59,6 @@ const Standing = Schema.Struct({
   unvouched: Schema.Boolean,
 });
 
-/** One thing that happens to the ask, as a history step names it. */
 const Move = Schema.TaggedUnion({
   Claim: { standing: Standing, who: People },
   Land: { who: People },
@@ -80,16 +69,10 @@ const Move = Schema.TaggedUnion({
 
 type Move = typeof Move.Type;
 
-/**
- * How the project service keeps the ask's claims: one state for the whole
- * ask (`shared`, an exclusive kind), or one state per claimant with the
- * kind's `race` (1 to 3) passed to each claim.
- */
 const Layout = Schema.Literals(["shared", "race1", "race2", "race3"]);
 
 type Layout = typeof Layout.Type;
 
-/** One step of a history: whole hours waited since the last one, then a move. */
 interface Step {
   readonly after: number;
   readonly move: Move;
@@ -103,7 +86,6 @@ const person = Arbitrary.schema(People);
 /** True one time in six; it shrinks to false, so a shrunk claim meets nothing. */
 const rare = roll(5).pipe(Arbitrary.map((n) => n === 5));
 
-/** About half of all claims meet no refusal. */
 const standing = Arbitrary.all({
   atCap: rare,
   blocked: rare,
@@ -129,7 +111,6 @@ const lands = person.pipe(
 
 const ticks = Arbitrary.Constant(Move.cases.Tick.make({}));
 
-/** Moves by weight; shrinking a roll towards 0 turns a move into an alarm. */
 const weighted = [
   ticks,
   ticks,
@@ -147,7 +128,7 @@ const moves = roll(weighted.length - 1).pipe(
   Arbitrary.flatMap((n): Arbitrary.Arbitrary<Move> => weighted[n] ?? ticks)
 );
 
-/** Whole hours, so steps land exactly on the 2 h and 24 h deadlines often. */
+/** Whole hours, so steps often land exactly on the 2 h and 24 h deadlines. */
 const histories = Arbitrary.array(
   Arbitrary.all({ after: roll(26), move: moves }),
   { maxLength: 40 }
@@ -158,7 +139,6 @@ const layouts = Arbitrary.schema(Layout);
 const raceOf = (layout: Layout) =>
   ({ race1: 1, race2: 2, race3: 3, shared: 1 })[layout];
 
-/** A live claim: `Live` or `Warned`. */
 const live = (state: ClaimState): Option.Option<Live> =>
   ClaimState.match(state, {
     Answered: () => Option.none(),
@@ -169,7 +149,6 @@ const live = (state: ClaimState): Option.Option<Live> =>
     Warned: Option.some<Live>,
   });
 
-/** Any state that holds or held a claim. */
 const held = (state: ClaimState): Option.Option<Live> =>
   ClaimState.match(state, {
     Answered: Option.some<Live>,
@@ -184,7 +163,6 @@ const isLive = (state: ClaimState) => Option.isSome(live(state));
 
 const ms = (time: DateTime.Utc) => DateTime.toEpochMillis(time);
 
-/** The time a claim's deadlines count from: its last push, or its making. */
 const quietSince = (claim: Live) =>
   Option.getOrElse(claim.lastPushAt, () => claim.openedAt);
 
@@ -193,7 +171,6 @@ const encode = Schema.encodeSync(ClaimState);
 const same = (left: ClaimState, right: ClaimState) =>
   JSON.stringify(encode(left)) === JSON.stringify(encode(right));
 
-/** One call to `transition`, as the model service made it. */
 interface Call {
   readonly before: ClaimState;
   readonly command: ClaimCommand;
@@ -202,16 +179,9 @@ interface Call {
 
 type Claim = typeof ClaimCommand.cases.Claim.Type;
 
-/** Whether the person making a claim holds the ask's live claim already. */
 const holds = (before: ClaimState, made: Claim) =>
   Option.exists(live(before), (holder) => holder.claimant === made.who.handle);
 
-/**
- * The refusal a claim by someone who does not hold it meets first, in the
- * lifecycle's order: a full ask before anything else (ADR 0008), then the
- * ask's blockers, the person's cap, a denouncement and a missing vouch. None
- * when it should go live.
- */
 const owed = (before: ClaimState, made: Claim) =>
   Option.map(
     Arr.findFirst(
@@ -232,10 +202,6 @@ const owed = (before: ClaimState, made: Claim) =>
     ([refusal]) => refusal
   );
 
-/**
- * A claim is refused with the first refusal it meets, and goes live, held by
- * its maker, when it meets none; the holder claiming again changes nothing.
- */
 const claimsAsOwed = (
   { before, command }: Call,
   result: ClaimResult
@@ -285,7 +251,6 @@ const claimsAsOwed = (
   });
 };
 
-/** Who pushed or released; none for any other command. */
 const pushedOrReleasedBy = ClaimCommand.match({
   Claim: () => Option.none<Handle>(),
   Land: () => Option.none<Handle>(),
@@ -294,10 +259,6 @@ const pushedOrReleasedBy = ClaimCommand.match({
   Tick: () => Option.none<Handle>(),
 });
 
-/**
- * Only a live claim's holder moves it by a push or a release, and the
- * holder's push or release always goes through.
- */
 const holderOnly = (
   { before, command }: Call,
   result: ClaimResult
@@ -323,15 +284,12 @@ const holderOnly = (
     },
   });
 
-/** Whether a push comes from the holder of a live claim. */
 const holderPushes = ({ before, command }: Call) =>
   ClaimCommand.guards.Push(command) &&
   Option.exists(live(before), (holder) => holder.claimant === command.who);
 
-/** An invariant over one successful call, naming what it found broken. */
 type Invariant = (call: Call, done: ClaimStep) => readonly string[];
 
-/** The holder's push keeps the claim live and counts from now. */
 const pushesRenew: Invariant = (call, { state }) =>
   holderPushes(call) &&
   !(
@@ -343,10 +301,6 @@ const pushesRenew: Invariant = (call, { state }) =>
     ? ["the holder's push makes the claim live from now"]
     : [];
 
-/**
- * A fork is made only on the way into Live from no claim, a lapsed one or a
- * released one, and then exactly once, named for the new claimant.
- */
 const forksOnlyNewClaims: Invariant = ({ before }, { effects, state }) => {
   const forks = effects.filter(ClaimEffect.$is("MakeFork"));
 
@@ -369,7 +323,6 @@ const forksOnlyNewClaims: Invariant = ({ before }, { effects, state }) => {
     : ["a new claim makes one fork, named for its claimant"];
 };
 
-/** Access is revoked exactly when a live claim ends. */
 const revokesWhenLiveEnds: Invariant = ({ before }, { effects, state }) => {
   const revokes = effects.filter(ClaimEffect.$is("RevokeAccess")).length;
   const ends = isLive(before) && !isLive(state);
@@ -379,7 +332,6 @@ const revokesWhenLiveEnds: Invariant = ({ before }, { effects, state }) => {
     : ["access is revoked once when a live claim ends"];
 };
 
-/** Deadlines count from the last push, or from the claim, never from later. */
 const deadlinesCount: Invariant = ({ now }, { state }) =>
   Option.match(held(state), {
     onNone: () => [],
@@ -398,7 +350,6 @@ const deadlinesCount: Invariant = ({ now }, { state }) =>
     },
   });
 
-/** Alarms are set only for later, and events happen now. */
 const noTimeTravel: Invariant = ({ now }, { effects }) => [
   ...effects
     .filter(ClaimEffect.$is("SetAlarm"))
@@ -412,7 +363,6 @@ const noTimeTravel: Invariant = ({ now }, { effects }) => [
     ),
 ];
 
-/** A claim is warned no earlier than warnsAt, and lapses no earlier than lapsesAt. */
 const deadlinesKept: Invariant = ({ before, now }, { state }) =>
   Option.match(held(state), {
     onNone: () => [],
@@ -430,11 +380,6 @@ const deadlinesKept: Invariant = ({ before, now }, { state }) =>
     ],
   });
 
-/**
- * A claim that moves into or within live sets the alarm for its next
- * deadline (warnsAt while live, lapsesAt once warned): deadlines run on
- * alarms, so a claim with none would never lapse.
- */
 const alarmsNextDeadline: Invariant = ({ before }, { effects, state }) =>
   Option.match(live(state), {
     onNone: () => [],
@@ -454,7 +399,6 @@ const alarmsNextDeadline: Invariant = ({ before }, { effects, state }) =>
     },
   });
 
-/** Answered never changes; Released changes only by a fresh claim. */
 const endsAreFinal: Invariant = ({ before, command }, { state }) => [
   ...(ClaimState.guards.Answered(before) && !same(before, state)
     ? ["Answered is terminal"]
@@ -477,10 +421,6 @@ const invariants: readonly Invariant[] = [
   endsAreFinal,
 ];
 
-/**
- * Names everything one call broke: who may claim, push and release, then,
- * when it went through, every invariant of the step it took.
- */
 const brokenBy = (call: Call, result: ClaimResult): readonly string[] => [
   ...claimsAsOwed(call, result),
   ...holderOnly(call, result),
@@ -491,10 +431,8 @@ const brokenBy = (call: Call, result: ClaimResult): readonly string[] => [
   }),
 ];
 
-/** The ask's claim states, by slot: the claimant's handle, or `ask` when shared. */
 type Slots = ReadonlyMap<string, ClaimState>;
 
-/** The model project service between two steps. */
 interface World {
   readonly now: DateTime.Utc;
   readonly slots: Slots;
@@ -509,7 +447,6 @@ const stateIn = (slots: Slots, slot: string): ClaimState =>
 const liveOutside = (slots: Slots, slot: string) =>
   [...slots].filter(([key, state]) => key !== slot && isLive(state)).length;
 
-/** A command for one slot. */
 interface Addressed {
   readonly command: ClaimCommand;
   readonly slot: string;
@@ -520,7 +457,6 @@ const to = (slot: string, command: ClaimCommand): Addressed => ({
   slot,
 });
 
-/** The commands the project service would send for a move, and where. */
 const commandsFor = (
   layout: Layout,
   slots: Slots,
@@ -559,14 +495,12 @@ const commandsFor = (
         ClaimCommand.cases.Release.make({ who: Handle.make(who) })
       ),
     ],
-    // An alarm reaches every claim the ask holds.
     Tick: () =>
       [...slots.keys()].map((slot) =>
         to(slot, ClaimCommand.cases.Tick.make({}))
       ),
   });
 
-/** Why an alarm left a claim past a deadline it reached, if it did. */
 const overdue = (now: DateTime.Utc, state: ClaimState) =>
   Option.flatMap(live(state), (claim) => {
     if (ms(now) >= ms(claim.lapsesAt)) {
@@ -578,7 +512,6 @@ const overdue = (now: DateTime.Utc, state: ClaimState) =>
       : Option.none();
   });
 
-/** What the whole ask keeps after a step: the race, and alarms that catch up. */
 const brokenAfter = (layout: Layout, world: World, move: Move) => {
   const states = [...world.slots.values()];
 
@@ -598,7 +531,6 @@ const brokenAfter = (layout: Layout, world: World, move: Move) => {
   ];
 };
 
-/** Takes one step: the next world, and what broke on the way. */
 const advance = (layout: Layout, world: World, { after, move }: Step) => {
   const now = DateTime.add(world.now, { hours: after });
   const slots = new Map(world.slots);
@@ -620,7 +552,6 @@ const advance = (layout: Layout, world: World, { after, move }: Step) => {
   return { broken: [...broken, ...brokenAfter(layout, next, move)], next };
 };
 
-/** Runs a history; returns its first bad step and what that step broke. */
 const firstBreak = (layout: Layout, steps: readonly Step[]) => {
   let world: World = { now: start, slots: new Map() };
 
@@ -637,12 +568,7 @@ const firstBreak = (layout: Layout, steps: readonly Step[]) => {
   return [];
 };
 
-/**
- * Generated histories are CPU work alone: under a second on an idle machine,
- * several seconds while turbo runs every package's tests at once (the CLI's
- * build test compiles binaries beside them). This limit is there to catch a
- * hang, not a busy machine.
- */
+/** CPU-bound, but slow while turbo runs every package's tests at once: this catches a hang, not a busy machine. */
 const generated = { timeout: 30_000 };
 
 describe("the claim lifecycle, over generated histories", generated, () => {

@@ -1,10 +1,3 @@
-/**
- * `AnswerRuns` in process, for tests: `start` drives the answer's
- * steps (merge, checks, land) through the project's own answer queue until
- * the answer lands, is refused, or waits (on a person, the landing slot, or
- * a retry the project's alarm starts again). A run already under way for the
- * same request is not started twice.
- */
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import type { CheckRunner } from "@repo/checks/check-runner";
 import type { RequestId } from "@repo/protocol/ids";

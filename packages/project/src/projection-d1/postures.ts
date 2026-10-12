@@ -1,20 +1,8 @@
-/**
- * `StandingPostures` over D1, beside the projection: one row per project in
- * `standing_postures` (`tables.ts`, migration 0005), each the posture a
- * list last read from the project's own record, when it moves by the clock
- * alone, and the project's last event the read saw.
- *
- * The projection deletes a project's row in the same write as an event
- * that can move its posture (`projection.ts`). A read that event came
- * after could still be written once the event is applied, so a row is
- * written only while the project's `cursor` stands at or before the event
- * the read saw, and never over a row from a later read.
- *
- * The lists of projects and of rows each go in as one JSON parameter
- * (`json_each`), so a list of any length is one statement under D1's limit
- * on bound parameters. Every failure, a database the migration has not
- * reached among them, is a miss: logged, and never the list's.
- */
+// The projection deletes a project's row with any event that can move its
+// posture, so a row is written only while the project's `cursor` stands at or
+// before the event the read saw, and never over a row from a later read.
+// Lists go in as one JSON parameter (`json_each`) to stay under D1's limit on
+// bound parameters. Every failure is a miss, never the list's.
 import { keyOf, nameOfKey, ProjectKey } from "@repo/protocol/ids";
 import type { ProjectName } from "@repo/protocol/ids";
 import { Posture } from "@repo/protocol/posture";
@@ -36,7 +24,6 @@ import type {
   StandingPosturesApi,
 } from "../standing-posture.ts";
 
-/** A row as `standing_postures` holds it. */
 const Row = Schema.Struct({
   moves_at: Schema.NullOr(Schema.DateTimeUtcFromString),
   posture: Posture,
@@ -46,7 +33,6 @@ const Row = Schema.Struct({
 
 const decodeRow = Schema.decodeUnknownOption(Row);
 
-/** An entry as the row it is written as, one element of the JSON parameter. */
 const rowOf = (project: ProjectName, entry: StandingEntry) => ({
   moves_at: entry.until === undefined ? null : DateTime.formatIso(entry.until),
   posture: entry.posture,
@@ -54,7 +40,6 @@ const rowOf = (project: ProjectName, entry: StandingEntry) => ({
   seen: entry.seen,
 });
 
-/** A row read back as an entry; `moves_at` only when it is set. */
 const entryOf = ({
   moves_at: movesAt,
   posture,
@@ -62,7 +47,6 @@ const entryOf = ({
 }: typeof Row.Type): StandingEntry =>
   movesAt === null ? { posture, seen } : { posture, seen, until: movesAt };
 
-/** `statement`'s rows, or `missed` and a warning when it fails. */
 const orMissed = <A>(
   statement: Effect.Effect<A, SqlError>,
   missed: A,

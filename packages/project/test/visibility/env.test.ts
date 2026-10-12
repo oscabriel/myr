@@ -1,13 +1,3 @@
-/**
- * The visibility cartridge's env, through the project service over
- * memory adapters: datekit's env shape at the landed SHA, write-only values
- * a decider sets and nobody reads back, placeholders and proxies for checks
- * of unlanded code, the scan that finds a stored value, and the decision a
- * widened `@proxy` opens. The parser is the `/memory` fake holding datekit's
- * committed schema as `@env-spec/parser` reads it (a case below holds the
- * fake to the real parser), but where two landings must read two texts:
- * there the real adapter reads the committed text.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { Brand } from "@repo/brand";
@@ -76,12 +66,10 @@ const noon = at("2026-10-07T12:00:00Z");
 
 const token = EnvKey.make("SENTRY_AUTH_TOKEN");
 
-/** A token-shaped value of 20 characters: what ines-v sets. */
 const value = "sntrys_eyJpYXQiOjE3M";
 
 const envFile = RepoPath.make(".env.schema");
 
-/** datekit's committed `.env.schema`, as `@env-spec/parser` reads it (through the visibility package's adapter). */
 const datekitParsed: ParsedEnvSchema = {
   header: [
     {
@@ -158,7 +146,6 @@ const datekitParsed: ParsedEnvSchema = {
 
 const item = Schema.decodeUnknownSync(EnvItem);
 
-/** A package's schema beside datekit's: `APP_ENV` again, and a key of its own, the header silent. */
 const weekParsed: ParsedEnvSchema = {
   header: [],
   imports: [],
@@ -168,13 +155,11 @@ const weekParsed: ParsedEnvSchema = {
   ],
 };
 
-/** How many times the parser was asked to parse. */
 class Parses extends Context.Service<
   Parses,
   { readonly count: Effect.Effect<number> }
 >()("test/Parses") {}
 
-/** `inner`, counting its parses. */
 const counting = (inner: Layer.Layer<EnvSchemaParser>) =>
   Layer.effectContext(
     Effect.gen(function* () {
@@ -194,7 +179,6 @@ const counting = (inner: Layer.Layer<EnvSchemaParser>) =>
     })
   ).pipe(Layer.provide(inner));
 
-/** datekit's one sensitive item, as the public sees it before any value. */
 const sentryAuthToken = item({
   description:
     "Source-map upload token. Release step only; never enters a check.",
@@ -205,14 +189,8 @@ const sentryAuthToken = item({
   tags: ["release"],
 });
 
-/** What a check sees in place of the token's value. */
 const tokenPlaceholder = "__SENTRY_AUTH_TOKEN_PLACEHOLDER__";
 
-/**
- * The env a check of datekit's code runs with, as the check job carries it
- * (on the wire): the token's placeholder, and its one `@proxy` host with
- * the path it allows and no method named.
- */
 const tokenRunEnv = {
   placeholders: [{ key: token, placeholder: tokenPlaceholder }],
   proxies: [
@@ -226,22 +204,16 @@ const tokenRunEnv = {
   ],
 };
 
-/** The project as ines-v first pushes it: a package and its env schema. */
 const start = (schema: string): Files => [
   ["package.json", '{ "name": "alice/datekit" }\n'],
   ["src/index.ts", "export const now = () => 0;\n"],
   [".env.schema", schema],
 ];
 
-/**
- * The WebCrypto vault under a test master key, as the platform composes
- * it: the store keeps only the sealed value.
- */
 const vault = WriteOnlyValuesWebCrypto(
   Redacted.make("0123456789abcdef".repeat(4))
 );
 
-/** The project's world over memory adapters, with the cartridge's env on `parser`. */
 const worldWith = <More = never>(
   parser: Layer.Layer<EnvSchemaParser | More>,
   on: Scenario = scenario
@@ -256,7 +228,6 @@ const world = worldWith(
   EnvSchemaParserMemory(new Map([[envFile, datekitParsed]]))
 );
 
-/** ines-v makes datekit and pushes its first commit, holding `schema`. */
 const begun = (schema: string = datekitText, more: Files = []) =>
   Effect.gen(function* () {
     yield* advanceTo("2026-10-07T12:00:00Z");
@@ -274,7 +245,6 @@ const begun = (schema: string = datekitText, more: Files = []) =>
     return api;
   });
 
-/** The token item of the shape anyone reads. */
 const tokenItem = (api: ProjectApi) =>
   Effect.map(api.envShape(anyone), ({ items }) =>
     items.find(({ key }) => key === token)
@@ -283,8 +253,7 @@ const tokenItem = (api: ProjectApi) =>
 const stored = ProjectStore.use((store) => store.load());
 
 describe("the env shape at the landed SHA", () => {
-  // The fake above is written by hand; this holds it to datekit's committed
-  // file as the real parser reads it, so a drift in either shows here.
+  // Holds the hand-written fake to the real parser's reading, so a drift in either shows here.
   it.effect(
     "is read from datekit's committed .env.schema as the fake holds it",
     () =>
@@ -555,7 +524,6 @@ describe("a write-only value", () => {
   );
 });
 
-/** datekit's schema with the token behind `proxy`'s argument list. */
 const proxied = (proxy: string) =>
   [
     "# @defaultSensitive=false",
@@ -685,7 +653,6 @@ const narrow = proxied('domain="sentry.io"');
 
 const wide = proxied('domain=["sentry.io", "upload.example.invalid"]');
 
-/** Where a repo's `main` stands now. */
 const tipOf = (name: RepoName) =>
   Effect.gen(function* () {
     const refs = yield* (yield* RepoHost).refs(name).pipe(Effect.orDie);
@@ -695,10 +662,6 @@ const tipOf = (name: RepoName) =>
     );
   });
 
-/**
- * ines-v lands `schema` as datekit's `.env.schema` from her working fork,
- * its checks passing on the merge.
- */
 const landSchema = (api: ProjectApi, schema: string, requestId: string) =>
   Effect.gen(function* () {
     const { fork } = yield* api.fork(ines);
@@ -729,7 +692,6 @@ const landSchema = (api: ProjectApi, schema: string, requestId: string) =>
     return yield* tipOf(repo);
   });
 
-/** The `ProxyWidened` decisions on ines-v's Today, with their evidence. */
 const widenings = (api: ProjectApi) =>
   Effect.map(api.today(ines), ({ decisions }) =>
     decisions.flatMap(({ evidence, subject }) =>
@@ -803,7 +765,6 @@ describe("where the env schemas live", () => {
   });
 });
 
-/** An item behind `@proxy` on `domains`, sensitive as every proxied item is. */
 const behind = (
   key: string,
   domains: readonly [string, ...string[]],

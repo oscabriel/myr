@@ -1,12 +1,3 @@
-/**
- * The visibility cartridge's project state, through the project
- * service over memory adapters with the live `ProjectVisibility`: a landing
- * that adds datekit's `visibility.ts` provisions the maintainers layer's
- * repo once and declares it in the ledger, and its narrowing waits for a
- * second decider and the notice period; a layer push lands the layer's
- * head and publishes each area's salted commitment; a claim is pinned to
- * the suite sealed when it opened.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
 import type { Decision } from "@repo/protocol/domain/decision";
@@ -53,21 +44,18 @@ import type { SealedFile } from "./world.ts";
 
 const anyone = Anonymous.make({});
 
-/** The project's rows as its store keeps them. */
 const stored = ProjectStore.use((store) => store.load());
 
 const exportArea = AreaName.make("export");
 
 const parserArea = AreaName.make("parser");
 
-/** The suite once the `parser` check is rewritten. */
 const secondSuite: readonly SealedFile[] = firstSuite.map((check) =>
   check.area === "parser"
     ? { ...check, content: 'it("reads ordinal dates", () => {});\n' }
     : check
 );
 
-/** A git blob id, computed as git does: SHA-1 of `blob <size>\0<content>`. */
 const blobId = (content: string) =>
   Effect.promise(() =>
     crypto.subtle.digest(
@@ -86,7 +74,6 @@ const blobId = (content: string) =>
     )
   );
 
-/** The suite's files as the commitment takes them. */
 const suiteFiles = (checks: readonly SealedFile[]) =>
   Effect.forEach(checks, ({ area, content, path }) =>
     Effect.map(blobId(content), (blob) => ({
@@ -96,7 +83,6 @@ const suiteFiles = (checks: readonly SealedFile[]) =>
     }))
   );
 
-/** Rows of `[path, …]`, sorted by path. */
 const byPath = (rows: readonly (readonly [string, ...string[]])[]) =>
   Array.sort(
     rows,
@@ -216,7 +202,6 @@ describe("a landing that adds the visibility config", () => {
         const [opened] = yield* postureDecisions(api);
         const decision = Option.getOrThrow(Option.fromUndefinedOr(opened));
 
-        /** What a list keeps, beside the posture the ledger shows. */
         const both = Effect.gen(function* () {
           const { posture, until } = yield* api.standing();
           const ledger = yield* api.ledger(anyone);
@@ -261,11 +246,9 @@ describe("a landing that adds the visibility config", () => {
   );
 });
 
-/** A `visibility.ts` whose maintainers layer also holds shipped source: Open core. */
 const coreSource =
   "export default visibility({ layers: { maintainers: withSource } });\n";
 
-/** What `coreSource` evaluates to: datekit's config, its maintainers layer holding source too. */
 const openCore = {
   ...datekitVisibility,
   layers: datekitVisibility.layers.map((layer) => ({
@@ -274,7 +257,6 @@ const openCore = {
   })),
 };
 
-/** main's files with `visibility.ts` holding `source`. */
 const mainWith = (source: string) =>
   mainFiles.map(
     ([path, content]) =>
@@ -511,7 +493,6 @@ describe("a claim", () => {
   );
 });
 
-/** datekit's config with a second layer that only okonkwo reads and writes. */
 const withTriage = {
   ...datekitVisibility,
   layers: [
@@ -546,7 +527,6 @@ describe("two layers", () => {
   );
 });
 
-/** datekit's config with each person's own layer too: config only. */
 const withPersonal = {
   ...datekitVisibility,
   layers: [
@@ -609,7 +589,6 @@ describe("the maintainers layer", () => {
   );
 });
 
-/** datekit's config with admission on: a new check passes main 3 times and catches a known-bad tree. */
 const admitting = {
   ...datekitVisibility,
   checks: {

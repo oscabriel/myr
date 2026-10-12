@@ -19,7 +19,6 @@ import {
 } from "./tables.ts";
 import type { Table } from "./tables.ts";
 
-// What SQLite hands back is decoded like any other outside input.
 const Bodies = Schema.Array(Schema.Struct({ body: Schema.String }));
 
 const decodeBodies = Schema.decodeUnknownEffect(Bodies);
@@ -32,7 +31,6 @@ const LastSeq = Schema.Tuple([Schema.Struct({ last: Schema.Int })]);
 
 const decodeLastSeq = Schema.decodeUnknownEffect(LastSeq);
 
-/** The rows a query returns, each decoded from its body. */
 const bodiesOf = <A>(table: Table<A>, statement: Statement<object>) =>
   statement.pipe(
     Effect.flatMap(decodeBodies),
@@ -42,11 +40,8 @@ const bodiesOf = <A>(table: Table<A>, statement: Statement<object>) =>
   );
 
 /**
- * A project's store on SQLite through `effect/sql`, so the same code runs on
- * a Durable Object's SQLite (`@effect/sql-sqlite-do`, given the storage so
- * transactions work) and on sqlite-node in tests. The layer runs the
- * migrations first. `load` and `commit` each run in one transaction; a
- * `SqlError` is a defect (see `ProjectStore`).
+ * The DO's SQLite needs the storage for transactions. `load` and `commit` each
+ * run in one transaction; a `SqlError` is a defect.
  */
 export const ProjectStoreSqlite = Layer.effect(
   ProjectStore,
@@ -69,8 +64,8 @@ export const ProjectStoreSqlite = Layer.effect(
         Effect.map(([row]) => row.last)
       );
 
-    // One statement per row, so a key written twice in one commit replaces
-    // its first row in place, as it does in `/memory`.
+    // One statement per row, so a key written twice in one commit replaces its
+    // first row, as in `/memory`.
     const upsert = <A>(table: Table<A>, rows: readonly A[]) =>
       Effect.forEach(
         rows,

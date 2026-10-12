@@ -29,12 +29,10 @@ const alice = handle("alice");
 
 const dana = handle("dana");
 
-/** Thursday noon: alice opens Today. */
 const now = at("2026-10-08T12:00:00Z");
 
 const minted = ids();
 
-/** A decision on a vouch for `name`, for alice and dana, expiring `expiresIn` hours from now. */
 const vouchFor = (name: string, expiresIn: number): Decision =>
   openDecision({
     deciders: [alice, dana],
@@ -63,7 +61,6 @@ const p7 = vouchFor("p7", 150);
 
 const p8 = vouchFor("p8", 200);
 
-/** The eight, given out of order. */
 const eight = [p5, p1, p8, p3, p2, p7, p4, p6];
 
 const fresh = { finishes: 0, total: 5, used: 0 };
@@ -209,7 +206,6 @@ describe("a decider's Today", () => {
   });
 
   it("samples at most 5 landings that needed nobody, newest first", () => {
-    /** A landing `hoursAgo`, with dana in `roles` beside the answerer and the asker. */
     const landing = (
       seed: string,
       hoursAgo: number,
@@ -255,7 +251,6 @@ describe("a decider's Today", () => {
   });
 });
 
-/** Each spend, in order, kept as the day's one row per decider. */
 const spendAll = (
   spends: readonly {
     readonly decider: Handle;
