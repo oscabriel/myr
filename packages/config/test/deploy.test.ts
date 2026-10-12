@@ -23,7 +23,6 @@ import {
 import { LockFile } from "../../../infra/recording.ts";
 import { repoRoot } from "./root.ts";
 
-/** One command the deploy spawned, with its folder relative to the repo root. */
 interface Spawned {
   readonly command: string;
   readonly args: readonly string[];
@@ -31,10 +30,6 @@ interface Spawned {
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
-/**
- * A `ChildProcessSpawner` that runs nothing: it records each command and
- * answers with the exit code `exitOf` gives it.
- */
 const recording = (exitOf: (spawned: Spawned) => number) =>
   Effect.gen(function* () {
     const path = yield* Path.Path;
@@ -78,7 +73,6 @@ const recording = (exitOf: (spawned: Spawned) => number) =>
     };
   });
 
-/** `deploy(argv)` over a recording spawner: what it spawned, and how it ended. */
 const run = (
   argv: readonly string[],
   options: {
@@ -91,9 +85,8 @@ const run = (
     const path = yield* Path.Path;
     const fake = yield* recording(options.exitOf ?? (() => 0));
 
-    // A lock nobody wrote, so a take being recorded on this machine
-    // (`infra/.recording`) never decides these tests; recording.test.ts
-    // holds the lock itself.
+    // A lock nobody wrote, so a local `infra/.recording` never decides these
+    // tests; recording.test.ts holds the lock itself.
     const unlocked = path.join(
       yield* fs.makeTempDirectoryScoped({ prefix: "deploy-unlocked-" }),
       ".recording"
@@ -113,7 +106,6 @@ const run = (
     return { result, spawned: yield* fake.spawned };
   }).pipe(Effect.scoped, Effect.provide(NodeServices.layer));
 
-/** A spawned command as one line: `apps/sandbox$ wrangler deploy --env x`. */
 const line = ({ args, command, cwd }: Spawned) =>
   `${cwd === "" ? "." : cwd}$ ${[command, ...args].join(" ")}`;
 
@@ -188,7 +180,6 @@ describe("a deploy to dev-oscabriel", () => {
         );
 
         expect(Result.isSuccess(result)).toBeTruthy();
-        // infra/workers-dev.json records the account's subdomain.
         expect(printed.at(-1)).toBe(
           "deploy dev-oscabriel: to offer Google sign-in, register https://platform-dev-oscabriel.oscargabriel.workers.dev/oauth/google/callback as the Google client's redirect URI (H4)"
         );
@@ -247,8 +238,6 @@ describe("a deploy to dev-oscabriel", () => {
     Effect.gen(function* () {
       const { spawned } = yield* run(["--stage", "dev-oscabriel"]);
 
-      // One per step: verify, sandbox, platform, web build, web, triggers,
-      // smoke.
       expect(spawned.map(({ env }) => env.WRANGLER_SEND_METRICS)).toStrictEqual(
         ["false", "false", "false", "false", "false", "false", "false"]
       );
@@ -365,10 +354,6 @@ describe("a deploy to dev-oscabriel", () => {
   );
 });
 
-/**
- * The message a failed `deploy(argv)` carries: `runMain` prints a failure as
- * its tag and its message, and nothing else.
- */
 const messageOf = (
   argv: readonly string[],
   options: Parameters<typeof run>[1] = {}

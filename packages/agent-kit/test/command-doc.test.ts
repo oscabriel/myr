@@ -105,14 +105,11 @@ describe("every command row", () => {
   });
 });
 
-/** Each row that calls `tag`, by its words and where it comes from. */
 const calling = (docs: readonly CommandDoc[], tag: string) =>
   docs.flatMap((doc) =>
     doc.contract === tag ? [`${doc.path.join(" ")} (${doc.source})`] : []
   );
 
-// The one list the platform's skill, the CLI's MCP prompt and the web's
-// `llms.txt` read: every command once, in the order a person scans for one.
 describe(commandDocs, () => {
   const docs = commandDocs(Contracts);
   const words = docs.map(({ path }) => path.join(" "));
@@ -175,8 +172,6 @@ describe(commandDocs, () => {
     ]);
   });
 
-  // `init` and `env set` do local work around the contract they call, so
-  // their hand-written rows stand for those contracts.
   it("gives a contract a hand-written command calls no row of its own", () => {
     expect(calling(docs, "initProject")).toStrictEqual(["init (local)"]);
     expect(calling(docs, "setEnv")).toStrictEqual(["env set (local)"]);

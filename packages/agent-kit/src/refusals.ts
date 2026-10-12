@@ -1,12 +1,3 @@
-/**
- * The refusals an answer can meet, read from the closed union: each one's
- * tag, whether retrying can help and its `next` come from its schema, its
- * exit code from the CLI's (`exitCodeOfTag`), and what to do about it from
- * the table below, which the type holds to the union's groups (a refusal
- * added to one fails the typecheck until it has a line here).
- * `refusalCatalog` walks every group the same way, for `/llms-full.txt`,
- * with a second table for the refusals no answer meets.
- */
 import { Brand } from "@repo/brand";
 import { ExitCode, exitCodeOfTag, precedence } from "@repo/protocol/exit-code";
 import { groups } from "@repo/protocol/refusal";
@@ -14,7 +5,6 @@ import { Exit, Predicate, SchemaAST } from "effect";
 
 import { code, table } from "./text.ts";
 
-/** The groups whose refusals an answer can meet, from claim to verdict. */
 const answerGroups = [
   "Push and claim",
   "Shape",
@@ -36,10 +26,6 @@ type AnswerTag = InstanceType<AnswerMember>["_tag"];
 
 type Tag = InstanceType<Member>["_tag"];
 
-/**
- * What to do on meeting it. A refusal whose `next` is set when it is raised
- * gives the command's form here, or what it names when no form fits.
- */
 interface Repair {
   readonly todo: string;
   readonly next?: string;
@@ -112,10 +98,6 @@ const repairs = {
   },
 } as const satisfies Record<AnswerTag, Repair>;
 
-/**
- * What to do on meeting a refusal no answer meets: at an ask's opening, a
- * maintainer's own push, a decision, a lookup, setup or the env.
- */
 const elsewhere = {
   DecisionClosed: {
     todo: "Nothing to decide: it was taken already, or expired to its default.",
@@ -196,7 +178,6 @@ const everyRepairOf = new Map<string, Repair>([
   ...Object.entries(elsewhere),
 ]);
 
-/** A field's value when the constructor fills it in, as it does a fixed `next`. */
 const constructorDefault = (ast: SchemaAST.AST) => {
   const fill = ast.context?.constructorDefault;
 
@@ -208,13 +189,10 @@ const constructorDefault = (ast: SchemaAST.AST) => {
     : undefined;
 };
 
-/** One refusal an answer can meet, as the skills list it. */
 export interface AnswerRefusal {
   readonly tag: string;
   readonly retryable: boolean;
-  /** The code the CLI exits with when it meets this refusal. */
   readonly exitCode: ExitCode;
-  /** Its `next`, in Markdown: the command as a code span, or what it names. */
   readonly next: string;
   readonly todo: string;
 }
@@ -229,7 +207,6 @@ const nextOf = (fixed: string | undefined, repair: Repair | undefined) => {
     : code(repair.next);
 };
 
-/** One member's row, from its schema and the repair `repairTable` gives it. */
 const rowOf = (
   member: Member,
   repairTable: ReadonlyMap<string, Repair>
@@ -247,19 +224,16 @@ const rowOf = (
   };
 };
 
-/** Every refusal an answer can meet, in the union's order. */
 export const answerRefusals: readonly AnswerRefusal[] = groups
   .flatMap((group): readonly Member[] =>
     answerGroups.some((answer) => answer === group.name) ? group.members : []
   )
   .map((member) => rowOf(member, repairOf));
 
-/** One refusal of the closed union, with the group the union files it under. */
 export interface CatalogRow extends AnswerRefusal {
   readonly group: string;
 }
 
-/** Every refusal of the closed union, every group, in the union's order. */
 export const refusalCatalog = (): readonly CatalogRow[] =>
   groups.flatMap((group) =>
     group.members.map((member: Member) => ({
@@ -268,7 +242,6 @@ export const refusalCatalog = (): readonly CatalogRow[] =>
     }))
   );
 
-/** What each code the CLI exits with tells its caller, in the order a caller reads them. */
 const exitMeanings = {
   [ExitCode.ok]: "It did what it was asked.",
   [ExitCode.failed]: "Something else went wrong; stderr says what.",
@@ -286,7 +259,6 @@ const exitMeanings = {
     "Refused: you may not do this until you sign in, or someone lets you in.",
 } as const satisfies Record<ExitCode, string>;
 
-/** The CLI's exit codes, as `/llms-full.txt` lists them. */
 export const exitCodeSection = () => [
   "## Exit codes",
   "",
@@ -299,7 +271,6 @@ export const exitCodeSection = () => [
   "",
 ];
 
-/** The refusals section every skill carries. */
 export const refusalSection = () => [
   "## Refusals",
   "",

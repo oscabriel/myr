@@ -20,7 +20,6 @@ import {
   webProbes,
 } from "../../../scripts/smoke.ts";
 
-/** What the fake platform answers one request with, after `delayMs` when given. */
 interface Reply {
   readonly status: number;
   readonly body?: string;
@@ -28,7 +27,6 @@ interface Reply {
   readonly delayMs?: number;
 }
 
-/** A request as the fake platform sees it. */
 interface Seen {
   readonly method: string;
   readonly path: string;
@@ -36,7 +34,6 @@ interface Seen {
   readonly body: string;
 }
 
-/** A call as effect/rpc's HTTP protocol sends one, with JSON serialization. */
 const ListAsksCall = Schema.fromJsonString(
   Schema.Tuple([
     Schema.TaggedStruct("Request", {
@@ -49,11 +46,8 @@ const ListAsksCall = Schema.fromJsonString(
 );
 
 /**
- * The platform's `/rpc` reply to `body`: for an anonymous `listAsks` of a
- * project in `held`, its open asks (none); of any other, the bytes its
- * server sent for a project it doesn't hold (captured from
- * `apps/platform`'s `serve` before any project existed, the refusal's
- * `next` aside); a 400 for anything else.
+ * The bytes of another project's reply were captured from `apps/platform`'s
+ * `serve` before any project existed, the refusal's `next` aside.
  */
 const rpcReply = (body: string, held: readonly string[]): Reply =>
   Option.match(Schema.decodeOption(ListAsksCall)(body), {
@@ -66,7 +60,6 @@ const rpcReply = (body: string, held: readonly string[]): Reply =>
     }),
   });
 
-/** The platform as `healthy` below, holding only the projects `held` names: a stage not seeded holds none. */
 const holding =
   (held: readonly string[]) =>
   ({ authorized, body, method, path }: Seen): Reply => {
@@ -100,19 +93,8 @@ const holding =
     return { status: 404 };
   };
 
-/**
- * The platform as smoke expects to find it: healthy, OAuth's resource
- * metadata published, MCP closed to anyone without a credential, anonymous
- * reads open, the seeded example `oscabriel/datekit` held and no repo it doesn't
- * hold, and a `/` that names MCP and the CLI's installer.
- */
 const healthy = holding(["oscabriel/datekit"]);
 
-/**
- * A platform whose 401 gate is gone and whose stage is down: `/health` and
- * `/rpc` break, MCP opens to anyone, git's paths answer 200, and `/` is
- * gone.
- */
 const broken = (seen: Seen): Reply => {
   if (seen.path === "/") {
     return { status: 404 };
@@ -137,7 +119,6 @@ const broken = (seen: Seen): Reply => {
   return healthy(seen);
 };
 
-/** `answer` served on an ephemeral local port, for the test's scope: its origin. */
 const fakePlatform = (answer: (seen: Seen) => Reply) =>
   Effect.gen(function* () {
     const app = Effect.gen(function* () {
@@ -199,9 +180,8 @@ describe("smoke against a live stage", () => {
     }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
-  // Live on dev-oscabriel: the first smoke after the first deploy got
-  // a 500 from /health and a defect from the first Project DO call, and a
-  // second run seconds later passed every probe.
+  // Seen live: the first smoke after a first deploy got a 500 from /health and
+  // a defect from the first Project DO call; a run seconds later passed.
   it.live(
     "asks again while a fresh deploy answers with a server error or a defect, and passes once it settles",
     () =>
@@ -247,7 +227,7 @@ describe("smoke against a live stage", () => {
     "asks / again while the version before a deploy still answers it with 404, and passes once it settles",
     () =>
       Effect.gen(function* () {
-        // a demo deploy that added `/`: smoke ran as the upload finished, and the
+        // A deploy that added `/`: smoke ran as the upload finished, and the
         // version before, which has no `/`, answered it once more with 404.
         const asked = { root: 0 };
 
@@ -318,12 +298,6 @@ describe("smoke against a live stage", () => {
   );
 });
 
-/**
- * The web as smoke expects to find it: its front page renders, its
- * `/llms.txt` answers with the Markdown it builds from the platform's
- * project list, which only a web that reaches the platform can, and so do
- * a seeded example's `llms.txt` and ask, and the agent skills' index.
- */
 const healthyWeb = ({ method, path }: Seen): Reply => {
   if (method === "GET" && path === "/") {
     return {
@@ -487,9 +461,8 @@ describe("smoke against a stage's web", () => {
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer))
   );
 
-  // Live on dev-oscabriel: smoke ran 4 s after the web Worker's first
-  // deploy, and its new workers.dev hostname answered 404 to both probes; a
-  // run seconds later passed both.
+  // Seen live: smoke ran 4 s after the web Worker's first deploy, and its new
+  // workers.dev hostname answered 404; a run seconds later passed.
   it.live(
     "asks the web again while a first deploy's hostname answers 404, and passes once it settles",
     () =>
@@ -521,7 +494,6 @@ describe("smoke against a stage's web", () => {
           probes: [...probes],
         });
       }).pipe(Effect.scoped, Effect.provide(FetchHttpClient.layer)),
-    // Five paths, each asked three times a second apart.
     30_000
   );
 
@@ -684,7 +656,6 @@ describe("the smoke command", () => {
           ? failed.failures.map(({ probe }) => probe)
           : []
       ).toStrictEqual(["health"]);
-      // `runMain` prints a failure as its tag and its message, and nothing else.
       expect(failed.message).toBe(`health failed at ${origin}`);
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
   );
@@ -692,8 +663,6 @@ describe("the smoke command", () => {
   it.live("probes the web at --web-url, and only there, beside --url", () =>
     Effect.gen(function* () {
       const origin = yield* fakePlatform(healthy);
-      // A web that answers, wrongly: JSON where a page and Markdown belong
-      // (only the agent skills' index is JSON).
       const web = yield* fakePlatform(() => ({ body: "{}", status: 200 }));
 
       yield* main(["--stage", "dev-oscabriel", "--url", origin]);

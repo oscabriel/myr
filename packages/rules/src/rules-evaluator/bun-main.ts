@@ -1,10 +1,6 @@
 /**
- * The `/bun` adapter's main module, written beside the config modules with a
- * `job.json` that names them. It imports each module in turn, so it can tell
- * a module that would not load (a syntax error, an import that resolves to
- * nothing) from one whose code threw, hands their exports to `entry.ts`, and
- * prints one JSON document as its last line of stdout: `Collected`, `Called`
- * or `Failed`. Plain JavaScript as source text, like the prelude.
+ * It imports each module in turn, so it can tell a module that would not load
+ * from one whose code threw. Plain JavaScript as source text, like the prelude.
  *
  * `job.json`: `{entry, project?: {file, path}, visibility?: {file, path},
  * asks: [{file, path}]}` for an evaluation, plus `{rule, facts}` for a call;

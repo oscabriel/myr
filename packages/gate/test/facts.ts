@@ -1,11 +1,3 @@
-/**
- * A push's facts for the gate's tests. One project, `datekit`, has two
- * modules, `parse` and `format`. Its ask `iso-week` has `parse` (and the root
- * manifest, for a dependency bump) as its territory, and bob holds a live
- * claim on it. By default bob pushes one change inside the territory to his
- * claim's fork, which every stage lets through; each test overrides only what
- * it is about: `testFacts({ changes: modified("docs/guide.md") })`.
- */
 import { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { ClaimView } from "@repo/protocol/domain/claim";
@@ -25,22 +17,16 @@ const { vouch } = Schema.decodeSync(
   Schema.Struct({ vouch: PolicyInput.fields.vouch })
 )({});
 
-/** The config folder's name, as `Brand.configDir` spells it. */
 export const configDir = vouch.file.slice(0, vouch.file.indexOf("/"));
 
-/** A decider for every path, who is in no line of the vouch file. */
 export const alice = Handle.make("alice");
 
-/** Vouched for, and the holder of the claim on `iso-week`. */
 export const bob = Handle.make("bob");
 
-/** Vouched for, with no claim. */
 export const carol = Handle.make("carol");
 
-/** In no line of the vouch file. */
 export const dana = Handle.make("dana");
 
-/** Denounced by the vouch file. */
 export const mallory = Handle.make("mallory");
 
 export const base = CommitSha.make("1111111111111111111111111111111111111111");
@@ -84,10 +70,8 @@ const askWire = {
   territory: { ...parseModule, paths: ["packages/parse/**", "/package.json"] },
 } as const;
 
-/** The ask bob answers. */
 export const ask = Schema.decodeSync(Ask)(askWire);
 
-/** Bob's live claim on `iso-week`. */
 export const claim = Schema.decodeSync(ClaimView)({
   ask: askWire.id,
   base,
@@ -102,7 +86,6 @@ export const claim = Schema.decodeSync(ClaimView)({
   warnsAt: "2026-10-07T14:00:00.000Z",
 });
 
-/** The policy at the landed SHA. */
 export const policy = Schema.decodeSync(Policy)({
   agents: "trailer",
   asks: [askWire],
@@ -152,11 +135,9 @@ export const policy = Schema.decodeSync(Policy)({
   weakening: { markers: [] },
 });
 
-/** The paths, each changed in place. */
 export const modified = (...paths: readonly string[]): readonly Change[] =>
   paths.map((path) => ({ path: RepoPath.make(path), status: "modified" }));
 
-/** The lines a push adds, as `[path, line, text]`, grouped by path. */
 export const addedLines = (
   ...lines: readonly (readonly [string, number, string])[]
 ): ReadonlyMap<RepoPath, readonly AddedLine[]> => {
@@ -171,7 +152,6 @@ export const addedLines = (
   return byPath;
 };
 
-/** Bob's clean push to his claim's fork, with `overrides` applied. */
 export const testFacts = (overrides: Partial<PushFacts> = {}): PushFacts => ({
   addedLines: addedLines([
     "packages/parse/src/week.ts",
@@ -199,6 +179,5 @@ export const testFacts = (overrides: Partial<PushFacts> = {}): PushFacts => ({
   ...overrides,
 });
 
-/** Refusals as they cross the wire, so a test compares their fields. */
 export const wire = (refusals: readonly Refusal[]) =>
   refusals.map((refusal) => Schema.encodeSync(Refusal)(refusal));

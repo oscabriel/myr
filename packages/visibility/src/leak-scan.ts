@@ -32,11 +32,10 @@
 // SOFTWARE.
 
 /**
- * The leak scan: whether a text, some bytes or
- * a stream holds a stored value, by exact match. It answers with the item's
- * key alone, never where the value was or what it was, so its answer cannot
- * help anyone guess a value. Values under `HARD_MIN_LENGTH` characters are
- * never looked for: they would match ordinary text everywhere.
+ * It answers with the item's key alone, never where the value was or what it
+ * was, so its answer cannot help anyone guess a value. Values under
+ * `HARD_MIN_LENGTH` characters are never looked for: they would match
+ * ordinary text everywhere.
  */
 import type { EnvKey } from "@repo/protocol/ids";
 import { Option, Redacted, Schema, Stream } from "effect";
@@ -44,19 +43,16 @@ import type { Effect } from "effect";
 
 import { charactersIn, HARD_MIN_LENGTH } from "./vault.ts";
 
-/** A stored value to look for, and the item it belongs to. */
 export interface Watched {
   readonly key: EnvKey;
   readonly value: Redacted.Redacted;
 }
 
-/** One watched item and every form of its value the scan looks for. */
 interface Needle {
   readonly forms: readonly string[];
   readonly key: EnvKey;
 }
 
-/** Every value's forms, in the order the items were given, and the longest form. */
 interface Needles {
   readonly longest: number;
   readonly needles: readonly Needle[];
@@ -95,11 +91,6 @@ const base64Forms = (value: string) => {
   });
 };
 
-/**
- * Every form a value takes where it commonly leaks: as itself, inside a
- * JSON string, URL-encoded as a URI component or a form field, and inside
- * base64 text. Each form once.
- */
 const formsOf = (value: string) => [
   ...new Set([
     value,
@@ -110,7 +101,6 @@ const formsOf = (value: string) => [
   ]),
 ];
 
-/** The forms of every value long enough to look for. */
 const needlesOf = (values: readonly Watched[]): Needles => {
   const needles = values.flatMap(({ key, value }) => {
     const text = Redacted.value(value);
@@ -129,7 +119,6 @@ const needlesOf = (values: readonly Watched[]): Needles => {
   };
 };
 
-/** The first watched item any form of whose value `text` contains. */
 const firstLeak = (text: string, { needles }: Needles) =>
   Option.fromUndefinedOr(
     needles.find(({ forms }) => forms.some((form) => text.includes(form)))
@@ -160,24 +149,16 @@ const holdback = (text: string, { longest, needles }: Needles) => {
   return 0;
 };
 
-/** The item whose stored value `text` holds, in any of its forms; none when it holds none. */
 export const scanText = (
   text: string,
   values: readonly Watched[]
 ): Option.Option<EnvKey> => firstLeak(text, needlesOf(values));
 
-/** As `scanText`, over bytes read as UTF-8 (bytes that are not text match nothing). */
 export const scanBytes = (
   bytes: Uint8Array,
   values: readonly Watched[]
 ): Option.Option<EnvKey> => scanText(new TextDecoder().decode(bytes), values);
 
-/**
- * As `scanText`, over a stream of byte chunks, read as UTF-8 in order. Each
- * chunk is scanned with the end of the text before it that could begin a
- * value, so a value split across any number of chunks is found. Stops at
- * the first leak.
- */
 export const scanStream = <E, R>(
   stream: Stream.Stream<Uint8Array, E, R>,
   values: readonly Watched[]

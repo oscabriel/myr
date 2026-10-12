@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest";
 
 import { matchAny, matchGlob } from "../src/glob.ts";
 
-// Each row is a glob, a path, and whether `.gitignore`'s rules match them.
 const rows: readonly (readonly [string, string, boolean])[] = [
   ["vitest.config.*", "vitest.config.ts", true],
   ["vitest.config.*", "packages/parse/vitest.config.ts", true],

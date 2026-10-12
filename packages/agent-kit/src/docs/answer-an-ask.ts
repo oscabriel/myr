@@ -1,8 +1,3 @@
-/**
- * The contributor's guide: install and sign in, find an ask, claim it,
- * answer it in git, check it before the push, push, read the verdict, and
- * what to do when it is refused.
- */
 import { Brand } from "@repo/brand";
 
 import { installCommand } from "../install.ts";

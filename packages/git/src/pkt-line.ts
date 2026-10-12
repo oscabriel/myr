@@ -22,20 +22,14 @@ export const concat = (parts: readonly Uint8Array[]) => {
 
 export const utf8 = (text: string) => encoder.encode(text);
 
-/** One pkt-line around `payload`. */
 export const pkt = (payload: Uint8Array) =>
   concat([
     encoder.encode((payload.length + 4).toString(16).padStart(4, "0")),
     payload,
   ]);
 
-/** A data line's payload, or `Flush`. */
 export type Packet = Uint8Array | "Flush";
 
-/**
- * The packet that starts at `at`, with where the next one starts; `None` if
- * the bytes stop before the packet does.
- */
 export const packetAt = (
   bytes: Uint8Array,
   at: number
@@ -65,7 +59,6 @@ export const packetAt = (
       });
 };
 
-/** Every packet in `bytes`, which must hold whole packets only. */
 export const packets = (bytes: Uint8Array) => {
   const found: Packet[] = [];
   let at = 0;
@@ -87,11 +80,8 @@ export const packets = (bytes: Uint8Array) => {
 const LENGTH = /^[0-9a-f]{4}$/u;
 
 /**
- * The text lines of a request in pkt-line framing, newline dropped, for a
- * reader that only looks: protocol v2's delimiter (`0001`) and response
- * end (`0002`) carry no line, nor does a flush, and reading stops where
- * the framing breaks, keeping the lines before it. `packets` is the strict
- * reader.
+ * Lenient: delimiter, response-end and flush packets carry no line, and
+ * reading stops where the framing breaks. `packets` is the strict reader.
  */
 export const textLines = (bytes: Uint8Array): readonly string[] => {
   const decoder = new TextDecoder();

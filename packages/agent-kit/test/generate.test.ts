@@ -26,18 +26,15 @@ import { expectGolden, transcript } from "./golden.ts";
 
 const plugin = `plugins/${Brand.slug}`;
 
-/** The `name:` line of a file's frontmatter; none without one. */
 const frontmatterName = (content: string) =>
   Option.fromNullishOr(/^name: (?<name>.+)$/mu.exec(content)?.groups?.name);
 
 const skill = `${keyOf(project)}-contribute`;
 
-/** `sha256("hello\n")`, as every tool that hashes prints it. */
 const helloDigest =
   "sha256:5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03";
 
 interface Case {
-  /** Its golden file: `test/golden/<golden>.txt`. */
   readonly golden: string;
   readonly what: string;
   readonly paths: readonly string[];
@@ -146,7 +143,6 @@ const eventsOf = Schema.decodeUnknownSync(
   Schema.Struct({ hooks: Schema.Record(Schema.String, Schema.Unknown) })
 );
 
-/** A SKILL.md's frontmatter keys: top level, and under `metadata`. */
 const frontmatterKeys = (content: string) => {
   const [, head = ""] = content.split("---\n");
   const lines = head.split("\n");
@@ -161,19 +157,16 @@ const frontmatterKeys = (content: string) => {
   };
 };
 
-/** A Markdown file's body: everything after its frontmatter's closing line. */
 const bodyOf = (content: string) => {
   const close = content.indexOf("\n---\n", 3);
 
   return close === -1 ? content : content.slice(close + "\n---\n".length);
 };
 
-/** The hash a file's frontmatter records, read with a pattern of its own. */
 const recordedHash = (content: string) =>
   /^ {2}content-hash: "(?<hash>sha256:[0-9a-f]{64})"$/mu.exec(content)?.groups
     ?.hash ?? "";
 
-/** The hook entry that runs `<cli> hook <event> --json`. */
 const hookCommand = (event: HookEvent) => [
   { command: `${Brand.cli} hook ${event} --json`, type: "command" },
 ];

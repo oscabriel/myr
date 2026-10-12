@@ -19,23 +19,17 @@ import { UpstreamRepoHost } from "../src/upstream/repo-host.ts";
 
 const repo = RepoName.make("demo");
 
-/** A token the store minted: its scope, its secret and when it expires. */
 interface Minted {
   readonly scope: TokenScope;
   readonly secret: string;
   readonly expiresAt: DateTime.Utc;
 }
 
-/** What one test sees: every request sent upstream and every token minted. */
 interface Seen {
   readonly requests: Ref.Ref<readonly Request[]>;
   readonly minted: Ref.Ref<readonly Minted[]>;
 }
 
-/**
- * The memory store, minting tokens shaped like Artifacts' (a secret, then
- * `?expires=`), with each mint written to `minted`.
- */
 const store = (minted: Seen["minted"]) =>
   Layer.effect(
     RepoHost,
@@ -65,7 +59,6 @@ const store = (minted: Seen["minted"]) =>
     })
   ).pipe(Layer.provide(RepoHostMemory));
 
-/** A `Fetch` that writes down each request and answers 200. */
 const recording = (requests: Seen["requests"]) =>
   Layer.succeed(
     Fetch,
@@ -89,7 +82,6 @@ const advertise = Exchange.Advertise({
   service: "git-upload-pack",
 });
 
-/** Runs `body` against the upstream over the memory store, with `demo` created. */
 const withUpstream = <A, E>(
   body: (seen: Seen) => Effect.Effect<A, E, Upstream | RepoHost>
 ) =>
@@ -108,7 +100,6 @@ const withUpstream = <A, E>(
 
 const basic = (secret: string) => `Basic ${btoa(`x:${secret}`)}`;
 
-/** What the upstream sent: the method, the URL and the headers that matter. */
 const sent = (request: Request) => ({
   authorization: request.headers.get("authorization"),
   method: request.method,
@@ -201,7 +192,6 @@ describe("the upstream over RepoHost", () => {
 
           expect(first).toHaveLength(1);
 
-          // The token is used until a minute before it expires.
           const lasts = Duration.subtract(
             DateTime.distance(
               yield* DateTime.now,

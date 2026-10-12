@@ -143,10 +143,6 @@ const isOpen = (expression: string): boolean => {
 // Kinds whose files would ship: a layer holding one keeps shipped code closed.
 const SHIPPED: ReadonlySet<LayerKind> = new Set(["fix", "source"]);
 
-/**
- * A layer that narrows what the public sees: neither a personal layer, which
- * gates nothing, nor a public one, which everyone reads.
- */
 const narrowing = (layer: Layer) =>
   layer.audience !== "personal" && layer.audience !== "public";
 
@@ -159,7 +155,6 @@ const days = (count: number) => (count === 1 ? "1 day" : `${count} days`);
 
 const labelled = (posture: Posture, label: string) => ({ label, posture });
 
-/** The posture from the layers alone (the table's first four rows). */
 const fromLayers = (visibility: VisibilityPolicy) => {
   const layers = visibility.layers.filter(narrowing);
   const shipping = layers.filter(ships);
@@ -196,15 +191,7 @@ const fromLayers = (visibility: VisibilityPolicy) => {
   );
 };
 
-/**
- * A project's posture and the label it is shown as, computed from its
- * visibility config and its licence: Open; Open with sealed
- * evidence, naming the sealed areas; Open on schedule, naming the longest
- * embargo; Open core, naming the closed layers; Source available, under a
- * licence that is not OSI-approved, whatever the layers. `licence` is the
- * SPDX id or expression from the landed `LICENSE` or `package.json`; none
- * found leaves the layers to decide.
- */
+/** `licence` is the SPDX id or expression from the landed `LICENSE` or `package.json`; none found leaves the layers to decide. */
 export const postureOf = (input: {
   readonly visibility: Option.Option<VisibilityPolicy>;
   readonly licence: Option.Option<string>;
@@ -216,7 +203,6 @@ export const postureOf = (input: {
         onSome: fromLayers,
       });
 
-// The postures, from Open down.
 const FURTHER_FROM_OPEN: readonly Posture[] = [
   "open",
   "openWithSealedEvidence",
@@ -225,10 +211,6 @@ const FURTHER_FROM_OPEN: readonly Posture[] = [
   "sourceAvailable",
 ];
 
-/**
- * Whether moving from one posture to another narrows what the public sees.
- * Narrowing is a `PostureChange` decision with a notice period; widening is
- * a release (the posture's ratchet).
- */
+/** Narrowing is a `PostureChange` decision with a notice period; widening is a release. */
 export const narrows = (from: Posture, to: Posture): boolean =>
   FURTHER_FROM_OPEN.indexOf(to) > FURTHER_FROM_OPEN.indexOf(from);

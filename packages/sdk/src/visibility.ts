@@ -1,14 +1,5 @@
-/**
- * The config folder's `visibility.ts`: a project's layers, its held-back
- * checks, how content flows between audiences, how long a narrowing waits,
- * and who may set write-only env values. And a layer's own manifest
- * (`layer.ts` in the layer repo's config folder), which alone names the
- * held-back checks' paths, each with the clause it enforces.
- *
- * Every builder returns plain data, checked against protocol's schema at the
- * call, so a mistake fails where it is written. The public file names areas,
- * kinds and rules only: what a `sealed` layer discloses.
- */
+// The public file names areas, kinds and rules only: what a `sealed` layer
+// discloses. Only a layer's own manifest names the held-back checks' paths.
 import {
   Layer,
   LayerManifest,
@@ -31,38 +22,27 @@ type VisibilityPolicyEncoded = typeof VisibilityPolicy.Encoded;
 
 type SealedChecksEncoded = typeof SealedChecks.Encoded;
 
-/** Who a rule names, as config writes it: `deciders`, or handles without `@`. */
 export type MembersInput = typeof Members.Encoded;
 
-/** The project's deciders, whoever they are at the landed commit. */
 export const deciders = "deciders" satisfies MembersInput;
 
-/**
- * A layer as a builder states it: everything but its name, which is its key
- * in `visibility({ layers })`, and its repo, which the platform makes.
- */
 export type LayerDefinition = Omit<typeof Layer.Encoded, "name" | "repo">;
 
-/** What a layer holds: one kind or more. */
 export type LayerHolds = readonly [LayerKind, ...LayerKind[]];
 
-/** A layer, as `layer()` takes it. */
 export interface LayerConfig<Holds extends LayerHolds = LayerHolds> {
   /** Who may read it. Default `"maintainers"`, the deciders' audience. */
   readonly audience?: Audience;
   /** What people outside its audience learn about what it holds. */
   readonly disclose: Disclosure;
   readonly holds: Holds;
-  /** Who may clone it. */
   readonly readers?: MembersInput;
-  /** Why it exists, in public. */
   readonly reason: string;
   /**
    * How long each kind it holds may stay unreleased: `{ experiment: "30 days" }`.
    * The protocol keeps one sunset a layer, so the layer takes the soonest.
    */
   readonly sunset?: Readonly<Partial<Record<Holds[number], Days>>>;
-  /** Who may push to it. */
   readonly writers?: MembersInput;
 }
 
@@ -79,10 +59,7 @@ const sunsetOf = (sunset: Readonly<Partial<Record<string, Days>>>) => {
   return days.length === 0 ? {} : { sunsetDays: Math.min(...days) };
 };
 
-/**
- * Declares a layer: a separate repo holding one audience's files, overlaid
- * on main only where that audience may read. Its paths stay in the layer.
- */
+/** Declares a layer: a separate repo holding one audience's files. Its paths stay in the layer. */
 export const layer = <const Holds extends LayerHolds>(
   config: LayerConfig<Holds>
 ): LayerDefinition =>
@@ -130,11 +107,6 @@ export const personal = (): LayerDefinition =>
     writers: deciders,
   });
 
-/**
- * Held-back checks as the public file states them: their areas by name and
- * code glob, never a check's path or name. `Area` is the areas' names, so a
- * layer's manifest can be held to them (`AreaOf`).
- */
 export type SealedChecksDefinition<Area extends string = string> = Omit<
   SealedChecksEncoded,
   "areas"
@@ -143,11 +115,9 @@ export type SealedChecksDefinition<Area extends string = string> = Omit<
 const sealedChecksOf = checked(SealedChecks);
 
 /**
- * Declares the held-back checks: the layer holding them, each area's name
- * and the code it guards, how often an answer may fail them, and when a new
- * check joins the suite. An answer is judged by the suite pinned at its
- * claim; a failure tells it one bit per area, and the suite is committed to
- * in public by a salted SHA-256 Merkle root.
+ * Declares the held-back checks. An answer is judged by the suite pinned at
+ * its claim; a failure tells it one bit per area, and the suite is committed
+ * to in public by a salted SHA-256 Merkle root.
  */
 export const sealedChecks = <
   const Areas extends Readonly<Record<string, string>>,
@@ -184,12 +154,10 @@ export const sealedChecks = <
   areas: config.areas,
 });
 
-/** How content moves between audiences, as data. */
 export type FlowsDefinition = VisibilityPolicyEncoded["flows"];
 
 const flowsOf = checked(VisibilityPolicy.fields.flows);
 
-/** The flow rules. */
 export const flows = {
   /**
    * Nothing moves from a layer into a wider audience but a credited
@@ -201,21 +169,17 @@ export const flows = {
     flowsOf({ noWriteDown: true, release: options?.release ?? deciders }),
 };
 
-/** A project's `visibility.ts`, as `visibility()` takes it. */
 export interface VisibilityConfig<Area extends string = string> {
-  /** Held-back checks: `sealedChecks({ areas })`. */
   readonly checks?: SealedChecksDefinition<Area>;
   /** Who may set a write-only env value. Default the deciders. */
   readonly env?: { readonly setters: MembersInput };
   /** Default `flows.noWriteDown()`. */
   readonly flows?: FlowsDefinition;
-  /** The project's layers, by name. */
   readonly layers?: Readonly<Record<string, LayerDefinition>>;
   /** How long a change that narrows visibility waits before it lands. Default `"7 days"`. */
   readonly notice?: { readonly narrowing: Days };
 }
 
-/** A visibility file's default export: the policy it states, as data. */
 export type VisibilityDefinition<Area extends string = string> = Omit<
   VisibilityPolicyEncoded,
   "checks"
@@ -239,10 +203,7 @@ const policyOf = checked(
   )
 );
 
-/**
- * Declares a project's visibility: the default export of the config
- * folder's `visibility.ts`. A project without one is Open.
- */
+/** Declares a project's visibility: the default export of `visibility.ts`. A project without one is Open. */
 export const visibility = <Area extends string = never>(
   config: VisibilityConfig<Area>
 ): VisibilityDefinition<Area> => {
@@ -284,23 +245,16 @@ export type AreaOf<Definition> =
       ? Area
       : never;
 
-/** One held-back check as its layer's manifest lists it. */
 export type SealedCheckInput<Area extends string = string> = Omit<
   typeof SealedCheck.Encoded,
   "area"
 > & { readonly area: Area };
 
-/** A layer manifest's default export, as data. */
 export type LayerManifestDefinition = typeof LayerManifest.Encoded;
 
 const manifestOf = checked(LayerManifest);
 
-/**
- * Declares a layer's manifest: the default export of `layer.ts` in the
- * layer repo's config folder. Each held-back check's path, its area, the
- * clause of an ask or a doc it enforces, and its author; and the commits a
- * new check must fail on before it is admitted.
- */
+/** Declares a layer's manifest: the default export of `layer.ts` in the layer repo's config folder. */
 export const layerManifest = <Area extends string>(config: {
   readonly checks: readonly SealedCheckInput<Area>[];
   readonly knownBad?: readonly string[];

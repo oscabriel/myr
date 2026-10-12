@@ -1,7 +1,3 @@
-/**
- * The receive-pack side of git's smart HTTP (gitprotocol-pack): the command
- * list that opens a push, and the report-status that answers it.
- */
 import { RefName } from "@repo/artifacts/repo-host";
 import { CommitSha } from "@repo/protocol/ids";
 import type { Refusal } from "@repo/protocol/refusal";
@@ -11,7 +7,6 @@ import { Array, Data, Effect, Option, Schema, Stream } from "effect";
 import type { Command } from "./custody.ts";
 import { FLUSH, concat, packetAt, packets, pkt, utf8 } from "./pkt-line.ts";
 
-/** The request is not a receive-pack request git would send. */
 export class Malformed extends Data.TaggedError("Malformed")<{
   readonly reason: string;
 }> {}
@@ -26,7 +21,6 @@ const objectId = (hex: string) =>
 
 const isRefName = Schema.is(RefName);
 
-/** The opening of a push, and every byte read to find it. */
 export interface Opening {
   readonly commands: readonly Command[];
   readonly capabilities: ReadonlySet<string>;
@@ -80,11 +74,7 @@ const chunkOf = (reader: ReadableStreamDefaultReader<Uint8Array>) =>
     try: () => reader.read(),
   });
 
-/**
- * Reads a push's command list, up to its flush, from the request body, then
- * lets the body go: the pack that follows stays unread in it. An empty list
- * is git's probe before a large push.
- */
+/** The pack that follows stays unread in the body. An empty list is git's probe before a large push. */
 export const readOpening = (body: ReadableStream<Uint8Array>) =>
   Effect.gen(function* () {
     const reader = body.getReader();
@@ -131,11 +121,10 @@ const rest = (body: ReadableStream<Uint8Array>) =>
     onError: () => new Malformed({ reason: "the push could not be read" }),
   });
 
-/** Reads the rest of a body and drops it, so the client finishes sending. */
+/** So the client finishes sending. */
 export const drain = (body: ReadableStream<Uint8Array>) =>
   Stream.runDrain(rest(body)).pipe(Effect.ignore);
 
-/** The bytes already read, then the rest of the body, as one stream. */
 export const resume = (read: Uint8Array, body: ReadableStream<Uint8Array>) =>
   Stream.toReadableStream(Stream.concat(Stream.succeed(read), rest(body)));
 
@@ -161,17 +150,13 @@ const chunks = (bytes: Uint8Array, limit: number) => {
   return parts;
 };
 
-/** One ref's line in a report: `None` if it landed, else git's reason. */
 export interface RefStatus {
   readonly ref: string;
   readonly ng: Option.Option<string>;
 }
 
-/** The upstream's answer to a push, out of its side band. */
 export interface UpstreamReport {
-  /** Side-band messages, which git prints as `remote:` lines. */
   readonly messages: readonly Uint8Array[];
-  /** `ok`, or why the pack did not unpack; `None` if no report came. */
   readonly unpack: Option.Option<string>;
   readonly refs: readonly RefStatus[];
 }
@@ -181,7 +166,6 @@ const text = (bytes: Uint8Array) =>
 
 const STATUS = /^(?<verdict>ok|ng) (?<ref>\S+)(?: (?<reason>.*))?$/u;
 
-/** Reads the upstream's reply to a push; throws if it is not pkt-lines. */
 export const readReport = (
   capabilities: ReadonlySet<string>,
   reply: Uint8Array
@@ -227,10 +211,6 @@ export const readReport = (
   return { messages, refs, unpack };
 };
 
-/**
- * The reply a pusher gets: side-band messages, then every refusal explained,
- * as `remote:` lines; then `ok` or `ng <ref> <reason>` for every ref.
- */
 export const writeReport = (
   capabilities: ReadonlySet<string>,
   messages: readonly Uint8Array[],
@@ -275,7 +255,6 @@ export const writeReport = (
 
 const ADVERTISED = /^(?<oid>[0-9a-f]{40}) (?<ref>[^\0\n ]+)/u;
 
-/** The refs in a ref advertisement (`info/refs`) and the commit each names. */
 export const readAdvertisement = (advertisement: Uint8Array) =>
   new Map(
     packets(advertisement).flatMap((packet) => {
@@ -288,7 +267,6 @@ export const readAdvertisement = (advertisement: Uint8Array) =>
     })
   );
 
-/** Every ref turned away for the same refusals. */
 export const refuseAll = (
   commands: readonly Command[],
   refusals: Array.NonEmptyReadonlyArray<Refusal>

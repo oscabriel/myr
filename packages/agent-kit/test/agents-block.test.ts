@@ -29,7 +29,6 @@ const older = {
   end,
 };
 
-/** The block as it sits in a file. */
 const written = ({ begin, body }: typeof block) => `${begin}\n${body}${end}`;
 
 describe(upsertAgentsBlock, () => {

@@ -44,20 +44,13 @@ import type {
   RepoNotFound,
 } from "../repo-host.ts";
 
-/**
- * A bare repo's directory on a file system isomorphic-git reads and writes:
- * the shape a push takes its objects from, so every stored repo is a source
- * too.
- */
 export type GitDir = PushSource;
 
-/** A repo a store found by name: its directory and the lock its pushes take. */
 export interface StoredRepo {
   readonly dir: GitDir;
   readonly lock: Semaphore.Semaphore;
 }
 
-/** The ref every repo's HEAD names: Artifacts' default branch. */
 export const mainRef = "refs/heads/main";
 
 class GitFailure extends Data.TaggedError("GitFailure")<{
@@ -67,7 +60,6 @@ class GitFailure extends Data.TaggedError("GitFailure")<{
 const git = <A>(run: () => Promise<A>) =>
   Effect.tryPromise({ catch: (cause) => new GitFailure({ cause }), try: run });
 
-/** `None` where isomorphic-git finds no such object, ref or file. */
 export const unlessMissing = <A>(
   run: () => Promise<A>
 ): Effect.Effect<Option.Option<A>> =>
@@ -94,7 +86,6 @@ const keep = (oid: string, write: () => Promise<string>) =>
     )
   );
 
-/** A new, empty bare repo whose HEAD names `main`. */
 export const initBare = (repo: GitDir) =>
   git(() => init({ ...repo, bare: true, defaultBranch: "main" })).pipe(
     Effect.orDie
@@ -106,11 +97,8 @@ export const tipOf = (repo: GitDir, ref: string) =>
   );
 
 /**
- * The ref a remote's import takes when none is named: the branch its HEAD
- * names, or, when HEAD names a branch it lacks (a store made here names
- * `main`), its one branch, as a remote whose default is `master` has it.
- * Otherwise what HEAD names, even a branch it lacks; `None` only for a
- * detached HEAD.
+ * When HEAD names a branch the remote lacks (a store made here names `main`),
+ * its one branch, as a remote whose default is `master` has it.
  */
 export const defaultRefOf = (repo: GitDir) =>
   Effect.gen(function* () {
@@ -198,10 +186,6 @@ const copyCommit = (
     yield* keep(oid, () => writeCommit({ ...into, commit }));
   });
 
-/**
- * A ref's target, objects first: an annotated tag after what it names
- * (a commit, or another tag), or else a commit and its history.
- */
 const copyTarget = (
   source: PushSource,
   into: GitDir,
@@ -226,7 +210,6 @@ const copyTarget = (
     yield* keep(oid, () => writeTag({ ...into, tag: tag.value.tag }));
   });
 
-/** Sets the new repo `into`'s `ref` to `source`'s `tip`, objects first. */
 export const seedRef = (
   source: PushSource,
   into: GitDir,
@@ -288,16 +271,8 @@ const commitAt = (repo: GitDir, sha: CommitSha) =>
     )
   );
 
-// isomorphic-git's entries carry `path` and `oid`; the port's, `name` and `sha`.
 const decodeEntries = Schema.decodeUnknownEffect(Schema.Array(TreeEntry));
 
-/**
- * The RepoHost methods that read a repo's objects and refs or push to it,
- * the same over every store whose repos are isomorphic-git directories:
- * `known` finds a repo's directory and lock by name. A push is a
- * compare-and-swap per ref under the repo's lock, never atomic across refs;
- * reads resolve short branch names and commit ids only.
- */
 export const objectsAndRefs = (
   known: (name: RepoName) => Effect.Effect<StoredRepo, RepoNotFound>
 ): Pick<

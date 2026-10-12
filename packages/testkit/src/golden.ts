@@ -1,18 +1,6 @@
-/**
- * Golden git transcripts: git's output made the same on every run and every
- * machine, compared with a file under `test/golden/`.
- *
- * Like everything in `@repo/testkit`, this module is for `test/` directories
- * only: no `src/` imports it.
- */
 import { Brand } from "@repo/brand";
 import { Config, Context, Effect, FileSystem } from "effect";
 
-/**
- * Where golden files live: `test/golden`, from the package whose tests run
- * (vitest runs in the package's folder). A test about golden files
- * themselves points it at a temporary folder.
- */
 export const GoldenDir = Context.Reference<string>("testkit/GoldenDir", {
   defaultValue: () => "test/golden",
 });
@@ -38,11 +26,9 @@ const lastRewrite = (line: string) =>
   line.split("\r").findLast((version) => version !== "") ?? "";
 
 /**
- * Git's output, the same on every run of the same push: without the eight
- * spaces git pads side-band lines with when stderr is not a terminal (and any
- * other trailing space), with temporary folders as `<tmp>`, full object ids as
- * `<sha>`, a local server's address as `<host>`, and each line rewritten with
- * carriage returns as a terminal leaves it.
+ * Without the spaces git pads side-band lines with when stderr is not a
+ * terminal, with temporary folders as `<tmp>`, object ids as `<sha>`, a local
+ * server as `<host>`, and each carriage-return line as a terminal leaves it.
  */
 export const normaliseGitOutput = (text: string): string =>
   text
@@ -60,16 +46,10 @@ export const normaliseGitOutput = (text: string): string =>
 // the rule `brand:check` applies.
 const NAME = new RegExp(`(?<![a-z])${Brand.slug}(?![a-z])`, "giu");
 
-/**
- * The text as a golden file holds it: the product's config folder as
- * `<configDir>` and every other spelling of its name as `<brand>`, so no
- * golden file names the product (`brand:check`) and a renamed brand still
- * matches.
- */
+/** The product's name as placeholders, so no golden file names it (`brand:check`). */
 const unbranded = (text: string) =>
   text.replaceAll(Brand.configDir, "<configDir>").replaceAll(NAME, "<brand>");
 
-/** The lines that differ, as `- golden` and `+ actual`, in order. */
 const difference = (golden: string, actual: string) => {
   const was = golden.split("\n");
   const now = actual.split("\n");
@@ -86,11 +66,7 @@ const difference = (golden: string, actual: string) => {
     .join("\n");
 };
 
-/**
- * Compares `text` with `test/golden/<name>.txt`, and fails the test where
- * they differ. With `UPDATE_GOLDEN=1` it writes the file instead, folders
- * and all: run the package's tests that way once, then read the diff.
- */
+/** With `UPDATE_GOLDEN=1` it writes the file instead: run the tests that way once, then read the diff. */
 export const expectGolden = (
   name: string,
   text: string

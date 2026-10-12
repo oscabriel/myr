@@ -1,10 +1,3 @@
-/**
- * The swarm's herdr view: six contributors in six herdr panes and a counter
- * pane, for the video. The view decides only where a harness runs and how a
- * prompt reaches it; the verdict loop and its outcomes (from
- * `<cli> status --json`, never pane text) are `swarm-loop.test.ts`'s. The counter follows the
- * project's `watch` and counts claims, pushes and landings.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { AnswerView } from "@repo/protocol/domain/answer";
@@ -72,7 +65,6 @@ const children = ["auth", "billing", "catalog", "kit", "notify", "search"].map(
 
 const sha = (digit: number) => CommitSha.make(String(digit).repeat(40));
 
-/** The `n`th event's place in the project's sequence, and its time. */
 const stamp = (n: number) => ({
   at: DateTime.makeUnsafe(
     `2026-10-08T12:${String(10 + n).padStart(2, "0")}:00.000Z`
@@ -80,11 +72,6 @@ const stamp = (n: number) => ({
   seq: 100 + n,
 });
 
-/**
- * A take's events: six claims, nine pushes (three agents pushed twice), four
- * landings, and events the counter does not count (a verdict, a released
- * claim, an ask that opened).
- */
 const takeEvents: readonly ProjectEvent[] = [
   ...children.map((ask, at) =>
     ProjectEvent.cases.Claimed.make({
@@ -277,7 +264,6 @@ describe("the panes", () => {
   );
 });
 
-/** The env names the CLI reads, spelled from the brand. */
 const SLUG = Brand.slug.toUpperCase();
 
 const platformUrl = "https://platform-dev-oscabriel.example.workers.dev";
@@ -285,18 +271,15 @@ const platformUrl = "https://platform-dev-oscabriel.example.workers.dev";
 const tokenOf = (handle: string) =>
   `${handle}-token-0123456789abcdef0123456789ab`;
 
-/** Whose token `env` carries, if anyone's. */
 const holderOf = (env: Readonly<Record<string, string | undefined>>) =>
   handles.find((handle) => env[`${SLUG}_TOKEN`] === tokenOf(handle));
 
-/** One command the fake world was asked to run. */
 interface Spawned {
   readonly command: string;
   readonly args: readonly string[];
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
-/** How a faked command ends: its exit code and what it printed. */
 interface Ending {
   readonly code?: number;
   readonly stdout?: string;
@@ -305,10 +288,6 @@ interface Ending {
 
 const bytes = (text: string) => Stream.make(new TextEncoder().encode(text));
 
-/**
- * A `ChildProcessSpawner` that runs nothing: it records each command and
- * ends it as `answer` says.
- */
 const fakeSpawner = (answer: (call: Spawned) => Effect.Effect<Ending>) =>
   Effect.gen(function* () {
     const spawned = yield* Ref.make<readonly Spawned[]>([]);
@@ -351,7 +330,6 @@ const fakeSpawner = (answer: (call: Spawned) => Effect.Effect<Ending>) =>
     };
   });
 
-/** A swarm fixture's text. */
 const fixture = (name: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -376,7 +354,6 @@ const StatusJson = Schema.fromJsonString(
   )
 );
 
-/** `handle`'s answer to `ask`, the `n`th they pushed, with its outcome. */
 const answerOf = (
   handle: string,
   ask: AskId,
@@ -392,11 +369,6 @@ const answerOf = (
 
 const landed = Outcome.cases.Landed.make({ sha: LandedSha.make(sha(9)) });
 
-/**
- * What `handle`'s `<cli> status --json` prints on its `call`th read: wren's
- * first answer is refused for leaving its territory and the next one lands;
- * everyone else's first answer lands.
- */
 const statusOf = (handle: string, call: number) => {
   const ask = children[handles.indexOf(handle)] ?? AskId.make("unknown");
 
@@ -420,14 +392,12 @@ const statusOf = (handle: string, call: number) => {
   });
 };
 
-/** herdr's answer for a pane it made. */
 const paneJson = (pane: string) =>
   JSON.stringify({
     id: "cli:pane:split",
     result: { pane: { pane_id: pane, workspace_id: "w9" }, type: "pane_info" },
   });
 
-/** herdr's answer for an agent that is idle and ready for input. */
 const agentJson = (name: string, type: string) =>
   JSON.stringify({
     id: `cli:agent:${type}`,
@@ -443,7 +413,6 @@ const agentJson = (name: string, type: string) =>
     },
   });
 
-/** What `<cli> claim <ask> --json` prints for `handle`. */
 const claimOf = (ask: string, handle: string) => {
   const fork = `burrow--${ask}--${handle}`;
 
@@ -469,14 +438,6 @@ const claimOf = (ask: string, handle: string) => {
   });
 };
 
-/**
- * The platform, git and herdr, faked for a whole `--view herdr` run: the
- * CLI's `asks`, `ask` and `claim` answer from the fixtures, each
- * contributor's `status` from `statusOf`, git and `mkfifo` succeed, herdr
- * makes panes `w9:p1`, `w9:p2`, … and every agent settles idle, and the
- * counter's `watch` hears nothing new. `replay` is how the counter's read
- * of where the project stands ends: an empty replay unless a test says.
- */
 const herdrWorld = (replay: Ending) =>
   Effect.gen(function* () {
     const panes = yield* Ref.make(1);
@@ -550,27 +511,19 @@ const herdrWorld = (replay: Ending) =>
         return Effect.map(answer(call), (stdout) => ({ stdout }));
       }
 
-      // The read of where the project stands is plain JSON; the follow hears nothing.
       return Effect.succeed(
         call.args.includes("content-type: application/json") ? replay : {}
       );
     });
   });
 
-/** `watch`'s plain JSON replay of a project that holds no event yet. */
 const emptyReplay: Ending = {
   stdout:
     '[{"_tag":"Exit","requestId":"1","exit":{"_tag":"Success","value":null}}]',
 };
 
-/** What herdr puts in the env of a process in one of its panes. */
 const inAPane = { HERDR_ENV: "1" };
 
-/**
- * `main --view herdr` for every contributor over `herdrWorld`, from a herdr
- * pane unless `herdrEnv` says otherwise, the counter's read of the project
- * ending as `replay`, with `.swarm/` and the ledger in a temp dir.
- */
 const herdrRunWith = (
   herdrEnv: Readonly<Record<string, string>>,
   replay: Ending = emptyReplay
@@ -622,7 +575,6 @@ const herdrRunWith = (
       Effect.result
     );
 
-    // The TestClock's epoch names the run.
     const run = `${swarm}/19700101-000000`;
     const summary = `${run}/agents.json`;
     const wrensScript = `${run}/wren/pane-shell`;
@@ -644,11 +596,9 @@ const herdrRunWith = (
 
 const herdrRun = herdrRunWith(inAPane);
 
-/** The herdr calls of a run, as argv. */
 const herdrCalls = (spawned: readonly Spawned[]) =>
   spawned.flatMap(({ args, command }) => (command === "herdr" ? [args] : []));
 
-/** The `agent <verb>` calls among `calls`, by the agent's name. */
 const agentCalls = (calls: readonly (readonly string[])[], verb: string) =>
   calls.flatMap((call) =>
     call[0] === "agent" && call[1] === verb
@@ -656,7 +606,6 @@ const agentCalls = (calls: readonly (readonly string[])[], verb: string) =>
       : []
   );
 
-/** The pane each contributor's harness runs in: the layout's order over `w9:p1`, `w9:p2`, …. */
 const paneOf = new Map([
   ["wren", "w9:p1"],
   ["counter", "w9:p2"],
@@ -762,7 +711,7 @@ describe("a run in herdr's panes", () => {
             .map(({ args }) => args)
         );
         // wren's harness is Claude Code, started with the headless run's
-        // safety flags: every tool allowed, no MCP server of the user's.
+        // safety flags: every tool allowed, no MCP server of the machine's own.
         expect(
           starts.find(({ name }) => name === "wren")?.args.slice(9)
         ).toStrictEqual([
@@ -911,7 +860,6 @@ describe("a run in herdr's panes", () => {
   );
 });
 
-/** What herdr's detection text shows while Claude Code 2.1.293 asks whether to trust a new folder. */
 const trustQuestion = [
   " Accessing workspace:",
   "",
@@ -921,11 +869,7 @@ const trustQuestion = [
   "   Yes, I trust this folder",
 ].join("\n");
 
-/**
- * …and then whether to import the CLAUDE.md files above the clone, "No"
- * under the cursor (live, Enter left the clone's
- * `hasClaudeMdExternalIncludesApproved` false).
- */
+/** …and then whether to import the CLAUDE.md files above the clone, "No" under the cursor. */
 const importsQuestion = [
   "  Allow external CLAUDE.md file imports?",
   "",
@@ -935,7 +879,6 @@ const importsQuestion = [
 
 const [wren] = roster;
 
-/** wren's workspace for run `r1`. */
 const wrensWorkspace: AgentWorkspace = {
   clone: "/work/.swarm/r1/wren/clone",
   dir: "/work/.swarm/r1/wren",
@@ -943,20 +886,12 @@ const wrensWorkspace: AgentWorkspace = {
   redacted: [`${SLUG}_TOKEN`],
 };
 
-/** The first of `queue`, taken off it unless it is the last. */
 const takeFrom = (queue: Ref.Ref<readonly string[]>) =>
   Ref.modify(queue, (all) => [
     all[0] ?? "",
     all.length > 1 ? all.slice(1) : all,
   ]);
 
-/**
- * wren's first attempt in herdr's pane `w9:p1`, where herdr finds Claude
- * Code blocked at startup: each `agent get` says the next of `states`
- * (`blocked` until the last), and each `agent read` shows the next of
- * `screens`. Files are kept in memory, so the TestClock moves as `clock`
- * says, deterministically.
- */
 const blockedStart = (input: {
   readonly states: readonly string[];
   readonly screens: readonly string[];
@@ -1100,11 +1035,6 @@ describe("a harness blocked at startup", () => {
   );
 });
 
-/**
- * What dev-oscabriel's `/rpc` answered `watch` for burrow over plain JSON
- * on 2026-10-08 (two of its eight events, the others cut): the frames at
- * once, then the exit.
- */
 const replayed = [
   '[{"_tag":"Chunk","requestId":"1","values":[',
   '{"_tag":"AskOpened","at":"2026-10-08T05:21:35.148Z","seq":7,"ask":{"ask":"drop-legacy-fetch-burrow-notify","blockedBy":[],"claimed":false,"kind":"migrate","territory":"@burrow/notify","want":"@burrow/notify: 1 caller of legacyFetch → http.get"}},',
@@ -1112,11 +1042,7 @@ const replayed = [
   ']},{"_tag":"Exit","requestId":"1","exit":{"_tag":"Success","value":null}}]',
 ].join("");
 
-/**
- * The framed stream's lines, as dev-oscabriel sends them over NDJSON: one
- * frame per line. The first repeats an event the counter already heard
- * (a claim, so a counter that heard it twice would say so).
- */
+/** The first frame repeats an event the counter already heard, so a double count would show. */
 const streamed = [
   '{"_tag":"Chunk","requestId":"1","values":[{"_tag":"Claimed","at":"2026-10-08T12:00:00.000Z","seq":8,"ask":"drop-legacy-fetch-burrow-billing","claimant":"tamsin"}]}',
   '{"_tag":"Chunk","requestId":"1","values":[{"_tag":"Claimed","at":"2026-10-08T12:05:00.000Z","seq":9,"ask":"drop-legacy-fetch-burrow-auth","claimant":"wren"}]}',

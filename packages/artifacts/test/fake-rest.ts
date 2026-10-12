@@ -1,42 +1,8 @@
 /**
- * An in-process fake of the Artifacts REST API over a `RepoHost` (in tests,
- * `RepoHostLocal`), for `/rest`'s tests. It serves the routes
- * `src/repo-host/rest.ts` lists, under
- * `<base>/accounts/<accountId>/artifacts/namespaces/<namespace>`, and answers
- * in Cloudflare's v4 envelope, `{success, errors: [{code, message}],
- * messages, result}`. A repo's `remote` is the host's, for a git server the
- * test runs there (`@repo/testkit/http-backend`).
- *
- * It keeps what Artifacts' REST docs and the probes say of the real API:
- *
- * - only `Authorization: Bearer <api token>` authenticates; anything else is
- *   401 (Cloudflare's code 10000);
- * - errors carry Artifacts' numeric codes (its errors page): 10200 not
- *   found, 10201 already exists, 10303 fork in progress, 10100 invalid
- *   input, 10103 invalid ttl, 10104 invalid url, 10400 internal;
- * - a fork names its target in the body, `{name, default_branch_only}`, a
- *   field cf's schema lacks (cf #180); a body without `name` is refused;
- * - create, fork and import answer with the new repo's `remote` and a
- *   day-long write token; a token's mint answers `{id, plaintext,
- *   scope, expires_at}`; a delete answers 202;
- * - under load, a fork answers HTTP 500 with code 10400 after making the
- *   repo, and a retry answers 409 with code 10201:
- *   `{ forkFailures: n }`; `{ forkLost: true }` makes those forks make
- *   nothing;
- * - revoking a token within about a second of its mint can be 404 (cf's
- *   help for `tokens revoke`): `{ revokeLag: n }` makes the first `n`
- *   revocations of each token 404;
- * - blobs and files are raw bytes; every other reply is JSON.
- *
- * And, as ASSUMPTIONs nobody has seen live, what the docs leave out:
- *
- * - commit metadata is the binding's, in snake case (`tree_hash`) as the
- *   API's other fields are, or in camel case: `{ casing: "camel" }`;
- * - a tree or a log is the binding's list, as the envelope's `result`;
- * - a tree or a commit read at an object of another kind is 500 (10400), as
- *   the binding throws `INTERNAL_ERROR` there;
- * - a ref is a short branch name or a commit id, as the binding's,
- *   and a log at a ref that names nothing is 404.
+ * An in-process fake of the Artifacts REST API over a `RepoHost`. It keeps
+ * what Artifacts' REST docs and probes say of the real API; what the docs
+ * leave out (commit field casing, a wrong-kind read as 500, a log at a ref
+ * that names nothing as 404) is an ASSUMPTION nobody has seen live.
  */
 import { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
 import {
@@ -66,21 +32,14 @@ import type {
 export interface FakeRestOptions {
   readonly accountId: string;
   readonly namespace: string;
-  /** The API token it takes, as a bearer token. */
   readonly token: string;
-  /** Defaults to `https://api.cloudflare.com/client/v4`. */
   readonly base?: string;
-  /** How many fork calls answer 500 (code 10400), as under load. */
   readonly forkFailures?: number;
-  /** Whether those forks make nothing; by default each makes the repo first. */
   readonly forkLost?: boolean;
-  /** How commit metadata spells its fields; snake case by default. */
   readonly casing?: "camel" | "snake";
-  /** How many revocations of each token answer 404 before one takes. */
   readonly revokeLag?: number;
 }
 
-/** Artifacts' error codes, from its errors page. */
 const Codes = {
   alreadyExists: 10_201,
   forkInProgress: 10_303,
@@ -91,7 +50,6 @@ const Codes = {
   notFound: 10_200,
 } as const;
 
-/** Cloudflare's own codes for a bad API token and an unknown route. */
 const UNAUTHENTICATED = 10_000;
 
 const NO_ROUTE = 7000;
@@ -121,7 +79,6 @@ const notFound = (what: string) =>
 const internal = () =>
   failed(500, Codes.internal, "An internal error occurred.");
 
-/** A reply decided before the host was asked: a refusal of the request itself. */
 class Answered extends Data.TaggedError("Answered")<{
   readonly response: Response;
 }> {}
@@ -129,7 +86,6 @@ class Answered extends Data.TaggedError("Answered")<{
 const invalid = (code: number, message: string) =>
   new Answered({ response: failed(400, code, message) });
 
-/** What a route's handler fails with: the host's errors, or a reply. */
 type Failure =
   | Answered
   | ForkInProgress
@@ -166,7 +122,6 @@ const decodeBranch = Schema.decodeUnknownOption(BranchName);
 
 const decodePath = Schema.decodeUnknownOption(RepoPath);
 
-/** A request's JSON body, decoded, or a 400. */
 const bodyOf = <A>(request: Request, codec: Schema.Codec<A, string>) =>
   Effect.promise(() => request.text()).pipe(
     Effect.flatMap(Schema.decodeEffect(codec)),
@@ -185,7 +140,6 @@ const objectNamed = (id: string) =>
     Effect.mapError(() => invalid(Codes.invalidInput, `invalid hash: ${id}`))
   );
 
-/** A short branch name or a commit id; anything else names nothing. */
 const revisionOf = (ref: string): Option.Option<Revision> =>
   Option.match(decodeObject(ref), {
     onNone: () =>
@@ -208,7 +162,6 @@ const entryOf = (entry: TreeEntry) => ({
   ),
 });
 
-/** Whether the repo holds `id` as an object of any kind. */
 const holds = (host: RepoHost["Service"], name: RepoName, id: ObjectId) =>
   Effect.all([
     host.readBlob(name, id),
@@ -221,7 +174,6 @@ const holds = (host: RepoHost["Service"], name: RepoName, id: ObjectId) =>
     )
   );
 
-/** A repo's info, as `GET /repos/{name}` gives it. */
 const infoOf = (name: RepoName, remote: string) =>
   ok({
     created_at: "2026-10-07T00:00:00.000Z",
@@ -236,13 +188,11 @@ const infoOf = (name: RepoName, remote: string) =>
     updated_at: "2026-10-07T00:00:00.000Z",
   });
 
-/** Whose a token is, and how many more revocations of it miss. */
 interface Minted {
   readonly repo: RepoName;
   readonly misses: number;
 }
 
-/** A route's path parameters, the request, and its URL. */
 interface Call {
   readonly name: string;
   readonly id: string;
@@ -252,7 +202,6 @@ interface Call {
 
 type Handler = (call: Call) => Effect.Effect<Response, Failure>;
 
-/** The fake API over `host`: a handler for the test's `Fetch` to route to. */
 export const fakeRest = (
   host: RepoHost["Service"],
   options: FakeRestOptions
@@ -263,7 +212,6 @@ export const fakeRest = (
     const forkFailures = yield* Ref.make(options.forkFailures ?? 0);
     const tokens = yield* Ref.make<ReadonlyMap<string, Minted>>(new Map());
 
-    // The times the host read from the commit itself.
     const metadataOf = (commit: Commit) => {
       const fields = {
         author: commit.author,
@@ -308,7 +256,6 @@ export const fakeRest = (
         };
       });
 
-    /** A new repo's reply, with its day-long write token. */
     const made = (name: RepoName, remote: string) =>
       mint(name, "write", DAY_SECONDS).pipe(
         Effect.map(({ plaintext }) => ({
@@ -381,7 +328,6 @@ export const fakeRest = (
         return ok(yield* made(name, remote));
       });
 
-    /** A commit or a tree; another kind of object at the id is a 500. */
     const object =
       <A>(
         read: (
@@ -423,7 +369,6 @@ export const fakeRest = (
         });
       });
 
-    /** A file at a ref that is a short branch name or a commit id. */
     const file: Handler = (call) =>
       Effect.gen(function* () {
         const name = yield* repoNamed(call.name);
@@ -515,7 +460,6 @@ export const fakeRest = (
       ["DELETE", /^\/tokens\/(?<id>[^/]+)$/u, revoke],
     ];
 
-    /** The handler for a request, and the call it is given. */
     const routed = (request: Request) => {
       const url = new URL(request.url);
       const path = `${url.origin}${url.pathname}`;

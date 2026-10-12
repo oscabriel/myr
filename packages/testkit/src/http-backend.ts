@@ -31,7 +31,6 @@ const blankLine = (bytes: Uint8Array) => {
   return -1;
 };
 
-/** A CGI reply (`Status:` and headers, a blank line, the body) as a Response. */
 const fromCgi = (output: Uint8Array) => {
   const cut = blankLine(output);
   const head = new TextDecoder().decode(output.slice(0, Math.max(cut, 0)));
@@ -52,17 +51,13 @@ const fromCgi = (output: Uint8Array) => {
   return new Response(output.slice(cut + 4), { headers, status });
 };
 
-/** `…/<repo>.git/info/refs` and the two service calls: what smart HTTP asks for. */
 const SMART_HTTP =
   /\/(?<repo>[^/]+)\.git\/(?<path>info\/refs|git-upload-pack|git-receive-pack)$/u;
 
 const notFound = () =>
   new Response("not a smart-HTTP git URL", { status: 404 });
 
-/**
- * Passes bytes and fails the stream on anything else: the Workers types leave
- * a request body's chunk type open.
- */
+/** The Workers types leave a request body's chunk type open. */
 const bytes = () =>
   new TransformStream<unknown, Uint8Array>({
     transform: (chunk, controller) => {
@@ -76,7 +71,6 @@ const bytes = () =>
     },
   });
 
-/** A request's body as the CGI's stdin; a request without one gives none. */
 const stdinOf = (request: Request) => {
   const { body } = request;
 
@@ -88,13 +82,7 @@ const stdinOf = (request: Request) => {
       }).pipe(Stream.orDie);
 };
 
-/**
- * `git http-backend` over the bare repos in `root`: a smart-HTTP server for
- * `…/<repo>.git/info/refs`, `…/git-upload-pack` and `…/git-receive-pack`,
- * whatever comes before the repo in the URL. It serves receive-pack too, and
- * reads no credentials: a test that wants a server to refuse them, or to stand
- * in for a reply, wraps this handler.
- */
+/** It reads no credentials: a test that wants a server to refuse them wraps this handler. */
 export const httpBackend =
   (root: string) =>
   (

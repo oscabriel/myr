@@ -1,12 +1,5 @@
-/**
- * Git smart HTTP over the `Fetch` port, for adapters whose store serves git
- * at a remote URL with a bearer token: `/binding` and `/rest`. It takes a
- * `remote` (`…/<repo>.git`, Artifacts' shape) and a token, and nothing about
- * how either was got.
- *
- * The token goes only into the `Authorization` header of requests to the
- * remote's own origin; everywhere else it stays `Redacted`.
- */
+// The token goes only into the `Authorization` header of requests to the
+// remote's own origin; everywhere else it stays `Redacted`.
 import { CommitSha } from "@repo/protocol/ids";
 import {
   Data,
@@ -47,7 +40,6 @@ import {
 } from "../repo-host.ts";
 import type { PushSource, RefUpdate, Tag } from "../repo-host.ts";
 
-/** What isomorphic-git or a response body threw, before it is read. */
 class GitFailure extends Data.TaggedError("GitFailure")<{
   readonly cause: unknown;
 }> {}
@@ -76,7 +68,6 @@ const decodeRef = Schema.decodeUnknownOption(RefName);
 
 const decodeSha = Schema.decodeUnknownOption(CommitSha);
 
-/** The repo a remote names: its last path segment, less `.git`. */
 const repoOf = (remote: string) =>
   Option.match(
     decodeRepo(
@@ -114,7 +105,6 @@ const bytesOf = (body: AsyncIterable<Uint8Array> | Iterable<Uint8Array>) =>
     : Stream.fromIterable(body)
   ).pipe(Stream.runCollect, Effect.map(concat));
 
-/** One chunk as the async iterator isomorphic-git reads a response body from. */
 const once = (bytes: Uint8Array): AsyncIterableIterator<Uint8Array> => {
   const chunks = [bytes];
 
@@ -134,7 +124,6 @@ const once = (bytes: Uint8Array): AsyncIterableIterator<Uint8Array> => {
   return iterator;
 };
 
-/** The side-band 3 (fatal) messages in a reply's top-level packet lines. */
 const fatalMessages = (bytes: Uint8Array) => {
   const messages: string[] = [];
   const text = new TextDecoder();
@@ -147,7 +136,6 @@ const fatalMessages = (bytes: Uint8Array) => {
       break;
     }
 
-    // A flush (`0000`) or a delimiter carries no payload.
     if (length < 4) {
       at += 4;
       continue;
@@ -166,12 +154,6 @@ const fatalMessages = (bytes: Uint8Array) => {
 const isReceivePack = (url: string) =>
   new URL(url).pathname.endsWith("/git-receive-pack");
 
-/**
- * isomorphic-git's HTTP client over `Fetch`, for one repo. It adds the token
- * to requests to the remote's origin, and reads a 404 as `RepoNotFound` and a
- * busy receive-pack as `HostBusy`, failing the exchange with them, so the
- * promise isomorphic-git awaits rejects with the typed error itself.
- */
 const httpFor = (remote: string, token: Redacted.Redacted, name: RepoName) =>
   Effect.gen(function* () {
     const run = yield* FiberSet.makeRuntimePromise<Fetch>();
@@ -233,9 +215,8 @@ const httpFor = (remote: string, token: Redacted.Redacted, name: RepoName) =>
   });
 
 /**
- * Runs an isomorphic-git call. The typed errors the HTTP client failed with
- * come back as new values (isomorphic-git stamps a `caller` onto what it
- * rethrows); anything else it threw is a `GitFailure` for the caller to read.
+ * The typed errors come back as new values: isomorphic-git stamps a `caller`
+ * onto what it rethrows.
  */
 const git = <A>(run: (signal: AbortSignal) => Promise<A>) =>
   Effect.tryPromise({
@@ -251,7 +232,6 @@ const git = <A>(run: (signal: AbortSignal) => Promise<A>) =>
     try: run,
   });
 
-/** Every ref the remote lists, custom refs included; never `HEAD` or a peeled tag. */
 const refsAt = (remote: string, http: HttpClient) =>
   git(() => listServerRefs({ http, protocolVersion: 1, url: remote })).pipe(
     Effect.catchTags({
@@ -272,11 +252,7 @@ const refsAt = (remote: string, http: HttpClient) =>
     )
   );
 
-/**
- * Every `refs/tags/*` the remote lists, each peeled to what it names: the
- * `^{}` line protocol v1 advertises after an annotated tag, else the tag's
- * own target.
- */
+/** Peeled by the `^{}` line protocol v1 advertises after an annotated tag, else the tag's own target. */
 const tagsAt = (remote: string, http: HttpClient) =>
   git(() =>
     listServerRefs({
@@ -301,7 +277,6 @@ const tagsAt = (remote: string, http: HttpClient) =>
     )
   );
 
-/** Every tag the remote lists, peeled to its commit. */
 export const listTags = (
   remote: string,
   token: Redacted.Redacted
@@ -314,10 +289,6 @@ export const listTags = (
     })
   );
 
-/**
- * Every ref the remote lists, as `ls-remote` lists them: what reads by name
- * cannot reach.
- */
 export const listRefs = (
   remote: string,
   token: Redacted.Redacted
@@ -333,22 +304,15 @@ export const listRefs = (
 const isMoved = (reason: string) =>
   MOVED.some((moved) => reason.includes(moved));
 
-/** Whether the store refused a push of `ref` because the ref moved. */
 const refusedAsMoved = ({ cause }: GitFailure, ref: RefName) =>
   cause instanceof Errors.GitPushError &&
   isMoved(cause.data.result.refs[ref]?.error ?? "");
 
 /**
- * One ref's compare-and-swap. The push's own ref discovery is the check: if
- * the tip it finds is not `from`, the push stops there, before any pack is
- * built, so the old value the push names is the one checked, and the store
- * checks it again as it moves the ref. A ref that moved after the check is
- * `Stale` at the tip a fresh listing shows.
- *
- * The old value is the only check, as on every store: `to` need not descend
- * from `from` (Artifacts takes such an update). So isomorphic-git's
- * own fast-forward test is off (`force`), which also spares it walking the
- * history of `to` in a source that holds only the new objects.
+ * One ref's compare-and-swap: the push's own ref discovery is the check, so
+ * it stops before any pack is built if the tip is not `from`. `to` need not
+ * descend from `from` (Artifacts takes such an update), so isomorphic-git's
+ * fast-forward test is off (`force`).
  */
 const pushOne = (
   remote: string,
@@ -419,9 +383,7 @@ const pushOne = (
   });
 
 /**
- * Pushes each update in order, one ref per push, since Artifacts has no
- * atomic push: each ref is updated or `Stale` on its own. Nothing is
- * retried; a `Stale` ref is the caller's to decide on. A busy store fails the
+ * One ref per push, since Artifacts has no atomic push. A busy store fails the
  * whole call with `HostBusy`, and refs before the busy one may have moved.
  */
 export const pushRefs = (input: {
@@ -441,12 +403,6 @@ export const pushRefs = (input: {
     })
   );
 
-/**
- * Fetches one ref of the remote into the repo `gitdir` in `fs` (made if
- * absent), `depth` commits deep when given; its tip, or `None` when the remote
- * has no such ref. The ref is a branch name or a full ref. The repo keeps the
- * objects and no ref, remote or tracking ref of the fetch's own.
- */
 export const fetchInto = (input: {
   readonly remote: string;
   readonly token: Redacted.Redacted;

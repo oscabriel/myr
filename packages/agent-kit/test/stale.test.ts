@@ -17,11 +17,9 @@ import {
   project,
 } from "./fixtures.ts";
 
-/** `sha256("hello\n")`, as every tool that hashes prints it. */
 const helloDigest =
   "sha256:5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03";
 
-/** The hash a file's frontmatter records, read with a pattern of its own. */
 const recordedHash = (file: string) =>
   /^ {2}content-hash: "(?<hash>sha256:[0-9a-f]{64})"$/mu.exec(file)?.groups
     ?.hash ?? "";

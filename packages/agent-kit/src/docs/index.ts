@@ -1,9 +1,3 @@
-/**
- * The docs: five guides written for people doing one job, then the
- * reference, read from the sources that define it. Each page is pure
- * Markdown for the CLI's commands and the two hosts' URLs; the web draws
- * it at `/docs/<slug>` and serves the text at `/docs/<slug>.md`.
- */
 import { Option } from "effect";
 
 import { answerAnAsk } from "./answer-an-ask.ts";
@@ -30,7 +24,6 @@ export type { DocEntry, DocPart, DocSlug } from "./entries.ts";
 
 export type { DocInput, DocPage } from "./page.ts";
 
-/** Every page, guides first, in the order the index lists them. */
 const sources: readonly DocSource[] = [
   startHere,
   answerAnAsk,
@@ -46,7 +39,6 @@ const sources: readonly DocSource[] = [
   importedPage,
 ];
 
-/** Every page, written for `input`. */
 export const docPages = (input: DocInput): readonly DocPage[] =>
   sources.flatMap((source) =>
     Option.toArray(
@@ -56,7 +48,6 @@ export const docPages = (input: DocInput): readonly DocPage[] =>
     )
   );
 
-/** The page at `slug`, written for `input`; none for a slug no page has. */
 export const docPage = (
   input: DocInput,
   slug: string

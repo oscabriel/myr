@@ -1,27 +1,12 @@
 /**
- * A fake of the Workers `Artifacts` binding over a repo host, for tests of
- * code that takes the binding. It keeps the surprises the spikes found in the
- * real one:
- *
- * - under `wrangler dev`, errors arrive as plain `Error`s with no `code`:
- *   pass `{ codeless: true }`;
- * - under load, a fork answers HTTP 500 after making the repo, and the retry
- *   answers 409: pass `{ forkFailures: n }`;
- * - reads by ref resolve short branch names and commit ids only, never
- *   `refs/heads/main`;
- * - `info().lastPushAt` stays `null` after pushes;
- * - past 2,000 requests per 10 s a repo's reads are refused as rate limited:
- *   pass `{ rateLimited: n }` to refuse the next `n` reads (ASSUMPTION: the
- *   refusal names the limit in its message, as an HTTP 429's "Too Many
- *   Requests" does; no live one has been seen yet).
+ * Keeps the surprises found in the real binding: codeless `Error`s under
+ * `wrangler dev`, a fork's 500-then-409 under load, reads that resolve short
+ * branch names and commit ids only, `info().lastPushAt` staying `null`, and
+ * rate-limited reads (ASSUMPTION: the refusal names the limit in its message;
+ * no live one has been seen yet).
  *
  * It takes its host structurally (`HostLike`), so `@repo/testkit` depends on
- * no adapter package: a `RepoHost` service value satisfies `HostLike`. Each
- * call runs the host's Effect with `Effect.runPromise`, since the binding is
- * a promise API; this is a test double, in a package only tests import.
- *
- * Like everything in `@repo/testkit`, this module is for `test/` directories
- * only: no `src/` imports it.
+ * no adapter package.
  */
 import { CommitSha, RepoName, RepoPath } from "@repo/protocol/ids";
 import {
@@ -38,7 +23,6 @@ import { constVoid } from "effect/Function";
 
 import { defaultNow } from "./clock.ts";
 
-/** A git object id, branded as `@repo/artifacts`' `ObjectId` is. */
 export const ObjectId = Schema.String.pipe(
   Schema.check(Schema.isPattern(/^[0-9a-f]{40}$/u)),
   Schema.brand("ObjectId")
@@ -46,7 +30,6 @@ export const ObjectId = Schema.String.pipe(
 
 export type ObjectId = typeof ObjectId.Type;
 
-/** A short branch name, branded as `@repo/artifacts`' `BranchName` is. */
 export const BranchName = Schema.String.pipe(
   Schema.check(
     Schema.isPattern(
@@ -58,7 +41,6 @@ export const BranchName = Schema.String.pipe(
 
 export type BranchName = typeof BranchName.Type;
 
-/** Where a read starts, as `@repo/artifacts`' `Revision` has it. */
 export type Revision = Data.TaggedEnum<{
   Branch: { readonly name: BranchName };
   Commit: { readonly sha: CommitSha };
@@ -66,7 +48,6 @@ export type Revision = Data.TaggedEnum<{
 
 export const Revision = Data.taggedEnum<Revision>();
 
-/** What a host fails with: `RepoHost`'s errors, by shape. */
 export type HostError =
   | { readonly _tag: "RepoNotFound"; readonly name: RepoName }
   | { readonly _tag: "RepoExists"; readonly name: RepoName }
@@ -106,11 +87,6 @@ interface HostCreated {
   readonly remote: string;
 }
 
-/**
- * The `RepoHost` methods the fake calls, by shape: the same parameters, with
- * the domain's ids, and results at least as wide. A `RepoHost` service value
- * is one.
- */
 export interface HostLike {
   readonly create: (name: RepoName) => Effect.Effect<HostCreated, HostError>;
   readonly importFrom: (
@@ -165,16 +141,9 @@ export interface HostLike {
 }
 
 export interface FakeOptions {
-  /** Throw plain `Error`s with no `code`, as remote bindings under `wrangler dev` do. */
   readonly codeless?: boolean;
-  /** How many forks fail with a 500 after making the repo, as under load. */
   readonly forkFailures?: number;
-  /** Remotes are `<remoteBase>/<name>.git`, for a git server the test runs; else the host's. */
   readonly remoteBase?: string;
-  /**
-   * The default branch an import that names none reports, as the remote's
-   * own: `master` for a remote like anyhow's. `main` when not given.
-   */
   readonly defaultBranch?: string;
   /**
    * How many of a just-imported repo's first `get`s answer
@@ -182,11 +151,9 @@ export interface FakeOptions {
    * `import()` returned, as a large one is.
    */
   readonly importing?: number;
-  /** How many of the next reads (a blob, a tree, a commit, a log) are refused as rate limited. */
   readonly rateLimited?: number;
 }
 
-/** A refusal the binding throws, before it becomes the thrown error. */
 class Refused extends Data.TaggedError("Refused")<{
   readonly code: ArtifactsError["code"];
   readonly reason: string;
@@ -209,7 +176,6 @@ const numericOf = (code: ArtifactsError["code"]) =>
     Match.orElse(() => 0)
   );
 
-/** A host's error as the binding words it; a refusal stays as it is. */
 const refusalOf = (error: HostError | Refused) =>
   Match.valueTags(error, {
     ForkInProgress: ({ name }) =>
@@ -236,7 +202,6 @@ const refusalOf = (error: HostError | Refused) =>
       }),
   });
 
-/** The repos the fake made, with what `info()` and `list()` report. */
 interface Kept {
   readonly id: string;
   readonly name: RepoName;
@@ -262,10 +227,6 @@ const decodeBranch = Schema.decodeUnknownOption(BranchName);
 
 const decodePath = Schema.decodeUnknownOption(RepoPath);
 
-/**
- * `main` → that branch; 40 hex digits → that commit; anything else, such as
- * `refs/heads/main` or a tag, resolves to nothing.
- */
 const revisionOf = (ref: string): Option.Option<Revision> =>
   isObjectId(ref)
     ? Option.some(Revision.Commit({ sha: CommitSha.make(ref) }))
@@ -288,7 +249,6 @@ const entryOf = (entry: HostTreeEntry): ArtifactsTreeEntry => ({
   type: typeOf(entry),
 });
 
-// The times the host read from the commit itself, in Unix seconds.
 const metadataOf = (commit: HostCommit): ArtifactsCommitMetadata => ({
   author: { email: commit.author.email, name: commit.author.name },
   authoredAt: commit.authoredAt,
@@ -317,7 +277,6 @@ const objectId = (hash: string): Effect.Effect<ObjectId, Refused> =>
 const blobOf = (bytes: Uint8Array) =>
   new Blob([bytes], { type: "application/octet-stream" });
 
-/** An Artifacts binding over `host`, with the real one's surprises (see the module's doc). */
 export const fakeArtifactsBinding = (
   host: HostLike,
   options: FakeOptions = {}
@@ -326,10 +285,8 @@ export const fakeArtifactsBinding = (
   let forkFailures = options.forkFailures ?? 0;
   let rateLimited = options.rateLimited ?? 0;
   let made = 0;
-  // Each imported repo's `get`s still to answer that the import runs on.
   const importing = new Map<RepoName, number>();
 
-  /** The thrown error: an `ArtifactsError`, or a plain one when codeless. */
   const thrown = ({ code, reason }: Refused) =>
     options.codeless === true
       ? new Error(`ArtifactsError: ${reason}`)
@@ -339,13 +296,11 @@ export const fakeArtifactsBinding = (
           numericCode: numericOf(code),
         });
 
-  /** Runs one call as the binding answers: a promise, rejected with its error. */
   const run = <A>(effect: Effect.Effect<A, Refused | HostError>) =>
     Effect.runPromise(
       Effect.mapError(effect, (failure) => thrown(refusalOf(failure)))
     );
 
-  /** What a read past the rate limit throws (see the module's doc). */
   const limited = () =>
     options.codeless === true
       ? new Error("ArtifactsError: Too many requests: rate limit exceeded")
@@ -355,7 +310,6 @@ export const fakeArtifactsBinding = (
           numericCode: 0,
         });
 
-  /** One read, refused while the scripted rate limit lasts. */
   const read = <A>(effect: Effect.Effect<A, Refused | HostError>) => {
     if (rateLimited > 0) {
       rateLimited -= 1;
@@ -394,11 +348,6 @@ export const fakeArtifactsBinding = (
     return repo;
   };
 
-  /**
-   * The fake's record of a repo the host has: the one it made, or a fresh one
-   * for a repo made on the host directly. A repo the host lacks fails with
-   * `RepoNotFound` and leaves no record, so `list()` never shows it.
-   */
   const keptOf = (name: RepoName) =>
     host.remote(name).pipe(Effect.map(() => kept.get(name) ?? keep(name, {})));
 
@@ -426,7 +375,6 @@ export const fakeArtifactsBinding = (
       return { expiresAt, id: token.id, plaintext, scope: token.scope };
     });
 
-  /** A new repo's result: its metadata, its remote and a day-long write token. */
   const createdOf = (repo: Kept) =>
     Effect.gen(function* () {
       const remote = yield* remoteOf(repo.name);
@@ -442,7 +390,6 @@ export const fakeArtifactsBinding = (
       };
     });
 
-  /** What `list()` shows of a repo; `info()` adds its remote. */
   const summaryOf = (repo: Kept): Omit<ArtifactsRepoInfo, "remote"> => ({
     createdAt: stamped,
     defaultBranch: repo.defaultBranch,
@@ -529,7 +476,6 @@ export const fakeArtifactsBinding = (
           const limit = Math.min(logOptions?.limit ?? 50, 1000);
           const offset = logOptions?.offset ?? 0;
 
-          // `HEAD` is the repo's default branch.
           const at = revisionOf(
             ref === "HEAD" ? (yield* keptOf(name)).defaultBranch : ref
           );

@@ -13,13 +13,8 @@ import { DateTime, Effect, Option, Schema } from "effect";
 
 import { committerLine } from "./trailers.ts";
 
-/**
- * Where verdicts live as git notes: one JSON note per commit, read
- * with `git notes --ref=<slug> show <commit>`.
- */
 export const notesRef = RefName.make(`refs/notes/${Brand.slug}`);
 
-/** A verdict to write as the note on `target`, on top of the notes at `notesParent` in `repo`. */
 export interface NoteInput {
   readonly repo: RepoName;
   readonly notesParent: Option.Option<CommitSha>;
@@ -28,10 +23,6 @@ export interface NoteInput {
   readonly now: DateTime.Utc;
 }
 
-/**
- * A git directory in memory that a push takes objects from: a `PushSource`
- * whose file system is `memoryFs`, so a reader gets its typed API.
- */
 export interface ScratchSource extends PushSource {
   readonly fs: MemoryFs;
 }
@@ -60,7 +51,6 @@ const hex = (bytes: ArrayBuffer) =>
 const bytesOfHex = (id: string) =>
   Uint8Array.from(id.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16));
 
-/** git's zlib stream, as a loose object holds it. */
 const deflate = (bytes: Uint8Array) =>
   Effect.promise(() =>
     new Response(
@@ -124,10 +114,6 @@ const commitBytes = (input: {
     ].join("\n")
   );
 
-/**
- * A bare git directory in memory that a push takes objects from: loose,
- * zlib-deflated objects named by the SHA-1 of their header and content.
- */
 const scratch = () =>
   Effect.gen(function* () {
     const fs = memoryFs();
@@ -181,7 +167,6 @@ const scratch = () =>
     };
   });
 
-/** The notes tree's entries at `parent`, read through the port; none for the first note. */
 const notesAt = (repo: RepoName, parent: Option.Option<CommitSha>) =>
   Option.match(parent, {
     onNone: () => Effect.succeed<readonly TreeEntry[]>([]),
@@ -207,11 +192,8 @@ const notesAt = (repo: RepoName, parent: Option.Option<CommitSha>) =>
 const encodeVerdict = Schema.encodeEffect(Schema.fromJsonString(Verdict));
 
 /**
- * The notes commit that puts `verdict` on `target`, in git's own notes
- * layout: a fanout-free tree with one blob per annotated commit, named by its
- * SHA, holding the verdict as JSON. The tree keeps every note under
- * `notesParent` (read through the port), and the platform commits it at
- * `now`. The new blob, tree and commit sit in a scratch git directory in
+ * git's own notes layout: a fanout-free tree with one blob per annotated
+ * commit, named by its SHA. The new objects sit in a scratch git directory in
  * memory, which `RepoHost.push` takes them from; the earlier notes' objects
  * are referenced by id and are already in `repo`.
  */

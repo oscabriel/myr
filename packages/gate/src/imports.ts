@@ -1,17 +1,11 @@
-/**
- * Imports read from text, for `ReachedInternals`: stage 1 reads the module
- * specifiers an answer adds and judges each against the modules' public
- * files, with no compiler and no file system. Full resolution (path aliases,
- * `exports` conditions, a re-export that leaks an internal) is stage 3's,
- * through `tsc`.
- */
+// Stage 1 reads imports from text, with no compiler and no file system. Full
+// resolution (path aliases, `exports` conditions, re-exports) is stage 3's.
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { RepoPath } from "@repo/protocol/ids";
 import { Array, Option } from "effect";
 
 import { matchAny } from "./glob.ts";
 
-/** One module specifier a text imports, and the 1-based line it sits on. */
 export interface ImportSpecifier {
   readonly specifier: string;
   readonly line: number;
@@ -29,22 +23,16 @@ const KEYWORD_BEFORE_REGEX =
   /(?:^|[^\w$])(?:return|typeof|case|do|else|in|of|new|delete|void|throw|yield|await)$/u;
 
 /**
- * `text` with its comments blanked, and the contents of its strings,
- * templates and regular expressions filled with `_`, so what is left to read
- * is code and the bare delimiters of its strings. Lines and offsets stay
- * where they were. A line whose code opens with `*` reads as the inside of a
- * block comment: an answer's added lines can start after the comment opened.
+ * A line whose code opens with `*` reads as the inside of a block comment: an
+ * answer's added lines can start after the comment opened.
  */
 const maskOf = (text: string): string => {
   let out = "";
   let mode: Mode = "code";
   let quote = "";
   let inClass = false;
-  // The last of the code read so far, its whitespace kept: what a `/` follows.
   let tail = "";
-  // Whether the current line holds nothing but whitespace so far.
   let blankLine = true;
-  // Each open `${`, with how many braces are open inside it.
   const expressions: number[] = [];
 
   const emit = (chars: string, as: "blank" | "fill") => {
@@ -64,14 +52,11 @@ const maskOf = (text: string): string => {
     blankLine = chars.endsWith("\n") || (blankLine && chars.trim() === "");
   };
 
-  /** Ends the current mode on `char`, which stays as code. */
   const close = (char: string) => {
     mode = "code";
     keep(char);
   };
 
-  // Each step reads the character at hand (and the next, for pairs) in its
-  // mode, and answers with how many characters it read.
   const inComment = (char: string) => {
     if (char === "\n") {
       mode = "code";
@@ -151,7 +136,6 @@ const maskOf = (text: string): string => {
     return 1;
   };
 
-  /** Whether a `/` here opens a regular expression rather than divides. */
   const opensRegex = () => {
     const before = tail.trimEnd();
 
@@ -162,7 +146,6 @@ const maskOf = (text: string): string => {
     );
   };
 
-  /** What a character of code opens: a string, a template, a regular expression, or nothing. */
   const opened = (char: string): Mode => {
     if (char === '"' || char === "'") {
       quote = char;
@@ -183,7 +166,6 @@ const maskOf = (text: string): string => {
     return "code";
   };
 
-  /** Counts braces inside a template's `${`; its closing one resumes the template. */
   const brace = (char: string) => {
     const open = expressions.pop();
 
@@ -254,14 +236,6 @@ const FORMS = [
   /(?<![\w$.])require\s*\(\s*(?<quote>["'`])(?<contents>_+)\k<quote>/gu,
 ];
 
-/**
- * Every module specifier `text` imports: static imports and re-exports
- * (`… from "x"`, over any number of lines), side-effect imports, dynamic
- * `import("x")` and `require("x")` (their specifier a string or a template
- * with no substitution), each on the line its specifier sits on, in the
- * order they appear. Comments, strings, templates and regular expressions
- * import nothing.
- */
 export const importSpecifiers = (text: string): readonly ImportSpecifier[] => {
   const masked = maskOf(text);
 
@@ -282,10 +256,8 @@ export const importSpecifiers = (text: string): readonly ImportSpecifier[] => {
     .map(({ line, specifier }) => ({ line, specifier }));
 };
 
-// A specifier relative to the importing file: `./x`, `../x`, `.` or `..`.
 const RELATIVE = /^\.\.?(?:\/|$)/u;
 
-// The folders a package subpath may not name: they hold a module's insides.
 const INSIDES = new Set(["src", "test", "internal"]);
 
 type Module = Policy["modules"][number];
@@ -293,7 +265,6 @@ type Module = Policy["modules"][number];
 const moduleOf = (modules: Policy["modules"], path: string) =>
   Array.findFirst(modules, (module) => matchAny(module.paths, path));
 
-/** `from`'s folder joined with a relative specifier; none when it leaves the repo. */
 const resolve = (from: string, specifier: string): Option.Option<string> => {
   const parts = from.split("/").slice(0, -1);
 
@@ -312,27 +283,19 @@ const resolve = (from: string, specifier: string): Option.Option<string> => {
   return Option.some(parts.join("/"));
 };
 
-/** A module file's path with its extension and a trailing `/index` dropped. */
 const bare = (path: string) =>
   path.replace(/\.[cm]?[jt]sx?$/u, "").replace(/\/index$/u, "");
 
-/** The folders a module's globs name: `packages/b/**` is `packages/b`. */
 const rootsOf = (module: Module) =>
   module.paths.map((glob) =>
     glob.replace(/^\//u, "").replace(/\/(?:\*\*)?$/u, "")
   );
 
-/**
- * Whether `target` is a file of `module` that it does not export. A folder
- * import of the module's root goes through its manifest, so it is public; a
- * module that lists no public files is not judged.
- */
 const isInternal = (module: Module, target: string) =>
   module.publicFiles !== undefined &&
   !rootsOf(module).includes(target) &&
   !module.publicFiles.some((file) => bare(file) === bare(target));
 
-/** The module a relative specifier lands in, when it is internal there. */
 const relative = (
   from: string,
   specifier: string,
@@ -344,11 +307,6 @@ const relative = (
     )
   );
 
-/**
- * The module a package specifier names, when its subpath names a folder that
- * holds the module's insides: `@scope/b/src/internal`. Only the project's own
- * modules are judged; a dependency's insides are its own business.
- */
 const subpath = (specifier: string, modules: Policy["modules"]) => {
   const segments = specifier.split("/");
   const length = specifier.startsWith("@") ? 2 : 1;
@@ -359,13 +317,6 @@ const subpath = (specifier: string, modules: Policy["modules"]) => {
     : Option.none();
 };
 
-/**
- * Whether an import of `specifier` from `from` reaches into another module's
- * internals: a relative import that lands on a file of another module that
- * the module does not export, or a package subpath of another module that
- * names its `src`, `test` or `internal` folder. Imports inside the importing
- * file's own module are its own.
- */
 export const reachedInternals = (input: {
   readonly from: RepoPath;
   readonly specifier: string;

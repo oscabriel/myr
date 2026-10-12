@@ -1,10 +1,5 @@
-/**
- * The source the `/worker` adapter hands the Worker Loader beside the config
- * folder's modules: a prelude that freezes the clock and randomness before
- * any config code runs (principle 8), and a main that imports the folder's
- * modules and answers one JSON document per request. Both are module text;
- * nothing here runs in the platform's own isolate except to write it.
- */
+// Module text for the Worker Loader: nothing here runs in the platform's own
+// isolate except to write it.
 import { Functions } from "@repo/sdk/functions";
 
 /**
@@ -14,25 +9,16 @@ import { Functions } from "@repo/sdk/functions";
  * facts (as `/bun` does).
  */
 export interface FrozenFacts {
-  /** The time, in epoch milliseconds. */
   readonly now: number;
   readonly seed: number;
 }
 
-/**
- * A scope's `Date`: constructed with or without a time, and asked for one.
- * Its `now` is replaced too, so the frozen `Date` leads to no other clock.
- */
 export interface DateClass {
   new (...args: readonly (Date | number | string)[]): Date;
   now: () => number;
   readonly prototype: Date;
 }
 
-/**
- * The globals the prelude replaces: `globalThis` in the loaded worker, a
- * plain object in tests.
- */
 export interface FreezableScope {
   Date: DateClass;
   readonly Math: { random: () => number };
@@ -43,7 +29,6 @@ export interface FreezableScope {
   readonly performance: { now: () => number };
 }
 
-/** What the prelude hands the main. */
 export interface Frozen {
   /**
    * Puts the randomness back where it stood the first time this was called:
@@ -54,21 +39,12 @@ export interface Frozen {
 }
 
 /**
- * Replaces the scope's clock and randomness with values from `facts`:
- * `Date.now()`, `new Date()` with no argument, `Date()`, a date's own
- * `constructor`, `performance.now()` (always 0), and `Math.random()`,
- * `crypto.getRandomValues()` and `crypto.randomUUID()` from a generator
- * seeded with `facts.seed`. The frozen `Date` is the scope's own behind a
- * proxy, whose `now` and whose dates' `constructor` it replaces as well, so
- * no path from it (a date the runtime made, what sits above it) leads to
- * the real clock: the same as `/bun`'s prelude.
- *
- * It is serialised into the prelude module with `Function#toString`, so its
- * body names nothing outside itself and defines no function or class a
- * bundler would name (only methods, and functions assigned to a member; an
- * arrow bound to a name or written as an object literal's property value
- * is named): a `keepNames` build, wrangler's default, would otherwise call
- * a naming helper the prelude module doesn't have.
+ * Serialised into the prelude module with `Function#toString`, so its body
+ * names nothing outside itself and defines no function or class a bundler
+ * would name (only methods, and functions assigned to a member; an arrow
+ * bound to a name or written as an object literal's property value is
+ * named): a `keepNames` build, wrangler's default, would otherwise call a
+ * naming helper the prelude module doesn't have.
  */
 export const installFrozenGlobals = (
   scope: FreezableScope,
@@ -179,48 +155,29 @@ export const installFrozenGlobals = (
   };
 };
 
-/**
- * The prelude module: `installFrozenGlobals` applied to the loaded worker's
- * `globalThis` with `facts` as JSON, exporting what it returns as `frozen`.
- */
 export const preludeModule = (facts: FrozenFacts): string =>
   `export const frozen = (${String(installFrozenGlobals)})(globalThis, ${JSON.stringify({ now: facts.now, seed: facts.seed })});\n`;
 
-/** The prelude's module name, beside the main at the root. */
 export const preludeName = "prelude.js";
 
-/** The main's module name. */
 export const mainName = "main.js";
 
-/** The modules a main imports: the config folder's, by their bundle paths. */
 export interface MainModules {
-  /** The ask files, in path order. */
   readonly asks: readonly string[];
-  /** The project module, when the folder has one. */
   readonly project?: string | undefined;
-  /** The visibility module, when the folder has one. */
   readonly visibility?: string | undefined;
 }
 
-/** A module the main imports on first use, by a literal specifier. */
 const importer = (path: string) =>
   `{ load: () => import(${JSON.stringify(`./${path}`)}), path: ${JSON.stringify(path)} }`;
 
 /**
- * The main module. It imports the prelude first, so the clock is frozen
- * before any config code exists; then, per request, it imports the config
- * folder's modules (once, while the worker stays warm) and answers the
- * request's job with one JSON document, as `/bun`'s main prints one:
+ * It imports the prelude first, so the clock is frozen before any config code
+ * exists, and answers each request with one JSON document:
  *
- * - `{}` → `Collected {asks: [{ask, path}], project?, visibility?}`, each
- *   module's default export as data (functions and the sdk's symbol drop
- *   out);
- * - `{rule, facts}` → `Called {result}`, the project module's rule called
- *   with the facts (`false` when it has none);
+ * - `{}` → `Collected {asks: [{ask, path}], project?, visibility?}`;
+ * - `{rule, facts}` → `Called {result}` (`false` when there is no rule);
  * - either → `Failed {reason: "load" | "threw", detail}`.
- *
- * Function-valued rules are read where the sdk keeps them, under its
- * `Functions` symbol, which the main finds by its registry key.
  */
 export const mainModule = (modules: MainModules): string => `
 import { frozen } from "./${preludeName}";

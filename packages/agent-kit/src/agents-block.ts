@@ -1,9 +1,3 @@
-/**
- * The AGENTS.md block: the brief every harness reads without installing
- * anything, between markers the platform owns. The first marker carries the
- * body's hash, so a hand-edited block is detectable; everything outside the
- * markers belongs to the project and is never touched.
- */
 import { Brand } from "@repo/brand";
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { LandedSha, ProjectName } from "@repo/protocol/ids";
@@ -14,7 +8,6 @@ import { contributeSkillName, contributeSkillPaths } from "./project-skill.ts";
 import { lanesOf, loopSteps, unfencedNorms } from "./sections.ts";
 import { code, listed, page } from "./text.ts";
 
-/** The block: its two marker lines and the text between them. */
 export interface AgentsBlock {
   readonly begin: string;
   readonly end: string;
@@ -64,11 +57,6 @@ const bodyOf = (project: ProjectName, policy: Policy) => {
   ]);
 };
 
-/**
- * The block for a project's AGENTS.md, from its policy alone: the landing
- * changes nothing in it, so a landing that leaves the policy's text alone
- * leaves the block, and its hash, as they were.
- */
 export const agentsBlock = (input: {
   readonly project: ProjectName;
   readonly policy: Policy;
@@ -85,11 +73,9 @@ export const agentsBlock = (input: {
   );
 };
 
-/** The block as a file holds it: the markers on lines of their own. */
 const written = (block: AgentsBlock) =>
   `${block.begin}\n${block.body}${block.body.endsWith("\n") ? "" : "\n"}${block.end}`;
 
-/** Where an existing block starts and ends, whatever hash its first marker carries. */
 const locate = (
   existing: string,
   end: string
@@ -110,7 +96,6 @@ const locate = (
   return marker ? Option.some({ from, to: to + end.length }) : Option.none();
 };
 
-/** What goes between a file's last text and an appended block: one blank line. */
 const separator = (existing: string) => {
   if (existing === "" || existing.endsWith("\n\n")) {
     return "";
@@ -119,11 +104,6 @@ const separator = (existing: string) => {
   return existing.endsWith("\n") ? "\n" : "\n\n";
 };
 
-/**
- * `existing` with the block in it: replacing the text from the first marker
- * to the last where a block is, appending it after a blank line where none
- * is. Every other byte stays as it was, and a second call changes nothing.
- */
 export const upsertAgentsBlock = (existing: string, block: AgentsBlock) =>
   Option.match(locate(existing, block.end), {
     onNone: () => `${existing}${separator(existing)}${written(block)}\n`,

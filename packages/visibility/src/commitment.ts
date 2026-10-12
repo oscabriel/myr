@@ -3,7 +3,6 @@ import type { AreaName, BlobSha, RepoPath } from "@repo/protocol/ids";
 import { SuiteRoot } from "@repo/protocol/ids";
 import { Array, Effect, Option, Order } from "effect";
 
-/** One held-back check file: where it sits in its layer, its area, and its blob. */
 export interface SuiteFile {
   readonly path: RepoPath;
   readonly area: AreaName;
@@ -18,11 +17,6 @@ const AREA = Uint8Array.of(0x02);
 
 const utf8 = (text: string) => new TextEncoder().encode(text);
 
-/**
- * SHA-256 of the parts joined, through WebCrypto, which the Workers and Bun
- * both have. Hashing bytes in memory cannot fail for a reason a caller could
- * handle, so a failure is a defect.
- */
 const sha256 = (...parts: readonly Uint8Array[]) =>
   Effect.promise(() =>
     crypto.subtle.digest(
@@ -69,7 +63,6 @@ const leaf = (salt: Uint8Array, file: SuiteFile) =>
     utf8(file.blob)
   );
 
-/** Each area's root as bytes, the areas sorted by name. */
 const roots = (salt: Uint8Array, files: readonly SuiteFile[]) =>
   Effect.forEach(
     Array.sort(new Set(files.map((file) => file.area)), Order.String),
@@ -86,12 +79,7 @@ const roots = (salt: Uint8Array, files: readonly SuiteFile[]) =>
       )
   );
 
-/**
- * Each area's commitment: the salted SHA-256 Merkle root of its files'
- * leaves, sorted by path. Without the salt, nobody can test a
- * guess at a check against it; with the same salt and files it is the same
- * root, in any order.
- */
+/** Without the salt, nobody can test a guess at a check against it. */
 export const areaRoots = (
   salt: Uint8Array,
   files: readonly SuiteFile[]
@@ -102,12 +90,7 @@ export const areaRoots = (
     )
   );
 
-/**
- * The whole suite's commitment: a Merkle root over each area's root under
- * its name, `H(0x02 ‖ area ‖ 0x00 ‖ area root)`, the areas sorted. It moves
- * when any file's content, path or area moves, or the salt does, so the
- * public sees that the suite changed and learns nothing of what it holds.
- */
+/** `H(0x02 ‖ area ‖ 0x00 ‖ area root)` per area, sorted: the public sees the suite changed and learns nothing of what it holds. */
 export const suiteRoot = (
   salt: Uint8Array,
   files: readonly SuiteFile[]
@@ -133,12 +116,6 @@ const byArea = Order.combine(
   )
 );
 
-/**
- * The `Held-back:` trailer's value, without its key, as the trailer
- * machinery takes it: each area sorted by name, as `passed/total @ root`
- * when its checks ran in this run, or `n/a` when none did. None when no
- * area ran.
- */
 export const heldBackValue = (input: {
   readonly results: readonly HeldBackResult[];
   readonly areas: readonly AreaName[];
@@ -171,10 +148,6 @@ export const heldBackValue = (input: {
       );
 };
 
-/**
- * The landing's `Held-back:` trailer, key and value:
- * `Held-back: export 7/7 @ sha256:…; parser n/a`. None when no area ran.
- */
 export const heldBackTrailer = (input: {
   readonly results: readonly HeldBackResult[];
   readonly areas: readonly AreaName[];

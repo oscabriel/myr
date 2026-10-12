@@ -3,7 +3,6 @@ import { Effect } from "effect";
 import { init, writeBlob, writeCommit, writeTree } from "isomorphic-git";
 import type { FsClient, TreeEntry } from "isomorphic-git";
 
-/** Paths and their text, such as `[["src/a.ts", "v1"]]`. */
 export type Files = readonly (readonly [path: string, content: string])[];
 
 // Fixed, so the same files and parents always make the same commit id.
@@ -14,10 +13,6 @@ const signature = {
   timezoneOffset: 0,
 };
 
-/**
- * A bare repo at `/client.git` in `fs` that tests build commits in and push
- * from. Its `source` is what `RepoHost.push` takes objects from.
- */
 export const gitClient = (fs: FsClient) =>
   Effect.gen(function* () {
     const source = { fs, gitdir: "/client.git" };

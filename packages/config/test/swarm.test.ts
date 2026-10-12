@@ -1,9 +1,5 @@
-/**
- * The swarm: its plan for a split family, its people, each
- * contributor's brief and workspace, and the run's summary file. The burrow
- * fixtures are what `<cli> asks` and `<cli> ask` printed for burrow's
- * `drop-legacy-fetch` family on the dev stage (2026-10-08).
- */
+// The burrow fixtures are what `<cli> asks` and `<cli> ask` printed for
+// burrow's `drop-legacy-fetch` family on a dev stage.
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Ask, AskListing } from "@repo/protocol/domain/ask";
@@ -59,10 +55,8 @@ const burrow = ProjectName.make("oscabriel/burrow");
 
 const ListedAsks = Envelope(Schema.Struct({ asks: Schema.Array(AskListing) }));
 
-/** What `<cli> claim <ask> --json` prints. */
 const Claimed = Envelope(Schema.Struct({ claim: ClaimView }));
 
-/** What `<cli> ask <ask> --json` prints, when it shows the ask. */
 const ShownAsk = Schema.Struct({
   command: Schema.Literal("ask"),
   data: Schema.Struct({ ask: Ask, brief: Schema.NonEmptyString }),
@@ -70,7 +64,6 @@ const ShownAsk = Schema.Struct({
   v: Schema.Literal(1),
 });
 
-/** A fixture's text. */
 const fixture = (name: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -81,7 +74,6 @@ const fixture = (name: string) =>
     );
   });
 
-/** burrow's open asks, as `<cli> asks --project burrow --json` listed them. */
 const burrowAsks = Effect.gen(function* () {
   const envelope = yield* Schema.decodeEffect(
     Schema.fromJsonString(ListedAsks)
@@ -362,7 +354,6 @@ describe("the roster", () => {
           roster.flatMap(({ adapter, handle }) => (adapter ? [handle] : []))
         ).toStrictEqual(["pell"]);
 
-        // An Anthropic id, OpenCode's GPT, an Amp mode, then pi's three.
         const models = [
           /^claude-/u,
           /^opencode-go\/gpt-/u,
@@ -407,7 +398,6 @@ describe("the scenarios' nudges", () => {
   });
 });
 
-/** The ask page `<cli> ask` printed for burrow's auth child. */
 const authPage = Effect.gen(function* () {
   const text = (yield* fixture("show-ask.json")).replaceAll(
     "{configDir}",
@@ -470,7 +460,6 @@ describe("the brief", () => {
   });
 });
 
-/** One command a fake spawner was asked to run. */
 interface Spawned {
   readonly command: string;
   readonly args: readonly string[];
@@ -478,11 +467,6 @@ interface Spawned {
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
-/**
- * A `ChildProcessSpawner` that runs nothing: it records each command and
- * answers with what `answer` gives it (exit 0 and no output by default).
- * `answer` also gets how many commands came before this one.
- */
 const fakeSpawner = (
   answer: (
     spawned: Spawned,
@@ -540,12 +524,10 @@ const fakeSpawner = (
     };
   });
 
-/** The env names the CLI reads, spelled from the brand. */
 const SLUG = Brand.slug.toUpperCase();
 
 const platformUrl = "https://platform-dev-oscabriel.example.workers.dev";
 
-/** wren's claim of burrow's auth child, as `<cli> claim --json` gives it. */
 const wrensClaim = Schema.decodeSync(ClaimView)({
   ask: "drop-legacy-fetch-burrow-auth",
   base: "9998ebe62c2f282d148b1d806372484916cc2548",
@@ -562,16 +544,10 @@ const wrensClaim = Schema.decodeSync(ClaimView)({
 
 const wrensToken = "wren-token-0123456789abcdef0123456789abcdef";
 
-/** What git prints when the gateway answers 404 for the fork: it is not made yet. */
 const forkNotMade = `remote: no repo ${wrensClaim.fork}
 fatal: repository '${wrensClaim.remote}/' not found
 `;
 
-/**
- * wren's workspace for run `r1`, below a temp dir, over a fake spawner
- * whose every clone exits `code`, or answers as `clone` says (given how
- * many clones came before it).
- */
 const wrensWorkspace = (
   code = 0,
   clone: (before: number) => {
@@ -850,7 +826,6 @@ describe("the swarm's folder", () => {
   );
 });
 
-/** Why the flags `argv` make no run, or `accepted` when they make one. */
 const reasonOf = (argv: readonly string[]) =>
   optionsOf(argv).pipe(
     Effect.match({
@@ -983,7 +958,6 @@ describe("the swarm's flags", () => {
   );
 });
 
-/** What `main` prints, line by line, over a spawner that answers `asks` with the fixture. */
 const dryRun = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -1008,7 +982,6 @@ const dryRun = (argv: readonly string[]) =>
       Effect.provide(fake.layer),
       Effect.provideService(SwarmDir, swarm),
       Effect.provideService(Console.Console, captured),
-      // No SESSION_TOKENS, nor any token: a dry run needs none.
       Effect.provideService(
         ConfigProvider.ConfigProvider,
         ConfigProvider.fromEnv({ env: {} })
@@ -1170,19 +1143,11 @@ describe("the dry run", () => {
   );
 });
 
-/** A fictional person's token on the fake platform: never printed, never in an argv. */
 const tokenOf = (handle: string) =>
   `${handle}-token-0123456789abcdef0123456789ab`;
 
-/**
- * `main` without `--dry-run`, over a fake platform: the CLI's `asks`, `ask`
- * and `claim` answer from the fixtures, git succeeds, and `SESSION_TOKENS`
- * holds `people`. The ledger and `.swarm/` are temp files. Any other command
- * (a harness, a workspace's `status`) exits 1 unless `otherwise` answers it.
- */
 const fullRun = (
   people: readonly string[],
-  /** The contributor whose claim the platform refuses with `AskFull`, if any. */
   refused?: string,
   otherwise?: (call: Spawned) => Option.Option<{
     readonly code?: number;
@@ -1299,7 +1264,6 @@ const fullRun = (
       Effect.result
     );
 
-    // The TestClock's epoch names the run.
     const summary = `${swarm}/19700101-000000/agents.json`;
 
     return {
@@ -1397,7 +1361,6 @@ describe("a run", () => {
           ["dagny", 0, {}],
           ["pell", 0, {}],
         ]);
-        // No claim, no fork: ivo's is never recorded for teardown.
         expect(
           ledger
             .map(({ name }) => name.split("--").at(-1) ?? "")
@@ -1414,8 +1377,6 @@ describe("a run", () => {
           "harness-output/claude-code/start.jsonl"
         ).pipe(Effect.provide(NodeServices.layer));
 
-        // wren's Claude Code starts a session; the platform has no answer
-        // from wren yet, so the loop nudges once and asks status again.
         const nothingYet = JSON.stringify({
           command: "status",
           data: { answers: [], claims: [], handle: "wren" },

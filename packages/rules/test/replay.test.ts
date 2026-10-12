@@ -15,7 +15,6 @@ import {
   nowMs,
 } from "./world.ts";
 
-/** Evaluates a bundle with the given facts, and encodes the policy. */
 const evaluated = (modules: ConfigBundle, with_: EvaluationFacts = facts) =>
   Effect.gen(function* () {
     const evaluator = yield* RulesEvaluator;
@@ -24,13 +23,6 @@ const evaluated = (modules: ConfigBundle, with_: EvaluationFacts = facts) =>
     return yield* Schema.encodeEffect(Policy)(policy);
   });
 
-/**
- * A config whose `project.ts` reads the clock and randomness while it loads,
- * and puts what it read into an ask's context: the wall clock, a dated
- * `new Date()`, the clock reached through a date's own constructor, a
- * `new Date(0)` that names its time, then `Math.random()`,
- * `crypto.getRandomValues()` and `crypto.randomUUID()`.
- */
 const readsTheClock = Effect.map(baseProject, (base) =>
   bundleOf({
     "asks/stamp.ask.ts": [
@@ -58,7 +50,6 @@ const readsTheClock = Effect.map(baseProject, (base) =>
   })
 );
 
-/** What the clock-reading config put into its ask's context. */
 const stampOf = (policy: typeof Policy.Encoded) =>
   policy.asks[0]?.brief.context;
 
@@ -99,7 +90,6 @@ describe("evaluating a config folder twice", () => {
         "1798761600000",
       ]);
 
-      // A date that names its own time is left alone.
       expect(first?.[3]).toBe("1970-01-01T00:00:00.000Z");
     }).pipe(Effect.provide(bunEvaluator()))
   );
@@ -108,7 +98,6 @@ describe("evaluating a config folder twice", () => {
     Effect.gen(function* () {
       const modules = yield* readsTheClock;
 
-      // Math.random(), crypto.getRandomValues() and crypto.randomUUID().
       const randomWith = (seed: number) =>
         Effect.map(
           evaluated(modules, { ...facts, seed }),

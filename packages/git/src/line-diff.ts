@@ -1,24 +1,17 @@
 /**
- * A line diff with no dependency: the whole edit script from one file's
- * lines to another's, as runs of equal, deleted and inserted lines. The
- * shortest script is Myers' O(ND) diff over the lines left once the shared
- * head and tail are set aside; past `MAX_EDITS` edits it stops looking for
- * the shortest, and the script keeps only the lines found once in each
- * file, in order (git's patience anchors, matched greedily).
- *
- * Positions are 0-based: an edit starts at `oldStart` in the old lines and
- * `newStart` in the new, and in a run of changes the deletions come first.
+ * Myers' O(ND) diff over the lines left once the shared head and tail are set
+ * aside; past `MAX_EDITS` edits it keeps only the lines found once in each
+ * file, in order (git's patience anchors, matched greedily). Positions are
+ * 0-based, and in a run of changes the deletions come first.
  */
 import { Data, Option } from "effect";
 
-/** `count` lines from `oldStart` in the old lines and `newStart` in the new. */
 interface Span {
   readonly oldStart: number;
   readonly newStart: number;
   readonly count: number;
 }
 
-/** One run of an edit script: lines both files share, or lines one alone holds. */
 export type Edit = Data.TaggedEnum<{
   Delete: Span;
   Equal: Span;
@@ -27,10 +20,8 @@ export type Edit = Data.TaggedEnum<{
 
 export const Edit = Data.taggedEnum<Edit>();
 
-/** One line's step through the script. */
 type Step = Edit["_tag"];
 
-// Past this many edits the diff stops looking for the shortest script.
 const MAX_EDITS = 1024;
 
 const at = (values: Int32Array, index: number) => values[index] ?? 0;
@@ -77,7 +68,6 @@ const stepsFrom = (
   return steps.toReversed();
 };
 
-/** A shortest edit script from `previous` to `next`, or none past `MAX_EDITS`. */
 const myers = (
   previous: readonly string[],
   next: readonly string[]
@@ -120,7 +110,6 @@ const myers = (
   return Option.none();
 };
 
-/** How many times each line occurs in `lines`. */
 const countsOf = (lines: readonly string[]) => {
   const counts = new Map<string, number>();
 
@@ -131,11 +120,6 @@ const countsOf = (lines: readonly string[]) => {
   return counts;
 };
 
-/**
- * A script for a rewrite too large for the shortest: the lines found once
- * in each file are kept, in order, each matched after the last; every other
- * line is deleted or inserted.
- */
 const anchored = (
   previous: readonly string[],
   next: readonly string[]
@@ -177,7 +161,6 @@ const anchored = (
   return steps;
 };
 
-/** The steps of a script, as runs: in each run of changes, deletions first. */
 const runsOf = (steps: readonly Step[]): readonly Edit[] => {
   const edits: Edit[] = [];
   let oldStart = 0;
@@ -228,7 +211,6 @@ const runsOf = (steps: readonly Step[]): readonly Edit[] => {
   return edits;
 };
 
-/** How many lines from each end `previous` and `next` share. */
 export const sharedEnds = (
   previous: readonly string[],
   next: readonly string[]
@@ -256,7 +238,6 @@ export const sharedEnds = (
   return { head, tail };
 };
 
-/** `middle` with the shared head and tail around it. */
 const framed = (
   ends: { readonly head: number; readonly tail: number },
   middle: readonly Step[]
@@ -266,10 +247,6 @@ const framed = (
   ...Array.from({ length: ends.tail }, (): Step => "Equal"),
 ];
 
-/**
- * A shortest edit script from `before` to `after`, or none when it takes
- * more than `MAX_EDITS` edits past the shared head and tail.
- */
 export const shortestDiff = (
   before: readonly string[],
   after: readonly string[]
@@ -285,10 +262,6 @@ export const shortestDiff = (
   );
 };
 
-/**
- * The edit script from `before` to `after`: the shortest, or, for a rewrite
- * past `MAX_EDITS` edits, one that keeps the lines found once in each file.
- */
 export const lineDiff = (
   before: readonly string[],
   after: readonly string[]

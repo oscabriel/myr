@@ -11,31 +11,26 @@ import type {
 } from "@repo/protocol/ids";
 import { Array, Option, Order, Schema } from "effect";
 
-/** One `Key: value` line of a commit message's trailer block. */
 export interface Trailer {
   readonly key: string;
   readonly value: string;
 }
 
-/** A git identity: the name and email of an author or committer line. */
 export interface GitIdentity {
   readonly name: string;
   readonly email: string;
 }
 
-/** The accountable person, as a landing's author: their handle at the platform's users domain. */
 export const authorLine = (handle: Handle): GitIdentity => ({
   email: `${handle}@users.${Brand.domain}`,
   name: handle,
 });
 
-/** The platform, which commits every landing. */
 export const committerLine: GitIdentity = {
   email: `platform@${Brand.domain}`,
   name: Brand.name,
 };
 
-/** What a landing commit's message is made of; every trailer comes from the platform's own rows. */
 export interface LandingMessage {
   readonly subject: string;
   readonly body?: string;
@@ -47,7 +42,6 @@ export interface LandingMessage {
     readonly patchId: PatchId;
     readonly checkVersion: CheckVersion;
   };
-  /** The `Held-back:` value, such as `export 7/7 @ sha256:…`, without its key. */
   readonly heldBack?: string;
   readonly requestId?: RequestId;
 }
@@ -62,10 +56,6 @@ const isSpace = (text: string) => SPACE.test(text);
 // git's scissors line: it and everything below it are not the message.
 const SCISSORS = "# ------------------------ >8 ------------------------";
 
-/**
- * Whether git reads `line` as the end of a commit message: a `---` divider
- * (then a blank or the line's end) or the scissors line.
- */
 const endsMessage = (line: string) =>
   line.startsWith(SCISSORS) ||
   (line.startsWith("---") && (line.length === 3 || isSpace(line.slice(3))));
@@ -93,10 +83,6 @@ const agentOf = ({ harness, model, verified }: AgentTrailer) =>
 
 const roleOrder = (role: CreditRole) => CreditRole.literals.indexOf(role);
 
-/**
- * Credits in the order of `CreditRole`, people within a role in the order
- * given, each (role, person) once: the same rows always make the same message.
- */
 const ordered = (credits: readonly Credit[]) =>
   Array.dedupeWith(
     Array.sortWith(credits, ({ role }) => roleOrder(role), Order.Number),
@@ -104,11 +90,6 @@ const ordered = (credits: readonly Credit[]) =>
       one.role === other.role && one.handle === other.handle
   );
 
-/**
- * A landing commit's message: the subject, the body, then one trailer block
- * that credits each person by role, discloses each agent as `Assisted-by`,
- * and cites the ask, the verdict, the held-back result and the request.
- */
 export const formatLanding = (input: LandingMessage): string => {
   const trailers: readonly Trailer[] = [
     ...ordered(input.credits).map(({ handle, role }) => ({
@@ -277,25 +258,18 @@ const blockStart = (lines: readonly string[]): Option.Option<number> => {
   return Option.none();
 };
 
-/** A value with its continuation lines folded to single spaces. */
 const unfold = (value: string) =>
   value
     .replaceAll(/^[ \t\n\v\f\r]+|[ \t\n\v\f\r]+$/gu, "")
     .replaceAll(/\n[ \t\n\v\f\r]*/gu, " ")
     .replaceAll(/^[ \t\n\v\f\r]+|[ \t\n\v\f\r]+$/gu, "");
 
-/**
- * A message's trailers in order, as `git interpret-trailers --parse` reads
- * them: keys and values trimmed, continuation lines unfolded, lines that are
- * not trailers left out.
- */
 export const parseTrailers = (message: string): readonly Trailer[] => {
   const lines = logLines(message);
 
   return Option.match(blockStart(lines), {
     onNone: () => [],
     onSome: (start) => {
-      // Each item is one trailer with its continuation lines, or another line.
       const items: string[] = [];
       let open = false;
 
@@ -369,17 +343,12 @@ const agentFrom = ({ key, value }: Trailer): Option.Option<AgentTrailer> => {
   );
 };
 
-/** The people a landing credits, and the agents it discloses. */
 export interface LandingCredits {
   readonly credits: readonly Credit[];
   readonly assisted: readonly AgentTrailer[];
 }
 
-/**
- * Who a landing credits, and which agents it discloses. Only trailers the
- * platform writes count: a credit names a platform handle by `authorLine`,
- * and `Assisted-by` is never credit.
- */
+/** Only trailers the platform writes count, and `Assisted-by` is never credit. */
 export const creditsOf = (message: string): LandingCredits => {
   const trailers = parseTrailers(message);
 

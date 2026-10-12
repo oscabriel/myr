@@ -1,8 +1,3 @@
-/**
- * The maintainer's guide: make a project, write how it takes changes in
- * its config folder, open asks, take proposals and drafts, spend Today's
- * decisions, finish an answer, land your own change and vouch.
- */
 import { Brand } from "@repo/brand";
 import { sourceHosts } from "@repo/protocol/ids";
 

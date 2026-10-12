@@ -1,10 +1,3 @@
-/**
- * The reference: each page read from what defines it, never copied. The
- * commands from the CLI's one list, the refusals from the closed union,
- * git, landings and events from the text `/llms-full.txt` serves, the MCP
- * tools from the contracts served over MCP, and the imported projects from
- * the copy of the import plan.
- */
 import { Brand } from "@repo/brand";
 import {
   Contracts,
@@ -23,7 +16,6 @@ import { importedProjects } from "./imported.ts";
 import type { DocSource } from "./page.ts";
 import { withoutHeading } from "./page.ts";
 
-/** A command as typed: its words, then its positionals in angle brackets. */
 const usage = ({ path, positional }: CommandDoc) =>
   code(
     [Brand.cli, ...path, ...positional.map((name) => `<${name}>`)].join(" ")
@@ -67,7 +59,6 @@ export const eventsPage: DocSource = {
   slug: "events",
 };
 
-/** Each contract served over MCP: its tool name, what it does, and whether it only reads. */
 const mcpTools = () =>
   [...Contracts.requests.values()].flatMap(({ _tag, annotations }) =>
     Context.get(annotations, Surfaces).includes("mcp")

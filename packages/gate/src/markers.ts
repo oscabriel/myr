@@ -1,15 +1,9 @@
-/**
- * Weakening markers: text an answer adds that turns a check off. A marker
- * with no reason after ` -- ` is refused at shape; one with a reason is an
- * escape, counted against its territory's escape ratchet.
- */
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { RepoPath } from "@repo/protocol/ids";
 import { Option, Order } from "effect";
 
 import type { PushFacts } from "./facts.ts";
 
-/** One marker, and the kind of check it turns off. */
 export interface Marker {
   readonly text: string;
   readonly family:
@@ -23,7 +17,6 @@ export interface Marker {
     | "go";
 }
 
-/** The markers every project starts with; a project may add more. */
 export const defaultMarkers: readonly Marker[] = [
   { family: "test", text: ".skip(" },
   { family: "test", text: ".only(" },
@@ -43,7 +36,6 @@ export const defaultMarkers: readonly Marker[] = [
   { family: "coverage", text: "c8 ignore" },
 ];
 
-/** The defaults and the markers the project adds, each once. */
 export const markersOf = (policy: Policy): readonly string[] => [
   ...new Set([
     ...defaultMarkers.map((marker) => marker.text),
@@ -51,7 +43,6 @@ export const markersOf = (policy: Policy): readonly string[] => [
   ]),
 ];
 
-/** One marker on one line, with the reason written after it, if any. */
 export interface MarkerHit {
   readonly path: RepoPath;
   readonly line: number;
@@ -59,13 +50,10 @@ export interface MarkerHit {
   readonly reason: Option.Option<string>;
 }
 
-// The ` -- ` that starts a reason after an escape directive.
 const REASON_MARK = /\s--(?=\s|$)/u;
 
-// What closes a comment after its reason: `*/`, `-->`.
 const CLOSER = /\s*(?:\*\/|-->)\s*$/u;
 
-/** The reason written after a marker on its line, if there is one. */
 const reasonIn = (rest: string): Option.Option<string> => {
   const mark = REASON_MARK.exec(rest);
 
@@ -82,10 +70,8 @@ const reasonIn = (rest: string): Option.Option<string> => {
 };
 
 /**
- * Every marker in `markers` that a line holds, once per line, ordered by
- * path, then line. A marker is plain text: it is found in any file, a string
- * in a README included; a project decides by adding to or trimming its list.
- * The lines are an answer's added lines, or its removed ones.
+ * A marker is plain text: it is found in any file, a README included; a
+ * project decides by adding to or trimming its list.
  */
 export const scanMarkers = (
   lines: PushFacts["addedLines"],

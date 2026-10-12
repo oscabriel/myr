@@ -21,8 +21,6 @@ import {
 } from "../src/vault.ts";
 import { WriteOnlyValuesWebCrypto } from "../src/vault/webcrypto.ts";
 
-// A fixed test master key and a second one, 32 bytes each as 64 hex
-// characters (the form the platform decodes `MASTER_KEY` in).
 const masterKey = WriteOnlyValuesWebCrypto(
   Redacted.make(
     "00112233445566778899aabbccddeeff00112233445566778899AABBCCDDEEFF"
@@ -37,7 +35,6 @@ const otherMasterKey = WriteOnlyValuesWebCrypto(
 
 const key = EnvKey.make("SENTRY_AUTH_TOKEN");
 
-/** A token-shaped value of 22 characters. */
 const token = "sntrys_eyJpYXQiOjE3MjA";
 
 const put = (value: string, acknowledgeShort = false) =>
@@ -50,7 +47,6 @@ const open = (sealed: SealedValue) =>
     Effect.map((value) => Redacted.value(value))
   );
 
-/** The sealed value with one byte of `field` changed. */
 const tampered = (
   sealed: SealedValue,
   field: "ciphertext" | "iv" | "wrappedKey"
@@ -67,11 +63,9 @@ const tampered = (
 
 const base64 = Schema.encodeSync(Schema.StringFromBase64);
 
-/** What an effect failed with: none when it succeeded. */
 const refusalOf = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.result(effect).pipe(Effect.map(Result.getFailure));
 
-/** The defect an effect died with. */
 const defectOf = <A, E>(exit: Exit.Exit<A, E>) =>
   Exit.isFailure(exit) ? Cause.squash(exit.cause) : undefined;
 

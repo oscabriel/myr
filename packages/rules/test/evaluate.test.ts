@@ -28,18 +28,15 @@ const decodeProposal = Schema.decodeUnknownSync(ProposalFacts);
 
 const decodeClaimant = Schema.decodeUnknownSync(ClaimantFacts);
 
-/** A proposal for an ask of the example's `fixBug` kind, but its record. */
 const fixBugProposal = {
   kind: "fixBug",
   proposer: "carol",
   territory: "@datekit/parse",
 };
 
-/** A red-then-green check on one file, as `CheckSpec` encodes it. */
 const redThenGreen = (path: string) =>
   CheckSpec.cases.RedThenGreen.make({ path: RepoPath.make(path) });
 
-/** What the platform fills in on every ask: when, where and whose. */
 const opened = {
   openedAt: now,
   openedIn: at,
@@ -47,7 +44,6 @@ const opened = {
   state: "open",
 };
 
-/** What every policy in these tests derives from the shared facts. */
 const fromFacts = {
   at,
   modules: [
@@ -64,13 +60,11 @@ const fromFacts = {
   ],
 };
 
-/** The judge closure the fake finishers give for a run block's test command. */
 const judgeFor = (test: string) => ({
   paths: [`${configFolder}/**`, ".github/workflows/ci.yml"],
   pointers: ["package.json#/scripts", `test:${test}`],
 });
 
-/** The run block the fake finder finds in CI. */
 const foundRun = { checks: { unit: "bun test" }, test: "bun test {path}" };
 
 const fixBug = {
@@ -84,7 +78,6 @@ const fixBug = {
   strength: "assertion",
 };
 
-/** The convex-merged example's policy, as `Policy` encodes it. */
 const exampleEncoded = {
   ...fromFacts,
   agents: "trailer",
@@ -135,7 +128,6 @@ const exampleEncoded = {
   weakening: { markers: [".skip(", ".only("] },
 };
 
-/** The policy a folder holding only `policy.json` states. */
 const jsonEncoded = {
   ...fromFacts,
   agents: "none",
@@ -182,10 +174,6 @@ const jsonEncoded = {
   weakening: { markers: [".skip("] },
 };
 
-/**
- * The defaults (no folder means defaults), as
- * `Policy` encodes them: the sdk's `defaults`, finished with the facts.
- */
 const defaultsEncoded = {
   ...fromFacts,
   agents: "trailer",
@@ -217,7 +205,6 @@ const defaultsEncoded = {
   weakening: { markers: [] },
 };
 
-/** Evaluates a bundle at `at` with the shared facts, and encodes the policy. */
 const evaluated = (modules: ConfigBundle) =>
   Effect.gen(function* () {
     const evaluator = yield* RulesEvaluator;
@@ -226,7 +213,6 @@ const evaluated = (modules: ConfigBundle) =>
     return yield* Schema.encodeEffect(Policy)(policy);
   });
 
-/** Evaluates a bundle that must fail, and hands back its `RulesFailed`. */
 const failed = (modules: ConfigBundle) =>
   Effect.gen(function* () {
     const evaluator = yield* RulesEvaluator;
@@ -242,10 +228,6 @@ const failed = (modules: ConfigBundle) =>
     return result.failure;
   });
 
-/**
- * A `visibility.ts`'s default export, as the sdk writes it: one layer of
- * held-back checks for one area.
- */
 const visibilityEncoded = {
   checks: {
     admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },
@@ -273,11 +255,9 @@ const visibilityEncoded = {
   notice: { narrowingDays: 7 },
 } satisfies typeof VisibilityPolicy.Encoded;
 
-/** A module whose default export is `data`. */
 const exporting = (data: Schema.Json) =>
   `export default ${JSON.stringify(data)};\n`;
 
-/** An ask file whose brief says what happens today, but not what is wanted. */
 const noWant = `export default ${JSON.stringify({
   blockedBy: [],
   brief: { current: "Dates parse only in one format" },

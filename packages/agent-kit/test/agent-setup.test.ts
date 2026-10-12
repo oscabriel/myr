@@ -1,10 +1,3 @@
-/**
- * The Agents page's one source: how each agent connects (remote MCP, MCP
- * over stdio, the CLI, text to paste, skills), each channel with when to
- * use it and the snippets to copy. A pure function of the CLI's commands
- * and the two hosts' URLs; the web draws it as `/agents` and serves it as
- * `/agents.md`, and its MCP JSON is the object the plugin bundles carry.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -52,11 +45,9 @@ const commands: readonly CommandDoc[] = [...someCommands, login, mcp];
 
 const channels = agentSetup({ commands, platformUrl, webUrl });
 
-/** The channel titled `title`; fails the test without one. */
 const channel = (from: readonly SetupChannel[], title: string) =>
   Option.getOrThrow(Arr.findFirst(from, (each) => each.title === title));
 
-/** The snippet labelled `label` in the channel titled `title`. */
 const snippet = (title: string, label: string) =>
   Option.getOrThrow(
     Arr.findFirst(channel(channels, title).snippets, (each) =>
@@ -64,12 +55,10 @@ const snippet = (title: string, label: string) =>
     )
   );
 
-/** A JSON object's text, decoded. */
 const parsed = Schema.decodeUnknownSync(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown))
 );
 
-/** The `.mcp.json` the Claude Code plugin carries for the same platform. */
 const pluginMcpJson = claudePlugin({ commands, platformUrl }).pipe(
   Effect.map((files) =>
     Option.getOrThrow(

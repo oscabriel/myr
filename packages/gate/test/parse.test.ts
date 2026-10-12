@@ -30,7 +30,6 @@ import {
   wire,
 } from "./facts.ts";
 
-/** Dana's own live claim on the ask, and her push to its fork. */
 const danasPush = (mode: PushFacts["policy"]["vouch"]["mode"]) =>
   testFacts({
     claim: Option.some({ ...claim, claimant: dana }),
@@ -43,7 +42,6 @@ const danasPush = (mode: PushFacts["policy"]["vouch"]["mode"]) =>
     }),
   });
 
-/** Dana's push to her own working fork (`<project>--me--dana`). */
 const danasWorkingForkPush = (mode: PushFacts["policy"]["vouch"]["mode"]) =>
   testFacts({
     ask: Option.none(),
@@ -57,8 +55,6 @@ const main = RefNameText.make("refs/heads/main");
 
 const tag = RefNameText.make("refs/tags/v1");
 
-// Each row is one push; parse answers with at most one refusal, the first
-// rule the push breaks.
 const rows: readonly {
   readonly name: string;
   readonly facts: PushFacts;
@@ -225,7 +221,6 @@ const rows: readonly {
     name: "a push to a layer's repo, which W6 opens to its writers",
     refusals: [new DirectPush({ ref: main })],
   },
-  // A fork takes branches only: every other ref is the platform's or no one's.
   {
     facts: testFacts({ ref: tag }),
     name: "the claimant's push of a tag to their claim's fork",

@@ -1,9 +1,3 @@
-/**
- * The agent guide: the ways an agent reaches the platform, each pointing
- * to the For agents page that holds the exact setup, and the rules that
- * hold for any agent.
- */
-
 import { code } from "../text.ts";
 import type { DocSource } from "./page.ts";
 import { cli } from "./page.ts";

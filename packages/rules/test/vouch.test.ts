@@ -2,8 +2,6 @@ import { describe, expect, it } from "@effect/vitest";
 
 import { parseVouchFile } from "../src/vouch.ts";
 
-// A vouch file in Ghostty's VOUCHED.td format: its header comment, then one
-// handle per line.
 const vouchedFile = [
   "# The list of vouched (or actively denounced) users for this repository.",
   "#",

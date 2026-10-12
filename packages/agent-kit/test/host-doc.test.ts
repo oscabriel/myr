@@ -1,9 +1,3 @@
-/**
- * The host's own Markdown, `frontLlms`: what the web serves at `/llms.txt`
- * and the platform at `/` for an agent. A pure function of the CLI's
- * commands, the listed projects and the two hosts' URLs; with no web app
- * it points only at what the platform serves itself.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -24,7 +18,6 @@ const platformUrl = "https://platform-test.example.workers.dev";
 
 const webUrl = "https://web-test.example.workers.dev";
 
-/** A command row as the command list holds it. */
 const row = (
   path: readonly [string, ...string[]],
   summary: string,
@@ -40,7 +33,6 @@ const row = (
   ...more,
 });
 
-/** The web's own `llms.test.ts` catalog, so the golden file is its former output. */
 const commands: readonly CommandDoc[] = [
   row(
     ["ask"],

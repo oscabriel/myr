@@ -18,12 +18,7 @@ const layersOf = (visibility: Option.Option<VisibilityPolicy>) =>
     onSome: (policy) => policy.layers,
   });
 
-/**
- * A project's public ledger: every row the Project DO keeps, in
- * sequence order (the sort is stable, so nothing is dropped or reordered
- * under one number), the layers its config declares, and the posture
- * computed from that config and its licence.
- */
+/** The sort is stable, so nothing is dropped or reordered under one number. */
 export const ledgerOf = (input: {
   readonly project: ProjectName;
   readonly visibility: Option.Option<VisibilityPolicy>;
@@ -41,17 +36,10 @@ export const ledgerOf = (input: {
   };
 };
 
-/** What the ledger records of a layer's declaration: what it holds and discloses. */
 const declared = (layer: Layer) =>
   `${layer.disclose}:${Array.sort(layer.holds, Order.String).join(",")}`;
 
-/**
- * The ledger entries a change to the visibility config writes, numbered
- * from `seq`: `LayerDeclared` for each layer the change adds, and again for
- * a layer whose kinds or disclosure it changes, sorted by layer name. A
- * layer that leaves writes nothing here; posture changes are decisions,
- * recorded where they are decided.
- */
+/** A layer that leaves writes nothing here; posture changes are decisions, recorded where they are decided. */
 export const entriesForPolicy = (
   before: Option.Option<VisibilityPolicy>,
   after: Option.Option<VisibilityPolicy>,

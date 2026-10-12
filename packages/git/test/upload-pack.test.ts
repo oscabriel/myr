@@ -1,8 +1,3 @@
-/**
- * What a clone's or fetch's upload-pack request reads, as the platform's
- * read log sees it: a table of requests as git writes them over
- * protocol v0 and v2, and the requests it can't make out.
- */
 import { describe, expect, it } from "@effect/vitest";
 import { CommitSha } from "@repo/protocol/ids";
 import { Option } from "effect";
@@ -15,10 +10,8 @@ const first = "1".repeat(40);
 
 const second = "2".repeat(40);
 
-/** v2's delimiter packet, between a command's capabilities and its arguments. */
 const DELIM = utf8("0001");
 
-/** A request of `lines`, each one pkt-line, and the packets between them. */
 const request = (...parts: readonly (string | Uint8Array)[]) =>
   concat(
     parts.map((part) =>

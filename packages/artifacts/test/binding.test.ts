@@ -51,10 +51,8 @@ const main = RefName.make("refs/heads/main");
 
 const landed = RefName.make("refs/asked/landed");
 
-/** Where the store's repos are served, in Artifacts' shape: `<base>/<name>.git`. */
 const remoteBase = "https://artifacts.test/git/projects";
 
-/** A packet-line holding one side-band 3 (fatal) message. */
 const fatal = (message: string) => {
   const payload = new TextEncoder().encode(`\u0003${message}`);
   const length = (payload.length + 4).toString(16).padStart(4, "0");
@@ -62,32 +60,21 @@ const fatal = (message: string) => {
   return new Uint8Array([...new TextEncoder().encode(length), ...payload]);
 };
 
-/** Artifacts' whole reply to a push it is too busy for: no report, no flush. */
 const busyReply = () =>
   new Response(fatal("artifacts_git_receive_pack_busy\n"), {
     headers: { "content-type": "application/x-git-receive-pack-result" },
   });
 
-/** What one request to the store carried, as the test's `Fetch` saw it. */
 interface Seen {
   readonly url: string;
   readonly authorization: string | null;
 }
 
-/** What a test may do to the next receive-pack call before git sees it. */
 type Intercept = (request: Request) => Effect.Effect<Option.Option<Response>>;
 
-/**
- * The binding over a fake Artifacts on local disk: a `RepoHostLocal` in a
- * temporary directory, wrapped by testkit's fake binding, whose remotes a
- * `Fetch` serves with real `git http-backend` over the same directory.
- * Every handle the binding opens is counted, and every token it mints is
- * recorded, so a test can check both came back.
- */
 const world = (
   options: FakeOptions & {
     readonly wrap?: (host: HostLike) => HostLike;
-    /** How many of the first `get`s answer that the repo is still being made, and how. */
     readonly making?: {
       readonly code: "CREATE_IN_PROGRESS" | "IMPORT_IN_PROGRESS";
       readonly gets: number;
@@ -220,7 +207,6 @@ const world = (
 
 type World = Effect.Success<ReturnType<typeof world>>;
 
-/** A test body over a fresh world, with the binding's `RepoHost` in scope. */
 const within = <A, E>(
   body: (
     world: World
@@ -248,7 +234,6 @@ describeRepoHost(
   }
 );
 
-/** A repo `name` with one commit on `main`, and the client that made it. */
 const seeded = (name: RepoName) =>
   Effect.gen(function* () {
     const repos = yield* RepoHost;
@@ -359,7 +344,6 @@ describe("the Workers binding's surprises, typed", () => {
     )
   );
 
-  // One side-band 3 packet and no report.
   it.live("reads a busy receive-pack as HostBusy, and moves nothing", () =>
     within(({ intercept }) =>
       Effect.gen(function* () {
@@ -393,7 +377,6 @@ describe("the Workers binding's surprises, typed", () => {
     )
   );
 
-  // git's receive-pack checks the old value the push names.
   it.live(
     "reports a ref that moved during the push as Stale at its new tip",
     () =>
@@ -502,8 +485,6 @@ describe("the Workers binding's surprises, typed", () => {
       )
   );
 
-  // Artifacts' `readTree` throws `INTERNAL_ERROR` for an object that is no
-  // tree; the other stores read no tree there.
   it.live("reads no tree at a blob's id or a commit's id", () =>
     within(
       () =>
@@ -671,7 +652,6 @@ describe("tokens and handles the binding takes", () => {
                 )
             )
           ).toBeTruthy();
-          // Revoked already: a second revoke finds nothing.
           expect(revoked.every((again) => !again)).toBeTruthy();
         })
       )
@@ -839,9 +819,8 @@ describe("git smart HTTP over the Fetch port", () => {
 });
 
 /**
- * `effect` run to its end on the TestClock: the clock moves on by the
- * longest sleep the binding takes between asks while the effect runs, so
- * a wait of minutes passes at once, whatever real I/O it does between.
+ * Runs `effect` on the TestClock, moving the clock by the binding's longest
+ * sleep while it runs, so a wait of minutes passes at once.
  */
 const onTestClock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {
@@ -855,7 +834,6 @@ const onTestClock = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     return yield* Fiber.await(fiber);
   });
 
-/** How many tokens on `name` are still live, as the fake lists them. */
 const liveTokens = (fake: Artifacts, name: RepoName) =>
   Effect.acquireUseRelease(
     Effect.promise(() => fake.get(name)),
@@ -875,8 +853,6 @@ const liveTokens = (fake: Artifacts, name: RepoName) =>
 describe("an import Artifacts is still copying", () => {
   const master = RefName.make("refs/heads/master");
 
-  // A remote whose default branch is `master`, as anyhow's is: its HEAD
-  // names `master`, and the import takes that branch under its own name.
   it.live(
     "imports a remote whose default branch is master without being told",
     () =>
@@ -916,8 +892,7 @@ describe("an import Artifacts is still copying", () => {
       )
   );
 
-  // Seven asks (about 32 s) were too few for a large import; the binding
-  // now asks for about three minutes, so twelve busy answers pass.
+  // An import may be asked about for three minutes, so twelve busy answers pass.
   it.effect(
     "waits through twelve IMPORT_IN_PROGRESS answers, then revokes the import's token and reads it",
     () =>

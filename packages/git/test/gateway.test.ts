@@ -10,7 +10,6 @@ import { Custody } from "../src/custody.ts";
 import { gitRoute } from "../src/gateway.ts";
 import { admitAll, commit, world } from "./world.ts";
 
-/** Custody that refuses, before forwarding, any push touching `ref`. */
 const refusing = (ref: string, refusals: readonly Refusal[]) =>
   Custody.of({
     admit: (_repo, commands) =>
@@ -20,19 +19,11 @@ const refusing = (ref: string, refusals: readonly Refusal[]) =>
     review: () => Effect.succeed([]),
   });
 
-/**
- * Artifacts' whole reply to a push it is too busy to take, as a probe recorded
- * it: one side-band 3 (fatal) packet, then the end of the response.
- */
 const artifactsBusy = () =>
   new Response("0024\u0003artifacts_git_receive_pack_busy", {
     headers: { "content-type": "application/x-git-receive-pack-result" },
   });
 
-/**
- * The lines git printed from the server's side band, less the spaces git pads
- * them with to clear a progress line.
- */
 const remoteLines = (stderr: string) =>
   stderr
     .split("\n")
@@ -42,7 +33,6 @@ const remoteLines = (stderr: string) =>
 // A credential the client sends; the gateway must keep it from the upstream.
 const asClient = ["-c", "http.extraHeader=Authorization: Bearer client-secret"];
 
-/** Text that compresses poorly, from a fixed seed (Park and Miller's generator). */
 const noise = (length: number) => {
   const digits: string[] = [];
   let state = 20_261_006;
@@ -252,7 +242,6 @@ describe("the gateway between git and its upstream", () => {
         expect(pushed.stderr).toContain(
           " ! [remote rejected] HEAD -> answer (OutOfScope)"
         );
-        // The answerer's fork keeps what the upstream took.
         expect(yield* gitOk(upstream, "rev-parse", "answer")).toBe(answer);
       }).pipe(Effect.provide(NodeServices.layer)),
     20_000

@@ -1,7 +1,3 @@
-/**
- * The seed: what it plans to put on a platform for each example
- * project, read from the example's tracked files, and putting it there.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -34,10 +30,8 @@ import {
 import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
-/** The config folder's name, from the brand (`Brand.configDir`). */
 const config = Brand.configDir;
 
-/** A file of an example, as the test reads it from disk. */
 const onDisk = (example: string, path: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -191,7 +185,6 @@ describe(planSeed, () => {
   );
 });
 
-/** Each step as the command prints it. */
 const linesOf = (steps: readonly SeedStep[]) => steps.map(stepLine);
 
 describe(runSeed, () => {
@@ -223,7 +216,6 @@ describe(runSeed, () => {
 
           const held = yield* seeded(plans);
 
-          // Each project's asks, each with the asks it waits on.
           const asks = Object.fromEntries(
             held.map(({ asks: listed, project }) => [
               project,
@@ -292,7 +284,6 @@ describe("runSeed, when a person has no session", () => {
           const stopped = yield* Effect.flip(runSeed(plan));
           const target = yield* SeedTarget;
 
-          // No project was made: the gateway has no burrow to list refs of.
           const listed = yield* target.refsOf(plan.project).pipe(
             Effect.map((held) => `listed ${held.size} refs`),
             Effect.catch(({ reason }) => Effect.succeed(reason))
@@ -380,7 +371,6 @@ describe(stageTarget, () => {
   );
 });
 
-/** What `main` prints, line by line, and how it ended. */
 const printedBy = (argv: readonly string[]) =>
   Effect.gen(function* () {
     const printed: string[] = [];
@@ -470,7 +460,6 @@ describe(main, () => {
           project: held?.project,
           ratchets: held?.ratchets,
         }).toStrictEqual({
-          // The migrate ask's family: the parent, six children, the delete child.
           asks: 8,
           decider: "okafor",
           project: "oscabriel/burrow",

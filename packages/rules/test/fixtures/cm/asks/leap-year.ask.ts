@@ -1,5 +1,2 @@
-/**
- * A second ask that names no asker, so the initializer asked it, and no
- * `blockedBy`, so nothing blocks it.
- */
+/** Names no asker and no `blockedBy`, so the defaults apply. */
 export { default } from "./leap-year.json" with { type: "json" };

@@ -33,7 +33,6 @@ const repo = RepoName.make("demo");
 
 const main = RefName.make("refs/heads/main");
 
-/** A verdict on the answer whose head is `head`. */
 const verdictOn = (head: CommitSha) =>
   Verdict.make({
     ask: AskId.make("week-at-year-end"),
@@ -60,7 +59,6 @@ const verdictOn = (head: CommitSha) =>
 
 const encodeVerdict = Schema.encodeEffect(Verdict);
 
-/** The note's text as a verdict, encoded again: compared with what was written. */
 const reencoded = (note: Option.Option<string>) =>
   Schema.decodeEffect(Schema.fromJsonString(Verdict))(
     Option.getOrElse(note, () => "")
@@ -68,7 +66,6 @@ const reencoded = (note: Option.Option<string>) =>
 
 const now = DateTime.makeUnsafe("2026-10-07T12:30:00Z");
 
-/** Two commits on `demo`'s main, the targets the notes are written on. */
 const targets = Effect.gen(function* () {
   const repos = yield* RepoHost;
   const client = yield* gitClient(memoryFs());
@@ -83,10 +80,6 @@ const targets = Effect.gen(function* () {
   return { first, second };
 });
 
-/**
- * The notes commit at `notesRef`, the names in its tree, and the note on
- * `target`: read through the port as plain git would find them.
- */
 const notesThroughPort = (target: CommitSha) =>
   Effect.gen(function* () {
     const repos = yield* RepoHost;
@@ -114,7 +107,6 @@ const notesThroughPort = (target: CommitSha) =>
     };
   });
 
-/** Copies a scratch git directory onto disk, so git itself can read it. */
 const onDisk = (source: ScratchSource) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -196,7 +188,6 @@ describe("verdicts as git notes", () => {
           yield* encodeVerdict(verdict)
         );
 
-        // git's own notes layout: `git notes show` finds the same note.
         const gitdir = yield* onDisk(source);
 
         expect(
@@ -262,7 +253,6 @@ describe("verdicts as git notes", () => {
           yield* encodeVerdict(verdictOn(first))
         );
 
-        // git lists both notes from the second notes commit's tree.
         const gitdir = yield* onDisk(two.source);
 
         const listed = yield* gitOk(

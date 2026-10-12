@@ -1,13 +1,5 @@
-/**
- * Write-only values sealed through WebCrypto, so the same code runs in
- * workerd and in Node (envelope-encrypted in the DO).
- *
- * `put` makes a fresh AES-GCM-256 data key and a fresh 12-byte IV for each
- * value, seals the value under them, and wraps the data key with the
- * master key by AES-KW (RFC 3394, which checks the key's integrity on
- * unwrap). `open` unwraps and decrypts; nothing else here returns a value.
- * A sealed value is useless without `MASTER_KEY`.
- */
+// A fresh AES-GCM-256 data key and IV per value, the data key wrapped with the
+// master key by AES-KW (RFC 3394, which checks the key's integrity on unwrap).
 import { Effect, Layer, Option, Redacted, Schema } from "effect";
 
 import {
@@ -24,10 +16,8 @@ import type { SealedValue, ValueToSeal } from "../vault.ts";
  */
 const KEY_VERSION = 1;
 
-/** AES-GCM's recommended IV size. */
 const IV_BYTES = 12;
 
-/** AES-256: the data key and the master key are 32 bytes each. */
 const KEY_BYTES = 32;
 
 /**
@@ -37,10 +27,8 @@ const KEY_BYTES = 32;
  */
 const PAD_TO = 64;
 
-/** The padding's first byte (ISO/IEC 7816-4): `0x80`, then zeros. */
 const PAD_MARK = 0x80;
 
-/** `MASTER_KEY` is not 32 bytes as 64 hex characters. Never names the key. */
 class MasterKeyUnusable extends Schema.TaggedError<MasterKeyUnusable>()(
   "MasterKeyUnusable",
   {}
@@ -58,7 +46,6 @@ const owned = (bytes: Uint8Array): Uint8Array<ArrayBuffer> =>
 const decodeBase64 = (text: string) =>
   Effect.map(Schema.decodeEffect(Schema.Uint8ArrayFromBase64)(text), owned);
 
-/** The value's UTF-8 bytes, then `0x80`, then zeros to the next step. */
 const padded = (value: string) => {
   const bytes = new TextEncoder().encode(value);
   const out = new Uint8Array((Math.floor(bytes.length / PAD_TO) + 1) * PAD_TO);
@@ -69,7 +56,6 @@ const padded = (value: string) => {
   return out;
 };
 
-/** The bytes before the padding; none when the padding is not there. */
 const unpadded = (bytes: Uint8Array) => {
   const end = bytes.findLastIndex((byte) => byte !== 0);
 
@@ -78,7 +64,6 @@ const unpadded = (bytes: Uint8Array) => {
     : Option.none();
 };
 
-/** The master key's 32 bytes, decoded from its hex; a defect for any other form. */
 const masterKeyBytes = (masterKey: Redacted.Redacted) =>
   Schema.decodeEffect(Schema.Uint8ArrayFromHex)(Redacted.value(masterKey)).pipe(
     Effect.mapError(() => new MasterKeyUnusable()),
@@ -91,9 +76,8 @@ const masterKeyBytes = (masterKey: Redacted.Redacted) =>
   );
 
 /**
- * The master key as an AES-KW key that can only wrap and unwrap, imported
- * for each call: WebCrypto's import is a promise, and the layer is built
- * where nothing may be awaited (the platform's router, at module load).
+ * Imported for each call: WebCrypto's import is a promise, and the layer is
+ * built where nothing may be awaited (the platform's router, at module load).
  */
 const importMasterKey = (bytes: Uint8Array<ArrayBuffer>) =>
   Effect.promise(() =>
@@ -103,7 +87,6 @@ const importMasterKey = (bytes: Uint8Array<ArrayBuffer>) =>
     ])
   );
 
-/** A fresh data key, from WebCrypto's random bytes, extractable only to be wrapped. */
 const freshDataKey = Effect.sync(() =>
   crypto.getRandomValues(new Uint8Array(KEY_BYTES))
 ).pipe(
@@ -114,7 +97,6 @@ const freshDataKey = Effect.sync(() =>
   )
 );
 
-/** Seals `value` under a fresh data key, wrapped by `master`. */
 const seal = (master: CryptoKey, input: ValueToSeal) =>
   Effect.gen(function* () {
     yield* admitLength(input);
@@ -151,7 +133,6 @@ const seal = (master: CryptoKey, input: ValueToSeal) =>
     } satisfies SealedValue;
   });
 
-/** Opens a sealed value; a defect naming the step that failed when it does not open. */
 const unseal = (master: CryptoKey, sealed: SealedValue) =>
   Effect.gen(function* () {
     if (sealed.keyVersion !== KEY_VERSION) {
@@ -206,11 +187,7 @@ const unseal = (master: CryptoKey, sealed: SealedValue) =>
     });
   }).pipe(Effect.orDie);
 
-/**
- * Write-only values sealed under `masterKey` (the platform's `MASTER_KEY`:
- * 32 bytes as 64 hex characters, either case). A key of any other form is
- * a defect when the layer is built, and the defect never holds the key.
- */
+/** A key of any other form is a defect when the layer is built, and the defect never holds the key. */
 export const WriteOnlyValuesWebCrypto = (
   masterKey: Redacted.Redacted
 ): Layer.Layer<WriteOnlyValues> =>

@@ -1,13 +1,3 @@
-/**
- * The web Worker's wiring, read as data: it reaches the platform
- * only through the `PLATFORM` service binding and holds no storage binding of
- * any kind, in any stage (AGENTS.md principle 7); `#backend` picks the
- * in-process backend under `development` and the binding otherwise; the byte
- * alarm measures it; and the examples stay outside the workspaces.
- *
- * Each file's presence is asserted before it is read, so a missing file is a
- * failed assertion, not a load error.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Path, Schema } from "effect";
@@ -23,7 +13,6 @@ import {
 import { budgets, workers } from "../../../scripts/startup-budget.ts";
 import { repoRoot } from "./root.ts";
 
-/** A file under the repo root, as text, once its presence is asserted. */
 const presentText = (file: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -35,13 +24,11 @@ const presentText = (file: string) =>
     return yield* fs.readFileString(at);
   }).pipe(Effect.provide(NodeServices.layer));
 
-/** A JSON (or JSONC) file under the repo root, decoded by `schema`. */
 const presentJson = <S extends Schema.Top>(file: string, schema: S) =>
   Effect.flatMap(presentText(file), (text) =>
     Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(blankJsonc(text))
   );
 
-/** The binding kinds that would reach storage or run code: none in the web. */
 const STORAGE = [
   "artifacts",
   "d1_databases",
@@ -82,10 +69,6 @@ const RootManifest = Schema.Struct({
   workspaces: Schema.Struct({ packages: Schema.Array(Schema.String) }),
 });
 
-/**
- * Whether a workspace glob's parts match a folder's segments: `*` is one
- * segment, `**` any number of them.
- */
 const globMatches = (
   parts: readonly string[],
   segments: readonly string[]
@@ -161,9 +144,9 @@ describe("the web Worker's wrangler.jsonc", () => {
       })
   );
 
-  // ADR 0026: the edge keeps the web's answers only behind its entry, which
-  // decides what may be kept; `vite dev` keeps nothing; and a kept page
-  // never outlives its Worker version, whose hashed assets it names.
+  // The edge keeps the web's answers only behind its entry, which decides what
+  // may be kept; `vite dev` keeps nothing; and a kept page never outlives its
+  // Worker version, whose hashed assets it names.
   it.effect(
     "enters through src/server.ts, and turns Workers Cache on in each stage alone, per version",
     () =>
@@ -244,9 +227,7 @@ describe("the byte alarm", () => {
     expect(workers.map(({ dir }) => dir)).toContain("apps/web");
   });
 
-  // Each Worker grows on its own, so each has limits of its own, about
-  // 15% above its bundle as last measured (the platform's entry, its only
-  // module, 1,679,675: both its limits at 1,900,000, 13% above).
+  // Each Worker has limits of its own, about 15% above its bundle as last measured.
   it("holds each Worker it measures to limits of its own", () => {
     expect(budgets).toStrictEqual({
       "apps/platform": { entry: 1_900_000, javascript: 1_900_000 },

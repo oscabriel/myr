@@ -12,10 +12,8 @@ const watched = (key: string, value: string): Watched => ({
 
 const found = (key: string) => Option.some(EnvKey.make(key));
 
-/** A token-shaped value. */
 const sentry = "sntrys_eyJpYXQiOjE3MjA";
 
-/** A value every serialized form changes: a quote, a slash, a plus, a space. */
 const stripe = 'sk_live_51H"q/7+x Zr';
 
 const values = [
@@ -29,7 +27,6 @@ const base64 = Schema.encodeSync(Schema.StringFromBase64);
 
 const base64Url = Schema.encodeSync(Schema.StringFromBase64Url);
 
-/** `text` as a stream of byte chunks, cut at the given byte offsets. */
 const chunked = (text: string, cuts: readonly number[]) => {
   const bytes = utf8(text);
   const bounds = [0, ...cuts, bytes.length];
@@ -119,7 +116,6 @@ describe("scanning text for stored values", () => {
 
   it.live("scans 5 MB of text for 20 values in under a second", () =>
     Effect.gen(function* () {
-      // A fixed Park–Miller generator, so the text is the same on every run.
       let state = 20_261_008;
 
       const draw = () => {

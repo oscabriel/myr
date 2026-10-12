@@ -1,8 +1,3 @@
-/**
- * An in-memory file system: the part of `fs.promises` that isomorphic-git
- * calls (`docs/fs.md` in isomorphic-git), with node's error codes.
- */
-
 type ReadOptions = string | { readonly encoding?: string } | undefined;
 
 interface Stats {
@@ -174,7 +169,6 @@ export const memoryFs = () => {
       : failure("ENOENT", path);
   };
 
-  /** Deletes a directory and everything under it; not part of `fs`. */
   const removeTree = (raw: string) => {
     const root = normalize(raw);
 

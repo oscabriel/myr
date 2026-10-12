@@ -1,14 +1,6 @@
 /**
- * Reasoned escapes: a marker with a reason after ` -- ` is not refused but
- * counted against its territory's escape ratchet. The
- * ratchet is incremental, with no command: its count moves by the reasoned
- * markers an answer adds minus those it removes. An answer that would take a
- * territory past its baseline waits for a decider, one `Waiver` per reasoned
- * marker it adds there, instead of landing or being refused.
- *
- * This is a pure function beside the stages, not a stage: a waiting answer
- * is not refused, so the caller (the Project DO, when an answer's checks
- * report) opens the decisions.
+ * A pure function beside the stages, not a stage: a waiting answer is not
+ * refused, so the caller (the Project DO) opens the decisions.
  */
 import type { Ask } from "@repo/protocol/domain/ask";
 import { DecisionSubject } from "@repo/protocol/domain/decision";
@@ -22,21 +14,14 @@ import { matchAny } from "./glob.ts";
 import { markersOf, scanMarkers } from "./markers.ts";
 import type { MarkerHit } from "./markers.ts";
 
-/** A `Waiver` decision's subject. */
 export type Waiver = Extract<DecisionSubject, { readonly _tag: "Waiver" }>;
 
-/** An answer asking a decider to raise one ratchet in one territory, and why. */
 export interface RaiseRequest {
   readonly ratchet: RatchetName;
   readonly territory: string;
   readonly reason: string;
 }
 
-/**
- * The escape ratchet of `territory`: `escapes-` and the territory's name in
- * lowercase words joined by `-` (`@datekit/parse` is `escapes-datekit-parse`);
- * a territory with no such words, the root's `.`, is `escapes-root`.
- */
 export const escapeRatchet = (territory: string): RatchetName =>
   RatchetName.make(
     `escapes-${
@@ -48,7 +33,6 @@ export const escapeRatchet = (territory: string): RatchetName =>
     }`
   );
 
-/** A marker hit whose line gives a reason. */
 interface Escape extends MarkerHit {
   readonly given: string;
 }
@@ -64,21 +48,10 @@ const escapesIn = (
     })
   );
 
-/**
- * The territory a path counts against: the first module holding it, or the
- * ask's territory for a path no module holds (a root manifest the ask may
- * change).
- */
 export const territoryOf = (policy: Policy, ask: Ask, path: RepoPath) =>
   policy.modules.find((module) => matchAny(module.paths, path))?.module ??
   ask.territory.module;
 
-/**
- * One `Waiver` per reasoned marker the push adds, in each territory whose
- * escape count after the push (its count on main, plus the reasoned markers
- * added there, less those removed) exceeds its baseline; ordered by path,
- * then line. A push that answers no ask has nothing to wait on.
- */
 export const escapeDecisions = (facts: PushFacts): readonly Waiver[] =>
   Option.match(facts.ask, {
     onNone: () => [],
@@ -114,12 +87,6 @@ export const escapeDecisions = (facts: PushFacts): readonly Waiver[] =>
     },
   });
 
-/**
- * The raises a push's `waivers` ask a decider for: a reasoned escape in a
- * territory explains a raise of every declared ratchet there, for its
- * reason. The Project DO judges an answer's counts with them, and
- * `<cli> check` does the same before the push.
- */
 export const explainedRaises = (
   policy: Policy,
   ask: Ask,

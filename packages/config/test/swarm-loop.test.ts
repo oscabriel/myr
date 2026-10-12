@@ -1,15 +1,6 @@
-/**
- * The swarm's verdict loop: each contributor's harness started
- * headless on the brief, and every refusal their answer meets sent back into
- * the same session, at most three times. The loop reads outcomes only from
- * the contributor's `<cli> status --json`; a harness's output gives it the
- * session id, that the session settled, and the tokens it used.
- *
- * The harness output under `fixtures/swarm/harness-output/<harness>/` is
- * what each installed harness printed for one headless start and one resume
- * on 2026-10-08, its local paths replaced and the user's own setup (tool,
- * MCP, plugin and skill lists, pi's system prompt) left out.
- */
+// `fixtures/swarm/harness-output/<harness>/` is what each harness printed for
+// one headless start and one resume, its local paths replaced and the
+// machine's own setup (tool, MCP, plugin and skill lists) left out.
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { AnswerView } from "@repo/protocol/domain/answer";
@@ -65,7 +56,6 @@ import type { AgentWorkspace } from "../../../scripts/lib/swarm/workspace.ts";
 import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
-/** The env names the CLI reads, spelled from the brand. */
 const SLUG = Brand.slug.toUpperCase();
 
 const token = "wren-token-0123456789abcdef0123456789abcdef";
@@ -74,7 +64,6 @@ const platformUrl = "https://platform-dev-oscabriel.example.workers.dev";
 
 const ask = AskId.make("drop-legacy-fetch-burrow-auth");
 
-/** A harness's recorded output: `start`, `resume`, or OpenCode's `refused-model`. */
 const recorded = (
   harness: Harness,
   run: "start" | "resume" | "refused-model"
@@ -97,7 +86,6 @@ const recorded = (
     return text.split("\n").filter((line) => line !== "");
   }).pipe(Effect.provide(NodeServices.layer));
 
-/** Everything one recorded run's lines say, in order. */
 const heard = (driver: HarnessDriver, lines: readonly string[]) =>
   lines.flatMap(driver.parse);
 
@@ -106,14 +94,12 @@ const sessionsIn = (events: readonly HarnessEvent[]) =>
     HarnessEvent.$is("SessionStarted")(event) ? [event.id] : []
   );
 
-// The commits of four answers, and the landing of the last.
 const heads = ["1", "2", "3", "4"].map((digit) =>
   CommitSha.make(digit.repeat(40))
 );
 
 const landing = LandedSha.make(CommitSha.make("a".repeat(40)));
 
-/** One answer to the ask, `n` seconds after noon, with its outcome. */
 const answer = (n: number, outcome: Outcome): AnswerView => ({
   ask,
   at: DateTime.makeUnsafe(`2026-10-08T12:00:0${n}.000Z`),
@@ -165,7 +151,6 @@ const StatusJson = Schema.fromJsonString(
   )
 );
 
-/** What `<cli> status --json` prints for wren with these answers. */
 const status = (...answers: readonly AnswerView[]) =>
   Schema.encodeSync(StatusJson)({
     command: "status",
@@ -174,7 +159,6 @@ const status = (...answers: readonly AnswerView[]) =>
     v: 1,
   });
 
-/** One command the fake spawner was asked to run. */
 interface Spawned {
   readonly command: string;
   readonly args: readonly string[];
@@ -183,14 +167,12 @@ interface Spawned {
   readonly extendEnv: boolean | undefined;
 }
 
-/** How a scripted harness run goes: its stdout lines and exit code, or it never ends. */
 type HarnessRun =
   | { readonly lines: readonly string[]; readonly code?: number }
   | { readonly stalls: readonly string[] };
 
 const bytes = (text: string) => new TextEncoder().encode(text);
 
-/** A process handle that prints `stdout` and ends with `exitCode`. */
 const handleOf = (input: {
   readonly stdout: Stream.Stream<Uint8Array>;
   readonly exitCode: Effect.Effect<number>;
@@ -209,11 +191,6 @@ const handleOf = (input: {
     unref: Effect.succeed(Effect.void),
   });
 
-/**
- * A `ChildProcessSpawner` that runs nothing. The workspace's CLI answers
- * `status` with the next of `statuses` (the last one again once they run
- * out); any other command is a harness, and plays the next of `harness`.
- */
 const fakeWorld = (script: {
   readonly harness: readonly HarnessRun[];
   readonly statuses: readonly string[];
@@ -303,7 +280,6 @@ const memoryFs = (files: Map<string, string>) =>
       }),
   });
 
-/** wren's workspace for run `r1`. */
 const dir = "/work/.swarm/r1/wren";
 
 const wrensWorkspace: AgentWorkspace = {
@@ -319,7 +295,6 @@ const wrensWorkspace: AgentWorkspace = {
   redacted: [`${SLUG}_TOKEN`],
 };
 
-/** The swarm's own env: the user's HOME, and secrets no harness may see. */
 const swarmEnv = ConfigProvider.fromEnv({
   env: {
     CLAUDECODE: "1",
@@ -331,11 +306,6 @@ const swarmEnv = ConfigProvider.fromEnv({
 
 const [wren, tamsin, ivo] = roster;
 
-/**
- * `runAgent` for `contributor` on burrow's auth child, over a fake world and
- * a file system in memory. It runs forked, so `clock` can move the TestClock
- * while it runs.
- */
 const agentRun = (input: {
   readonly harness: readonly HarnessRun[];
   readonly statuses: readonly string[];
@@ -389,7 +359,6 @@ const agentRun = (input: {
     };
   });
 
-/** The prompt a harness run carried: its last argument. */
 const promptOf = (run: Spawned | undefined) => run?.args.at(-1) ?? "";
 
 describe("the verdict loop", () => {
@@ -659,8 +628,6 @@ describe("the verdict loop", () => {
       Effect.gen(function* () {
         const start = yield* recorded("claude-code", "start");
 
-        // The brief tells the agent to read status and push again, so one
-        // session can push several answers before it settles.
         const { harnessRuns, result } = yield* agentRun({
           harness: [{ lines: start }],
           statuses: [
@@ -837,7 +804,6 @@ describe("the verdict loop", () => {
   );
 });
 
-/** A workspace for the golden argv: `/work/.swarm/r1/<handle>`. */
 const goldenWorkspace = (handle: string): AgentWorkspace => ({
   clone: `/work/.swarm/r1/${handle}/clone`,
   dir: `/work/.swarm/r1/${handle}`,

@@ -1,33 +1,25 @@
 /**
- * What the drafter reads: files picked from the project's canonical tree at
- * the landed commit, deterministically, within a byte budget (ADR 0018).
- * The caller hands the tree and a reader over the canonical repo only, so
- * no layer's repo can be read here; a path that looks like a layer's or a
- * held-back check's is refused anyway, as is an env file.
+ * A path that looks like a layer's or a held-back check's is refused even
+ * though the caller hands a reader over the canonical repo only.
  *
  * The order is the priority: an existing ask with its test as a style
  * example (first, so no long README can spend the budget it needs), the
  * root READMEs, the root manifest, the project module, then the
- * territory's files (or, with none given, the source files whose path
- * shares the most words with the want, at most 12), each source with its
- * sibling tests, and last every other README. Each file is cut at 40 KB,
- * and the rest of the budget cuts the next one, both with a marker.
+ * territory's files (or the source files whose path shares the most words
+ * with the want), each source with its sibling tests, and last every other
+ * README.
  */
 import { Brand } from "@repo/brand";
 import type { ConfigFile } from "@repo/protocol/domain/common";
 import { RepoPath } from "@repo/protocol/ids";
 import { Array, Effect, Option, Order, Schema, pipe } from "effect";
 
-/** The bytes the model reads in all, about 50k tokens. */
 const defaultBudget = 200 * 1024;
 
-/** The most of one file the model reads. */
 const perFile = 40 * 1024;
 
-/** Room kept for a cut file's marker. */
 const markerRoom = 64;
 
-/** Source files ranked by the want, when no territory is given. */
 const rankedFiles = 12;
 
 const manifests = new Set([
@@ -106,7 +98,6 @@ const extensionOf = (path: string) => {
   return name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "";
 };
 
-/** A layer's file, a held-back check, or an env file: never read. */
 const isWithheld = (path: string) =>
   path.startsWith(`${Brand.configDir}/layers/`) ||
   segmentsOf(path).some(
@@ -133,10 +124,8 @@ const isAskFile = (path: string) =>
   path.endsWith(askSuffix) &&
   !path.slice(askFolder.length).includes("/");
 
-/** A file's name without its extensions: `add.test.ts` is `add`. */
 const stemOf = (path: string) => baseName(path).split(".")[0] ?? "";
 
-/** A word and its camel-case parts, lower-cased: `addMonths` → addmonths, add, months. */
 const wordsOf = (text: string): readonly string[] =>
   text
     .split(/[^A-Za-z0-9]+/u)
@@ -152,7 +141,6 @@ const wordsOf = (text: string): readonly string[] =>
     )
     .filter((word) => word.length >= 3 && !stopWords.has(word));
 
-/** How many of the want's words a path shares, its extension left out. */
 const overlap = (want: ReadonlySet<string>, path: string) =>
   Array.dedupe(
     wordsOf(path.slice(0, path.length - extensionOf(path).length))
@@ -163,13 +151,11 @@ interface Ranked {
   readonly score: number;
 }
 
-/** Most shared words first, then by path. */
 const byScore = Order.combine(
   Order.mapInput(Order.flip(Order.Number), ({ score }: Ranked) => score),
   Order.mapInput(Order.String, ({ path }: Ranked) => path)
 );
 
-/** The source files whose path shares a word with the want, most first, at most `rankedFiles`. */
 const ranked = (paths: readonly string[], want: ReadonlySet<string>) =>
   paths
     .flatMap((path): Ranked[] => {
@@ -181,7 +167,6 @@ const ranked = (paths: readonly string[], want: ReadonlySet<string>) =>
     .slice(0, rankedFiles)
     .map(({ path }) => path);
 
-/** The tests beside a source file: the same stem with a test suffix, anywhere. */
 const siblingTests = (tree: readonly string[], source: string) => {
   const stem = stemOf(source);
 
@@ -195,7 +180,6 @@ const siblingTests = (tree: readonly string[], source: string) => {
 
 const decodeLiteral = Schema.decodeOption(Schema.fromJsonString(Schema.String));
 
-/** The test file an ask file names in its `path`, when it names one. */
 const askTestPath = (source: string): Option.Option<string> =>
   pipe(
     Option.fromNullishOr(
@@ -204,7 +188,6 @@ const askTestPath = (source: string): Option.Option<string> =>
     Option.flatMap(decodeLiteral)
   );
 
-/** The folder the picked style example's test sits in: the project's ask-test folder. */
 export const askTestFolderOf = (
   files: readonly ConfigFile[]
 ): Option.Option<string> =>
@@ -218,7 +201,6 @@ const encoder = new TextEncoder();
 
 const decoder = new TextDecoder();
 
-/** `content` cut to at most `room` bytes and its marker, or none when nothing fits. */
 const cut = (content: string, room: number): Option.Option<string> => {
   const bytes = encoder.encode(content);
 
@@ -235,11 +217,6 @@ const cut = (content: string, room: number): Option.Option<string> => {
       );
 };
 
-/**
- * The files the model reads for a want, in the order above, each read once
- * through `read` and the whole within `budget` bytes. The same tree, in any
- * order, and the same want give the same files.
- */
 export const pickFiles = (
   tree: readonly RepoPath[],
   input: { readonly want: string; readonly territory?: readonly RepoPath[] },

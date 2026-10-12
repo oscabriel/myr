@@ -1,31 +1,22 @@
 /**
- * First-parent blame, pure: given one file's versions newest first (one
- * per first-parent commit that changed its blob), each line of the newest
- * goes to the oldest version that still holds it unchanged, found by a
- * line diff (`line-diff.ts`) between each version and the one before it.
  * Lines the oldest version given still holds go to it: the caller knows
- * whether that version brought them or the walk stopped there. A caller
- * that reads versions one at a time folds them with `traceBack`, so only
- * two are held at once.
+ * whether that version brought them or the walk stopped there.
  */
 import type { WhyRange } from "@repo/protocol/domain/code";
 import type { CommitSha } from "@repo/protocol/ids";
 
 import { Edit, lineDiff } from "./line-diff.ts";
 
-/** One version of a file: the commit that made it, and its text. */
 export interface Version {
   readonly sha: CommitSha;
   readonly text: string;
 }
 
-/** Why each line is there, and whether any went to the oldest version given. */
 export interface Blame {
   readonly ranges: readonly WhyRange[];
   readonly reachedEnd: boolean;
 }
 
-/** A text's lines, without the empty one after a final newline. */
 export const linesOf = (text: string): readonly string[] => {
   if (text === "") {
     return [];
@@ -40,7 +31,6 @@ export const linesOf = (text: string): readonly string[] => {
   return lines;
 };
 
-/** Where each line of `after` sits in `before`, or -1 for a line `before` lacks. */
 const originsOf = (before: readonly string[], after: readonly string[]) => {
   const origins = new Int32Array(after.length).fill(-1);
 
@@ -55,7 +45,6 @@ const originsOf = (before: readonly string[], after: readonly string[]) => {
   return origins;
 };
 
-/** Each line's version as ranges of consecutive lines, numbered from 1. */
 const rangesOf = (owners: readonly CommitSha[]): readonly WhyRange[] => {
   const ranges: WhyRange[] = [];
 
@@ -73,20 +62,13 @@ const rangesOf = (owners: readonly CommitSha[]): readonly WhyRange[] => {
   return ranges;
 };
 
-/**
- * A blame under way: the newest version's lines each given a version, or
- * still open at a line of the version reached so far.
- */
 export interface Tracing {
-  /** Each line's version, or null while it is open. */
   readonly owners: readonly (CommitSha | null)[];
-  /** Each open line of the newest, by where it sits in `lines`. */
   readonly open: ReadonlyMap<number, number>;
   readonly lines: readonly string[];
   readonly sha: CommitSha;
 }
 
-/** A blame of `newest`, every line open. */
 export const blameFrom = (newest: Version): Tracing => {
   const lines = linesOf(newest.text);
 
@@ -98,13 +80,8 @@ export const blameFrom = (newest: Version): Tracing => {
   };
 };
 
-/** Whether every line has its version, so no older one need be read. */
 export const isSettled = (tracing: Tracing) => tracing.open.size === 0;
 
-/**
- * `tracing` taken back to `older`, the version before the one it reached:
- * each open line `older` lacks goes to the version reached.
- */
 export const traceBack = (tracing: Tracing, older: Version): Tracing => {
   const lines = linesOf(older.text);
   const origins = originsOf(lines, tracing.lines);
@@ -124,13 +101,11 @@ export const traceBack = (tracing: Tracing, older: Version): Tracing => {
   return { lines, open, owners, sha: older.sha };
 };
 
-/** Why each line is there, the open lines going to the version reached. */
 export const settle = (tracing: Tracing): Blame => ({
   ranges: rangesOf(tracing.owners.map((owner) => owner ?? tracing.sha)),
   reachedEnd: tracing.open.size > 0,
 });
 
-/** Why each line of the newest of `versions` (newest first) is there. */
 export const blame = (versions: readonly Version[]): Blame => {
   const [newest, ...older] = versions;
 

@@ -27,23 +27,15 @@ import type { ConfigBundle } from "../rules-evaluator.ts";
 import { bunMain } from "./bun-main.ts";
 import { bunPrelude, clockVariable } from "./bun-prelude.ts";
 
-/** How the `/bun` adapter runs config code. */
 export interface BunOptions {
-  /** The bun binary; `bun` on the `PATH` by default. */
   readonly bun?: string;
   /**
    * What the bun binary needs in its env beside `PATH` and the clock: a
    * compiled CLI runs itself as bun with `BUN_BE_BUN=1`. None by default.
    */
   readonly env?: Readonly<Record<string, string>>;
-  /**
-   * The module the main hands the exports to (`../entry.ts` here, or a
-   * bundled copy of it on disk); this package's own by default.
-   */
   readonly entry?: string;
-  /** The module the sdk's imports point at; `@repo/sdk`'s entry by default. */
   readonly sdk?: string;
-  /** How long config code may run; 5 seconds by default. */
   readonly timeout?: Duration.Input;
 }
 
@@ -54,11 +46,9 @@ export interface BunOptions {
 const SDK_IMPORT =
   /(?<lead>\bfrom\s*|\bimport\s*\(?\s*)(?<quote>["'])(?:@repo\/sdk|@[a-z0-9][\w.-]*\/cli\/rules)\k<quote>/gu;
 
-/** Points every import of the sdk, by either name, at the module `sdk`. */
 const pointSdkAt = (source: string, sdk: string) =>
   source.replaceAll(SDK_IMPORT, `$<lead>${JSON.stringify(sdk)}`);
 
-/** What the subprocess prints as its last line. */
 const Output = Schema.TaggedUnion({
   Called: { result: Schema.Json },
   Collected: Collected.fields,
@@ -72,13 +62,11 @@ type Output = typeof Output.Type;
 
 const decodeOutput = Schema.decodeEffect(Schema.fromJsonString(Output));
 
-/** A module the main imports: where it was written, and its path in the bundle. */
 interface Written {
   readonly file: string;
   readonly path: string;
 }
 
-/** What the main is asked to do: collect the folder's exports, or call a rule. */
 interface Job {
   readonly asks: readonly Written[];
   readonly entry: string;
@@ -88,7 +76,6 @@ interface Job {
   readonly visibility?: Written;
 }
 
-/** The frozen clock and seed the prelude installs. */
 interface Clock {
   readonly now: string;
   readonly seed: number;
@@ -117,7 +104,6 @@ const resultLimit = 16 * 1024 * 1024;
 
 const logLimit = 64 * 1024;
 
-/** The last `limit` characters a stream prints; the rest is read and dropped. */
 const tailOf = <E>(bytes: Stream.Stream<Uint8Array, E>, limit: number) =>
   bytes.pipe(
     Stream.decodeText(),
@@ -132,7 +118,6 @@ const tailOf = <E>(bytes: Stream.Stream<Uint8Array, E>, limit: number) =>
     Effect.map((kept) => kept.slice(-limit))
   );
 
-/** The project module, the visibility module and the ask files, as the main imports them. */
 const modulesOf = (
   written: ReadonlyMap<string, string>,
   project: string | undefined,
@@ -154,15 +139,7 @@ const modulesOf = (
     : { ...withProject, visibility: at(visibility) };
 };
 
-/**
- * `RulesEvaluator` over a `bun` subprocess. Each evaluation writes the
- * bundle's modules into a scoped temp directory (every import of the sdk
- * pointed at the sdk's own entry), runs `bun --preload <prelude> <main>`
- * with no inherited env beyond `PATH`, frozen time and randomness, and a
- * time limit, and reads one JSON document from its stdout. A bundle with no
- * project module, no asks and no visibility module reads `policy.json`, or
- * gets the defaults, without a subprocess. Then `finishPolicy`, with the caller's `Finishers`.
- */
+/** The subprocess inherits no env beyond `PATH`, with frozen time and randomness and a time limit. */
 export const rulesEvaluatorBun = (options: BunOptions = {}) =>
   Layer.effect(
     RulesEvaluator,
@@ -189,7 +166,6 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
       const sdk =
         options.sdk ?? (yield* fromUrl(import.meta.resolve("@repo/sdk")));
 
-      /** Writes `source` at `file` under `root`, refusing a path that leaves it. */
       const writeUnder = (root: string, file: string, source: string) => {
         const target = path.join(root, file);
         const relative = path.relative(root, target);
@@ -213,7 +189,6 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
         );
       };
 
-      /** Runs the main over the bundle for one job, and reads its result. */
       const run = (
         bundle: ConfigBundle,
         clock: Clock,
@@ -304,7 +279,6 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
             : output;
         });
 
-      /** Runs a job in its own scope, within the time limit. */
       const limited = (
         effect: Effect.Effect<Output, RulesFailed, Scope.Scope>
       ) =>
@@ -408,5 +382,4 @@ export const rulesEvaluatorBun = (options: BunOptions = {}) =>
     })
   );
 
-/** The `/bun` adapter with its defaults: `bun` on the `PATH`, a 5-second limit. */
 export const RulesEvaluatorBun = rulesEvaluatorBun();

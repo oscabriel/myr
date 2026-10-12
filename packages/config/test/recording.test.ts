@@ -1,9 +1,3 @@
-/**
- * The deploy lock for recording days: `bun infra/recording.ts
- * on` writes `infra/.recording`, and while it is there `infra/deploy.ts`
- * refuses every deploy with `RecordingInProgress` before it spawns anything.
- * `off` is the only way out.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -30,10 +24,6 @@ import {
 } from "../../../infra/recording.ts";
 import { repoRoot } from "./root.ts";
 
-/**
- * A spawner that runs nothing and exits 0: each command it was asked for,
- * as `<folder>$ <command> <args>`, its folder relative to the repo root.
- */
 const spawning = Effect.gen(function* () {
   const path = yield* Path.Path;
   const root = yield* repoRoot;
@@ -74,7 +64,6 @@ const spawning = Effect.gen(function* () {
   };
 });
 
-/** A temp root's lock file, `infra/.recording` under it, for one test's scope. */
 const tempLock = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -85,7 +74,6 @@ const tempLock = Effect.gen(function* () {
   return path.join(root, lockPath);
 });
 
-/** `deploy(argv)` with the lock at `lock`: how it ended, and what it spawned. */
 const deployed = (argv: readonly string[], lock: string) =>
   Effect.gen(function* () {
     const fake = yield* spawning;
@@ -104,7 +92,6 @@ const deployed = (argv: readonly string[], lock: string) =>
     return { result, spawned: yield* fake.spawned };
   });
 
-/** What `recording(argv)` prints, with the lock at `lock`. */
 const printedBy = (argv: readonly string[], lock: string) =>
   Effect.gen(function* () {
     const printed: string[] = [];

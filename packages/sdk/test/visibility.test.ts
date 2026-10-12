@@ -22,7 +22,6 @@ const decodePolicy = Schema.decodeUnknownSync(VisibilityPolicy);
 
 const decodeManifest = Schema.decodeUnknownSync(LayerManifest);
 
-// One held-back check as a layer's manifest lists it.
 const exportCheck = {
   area: "export",
   author: "alice",
@@ -34,8 +33,6 @@ const exportCheck = {
   path: "checks/export/escapes-titles.test.ts",
 } as const;
 
-// A `visibility.ts` as the platform reads it: every default the
-// example leaves unsaid is filled, and nothing names a path or a check.
 const osrPolicy = {
   checks: {
     admit: { greenOnMainRuns: 3, redOnKnownBadAtLeast: 1 },

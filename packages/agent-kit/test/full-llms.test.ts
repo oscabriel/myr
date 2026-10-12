@@ -1,10 +1,3 @@
-/**
- * `/llms-full.txt`: what an agent needs beyond the index. `frontLlms`'
- * text, then every refusal of the closed union, how git meets the
- * platform, how a landing happens, every event a watcher hears, and the
- * guides for the moments an answer goes sideways. A pure function of the
- * CLI's commands, the listed projects and the two hosts' URLs.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
@@ -24,7 +17,6 @@ const platformUrl = "https://platform-test.example.workers.dev";
 
 const webUrl = "https://web-test.example.workers.dev";
 
-/** A command row as the command list holds it. */
 const row = (
   path: readonly [string, ...string[]],
   summary: string,
@@ -102,7 +94,6 @@ const text = fullLlms(input);
 
 const lines = text.split("\n");
 
-/** The lines of the section headed `## <title>`, up to the next `## `. */
 const section = (title: string) => {
   const start = lines.indexOf(`## ${title}`);
   const rest = lines.slice(start + 1);

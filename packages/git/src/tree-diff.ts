@@ -6,10 +6,7 @@ import { Array, Effect, Option, Order, Semaphore } from "effect";
 
 import { Edit, sharedEnds, shortestDiff } from "./line-diff.ts";
 
-/**
- * One file an answer changed, with its blob ids before and after. The same
- * shape as the gate's `Change` (`@repo/gate/facts`), which git cannot import.
- */
+/** The same shape as the gate's `Change` (`@repo/gate/facts`), which git cannot import. */
 export interface Change {
   readonly path: RepoPath;
   readonly status: "added" | "modified" | "deleted";
@@ -17,7 +14,6 @@ export interface Change {
   readonly after?: BlobSha;
 }
 
-/** A line a change added, numbered from 1 in the new file. */
 export interface AddedLine {
   readonly line: number;
   readonly text: string;
@@ -123,12 +119,7 @@ const walk = (
     return changed.flat();
   });
 
-/**
- * The files that differ between two trees of `repo`, read through the
- * `RepoHost` port alone: it walks both roots and descends only into subtrees
- * whose ids differ, since the store has no diff of its own. At most eight
- * trees are read at once.
- */
+/** Descends only into subtrees whose ids differ: the store has no diff of its own. */
 export const treeDiff = (
   repo: RepoName,
   base: TreeSha,
@@ -154,10 +145,6 @@ const linesOf = (bytes: Uint8Array) => {
   return lines;
 };
 
-/**
- * Lines of `next` with no partner in `previous`, matched by count: the
- * fallback for a rewrite too large for the shortest script.
- */
 const unmatched = (previous: readonly string[], next: readonly string[]) => {
   const left = new Map<string, number>();
 
@@ -174,11 +161,6 @@ const unmatched = (previous: readonly string[], next: readonly string[]) => {
   });
 };
 
-/**
- * The lines of `next` that are not in `previous`, numbered from 1: the
- * insertions of the shortest edit script (`line-diff.ts`), or, for a
- * rewrite too large for it, the lines with no partner by count.
- */
 const added = (
   previous: readonly string[],
   next: readonly string[]
@@ -200,10 +182,6 @@ const added = (
       ),
   }).map((index) => ({ line: index + 1, text: next[index] ?? "" }));
 
-/**
- * A file's lines; none for a binary blob, or for a submodule's pointer, whose
- * id names a commit in another repo, so the store has no blob by it.
- */
 const textOf = (repo: RepoName, blob: BlobSha | undefined) =>
   blob === undefined
     ? Effect.succeedSome<readonly string[]>([])
@@ -219,11 +197,6 @@ const textOf = (repo: RepoName, blob: BlobSha | undefined) =>
 // calls, and no more than four files' text held at a time.
 const CHANGES = { concurrency: STORE_CALLS / 2 } as const;
 
-/**
- * The lines each added or modified file gained, by a line diff of its blobs.
- * A binary blob (a NUL in its first 8 KiB) and a submodule's pointer report
- * no lines. At most eight blobs are read at once.
- */
 export const addedLines = (
   repo: RepoName,
   changes: readonly Change[]

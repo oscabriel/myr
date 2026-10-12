@@ -7,8 +7,6 @@ import { EnvSchemaParser } from "../src/env-schema.ts";
 import { LayerRepos } from "../src/layer-repos.ts";
 import { SealedValue, WriteOnlyValues } from "../src/vault.ts";
 
-// The skeleton's test: the ports the visibility package builds against.
-// The modules that fill them have their own tests beside this one.
 describe("the package", () => {
   it("is @repo/visibility", () => {
     expect(manifest.name).toBe("@repo/visibility");

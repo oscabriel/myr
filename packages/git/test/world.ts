@@ -11,13 +11,11 @@ import { Custody } from "../src/custody.ts";
 import { gateway } from "../src/gateway.ts";
 import { Exchange, Upstream } from "../src/upstream.ts";
 
-/** Custody that lets every push through. */
 export const admitAll = Custody.of({
   admit: () => Effect.succeed([]),
   review: () => Effect.succeed([]),
 });
 
-/** Writes the files, commits them all, and returns the commit's id. */
 export const commit = (
   cwd: string,
   message: string,
@@ -36,7 +34,6 @@ export const commit = (
     return CommitSha.make(yield* gitOk(cwd, "rev-parse", "HEAD"));
   });
 
-/** An exchange as the HTTP request a smart-HTTP server would get. */
 const requestOf = (repo: RepoName, exchange: Exchange) =>
   Exchange.$match(exchange, {
     Advertise: ({ headers, service }) =>
@@ -66,13 +63,7 @@ const requestOf = (repo: RepoName, exchange: Exchange) =>
       ),
   });
 
-/**
- * `git http-backend` over the bare repos in `root`, as the gateway's
- * upstream. Like Artifacts, it takes no credentials from the client: an
- * exchange carrying any is refused. `atPush` runs as each receive-pack call
- * arrives, so a test can move a ref under a push; a reply it gives stands in
- * for the upstream's.
- */
+/** Like Artifacts, it takes no credentials from the client: an exchange carrying any is refused. */
 const upstreamAt = (
   root: string,
   atPush: Effect.Effect<
@@ -121,21 +112,11 @@ const app = Effect.gen(function* () {
   return HttpServerResponse.fromWeb(response);
 }).pipe(Effect.orDie);
 
-/** The two repos a test reaches past the gateway. */
 export interface Repos {
-  /** A work tree that pushes to the upstream directly. */
   readonly seed: string;
-  /** The bare repo behind the gateway. */
   readonly upstream: string;
 }
 
-/**
- * A bare upstream repo `alice__demo.git`, the project `alice/demo`'s, whose
- * `main` holds one commit, a `seed`
- * clone that pushes to it directly, and the gateway in front of it on a
- * local port, judging pushes with `custody`. `atPush` runs as each push
- * reaches the upstream; a reply it gives stands in for the upstream's.
- */
 export const world = (
   custody: Custody["Service"],
   atPush: (

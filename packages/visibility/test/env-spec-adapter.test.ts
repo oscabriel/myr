@@ -21,7 +21,6 @@ const parse = (file: RepoPath, text: string) =>
     return yield* parser.parse(file, text);
   }).pipe(Effect.provide(EnvSchemaParserEnvSpec));
 
-/** The modules a source file imports, in order: static, side-effect, `import()` and re-exports alike. */
 const importsOf = (source: string | undefined) =>
   [
     ...(source ?? "").matchAll(
@@ -29,13 +28,11 @@ const importsOf = (source: string | undefined) =>
     ),
   ].map((match) => match.groups?.specifier);
 
-/** The seam's own modules, as text. */
 const seam = import.meta.glob(
   ["../src/env-schema.ts", "../src/env-schema/env-spec.ts"],
   { eager: true, import: "default", query: "?raw" }
 );
 
-/** Where the parser's pinned 0.6.1 build lives, and its ES modules, as text. */
 const dist = "../node_modules/@env-spec/parser/dist/";
 
 const parserModules = import.meta.glob(
@@ -43,7 +40,6 @@ const parserModules = import.meta.glob(
   { eager: true, exhaustive: true, import: "default", query: "?raw" }
 );
 
-// The adapter over @env-spec/parser 0.6.1.
 describe("the /env-spec adapter", () => {
   // The /memory fake holds what this parser reads, so a test over the fake
   // says what the real parser says.
@@ -55,9 +51,8 @@ describe("the /env-spec adapter", () => {
       })
   );
 
-  // datekit, as the env shape beat shows it: the Sentry token is
-  // sensitive, required only in production, and sent only to sentry.io's
-  // API; everything else is public.
+  // datekit: the Sentry token is sensitive, required only in production, and
+  // sent only to sentry.io's API; everything else is public.
   it.effect(
     "gives datekit's committed .env.schema the shape the demo shows",
     () =>
@@ -128,7 +123,7 @@ describe("the /env-spec adapter", () => {
   );
 });
 
-// ADR 0009: the platform parses, never resolves.
+// The platform parses, never resolves.
 describe("the /env-spec adapter never evaluates", () => {
   it.effect(
     "reads $(…) and exec(…) as text, and the shape carries no value",

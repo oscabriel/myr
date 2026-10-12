@@ -22,7 +22,6 @@ import { temporaryRoot } from "./temporary-root.ts";
 
 const main = RefName.make("refs/heads/main");
 
-/** No network: every request fails as an unreachable host's would. */
 const offline = Layer.succeed(
   Fetch,
   Fetch.of({
@@ -31,16 +30,13 @@ const offline = Layer.succeed(
   })
 );
 
-/** The store in `root`, whose remotes are its repos' own `file://` URLs. */
 const storeAt = (root: string) =>
   RepoHostLocal.layer({ remoteBase: `file://${root}`, root }).pipe(
     Layer.provide(offline)
   );
 
-/** A store in a new temporary directory, removed when the test ends. */
 const freshStore = Layer.unwrap(Effect.map(temporaryRoot, storeAt));
 
-/** Real `git http-backend` over `root` on a local port: its base URL. */
 const served = (root: string) =>
   Effect.gen(function* () {
     const spawner =
@@ -78,8 +74,7 @@ describeRepoHost("local", freshStore, {
 });
 
 describe("bare repos on local disk", () => {
-  // The issue's Check: what the adapter stores is a repo real git can clone
-  // over smart HTTP, served by `git http-backend` from the same root.
+  // What the adapter stores is a repo real git can clone over smart HTTP.
   it.live(
     "serves a pushed file to a real git clone of its remote",
     () =>
@@ -227,7 +222,6 @@ describe("importing onto local disk", () => {
     }).pipe(Effect.provide(freshStore))
   );
 
-  // A file URL that names another machine is no path on this one.
   it.effect("refuses a file URL on another host, and makes no repo", () =>
     Effect.gen(function* () {
       const repos = yield* RepoHost;

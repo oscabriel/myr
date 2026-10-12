@@ -1,9 +1,3 @@
-/**
- * The ledger of throwaway resources: every namespace, repo or
- * project a smoke run, a swarm run or a `seed --as` copy makes on a stage is
- * written to `infra/created.jsonl`, so teardown acts only on what this
- * build made.
- */
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, FileSystem, Path } from "effect";
@@ -35,7 +29,6 @@ const swarmProject: Created = {
   stage: "dev-oscabriel",
 };
 
-/** A fresh ledger file in a temp dir, for the scope of one test. */
 const tempLedger = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;

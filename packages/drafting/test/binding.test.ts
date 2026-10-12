@@ -1,7 +1,3 @@
-/**
- * The Workers AI drafter, over a fake `Ai` that records its call: what it
- * asks the model for, and how each kind of reply or failure comes back.
- */
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Brand } from "@repo/brand";
 import { AskId, LandedSha, ProjectName, RepoPath } from "@repo/protocol/ids";
@@ -47,10 +43,8 @@ interface Call {
   readonly model: string;
 }
 
-/** What the fake binding does: answer with a reply, or throw. */
 type Outcome = { readonly reply: object } | { readonly thrown: Error };
 
-/** A fake binding that gives `outcome` and keeps every call. */
 const fakeAi = (outcome: Outcome) => {
   const calls: Call[] = [];
 
@@ -80,7 +74,6 @@ const thrown = (message: string): Outcome => ({ thrown: new Error(message) });
 
 const failure = (reason: DraftFailed["reason"]) => new DraftFailed({ reason });
 
-/** The one call a draft makes, as the fake recorded it. */
 const callOf = Effect.gen(function* () {
   const { ai, calls } = fakeAi(chat(json));
 
@@ -205,8 +198,8 @@ describe("the Workers AI drafter", () => {
     "takes one sentence where the schema asks for a list of them, as a list of one",
     () =>
       Effect.gen(function* () {
-        // kimi-k2.7-code on dev-oscabriel answered every attempt with
-        // `context` and `outOfScope` as strings, whatever the JSON Schema said.
+        // Seen live: kimi-k2.7-code answered every attempt with `context` and
+        // `outOfScope` as strings, whatever the JSON Schema said.
         const reply = JSON.stringify({
           ...encoded,
           context: "An ordinal date is YYYY-DDD.",

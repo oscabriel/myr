@@ -1,16 +1,6 @@
-/**
- * The datekit example, run as the project it pretends to be:
- * `bun test` inside `examples/datekit` is red on main for exactly the three
- * tests its asks name as their checks, each by an assertion rather than a
- * load error (what red first in GLOSSARY.md asks of a check), and green for
- * every other test. Its run block holds on main too: every lane passes, and
- * each ask's check, run alone by the block's test command, is red by an
- * assertion. The example is a Bun project of its own, outside the
- * workspaces, so each command runs as a child process under
- * `sh -c`, the way the platform's Checker runs a project's commands, in a
- * copy of its public tree: every file git tracks but its layers (`layers/`,
- * pushed to the private namespace, never to main).
- */
+// The example is a Bun project outside the workspaces, so each command runs
+// as a child process under `sh -c`, as the Checker runs a project's commands,
+// in a copy of its public tree (every tracked file but `layers/`).
 import { NodeServices } from "@effect/platform-node";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Path, Stream } from "effect";
@@ -19,29 +9,24 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { Brand } from "../../brand/src/index.ts";
 import { repoRoot } from "./root.ts";
 
-/** The example, from the repo root. */
 const example = "examples/datekit";
 
-/** What one run of `bun test` printed, both streams, and how it ended. */
 interface BunRun {
   readonly exitCode: number;
   readonly output: string;
 }
 
-/** One test file's part of bun's report: the tests it failed, and its text. */
 interface FileReport {
   readonly failed: readonly string[];
   readonly file: string;
   readonly text: string;
 }
 
-/** Bun's report, read: each file it reported on, and its closing counts. */
 interface BunReport {
   readonly errors: number;
   readonly failed: number;
   readonly files: readonly FileReport[];
   readonly passed: number;
-  /** How many tests bun ran, across how many files. */
   readonly ran: { readonly files: number; readonly tests: number };
 }
 
@@ -85,21 +70,18 @@ const LANES = /\bchecks:\s*\{(?<lanes>[^}]*)\}/u;
 
 const LANE = /(?<lane>\w+):\s*"(?<command>[^"]+)"/gu;
 
-/** A closing count bun prints (` 3 fail`), or 0 when it prints none. */
 const countOf = (output: string, word: string) =>
   Number(
     new RegExp(`^\\s*(?<count>\\d+) ${word}$`, "mu").exec(output)?.groups
       ?.count ?? "0"
   );
 
-/** The name a `(fail)` line gives, if the line is one. */
 const failedIn = (line: string) => {
   const name = FAILED_TEST.exec(line)?.groups?.name;
 
   return name === undefined ? [] : [name];
 };
 
-/** Reads bun's console report into its files and counts. */
 const readReport = (output: string): BunReport => {
   const lines = output.split("\n").map((line) => line.trim());
 
@@ -139,11 +121,6 @@ const readReport = (output: string): BunReport => {
 const text = <E>(bytes: Stream.Stream<Uint8Array, E>) =>
   bytes.pipe(Stream.decodeText(), Stream.mkString);
 
-/**
- * The example's public tree in a folder of its own, for as long as the
- * scope lasts: every file git tracks under it but its layers, as the seed
- * pushes main.
- */
 const publicTree = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -171,7 +148,6 @@ const publicTree = Effect.gen(function* () {
   return dir;
 });
 
-/** Runs `command` in the example's public tree at `dir` under `sh -c`, as the Checker runs a lane. */
 const inTree = (dir: string, command: string) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -193,7 +169,6 @@ const inTree = (dir: string, command: string) =>
     })
   );
 
-/** The example's run block, read from its project file. */
 const runBlock = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -213,10 +188,6 @@ const runBlock = Effect.gen(function* () {
   return { lanes, test: TEST_COMMAND.exec(source)?.groups?.command ?? "" };
 });
 
-/**
- * Each ask file in the example's config folder, and the check file it names;
- * none when the folder is missing.
- */
 const askChecks = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -238,7 +209,6 @@ const askChecks = Effect.gen(function* () {
   );
 });
 
-/** How a file failed: how many tests, whether by an assertion, whether it loaded. */
 const howFailed = ({ failed, file, text: part }: FileReport) => ({
   assertion: ASSERTION.test(part),
   file,
@@ -254,7 +224,6 @@ describe("the datekit example", () => {
     "is red on main for exactly its three asks' checks, each by an assertion, and green elsewhere",
     () =>
       Effect.gen(function* () {
-        // The example's own `package.json` test script.
         const run = yield* inTree(yield* publicTree, "bun test");
         const report = readReport(run.output);
         const checks = yield* askChecks;
@@ -265,8 +234,6 @@ describe("the datekit example", () => {
           "parse-iso-week.ask.ts",
         ]);
 
-        // The run fails, and only by the asks' checks: one test in each, by
-        // an assertion, with nothing that failed to load.
         expect({
           errors: report.errors,
           exitedNonZero: run.exitCode !== 0,
@@ -289,8 +256,6 @@ describe("the datekit example", () => {
             .toSorted(byFile),
         });
 
-        // Every other test passes, across the four suites the library keeps
-        // green (parse, format, add, diff) and the three checks.
         expect({
           files: report.ran.files,
           passedOrFailed: report.passed + report.failed,
@@ -360,7 +325,6 @@ describe("the datekit example", () => {
           }))
         );
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
-    // Four `bun test` runs over a small library, one after another.
     30_000
   );
 });

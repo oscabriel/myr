@@ -1,15 +1,5 @@
-/**
- * The env shape's fixtures: each `.env.schema` beside it as
- * committed, the structure the parser reads it as (what the `/memory` fake
- * holds), and the env shape it gives. The same fixtures run through both
- * parsers (`env-shape.test.ts`), and the adapter's reading of each text is
- * held to its structure (`env-spec-adapter.test.ts`), so the fake says what
- * the real parser says.
- *
- * Where varlock's own tests show its behaviour, an expectation cites the
- * test it mirrors (defaults must match), from the varlock clone at
- * `928e8e4b`, under `packages/varlock/src/env-graph/test/`.
- */
+// Where varlock's own tests show its behaviour, an expectation cites the test
+// it mirrors, from varlock@928e8e4b's `packages/varlock/src/env-graph/test/`.
 import type { EnvSchemaView } from "@repo/protocol/domain/env";
 import { RepoPath } from "@repo/protocol/ids";
 
@@ -25,13 +15,11 @@ import prefix from "./prefix.env.schema?raw";
 import proxy from "./proxy.env.schema?raw";
 import silentHeader from "./silent-header.env.schema?raw";
 
-/** The env shape a fixture gives, as the wire carries it, but for where and whose. */
 export type ExpectedView = Omit<
   typeof EnvSchemaView.Encoded,
   "at" | "file" | "project"
 >;
 
-/** `forEnv(production)`, as the parser reads it. */
 const forProduction = {
   fn: "forEnv",
   named: [],
@@ -39,7 +27,6 @@ const forProduction = {
   text: "forEnv(production)",
 };
 
-/** `$APP_ENV`, which the parser reads as the call `ref(APP_ENV)`. */
 const appEnv = {
   fn: "ref",
   named: [],
@@ -47,7 +34,6 @@ const appEnv = {
   text: "ref(APP_ENV)",
 };
 
-/** `@proxy(domain="…", path="…")`, as the parser reads it. */
 const proxyTo = (domain: string, path: string) => ({
   name: "proxy",
   value: {
@@ -59,7 +45,6 @@ const proxyTo = (domain: string, path: string) => ({
   },
 });
 
-/** One `.env.schema`: where it sits, its text, its parsed structure, and its env shape. */
 export interface EnvFixture {
   readonly title: string;
   readonly file: RepoPath;
@@ -328,11 +313,10 @@ export const fixtures: readonly EnvFixture[] = [
     view: {
       currentEnvKey: "APP_ENV",
       imports: [],
-      // ADR 0009: a function-valued flag fails safe. Where the
-      // flag is static, varlock decides: sensitive-decorator.test.ts,
-      // "enabled=false toggles the item to not sensitive" (OFF public, ON
-      // sensitive) and "opts an item out of leak detection while keeping it
-      // sensitive".
+      // A function-valued flag fails safe. Where the flag is static, varlock
+      // decides: sensitive-decorator.test.ts, "enabled=false toggles the item
+      // to not sensitive" (OFF public, ON sensitive) and "opts an item out of
+      // leak detection while keeping it sensitive".
       items: [
         { key: "APP_ENV", required: false, sensitive: false, tags: [] },
         {
@@ -757,7 +741,6 @@ export const fixtures: readonly EnvFixture[] = [
   },
 ];
 
-/** A `.env.schema` the platform refuses to read, and why. */
 export interface RefusedFixture {
   readonly title: string;
   readonly file: RepoPath;
@@ -766,7 +749,6 @@ export interface RefusedFixture {
   readonly reason: string;
 }
 
-/** `API_KEY=` under a header that imports `path`, as the parser reads it. */
 const importing = (path: string): ParsedEnvSchema => ({
   header: [{ name: "import", value: { named: [], positional: [path] } }],
   imports: [],
@@ -797,7 +779,6 @@ export const refused: readonly RefusedFixture[] = [
   },
 ];
 
-/** What the `/memory` fake holds: every fixture's parsed structure, by its file. */
 export const parsedByFile: ReadonlyMap<RepoPath, ParsedEnvSchema> = new Map(
   [...fixtures, ...refused].map(({ file, parsed }) => [file, parsed])
 );

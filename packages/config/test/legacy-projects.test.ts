@@ -1,18 +1,11 @@
-/**
- * The projects made before owners keep the keys they were made with
- * (`packages/protocol/src/legacy.ts`): the protocol's table holds the two
- * examples, the operator's, and every import at its source path, each by
- * the key it has on the stages. The table is written by hand in the
- * protocol, so a Worker never imports a script; this holds it to its
- * sources, the examples' folders and the import plan.
- */
+// The protocol's table is written by hand, so a Worker never imports a
+// script; this holds it to its sources, the examples' folders and the import plan.
 import { describe, expect, it } from "@effect/vitest";
 
 import { examples } from "../../../scripts/lib/import/plan.ts";
 import { EXAMPLES } from "../../../scripts/seed.ts";
 import { legacyProjects } from "../../protocol/src/legacy.ts";
 
-/** Each example folder's project, in the operator's namespace. */
 const seeded = EXAMPLES.map((folder) => {
   const key = folder.slice(folder.lastIndexOf("/") + 1);
 

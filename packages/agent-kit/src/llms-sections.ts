@@ -1,13 +1,3 @@
-/**
- * The sections of `/llms-full.txt` that the docs' reference shows too:
- * every refusal of the closed union, how git meets the platform, how a
- * landing happens (ADR 0014), and one line per event a watcher hears. Pure,
- * and every name comes from `Brand`. The refusals come from the union and
- * the events from a table the type holds to `ProjectEvent`, so a new tag
- * cannot be missing. Nothing here names a private repo, its files or its
- * readers (AGENTS.md principle 7): the gateway lines below are the ones
- * anyone outside one can meet.
- */
 import { Brand } from "@repo/brand";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
 
@@ -18,15 +8,10 @@ const cli = (...words: readonly string[]) => [Brand.cli, ...words].join(" ");
 
 const notesRef = `refs/notes/${Brand.slug}`;
 
-/** How an answer is pushed to a claim's fork: a function, so loading this module runs nothing. */
 export const pushAnswer = () => code(`git push ${Brand.slug} HEAD:main`);
 
-/** What the gateway says when git is not let in: `<reason>; sign in with <cli> login`. */
 const signIn = (reason: string) => `${reason}; sign in with ${cli("login")}`;
 
-// --- Refusals -----------------------------------------------------------------
-
-/** Every refusal of the closed union, with its group, retry, exit code, `next` and repair. */
 export const refusals = () => [
   "## Refusals",
   "",
@@ -46,9 +31,6 @@ export const refusals = () => [
   "",
 ];
 
-// --- Git here -------------------------------------------------------------------
-
-/** How git reaches the platform's repos, who reads and pushes each, and what it says when it refuses. */
 export const gitHere = (platformUrl: string) => [
   "## Git here",
   "",
@@ -97,9 +79,6 @@ export const gitHere = (platformUrl: string) => [
   "",
 ];
 
-// --- How a landing happens ----------------------------------------------------
-
-/** How a checked answer becomes a commit on `main`. */
 export const landing = () => [
   "## How a landing happens",
   "",
@@ -111,9 +90,6 @@ export const landing = () => [
   "",
 ];
 
-// --- Events ---------------------------------------------------------------------
-
-/** What each event says happened, one line per tag of `ProjectEvent`. */
 const eventLines = {
   AskClosed: "An ask closed, with the landing that answered it.",
   AskOpened: "A new ask opened.",
@@ -132,7 +108,6 @@ const eventLines = {
   Warned: "A claim was warned that it lapses without a push.",
 } as const satisfies Record<ProjectEvent["_tag"], string>;
 
-/** One line per event a watcher of a project hears. */
 export const events = () => [
   "## Events",
   "",

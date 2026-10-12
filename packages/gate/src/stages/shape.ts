@@ -1,11 +1,5 @@
-/**
- * Stage 1, shape: what the push's changes do, read from the change list and
- * the added lines alone. It accumulates, so one push hears about every
- * problem at once, in the order of the refusal union's Shape group.
- *
- * The stage's value is `scan` (lint keeps "shape" out of symbol names); its
- * `name` is the stage's, `shape`.
- */
+// The stage's value is `scan` (lint keeps "shape" out of symbol names); its
+// `name` is `shape`.
 import type { Ask } from "@repo/protocol/domain/ask";
 import { CheckSpec } from "@repo/protocol/domain/check";
 import { RepoPath } from "@repo/protocol/ids";
@@ -26,17 +20,14 @@ import { importSpecifiers, reachedInternals as reachInto } from "../imports.ts";
 import { markersOf, scanMarkers } from "../markers.ts";
 import type { Stage } from "../stage.ts";
 
-/** The one JSON pointer the gate is told about: whether the scripts changed. */
 const SCRIPTS = "package.json#/scripts";
 
-/** The ask's own files: its file in the config folder, and its check's file. */
 const ownFiles = (ask: Ask): ReadonlySet<string> =>
   new Set([
     ask.file,
     ...(CheckSpec.guards.RedThenGreen(ask.check) ? [ask.check.path] : []),
   ]);
 
-/** Each path once, in a fixed order, if there are any. */
 const someOf = (
   paths: Iterable<RepoPath>
 ): Option.Option<Array.NonEmptyReadonlyArray<RepoPath>> => {
@@ -47,10 +38,6 @@ const someOf = (
     : Option.none();
 };
 
-/**
- * Whether a path judges the push. An answer may not touch its ask's own
- * files, which judge it; a decider opening the ask writes them.
- */
 const judges = (facts: PushFacts) => (path: RepoPath) => {
   const own = Option.exists(facts.ask, (ask) => ownFiles(ask).has(path));
 
@@ -59,11 +46,6 @@ const judges = (facts: PushFacts) => (path: RepoPath) => {
     : own || matchAny(facts.policy.judge.paths, path);
 };
 
-/**
- * Whether a path is the push's to change: inside the ask's territory, or one
- * of the ask's own files when a decider opens it. With no ask (a decider's
- * own landing) there is no territory to leave.
- */
 const inScope = (facts: PushFacts) => (path: RepoPath) =>
   Option.match(facts.ask, {
     onNone: () => true,
@@ -72,7 +54,6 @@ const inScope = (facts: PushFacts) => (path: RepoPath) =>
       (facts.opensAsk && ownFiles(ask).has(path)),
   });
 
-/** Changed paths outside the territory. A judged path is TouchedJudge's to name. */
 const outOfScope = (facts: PushFacts): readonly Refusal[] => {
   const judged = judges(facts);
   const allowed = inScope(facts);
@@ -90,7 +71,6 @@ const outOfScope = (facts: PushFacts): readonly Refusal[] => {
   );
 };
 
-/** Changed paths in the judge closure, and the scripts pointer when it moved. */
 const touchedJudge = (facts: PushFacts): readonly Refusal[] => {
   const scripts =
     facts.scriptsChanged && facts.policy.judge.pointers.includes(SCRIPTS)
@@ -109,7 +89,6 @@ const touchedJudge = (facts: PushFacts): readonly Refusal[] => {
   );
 };
 
-/** Every marker added with no reason; a reasoned one is an escape, for `escapeDecisions`. */
 const weakened = (facts: PushFacts): readonly Refusal[] =>
   scanMarkers(facts.addedLines, markersOf(facts.policy)).flatMap(
     ({ line, marker, path, reason }) =>
@@ -118,7 +97,6 @@ const weakened = (facts: PushFacts): readonly Refusal[] =>
         : []
   );
 
-/** Whether a layer's path set holds `path`: the path itself, or a folder above it. */
 const inLayers =
   (layerPaths: ReadonlySet<RepoPath>) =>
   (path: RepoPath): boolean => {
@@ -129,17 +107,10 @@ const inLayers =
   };
 
 /**
- * The no-write-down guard by path, the one rule stage 1
- * and the visibility cartridge's landing guard share: added or
- * changed paths a layer holds, as the path itself or under a folder the set
- * names. A deletion writes nothing. The refusal is no oracle on which paths
- * are a layer's: to a pusher who cannot read the layers it names every path
- * they added or modified, all of them their own; only a reader hears which
- * collide.
- *
- * `pusherCanRead` vouches for every layer whose paths are in `layerPaths`:
- * true only when the pusher reads all of them, so reading one layer never
- * names another's paths.
+ * The refusal is no oracle on which paths are a layer's: to a pusher who
+ * cannot read the layers it names every path they added or modified; only a
+ * reader hears which collide. `pusherCanRead` must hold for every layer in
+ * `layerPaths`, so reading one layer never names another's paths.
  */
 export const layerPathRefusal = (input: {
   readonly changes: readonly Pick<Change, "path" | "status">[];
@@ -160,7 +131,6 @@ export const layerPathRefusal = (input: {
       );
 };
 
-/** Stage 1's guard by path, over the push's facts (`canReadLayers`). */
 const privatePaths = (facts: PushFacts): readonly Refusal[] =>
   Option.toArray(
     layerPathRefusal({
@@ -170,13 +140,8 @@ const privatePaths = (facts: PushFacts): readonly Refusal[] =>
     })
   );
 
-// The files whose imports are read: JavaScript and TypeScript sources.
 const SCRIPT = /\.[cm]?[jt]sx?$/u;
 
-/**
- * Each run of consecutive added lines as one text, with the number of the
- * line before it, so an import over several lines is read whole.
- */
 const runsOf = (lines: readonly AddedLine[]) => {
   // Consecutive lines keep the same difference from their place in order.
   const placed = lines
@@ -193,11 +158,6 @@ const runsOf = (lines: readonly AddedLine[]) => {
     : [];
 };
 
-/**
- * Imports the answer adds to a script inside its territory that reach into
- * another module's internals, each on its line. A push that answers no ask
- * (a decider's own landing) is not judged.
- */
 const reachedInternals = (facts: PushFacts): readonly Refusal[] =>
   Option.match(facts.ask, {
     onNone: () => [],
@@ -231,23 +191,17 @@ const reachedInternals = (facts: PushFacts): readonly Refusal[] =>
         ),
   });
 
-// The Shape group's tags, in union order.
 const unionOrder: readonly string[] =
   groups
     .find((group) => group.name === "Shape")
     ?.members.map((member) => member.identifier) ?? [];
 
-/** Union group order, then path, then line. */
 const byUnionOrder = Order.combineAll<Refusal>([
   Order.mapInput(Order.Number, (refusal) => unionOrder.indexOf(refusal._tag)),
   Order.mapInput(Order.String, (refusal) => refusal.at?.path ?? ""),
   Order.mapInput(Order.Number, (refusal) => refusal.at?.line ?? 0),
 ]);
 
-/**
- * Stage 1: every problem the push's changes have, in the union's Shape
- * order, then by path, then by line.
- */
 export const scan: Stage<never> = {
   accumulate: true,
   name: "shape",
