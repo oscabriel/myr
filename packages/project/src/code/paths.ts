@@ -1,9 +1,3 @@
-/**
- * Every file of a commit: each blob, symlink and submodule path under its
- * root tree, up to 50,000 (a file tree's sidebar), kept by the root tree's
- * id. The walk reads at most eight trees at once, one depth at a time, and
- * stops descending once the cap is passed.
- */
 import type {
   RepoHost,
   RepoNotFound,
@@ -21,33 +15,23 @@ import { CodeCache } from "./cache.ts";
 import { commitAt, resolveRev } from "./revision.ts";
 import { entriesOf } from "./tree.ts";
 
-/** The most paths a commit's list holds. */
 export const PATHS_CAP = 50_000;
 
-/** The longest path list the cache keeps: about 1 MB of paths. */
 const KEPT_PATHS = 10_000;
 
-// Store calls under way at once, however wide or deep the tree.
 const STORE_CALLS = 8;
 
-/** One file under a root tree, with the entry that names it. */
 export interface FileAt {
   readonly path: RepoPath;
   readonly entry: TreeEntry;
 }
 
-/** A folder still to read: its path's prefix and its tree's id. */
 interface Folder {
   readonly prefix: string;
   readonly tree: string;
 }
 
-/**
- * Every file under the tree `root`, in path order; past `cap`, the walk
- * stops and says so. It reads one depth at a time, so which folders it
- * reaches before it stops depends on the tree alone, never on which read
- * came back first: the same tree gives the same list (principle 8).
- */
+/** One depth at a time, so the list past `cap` depends on the tree alone, never on which read came back first. */
 export const filesUnder = (
   repo: RepoName,
   root: string,
@@ -98,7 +82,6 @@ export const filesUnder = (
     };
   });
 
-/** Every file path at `at`, up to the cap. */
 export const pathList = (
   project: CodeProject,
   at: Option.Option<Rev>
@@ -116,7 +99,6 @@ export const pathList = (
       .through(
         `${project.repo}:paths:${tree}`,
         filesUnder(project.repo, tree, PATHS_CAP),
-        // A longer list is walked again, over trees the cache keeps.
         { heavy: true, keep: (list) => list.files.length <= KEPT_PATHS }
       )
       .pipe(Effect.orDie);

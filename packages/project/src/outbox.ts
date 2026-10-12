@@ -1,17 +1,3 @@
-/**
- * The outbox: side effects a call's commit asked for, kept with the rows
- * that made them until they are done (ADR 0012's settle). A row is written in
- * the same commit as its transition, run right after it, and acknowledged
- * once it succeeded; one that failed stays, with a later `notBefore`, and the
- * next alarm runs it again. Each is safe to run twice.
- *
- * Kinds: a projected event for the read models (`Projected`), a claim's
- * fork (`MakeFork`), the start of an answer run (`StartAnswer`), a
- * landing's unwritten bookkeeping, written by landing the same job again
- * (`Bookkeeping`), an effect a visibility plan asked for, settled by
- * the port that planned it (`Visibility`), and the start of a proposal's
- * draft run, one per round (`StartDraft`).
- */
 import { RefName, RepoHost } from "@repo/artifacts/repo-host";
 import { Verdict } from "@repo/protocol/domain/answer";
 import type { ProjectEvent } from "@repo/protocol/domain/event";
@@ -37,7 +23,6 @@ import { ProjectVisibility, VisibilityEffect } from "./visibility-port.ts";
 
 const mainRef = RefName.make("refs/heads/main");
 
-/** An answer's landing job, as its bookkeeping retry lands it again. */
 export const LandAgain = Schema.Struct({
   author: Handle,
   base: CommitSha,
@@ -53,7 +38,6 @@ export const LandAgain = Schema.Struct({
 
 export type LandAgain = typeof LandAgain.Type;
 
-/** What one outbox row asks for. */
 export const OutboxBody = Schema.Union([
   ProjectedEvent,
   Schema.TaggedStruct("MakeFork", { from: RepoName, name: RepoName }),
@@ -71,7 +55,6 @@ const encodeBody = Schema.encodeEffect(BodyJson);
 
 const decodeBody = Schema.decodeUnknownEffect(BodyJson);
 
-/** A row asking for `body`, due at `notBefore`; a row with the same id is replaced. */
 export const outboxRow = (
   id: string,
   body: OutboxBody,
@@ -85,7 +68,6 @@ export const outboxRow = (
     notBefore,
   }));
 
-/** One row per event, for the read models, keyed by the event's number. */
 export const projectedRows = (
   project: ProjectName,
   events: readonly ProjectEvent[],
@@ -99,7 +81,6 @@ export const projectedRows = (
     )
   );
 
-/** The row that starts (or resumes) an answer's run at `at`. */
 export const startRow = (requestId: RequestId, at: DateTime.Utc) =>
   outboxRow(
     `start:${requestId}:${DateTime.toEpochMillis(at)}`,
@@ -107,7 +88,6 @@ export const startRow = (requestId: RequestId, at: DateTime.Utc) =>
     at
   );
 
-/** The row that starts a proposal's draft run for one round: one row per round. */
 export const draftRow = (params: DraftParams, at: DateTime.Utc) =>
   outboxRow(
     `draft:${params.proposal}:r${params.round}`,
@@ -115,17 +95,14 @@ export const draftRow = (params: DraftParams, at: DateTime.Utc) =>
     at
   );
 
-/** Whether a row is due at `now`. */
 export const isDue = (row: OutboxRow, now: DateTime.Utc) =>
   DateTime.isLessThanOrEqualTo(row.notBefore, now);
 
-/** What running some rows came to: the ids done, and the rows to run again later. */
 export interface OutboxRun {
   readonly done: readonly string[];
   readonly retry: readonly OutboxRow[];
 }
 
-/** The row again, after `attempts` failures: due after a backoff from `now`. */
 const later = (row: OutboxRow, now: DateTime.Utc): OutboxRow => ({
   ...row,
   attempts: row.attempts + 1,
@@ -145,10 +122,8 @@ const all = (runs: readonly OutboxRun[]): OutboxRun => ({
   retry: runs.flatMap(({ retry }) => retry),
 });
 
-/**
- * A claim's fork, made or found made. Artifacts may answer a fork that
- * worked with an error: a fork that exists and has `main` is made.
- */
+// Artifacts may answer a fork that worked with an error: a fork that exists
+// and has `main` is made.
 const fork = (from: RepoName, name: RepoName) =>
   RepoHost.use((host) =>
     host.fork(from, name).pipe(
@@ -163,7 +138,6 @@ const fork = (from: RepoName, name: RepoName) =>
     )
   );
 
-/** The landing job again: its unwritten bookkeeping is written, and nothing else moves. */
 const landAgain = (job: LandAgain) =>
   Lander.use((lander) =>
     lander.land({
@@ -189,12 +163,7 @@ const bySeq = Order.mapInput(Order.Number, ({ body }: Decoded) =>
   OutboxBody.guards.Projected(body) ? body.event.seq : 0
 );
 
-/**
- * Runs the rows: projected events first, in their order and in one call,
- * then forks, bookkeeping, visibility's effects, the draft runs, and last
- * the answer runs (which may run long, and settle their own rows). Nothing
- * here fails: each row is done, or retried.
- */
+// Answer runs go last: they may run long, and settle their own rows.
 export const runOutbox = (
   rows: readonly OutboxRow[],
   queue: AnswerQueue,

@@ -2,9 +2,7 @@ import { Effect } from "effect";
 import * as Migrator from "effect/sql/Migrator";
 import { SqlClient } from "effect/sql/SqlClient";
 
-// A project's tables. Each holds its key columns and `body`, the row's
-// encoded JSON (see `tables.ts`). A migration is never edited once it has
-// run anywhere: a change is a new numbered entry.
+// A migration is never edited once it has run anywhere: a change is a new numbered entry.
 
 const projectState = Effect.gen(function* () {
   const sql = yield* SqlClient;
@@ -59,9 +57,6 @@ const projectState = Effect.gen(function* () {
   yield* sql`CREATE TABLE outbox (id TEXT PRIMARY KEY, body TEXT NOT NULL)`;
 });
 
-// The visibility tables: a project's layers, the attempts on its
-// held-back checks, its public ledger, its write-only values, and the read
-// log of its layer repos. Without the visibility cartridge they stay empty.
 const visibility = Effect.gen(function* () {
   const sql = yield* SqlClient;
 
@@ -87,19 +82,11 @@ const visibility = Effect.gen(function* () {
   )`;
 });
 
-/** Every migration, by `<id>_<name>`, in the order they run. */
 const migrations = {
   "1_project_state": projectState,
   "2_visibility": visibility,
 };
 
-/**
- * Brings a project's database up to date and returns the migrations it ran.
- * It records each one it runs (in `migrations`), so running it again runs
- * nothing. It needs no filesystem, so it runs in a Durable Object. A
- * migration that fails is a defect: the project cannot start without its
- * tables.
- */
 export const migrate: Effect.Effect<
   readonly (readonly [id: number, name: string])[],
   never,

@@ -1,12 +1,3 @@
-/**
- * The facts the gate and the rules evaluator decide over, gathered from the
- * repos through `RepoHost`: the gate's `PushFacts` for one push (its change
- * list, the lines it added, where it goes), and the rules' `EvaluationFacts`
- * at one commit (the files its finder and judge closure read, its
- * workspaces, its vouch file).
- * Neither the gate nor rule code reads a repo; the project service hands
- * them these.
- */
 import { ObjectId, RepoHost, Revision } from "@repo/artifacts/repo-host";
 import type { RepoNotFound } from "@repo/artifacts/repo-host";
 import { judgeInputs } from "@repo/checks/judge";
@@ -32,7 +23,6 @@ import type { EvaluationFacts } from "@repo/rules/rules-evaluator";
 import { Array, Effect, Option, Schema } from "effect";
 import type { DateTime } from "effect";
 
-/** A commit the push names that the repo does not hold. */
 export class MissingCommit extends Schema.TaggedError<MissingCommit>()(
   "MissingCommit",
   { sha: Schema.String }
@@ -44,12 +34,6 @@ const asHandle = Schema.decodeUnknownOption(Handle);
 
 const asLayer = Schema.decodeUnknownOption(LayerName);
 
-/**
- * Where a push goes, read from the repo's name: `<project>`,
- * `<project>--<ask>--<handle>`, `<project>--me--<handle>` or
- * `<project>--<layer>`. Any other name is read as canonical's, which takes
- * no push.
- */
 export const targetOf = (repo: RepoName, project: ProjectName): PushTarget => {
   const [named, second, third, ...rest] = repo.split("--");
   const canonical = PushTarget.Canonical({ project });
@@ -100,7 +84,6 @@ const ScriptsOf = Schema.fromJsonString(
 
 const decodeScripts = Schema.decodeUnknownOption(ScriptsOf);
 
-/** A `package.json` blob's `scripts`, as canonical JSON text; none when it reads as no manifest. */
 const scriptsIn = (repo: RepoName, blob: string | undefined) =>
   blob === undefined
     ? Effect.succeed("")
@@ -113,7 +96,6 @@ const scriptsIn = (repo: RepoName, blob: string | undefined) =>
         )
       );
 
-/** Whether the root manifest's `scripts` differ between the change's two blobs. */
 const scriptsChanged = (repo: RepoName, changes: readonly Change[]) =>
   Option.match(
     Array.findFirst(changes, (change) => change.path === "package.json"),
@@ -130,12 +112,10 @@ const scriptsChanged = (repo: RepoName, changes: readonly Change[]) =>
     }
   );
 
-/** What `pushFacts` is told: the push, and what the project knows about it. */
 export interface PushInput {
   readonly ask: Option.Option<Ask>;
   readonly base: CommitSha;
   readonly claim: Option.Option<ClaimView>;
-  /** How many live claims the pusher holds, for `CapReached`. */
   readonly claimsHeld: number;
   readonly head: CommitSha;
   readonly landed: LandedSha;
@@ -143,16 +123,9 @@ export interface PushInput {
   readonly project: ProjectName;
   readonly pusher: Principal;
   readonly ref: string;
-  /** The repo the push went to, which holds `base` and `head`. */
   readonly repo: RepoName;
 }
 
-/**
- * The gate's facts for one push: its change list from `base` to `head` (by
- * subtree ids, through the port), the lines it added, where it goes, and
- * whether it moved the root manifest's scripts. No layer paths or ratchet
- * counts yet. A commit the repo lacks is `MissingCommit`.
- */
 export const pushFacts = (
   input: PushInput
 ): Effect.Effect<PushFacts, RepoNotFound | MissingCommit, RepoHost> =>
@@ -187,21 +160,13 @@ export const pushFacts = (
     } satisfies PushFacts;
   });
 
-// ------------------------------------------------------------ rules facts
-
-/** How many of a repo's trees or blobs the facts read at once. */
 const READS_AT_ONCE = 16;
 
-/** A blob or a folder of a commit's tree: its path from the root, and its id. */
 interface Located {
   readonly path: string;
   readonly sha: ObjectId;
 }
 
-/**
- * Every blob under the tree `root`, by its path from the root: each folder
- * read once, a level at a time. A submodule is no file.
- */
 const blobsUnder = (
   repo: RepoName,
   root: ObjectId
@@ -243,24 +208,15 @@ const blobsUnder = (
   return level([{ path: "", sha: root }], []);
 };
 
-/** What `evaluationFacts` is told besides the commit. */
 export interface FactsInput {
   readonly initializer: Handle;
   readonly now: DateTime.Utc;
   readonly project: ProjectName;
-  /** Where the vouch file is, as the policy before this commit says. */
   readonly vouchFile: RepoPath;
 }
 
-/**
- * The rules' facts at one commit of `repo`: every file of its tree, with
- * the text of each one the run-block finder or the judge closure reads
- * (`@repo/checks`' `judgeInputs`, which the CLI's local check and hook
- * gather through too), the workspaces its root manifest declares, and its
- * vouch file. The seed is the commit's own first eight hex digits, so the
- * same commit always sees the same randomness. A commit the repo lacks gives
- * empty facts: the evaluation then decides on its config folder alone.
- */
+// The seed is the commit's first eight hex digits, so the same commit always
+// sees the same randomness.
 export const evaluationFacts = (
   repo: RepoName,
   at: CommitSha,

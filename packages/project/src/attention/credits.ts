@@ -1,13 +1,3 @@
-/**
- * A person's credits (GLOSSARY "Credit"): how many landings name them in
- * each human role, by project and area, for their credits page. Roles and
- * counts only: no score, no total across roles, no ranking.
- *
- * Credit is read from each landing's `credits` rows, which the platform wrote
- * as the landing's trailers, never from commit messages. `Assisted-by` is a
- * disclosure of the agent a person worked through, kept apart in `assisted`,
- * and never counts.
- */
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { CreditSummary } from "@repo/protocol/domain/record";
@@ -17,15 +7,8 @@ import { Array as Arr, Option, Order } from "effect";
 
 import { areaOf } from "./record.ts";
 
-/** What a person's credits are counted from. */
 export interface CreditsInput {
-  /**
-   * The asks the landings answered, by id, closed ones included, to find
-   * each landing's area. Ask ids are unique only within a project, so for a
-   * person's credits across projects call once per project and join the
-   * rows (they sort by project first): a landing whose id finds another
-   * project's ask credits no area.
-   */
+  /** Ask ids are unique only within a project: call once per project and join the rows. */
   readonly asks: ReadonlyMap<AskId, Ask>;
   readonly handle: Handle;
   readonly landings: readonly LandingView[];
@@ -34,22 +17,13 @@ export interface CreditsInput {
 const byText = (field: (row: CreditSummary) => string) =>
   Order.mapInput(Order.String, field);
 
-/**
- * By project, then area, then role, each as text. Not `Order.Struct`: it
- * compares in key order, and keys are kept sorted.
- */
+// Not `Order.Struct`: it compares in key order, and keys are kept sorted.
 const bySummary = Order.combineAll([
   byText(({ project }) => project),
   byText(({ area }) => area),
   byText(({ role }) => role),
 ]);
 
-/**
- * One row per project, area and role the person holds, counting the landings
- * that credit them so; a role repeated on one landing counts once. A landing
- * with no area (no ask, or one not found) credits no area, so it is not
- * counted, as on the record. Rows are sorted by project, area and role.
- */
 export const creditsByArea = (
   input: CreditsInput
 ): readonly CreditSummary[] => {

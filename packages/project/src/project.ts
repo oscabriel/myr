@@ -1,19 +1,3 @@
-/**
- * The project service: every contract's server logic for one project,
- * host-free, over ports. Each call hydrates the project from
- * its store, moves its lifecycles by pure transitions, persists rows, outbox
- * and events in one commit, then settles the outbox (ADR 0012): forks,
- * projected events, answer runs and unwritten bookkeeping, each retried by
- * the next alarm when it fails. Deadlines (claims warned and lapsed, retries)
- * run on the project's one alarm, set to the earliest pending one.
- *
- * Calls that write run one at a time per project; the slow part of an
- * answer (merge, checks, land) runs outside that lock, in the answer's run,
- * which reports each step back through `advanceAnswer`. Every method checks
- * its arguments and its result against the contract's or the domain's
- * schemas (`MethodSchemas`, principle 2), which the Durable Object boundary
- * reuses.
- */
 import {
   BranchName,
   RefName,
@@ -315,7 +299,6 @@ import {
 } from "./visibility-port.ts";
 import type { VisibilityPlan } from "./visibility-port.ts";
 
-/** Every port one project's service runs on. */
 export type ProjectPorts =
   | Alarms
   | AnswerRuns
@@ -326,37 +309,22 @@ export type ProjectPorts =
   | RepoHost
   | RulesEvaluator;
 
-/**
- * The platform's gateway, where every repo's git URL starts: what a claim's
- * and a project's `remote` name. Never an Artifacts URL. The platform's
- * Worker sets its own; the default is the product's domain.
- */
+/** The gateway every repo's git URL starts with; never an Artifacts URL. */
 export const GatewayUrl = Context.Reference<string>("project/GatewayUrl", {
   defaultValue: () => `https://${Brand.domain}`,
 });
 
-/**
- * The rules evaluator's finishers from `@repo/checks`: the run-block finder
- * and the judge closure (`rules` may not import `checks`).
- * Every rules evaluator adapter needs it beside the project's ports.
- */
+/** Injected from `@repo/checks` because `rules` may not import `checks`. */
 export const FinishersFromChecks: Layer.Layer<Finishers> = Layer.succeed(
   Finishers,
   { findRunBlock, judgeClosure }
 );
 
-/** A push one repo took, as the gateway's custody reports it. */
 export const PushReport = Schema.Struct({
   after: CommitSha,
-  /**
-   * The harness the push came through, as its credential helper's username
-   * named it (`@repo/protocol/audit`): audit metadata, never who pushed. A
-   * claimant's push keeps it on their claim, for the landing's
-   * `Assisted-by:`.
-   */
+  /** Self-reported by the credential helper: audit metadata, never who pushed. */
   audit: Schema.optionalKey(HarnessAudit),
   before: Schema.Option(CommitSha),
-  /** The push event's id; the same event reported twice is acted on once. */
   eventId: Schema.NonEmptyString,
   pusher: Principal,
   ref: Schema.NonEmptyString,
@@ -365,17 +333,11 @@ export const PushReport = Schema.Struct({
 
 export type PushReport = typeof PushReport.Type;
 
-/** One file a decider opens an ask with: its ask file, or its check. */
 export interface AskFile {
   readonly content: string;
   readonly path: RepoPath;
 }
 
-/**
- * A project's posture as a list keeps it: the posture its ledger shows
- * now, the next instant it moves by the clock alone, if one is set, and the
- * project's last event the read saw (`ProjectApi.standing`).
- */
 export const StandingNow = Schema.Struct({
   posture: Posture,
   seen: Schema.Int,
@@ -384,7 +346,6 @@ export const StandingNow = Schema.Struct({
 
 export type StandingNow = typeof StandingNow.Type;
 
-/** The refusals `submitAnswer` answers with. */
 export type SubmitRefusal =
   | NotClaimed
   | ClaimLapsed
@@ -396,15 +357,7 @@ export type SubmitRefusal =
   | ReachedInternals
   | PrivatePathInPublicTree;
 
-/**
- * Every contract's server logic for one project. Each method takes its
- * caller explicitly: one project's service serves many callers. The
- * decider-facing methods (Today, proposals, decisions, finishes, a
- * decider's own landings, vouches, credits, the ledger and the env shape)
- * are `DeciderApi`'s, with their bodies in `deciders.ts`.
- */
 export interface ProjectApi extends AnswerQueue, DeciderApi {
-  // reads
   readonly listAsks: (
     caller: Principal
   ) => Effect.Effect<{ readonly asks: readonly AskListing[] }>;
@@ -424,64 +377,22 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
     caller: Principal,
     sha: CommitSha
   ) => Effect.Effect<{ readonly landing: LandingView }, UnknownCommit>;
-  /** Where main has landed: none before the first push. */
   readonly head: () => Effect.Effect<{ readonly landed?: LandedSha }>;
-  /** Every claim's fork, with its ask, claimant and the claim's state. */
   readonly forks: () => Effect.Effect<readonly ForkRef[]>;
-  /**
-   * The posture the ledger shows now, the next instant it moves by the
-   * clock alone (none when only an event moves it), and the project's last
-   * event this read saw. Platform-only, on no surface: what a list keeps
-   * each project's posture by (`standing-posture.ts`).
-   */
   readonly standing: () => Effect.Effect<StandingNow>;
-  /**
-   * The policy at the landed commit as anyone may read it (no layers, no
-   * function-valued rules, no asks), once it has evaluated; until then, after
-   * the first landing, why it has not (derived at each read, never stored).
-   */
   readonly policy: () => Effect.Effect<PolicyStatus>;
-  /**
-   * What a draft's run reads for one round of an open proposal: the landed
-   * commit, the want and territory, the public policy and the canonical
-   * tree's paths. Platform-only: no caller.
-   */
   readonly draftContext: (
     proposal: ProposalId,
     round: number
   ) => Effect.Effect<DraftContextData, UnknownProposal | ProposalClosed>;
-  /**
-   * An ask's files rehearsed as `accept` would open them, red first, by the
-   * first decider of their paths, and nothing landed or written: `Red`, or
-   * the final refusal `Refused` with why and the check's output's tail. A
-   * blocked Checker or a moved main stays an error, to try again.
-   * Platform-only: no caller.
-   */
   readonly rehearseOpen: (
     files: readonly ConfigFile[]
   ) => Effect.Effect<Rehearsal, VerifierBlocked | StaleBase>;
-  /**
-   * A draft's round ended: a `Red` draft holds its files and goes to the
-   * deciders as the proposal's decision; a `Failed` one goes to them with
-   * its want alone. A round that is not the proposal's current one, or a
-   * proposal no longer open, changes nothing. Platform-only: no caller.
-   */
   readonly draftSettled: (
     proposal: ProposalId,
     round: number,
     result: DraftResult
   ) => Effect.Effect<void>;
-  /**
-   * The log a failing lane left, by the name its verdict gives it
-   * (`LaneResult.logRef`), for the project's deciders and the claimant
-   * of the answer the name points at. A name `logRefOf` never makes, or one
-   * that points at another project, is `UnknownProject` for anyone; past
-   * that, anyone else is `NotDecider` whether or not a log is kept under the
-   * name, and a reader allowed in finds no log kept as `UnknownProject`
-   * too. A log over 256 KiB comes back as its last 256 KiB, where a
-   * failure prints. The log is read from the `EvidenceStore` the call runs
-   * with (the stage's bucket), outside the project's lock.
-   */
   readonly evidence: (
     caller: Principal,
     ref: LogRef
@@ -500,14 +411,7 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
   ) => Effect.Effect<
     readonly { readonly event: ProjectEvent; readonly seq: number }[]
   >;
-  /**
-   * Who may make the project's first push to its canonical `main`: its
-   * initializer, while the project awaits that push; no
-   * one once it has a landed SHA. The gateway's custody reads it before a
-   * push reaches the canonical repo.
-   */
   readonly firstPusher: () => Effect.Effect<Option.Option<Handle>>;
-  // writes
   readonly initProject: (
     caller: Person,
     input: {
@@ -552,19 +456,7 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
     caller: Person,
     ask: AskId
   ) => Effect.Effect<{ readonly released: boolean }, NotClaimed>;
-  /**
-   * A push a claim fork took: liveness for its claimant's claim, and stages
-   * 0–1 over it. The fork keeps the commit whatever the gate says; the
-   * refusals, every one at once, reach the pusher in git's output. The same
-   * push event reported again changes nothing.
-   */
   readonly recordPush: (input: PushReport) => Effect.Effect<readonly Refusal[]>;
-  /**
-   * Stages 0–1 over the answer, then its run starts and the receipt says it
-   * is being checked. The same `requestId`, or the same head from
-   * the same person while its first answer stands, returns the first receipt.
-   * Of stage 1's refusals the first comes back; `recordPush` lists them all.
-   */
   readonly submitAnswer: (
     caller: Person,
     input: {
@@ -574,88 +466,49 @@ export interface ProjectApi extends AnswerQueue, DeciderApi {
       readonly requestId: RequestId;
     }
   ) => Effect.Effect<AnswerReceipt, SubmitRefusal>;
-  /**
-   * The project's alarm fired: deadlines that passed move (claims warned
-   * and lapsed, proposals expired, decisions defaulted), and outbox rows
-   * due run again.
-   */
   readonly onAlarm: () => Effect.Effect<void>;
-  // visibility: each delegates to `ProjectVisibility` or
-  // `ProjectEnv`, whose defaults are a project without typed visibility.
-  /**
-   * How far `caller` may reach into `layer`, for the gateway; none when the
-   * project declares no such layer, so its repo is an unknown repo.
-   */
   readonly layerAccess: (
     caller: Principal,
     layer: LayerName
   ) => Effect.Effect<Option.Option<LayerAccess>>;
-  /** What stage 1 takes from visibility for `caller`'s pushes: the layer paths, and whether they read a layer. */
   readonly layerFacts: (caller: Principal) => Effect.Effect<LayerFacts>;
-  /** A push a layer's repo took: its head is proposed, and admitted at once or through admission. */
   readonly recordLayerPush: (
     caller: Person,
     input: { readonly head: CommitSha; readonly layer: LayerName }
   ) => Effect.Effect<void>;
-  /** A clone or fetch of a layer's repo, for its read log. */
   readonly recordLayerRead: (
     caller: Person,
     input: { readonly layer: LayerName; readonly sha?: CommitSha }
   ) => Effect.Effect<void>;
-  /**
-   * The held-back run an answer's checks end with: the suite its claim was
-   * pinned to, read at the pinned layer commit. None when nothing is sealed
-   * for it (the request is unknown, has no claim, or pinned nothing).
-   */
   readonly heldBackJob: (
     requestId: RequestId
   ) => Effect.Effect<Option.Option<HeldBackJob>>;
-  /**
-   * A held-back run's area bits for the tree the answer is being checked
-   * on, judged once per tree: the refusals it earns, which the run's checks
-   * report with their own. Every area passing keeps the `Held-back:`
-   * trailer for the landing. The same tree reported again is judged as
-   * before, its attempt counted once.
-   */
   readonly recordHeldBack: (
     requestId: RequestId,
     results: readonly HeldBackResult[]
   ) => Effect.Effect<readonly Refusal[]>;
-  /** The runs that would admit a layer's pushed head; none when nothing waits on admission. */
   readonly admissionPlan: (input: {
     readonly head: CommitSha;
     readonly layer: LayerName;
   }) => Effect.Effect<Option.Option<AdmissionPlan>>;
-  /** What an admission's runs came to: the layer's landed SHA moves, or stays. */
   readonly recordAdmission: (input: AdmissionReport) => Effect.Effect<void>;
-  /** The stored write-only value a text or blob contains, by its item; none when it holds none. */
   readonly scanForValues: (
     input: { readonly text: string } | { readonly blob: Uint8Array }
   ) => Effect.Effect<Option.Option<EnvKey>>;
 }
 
-/** The most paths a draft's context lists: as many as the code browser's `listPaths`. */
 const MAX_DRAFT_PATHS = 50_000;
 
-/** What `projectPolicy` answers: the public policy, or why there is none yet. */
 export type PolicyStatus = typeof PolicyOf.successSchema.Type;
 
-/** The most commits one `landings` call looks up: a log page's, or a blame's batch. */
 export const MAX_LANDINGS = 100;
 
-/** The schemas one method's arguments (in order), success and failure cross a boundary with. */
 export interface MethodSchema {
   readonly args: readonly Schema.Top[];
   readonly error: Schema.Top;
   readonly success: Schema.Top & { readonly EncodingServices: never };
 }
 
-/**
- * Every `ProjectApi` method's schemas: contract methods take their success
- * and failure from `Contracts`, the rest from the domain. The service checks
- * each argument and each success against them; the Durable Object boundary
- * encodes and decodes with the same ones.
- */
 export const MethodSchemas = {
   [envSchemaMethod]: {
     args: [Principal],
@@ -931,12 +784,6 @@ export const MethodSchemas = {
   },
 } as const satisfies { readonly [M in keyof ProjectApi]: MethodSchema };
 
-/**
- * What the checks of an answer's last checked tree counted: each of the
- * policy's ratchets per territory, and each territory's reasoned escapes
- * once the answer is in (its count on main, and those the answer adds).
- * The answer's landing writes them to the project's `ratchets` rows.
- */
 export const Measured = Schema.Struct({
   declared: Schema.Array(MeasuredCount),
   escapes: Schema.Array(MeasuredCount),
@@ -944,11 +791,6 @@ export const Measured = Schema.Struct({
 
 export type Measured = typeof Measured.Type;
 
-/**
- * A held-back run judged for one checked tree: the refusals it earned,
- * and the `Held-back:` trailer's value when every area passed. Judged once
- * per tree, so a run reported again counts no attempt twice.
- */
 export const HeldBackJudged = Schema.Struct({
   refusals: Schema.Array(Refusal),
   trailer: Schema.optionalKey(Schema.NonEmptyString),
@@ -957,14 +799,6 @@ export const HeldBackJudged = Schema.Struct({
 
 export type HeldBackJudged = typeof HeldBackJudged.Type;
 
-/**
- * Where one answer stands, as its row keeps it: the landing lifecycle's
- * state, the receipt its request was first given (a replay gets it again),
- * the verdict on its last checked tree, what that tree counted, its last
- * held-back run's judgement, and each `Waiver` a decider accepted for this
- * answer (checked again after main moved, it is not asked again; another
- * answer to the ask is).
- */
 export const AnswerRecord = Schema.Struct({
   heldBack: Schema.optionalKey(HeldBackJudged),
   landing: LandingState,
@@ -994,12 +828,6 @@ const decodePolicy = Schema.decodeUnknownEffect(PolicyJson);
 
 const encodePolicy = Schema.encodeEffect(PolicyJson);
 
-/**
- * A method run between the check of its arguments (each against its
- * schema's type side: a value that is not one is the caller's defect, since
- * the boundary that decoded it would have refused it) and the check that its
- * success encodes.
- */
 const checked = <A, E, R>(
   schemas: MethodSchema,
   args: readonly unknown[],
@@ -1019,11 +847,9 @@ const checked = <A, E, R>(
     )
   );
 
-/** A policy as anyone may read it: without its layers, function-valued rules and asks. */
 const publicPolicy = (policy: Policy): PublicPolicy =>
   Struct.omit(policy, ["asks", "functions", "visibility"]);
 
-/** A claim's fork, as the refs page lists it. */
 const listedFork = (claim: Live, state: ClaimView["state"]) =>
   Option.some<ForkRef>({
     ask: claim.ask,
@@ -1033,7 +859,6 @@ const listedFork = (claim: Live, state: ClaimView["state"]) =>
     state,
   });
 
-/** Where a claim stands, as its fork's listing says it; an open ask has no fork. */
 const forkOf = (state: ClaimState): Option.Option<ForkRef> =>
   ClaimState.match(state, {
     Answered: (claim) => listedFork(claim, "answered"),
@@ -1044,16 +869,11 @@ const forkOf = (state: ClaimState): Option.Option<ForkRef> =>
     Warned: (claim) => listedFork(claim, "warned"),
   });
 
-/** The most of a lane's log `evidence` gives back: its last 256 KiB. */
 const EVIDENCE_TAIL = 256 * 1024;
 
-/** Whether a UTF-8 byte starts a character: it is no continuation byte (`10xxxxxx`). */
 const startsCharacter = (byte: number) => byte < 0x80 || byte >= 0xc0;
 
-/**
- * A log as `evidence` gives it back: whole up to 256 KiB, else its last
- * 256 KiB, where a failure prints, cut between characters, never inside one.
- */
+/** The log's tail, where a failure prints, cut between UTF-8 characters. */
 const tailOf = (log: string, limit = EVIDENCE_TAIL) => {
   const bytes = new TextEncoder().encode(log);
 
@@ -1074,7 +894,6 @@ const mainRef = RefName.make("refs/heads/main");
 
 const HOUR = 3_600_000;
 
-/** The claim deadlines before a project has a policy: the defaults. */
 const defaultClaims: Policy["claims"] = {
   lapseAfterMs: 24 * HOUR,
   warnAfterMs: 2 * HOUR,
@@ -1090,7 +909,6 @@ interface Answered {
   readonly row: AnswerRow;
 }
 
-/** A project as one call reads it at its start. */
 interface Hydrated {
   readonly answers: readonly Answered[];
   readonly asks: ReadonlyMap<AskId, Ask>;
@@ -1104,21 +922,14 @@ interface Hydrated {
   readonly project: Option.Option<ProjectRow>;
   readonly proposals: readonly Proposal[];
   readonly queue: LandingQueue;
-  /** Every ratchet's baseline per territory, the escape ratchets' included. */
   readonly ratchets: readonly RatchetRow[];
-  /** The rows as the store gave them, which the visibility ports read. */
   readonly snapshot: ProjectSnapshot;
 }
 
-/**
- * What one call writes, gathered as it goes and committed at its end. The
- * project row and the queue are kept in one-entry maps, so the record itself
- * never changes. Budget days are keyed by day and decider.
- */
+/** The project row and the queue sit in one-entry maps so the record itself never changes. */
 interface Writes {
   readonly answers: Map<RequestId, AnswerRow>;
   readonly asks: Map<AskId, Ask>;
-  /** Keyed by their table's key (`keyIn`); the visibility ports write them. */
   readonly attempts: Map<string, AttemptRow>;
   readonly budgetDays: Map<string, BudgetDayRow>;
   readonly claims: Map<string, ClaimRow>;
@@ -1134,7 +945,6 @@ interface Writes {
   readonly proposals: Map<ProposalId, Proposal>;
   readonly pushEvents: PushEventRow[];
   readonly queue: Map<"queue", LandingQueue>;
-  /** Keyed by ratchet and territory (`ratchetKey`). */
   readonly ratchets: Map<string, RatchetRow>;
 }
 
@@ -1181,12 +991,6 @@ const isEmpty = (writes: Writes) =>
     writes.ratchets.size,
   ].every((count) => count === 0);
 
-/** A row's key in its table, as the store keys it. */
-/**
- * Keeps `landing` and hears it as `Landed`: every landing that moves main
- * is heard, so a watcher and the front page see it (a project's row is
- * written on its first event).
- */
 const keepLanding = (
   writes: Writes,
   landing: LandingView,
@@ -1202,7 +1006,6 @@ const keyIn = <A>(table: Table<A>, row: A) => {
   return JSON.stringify(table.key.map((name) => columns[name]));
 };
 
-/** `held` with `written` over it: each written row in its key's place, the new ones after. */
 const overlaid = <A>(
   table: Table<A>,
   held: readonly A[],
@@ -1220,15 +1023,8 @@ const overlaid = <A>(
   ];
 };
 
-/** Ledger entries in order. */
 const bySeq = Order.mapInput(Order.Number, (entry: LedgerRow) => entry.seq);
 
-/**
- * The project as one call has it so far: the rows it hydrated with the
- * rows it wrote on top (a landing it recorded first, as the store orders
- * them). What the visibility ports read, so a port numbers a ledger entry
- * or a decision after the ones the call already made.
- */
 const snapshotNow = (h: Hydrated, writes: Writes): ProjectSnapshot => {
   const held = h.snapshot;
 
@@ -1281,11 +1077,6 @@ const snapshotNow = (h: Hydrated, writes: Writes): ProjectSnapshot => {
   };
 };
 
-/**
- * The tables a visibility port may write: its own, and the decisions,
- * events and outbox rows its plans add. The project service writes every
- * other one itself.
- */
 const portTables = new Set<string>([
   "attempts",
   "decisions",
@@ -1297,7 +1088,6 @@ const portTables = new Set<string>([
   "outbox",
 ]);
 
-/** A port's rows added to the call's: each keyed table by its key, the logs appended. */
 const absorb = (writes: Writes, more: ProjectWrites) => {
   const foreign = Object.keys(more).filter((table) => !portTables.has(table));
 
@@ -1334,11 +1124,6 @@ const absorb = (writes: Writes, more: ProjectWrites) => {
   return Effect.void;
 };
 
-/**
- * A port's plan taken into the call: its rows with the call's, and each of
- * its effects as an outbox row, settled after the commit and retried until
- * done.
- */
 const applyPlan = (writes: Writes, plan: VisibilityPlan, now: DateTime.Utc) =>
   Effect.gen(function* () {
     yield* absorb(writes, plan.writes);
@@ -1361,7 +1146,6 @@ const applyPlan = (writes: Writes, plan: VisibilityPlan, now: DateTime.Utc) =>
 const claimKey = (ask: AskId, claimant: Handle) =>
   JSON.stringify([ask, claimant.toLowerCase()]);
 
-/** A claim's own fields, in every state but `Open`. */
 const claimOf = (state: ClaimState): Option.Option<Live> =>
   ClaimState.match(state, {
     Answered: (claim) => Option.some<Live>(claim),
@@ -1374,7 +1158,6 @@ const claimOf = (state: ClaimState): Option.Option<Live> =>
 
 const isLive = ClaimState.isAnyOf(["Live", "Warned"]);
 
-/** When a live claim's next deadline is: its warning, or once warned its lapse. */
 const deadlineOf = (state: ClaimState): Option.Option<DateTime.Utc> =>
   ClaimState.match(state, {
     Answered: () => Option.none(),
@@ -1385,7 +1168,6 @@ const deadlineOf = (state: ClaimState): Option.Option<DateTime.Utc> =>
     Warned: ({ lapsesAt }) => Option.some(lapsesAt),
   });
 
-/** A path a composed commit can hold: plain folder names and a file name. */
 const isPlainPath = (path: string) =>
   path
     .split("/")
@@ -1397,7 +1179,6 @@ const isPlainPath = (path: string) =>
         segment !== ".git"
     );
 
-/** Whether the brief holds a field its kind requires. */
 const holds = (ask: Ask, wanted: AskKind["requires"][number]) =>
   Match.value(wanted).pipe(
     Match.when("want", () => ask.brief.want.length > 0),
@@ -1409,11 +1190,9 @@ const holds = (ask: Ask, wanted: AskKind["requires"][number]) =>
     Match.exhaustive
   );
 
-/** Whether two import sources name the same repo and branch (ADR 0031). */
 const sameSource = (a: ImportSource, b: ImportSource) =>
   a.url === b.url && a.branch === b.branch;
 
-/** An optional field as an object to spread: the field when present, nothing when not. */
 const field = <K extends string, A>(
   key: K,
   value: Option.Option<A>
@@ -1423,7 +1202,6 @@ const field = <K extends string, A>(
     onSome: (present) => Record.singleton(key, present),
   });
 
-/** The credit an answer's landing carries: who asked, who answered, who mentored. */
 const creditsFor = (ask: Ask, answerer: Handle): readonly Credit[] => [
   { handle: ask.askedBy, role: "Asked-by" },
   { handle: answerer, role: "Signed-off-by" },
@@ -1435,21 +1213,13 @@ const creditsFor = (ask: Ask, answerer: Handle): readonly Credit[] => [
   ),
 ];
 
-/** What a check of `ask` runs, and the lane it reports as. */
 const askLaneOf = (policy: Policy, ask: Ask) =>
   commandFor(ask.check, policy.run, policy.ratchets);
 
-/** A check judged by what its command prints: a lint's count, or a migrate's callers. */
 const isCounted = CheckSpec.isAnyOf(["LintToZero", "Migrate", "SymbolAbsent"]);
 
-/** A check that counts a name's callers: a migrate, or its delete child. */
 const countsCallers = CheckSpec.isAnyOf(["Migrate", "SymbolAbsent"]);
 
-/**
- * The lane an ask's check runs as: a `lintToZero`, `migrate` or
- * `symbolAbsent` check is a count, so its lane hands back what its command
- * printed.
- */
 const askCheckLane = (policy: Policy, ask: Ask) =>
   Option.map(askLaneOf(policy, ask), ({ command, lane }) =>
     isCounted(ask.check)
@@ -1457,7 +1227,6 @@ const askCheckLane = (policy: Policy, ask: Ask) =>
       : CheckLane.make({ command, lane })
   );
 
-/** The lanes an answer's checks run: the ask's own check, then every project lane. */
 const lanesOf = (
   policy: Policy,
   ask: Option.Option<Ask>
@@ -1470,11 +1239,6 @@ const lanesOf = (
   ),
 ];
 
-/**
- * The policy's ratchets that `command` counts, read from what it printed:
- * one count per ratchet and territory. A ratchet whose count can't be read
- * there is left out, and its first answer's landing sets its baseline.
- */
 const countedBy = (policy: Policy, command: string, stdout: string) =>
   Effect.map(
     Effect.forEach(
@@ -1499,13 +1263,11 @@ const countedBy = (policy: Policy, command: string, stdout: string) =>
     (counts): readonly RatchetCount[] => counts.flat()
   );
 
-/** A ratchet row's key in a call's writes: its ratchet and territory. */
 const ratchetKey = (row: {
   readonly ratchet: string;
   readonly territory: string;
 }) => JSON.stringify([row.ratchet, row.territory]);
 
-/** A row as `ratchets.ts` reads a baseline. */
 const baselineOf = (row: RatchetRow): RatchetBaseline => ({
   count: row.count,
   ratchet: row.ratchet,
@@ -1513,17 +1275,11 @@ const baselineOf = (row: RatchetRow): RatchetBaseline => ({
   territory: row.territory,
 });
 
-/**
- * Whether a row is a territory's escape ratchet's (`escapeRatchet`), which
- * has no command: its count is the territory's reasoned escapes on main,
- * moved by those each landing adds.
- */
 const isEscapeRow = (row: {
   readonly ratchet: string;
   readonly territory: string;
 }) => row.ratchet === escapeRatchet(row.territory);
 
-/** Whether two `Waiver`s are about one escape: one ask, one marker and reason, one line. */
 const sameEscape = (one: Waiver) => (other: Waiver) =>
   other.ask === one.ask &&
   other.marker === one.marker &&
@@ -1531,13 +1287,11 @@ const sameEscape = (one: Waiver) => (other: Waiver) =>
   other.at.path === one.at.path &&
   other.at.line === one.at.line;
 
-/** What a decider just decided for an answer waiting on it: the subject, and the choice in its words. */
 interface DecidedOn {
   readonly choice: Choice;
   readonly subject: PendingDecision["subject"];
 }
 
-/** The decision `command` takes, when it is one the answer waiting in `before` waits on. */
 const decidedOn = (
   before: LandingState,
   command: LandingCommand
@@ -1552,7 +1306,6 @@ const decidedOn = (
       )
     : Option.none();
 
-/** The `Waiver`s a decider accepted for an answer: those it had, and the one just accepted. */
 const waivedAfter = (
   waived: readonly Waiver[],
   decided: Option.Option<DecidedOn>
@@ -1567,7 +1320,6 @@ const waivedAfter = (
   ),
 ];
 
-/** What a decider weighs for one subject an answer waits on. */
 const evidenceFor = (
   request: Request,
   subject: Waiver | RaiseRatchet
@@ -1587,12 +1339,6 @@ const evidenceFor = (
       },
 ];
 
-/**
- * A `lintToZero` check is red first by its count: twice on the composed
- * commit its rule reports something in its territory, the same number
- * both times. Gives what the policy's ratchets count in the same
- * lint, for their baselines at the ask's opening.
- */
 const redByCount = (input: {
   readonly ask: Ask;
   readonly check: LintToZeroCheck;
@@ -1630,7 +1376,6 @@ const redByCount = (input: {
     return yield* countedBy(policy, check.command, once.stdout);
   });
 
-/** A section of a brief, when it has lines. */
 const section = (heading: string, lines: readonly string[] | undefined) =>
   lines === undefined || lines.length === 0
     ? []
@@ -1639,7 +1384,6 @@ const section = (heading: string, lines: readonly string[] | undefined) =>
 const listed = (lines: readonly string[] | undefined) =>
   lines?.map((line) => `- ${line}`);
 
-/** What an ask's check holds it to, in a sentence. */
 const checkLine = (check: CheckSpec) =>
   CheckSpec.match(check, {
     LintToZero: ({ rule }) =>
@@ -1654,7 +1398,6 @@ const checkLine = (check: CheckSpec) =>
     SymbolAbsent: ({ symbol }) => `Nothing uses \`${symbol}\` any more.`,
   });
 
-/** The ask as an answerer reads it first, in Markdown. */
 const briefOf = (ask: Ask): string => {
   const { brief, territory } = ask;
   const paths = territory.paths.map((path) => `\`${path}\``).join(", ");
@@ -1682,7 +1425,6 @@ const briefOf = (ask: Ask): string => {
   ].join("\n");
 };
 
-/** The refusal `submitAnswer` gives for one from the gate: its own, or `NotClaimed`. */
 const submitRefusal = (refusal: Refusal, ask: AskId): SubmitRefusal =>
   Match.value(refusal).pipe(
     Match.tag(
@@ -1700,12 +1442,6 @@ const submitRefusal = (refusal: Refusal, ask: AskId): SubmitRefusal =>
     Match.orElse(() => NotClaimed.of(ask))
   );
 
-/**
- * The agents a claim's pushes named, with the one `audit` names added: a
- * harness and its model, once each, in the order they first pushed. The
- * platform heard the harness from the push's own credential helper and
- * confirmed nothing, so it is `claimed`. A push no harness named adds none.
- */
 const withAgent = (
   agents: readonly AgentTrailer[],
   audit: HarnessAudit | undefined
@@ -1727,11 +1463,6 @@ const withAgent = (
     : [...agents, agent];
 };
 
-/**
- * The agents an answer's landing discloses as `Assisted-by:`:
- * those its claim's pushes named, unless the project's policy says
- * `agents: "none"`.
- */
 const disclosed = (
   policy: Policy,
   claim: Option.Option<ClaimRow>
@@ -1743,11 +1474,6 @@ const disclosed = (
         onSome: ({ assisted }) => assisted ?? [],
       });
 
-/**
- * The `Held-back:` trailer's value for the tree a verdict judged: the
- * answer's last held-back run's, when it ran on that tree and every area
- * passed.
- */
 const heldBackTrailerOf = (
   record: { readonly heldBack?: HeldBackJudged },
   tree: TreeSha
@@ -1760,7 +1486,6 @@ const heldBackTrailerOf = (
     ({ trailer }) => Option.fromUndefinedOr(trailer)
   );
 
-/** A landing's commit message, from the platform's own rows. */
 const messageOf = (
   request: Request,
   ask: Option.Option<Ask>,
@@ -1789,24 +1514,17 @@ const messageOf = (
   );
 };
 
-/** Answers oldest first, by when their row last moved. */
 const byUpdated = Order.mapInput(
   DateTime.Order,
   ({ row }: Answered) => row.updatedAt
 );
 
-/**
- * The verdict a landing carries: the one the checks gave, whose outcome
- * was the answer's when it was judged (a stage still to pass), now `Landed`
- * at the landing's SHA.
- */
 const landedVerdict = (verdict: Option.Option<Verdict>, sha: LandedSha) =>
   Option.map(verdict, (made): Verdict => ({
     ...made,
     outcome: Outcome.cases.Landed.make({ sha }),
   }));
 
-/** A `Landed` event with the verdict the landing carries; any other event as it is. */
 const withVerdict = (
   event: ProjectEventInput,
   verdict: Option.Option<Verdict>
@@ -1822,7 +1540,6 @@ const withVerdict = (
     Match.orElse((other) => other)
   );
 
-/** Whether a landing's effect is for the answer's run: a step, or a retry to wait for. */
 const runnable = (effect: LandingEffect): effect is RunnableEffect =>
   isStep(effect) || LandingEffect.$is("Retry")(effect);
 
@@ -1836,13 +1553,11 @@ type Checking = Extract<LandingState, { readonly _tag: "Checking" }>;
 
 type Landing = Extract<LandingState, { readonly _tag: "Landing" }>;
 
-/** What a landing's effects leave: the steps to hand to the run, and the queue. */
 interface Settled {
   readonly queue: LandingQueue;
   readonly steps: readonly LandingEffect[];
 }
 
-/** Starts the run of a request the queue just admitted, unless it is the one advancing. */
 const startOther = (
   writes: Writes,
   admitted: Option.Option<RequestId>,
@@ -1858,11 +1573,6 @@ const startOther = (
     }
   );
 
-/**
- * What sees an ask's check run twice as it opens: whether the lane prints
- * its output back, and both runs. Opening for real sees nothing; a
- * rehearsal reads why the check was not red, and its output's tail.
- */
 interface Watch {
   readonly ran: (
     lane: LaneName,
@@ -1873,13 +1583,11 @@ interface Watch {
 
 const unwatched: Watch = { ran: () => Effect.void, stdout: false };
 
-/** A rehearsal's check, as its watch saw it run twice. */
 interface Seen {
   readonly lane: LaneName;
   readonly runs: readonly [CheckRun, CheckRun];
 }
 
-/** The refusals opening an ask gives that waiting does not lift. */
 type FinalRefusal =
   | IncompleteBrief
   | NotDecider
@@ -1887,7 +1595,6 @@ type FinalRefusal =
   | TouchedJudge
   | WeakCheck;
 
-/** How one run of a rehearsed check went, for telling why it was not red. */
 const readingOf = (run: CheckRun, lane: LaneName) => {
   const result = run.lanes.find((each) => each.lane === lane)?.result;
 
@@ -1898,11 +1605,6 @@ const readingOf = (run: CheckRun, lane: LaneName) => {
   return result === "failed" && !signed ? "loadError" : (result ?? "blocked");
 };
 
-/**
- * Why a check was not red first, from its two runs: both passed; one could
- * not run; one never reached an assertion (a load error, or a throw that is
- * none); else it failed two ways.
- */
 const notRedBecause = ({ lane, runs }: Seen): Diagnosis => {
   const readings = runs.map((run) => readingOf(run, lane));
 
@@ -1917,16 +1619,13 @@ const notRedBecause = ({ lane, runs }: Seen): Diagnosis => {
   return readings.includes("loadError") ? "LoadError" : "Flaky";
 };
 
-/** Why opening was refused, in a drafter's words. */
 const diagnosisOf = (
   refusal: FinalRefusal,
   seen: Option.Option<Seen>
 ): Diagnosis =>
   Match.valueTags(refusal, {
-    // A territory beyond the decider of the files' paths is the brief's.
     IncompleteBrief: (): Diagnosis => "Brief",
     NotDecider: (): Diagnosis => "Brief",
-    // No lane to run is a brief whose check names none.
     NotRedFirst: () =>
       Option.match(seen, {
         onNone: (): Diagnosis => "Brief",
@@ -1937,7 +1636,6 @@ const diagnosisOf = (
       weakness === "no assertion" ? "NoTests" : "Weak",
   });
 
-/** The last of what the check printed: its second run's output, else its first's. */
 const excerptOf = (seen: Option.Option<Seen>) =>
   Option.match(
     Option.flatMap(seen, ({ lane, runs: [first, second] }) =>
@@ -1949,7 +1647,6 @@ const excerptOf = (seen: Option.Option<Seen>) =>
     }
   );
 
-/** A rehearsal refused: the refusal, why, and the output's tail. */
 const rehearsalRefused = (
   refusal: FinalRefusal,
   seen: Option.Option<Seen>
@@ -1960,10 +1657,6 @@ const rehearsalRefused = (
     refusal,
   });
 
-/**
- * A red rehearsal's lane and signature: the check's own, or, for a check
- * red by its count, which has none, that it is.
- */
 const redOf = ({ lane, runs }: Seen) => ({
   lane,
   signature: Result.match(redFirstOfRuns(runs, lane), {
@@ -1972,7 +1665,6 @@ const redOf = ({ lane, runs }: Seen) => ({
   }),
 });
 
-/** Whether an ask's check file has one of the five weak shapes. */
 const weakness = (ask: Ask, files: readonly AskFile[]) => {
   const { check } = ask;
 
@@ -1985,7 +1677,6 @@ const weakness = (ask: Ask, files: readonly AskFile[]) => {
   );
 };
 
-/** Stage 0–1's refusals for a push, every one; what a missing commit or repo comes to. */
 const gateOf = (
   facts: Effect.Effect<PushFacts, RepoNotFound | MissingCommit>,
   missing: readonly Refusal[],
@@ -2005,7 +1696,6 @@ const gateOf = (
     })
   );
 
-/** The queue once a request no longer landing has left its place in it. */
 const leaveIfDone = (
   writes: Writes,
   queue: LandingQueue,
@@ -2031,11 +1721,9 @@ const leaveIfDone = (
   );
 };
 
-/** A landing that names neither the ask it answers nor one it opened. */
 const namesNoAsk = (landing: LandingView) =>
   landing.ask === undefined && landing.opened === undefined;
 
-/** One project's service over the ports. */
 export const projectService = (
   name: ProjectName
 ): Effect.Effect<ProjectApi, never, ProjectPorts> =>
@@ -2049,19 +1737,14 @@ export const projectService = (
     const alarms = Context.get(ports, Alarms);
     // Read once, as the ports are: a call runs in its caller's context.
     const generate = yield* ProjectGenerator;
-    // Typed visibility and the env: the cartridge's when a host
-    // provides it, a project without them otherwise.
     const visibility = yield* ProjectVisibility;
     const envPort = yield* ProjectEnv;
     const draftRuns = yield* DraftRuns;
     const lock = yield* Semaphore.make(1);
-    // The repo is the project's key, as every repo of its forks is (ADR 0032).
     const repo = RepoName.make(keyOf(name));
 
     const withPorts = <A, E>(effect: Effect.Effect<A, E, ProjectPorts>) =>
       Effect.provideContext(effect, ports);
-
-    // ----------------------------------------------------------- hydrate
 
     const hydrate: Effect.Effect<Hydrated> = Effect.gen(function* () {
       const snapshot = yield* store.load();
@@ -2108,7 +1791,6 @@ export const projectService = (
       };
     });
 
-    /** The project row once it is live: it has a landed SHA. */
     const liveRow = (h: Hydrated) =>
       Option.flatMap(h.project, (row) =>
         row.state === "live" && row.landed !== undefined
@@ -2116,11 +1798,9 @@ export const projectService = (
           : Option.none()
       );
 
-    /** The ask as this call has it: as written so far, or as hydrated. */
     const askNow = (h: Hydrated, writes: Writes, id: AskId) =>
       Option.fromUndefinedOr(writes.asks.get(id) ?? h.asks.get(id));
 
-    /** The `ratchets` rows as this call has them: written so far, over the hydrated ones. */
     const ratchetsNow = (
       h: Hydrated,
       writes: Writes
@@ -2132,13 +1812,11 @@ export const projectService = (
       ),
     ];
 
-    /** The baselines of the policy's ratchets, as this call has them; the escape ratchets apart. */
     const baselinesNow = (h: Hydrated, writes: Writes) =>
       ratchetsNow(h, writes)
         .filter((row) => !isEscapeRow(row))
         .map(baselineOf);
 
-    /** Writes each baseline that differs from the row this call has for it. */
     const putRatchets = (
       h: Hydrated,
       writes: Writes,
@@ -2171,7 +1849,6 @@ export const projectService = (
         )
       );
 
-    /** A claim's row as this call has it: as written so far, over the hydrated one. */
     const claimRowNow = (
       h: Hydrated,
       writes: Writes,
@@ -2200,10 +1877,6 @@ export const projectService = (
         () => defaultClaims
       );
 
-    /**
-     * A claim as its claimant sees it: with its fork's gateway URL, its
-     * check, and the held-back suite it was pinned to, if any.
-     */
     const viewOf = (
       policy: Option.Option<Policy>,
       ask: Option.Option<Ask>,
@@ -2235,11 +1908,7 @@ export const projectService = (
         );
       });
 
-    /**
-     * Whether `who` reads every layer the project keeps a repo for, so every
-     * layer stage 1's paths come from: only then may a refusal name which
-     * paths collide. Reading one layer never names another's paths.
-     */
+    /** Only a reader of every layer may hear which layer paths collide. */
     const readsEveryLayer = (who: Principal, snapshot: ProjectSnapshot) => {
       const readable = visibility.readableLayers(who, snapshot);
 
@@ -2249,7 +1918,6 @@ export const projectService = (
       );
     };
 
-    /** `facts` with the layer paths, and whether its pusher reads every layer. */
     const layered = (snapshot: ProjectSnapshot, facts: PushFacts) =>
       Effect.map(visibility.layerPaths(snapshot), (layerPaths): PushFacts => ({
         ...facts,
@@ -2257,11 +1925,6 @@ export const projectService = (
         layerPaths,
       }));
 
-    /**
-     * A push's stage 0–1 facts with what visibility knows: every
-     * layer path, and whether the pusher reads a layer. A project without
-     * typed visibility has neither.
-     */
     const withLayerFacts = <E>(
       h: Hydrated,
       writes: Writes,
@@ -2271,13 +1934,6 @@ export const projectService = (
         Effect.flatMap((found) => layered(snapshotNow(h, writes), found))
       );
 
-    // ------------------------------------------------------------ commit
-
-    /**
-     * Writes everything the call gathered in one commit, with the events'
-     * projection rows beside them, and returns the outbox rows it wrote. A
-     * commit carrying a push event already stored wrote nothing: none.
-     */
     const commit = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
       Effect.gen(function* () {
         if (isEmpty(writes)) {
@@ -2337,9 +1993,6 @@ export const projectService = (
         return outbox;
       });
 
-    // ------------------------------------------------------------ settle
-
-    /** Sets the project's alarm to its earliest pending deadline or retry. */
     const armAlarm = Effect.gen(function* () {
       const h = yield* hydrate;
 
@@ -2354,10 +2007,6 @@ export const projectService = (
       }
     });
 
-    /**
-     * Runs the outbox rows that are due, acknowledges the ones done, puts
-     * the rest back with a later time, then sets the alarm.
-     */
     const settle = (queue: AnswerQueue, rows: readonly OutboxRow[]) =>
       Effect.gen(function* () {
         const now = yield* DateTime.now;
@@ -2382,13 +2031,6 @@ export const projectService = (
         yield* armAlarm;
       });
 
-    /**
-     * One call that writes: under the project's lock it hydrates, runs
-     * `body` (pure transitions, and the port calls that decide them), and
-     * commits what it gathered; then, outside the lock, settles the outbox
-     * rows it wrote. A body that fails commits nothing. Every method calls
-     * it through `write`, which adds the generated follow-up to the body.
-     */
     const writeLocked = <A, E>(
       queue: AnswerQueue,
       body: (
@@ -2414,9 +2056,6 @@ export const projectService = (
         return answered;
       });
 
-    // ------------------------------------------------------------ claims
-
-    /** The ask's state once a claim on it moved: claimed while a live claim holds it. */
     const askAfter = (
       h: Hydrated,
       writes: Writes,
@@ -2452,11 +2091,6 @@ export const projectService = (
       }
     };
 
-    /**
-     * Records a claim's step: its row, its fork, its events and its ask's
-     * state. The row keeps the agents the claim's pushes named: `assisted`
-     * when given (a claim granted anew starts with none), else as it had them.
-     */
     const applyClaim = (
       h: Hydrated,
       writes: Writes,
@@ -2519,9 +2153,6 @@ export const projectService = (
         askAfter(h, writes, ask, step);
       });
 
-    // ------------------------------------------------------------ policy
-
-    /** The config folder at a commit, evaluated; none when it can't be. */
     const evaluateAt = (row: ProjectRow, at: LandedSha, now: DateTime.Utc) =>
       Effect.gen(function* () {
         const previous = yield* Option.match(
@@ -2567,11 +2198,6 @@ export const projectService = (
         );
       });
 
-    /**
-     * The project row with the policy at `at`: the config folder bundled
-     * there and evaluated. A Lander or evaluator that fails keeps the policy
-     * the row held.
-     */
     const withPolicyAt = (row: ProjectRow, at: LandedSha, now: DateTime.Utc) =>
       Effect.flatMap(evaluateAt(row, at, now), (policy) =>
         Option.match(policy, {
@@ -2585,11 +2211,6 @@ export const projectService = (
         })
       );
 
-    /**
-     * Whether the landed tree at `at` has a config folder at its root: one
-     * commit read and one tree read. A commit or tree the repo does not have
-     * has none.
-     */
     const hasConfigAt = (at: LandedSha) =>
       Effect.gen(function* () {
         const landedCommit = yield* host.readCommit(repo, at);
@@ -2608,16 +2229,9 @@ export const projectService = (
         );
       }).pipe(Effect.orDie);
 
-    /**
-     * The public policy once one has evaluated; before that, after the first
-     * landing, why not: the landed tree has no config folder (the defaults
-     * found no test command), or it has one that did not evaluate. Derived
-     * here, never stored, so a project that never evaluated says why at once.
-     */
     const policyStatus: Effect.Effect<PolicyStatus> = Effect.gen(function* () {
       const h = yield* hydrate;
 
-      // Where the project came from, when it was imported (ADR 0031).
       const origin = field(
         "importedFrom",
         Option.flatMapNullishOr(h.project, (row) => row.importedFrom)
@@ -2646,12 +2260,7 @@ export const projectService = (
       };
     });
 
-    /**
-     * Each landing with the ask it opened: a row written before landings
-     * carried `opened` gets it from the asks, the one with no parent whose
-     * `openedIn` is its SHA. Only a landing that names no ask is looked up,
-     * and the asks are read once for the whole batch.
-     */
+    /** Older landing rows carry no `opened`: it is found from the asks' `openedIn`. */
     const withOpened = (found: readonly LandingView[]) =>
       Effect.gen(function* () {
         if (!found.some(namesNoAsk)) {
@@ -2677,9 +2286,6 @@ export const projectService = (
         });
       });
 
-    // --------------------------------------------------------- generated
-
-    /** A file's text at a landed commit of the canonical repo; none where it has no such file. */
     const textAt = (at: LandedSha) => (path: string) =>
       host
         .readFile(repo, Revision.Commit({ sha: at }), RepoPath.make(path))
@@ -2688,19 +2294,11 @@ export const projectService = (
           Effect.orDie
         );
 
-    /**
-     * The platform's own landing of the regenerated files on top of
-     * `landed`, recorded with the landing it follows: the files composed
-     * onto main and landed through the Lander, a compare-and-swap push of
-     * `main` then the mirror, as every platform landing is, with the request
-     * id `gen-<landed>`, so a replay finds its commit.
-     */
     const landFollowUp = (input: {
       readonly h: Hydrated;
       readonly landed: LandedSha;
       readonly landing: LandingView;
       readonly now: DateTime.Utc;
-      /** The policy read at `landed`, encoded as the row holds it. */
       readonly policy: Exclude<ProjectRow["policy"], undefined>;
       readonly row: ProjectRow;
       readonly writes: Writes;
@@ -2762,13 +2360,10 @@ export const projectService = (
       });
 
     /**
-     * A follow-up that did not land. When canonical `main` still stands at
-     * `landed`, nothing of it reached main: the landing it follows stands,
-     * and the failure is logged. When main moved on (the push went through
-     * and the Lander's answer was lost), or where it stands can't be read,
-     * the call fails and commits nothing, so the project's landed SHA never
-     * falls behind main: the same call run again finds both commits by their
-     * request ids.
+     * When main still stands at `landed`, the failure is only logged. When main
+     * moved on (the Lander's answer was lost) or can't be read, the call fails,
+     * so the landed SHA never falls behind main; a rerun finds both commits by
+     * their request ids.
      */
     const unlanded = <E>(landed: LandedSha, cause: Cause.Cause<E>) =>
       Effect.gen(function* () {
@@ -2790,16 +2385,9 @@ export const projectService = (
       });
 
     /**
-     * After a call moved the landed SHA (the first adoption, an answer, a
-     * decider's own landing, an ask opened, a vouch): the platform's own
-     * landing of the regenerated contribute skill and AGENTS.md block on
-     * top, when the policy read at the new landed SHA changes what they say.
-     * It never joins the landing that changed the config
-     * ("land only the checked tree"), and it is recorded in the same commit
-     * as the landing it follows, under the project's lock. It is
-     * bookkeeping: one that cannot land is logged, and the landing it follows
-     * stands; the next landing that changes the config writes the files
-     * again (`unlanded`).
+     * A separate landing on top, never joined to the one that changed the
+     * config (land only the checked tree). Bookkeeping: a failure is logged
+     * and the next config change writes the files again.
      */
     const followUp = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
       Effect.gen(function* () {
@@ -2845,14 +2433,6 @@ export const projectService = (
         );
       });
 
-    /**
-     * After a call moved the landed SHA: the env port hears the
-     * move (a `ProxyWidened` decision for a widened proxy), and, when the
-     * policy was read at the new SHA, the visibility port hears it (layers
-     * provisioned and declared, a narrowing's `PostureChange`). Their plans
-     * go into the same commit; their effects settle after it. Without the
-     * cartridge both plans are empty.
-     */
     const visibilityAfter = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
       Effect.gen(function* () {
         const row = writes.project.get("row");
@@ -2895,15 +2475,9 @@ export const projectService = (
         );
       });
 
-    /** What follows a call that may have landed: the generated files, then visibility. */
     const afterLandings = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
       Effect.andThen(followUp(h, writes, now), visibilityAfter(h, writes, now));
 
-    /**
-     * One call that writes (`writeLocked`), with the generated follow-up of
-     * any landing the body recorded and what visibility makes of it, in the
-     * same commit.
-     */
     const write = <A, E>(
       queue: AnswerQueue,
       body: (
@@ -2916,7 +2490,6 @@ export const projectService = (
         Effect.tap(body(h, writes, now), () => afterLandings(h, writes, now))
       );
 
-    /** A `main` for an imported repo whose branch had another name, at its tip. */
     const mainAt = (tip: CommitSha) =>
       Effect.gen(function* () {
         const empty = { fs: memoryFs(), gitdir: "/adopt.git" };
@@ -2935,17 +2508,12 @@ export const projectService = (
       });
 
     /**
-     * An imported repo adopted: its tip becomes the first landed SHA, on a
-     * `main` of its own when the imported branch had another name. The tip
-     * is `main`'s, else the named branch's, else the one branch the import
-     * made (the remote's default, `master` or any other).
+     * The tip is `main`'s, else the named branch's, else the one branch the
+     * import made.
      *
-     * `adopt` runs only while the project has no row, so a repo that exists
-     * is this project's earlier import, which died after Artifacts made the
-     * repo (a slow import outlasting the binding's wait): it is waited for
-     * and adopted, as `initBody` keeps an empty repo a failed `create` left.
-     * ASSUMPTION: the retry names the same remote; the repo holds what the
-     * first import copied.
+     * Runs only while the project has no row, so an existing repo is this
+     * project's earlier import that died after Artifacts made it; it is waited
+     * for and adopted. Assumes the retry names the same remote.
      */
     const adopt = (from: { readonly branch?: string; readonly url: string }) =>
       Effect.gen(function* () {
@@ -3005,9 +2573,6 @@ export const projectService = (
         return LandedSha.make(tip.value);
       });
 
-    // ------------------------------------------------------------ answers
-
-    /** The answer's run, as `answer` and a step see it. */
     const runOf = (h: Hydrated, found: Answered): AnswerRun => {
       const { landing, verdict } = found.record;
       const { request } = landing;
@@ -3074,7 +2639,6 @@ export const projectService = (
       };
     };
 
-    /** The verdict on a checked tree: the gate's `verdictOf` over what the checks saw. */
     const verdictFor = (input: {
       readonly ask: Ask;
       readonly checking: Checking;
@@ -3135,7 +2699,6 @@ export const projectService = (
         );
       });
 
-    /** The claim that answered an ask, answered by its landing. */
     const answerClaim = (
       h: Hydrated,
       writes: Writes,
@@ -3160,15 +2723,9 @@ export const projectService = (
           ),
       });
 
-    /** Every ask as this call has it: as written so far, over the hydrated ones. */
     const asksNow = (h: Hydrated, writes: Writes): ReadonlyMap<AskId, Ask> =>
       new Map([...h.asks, ...writes.asks]);
 
-    /**
-     * A migrate family once its child `landed` closed: each
-     * child waiting on its siblings opens when the last of them lands, and
-     * the parent closes on the landing that closes its last child.
-     */
     const familyAfter = (
       h: Hydrated,
       writes: Writes,
@@ -3212,17 +2769,11 @@ export const projectService = (
       }
     };
 
-    /**
-     * A landing on main recorded: the landing, its ask closed, the answering
-     * claim answered, its migrate family moved on, the landed SHA moved and
-     * the policy read there.
-     */
     const recordLanding = (
       h: Hydrated,
       writes: Writes,
       landing: Landing,
       landed: {
-        /** The `Held-back:` trailer's value the landing carries, if its suite judged it. */
         readonly heldBack: Option.Option<string>;
         readonly sha: LandedSha;
         readonly verdict: Option.Option<Verdict>;
@@ -3282,7 +2833,6 @@ export const projectService = (
         }
       });
 
-    /** One of a landing's effects, settled by the project or handed to its run. */
     const settleEffect = (
       context: {
         readonly before: LandingState;
@@ -3347,10 +2897,6 @@ export const projectService = (
       });
     };
 
-    /**
-     * The verdict after a step: a fresh one when the checks just judged the
-     * tree under way, else the one the answer had.
-     */
     const verdictAfter = (input: {
       readonly ask: Option.Option<Ask>;
       readonly before: LandingState;
@@ -3389,7 +2935,6 @@ export const projectService = (
       );
     };
 
-    /** The row that lands a request's job again, for the bookkeeping it left unwritten. */
     const bookkeepingRow = (input: {
       readonly ask: Option.Option<Ask>;
       readonly heldBack: Option.Option<string>;
@@ -3424,7 +2969,6 @@ export const projectService = (
       );
     };
 
-    /** Bookkeeping a land reported unwritten: landed again later, for it alone. */
     const keepBooks = (input: {
       readonly ask: Option.Option<Ask>;
       readonly before: LandingState;
@@ -3459,20 +3003,6 @@ export const projectService = (
       );
     };
 
-    /**
-     * The checks' report on the tree under way, judged against the
-     * project's ratchets. Each of the policy's
-     * ratchets the merged tree counts over its baseline is refused
-     * `Weakened{ratchet}`, unless a reasoned escape the answer adds in its
-     * territory asks to raise it (`RaiseRatchet`); each reasoned escape over
-     * its territory's escape baseline waits on a `Waiver`, unless a decider
-     * already accepted it for this answer (`waived`: a re-check after main
-     * moved asks nothing twice). Nothing waits once something refused; the
-     * decisions open with their subject's default, `decline`. The answer's
-     * lines unread are the gate's trouble (`VerifierBlocked`): no escape
-     * lands unweighed. What the tree counted is kept for the answer's
-     * landing.
-     */
     const ratchetJudged = (input: {
       readonly checking: Checking;
       readonly command: Data.TaggedEnum.Value<LandingCommand, "Checked">;
@@ -3624,7 +3154,6 @@ export const projectService = (
         };
       });
 
-    /** An accepted `RaiseRatchet` the answer waits on raises its baseline: the one way a baseline rises. */
     const raiseOnDecision = (
       h: Hydrated,
       writes: Writes,
@@ -3652,12 +3181,6 @@ export const projectService = (
       }
     };
 
-    /**
-     * A landing's counts become the baselines: each of the policy's
-     * ratchets lowered where the landed tree counts less (or set, where it
-     * had none), and each territory's escapes as they stand with the
-     * answer's in; the gate let no raise land that a decider did not accept.
-     */
     const ratchetsAtLanding = (
       h: Hydrated,
       writes: Writes,
@@ -3681,7 +3204,6 @@ export const projectService = (
       ]);
     };
 
-    /** One reported step of an answer, under the lock: its transition and all it settles. */
     const advanceBody =
       (requestId: RequestId, reported: LandingCommand, report?: AnswerReport) =>
       (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
@@ -3812,15 +3334,6 @@ export const projectService = (
           };
         });
 
-    // ------------------------------------------------------------ writes
-
-    /**
-     * The first adoption as a landing: the initializer's first push, or an
-     * import's tip. It answers no ask, has no parent and credits no one;
-     * its row lets `landing` (and so OnPush) know the commit as the
-     * platform's own, and its event lists the project on the front page
-     * even when no policy evaluates and nothing else happens in it.
-     */
     const landAdoption = (
       writes: Writes,
       author: Handle,
@@ -3841,11 +3354,6 @@ export const projectService = (
       );
     };
 
-    /**
-     * The project's adoption, the one landing with no parent: in the
-     * snapshot's newest landings, else found by walking back from the last
-     * landed SHA through each landing's parent.
-     */
     const adoptionOf = (h: Hydrated, row: ProjectRow) =>
       Effect.gen(function* () {
         const kept = h.landings.find(({ parent }) => parent === undefined);
@@ -3873,14 +3381,6 @@ export const projectService = (
         return Option.none<LandingView>();
       });
 
-    /**
-     * An import asked again by its initializer converges (ADR 0031): with
-     * the source the row keeps, it answers as the first call did; for a row
-     * that keeps no source yet, the source is written first. Only an
-     * import's row takes one: its adoption landed in the call that made it,
-     * so the adoption's `landedAt` is the row's `createdAt`, where a first
-     * push lands later. Any other repeat is `ProjectExists`, as before.
-     */
     const keepSource = (
       caller: Person,
       from: ImportSource,
@@ -3940,7 +3440,7 @@ export const projectService = (
           }
 
           // A project is made only in a namespace of one's own: the caller's
-          // handle, or the source namespace the import's URL names (ADR 0032).
+          // handle, or the source namespace the import's URL names.
           const owner = ownerOf(name);
 
           const mine = isSourceNamespace(owner)
@@ -4025,11 +3525,6 @@ export const projectService = (
           return { landed };
         });
 
-    /**
-     * The ask a decider's files state, read from the config folder at the
-     * commit they compose; its kind, as every rule but the ask itself, is
-     * main's (ADR 0005).
-     */
     const statedAsk = (input: {
       readonly composed: CommitSha;
       readonly id: AskId;
@@ -4072,7 +3567,6 @@ export const projectService = (
         return stated;
       });
 
-    /** The judge an ask's files touch beyond their own (stage 1, as an ask opens). */
     const touchedJudge = (input: {
       readonly ask: Ask;
       readonly caller: Person;
@@ -4105,10 +3599,6 @@ export const projectService = (
         (refusals) => Array.findFirst(refusals, isTouchedJudge)
       );
 
-    /**
-     * An ask's own check run twice on the composed commit, and the lane it
-     * ran as; `watch` sees both runs, and asks for the lane's output.
-     */
     const runTwice = (
       policy: Policy,
       ask: Ask,
@@ -4148,11 +3638,6 @@ export const projectService = (
         return { lane: lane.value.lane, runs };
       });
 
-    /**
-     * Red first: the ask's check fails twice on the composed commit, the
-     * same way (a `lintToZero` check, by its count). Gives the counts of the
-     * policy's ratchets the check's own run read on the way.
-     */
     const redTwice = (
       policy: Policy,
       ask: Ask,
@@ -4177,11 +3662,6 @@ export const projectService = (
         return [];
       });
 
-    /**
-     * Red first for a check that counts callers (`migrate`, `symbolAbsent`):
-     * twice on the composed commit its count command prints the same
-     * callers, and some in the ask's territory. Gives the count.
-     */
     const callersTwice = (
       policy: Policy,
       ask: Ask,
@@ -4210,12 +3690,6 @@ export const projectService = (
         return once;
       });
 
-    /**
-     * The family files of a split that would land on a path already taken:
-     * an ask the project holds, one main's config folder states, one of the
-     * decider's own files, or another file of the family. Overwriting any
-     * would change the judge beyond the ask's own files (`TouchedJudge`).
-     */
     const takenBy = (
       h: Hydrated,
       writes: Writes,
@@ -4241,12 +3715,6 @@ export const projectService = (
       );
     };
 
-    /**
-     * What a migrate (or `symbolAbsent`) ask's opening lands: red first by
-     * its callers, then, when its callers sit in two or more of its
-     * modules, its family's files beside the decider's, every
-     * ask of the family, and the callers ratchet at the counted total.
-     */
     const migrateOpening = (input: {
       readonly ask: Ask;
       readonly composed: { readonly commit: CommitSha; readonly tree: TreeSha };
@@ -4323,10 +3791,6 @@ export const projectService = (
         };
       });
 
-    /**
-     * The landing that opens an ask: its files on main, authored by its
-     * asker. A migrate ask's landing names the children it opened with it.
-     */
     const landAsk = (input: {
       readonly ask: Ask;
       readonly assisted: readonly AgentTrailer[];
@@ -4374,15 +3838,6 @@ export const projectService = (
       return Effect.map(landing, ({ sha }) => ({ credits, requestId, sha }));
     };
 
-    /**
-     * Everything opening an ask checks, with nothing written and nothing
-     * landed: the files composed onto main, the ask they state evaluated at
-     * the composed commit, the judge they touch, a weak check, and red
-     * first (or a migrate ask's callers and family). Succeeds with what the
-     * landing needs; fails with the ask as it stands when it is open
-     * already, so nothing is to land. `opening.decider` must decide for the
-     * ask's territory. `watch` sees the check's runs.
-     */
     const prepareOpening = (
       h: Hydrated,
       writes: Writes,
@@ -4494,14 +3949,6 @@ export const projectService = (
         return Result.succeed({ ask, main, opens, row });
       });
 
-    /**
-     * An ask opened from its files, red first, and landed as a platform
-     * commit: what `openAsk` does for a decider, and what an accepted
-     * proposal does for its proposer. `opening.decider` must decide
-     * for the ask's territory; `opening.asker` asks it and authors the
-     * landing, which carries `opening.credits` and discloses
-     * `opening.assisted`.
-     */
     const openFrom = (
       h: Hydrated,
       writes: Writes,
@@ -4552,7 +3999,6 @@ export const projectService = (
           author: opening.asker,
           credits: landed.credits,
           landedAt: now,
-          // The ask it opened: a migrate family's parent, never a step.
           opened: ask.id,
           parent: main,
           project: name,
@@ -4606,11 +4052,6 @@ export const projectService = (
           files: input.files,
         });
 
-    /**
-     * An ask's files rehearsed: `prepareOpening` by the first decider of
-     * their paths, its lane asked for its output, and nothing landed or
-     * written. A final refusal is `Refused`, with why and the output's tail.
-     */
     const rehearse = (
       h: Hydrated,
       now: DateTime.Utc,
@@ -4699,7 +4140,6 @@ export const projectService = (
         );
       });
 
-    /** Every blob's path in the canonical tree at `at`, sorted, at most `MAX_DRAFT_PATHS`. */
     const pathsAt = (at: LandedSha) => {
       const walk = (
         prefix: string,
@@ -4733,11 +4173,6 @@ export const projectService = (
       );
     };
 
-    /**
-     * What a draft's run reads for one round: an open proposal's want and
-     * territory, the landed commit, the public policy there, and every path
-     * of the canonical tree.
-     */
     const draftContextOf = (proposal: ProposalId, round: number) =>
       Effect.gen(function* () {
         const h = yield* hydrate;
@@ -4771,7 +4206,6 @@ export const projectService = (
         };
       });
 
-    /** Whether a person may claim an ask, by the trust rules, and the ask's race. */
     const trustOf = (
       h: Hydrated,
       policy: Policy,
@@ -4934,7 +4368,6 @@ export const projectService = (
           return { released: step.effects.length > 0 };
         });
 
-    /** The claimant's own push keeps their claim alive, whatever the gate says of it. */
     const keepAlive = (
       h: Hydrated,
       writes: Writes,
@@ -4986,12 +4419,6 @@ export const projectService = (
       });
     };
 
-    /**
-     * Canonical `main` moved to a commit that is neither the landed SHA nor
-     * a landing, or deleted, opens a `StrayPush` decision, in the same
-     * commit as the push event's row, so an event reported again opens
-     * nothing.
-     */
     const strayOn = (
       h: Hydrated,
       writes: Writes,
@@ -5111,12 +4538,7 @@ export const projectService = (
           return refusals;
         });
 
-    /**
-     * The receipt of an answer given before: the caller's own request
-     * again, or the same head from them while that answer stands. A
-     * request id another person's answer holds is not the caller's to
-     * replay, nor to take: `NotClaimed`.
-     */
+    /** A request id another person's answer holds is not the caller's to replay: `NotClaimed`. */
     const earlier = (
       h: Hydrated,
       caller: Person,
@@ -5148,7 +4570,6 @@ export const projectService = (
       return Effect.succeed(Option.map(given, ({ record }) => record.receipt));
     };
 
-    /** A new answer request, queued and started on main as it stands, with its receipt. */
     const queueAnswer = (
       writes: Writes,
       request: Request,
@@ -5294,7 +4715,6 @@ export const projectService = (
           );
         });
 
-    /** Every live claim whose deadline passed, moved by `Tick`. */
     const tickAll = (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
       Effect.forEach(
         h.claims.filter(({ state }) => isLive(state)),
@@ -5316,8 +4736,6 @@ export const projectService = (
           ),
         { discard: true }
       );
-
-    // ------------------------------------------------------------ reads
 
     const statusOf = (caller: Person) =>
       Effect.gen(function* () {
@@ -5382,16 +4800,7 @@ export const projectService = (
         return Effect.succeed(field("verdict", verdict));
       });
 
-    // ---------------------------------------------------------- evidence
-
-    /**
-     * Who may read the log named `ref`, and then the log: the name must
-     * point at this project (anything else is that project unknown, as a
-     * name nobody made is); then the caller must decide here, or be the
-     * claimant of the answer it points at (`NotDecider` otherwise, whether
-     * or not a log is kept, so the reply tells no one which logs exist);
-     * then the log must be kept.
-     */
+    /** `NotDecider` comes before the log lookup, so the reply never tells which logs exist. */
     const evidenceOf = (caller: Principal, ref: LogRef) =>
       Effect.gen(function* () {
         const named = logOfRef(ref);
@@ -5430,18 +4839,10 @@ export const projectService = (
         return { lane, ...tailOf(kept.value) };
       });
 
-    // -------------------------------------------------------- visibility
-    //
-    // Each delegates to `ProjectVisibility` or `ProjectEnv`: the
-    // service hydrates, the port decides over the project as the call has
-    // it, and the service commits the port's rows with its own.
-
-    /** The env a check of unlanded code carries, for the project as it is stored. */
     const unlandedEnv = Effect.flatMap(hydrate, (h) =>
       envPort.runEnv({ landed: false }, h.snapshot)
     );
 
-    /** The claim an answer is made through, with the suite it was pinned to: none for a decider's own landing, or a claim that pinned none. */
     const pinnedClaimOf = (h: Hydrated, record: AnswerRecord) => {
       const { request } = record.landing;
 
@@ -5456,7 +4857,6 @@ export const projectService = (
       );
     };
 
-    /** An answer's run as `answer` gives it: with the env its checks carry. */
     const answerOf = (requestId: RequestId) =>
       Effect.gen(function* () {
         const h = yield* hydrate;
@@ -5489,12 +4889,6 @@ export const projectService = (
           : yield* visibility.heldBackJob(claim.value, h.snapshot);
       });
 
-    /**
-     * A held-back run of the tree the answer is being checked on, judged
-     * once: the same tree reported again answers as it did (its attempt
-     * counted once, principle 8), and a run that no longer checks a tree,
-     * or has no pinned suite, earns nothing.
-     */
     const heldBackBody =
       (requestId: RequestId, results: readonly HeldBackResult[]) =>
       (h: Hydrated, writes: Writes, now: DateTime.Utc) =>
@@ -5558,7 +4952,6 @@ export const projectService = (
         };
       });
 
-    /** The project's env shape at its landed SHA; none to read before anything landed. */
     const envSchemaOf = Effect.gen(function* () {
       const h = yield* hydrate;
 
@@ -5595,7 +4988,6 @@ export const projectService = (
           return set.result;
         });
 
-    /** A plan a port makes of the project as this call has it, taken into the call. */
     const planned =
       (
         plan: (
@@ -5608,9 +5000,6 @@ export const projectService = (
           applyPlan(writes, made, now)
         );
 
-    // ---------------------------------------------------------- deciders
-
-    /** The decider-facing methods, over the same hydrate, write and helpers. */
     const decided = deciders<Hydrated, Writes>({
       advance: (h, writes, now, requestId, command) =>
         advanceBody(requestId, command)(h, writes, now),
@@ -5650,8 +5039,6 @@ export const projectService = (
 
         yield* settle(queue, rows);
       });
-
-    // ------------------------------------------------------------ the api
 
     const api: ProjectApi = {
       [envSchemaMethod]: (caller) =>

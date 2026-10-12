@@ -1,46 +1,3 @@
-/**
- * `Projection` over D1: each project's outbox rows become the front page's
- * rows, the project list's and every person's credits (`tables.ts`). The
- * Project DO stays the system of record; this is a read model it feeds
- * through its outbox, and nothing else writes it.
- *
- * - A project is listed from its first event on (no event says a project
- *   was made), `open` until a `PostureChanged` ledger entry moves it: the
- *   fallback for a list, which reads each project's standing posture from
- *   its own ledger (`withStandingPosture`), since a first config, a
- *   widening and a narrowing taking effect by the clock write no such
- *   entry. Its open asks are counted again from the front page whenever an
- *   ask opens or closes, and a landing stamps when it last landed.
- * - A landing credits each person it names once per role, in its ask's
- *   area: the module of the ask's territory, read from the ask's front
- *   page row, which is still there when its `Landed` applies (its
- *   `AskClosed` comes after). A landing with no ask, or whose ask the front
- *   page never held, credits no area. `Assisted-by` is never credit.
- *
- * Events apply in their project's order, once each. Every statement is
- * guarded by the project's cursor: it runs only if the cursor stands just
- * before its event, and the event's last statement moves the cursor on. So a
- * row seen again, or an older row after a newer one, changes nothing, and
- * two deliveries racing each other apply each event once. A row past a gap
- * (its project's cursor short of the event before it) is not applied, and
- * `apply` fails with `ProjectionFailed` once the rest is in: the outbox keeps
- * those rows and sends them again after the missing one.
- *
- * - A list keeps each project's standing posture beside these tables
- *   (`postures.ts`, migration 0005). An event that can move a project's
- *   posture deletes its kept row in the same write: a `Landed` (a config
- *   lands, a narrowing opens its decision), a `Decided` (an accepted
- *   narrowing starts to stand, now or once its notice runs out) and a
- *   `LedgerAppended` (a `PostureChanged` row; any other entry too, which
- *   costs one read). The table is looked for once per isolate until it is
- *   found, so a database the migration has not reached yet projects as
- *   before.
- *
- * One call is one atomic write: a D1 batch when the `SqlClient` is D1's
- * (D1 has no interactive transactions), and a transaction anywhere else,
- * such as sqlite-node in tests. The client itself says which it is, so the
- * layer needs nothing but the `SqlClient`. A failed write applies nothing.
- */
 import { TypeId } from "@effect/sql-d1/D1Client";
 import type { D1Client } from "@effect/sql-d1/D1Client";
 import { ProjectEvent } from "@repo/protocol/domain/event";
@@ -76,11 +33,7 @@ const Cursors = Schema.Array(
 
 const decodeCursors = Schema.decodeUnknownEffect(Cursors);
 
-/**
- * Whether the client is D1's: every client `@effect/sql-d1` makes carries
- * its `TypeId`, and only its `batch` writes several statements atomically
- * there (its `withTransaction` dies).
- */
+// D1 has no interactive transactions (`withTransaction` dies): only its `batch` is atomic.
 const isD1 = (client: SqlClient): client is D1Client => TypeId in client;
 
 const bySeq = Order.mapInput(
@@ -88,17 +41,9 @@ const bySeq = Order.mapInput(
   ({ event, project }: ProjectedEvent) => [project, event.seq] as const
 );
 
-/** Each project, with the last event the rows carry for it. */
 const lastOf = (events: readonly ProjectedEvent[]) =>
   new Map(events.map(({ event, project }) => [project, event.seq]));
 
-/**
- * Each person a landing credits, once per role, by the key `sameHandle`
- * compares handles by (`handleKey`): the rule of
- * `creditsByArea` (`attention/credits.ts`) for one landing, whose
- * area the projection reads from D1. Only `credits` counts: `assisted` (the
- * `Assisted-by` trailers) names agents, never people.
- */
 const creditedOn = (landing: Pick<LandingView, "credits">) =>
   Array.dedupeWith(
     landing.credits.map(({ handle, role }) => ({
@@ -114,7 +59,6 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
     Effect.gen(function* () {
       const sql = yield* SqlClient;
 
-      /** The statements in order, all or none. */
       const atomically = (
         statements: readonly Statement<object>[]
       ): Effect.Effect<readonly (readonly object[])[], SqlError> =>
@@ -124,10 +68,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
 
       const posturesFound = yield* Ref.make(false);
 
-      /**
-       * Whether the kept postures' table is there (migration 0005): looked
-       * for until it is found, and never again after.
-       */
+      // Looked for until found, so a database the migration has not reached projects as before.
       const keepsPostures = Effect.gen(function* () {
         if (yield* Ref.get(posturesFound)) {
           return true;
@@ -141,24 +82,18 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
         return tables.length > 0;
       });
 
-      /** Whether the project's cursor stands just before event `seq`. */
       const isNext = (project: ProjectName, seq: number) =>
         sql`(SELECT COALESCE(MAX(seq), 0) FROM cursor WHERE project = ${keyOf(project)}) = ${seq - 1}`;
 
-      /**
-       * What one event changes in the read model, if anything: the project's
-       * row first, so every event lists its project.
-       */
       const writes = (
         { event, project }: ProjectedEvent,
         postures: boolean
       ) => {
         const next = isNext(project, event.seq);
 
-        // Every row keeps the project's key, never its name (ADR 0032).
+        // Every row keeps the project's key, never its name.
         const key = keyOf(project);
 
-        /** The project's kept posture, cleared: this event may move it. */
         const unkept = postures
           ? [
               sql`DELETE FROM standing_postures
@@ -178,13 +113,7 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
           sql`UPDATE front_page SET claimed = MAX(claimed + ${change}, 0)
             WHERE project = ${key} AND ask = ${ask} AND ${next}`;
 
-        /**
-         * One more landing for each person `landing` credits, in each role,
-         * in its ask's area. A landing that names a project other than the
-         * one whose outbox carried it credits nothing: ask ids are unique
-         * only within a project (`areaOf` in `attention/record.ts` checks
-         * the same).
-         */
+        // Ask ids are unique only within a project: a landing naming another project credits nothing.
         const credited = ({ ask, ...landing }: LandingView) =>
           ask === undefined || landing.project !== project
             ? []
@@ -247,7 +176,6 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
         return [listed, ...changes];
       };
 
-      /** Moves the project's cursor on to `seq`, if it stands just before it. */
       const advance = (project: ProjectName, seq: number) =>
         sql`INSERT INTO cursor (project, seq)
           SELECT ${keyOf(project)}, ${seq} WHERE ${isNext(project, seq)}
@@ -256,10 +184,6 @@ export const ProjectionD1: Layer.Layer<Projection, never, SqlClient> =
       const cursorsOf = (projects: readonly ProjectName[]) =>
         sql`SELECT project, seq FROM cursor WHERE ${sql.in("project", projects.map(keyOf))}`;
 
-      /**
-       * Applies the events in one write, then reads where each project's
-       * cursor stands: short of a project's last event means a gap.
-       */
       const deliver = (events: Array.NonEmptyReadonlyArray<ProjectedEvent>) =>
         Effect.gen(function* () {
           const last = lastOf(events);

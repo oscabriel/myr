@@ -1,30 +1,9 @@
-/**
- * The front page's tables in D1, as the platform's first D1 migration
- * (`apps/platform/migrations/0001_front_page.sql`) creates them. The file
- * holds exactly this text, and the projection's test applies the file and
- * checks that it does, so the DDL has one source.
- *
- * - `front_page`: one row per open ask of every project. `claimed` counts
- *   the live claims on the ask (a race ask may hold several); `blocked_by`
- *   is the ask's blockers as a JSON array of ask ids; `opened_at` is when
- *   its `AskOpened` happened. A landed ask's row is deleted.
- * - `cursor`: the last event applied per project. Events apply in their
- *   project's order, once each, so a replayed or late row changes nothing.
- *
- * A migration is never edited once it has run anywhere: the project list adds
- * its tables in `0004_projects_credits.sql` (`ProjectsCreditsDdl`), and the
- * kept standing postures theirs in `0005_standing_postures.sql`
- * (`StandingPosturesDdl`).
- */
 import type { Handle } from "@repo/protocol/ids";
 
-/**
- * The key `credits.handle_key` holds a person by: the handle lowercased,
- * the rule protocol's `sameHandle` compares by. The projection writes it and
- * the credits query reads by it, so both take it from here.
- */
+/** The projection writes and the credits query reads by this key, as `sameHandle` compares. */
 export const handleKey = (handle: Handle): string => handle.toLowerCase();
 
+/** Must equal `apps/platform/migrations/0001_front_page.sql`; the projection's test checks it. */
 export const FrontPageDdl = `-- The front page: every open ask of every project, projected from each
 -- project's outbox by packages/project/src/projection-d1 (its tables.ts
 -- holds this text). The projection is the only writer.
@@ -51,28 +30,7 @@ CREATE TABLE cursor (
 );
 `;
 
-/**
- * The project list's and the credits' tables in D1, as the platform's
- * fourth D1 migration (`apps/platform/migrations/0004_projects_credits.sql`)
- * creates them, beside the front page's. The file holds exactly this text,
- * and the projection's credits test applies the file and checks that it
- * does.
- *
- * - `projects`: one row per project the projection has heard from: its
- *   posture (`open` until a `PostureChanged` ledger entry; the fallback a
- *   list keeps when it cannot read the project's own ledger, which it reads
- *   for the posture standing now: `withStandingPosture`), its open asks
- *   (counted from `front_page` whenever an ask opens or closes), and when
- *   it last landed (null before its first landing).
- * - `credits`: how many landings credit a person (by `handle_key`, the
- *   handle lowercased: `handleKey`) in one role, in one area of one project.
- *
- * Its last statement lists the projects `cursor` already knows of, with
- * their open asks, so a database the front page's migration made keeps its
- * project list (an earlier stopgap read it from `cursor`). Their credits and
- * last landings come back only with a rebuild: clear the four tables and
- * replay each project's events from seq 1.
- */
+/** Must equal `apps/platform/migrations/0004_projects_credits.sql`; the credits test checks it. */
 export const ProjectsCreditsDdl = `-- The project list and every person's credits, projected from each
 -- project's outbox by packages/project/src/projection-d1 beside the front
 -- page (its tables.ts holds this text). The projection is the only writer.
@@ -110,20 +68,7 @@ SELECT cursor.project, 'open',
 FROM cursor;
 `;
 
-/**
- * The kept standing postures' table in D1, as the platform's fifth D1
- * migration (`apps/platform/migrations/0005_standing_postures.sql`) creates
- * it. The file holds exactly this text, and the postures' test applies the
- * file and checks that it does.
- *
- * - `standing_postures`: one row per project a list has read the posture
- *   of (`withStandingPosture`): the posture, when it moves by the clock
- *   alone (`moves_at`, ISO 8601; null when only an event moves it), and
- *   the project's last event the read saw (`seen`). The projection deletes
- *   a project's row with any event that can move its posture; a list
- *   writes one only while `cursor` stands at or before `seen`
- *   (`postures.ts`).
- */
+/** Must equal `apps/platform/migrations/0005_standing_postures.sql`; the postures' test checks it. */
 export const StandingPosturesDdl = `-- Each listed project's standing posture, as a list last read it from the
 -- project's own record, kept by packages/project/src/projection-d1 (its
 -- tables.ts holds this text). A cache: a row lost costs one read. The

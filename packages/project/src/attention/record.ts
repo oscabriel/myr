@@ -1,62 +1,33 @@
-/**
- * A person's record (GLOSSARY "Record"): their landings by area that stayed
- * unreverted long enough to count, inside the window that still counts. It
- * answers trust rules only, yes or no: it is never a score, never a ranking,
- * and never leaves `packages/project`. Nothing here counts
- * against anyone: a check that flaked or a verifier that was blocked never
- * reached a landing, so it is not in the record at all.
- *
- * Pure: `now` and which landings were reverted are arguments. The project
- * service builds `reverted` from revert landings and `StrayPush` decisions
- * decided `revert`, since a landing does not say it was reverted.
- */
 import type { Ask } from "@repo/protocol/domain/ask";
 import type { LandingView } from "@repo/protocol/domain/landing";
 import type { Policy } from "@repo/protocol/domain/policy";
 import type { AskId, Handle, LandedSha, ProjectName } from "@repo/protocol/ids";
 import { Array as Arr, DateTime, Option } from "effect";
 
-/** One landing that counts on its accountable person's record, in its area. */
 export interface RecordEntry {
-  /** The module of the territory its ask was in. */
   readonly area: string;
-  /** When it landed. */
   readonly at: DateTime.Utc;
   readonly handle: Handle;
   readonly landing: LandedSha;
   readonly project: ProjectName;
 }
 
-/** What a record is built from. */
 export interface RecordInput {
-  /**
-   * The project's asks by id, closed ones included, to find each landing's
-   * area. Ask ids are unique only within a project, so give one project's
-   * asks and landings, and build one record per project for several: a
-   * landing whose id finds another project's ask counts for no area.
-   */
+  /** Ask ids are unique only within a project: give one project's asks and landings. */
   readonly asks: ReadonlyMap<AskId, Ask>;
   readonly landings: readonly LandingView[];
   readonly now: DateTime.Utc;
   readonly policy: Policy["record"];
-  /** Landings since reverted; they never count. */
   readonly reverted: ReadonlySet<LandedSha>;
 }
 
-/** A record rule: at least `atLeast` counted landings in `area`. */
 export interface RecordRule {
   readonly area: string;
   readonly atLeast: number;
 }
 
-/** A handle as a map key: the form `sameHandle` (`@repo/protocol/ids`) compares by. */
 const personOf = (handle: Handle) => handle.toLowerCase();
 
-/**
- * A landing's area: the module of the territory its ask was in. A landing
- * that answered no ask (a decider's own, the first adoption), or whose ask
- * is not known in its project, has none.
- */
 export const areaOf = (
   landing: LandingView,
   asks: ReadonlyMap<AskId, Ask>
@@ -67,10 +38,6 @@ export const areaOf = (
     Option.map((ask) => ask.territory.module)
   );
 
-/**
- * Whether a landing counts at `now`: it has stayed for `countsAfterDays`
- * (from that day on) and is no older than `windowDays` (that day included).
- */
 const counts = (
   landedAt: DateTime.Utc,
   now: DateTime.Utc,
@@ -85,12 +52,6 @@ const counts = (
     DateTime.add(landedAt, { days: window.windowDays })
   );
 
-/**
- * Everyone's record at `now`, built once; the result looks up one person's.
- * A landing is on the record of its author, the accountable person, and
- * counts after `countsAfterDays` unreverted, for `windowDays`. Entries keep
- * the landings' order.
- */
 export const recordOf = (
   input: RecordInput
 ): ((handle: Handle) => readonly RecordEntry[]) => {
@@ -132,11 +93,7 @@ export const recordOf = (
   return (handle) => byPerson.get(personOf(handle)) ?? [];
 };
 
-/**
- * Whether a record holds at least `atLeast` counted landings in `area`: yes
- * or no, never how many. It counts every entry it is given, so a caller
- * holding several projects' entries passes one project's (`mayClaim` does).
- */
+/** Counts every entry it is given: pass one project's entries. */
 export const meets = (
   entries: readonly RecordEntry[],
   rule: RecordRule

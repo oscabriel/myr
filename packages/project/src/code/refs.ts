@@ -1,10 +1,3 @@
-/**
- * A project's refs as readers see them: main's landed commit (the
- * project's record, never a ref), its tags peeled to their commits (the
- * repo's `tags`) in a reader's order (`sortTags`), and its forks. Only
- * `refs/tags/*` is read: nothing of the platform's own (its landed mirror,
- * compose refs, notes) and no branch but main ever shows.
- */
 import { RepoHost } from "@repo/artifacts/repo-host";
 import { packageOf, TagName } from "@repo/protocol/domain/code";
 import type { RefsView, TagRef } from "@repo/protocol/domain/code";
@@ -13,12 +6,10 @@ import { Array, Effect, Option, Schema } from "effect";
 import type { CodeProject } from "../code.ts";
 import { tagNameOf } from "./revision.ts";
 
-/** A name cut into runs of digits and runs of anything else. */
 const runsOf = (name: string) => name.match(/\d+|\D+/gu) ?? [];
 
 const isDigits = (run: string) => /^\d/u.test(run);
 
-/** Two strings as written, code point by code point. */
 const compareText = (one: string, other: string) => {
   if (one === other) {
     return 0;
@@ -27,7 +18,6 @@ const compareText = (one: string, other: string) => {
   return one < other ? -1 : 1;
 };
 
-/** Two runs of digits by their value, however long. */
 const compareNumbers = (one: string, other: string) => {
   const left = one.replace(/^0+(?=\d)/u, "");
   const right = other.replace(/^0+(?=\d)/u, "");
@@ -39,12 +29,7 @@ const compareNumbers = (one: string, other: string) => {
   return compareText(left, right);
 };
 
-/**
- * Tags newest first, by version: runs of digits compare by value, so
- * `v1.10.0` comes before `v1.9.0`, and a release before its own
- * pre-releases (`v1.10.0` before `v1.10.0-beta.1`). Names are otherwise
- * compared as written, so a scoped package's tags stay together.
- */
+/** Newest first: digit runs compare by value (`v1.10.0` before `v1.9.0`), and a release before its pre-releases. */
 export const compareTags = (one: string, other: string): number => {
   const left = runsOf(one);
   const right = runsOf(other);
@@ -67,8 +52,7 @@ export const compareTags = (one: string, other: string): number => {
     return 0;
   }
 
-  // One name runs on past the other: a pre-release (`-beta.1`) is older
-  // than its release, anything else newer.
+  // A pre-release (`-beta.1`) is older than its release, anything else newer.
   const longer = left.length > right.length ? left : right;
   const rest = longer[Math.min(left.length, right.length)] ?? "";
   const longerIsNewer = !rest.startsWith("-");
@@ -77,12 +61,7 @@ export const compareTags = (one: string, other: string): number => {
   return leftIsLonger === longerIsNewer ? -1 : 1;
 };
 
-/**
- * Tags in the order a reader meets them, from their names alone: the tags
- * that version no package first; then each package's tags as one run, the
- * package with the most tags first (a monorepo's main package), ties by
- * name; newest first within each (`compareTags`).
- */
+/** Unversioned tags first, then each package's tags together, most tags first; newest first within each. */
 export const sortTags = <T extends { readonly name: string }>(
   tags: readonly T[]
 ): readonly T[] => {
@@ -124,7 +103,7 @@ export const sortTags = <T extends { readonly name: string }>(
 
 const decodeTag = Schema.decodeUnknownOption(TagName);
 
-/** Main's landed commit, its tags peeled and sorted newest first, and its forks. */
+/** Only `refs/tags/*` is read: none of the platform's own refs and no branch but main ever shows. */
 export const refsView = (
   project: CodeProject
 ): Effect.Effect<RefsView, never, RepoHost> =>

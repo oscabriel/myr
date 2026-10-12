@@ -1,10 +1,3 @@
-/**
- * The landing lifecycle: one answer request's way from the queue to main
- * (ADR 0012). A pure `transition(state, command, now)` returns the next state
- * and the effects the project service settles; it reads no clock and calls no
- * port. A command that does not apply to a state changes nothing, so a replay
- * converges (principle 8).
- */
 import { AgentTrailer, Credit } from "@repo/protocol/domain/credit";
 import type { CreditRole } from "@repo/protocol/domain/credit";
 import type { Choice } from "@repo/protocol/domain/decision";
@@ -36,13 +29,9 @@ import { Array, Data, DateTime, Duration, Match, Option, Schema } from "effect";
 
 import { ProjectEventInput } from "./events.ts";
 
-/** How many times a moved main may send an answer back to merge before it is refused as stale. */
 export const maxRemerges = 3;
 
-/**
- * One path an answer's merge changed. Structurally the gate's and git's
- * `Change`, so the service passes one where the other is expected.
- */
+/** Structurally the gate's and git's `Change`, so either passes where the other is expected. */
 export const Change = Schema.Struct({
   after: Schema.optionalKey(BlobSha),
   before: Schema.optionalKey(BlobSha),
@@ -52,20 +41,12 @@ export const Change = Schema.Struct({
 
 export type Change = typeof Change.Type;
 
-/**
- * An admitted answer, as the gate let it through: who answers which ask from
- * which fork, and the credit its landing will carry.
- */
 export const Request = Schema.Struct({
   answerer: Handle,
   /** Absent for a decider's own landing. */
   ask: Schema.OptionFromOptionalKey(AskId),
   assisted: Schema.Array(AgentTrailer),
   base: CommitSha,
-  /**
-   * The credit trailers the landing carries; a finish adds `Finished-by`, and
-   * an accepted decision `Decided-by`.
-   */
   credits: Schema.Array(Credit),
   fork: RepoName,
   head: CommitSha,
@@ -75,10 +56,6 @@ export const Request = Schema.Struct({
 
 export type Request = typeof Request.Type;
 
-/**
- * A decision an answer can wait on. Declining one refuses the answer with the
- * refusal it stands for.
- */
 export const AnswerDecision = Schema.Union([
   DecisionSubject.cases.PostureChange,
   DecisionSubject.cases.RaiseRatchet,
@@ -87,7 +64,6 @@ export const AnswerDecision = Schema.Union([
 
 export type AnswerDecision = typeof AnswerDecision.Type;
 
-/** A decision the answer waits on, with the id the service minted for it. */
 export const PendingDecision = Schema.Struct({
   id: DecisionId,
   subject: AnswerDecision,
@@ -97,8 +73,6 @@ export type PendingDecision = typeof PendingDecision.Type;
 
 const Count = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
-// What every state between the queue and main carries: the main it works
-// against, how often a moved main sent it back, and how often a port retried.
 const underway = {
   attempt: Count,
   main: LandedSha,
@@ -108,83 +82,58 @@ const underway = {
 
 const checkedFields = { ...underway, tree: TreeSha };
 
-/** Where one answer request stands on its way to main. */
 export const LandingState = Schema.TaggedUnion({
-  /** Passed its checks, and waits on decisions; a finish may follow. */
   AwaitingDecision: {
     ...checkedFields,
     decisions: Schema.NonEmptyArray(PendingDecision),
     finish: AskKind.fields.finish,
   },
-  /** Passed its checks, and waits for a decider's finish. */
   AwaitingFinish: checkedFields,
-  /** The merged tree is being checked. */
   Checking: { ...checkedFields, changes: Schema.Array(Change) },
   Landed: { request: Request, sha: LandedSha },
-  /** Passed every stage; the platform is landing the tree on main. */
   Landing: checkedFields,
-  /** Being merged onto `main`. */
   Merging: underway,
   Queued: { request: Request },
   Refused: { refusals: Schema.NonEmptyArray(Refusal), request: Request },
-  /** Passed the gate, and waits for its parent ask to land first. */
   WaitingOnParent: { parent: AskId, request: Request },
 });
 
 export type LandingState = typeof LandingState.Type;
 
-/** What the service tells a landing: a port's answer, a person's decision, or the queue's go. */
 export type LandingCommand = Data.TaggedEnum<{
-  /** The queue started the request against the landed main. */
   Start: { readonly main: LandedSha };
-  /** The request's ask waits on its parent; `Start` resumes it. */
   Wait: { readonly parent: AskId };
-  /** The merge onto `main` came out clean. */
   Merged: {
     readonly changes: readonly Change[];
     readonly main: LandedSha;
     readonly tree: TreeSha;
   };
-  /**
-   * The merge onto `main` conflicted in these paths; `movedBy` names the
-   * landing that last changed each one the step found.
-   */
   MergeConflict: {
     readonly conflicts: readonly RepoPath[];
     readonly main: LandedSha;
     readonly movedBy?: Array.NonEmptyReadonlyArray<MovedBy>;
   };
-  /** The checks judged `tree`. */
   Checked: {
     readonly decisions: readonly PendingDecision[];
     readonly finish: AskKind["finish"];
     readonly refusals: readonly Refusal[];
     readonly tree: TreeSha;
   };
-  /** A decider finished the answer. */
   Finished: { readonly by: Handle };
-  /** Decider `by` decided one of the decisions the answer waits on. */
   Decided: {
     readonly by: Handle;
     readonly choice: Choice;
     readonly decision: DecisionId;
   };
-  /** Landing found main moved from `from`, the main it landed against, to `main`. */
   MainMoved: { readonly from: LandedSha; readonly main: LandedSha };
-  /** The landing is on main at `sha`. */
   LandedOk: { readonly sha: LandedSha };
-  /** The repo was busy with another push during landing attempt `attempt`. */
   Busy: { readonly attempt: number };
-  /**
-   * A port answered `VerifierBlocked` during attempt `attempt`: retried with
-   * backoff, never counted against the answerer.
-   */
+  /** Retried with backoff, never counted against the answerer. */
   Blocked: { readonly attempt: number };
 }>;
 
 export const LandingCommand = Data.taggedEnum<LandingCommand>();
 
-/** What the service runs for a landing: the transition only describes it. */
 export type LandingEffect = Data.TaggedEnum<{
   Merge: {
     readonly base: CommitSha;
@@ -194,16 +143,13 @@ export type LandingEffect = Data.TaggedEnum<{
   };
   RunChecks: { readonly tree: TreeSha };
   Land: { readonly main: LandedSha; readonly tree: TreeSha };
-  /** Run the state's `pendingEffects` again at `at`. */
   Retry: { readonly at: DateTime.Utc };
   Emit: { readonly event: ProjectEventInput };
-  /** Record the landing: close the ask, answer the claim, move the landed SHA. */
   Record: { readonly sha: LandedSha };
 }>;
 
 export const LandingEffect = Data.taggedEnum<LandingEffect>();
 
-/** One step of a landing: the state it reached and the effects to settle. */
 export interface Step {
   readonly effects: readonly LandingEffect[];
   readonly state: LandingState;
@@ -235,14 +181,9 @@ const passedOf = ({ attempt, main, remerges, request, tree }: Passed) => ({
   tree,
 });
 
-/** How long a retry waits after attempt `attempt`: a second, doubling, up to five minutes. */
 export const backoff = (attempt: number): Duration.Duration =>
   Duration.millis(Math.min(1000 * 2 ** attempt, 5 * 60 * 1000));
 
-/**
- * The port call a state waits on: the service runs it when the state is
- * entered, and again at a `Retry`.
- */
 export const pendingEffects = (state: LandingState): readonly LandingEffect[] =>
   LandingState.matchOrElse<readonly LandingEffect[]>(
     state,
@@ -276,9 +217,6 @@ const refuse = (
 const start = (request: Request, main: LandedSha): Step =>
   enter(Merging.make({ attempt: 0, main, remerges: 0, request }));
 
-// A port answered `Busy` or `VerifierBlocked` for this attempt: the same
-// state waits, then runs its port call again. A report for another attempt
-// is a replay, and changes nothing.
 const retry = (
   state: typeof Checking.Type | typeof Landing.Type | typeof Merging.Type,
   attempt: number,
@@ -298,7 +236,6 @@ const retry = (
 const isFinished = (request: Request) =>
   request.credits.some(({ role }) => role === "Finished-by");
 
-// The landing credits a person once in each role, however often they act in it.
 const credit = (request: Request, role: CreditRole, handle: Handle): Request =>
   request.credits.some(
     (given) => given.role === role && given.handle === handle
@@ -306,8 +243,6 @@ const credit = (request: Request, role: CreditRole, handle: Handle): Request =>
     ? request
     : { ...request, credits: [...request.credits, { handle, role }] };
 
-// Every stage passed but the human one: wait on each decision first, then on
-// a finish the kind requires and nobody gave yet, then land.
 const human = (
   passed: Passed,
   decisions: readonly PendingDecision[],
@@ -328,7 +263,6 @@ const human = (
       ),
   });
 
-/** The refusal a merge that conflicted stands for, naming who moved each path the step found. */
 const staleOn = (
   base: CommitSha,
   {
@@ -341,7 +275,6 @@ const staleOn = (
     ? new StaleBase({ base, conflicts, main })
     : new StaleBase({ base, conflicts, main, movedBy });
 
-/** The refusal a declined decision stands for. */
 const declined = (subject: AnswerDecision): Refusal =>
   AnswerDecision.match(subject, {
     PostureChange: ({ from, to }) => new PostureChange({ from, to }),
@@ -421,8 +354,6 @@ const landed = (
   };
 };
 
-// Main moved under the landing. A report about another main is a replay. A
-// clean re-merge goes back through the checks; past the limit it is stale.
 const moved = (
   state: typeof Landing.Type,
   { from, main }: { readonly from: LandedSha; readonly main: LandedSha }
@@ -445,12 +376,7 @@ const moved = (
       );
 };
 
-/**
- * One step of a landing. A command that does not apply to the state, or
- * reports on another main, tree, attempt or decision than the state is at,
- * returns the state as it was with no effects: replays and late duplicates
- * converge. Landed and Refused never move.
- */
+/** A command that does not apply, or reports on another main, tree, attempt or decision, changes nothing: replays converge. */
 export const transition = (
   state: LandingState,
   command: LandingCommand,
@@ -530,7 +456,6 @@ export const transition = (
       ),
   });
 
-/** Where the answer stands, as `status`, `verdict` and MCP report it. */
 export const outcomeOf = (state: LandingState): Outcome =>
   LandingState.match<Outcome>(state, {
     AwaitingDecision: ({ decisions }) =>
@@ -538,7 +463,6 @@ export const outcomeOf = (state: LandingState): Outcome =>
     AwaitingFinish: () => Outcome.cases.AwaitingFinish.make({}),
     Checking: () => Outcome.cases.Checking.make({ stage: "checks" }),
     Landed: ({ sha }) => Outcome.cases.Landed.make({ sha }),
-    // Past every stage: the landing closes the last one.
     Landing: () => Outcome.cases.Checking.make({ stage: "human" }),
     Merging: () => Outcome.cases.Checking.make({ stage: "merge" }),
     Queued: () => Outcome.cases.Checking.make({ stage: "merge" }),
@@ -547,12 +471,7 @@ export const outcomeOf = (state: LandingState): Outcome =>
       Outcome.cases.WaitingOnParent.make({ ask: parent }),
   });
 
-/**
- * The project's landing queue, as a value the store persists: requests land
- * one at a time, in the order their checks passed.
- */
 export const LandingQueue = Schema.Struct({
-  /** The request whose landing is underway. */
   active: Schema.OptionFromOptionalKey(RequestId),
   order: Schema.Array(RequestId),
 });
@@ -562,13 +481,11 @@ export type LandingQueue = typeof LandingQueue.Type;
 const isActive = (queue: LandingQueue, id: RequestId) =>
   Option.contains(queue.active, id);
 
-/** Adds a request to the back of the queue; a request already in it stays where it is. */
 export const enqueue = (queue: LandingQueue, id: RequestId): LandingQueue =>
   isActive(queue, id) || queue.order.includes(id)
     ? queue
     : { ...queue, order: [...queue.order, id] };
 
-/** Admits the request at the front, unless one is already landing. */
 export const next = (
   queue: LandingQueue
 ): {
@@ -585,10 +502,6 @@ export const next = (
         }),
       });
 
-/**
- * Frees the slot once a request's landing is over (landed, refused or sent
- * back to merge), or drops a request that leaves before its turn.
- */
 export const settle = (queue: LandingQueue, id: RequestId): LandingQueue =>
   isActive(queue, id)
     ? { ...queue, active: Option.none() }

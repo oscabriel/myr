@@ -1,9 +1,3 @@
-/**
- * Folders of a commit: a tree's entries by its id (kept once read), the
- * entry at a path, walked one segment at a time, and one folder as a
- * reader lists it: folders first, then by name, each entry by its kind,
- * with its README by GitLab's precedence, any case.
- */
 import { ObjectId, RepoHost } from "@repo/artifacts/repo-host";
 import type { RepoNotFound, TreeEntry } from "@repo/artifacts/repo-host";
 import type { CodeEntry, Rev, TreeListing } from "@repo/protocol/domain/code";
@@ -17,19 +11,9 @@ import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
 import { commitAt, resolveRev } from "./revision.ts";
 
-/**
- * How many commits a walk over history (a path's log, why each line is
- * there) has under way at once, in one ordered pass with no batch to wait
- * on. A live store answers each read in tens to hundreds of milliseconds,
- * and a path four folders deep chains five reads per commit, so one at a
- * time a 200-commit walk took a minute on dev-oscabriel and sixteen at
- * once in batches still 14-28 s. Forty-eight at once, at a few
- * hundred milliseconds each, stays under the store's 2,000 requests per
- * 10 s per repo for one viewer.
- */
+/** Live store reads take 0.1-0.5 s and chain per path segment; 48 at once keeps a walk fast and under the store's 2,000 requests per 10 s per repo. */
 export const READS_AT_ONCE = 48;
 
-/** The entries of the tree `id`; a tree a commit or a tree names is always there. */
 export const entriesOf = (
   repo: RepoName,
   id: string
@@ -50,7 +34,6 @@ export const entriesOf = (
     );
   });
 
-/** The segments of `path`; none when one is empty, `.` or `..`. */
 export const segmentsOf = (path: string): Option.Option<readonly string[]> => {
   const segments = path.split("/");
 
@@ -61,7 +44,6 @@ export const segmentsOf = (path: string): Option.Option<readonly string[]> => {
     : Option.none();
 };
 
-/** The entry at `path` under the tree `root`, walked one segment at a time. */
 export const entryAt = (
   repo: RepoName,
   root: string,
@@ -92,7 +74,6 @@ export const entryAt = (
       }),
   });
 
-/** What a reader sees an entry as: a gitlink is a submodule, mode 120000 a symlink. */
 export const kindOf = (entry: TreeEntry): CodeEntry["type"] =>
   Match.value(entry).pipe(
     Match.when({ type: "tree" }, () => "tree" as const),
@@ -101,13 +82,11 @@ export const kindOf = (entry: TreeEntry): CodeEntry["type"] =>
     Match.orElse(() => "blob" as const)
   );
 
-/** Folders first, then by name. */
 const byKindThenName = Order.combine(
   Order.mapInput(Order.Boolean, (entry: CodeEntry) => entry.type !== "tree"),
   Order.mapInput(Order.String, (entry: CodeEntry) => entry.name)
 );
 
-/** GitLab's README precedence, lowercased. */
 const README = [
   "readme.md",
   "readme.markdown",
@@ -117,11 +96,7 @@ const README = [
   "readme.rst",
 ];
 
-/**
- * Where a symlink in `folder` points, as a path from the repo's root: its
- * target read against the folder, `.` and `..` resolved. None when the
- * target is absolute or climbs out of the repo.
- */
+/** None when the target is absolute or climbs out of the repo. */
 const linkTargetOf = (
   folder: string,
   target: string
@@ -145,10 +120,8 @@ const linkTargetOf = (
   return Option.liftPredicate(resolved.join("/"), (path) => path !== "");
 };
 
-/** The longest path a symlink's target may be: git's own `PATH_MAX`. */
 const LINK_TARGET_MAX = 4096;
 
-/** A symlink's target text, kept by its blob id; none when it is too long to be a path. */
 const linkTextOf = (repo: RepoName, link: string) =>
   Effect.gen(function* () {
     const cache = yield* CodeCache;
@@ -167,11 +140,7 @@ const linkTextOf = (repo: RepoName, link: string) =>
     );
   });
 
-/**
- * The file the symlink blob `link` in `folder` names, if it is a file in
- * the repo: one link followed, never a chain (a link's entry is a blob too,
- * so its kind is asked, not its type).
- */
+/** One link followed, never a chain; a link's entry is a blob too, so its kind is asked, not its type. */
 const linkedFile = (
   repo: RepoName,
   root: Effect.Effect<string, never, RepoHost>,
@@ -202,12 +171,6 @@ const linkedFile = (
     );
   });
 
-/**
- * The folder's README by GitLab's precedence, any case: a file, or a
- * symlink to a file elsewhere in the repo (axum's root README.md links to
- * its crate's), read where it points, so its relative links resolve there.
- * A link out of the repo, to nothing or to a folder is no README.
- */
 const readmeOf = (
   repo: RepoName,
   root: Effect.Effect<string, never, RepoHost>,
@@ -240,7 +203,6 @@ const readmeOf = (
     return Option.none();
   });
 
-/** The tree `path` names at `commit`, or `UnknownPath`. */
 export const folderAt = (
   repo: RepoName,
   commit: CommitSha,
@@ -269,7 +231,6 @@ export const folderAt = (
     })
   );
 
-/** One folder at `at`, folders first, with its README. */
 export const listing = (
   project: CodeProject,
   at: Option.Option<Rev>,

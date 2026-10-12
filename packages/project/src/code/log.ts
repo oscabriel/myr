@@ -1,21 +1,3 @@
-/**
- * The first-parent log from a revision, a page at a time: each commit as a
- * reader sees it (subject, body, trailers, who and when), and `landing`
- * only where the project's record has one, so a trailer in an imported
- * commit never reads as a landing. With a path, only the commits whose
- * first-parent change touched it, scanning at most 200 commits a call;
- * `next` is where the scan stopped, so the next page resumes it.
- *
- * A path's history from the scan's first commit is kept by immutable ids
- * (`history.ts`) under `<repo>/path-log/v<LOG_VERSION>/<commit>/<scan>/
- * <sha256(path)>`: the commits of the scan that changed the path, newest
- * first, and whether the scan reached the root; pages are cut from it.
- * Kept nowhere yet, it is the history kept at the nearest first-parent
- * ancestor within `INCREMENT_REACH` commits plus the commits between that
- * changed the path, cut to the scan; else each commit of the scan has its
- * entry looked up once (`READS_AT_ONCE` under way, in one ordered pass),
- * and neighbours compared.
- */
 import { inRepoSession, Revision, RepoHost } from "@repo/artifacts/repo-host";
 import type {
   Commit,
@@ -44,13 +26,10 @@ import type { StoredPathLog } from "./history.ts";
 import { commitAt, resolveRev } from "./revision.ts";
 import { entryAt, READS_AT_ONCE } from "./tree.ts";
 
-/** The most commits one page holds. */
 export const LOG_LIMIT = 100;
 
-/** The most first-parent commits a path's log scans in one call. */
 export const PATH_SCAN = 200;
 
-/** A commit as a reader sees it, with its landing when it is one. */
 export const commitView = (
   commit: Commit,
   landing: Option.Option<LandingView>
@@ -84,7 +63,6 @@ export const commitView = (
   };
 };
 
-/** `commits` as a reader sees them, each landing from one batch of the project's record. */
 export const commitViews = (
   project: CodeProject,
   commits: readonly Commit[]
@@ -104,10 +82,6 @@ export const commitViews = (
     }
   );
 
-/**
- * `count` first-parent commits from `sha`, the first `from` skipped: a
- * commit's history never changes, so the page is kept by its start.
- */
 export const pageOf = (
   repo: RepoName,
   sha: CommitSha,
@@ -126,14 +100,12 @@ export const pageOf = (
     );
   });
 
-/** What sits at `path` in `tree`: its id and mode, or nothing. */
 const idAt = (repo: RepoName, tree: string, path: RepoPath) =>
   Effect.map(
     entryAt(repo, tree, path),
     Option.map(({ mode, sha }: TreeEntry) => `${mode} ${sha}`)
   );
 
-/** A page of the log, and where the next starts when there is more. */
 export interface LogPage {
   readonly commits: readonly CommitView[];
   readonly next?: number;
@@ -148,17 +120,11 @@ const pageWith = (
     onSome: (at) => ({ commits, next: at }),
   });
 
-/** What sits at a path in a commit, as a walk compares it with its parent's. */
 type IdOf = (
   commit: Commit
 ) => Effect.Effect<Option.Option<string>, RepoNotFound, RepoHost>;
 
-/**
- * How a walk from `start` looks `path` up in each commit: a file small
- * enough there is read whole, one call a commit (`file-walk.ts`), and
- * named by its blob id, so a change of its mode alone is not seen; any
- * other path by its folders, named by its mode and id.
- */
+// A small file is named by its blob id, so a change of its mode alone is not seen.
 const idOfFrom = (
   repo: RepoName,
   path: RepoPath,
@@ -180,19 +146,12 @@ const idOfFrom = (
     })
   );
 
-/** What sits at the path in each commit of `commits`, in order: one lookup each. */
 const idsOf = (
   idOf: IdOf,
   commits: readonly Commit[]
 ): Effect.Effect<readonly Option.Option<string>[], RepoNotFound, RepoHost> =>
   Effect.forEach(commits, idOf, { concurrency: READS_AT_ONCE });
 
-/**
- * The commits among the first `count` of `scan` that changed `path` from
- * their first parent, newest first. The log is first parents, so each
- * commit's parent is the next in `scan`; only past it (or should the log
- * ever say otherwise) is a parent read on its own.
- */
 const changedIn = (
   repo: RepoName,
   idOf: IdOf,
@@ -235,7 +194,6 @@ const changedIn = (
     return Array.getSomes(changed);
   });
 
-/** The path's history from `scan[0]`, kept at the nearest ancestor within reach. */
 const nearestKept = (repo: RepoName, path: RepoPath, scan: readonly Commit[]) =>
   Effect.map(
     Effect.forEach(
@@ -253,7 +211,6 @@ const nearestKept = (repo: RepoName, path: RepoPath, scan: readonly Commit[]) =>
       )
   );
 
-/** The path's history over `scan` (at most `PATH_SCAN` commits and the parent of its last). */
 const historyOf = (
   repo: RepoName,
   path: RepoPath,
@@ -293,7 +250,6 @@ const historyOf = (
     };
   });
 
-/** A page of first-parent commits from `at`, each landing with its record. */
 export const logPage = (
   project: CodeProject,
   input: {
@@ -370,7 +326,4 @@ export const logPage = (
       commits,
       scan.length > PATH_SCAN ? Option.some(from + PATH_SCAN) : Option.none()
     );
-  }).pipe(
-    // The scan and the walk over it: one session, one handle.
-    inRepoSession
-  );
+  }).pipe(inRepoSession);

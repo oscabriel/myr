@@ -1,16 +1,3 @@
-/**
- * `FrontPage` over D1: the open asks of every project, the project list and
- * a person's credits, each in one query, read from the rows `ProjectionD1`
- * keeps (`tables.ts`), so no project wakes.
- *
- * An entry is what the anonymous viewer sees: an ask is takeable when no
- * live claim holds it, nothing it waits on is still open, and it is held for
- * nobody. Its `blockedBy` names only the asks it still waits on: one that
- * landed has left the front page. Newest asks come first, each with its
- * project's posture. Projects are listed by name, and a person's credits by
- * project, area and role: counts by role and area, never a score or a total
- * across roles. A failed read is a defect: the port's reads cannot fail.
- */
 import { Reserve } from "@repo/protocol/domain/ask";
 import type {
   FrontPageEntry,
@@ -29,13 +16,11 @@ import { handleKey } from "./tables.ts";
 
 const AskIds = Schema.fromJsonString(Schema.Array(AskId));
 
-/** One row of the front page query. */
 const EntryRow = Schema.Struct({
   ask: AskId,
   blocked_by: AskIds,
   claimed: Schema.Int,
   kind: KindName,
-  /** The asks it waits on that are still on the front page. */
   open_blockers: AskIds,
   posture: Posture,
   project: ProjectKey,
@@ -48,7 +33,6 @@ type EntryRow = typeof EntryRow.Type;
 
 const decodeRows = Schema.decodeUnknownEffect(Schema.Array(EntryRow));
 
-/** One row of the projects query. */
 const ProjectRow = Schema.Struct({
   landed_at: Schema.NullOr(Schema.DateTimeUtcFromString),
   open_asks: Schema.Int,
@@ -60,8 +44,7 @@ type ProjectRow = typeof ProjectRow.Type;
 
 const decodeProjectRows = Schema.decodeUnknownEffect(Schema.Array(ProjectRow));
 
-// Each row keeps the project's key (ADR 0032); a row whose key no project
-// can have (a throwaway torn down before owners) is left out of every list.
+// A row whose key no project can have is left out of every list.
 const CreditRow = Schema.Struct({
   ...CreditSummary.fields,
   project: ProjectKey,
@@ -147,7 +130,6 @@ export const FrontPageD1: Layer.Layer<FrontPage, never, SqlClient> =
           Effect.orDie
         );
 
-      // By the key the projection keeps: the handle as `sameHandle` compares it.
       const credits = (handle: Handle) =>
         sql`SELECT project, area, role, count
           FROM credits

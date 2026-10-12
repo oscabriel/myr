@@ -1,9 +1,3 @@
-/**
- * `Projects` in memory: each project is one service over its own
- * `ProjectStoreMemory`, built when the project is made and kept in a `Ref`
- * the layer makes (never in a module-level variable). Every project shares
- * the other ports the layer is given.
- */
 import type { ProjectName } from "@repo/protocol/ids";
 import { ProjectExists, UnknownProject } from "@repo/protocol/refusal";
 import { Context, Effect, Layer, Option, SynchronizedRef } from "effect";
@@ -28,7 +22,6 @@ export const ProjectsMemory: Layer.Layer<
       ReadonlyMap<ProjectName, ProjectApi>
     >(new Map());
 
-    /** A new project's service, over a store of its own that lives as long as the layer. */
     const build = (project: ProjectName) =>
       Effect.gen(function* () {
         // Fresh, or the build would reuse a store an enclosing layer made.

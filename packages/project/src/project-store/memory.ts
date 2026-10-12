@@ -21,20 +21,16 @@ import {
 } from "./tables.ts";
 import type { Column, Table, Upsert } from "./tables.ts";
 
-/** A row as a table keeps it: its columns and its encoded body. */
 interface Stored {
   readonly body: string;
   readonly columns: Readonly<Record<string, Column>>;
 }
 
-/** A table's rows by key, in the order each key was first written. */
 type Rows = ReadonlyMap<string, Stored>;
 
 interface State {
-  /** The number of the newest layer read, or 0 before the first. */
   readonly lastRead: number;
   readonly lastSeq: number;
-  /** Each table's rows by table name; the kept events too, oldest first. */
   readonly tables: ReadonlyMap<string, Rows>;
 }
 
@@ -50,10 +46,8 @@ const decodeAll = <A>(table: Table<A>, stored: Iterable<Stored>) =>
 const all = <A>(state: State, table: Table<A>) =>
   decodeAll(table, rowsIn(state, table).values());
 
-/** A landing with the place it was first written in. */
 type Placed = readonly [index: number, row: Stored];
 
-/** Newest first: by landing time, then the later write, as `/sqlite` orders them. */
 const newestFirst = Order.combine(
   Order.mapInput(Order.flip(Order.Number), ([, row]: Placed) =>
     Number(row.columns.landed_at)
@@ -61,7 +55,6 @@ const newestFirst = Order.combine(
   Order.mapInput(Order.flip(Order.Number), ([index]: Placed) => index)
 );
 
-/** Ledger entries in order, as `/sqlite` reads them. */
 const bySeq = Order.mapInput(Order.Number, (entry: LedgerRow) => entry.seq);
 
 const snapshotOf = (state: State) =>
@@ -99,7 +92,6 @@ const snapshotOf = (state: State) =>
     } satisfies ProjectSnapshot;
   });
 
-/** The push events in `writes` that `state` already holds, each once. */
 const seenIn = (state: State, writes: ProjectWrites) => {
   const seen = rowsIn(state, Tables.pushEvents);
 
@@ -131,10 +123,6 @@ const upsertInto =
       tables.set(table.name, kept);
     });
 
-/**
- * The state after `writes`, built from copies through the write plan both
- * adapters share. A row that won't encode dies before anything is swapped in.
- */
 const written = (state: State, writes: ProjectWrites) =>
   Effect.gen(function* () {
     const tables = new Map(state.tables);
@@ -160,12 +148,6 @@ const written = (state: State, writes: ProjectWrites) =>
     return [committed, next] as const;
   });
 
-/**
- * A project's store in memory: the same tables, keys and encoded bodies as
- * `/sqlite`, held in one `SynchronizedRef` the layer makes. A commit builds
- * the next state from copies and swaps it in only when every row encoded, so
- * a failed commit leaves the previous state whole.
- */
 export const ProjectStoreMemory = Layer.effect(
   ProjectStore,
   Effect.gen(function* () {

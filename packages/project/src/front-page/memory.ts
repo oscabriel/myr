@@ -1,8 +1,3 @@
-/**
- * `FrontPage` in memory, seeded from data: what tests read the front page,
- * the project list and credits from. It filters as the D1
- * adapter does and never changes.
- */
 import type {
   FrontPageEntry,
   ProjectListing,
@@ -15,11 +10,9 @@ import { Effect, Layer } from "effect";
 import { FrontPage } from "../front-page.ts";
 import type { FrontPageFilter } from "../front-page.ts";
 
-/** What the memory front page reads back. */
 export interface FrontPageSeed {
   readonly projects: readonly ProjectListing[];
   readonly entries: readonly FrontPageEntry[];
-  /** Each credit, with the person it credits. */
   readonly credits: readonly {
     readonly handle: Handle;
     readonly credit: CreditSummary;

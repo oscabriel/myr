@@ -1,9 +1,3 @@
-/**
- * `Lander` from a script, for tests: each operation returns its scripted
- * results in order, and the last one again once they run out. An operation
- * with no script is `VerifierBlocked`, as a Lander that cannot run is. It
- * records every job it is given, in order, for the test to read back.
- */
 import type { RepoBusy, StaleBase } from "@repo/protocol/refusal";
 import { VerifierBlocked } from "@repo/protocol/refusal";
 import type { ConfigBundle } from "@repo/rules/rules-evaluator";
@@ -21,7 +15,6 @@ import type {
   Merged,
 } from "../lander.ts";
 
-/** One call the scripted Lander answered, with the job it was given. */
 export type LanderJob = Data.TaggedEnum<{
   Merge: { readonly job: MergeJob };
   Land: { readonly job: LandJob };
@@ -31,7 +24,6 @@ export type LanderJob = Data.TaggedEnum<{
 
 export const LanderJob = Data.taggedEnum<LanderJob>();
 
-/** Each operation's results, in the order its calls get them. */
 export interface LanderScript {
   readonly merge?: readonly Result.Result<
     Merged,
@@ -45,16 +37,11 @@ export interface LanderScript {
   readonly bundle?: readonly Result.Result<ConfigBundle, VerifierBlocked>[];
 }
 
-/** A scripted Lander, and the jobs it has been given so far. */
 export type ScriptedLander = Layer.Layer<Lander> & {
   readonly jobs: Effect.Effect<readonly LanderJob[]>;
 };
 
 export const LanderMemory = {
-  /**
-   * One scripted Lander: every build of the layer shares its script's place
-   * and its record of jobs, so a test reads `jobs` after providing it.
-   */
   layer: (script: LanderScript): ScriptedLander => {
     const jobs: LanderJob[] = [];
     const served = new Map<keyof LanderScript, number>();

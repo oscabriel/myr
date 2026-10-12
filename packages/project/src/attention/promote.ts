@@ -1,17 +1,3 @@
-/**
- * The Garden's "Promote" beat: when deciders have finished two or
- * more answers in one area for the same reason, the same lint rule, that
- * class of mistake is put to them as one decision. Accepted, its proposal
- * opens a `lintToZero` ask for the rule in that territory, red first like
- * any ask (the run on main at `openAsk` is the proof the rule still finds
- * something; no rule is replayed against old trees). Its default is
- * `decline`, so ignoring it changes nothing, and nothing opens without a
- * person's yes.
- *
- * Pure over records: the service gives the finishes it knows, the project's
- * decisions so far, and ids minted from its sequence; it writes what comes
- * back as it writes a proposal and its decision.
- */
 import { Brand } from "@repo/brand";
 import { CheckSpec, RatchetMeasure } from "@repo/protocol/domain/check";
 import type { Evidence } from "@repo/protocol/domain/common";
@@ -32,14 +18,7 @@ import { Array as Arr, DateTime, Option, Order, Schema } from "effect";
 import { decidersFor, openDecision } from "./decisions.ts";
 import { platformHandle } from "./effects.ts";
 
-/**
- * One finish: a decider's commits on top of an answer before it landed
- * (`Finished-by`). Its `area` is the module of the ask's territory; `rule`
- * is the lint rule its verdict's lanes name, and `note` what the decider
- * wrote; `paths` are the files the finish changed.
- */
 export interface FinishRecord {
-  /** The ask the finished answer answered: a finish's id, one per landing. */
   readonly ask: AskId;
   readonly area: string;
   readonly decider: Handle;
@@ -49,18 +28,14 @@ export interface FinishRecord {
   readonly paths: readonly RepoPath[];
 }
 
-/** A promotion: the proposal for a `lintToZero` ask, and the decision that puts it to its deciders. */
 export interface Promotion {
   readonly decision: Decision;
   readonly proposal: Proposal;
 }
 
-/** What `promotions` reads. */
 export interface PromotionInput {
-  /** The project's decisions so far, decided and expired ones included. */
   readonly existing: readonly Decision[];
   readonly finishes: readonly FinishRecord[];
-  /** The next ids of the project's sequence (never `crypto.randomUUID`). */
   readonly ids: {
     readonly decision: DecisionId;
     readonly proposal: ProposalId;
@@ -70,7 +45,6 @@ export interface PromotionInput {
   readonly project: ProjectName;
 }
 
-/** The evidence labels a promotion is found again by. */
 const labels = {
   area: "area",
   finished: "finished",
@@ -80,35 +54,18 @@ const labels = {
   why: "why",
 } as const;
 
-/**
- * A lint rule as its id is written, in lowercase: `no-date-equality`,
- * `typescript/no-explicit-any`, `@typescript-eslint/no-explicit-any`.
- */
 const ruleId = /^@?[a-z0-9][a-z0-9_-]*(?:\/[a-z0-9][a-z0-9_-]*)*$/u;
 
-/** Words joined as a rule's id joins them, by a dash or a slash. */
 const joined = /[-/]/u;
 
-/** A backticked span in a note: `` `no-date-equality` ``. */
 const backticked = /`(?<span>[^`]+)`/gu;
 
-/**
- * `text` as the rule a note names. It is taken as written, and it must join
- * two words or more, so a one-word note (`typo`) or a code span
- * (`startOfDay`) names no rule; a one-word rule (`eqeqeq`) comes from the
- * lanes.
- */
 const asRule = (text: string): Option.Option<string> =>
   Option.liftPredicate(
     text.trim(),
     (word) => ruleId.test(word) && joined.test(word)
   );
 
-/**
- * The rule a decider's note names: the note itself when it is one rule id,
- * else its first backticked span that is one. A note in prose alone names
- * no rule, so it promotes nothing: a `lintToZero` ask needs a rule.
- */
 const ruleInNote = (note: string): Option.Option<string> =>
   Option.orElse(asRule(note), () =>
     Arr.findFirst([...note.matchAll(backticked)], ({ groups }) =>
@@ -116,7 +73,6 @@ const ruleInNote = (note: string): Option.Option<string> =>
     )
   );
 
-/** Why a finish was made: the rule its lanes name, else the rule its note names. */
 const reasonOf = (finish: FinishRecord): Option.Option<string> =>
   Option.orElse(
     Option.filter(
@@ -126,13 +82,11 @@ const reasonOf = (finish: FinishRecord): Option.Option<string> =>
     () => Option.flatMap(finish.note, ruleInNote)
   );
 
-/** A finish with the rule it was made for. */
 interface Reasoned {
   readonly finish: FinishRecord;
   readonly rule: string;
 }
 
-/** Finishes in one area for one rule, oldest first. */
 interface Group {
   readonly area: string;
   readonly finishes: Arr.NonEmptyReadonlyArray<FinishRecord>;
@@ -149,7 +103,6 @@ const byGroup: Order.Order<Group> = Order.combine(
   Order.mapInput(Order.String, ({ rule }: Group) => rule)
 );
 
-/** Finishes grouped by (area, rule), each group oldest first, groups by area then rule. */
 const groupsOf = (finishes: readonly Reasoned[]): readonly Group[] =>
   Arr.sort(
     Object.values(
@@ -172,7 +125,6 @@ const valueOf = (decision: Decision, label: string) =>
     Option.map(({ value }) => value)
   );
 
-/** The promotions decided or open for `group`'s area and rule. */
 const promotedFor = (existing: readonly Decision[], group: Group) =>
   existing.filter(
     (decision) =>
@@ -182,7 +134,6 @@ const promotedFor = (existing: readonly Decision[], group: Group) =>
       Option.contains(valueOf(decision, labels.rule), group.rule)
   );
 
-/** The finishes a promotion was made from: the key its evidence carries. */
 const finishesNamed = (decision: Decision): readonly string[] =>
   Option.match(valueOf(decision, labels.promotedFrom), {
     onNone: () => [],
@@ -193,12 +144,6 @@ const isOpen = (decision: Decision, now: DateTime.Utc) =>
   decision.decided === undefined &&
   DateTime.isLessThan(now, decision.expiresAt);
 
-/**
- * The finishes of `group` no earlier promotion of the same area and rule
- * was made from, each ask once; none while such a promotion is still open.
- * A promotion declined, or let expire, keeps its finishes: two new ones are
- * needed to ask again.
- */
 const freshOf = (
   existing: readonly Decision[],
   group: Group,
@@ -218,7 +163,6 @@ const freshOf = (
   );
 };
 
-/** Whether an ask not yet closed already holds `rule` to zero. */
 const alreadyAsked = (policy: Policy, rule: string) =>
   policy.asks.some(
     ({ check, state }) =>
@@ -227,11 +171,6 @@ const alreadyAsked = (policy: Policy, rule: string) =>
       check.rule === rule
   );
 
-/**
- * The project's own lint command, with JSON output: a counted ratchet's for
- * `rule`, else any counted ratchet's, else a `lintToZero` ask's. A project
- * that has none is not guessed at, and nothing is promoted.
- */
 const lintCommandOf = (policy: Policy, rule: string): Option.Option<string> => {
   const counted = policy.ratchets.flatMap(({ measure }) =>
     RatchetMeasure.guards.Count(measure) ? [measure] : []
@@ -250,25 +189,18 @@ const lintCommandOf = (policy: Policy, rule: string): Option.Option<string> => {
   );
 };
 
-/** The project's kind for `lintToZero` asks: the first of that check kind it lists. */
 const lintKindOf = (policy: Policy): Option.Option<AskKind> =>
   Arr.findFirst(policy.kinds, ({ checkKind }) => checkKind === "lintToZero");
 
-/** Where the ask may change things: a module by its name, or folders as globs. */
 type Place =
   | { readonly module: string }
   | { readonly globs: Arr.NonEmptyReadonlyArray<string> };
 
 const folderOf = (path: string) => path.split("/").slice(0, -1).join("/");
 
-/** Whether `folder` sits under `other`. */
 const isUnder = (folder: string, other: string) =>
   folder !== other && folder.startsWith(`${other}/`);
 
-/**
- * The folders `paths` sit in, as globs, each under no other: `src/date/**`;
- * `**` when a file sits at the root.
- */
 const foldersOf = (paths: readonly RepoPath[]): readonly string[] => {
   const folders = Arr.dedupe(paths.map(folderOf));
 
@@ -284,10 +216,6 @@ const foldersOf = (paths: readonly RepoPath[]): readonly string[] => {
   ).map((folder) => `${folder}/**`);
 };
 
-/**
- * The territory the finishes touched: their area when it is one of the
- * project's modules, else the folders of the files they changed.
- */
 const placeOf = (
   policy: Policy,
   area: string,
@@ -307,14 +235,12 @@ const placeOf = (
 const describePlace = (place: Place) =>
   "module" in place ? place.module : place.globs.join(", ");
 
-/** `no-date-equality` in `src/date` → `no-date-equality-in-src-date`. */
 const slug = (text: string) =>
   text
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/gu, "-")
     .replaceAll(/^-+|-+$/gu, "");
 
-/** The new ask's id: the rule, and the area unless it is the whole repo. */
 const askIdOf = (rule: string, area: string): Option.Option<AskId> =>
   Schema.decodeOption(AskId)(
     area === "." || slug(area) === ""
@@ -324,7 +250,6 @@ const askIdOf = (rule: string, area: string): Option.Option<AskId> =>
 
 const quoted = (text: string) => JSON.stringify(text);
 
-/** A list of names as a sentence says it: `alice`, `alice and bob`, `alice, bob and carol`. */
 const spoken = (names: Arr.NonEmptyReadonlyArray<string>) => {
   const last = Arr.lastNonEmpty(names);
   const rest = Arr.initNonEmpty(names);
@@ -332,18 +257,11 @@ const spoken = (names: Arr.NonEmptyReadonlyArray<string>) => {
   return rest.length === 0 ? last : `${rest.join(", ")} and ${last}`;
 };
 
-/** What the ask file's territory field says. */
 const territoryCall = (place: Place) =>
   "module" in place
     ? `territory.package(${quoted(place.module)})`
     : `territory.paths(${place.globs.map(quoted).join(", ")})`;
 
-/**
- * The ask file, through the sdk's `kinds.lintToZero` when the project's
- * kind is that one, else through a kind of its own name made in the file
- * (as a migrate family's child is written). A `lintToZero` ask's check is
- * built from its args, so the ask file is its only file.
- */
 const askFileOf = (input: {
   readonly command: string;
   readonly from: readonly FinishRecord[];
@@ -393,7 +311,6 @@ const askFileOf = (input: {
   ].join("\n");
 };
 
-/** One finish as its decision shows it: `compare-days by alice on 2026-10-01: <note>`. */
 const finishLine = (finish: FinishRecord) => {
   const line = `${finish.ask} by ${finish.decider} on ${DateTime.formatIsoDateUtc(finish.at)}`;
 
@@ -403,7 +320,6 @@ const finishLine = (finish: FinishRecord) => {
   });
 };
 
-/** `group`'s promotion, when it is due and the project can hold its ask. */
 const promotionOf = (
   input: PromotionInput,
   group: Group
@@ -429,8 +345,7 @@ const promotionOf = (
 
   const touched = fresh.flatMap(({ paths }) => paths);
 
-  // The finishers who still decide for what they touched: the decision is
-  // theirs ("you finished 2 answers …"), and accepting needs a decider.
+  // Only finishers who still decide: accepting needs a decider.
   const deciders = decidersFor(policy, touched).filter((decider) =>
     fresh.some((finish) => sameHandle(finish.decider, decider))
   );
@@ -498,18 +413,7 @@ const promotionOf = (
   });
 };
 
-/**
- * The promotions due: finishes grouped by (area, rule), counting those
- * within the policy's record window; a group of two or more finishes no
- * earlier promotion of it was made from, with no promotion of it still
- * open, is put to the finishers who still decide for what they touched.
- *
- * At most one per call, since `ids` is one pair from the project's
- * sequence: called as each finish lands, only that finish's group can
- * become due. Groups go by area, then rule; one that cannot be held as an
- * ask (no rule, no `lintToZero` kind, no JSON lint command, an ask for the
- * rule already open, no decider left) is skipped.
- */
+/** At most one per call: `ids` is one pair from the project's sequence. */
 export const promotions = (input: PromotionInput): readonly Promotion[] => {
   const since = DateTime.subtract(input.now, {
     days: input.policy.record.windowDays,

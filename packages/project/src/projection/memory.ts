@@ -1,23 +1,15 @@
-/**
- * `Projection` in memory, for tests and the platform's local composition: it
- * keeps every event it was given once per `(project, event.seq)`, as the port
- * asks, in the order it first took them, and reads them back. Not once per
- * row id: every project's outbox names its rows `projected:<seq>`, so two
- * projects' rows share ids (the dev world once dropped burrow's events that way).
- */
+// Keyed by (project, seq), not row id: every project's outbox names its rows `projected:<seq>`, so ids collide across projects.
 import { Context, Effect, Layer, Ref, Schema } from "effect";
 
 import { Projection, ProjectedEvent } from "../projection.ts";
 
 const decodeProjected = Schema.decodeUnknownEffect(ProjectedEvent);
 
-/** What the memory projection has taken so far. */
 export class ProjectedRows extends Context.Service<
   ProjectedRows,
   { readonly events: Effect.Effect<readonly ProjectedEvent[]> }
 >()("project/ProjectedRows") {}
 
-/** A fresh, empty projection each time the layer is built, and its reading. */
 export const ProjectionMemory: Layer.Layer<Projection | ProjectedRows> =
   Layer.effectContext(
     Effect.gen(function* () {

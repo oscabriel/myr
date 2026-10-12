@@ -1,24 +1,3 @@
-/**
- * The visibility cartridge's env (ADR 0009), as the `ProjectEnv`
- * port:
- *
- * - The env shape: every `.env.schema` at the landed SHA (the repo's root
- *   first, then each workspace package's folder), parsed through the
- *   parser seam and never resolved, read once per commit, with each
- *   sensitive item's who and when from the Project DO's rows. Never a value.
- * - Write-only values: only a person the policy lets set values (the
- *   deciders unless `visibility.env.setters` names others) sets one, only
- *   for a `@sensitive` item of the shape, sealed by the vault under the
- *   platform's master key; the row and a public `ValueSet` ledger entry are
- *   the call's writes, and nothing returns the value.
- * - The env a check runs with: a placeholder for every sensitive item and
- *   the `@proxy` rules, so unlanded code never sees a value; a run of
- *   landed code alone also carries the values, opened for that run.
- * - The scan: the other place a stored value is opened, to find it in a
- *   text or a blob, and it answers with the item's key alone.
- * - After a landing: a `ProxyWidened` decision for each item whose value
- *   may now reach a host it could not before.
- */
 import { RepoHost, Revision } from "@repo/artifacts/repo-host";
 import type { EnvProxy } from "@repo/checks/check-runner";
 import { Hostname } from "@repo/protocol/domain/common";
@@ -70,20 +49,12 @@ import type { ProjectSnapshot } from "../project-store.ts";
 import type { EnvValueRow } from "../project-store/rows.ts";
 import { noPlan, policyIn } from "../visibility-port.ts";
 
-/** The env schema's name, in the repo's root and in a package's folder. */
 const schemaName = ".env.schema";
 
-/** The root's env schema: where the shape lives when nothing else says. */
 const rootSchema = RepoPath.make(schemaName);
 
-/** A character that makes a path segment a glob. */
 const GLOB = /[*?[{]/u;
 
-/**
- * The folder a territory's glob covers: its fixed head (`packages/week/**`
- * → `packages/week`), or, for a glob naming one file, that file's folder.
- * The root is `""`.
- */
 const folderOf = (glob: string): string => {
   const segments = glob
     .split("/")
@@ -96,11 +67,6 @@ const folderOf = (glob: string): string => {
   );
 };
 
-/**
- * Where a project's env schemas live: `.env.schema` in the repo's root,
- * then `<package folder>/.env.schema` for each workspace package the
- * policy's territories name, in order, each once.
- */
 export const schemaFilesAt = (
   modules: readonly Territory[]
 ): readonly RepoPath[] =>
@@ -115,16 +81,11 @@ export const schemaFilesAt = (
     ),
   ]).map((path) => RepoPath.make(path));
 
-/** Whether `pattern` (a host, or a glob `*.example.com`) covers `host`. */
 const covers = (pattern: string, host: string) =>
   pattern === host ||
   (pattern.startsWith("*.") && host.endsWith(pattern.slice(1)));
 
-/**
- * The hosts an item's value may reach through the platform's proxy: its
- * `@proxy` domains, lower-cased, unless the rule blocks every request. Only
- * a sensitive item holds a value, so any other reaches none.
- */
+/** Only a sensitive item holds a value, so any other reaches no host. */
 const reachOf = (item: EnvItem | undefined): readonly string[] =>
   item?.sensitive === true &&
   item.proxy !== undefined &&
@@ -132,23 +93,14 @@ const reachOf = (item: EnvItem | undefined): readonly string[] =>
     ? Array.dedupe(item.proxy.domains.map((host) => host.toLowerCase()))
     : [];
 
-/** The hosts `key`'s value may reach in `view`: none when the view has no such item. */
 const reachIn = (view: Pick<EnvSchemaView, "items">, key: EnvKey) =>
   reachOf(view.items.find((item) => item.key === key));
 
-/** A widened `@proxy`: the item, and every host its value may now reach. */
 export interface Widened {
   readonly hosts: readonly Hostname[];
   readonly item: EnvKey;
 }
 
-/**
- * Each item of `after` whose value may reach a host that no host or glob
- * of `before` covered: a new `@proxy` domain, a new proxied item, or a rule
- * that blocked every request and no longer does. A narrowing, an unchanged
- * rule and a newly blocked one widen nothing. The hosts are all the item's
- * hosts after, as hostnames.
- */
 export const widenedProxies = (
   before: Pick<EnvSchemaView, "items">,
   after: Pick<EnvSchemaView, "items">
@@ -162,37 +114,25 @@ export const widenedProxies = (
       : [];
   });
 
-/** One commit's env schemas, as the cache keeps them. */
 class ReadAt extends Data.Class<{
   readonly at: LandedSha;
   readonly files: readonly RepoPath[];
   readonly project: ProjectName;
 }> {}
 
-/**
- * A commit's env shape, read once: its items without any value's who and
- * when (the DO's rows add those), and the schema that declared each item.
- */
 interface Read {
   readonly declaredIn: ReadonlyMap<EnvKey, RepoPath>;
   readonly schema: EnvSchemaFile;
 }
 
-/** A shape with no schema in it: no items. */
 const unread: Read = {
   declaredIn: new Map(),
   schema: { file: rootSchema, imports: [], items: [] },
 };
 
-/** How many commits' shapes one project keeps read. */
 const readCapacity = 16;
 
-/**
- * Several schemas as one shape: the root's items, then each package's not
- * already declared (the first schema to declare a key holds it); the file
- * is the first schema read, the imports are every schema's, and the
- * current env key is the first one named.
- */
+/** The first schema to declare a key holds it. */
 const merged = (views: readonly EnvSchemaView[]): Read => {
   const [first] = views;
 
@@ -227,7 +167,6 @@ const merged = (views: readonly EnvSchemaView[]): Read => {
   };
 };
 
-/** The project's landed SHA and its row, once something landed. */
 const landedIn = (snapshot: ProjectSnapshot) =>
   Option.flatMap(snapshot.project, (row) =>
     row.landed === undefined
@@ -235,11 +174,6 @@ const landedIn = (snapshot: ProjectSnapshot) =>
       : Option.some({ landed: row.landed, row })
   );
 
-/**
- * Whether `handle` may set write-only values: one of the setters the
- * policy's `visibility.env` names, or, when it names the deciders or the
- * project declares no visibility, a decider.
- */
 const maySet = (policy: Policy, handle: Handle) => {
   const setters = policy.visibility?.env.setters ?? "deciders";
 
@@ -248,7 +182,6 @@ const maySet = (policy: Policy, handle: Handle) => {
     : setters.some((each) => sameHandle(each, handle));
 };
 
-/** An item with who set its value and when, from its row: only a sensitive item has one. */
 const withValue = (
   item: EnvItem,
   rows: ReadonlyMap<EnvKey, EnvValueRow>
@@ -266,11 +199,10 @@ const decodeSealed = Schema.decodeUnknownEffect(
   Schema.toCodecJson(SealedValue)
 );
 
-/** `text`, unless it is absent or empty: the check job's wire takes no empty method or path. */
+/** The check job's wire takes no empty method or path. */
 const nonEmpty = (text: Option.Option<string>) =>
   Option.getOrUndefined(Option.filter(text, (each) => each !== ""));
 
-/** A proxy rule as the check job carries it (`EnvProxy`): no key for a method or path the rule leaves open. */
 const onTheWire = (rule: ProxyRule): EnvProxy => {
   const method = nonEmpty(rule.method);
   const path = nonEmpty(rule.path);
@@ -285,15 +217,9 @@ const onTheWire = (rule: ProxyRule): EnvProxy => {
   };
 };
 
-/** A host list as evidence shows it: `none` before an item had any. */
 const hostsText = (hosts: readonly string[]) =>
   hosts.length === 0 ? "none" : hosts.join(", ");
 
-/**
- * The `ProjectEnv` port over the parser seam, the vault and the project's
- * repos (the public namespace's): the name the port's stub exported, so the
- * cartridge's `index.ts` and the platform compose it unchanged.
- */
 export const ProjectEnvLive: Layer.Layer<
   never,
   never,
@@ -305,7 +231,6 @@ export const ProjectEnvLive: Layer.Layer<
     const vault = yield* WriteOnlyValues;
     const host = yield* RepoHost;
 
-    /** One schema at a commit, as the public sees it; none where the commit has no such file, or it cannot be read. */
     const viewOf = (key: ReadAt, file: RepoPath) =>
       host
         .readFile(
@@ -343,8 +268,7 @@ export const ProjectEnvLive: Layer.Layer<
           )
         );
 
-    // Read once per commit: a landed commit's schemas never change. A
-    // failed read is not kept, so the next call reads again.
+    // A landed commit's schemas never change; a failed read is not kept.
     const reads = yield* Cache.makeWith(
       (key: ReadAt) =>
         Effect.map(
@@ -358,7 +282,6 @@ export const ProjectEnvLive: Layer.Layer<
       }
     );
 
-    /** The shape at `at`, from the schemas the snapshot's policy places. */
     const readAt = (at: LandedSha, snapshot: ProjectSnapshot) =>
       Option.match(snapshot.project, {
         onNone: () => Effect.succeed(unread),
@@ -378,14 +301,13 @@ export const ProjectEnvLive: Layer.Layer<
           ),
       });
 
-    /** The shape at the landed SHA; none before anything landed. */
     const landedRead = (snapshot: ProjectSnapshot) =>
       Option.match(landedIn(snapshot), {
         onNone: () => Effect.succeed(unread),
         onSome: ({ landed }) => readAt(landed, snapshot),
       });
 
-    /** Every stored value, opened, to look for; dropped when the scan ends. */
+    /** Opened values to scan for; dropped when the scan ends. */
     const watched = (rows: readonly EnvValueRow[]) =>
       Effect.forEach(rows, (row) =>
         decodeSealed(row.sealed).pipe(
@@ -447,9 +369,8 @@ export const ProjectEnvLive: Layer.Layer<
             writes: { decisions: [...decisions.values()] },
           };
         }),
-      // Every run sees placeholders and goes out through the proxy rules; a run
-      // of landed code alone also carries the values, opened here for the call
-      // that runs it (the sandbox's env gateway swaps them in on the way out).
+      // Only a run of landed code carries the values; the sandbox's env
+      // gateway swaps them in on the way out.
       runEnv: ({ landed }, snapshot) =>
         Effect.gen(function* () {
           const { schema } = yield* landedRead(snapshot);
@@ -510,8 +431,7 @@ export const ProjectEnvLive: Layer.Layer<
 
           const sealed = yield* vault.put({ acknowledgeShort, key, value });
 
-          // Who set which item's value, for the platform's own logs, as the
-          // public ledger says it: never the value.
+          // Never the value.
           yield* Effect.logInfo("a write-only value was set").pipe(
             Effect.annotateLogs({ by: by.handle, key })
           );

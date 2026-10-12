@@ -1,10 +1,7 @@
 /**
- * A revision as a reader names it, resolved to the commit it means in the
- * project's canonical repo (ADR 0019): absent or `main` is main's landed
- * commit, from the project's record and never from a ref; 40 hex digits are
- * that commit, if the repo holds it; anything else is a tag's exact name,
- * found among the repo's tags and never joined into a ref path, so
- * `../heads/x` or a ref of the platform's own names nothing.
+ * `main` resolves from the project's record, never a ref; a tag name is
+ * matched among the repo's tags, never joined into a ref path, so
+ * `../heads/x` names nothing.
  */
 import { RepoHost } from "@repo/artifacts/repo-host";
 import type { Commit, RepoNotFound } from "@repo/artifacts/repo-host";
@@ -17,23 +14,16 @@ import { Array, Effect, Option } from "effect";
 import type { CodeProject } from "../code.ts";
 import { CodeCache } from "./cache.ts";
 
-/** A full commit id: 40 lowercase hex digits. Short ids are not resolved. */
 const FULL_SHA = /^[0-9a-f]{40}$/u;
 
-/** Whether `rev` names a commit by its full id (and so never moves). */
 export const isFullSha = (rev: string) => FULL_SHA.test(rev);
 
-/** Where every tag's name starts. */
 const TAGS = "refs/tags/";
 
-/** A ref name's tag name, when it is a tag's. */
 export const tagNameOf = (ref: string): Option.Option<string> =>
   ref.startsWith(TAGS) ? Option.some(ref.slice(TAGS.length)) : Option.none();
 
-/**
- * The commit `sha` in `repo`, kept once found. A miss is not kept: the
- * commit may yet be pushed.
- */
+/** A miss is not kept: the commit may yet be pushed. */
 export const commitAt = (
   repo: RepoName,
   sha: CommitSha
@@ -54,7 +44,6 @@ export const commitAt = (
       );
   });
 
-/** The commit `at` names in the project's canonical repo. */
 export const resolveRev = (
   project: CodeProject,
   at: Option.Option<Rev>

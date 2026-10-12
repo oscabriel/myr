@@ -1,15 +1,3 @@
-/**
- * The env shape's neutral port (ADR 0009): a project's public env
- * schema, its write-only values, the env its checks run with, and the scan
- * that finds a stored value where it must not be. The default is a project
- * without the visibility cartridge: no items, no values, nothing to scan
- * for. The cartridge's `ProjectEnv` parses `.env.schema` at the
- * landed SHA and seals values with the platform's master key.
- *
- * As `visibility-port.ts`: each method reads the project as the call has it
- * (`snapshot`) and returns its rows for the service to commit; nothing here
- * returns a value.
- */
 import { CheckJob } from "@repo/checks/check-runner";
 import type { EnvSchemaView } from "@repo/protocol/domain/env";
 import { RepoPath, sameHandle } from "@repo/protocol/ids";
@@ -24,41 +12,26 @@ import type { ProjectSnapshot, ProjectWrites } from "./project-store.ts";
 import { noPlan, policyIn } from "./visibility-port.ts";
 import type { VisibilityPlan } from "./visibility-port.ts";
 
-/**
- * The env a check job of unlanded code carries: what the code sees in place
- * of each write-only value, and the outbound hosts whose requests the
- * platform's env gateway rewrites. Never a value, so it is what an answer's
- * run keeps (`AnswerRun.env`) and what crosses a Workflow step. The
- * `CheckJob`'s own fields, so the job's schema decides their form.
- */
+/** Never holds a value, so it may be stored and cross a Workflow step. */
 export const UnlandedRunEnv = Schema.Struct(
   Struct.pick(CheckJob.fields, ["placeholders", "proxies"])
 );
 
 export type UnlandedRunEnv = typeof UnlandedRunEnv.Type;
 
-/**
- * The env a check job carries: as for unlanded code, and for a job of
- * landed code alone, `landed` and the values opened for it. Built in
- * the call that runs the job and dropped after: never stored, never in a
- * Workflow step's output.
- */
+/** Holds opened values for landed code: never stored, never in a Workflow step's output. */
 export const RunEnv = Schema.Struct(
   Struct.pick(CheckJob.fields, ["landed", "placeholders", "proxies", "values"])
 );
 
 export type RunEnv = typeof RunEnv.Type;
 
-/** The env a job carries when the project has no write-only values: none. */
 export const noRunEnv: UnlandedRunEnv = { placeholders: [], proxies: [] };
 
-/** A project's env schema at one commit, as `envShape` shows it but for where and whose. */
 export type EnvSchemaFile = Omit<EnvSchemaView, "at" | "project">;
 
-/** Where the env schema lives: the repo's root. */
 const envFile = RepoPath.make(".env.schema");
 
-/** A write-only value set: what `setEnv` answers with, and the rows that keep it sealed. */
 export interface ValueSet {
   readonly result: {
     readonly key: EnvKey;
@@ -68,17 +41,13 @@ export interface ValueSet {
   readonly writes: ProjectWrites;
 }
 
-/** What `scan` searches: a text that leaves a run, or a blob an answer adds. */
 export type Scanned = { readonly text: string } | { readonly blob: Uint8Array };
 
-/** The project's env, as the project service reaches it. */
 export interface EnvPort {
-  /** The env schema at a landed commit: its file, imports and items, each sensitive item with who set its value and when. */
   readonly view: (
     at: LandedSha,
     snapshot: ProjectSnapshot
   ) => Effect.Effect<EnvSchemaFile>;
-  /** A write-only value for one sensitive item, sealed; never returned. */
   readonly set: (
     input: {
       readonly acknowledgeShort: boolean;
@@ -92,17 +61,14 @@ export interface EnvPort {
     ValueSet,
     NotDecider | UnknownEnvItem | NotSensitive | ValueTooShort
   >;
-  /** The env a check runs with: placeholders and proxies for unlanded code, the values only for landed code. */
   readonly runEnv: (
     input: { readonly landed: boolean },
     snapshot: ProjectSnapshot
   ) => Effect.Effect<RunEnv>;
-  /** The stored value `scanned` contains, by its item's key; none when it holds none. */
   readonly scan: (
     scanned: Scanned,
     snapshot: ProjectSnapshot
   ) => Effect.Effect<Option.Option<EnvKey>>;
-  /** After a landing moved the landed SHA: a `ProxyWidened` decision for each widened `@proxy`. */
   readonly onLanded: (
     input: {
       readonly after: LandedSha;
@@ -113,7 +79,6 @@ export interface EnvPort {
   ) => Effect.Effect<VisibilityPlan>;
 }
 
-/** Whether `handle` decides anything in the project the snapshot holds. */
 const decides = (snapshot: ProjectSnapshot, handle: Handle) =>
   Option.exists(policyIn(snapshot), (policy) =>
     policy.deciders.some(({ handles }) =>
@@ -121,12 +86,6 @@ const decides = (snapshot: ProjectSnapshot, handle: Handle) =>
     )
   );
 
-/**
- * A project without the cartridge's env: no items, so no value to set (a
- * decider asking is told the item is unknown; anyone else, that only
- * deciders set values), nothing for a check but its own env, and nothing to
- * scan for.
- */
 export const noEnv: EnvPort = {
   onLanded: () => Effect.succeed(noPlan),
   runEnv: () => Effect.succeed(noRunEnv),
@@ -140,13 +99,8 @@ export const noEnv: EnvPort = {
   view: () => Effect.succeed({ file: envFile, imports: [], items: [] }),
 };
 
-/**
- * How a host gives the project service its env. The default is `noEnv`,
- * so a host that provides nothing runs the platform without it.
- */
 export const ProjectEnv = Context.Reference<EnvPort>("project/ProjectEnv", {
   defaultValue: () => noEnv,
 });
 
-/** The default, said out loud: a project without the cartridge's env. */
 export const NoEnv: Layer.Layer<never> = Layer.succeed(ProjectEnv, noEnv);

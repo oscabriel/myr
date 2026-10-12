@@ -1,17 +1,3 @@
-/**
- * A migrate ask's family: one ask that moves every use of a name
- * to another opens, when its callers sit in two or more of the project's
- * modules, as one child ask per module with callers, each with that module
- * as its territory and "no callers in this module" as its check, and a
- * delete child that waits on every child and checks the name is gone. The
- * children's territories are disjoint, so their claims never overlap and
- * their answers re-merge cleanly through the serial landing queue; the
- * parent closes when its last child lands.
- *
- * Pure: the callers are counted by the project's own command (its stdout is
- * `CallerCount`), never by a scan here, and the service lands the family and
- * moves it after each landing.
- */
 import { Brand } from "@repo/brand";
 import { matchAny } from "@repo/gate/glob";
 import type { Ask } from "@repo/protocol/domain/ask";
@@ -23,10 +9,6 @@ import type { Territory } from "@repo/protocol/domain/territory";
 import { AskId, RatchetName, RepoPath } from "@repo/protocol/ids";
 import { Array, Option, Schema } from "effect";
 
-/**
- * What a migrate ask's count command prints: every caller of the name, and
- * the callers in each module, by the module's name.
- */
 export const CallerCount = Schema.Struct({
   byModule: Schema.Record(Schema.String, NoneOrMore),
   total: NoneOrMore,
@@ -34,12 +16,10 @@ export const CallerCount = Schema.Struct({
 
 export type CallerCount = typeof CallerCount.Type;
 
-/** A count command's stdout, read as its `CallerCount`. */
 export const callerCountOf = Schema.decodeUnknownOption(
   Schema.fromJsonString(CallerCount)
 );
 
-/** Whether two counts are the same: the same total, and the same callers in every module. */
 export const sameCount = (one: CallerCount, other: CallerCount): boolean =>
   one.total === other.total &&
   Array.dedupe([
@@ -49,62 +29,46 @@ export const sameCount = (one: CallerCount, other: CallerCount): boolean =>
     (module) => (one.byModule[module] ?? 0) === (other.byModule[module] ?? 0)
   );
 
-/** A migrate ask's check: the name it moves from, where to, and the command that counts callers. */
 type MigrateCheck = Extract<CheckSpec, { readonly _tag: "Migrate" }>;
 
-/** One file the family adds to the config folder. */
 export interface FamilyFile {
   readonly content: string;
   readonly path: RepoPath;
 }
 
-/** A migrate ask split into its family, and what its opening lands. */
 export interface MigrateFamily {
-  /** The migrate ask, blocked by every child and the delete child. */
   readonly parent: Ask;
-  /** One child per module with callers, in the policy's module order. */
   readonly children: Array.NonEmptyReadonlyArray<Ask>;
-  /** The last child: the name is gone. Blocked by every child until they land. */
   readonly deleteChild: Ask;
-  /** The children's and the delete child's ask files, in that order. */
   readonly files: Array.NonEmptyReadonlyArray<FamilyFile>;
-  /** The callers ratchet the opening records, at the counted total. */
   readonly ratchet: {
     readonly name: RatchetName;
     readonly baseline: number;
   };
 }
 
-/** `@burrow/http-kit` → `burrow-http-kit`: a name an ask id can carry. */
 const slug = (name: string) =>
   name
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/gu, "-")
     .replaceAll(/^-+|-+$/gu, "");
 
-/**
- * The id of a family's child in `module`: `drop-legacy-fetch-p1`. It never
- * holds `--`, which repo names keep as their separator.
- */
+/** Never holds `--`, which repo names keep as their separator. */
 export const childId = (parent: AskId, module: string): AskId =>
   AskId.make(`${parent}-${slug(module) || "root"}`);
 
-/** The id of a family's delete child: `drop-legacy-fetch-delete`. */
 export const deleteChildId = (parent: AskId): AskId =>
   AskId.make(`${parent}-delete`);
 
-/** The ratchet on a name's callers: `legacyFetch` → `callers-legacyfetch`. */
 export const callersRatchet = (from: SymbolName): RatchetName =>
   RatchetName.make(`callers-${slug(from) || "name"}`);
 
-/** What an ask still waits on: each ask it is blocked by that has not closed. */
 export const remainingBlockers = (
   ask: Ask,
   asks: ReadonlyMap<AskId, Ask>
 ): readonly AskId[] =>
   ask.blockedBy.filter((blocker) => asks.get(blocker)?.state !== "closed");
 
-/** Whether a family is done: it has children, and every one has closed. */
 export const familyClosed = (
   parent: AskId,
   asks: ReadonlyMap<AskId, Ask>
@@ -114,10 +78,6 @@ export const familyClosed = (
   return members.length > 0 && members.every(({ state }) => state === "closed");
 };
 
-/**
- * The modules a territory spans: the one it names, or every module whose
- * paths its globs all cover (`packages/**` covers `packages/p1/**`).
- */
 export const modulesWithin = (
   territory: Territory,
   modules: readonly Territory[]
@@ -131,11 +91,7 @@ export const modulesWithin = (
       );
 };
 
-/**
- * The callers an ask's own check counts: in its module, when its territory
- * names one; in the modules it spans, when it spans some but not all;
- * everywhere, when it spans them all or none (a repo with no modules).
- */
+/** In its module when the territory names one; in the modules it spans when some but not all; else everywhere. */
 export const callersIn = (
   territory: Territory,
   counts: CallerCount,
@@ -151,10 +107,6 @@ export const callersIn = (
       );
 };
 
-/**
- * The ratchet a migrate ask's callers are counted by on every answer while
- * it is open: its count command's `total`, over the whole project.
- */
 export const callersSpec = (check: MigrateCheck): RatchetSpec => ({
   measure: RatchetMeasure.cases.Metric.make({
     command: check.count,
@@ -163,7 +115,6 @@ export const callersSpec = (check: MigrateCheck): RatchetSpec => ({
   name: callersRatchet(check.from),
 });
 
-/** The callers ratchets of every migrate ask still open, one per name. */
 export const callersSpecs = (asks: Iterable<Ask>): readonly RatchetSpec[] =>
   Array.dedupeWith(
     [...asks].flatMap(({ check, state }) =>
@@ -181,14 +132,9 @@ const header = (parent: AskId) =>
 
 const sdk = quoted(`${Brand.cliPackage}/rules`);
 
-/** An object literal's lines, each `key: value,`, indented by two. */
 const fields = (entries: readonly (readonly [string, string])[]) =>
   entries.map(([key, value]) => `  ${key}: ${value},`);
 
-/**
- * A child's file, through the sdk's `kinds.migrate` when the parent is of
- * that kind, else through a kind of the parent's name made in the file.
- */
 const childFile = (child: Ask, check: MigrateCheck, parent: AskId) => {
   const stated: (readonly [string, string])[] = [
     ["parent", quoted(parent)],
@@ -234,10 +180,7 @@ const childFile = (child: Ask, check: MigrateCheck, parent: AskId) => {
   ].join("\n");
 };
 
-/**
- * The delete child's file: the sdk has no `symbolAbsent` builder, so the
- * file makes a kind of the parent's name whose check is the name gone.
- */
+/** The sdk has no `symbolAbsent` builder, so the file makes its own kind whose check is the name gone. */
 const deleteFile = (child: Ask, check: MigrateCheck, parent: AskId) =>
   [
     header(parent),
@@ -264,19 +207,12 @@ const deleteFile = (child: Ask, check: MigrateCheck, parent: AskId) =>
 const callersOf = (count: number) =>
   count === 1 ? "1 caller" : `${count} callers`;
 
-/** A child's want: `p1: 5 callers of legacyFetch → http.get`. */
 const childWant = (module: string, count: number, check: MigrateCheck) =>
   check.to === undefined
     ? `${module}: ${callersOf(count)} of ${check.from} to remove`
     : `${module}: ${callersOf(count)} of ${check.from} → ${check.to}`;
 
-/**
- * Splits a migrate ask into its family: a child for each module of its
- * territory that has callers, in the policy's module order, and a delete
- * child blocked by all of them, each asked by the parent's asker and held
- * as the parent is held. `None` when the ask is no migrate ask, or fewer
- * than two of its modules have callers: a split of one is the ask itself.
- */
+/** `None` for a non-migrate ask, or when fewer than two modules have callers: a split of one is the ask itself. */
 export const splitFamily = (input: {
   readonly parent: Ask;
   readonly counts: CallerCount;

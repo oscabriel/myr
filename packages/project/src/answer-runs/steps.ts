@@ -1,13 +1,3 @@
-/**
- * An answer run's steps, as Effect programs over the ports. Each port call a
- * `LandingEffect` names becomes the `LandingCommand` that reports it: a
- * merge, the checks on the exact merged tree, or the land on main. A step
- * decides nothing: the landing lifecycle does, in the project's
- * `advanceAnswer`, and the gate classifies a failing lane.
- *
- * The inline adapter drives them in a loop (`drive`); the Answer Workflow
- * runs each as a durable step.
- */
 import type { RepoHost } from "@repo/artifacts/repo-host";
 import { CheckAt, CheckRunner } from "@repo/checks/check-runner";
 import type { CheckLane, CheckRun } from "@repo/checks/check-runner";
@@ -31,28 +21,22 @@ import {
 import { movedBy } from "./movers.ts";
 import type { LandingsOf } from "./movers.ts";
 
-/** A step's result: the command it reports, and what it saw beside it. */
 export interface Reported {
   readonly command: LandingCommand;
   readonly report?: AnswerReport;
 }
 
-/** Whether an effect is a port call a run makes, rather than the project's to settle. */
 export const isStep = (effect: LandingEffect) =>
   LandingEffect.$is("Merge")(effect) ||
   LandingEffect.$is("RunChecks")(effect) ||
   LandingEffect.$is("Land")(effect);
 
-/**
- * The port calls a run makes now: the one its state waits on, except a
- * land, which runs only while the request holds the project's landing slot.
- */
+/** A land runs only while the request holds the project's landing slot. */
 export const nextSteps = (run: AnswerRun): readonly LandingEffect[] =>
   LandingState.guards.Landing(run.state) && !run.admitted
     ? []
     : pendingEffects(run.state);
 
-/** The attempt a port's `Busy` or `Blocked` report is about: the state's own. */
 const attemptOf = (state: LandingState) =>
   LandingState.matchOrElse(
     state,
@@ -67,10 +51,6 @@ const attemptOf = (state: LandingState) =>
 const reported = (command: LandingCommand, report?: AnswerReport): Reported =>
   report === undefined ? { command } : { command, report };
 
-/**
- * The answer's head merged onto `main`: the tree to check, or the paths
- * that conflict, with the landing that last moved each one (`movedBy`).
- */
 const merge = (
   run: AnswerRun,
   step: Extract<LandingEffect, { readonly _tag: "Merge" }>,
@@ -113,24 +93,16 @@ const merge = (
     })
   );
 
-/** Each lane's result in a run, by lane. */
 const resultsOf = (run: CheckRun): ReadonlyMap<LaneName, LaneResult> =>
   new Map(run.lanes.map((lane) => [lane.lane, lane]));
 
 const isTrouble = (result: LaneOutcome) =>
   result === "flaked" || result === "blocked";
 
-/** Where a lane's log is kept when its run named no place: by request and lane. */
 const logRefOf = (requestId: RequestId, lane: LaneName) =>
   `${requestId}/${lane}`;
 
-/**
- * The checks on the exact merged tree, every lane every time. A lane that
- * did not pass is classified by the gate: a checker that never started gets
- * one fresh run, and a project lane is run on main too, since a lane red on
- * main is the gate's trouble, not the answer's. The ask's own check is red
- * on main by design, so it counts as passing there.
- */
+/** Every lane every time; a failing project lane is run on main too, since red on main is the gate's trouble. The ask's own check is red on main by design, so it passes there. */
 const checks = (
   run: AnswerRun,
   checking: Extract<LandingState, { readonly _tag: "Checking" }>
@@ -141,10 +113,7 @@ const checks = (
 
     const block = yield* runBlockOf(run);
 
-    // The merged tree lives in the answer's fork, where the Lander's merge
-    // leaves it (its merge ref), and main in the project's own repo: a
-    // Checker fetches the repo a job names, so each job names the one that
-    // holds its commit, as the `Answer` Workflow's jobs do.
+    // A Checker fetches the repo a job names: the merged tree lives in the answer's fork (the merge ref), main in the project's repo.
     const job = (at: CheckAt, lanes: readonly CheckLane[]) =>
       runner.run({
         ...(run.env ?? noRunEnv),
@@ -224,11 +193,6 @@ const checks = (
     );
   });
 
-/**
- * The checked tree landed on main as the platform's commit, with the
- * message the project wrote. A moved main sends it back to merge; a busy
- * repo or a blocked Lander waits and tries again.
- */
 const land = (
   run: AnswerRun,
   landing: Extract<LandingState, { readonly _tag: "Landing" }>,
@@ -277,12 +241,6 @@ const land = (
     })
   );
 
-/**
- * One step: the port call `effect` names, run for `run`, and the command
- * that reports it. `None` when the run's state no longer waits on that call
- * (a replay after the state moved on). A merge that conflicts asks
- * `landings` who moved each path.
- */
 export const runStep = (
   run: AnswerRun,
   effect: LandingEffect,
@@ -316,12 +274,6 @@ export const runStep = (
         : Effect.succeedNone,
   });
 
-/**
- * Carries one answer as far as it goes now: runs the step its state waits
- * on, reports it, and goes on with the steps the report returns, until the
- * answer lands, is refused, waits on a person or the queue, or must wait for
- * a retry (the project's alarm starts it again).
- */
 export const drive = (
   queue: AnswerQueue,
   requestId: RequestId
