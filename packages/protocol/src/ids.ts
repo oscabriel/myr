@@ -190,8 +190,10 @@ export const reservedProjectNames = [
   "icons",
   "import",
   "people",
+  "privacy",
   "releases",
   "rpc",
+  "terms",
   "today",
 ] as const;
 

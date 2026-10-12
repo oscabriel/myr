@@ -48,9 +48,11 @@ describe("the web's own paths", () => {
       "llms-full.txt",
       "llms.txt",
       "people",
+      "privacy",
       "releases",
       "robots.txt",
       "rpc",
+      "terms",
       "today",
     ]);
   });
